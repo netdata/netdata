@@ -18,17 +18,28 @@ Two charts are produced:
 - **Z-Score** (`zscores.z`): This chart shows the calculated Z-Score per chart (or dimension if `mode='per_dim'`).
 - **Z-Score >3** (`zscores.3sigma`): This chart shows a `1` if the absolute value of the Z-Score is greater than 3 or a `0` otherwise. 
 
-Below is an example of the charts produced by this collector and a typical example of how they would look when things are 'normal' on the system. The zscores tend to bounce randomly around a range typically between 0 to +3 (or -3 to +3 if `z_abs: 'false'`), one or two might stay steady at a more constant value depending on your configuration and the typical workload on your system. 
+Below is an example of the charts produced by this collector and a typical example of how they would look when things are 'normal' on the system. The zscores tend to bounce randomly around a range typically between 0 to +3 (or -3 to +3 if `z_abs: 'false'`), one or two might stay steady at a more constant value depending on your configuration and the typical workload on your system (typically those charts that do not change that much and so have a smaller range of values on which to calculate a zscore). 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal.jpg)
 
-If we then go onto the system and run a command like `stress-ng --matrix 2 -t 2m` to create some stress, we see some charts begin to have zscores that jump outside the typical range. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first.
+If we then go onto the system and run a command like `stress-ng --all 2` to create some stress, we see some charts begin to have zscores that jump outside the typical range. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first (for more background information on why 3 sigma see [here](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule#:~:text=In%20the%20empirical%20sciences%20the,99.7%25%20probability%20as%20near%20certainty.)). 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
 
 Then as the issue passes the zscores should settle back down into their normal range again as they are calculated in a rolling and smoothed way (as defined by your `zscores.conf` file). 
 
 ![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal-again.jpg)
+
+## Requirements
+
+- This collector will only work with python 3 and requires the below python packages be installed.
+
+```bash
+# become netdata user
+sudo su -s /bin/bash netdata
+# install required packages
+pip install numpy pandas requests netdata-pandas
+```
 
 ## Configuration
 
@@ -41,7 +52,9 @@ sudo ./edit-config python.d.conf
 sudo service netdata restart
 ```
 
-The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your system. Out of the box, the config comes with some sane defaults to get you started. 
+The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your system. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-netdata/) to get you started. 
+
+If you are unsure about any of the below configuration options then it's best to just ignore all this leave the `zscores.conf` files alone to begin with and return to it later if you would like to tune things a bit more once the collector is running.    
 
 Edit the `python.d/zscores.conf` configuration file using `edit-config` from the your agent's [config
 directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
@@ -51,15 +64,15 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/zscores.conf
 ```
 
-The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
+The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does. 
 
 ```bash
 # what host to pull data from
 host: '127.0.0.1:19999'
-# what charts to pull data for
-charts_in_scope: 'system.cpu,system.load,system.io,system.pgpgio,system.ram,system.net,system.ip,system.ipv6,system.processes,system.ctxt,system.idlejitter,system.intr,system.softirqs,system.softnet_stat'
+# what charts to pull data for. 'system.*' will use all available "System Overview" charts otherwise use a string like 'system.cpu,system.load,system.net' to define a specific list of charts you want to calculate zscores for.
+charts_in_scope: 'system.*'
 # length of time to base calulcations off for mean and sigma
-train_secs: 3600 # use last 1 hour to work out the mean and sigma for the zscore
+train_secs: 14400 # use last 4 hours to work out the mean and sigma for the zscore
 # offset preceeding latest data to ignore when calculating mean and sigma
 offset_secs: 300 # ignore last 5 minutes of data when calculating the mean and sigma
 # recalculate the mean and sigma every n steps of the collector
@@ -71,22 +84,11 @@ z_clip: 10 # cap each zscore at 10 so as to avoid really large individual zscore
 # set z_abs: 'true' to make all zscores be absolute values only.
 z_abs: 'true'
 # burn in period in which to initially calculate mean and sigma on every step
-burn_in: 20 # on startup of the collector continually update the mean and sigma in case any gaps or inital calculations fail to return
+burn_in: 2 # on startup of the collector continually update the mean and sigma in case any gaps or inital calculations fail to return
 # mode can be to get a zscore 'per_dim' or 'per_chart'
 mode: 'per_chart' # 'per_chart' means individual dimension level smoothed zscores will be aggregated to one zscore per chart per time step
 # per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'
 per_chart_agg: 'mean' # 'absmax' will take the max absolute value accross all dimensions but will maintain the sign. 'mean' will just average.
-```
-
-## Requirements
-
-- This collector will only work with python 3 and requires the below python packages be installed.
-
-```bash
-# become netdata user
-sudo su -s /bin/bash netdata
-# install required packages
-pip install numpy pandas requests netdata-pandas
 ```
 
 ## Notes
