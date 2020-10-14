@@ -323,27 +323,46 @@ each state.
 
 By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
 
-### Monitored wireless
+### Monitoring wireless network interfaces
+
+The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` of your `netdata.conf` file.
+
+```conf
+    enable new interfaces detected at runtime = yes
+    status for all interfaces = yes
+    quality for all interfaces = yes
+    discarded packets for all interfaces = yes
+    missed for all interfaces = yes
+```
+
+For all configuration options:
+
+-   `auto` = enable monitoring if the collected values are not zero
+-   `yes` = enable monitoring
+-   `no` = disable monitoring
 
 #### Monitored wireless interface metrics
 
 -   **Status**
-    The current state, this is a device dependent option.
+    The current state of the interface. This is a device-dependent option.
 
 -   **Link**    
     Overall quality  of  the  link. 
 
 -   **Level**
-    Received signal strength (RSSI - how strong the received signal is).
+    Received signal strength (RSSI), which indicates how strong the received signal is.
     
 -   **Noise**
     Background noise level.    
     
 -   **Discarded packets**
-    Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`) and packets ost in relation with specific wireless operations (`misc`).
+    
+   Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets ost in relation with specific wireless operations (`misc`). 
     
 -   **Missed beacon**    
-     Number of periodic beacons from the Cell or the Access Point the interface has missed.
+     Number of periodic beacons from the cell or the access point the interface has missed.
+     
+#### Wireless configuration     
 
 #### alarms
 
