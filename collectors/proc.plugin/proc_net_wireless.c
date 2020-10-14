@@ -227,7 +227,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                            CONFIG_BOOLEAN_AUTO);
 
         do_beacon = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
-                                                "missed beacon", CONFIG_BOOLEAN_AUTO);
+                                                "missed beacon for all interface", CONFIG_BOOLEAN_AUTO);
 	}
 
     if (unlikely(!ff)) {
