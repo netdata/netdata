@@ -179,22 +179,22 @@ static void configure_device(int do_status, int do_quality, int do_discarded_pac
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_status", wireless_dev->name);
     wireless_dev->chart_id_net_status = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_link", wireless_dev->name);
     wireless_dev->chart_id_net_link = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_level", wireless_dev->name);
     wireless_dev->chart_id_net_level = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_noise", wireless_dev->name);
     wireless_dev->chart_id_net_noise = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_discarded_packets", wireless_dev->name);
     wireless_dev->chart_id_net_discarded_packets = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_missed_beacon", wireless_dev->name);
     wireless_dev->chart_id_net_missed_beacon = strdupz(buffer);
 }
 
@@ -259,11 +259,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->status = str2kernel_uint_t(procfile_lineword(ff, l, 1));
 
             if (unlikely(!wireless_dev->st_status)) {
-                wireless_dev->st_status = rrdset_create_localhost("ap_status",
+                wireless_dev->st_status = rrdset_create_localhost("wireless",
                                                                   wireless_dev->chart_id_net_status,
                                                                   NULL,
                                                                   wireless_dev->name,
-                                                                  "ap.status",
+                                                                  "wireless.status",
                                                                   "Status",
                                                                   "status",
                                                                   PLUGIN_PROC_NAME,
@@ -290,11 +290,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->noise = str2ld(procfile_lineword(ff, l, 4), NULL);
 
             if (unlikely(!wireless_dev->st_link)) {
-                wireless_dev->st_link = rrdset_create_localhost("ap_quality_link",
+                wireless_dev->st_link = rrdset_create_localhost("wireless",
                                                                 wireless_dev->chart_id_net_link,
                                                                 NULL,
                                                                 wireless_dev->name,
-                                                                "ap.quality.link",
+                                                                "wireless.quality_link",
                                                                 "Link",
                                                                 "dB",
                                                                 PLUGIN_PROC_NAME,
@@ -311,11 +311,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             }
 
             if (unlikely(!wireless_dev->st_level)) {
-                wireless_dev->st_level = rrdset_create_localhost("ap_quality_level",
+                wireless_dev->st_level = rrdset_create_localhost("wireless",
                                                                  wireless_dev->chart_id_net_level,
                                                                  NULL,
                                                                  wireless_dev->name,
-                                                                 "ap.quality.level",
+                                                                 "wireless.quality_level",
                                                                  "Signal level",
                                                                  "dB",
                                                                  PLUGIN_PROC_NAME,
@@ -332,11 +332,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             }
 
             if (unlikely(!wireless_dev->st_noise)) {
-                wireless_dev->st_noise = rrdset_create_localhost("ap_quality_noise",
+                wireless_dev->st_noise = rrdset_create_localhost("wireless",
                                                                  wireless_dev->chart_id_net_noise,
                                                                  NULL,
                                                                  wireless_dev->name,
-                                                                 "ap.quality.noise",
+                                                                 "wireless.quality_noise",
                                                                  "Noise",
                                                                  "dB",
                                                                  PLUGIN_PROC_NAME,
@@ -373,11 +373,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->misc = str2kernel_uint_t(procfile_lineword(ff, l, 9));
 
             if (unlikely(!wireless_dev->st_discarded_packets)) {
-                wireless_dev->st_discarded_packets = rrdset_create_localhost("ap_discarded",
+                wireless_dev->st_discarded_packets = rrdset_create_localhost("wireless",
                                                                              wireless_dev->chart_id_net_discarded_packets,
                                                                              NULL,
                                                                              wireless_dev->name,
-                                                                             "ap.discarded",
+                                                                             "wireless.discarded",
                                                                              "Discarded Packets",
                                                                              "packets/s",
                                                                              PLUGIN_PROC_NAME,
@@ -424,11 +424,11 @@ int do_proc_net_wireless(int update_every, usec_t dt)
             wireless_dev->missed_beacon = str2kernel_uint_t(procfile_lineword(ff, l, 10));
 
             if (unlikely(!wireless_dev->st_missed_beacon)) {
-                wireless_dev->st_missed_beacon = rrdset_create_localhost("ap_missed",
+                wireless_dev->st_missed_beacon = rrdset_create_localhost("wireless",
                                                                          wireless_dev->chart_id_net_missed_beacon,
                                                                          NULL,
                                                                          wireless_dev->name,
-                                                                         "ap.missed",
+                                                                         "wireless.missed",
                                                                          "Missed beacon",
                                                                          "packets/s",
                                                                          PLUGIN_PROC_NAME,
