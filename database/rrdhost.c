@@ -224,9 +224,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     char filename[FILENAME_MAX + 1];
 
-#ifdef ENABLE_DBENGINE
-    (void) sql_store_host(guid, hostname, registry_hostname, update_every, os, timezone, tags);
-#endif
     if(is_localhost) {
 
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
@@ -297,14 +294,18 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
-            error("Host machine GUID is not valid.");
+        if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
+            (void) sql_store_host(host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+            sql_cache_host_charts(host);
+        }
+        else {
+            errno = 0;
+            error("Host machine GUID %s is not valid", host->machine_guid);
         }
         //if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
         //    error("Failed to store machine GUID to global map");
         //else
         //    info("Added %s to global map for host %s", host->machine_guid, host->hostname);
-        sql_cache_host_charts(host);
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;

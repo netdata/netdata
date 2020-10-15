@@ -654,7 +654,7 @@ bind_fail:
 }
 
 int sql_store_host(
-    const char *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
+    uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
     const char *tzone, const char *tags)
 {
     sqlite3_stmt *res;
@@ -673,13 +673,13 @@ int sql_store_host(
         return 1;
     }
 
-    uuid_t host_uuid;
-    rc = uuid_parse(guid, host_uuid);
-    if (unlikely(rc)) {
-        errno = 0;
-        error("Failed to parse HOST UUID [%s]", guid);
-        return 1;
-    }
+    //uuid_t host_uuid;
+    //c = uuid_parse(guid, host_uuid);
+//    if (unlikely(rc)) {
+//        errno = 0;
+//        error("Failed to parse host with guid %s", guid);
+//        return 1;
+//    }
 
     rc = sqlite3_bind_blob(res, 1, host_uuid, 16, SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
@@ -712,19 +712,19 @@ int sql_store_host(
     rc = sqlite3_step(res);
     if (unlikely(rc != SQLITE_DONE)) {
         errno = 0;
-        error("Failed to store host [%s], rc = %d", guid, rc);
+        error("Failed to store host %s, rc = %d", hostname, rc);
     }
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK)) {
         errno = 0;
-        error("Failed to finalize statement to store host [%s], rc = %d", guid, rc);
+        error("Failed to finalize statement to store host %s, rc = %d", hostname, rc);
     }
     return 0;
 
 bind_fail:
     errno = 0;
-    error("Failed to bind parameter to store host %s, rc = %d", guid, rc);
+    error("Failed to bind parameter to store host %s, rc = %d", hostname, rc);
     return 1;
 }
 

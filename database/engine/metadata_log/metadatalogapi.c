@@ -79,6 +79,8 @@ void metalog_commit_update_host(RRDHOST *host)
     struct metalog_instance *ctx;
     BUFFER *buffer;
 
+    info("Ignoring metalog_commit_update_host");
+    return;
     /* Metadata are only available with dbengine */
     ctx = get_metalog_ctx(host);
     if (!ctx)
@@ -198,6 +200,10 @@ void metalog_commit_delete_chart(RRDSET *st)
     BUFFER *buffer;
     char uuid_str[37];
 
+    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+    info("metalog_commit_delete_chart %s", uuid_str);
+    return;
+
     /* Metadata are only available with dbengine */
     if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
@@ -277,6 +283,10 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
     /* Metadata are only available with dbengine */
     if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
         return;
+
+    uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
+    info("metalog_commit_delete_dimension %s", uuid_str);
+    return;
 
     ctx = get_metalog_ctx(st->rrdhost);
     if (!ctx)
@@ -394,6 +404,11 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
     RRDSET *st;
     RRDHOST *host;
     uint8_t empty_chart;
+
+    char uuid_str[37];
+    uuid_unparse_lower(*metric_uuid, uuid_str);
+    info("metalog_delete_dimension_by_uuid %s", uuid_str);
+    return;
 
     rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
     if (!rd) { /* in the case of legacy UUID convert to multihost and try again */

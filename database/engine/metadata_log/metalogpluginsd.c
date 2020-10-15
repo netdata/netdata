@@ -32,15 +32,15 @@ PARSER_RC metalog_pluginsd_host_action(
     }
 
     if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
-        struct metalog_record record;
-        struct metadata_logfile *metalogfile = state->metalogfile;
-
-        uuid_parse(machine_guid, record.uuid);
-        mlf_record_insert(metalogfile, &record);
-        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            ((PARSER_USER_OBJECT *) user)->host = localhost;
-        else
-            ((PARSER_USER_OBJECT *) user)->host = NULL;
+//        struct metalog_record record;
+//        struct metadata_logfile *metalogfile = state->metalogfile;
+//
+//        uuid_parse(machine_guid, record.uuid);
+//        mlf_record_insert(metalogfile, &record);
+//        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+//            ((PARSER_USER_OBJECT *) user)->host = localhost;
+//        else
+//            ((PARSER_USER_OBJECT *) user)->host = NULL;
         return PARSER_RC_OK;
     }
 
@@ -52,8 +52,18 @@ PARSER_RC metalog_pluginsd_host_action(
 //    rrdpush_destination = appconfig_get(&stream_config, machine_guid, "proxy destination", rrdpush_destination);
 //    rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 //    rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
-    uuid_parse(machine_guid, state->host_uuid);
-    (void) sql_store_host(machine_guid, hostname, registry_hostname, update_every, os, timezone, tags);
+    if (likely(!uuid_parse(machine_guid, state->host_uuid))) {
+        int rc = sql_store_host(&state->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        if (unlikely(rc)) {
+            errno = 0;
+            error("Failed to store host %s with UUID %s in the database", hostname, machine_guid);
+        }
+    }
+    else {
+        errno = 0;
+        error("Host machine GUID %s is not valid", machine_guid);
+    }
+
 
 //    host = rrdhost_create(
 //        hostname
@@ -160,8 +170,7 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
     }
     //dim_uuid = uuid_is_null(state->uuid) ? NULL : &state->uuid;
     //uuid_copy(state->dim_uuid, state->uuid);
-    uuid_clear(state->uuid); /* Consume UUID */
-
+//    uuid_clear(state->uuid); /* Consume UUID */
     //TODO: Remove
     (void) sql_store_dimension(&state->uuid, &state->chart_uuid, id, name, multiplier, divisor, algorithm_type);
     uuid_clear(state->uuid); /* Consume UUID */
