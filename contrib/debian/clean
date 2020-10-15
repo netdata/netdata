@@ -1,0 +1,8 @@
+*/*/*/*/*/*.o
+*/*/*/*/*.o
+*/*/*/*.o
+*/*/*.o
+*/*.o
+tmp/
+externaldeps/
+daemon/get-kubernetes-labels.sh
