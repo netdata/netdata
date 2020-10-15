@@ -300,7 +300,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                 RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_link, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "link", NULL, 1, 1,
+                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "quality_link", NULL, 1, 1,
                                                    RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(wireless_dev->st_link);
@@ -321,7 +321,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                  RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_level, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_level = rrddim_add(wireless_dev->st_level, "level", NULL, 1, 1,
+                wireless_dev->rd_level = rrddim_add(wireless_dev->st_level, "signal_level", NULL, 1, 1,
                                                     RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(wireless_dev->st_level);
@@ -342,7 +342,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                  RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_noise, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_noise = rrddim_add(wireless_dev->st_noise, "noise", NULL, 1, 1,
+                wireless_dev->rd_noise = rrddim_add(wireless_dev->st_noise, "noise_level", NULL, 1, 1,
                                                     RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(wireless_dev->st_noise);
@@ -434,7 +434,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                          RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_missed_beacon, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed beacon",
+                wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed_beacons",
                                                             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(wireless_dev->st_missed_beacon);
