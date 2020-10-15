@@ -424,7 +424,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                          wireless_dev->chart_id_net_missed_beacon,
                                                                          NULL,
                                                                          wireless_dev->name,
-                                                                         "wireless.missed_beacon",
+                                                                         "wireless.missed_beacons",
                                                                          "Number of missed beacons we have missed.",
                                                                          "packets/s",
                                                                          PLUGIN_PROC_NAME,
