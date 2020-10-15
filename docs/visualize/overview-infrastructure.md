@@ -77,8 +77,8 @@ functions to your advantage, you've proactively recognizing single-node issues u
 
 Overview helps you take the investigation further with quick access to single-node dashboards in Netdata Cloud.
 
-Click on **X Charts** of any composite chart's utility bar to to display a dropdown of contributing contexts and nodes
-contributing. Click on the link icon <img class="img__inline img__inline--link"
+Click on **X Charts** of any composite chart's definition bar to to display a dropdown of contributing contexts and
+nodes contributing. Click on the link icon <img class="img__inline img__inline--link"
 src="https://user-images.githubusercontent.com/1153921/95762109-1d219300-0c62-11eb-8daa-9ba509a8e71c.png" /> next to a
 given node to quickly _jump to the same chart in that node's single-node dashboard_ in Netdata Cloud.
 
