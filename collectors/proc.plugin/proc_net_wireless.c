@@ -182,13 +182,13 @@ static void configure_device(int do_status, int do_quality, int do_discarded_pac
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_status", wireless_dev->name);
     wireless_dev->chart_id_net_status = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_link", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_link_quality", wireless_dev->name);
     wireless_dev->chart_id_net_link = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_level", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_signal_level", wireless_dev->name);
     wireless_dev->chart_id_net_level = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_noise", wireless_dev->name);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_noise_level", wireless_dev->name);
     wireless_dev->chart_id_net_noise = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s_discarded_packets", wireless_dev->name);
