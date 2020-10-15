@@ -290,7 +290,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                 wireless_dev->chart_id_net_link,
                                                                 NULL,
                                                                 wireless_dev->name,
-                                                                "wireless.quality_link",
+                                                                "wireless.link_quality",
                                                                 "Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.",
                                                                 "value",
                                                                 PLUGIN_PROC_NAME,
