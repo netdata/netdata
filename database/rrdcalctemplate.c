@@ -45,19 +45,15 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 }
 
 static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
-    error("KILLME %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
         return 0;
 
-    error("KILLME 1 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
     if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, st->module_name))
         return 0;
 
-    error("KILLME 2 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
     if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, st->plugin_name))
         return 0;
 
-    error("KILLME 3 %s: %s %s %s", st->name, rt->family_match, rt->module_match, rt->plugin_match);
     return 1;
 }
 
