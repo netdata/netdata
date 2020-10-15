@@ -300,7 +300,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
                                                                 RRDSET_TYPE_LINE);
                 rrdset_flag_set(wireless_dev->st_link, RRDSET_FLAG_DETAIL);
 
-                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "quality_link", NULL, 1, 1,
+                wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "link_quality", NULL, 1, 1,
                                                    RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(wireless_dev->st_link);
