@@ -209,7 +209,8 @@ int do_proc_net_wireless(int update_every, usec_t dt)
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/wireless");
 
-        proc_net_wireless_filename = strdupz(filename);
+        proc_net_wireless_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,"filename to monitor",
+                                                filename);
 
         do_status = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
                                                 "status for all interfaces", CONFIG_BOOLEAN_AUTO);
