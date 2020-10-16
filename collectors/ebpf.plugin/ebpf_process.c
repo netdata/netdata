@@ -25,8 +25,8 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 static ebpf_data_t process_data;
 
 ebpf_process_stat_t **global_process_stats = NULL;
-static ebpf_process_publish_apps_t **current_apps_data = NULL;
-static ebpf_process_publish_apps_t **prev_apps_data = NULL;
+ebpf_process_publish_apps_t **current_apps_data = NULL;
+ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
 int process_enabled = 0;
 
@@ -836,7 +836,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
-        cleanup_exited_pids(global_process_stats);
+        cleanup_exited_pids();
         collect_data_for_all_processes(pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
@@ -870,6 +870,21 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *
  *****************************************************************/
 
+void clean_global_memory() {
+    int pid_fd = map_fd[0];
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        uint32_t pid = pids->pid;
+        ebpf_process_stat_t *w = global_process_stats[pid];
+        freez(w);
+
+        bpf_map_delete_elem(pid_fd, &pid);
+        freez(current_apps_data[pid]);
+
+        pids = pids->next;
+    }
+}
+
 /**
  * Clean up the main thread.
  *
@@ -883,11 +898,12 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
+    clean_global_memory();
     freez(global_process_stats);
-
-    freez(process_data.map_fd);
     freez(current_apps_data);
     freez(prev_apps_data);
+
+    freez(process_data.map_fd);
 }
 
 /*****************************************************************

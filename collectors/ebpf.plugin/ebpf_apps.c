@@ -910,10 +910,8 @@ static inline void del_pid_entry(pid_t pid)
 
 /**
  * Remove PIDs when they are not running more.
- *
- * @param out is the structure where PIDs are stored.
  */
-void cleanup_exited_pids(ebpf_process_stat_t **out)
+void cleanup_exited_pids()
 {
     struct pid_stat *p = NULL;
 
@@ -926,11 +924,13 @@ void cleanup_exited_pids(ebpf_process_stat_t **out)
             p = p->next;
             del_pid_entry(r);
 
-            ebpf_process_stat_t *w = out[r];
-            if (w) {
-                freez(w);
-                out[r] = NULL;
-            }
+            freez(global_process_stats[r]);
+            global_process_stats[r] = NULL;
+
+            freez(current_apps_data[r]);
+            current_apps_data[r] = NULL;
+
+            prev_apps_data[r] = NULL;
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1043,6 +1043,10 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
             freez(w);
             global_process_stats[key] = NULL;
+
+            freez(current_apps_data[key]);
+            current_apps_data[key] = NULL;
+            prev_apps_data[key] = NULL;
 
             pids = pids->next;
             continue;
