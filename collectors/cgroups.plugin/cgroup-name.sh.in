@@ -77,7 +77,7 @@ function docker_like_get_name_api() {
 }
 
 # get_lbl_val returns the value for the label with the given name.
-# Returns an empty string if the label doesn't exist.
+# Returns "null" string if the label doesn't exist.
 # Expected labels format: 'name="value",...'.
 function get_lbl_val() {
   local labels want_name
@@ -95,6 +95,7 @@ function get_lbl_val() {
     fi
   done
 
+  echo "null"
   return 1
 }
 
@@ -210,7 +211,6 @@ function k8s_get_kubepod_name() {
 
   # available labels:
   # namespace, pod_name, pod_uid, container_name, container_id
-  # TODO: check 'null' values after 'jq' and missing values after 'get_lbl_val'
   local labels
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
@@ -221,6 +221,12 @@ function k8s_get_kubepod_name() {
       labels="${labels%%,cont*}"
       name="pod_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)"
     fi
+  fi
+
+  # jq filter nonexistent field and nonexistent label value is 'null'
+  if [[ $name =~ _null(_|$) ]]; then
+    warning "${funcname}: invalid name: $name (cgroup '$id')"
+    name=""
   fi
 
   echo "$name"
