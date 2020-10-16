@@ -3,7 +3,7 @@
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
-#include "../daemon/common.h"
+#include "../../daemon/common.h"
 #include "aclk_common.h"
 #include "aclk_stats.h"
 

@@ -3,7 +3,7 @@
 #ifndef NETDATA_AGENT_CLOUD_LINK_H
 #define NETDATA_AGENT_CLOUD_LINK_H
 
-#include "../daemon/common.h"
+#include "../../daemon/common.h"
 #include "mqtt.h"
 #include "aclk_common.h"
 

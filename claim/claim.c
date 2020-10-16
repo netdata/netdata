@@ -2,7 +2,7 @@
 
 #include "claim.h"
 #include "../registry/registry_internals.h"
-#include "../aclk/aclk_common.h"
+#include "../aclk/legacy/aclk_common.h"
 
 char *claiming_pending_arguments = NULL;
 

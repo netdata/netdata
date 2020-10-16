@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <libnetdata/json/json.h>
-#include "../daemon/common.h"
+#include "../../daemon/common.h"
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
 #include "aclk_stats.h"
