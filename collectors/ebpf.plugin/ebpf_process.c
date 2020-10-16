@@ -432,12 +432,14 @@ static void read_hash_global_tables()
  */
 static void ebpf_process_update_apps_data()
 {
-    size_t i;
-    for (i = 0; i < all_pids_count; i++) {
-        uint32_t current_pid = pid_index[i];
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        uint32_t current_pid = pids->pid;
         ebpf_process_stat_t *ps = global_process_stats[current_pid];
-        if (!ps)
+        if (!ps) {
+            pids = pids->next;
             continue;
+        }
 
         ebpf_process_publish_apps_t *cad = current_apps_data[current_pid];
         ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
@@ -477,6 +479,8 @@ static void ebpf_process_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes + (uint64_t)ps->readv_bytes;
 
         ebpf_process_update_apps_publish(cad, pad, lstatus);
+
+        pids = pids->next;
     }
 }
 
@@ -833,7 +837,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         cleanup_exited_pids(global_process_stats);
-        collect_data_for_all_processes(pid_index, pid_fd);
+        collect_data_for_all_processes(pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
 

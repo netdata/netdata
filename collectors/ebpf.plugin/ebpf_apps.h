@@ -414,7 +414,7 @@ extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t *
 
 extern size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
 
-extern void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd);
+extern void collect_data_for_all_processes(int tbl_pid_stats_fd);
 
 extern ebpf_process_stat_t **global_process_stats;
 

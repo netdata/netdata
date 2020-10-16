@@ -198,8 +198,8 @@ extern void write_end_chart();
 // Common variables
 extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
-extern pid_t *pid_index;
 extern int debug_enabled;
+extern struct pid_stat *root_of_pids;
 
 // Socket functions and variables
 // Common functions

@@ -1007,12 +1007,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  * Read data from hash table and store it in appropriate vectors.
  * It also creates the link between targets and PIDs.
  *
- * @param out                   the output vector where we store data read from hash table.
- * @param index                 the vector to store the indexes read.
- * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
-void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd)
+void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
@@ -1032,7 +1029,6 @@ void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd)
 
     read_proc_filesystem();
 
-    int counter = 0;
     uint32_t key;
     pids = root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
@@ -1052,9 +1048,6 @@ void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd)
             continue;
         }
 
-        index[counter] = key;
-        counter++;
-
         pids = pids->next;
     }
 
@@ -1065,11 +1058,9 @@ void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd)
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
-    struct pid_stat *p = NULL;
-
     // // concentrate everything on the targets
-    for (p = root_of_pids; p; p = p->next)
-        aggregate_pid_on_target(p->target, p, NULL);
+    for (pids = root_of_pids; pids; pids = pids->next)
+        aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);
 }
