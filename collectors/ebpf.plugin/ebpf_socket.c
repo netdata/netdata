@@ -1657,7 +1657,10 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
  */
 static void ebpf_socket_cleanup(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
     freez(socket_aggregated_data);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
