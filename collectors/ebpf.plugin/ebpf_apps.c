@@ -1012,7 +1012,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
-void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int tbl_pid_stats_fd)
+void collect_data_for_all_processes(pid_t *index, int tbl_pid_stats_fd)
 {
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
@@ -1038,13 +1038,16 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
-        ebpf_process_stat_t *w = out[key];
+        ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
             w = mallocz(sizeof(ebpf_process_stat_t));
-            out[key] = w;
+            global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+            freez(w);
+            global_process_stats[key] = NULL;
+
             pids = pids->next;
             continue;
         }

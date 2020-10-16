@@ -24,7 +24,7 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
 static ebpf_data_t process_data;
 
-static ebpf_process_stat_t **local_process_stats = NULL;
+ebpf_process_stat_t **global_process_stats = NULL;
 static ebpf_process_publish_apps_t **current_apps_data = NULL;
 static ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
@@ -201,11 +201,11 @@ void ebpf_process_remove_pids()
     int pid_fd = map_fd[0];
     while (pids) {
         uint32_t pid = pids->pid;
-        ebpf_process_stat_t *w = local_process_stats[pid];
+        ebpf_process_stat_t *w = global_process_stats[pid];
         if (w) {
             if (w->removeme) {
                 freez(w);
-                local_process_stats[pid] = NULL;
+                global_process_stats[pid] = NULL;
                 bpf_map_delete_elem(pid_fd, &pid);
             }
         }
@@ -435,7 +435,7 @@ static void ebpf_process_update_apps_data()
     size_t i;
     for (i = 0; i < all_pids_count; i++) {
         uint32_t current_pid = pid_index[i];
-        ebpf_process_stat_t *ps = local_process_stats[current_pid];
+        ebpf_process_stat_t *ps = global_process_stats[current_pid];
         if (!ps)
             continue;
 
@@ -832,8 +832,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
-        cleanup_exited_pids(local_process_stats);
-        collect_data_for_all_processes(local_process_stats, pid_index, pid_fd);
+        cleanup_exited_pids(global_process_stats);
+        collect_data_for_all_processes(pid_index, pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
 
@@ -879,7 +879,7 @@ static void ebpf_process_cleanup(void *ptr)
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
-    freez(local_process_stats);
+    freez(global_process_stats);
 
     freez(process_data.map_fd);
     freez(current_apps_data);
@@ -905,7 +905,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
+    global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
     current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
     prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
