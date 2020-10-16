@@ -228,7 +228,7 @@ services:
 
 If you don't want to destroy and recreate your container, you can edit the Agent's `netdata.conf` file directly. See the
 above section on [configuring Agent containers](#configure-agent-containers) to find the appropriate method based on
-howw you created the container.
+how you created the container.
 
 ### Add or remove other volumes
 
