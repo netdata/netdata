@@ -6,12 +6,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/o
 
 # See an overview of your infrastructure
 
-In Netdata Cloud, your nodes are organized into War Rooms. The default view for any War Room is called the **Overview**,
-which uses composite charts to display real-time aggregated metrics from all the nodes (or a filtered selection) in a
-given War Room.
+In Netdata Cloud, your nodes are organized into War Rooms. One of the two available views for a War Room is the
+**Overview**, which uses composite charts to display real-time aggregated metrics from all the nodes (or a filtered
+selection) in a given War Room.
 
 With Overview's composite charts, you can see your infrastructure from a single pane of glass, discover trends or
-anomalies, then drill down with filtering or single-node dashboards to see more. For example, in the screenshot below,
+anomalies, then drill down with filtering or single-node dashboards to see more. In the screenshot below,
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
 ![The War Room
@@ -34,8 +34,7 @@ Let's walk through some examples of using the Overview to monitor and troublesho
 
 While not exclusive to Overview, you can use two important features, [node
 filtering](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) and the [time
-picker](https://learn.netdata.cloud/docs/cloud/war-rooms#time-picker), to either widen or narrow the focus of your
-infrastructure monitoring.
+picker](https://learn.netdata.cloud/docs/cloud/war-rooms#time-picker), to widen or narrow your infrastructure monitoring focus.
 
 By default, the Overview shows composite charts aggregated from every node in the War Room, but you can change that
 behavior on an ad-hoc basis. The node filter allows you to create complex queries against your infrastructure based on
@@ -62,9 +61,9 @@ defaults](https://user-images.githubusercontent.com/1153921/96195245-1f554d00-0f
 
 By default, the **Disk I/O Bandwidth (disk.io)** composite chart displays the **sum** of all dimensions (`reads` and
 `writes`) from all nodes in that War Room. This smart default helps you identify anomalous behavior, but doesn't
-necessarily provide the full picture. Let's say you want to better understand the severity of disk writes. Use the
-definition bar to change the aggregate function to **min** (because the `writes` dimension is on the negative axis), and
-display only the `writes` dimension.
+necessarily provide the full picture. Let's say you want to understand the severity of disk writes. Use the definition
+bar to change the aggregate function to **min** (because the `writes` dimension is on the negative axis), and display
+only the `writes` dimension.
 
 ![A disk I/O composite chart after changing the aggregate
 function](https://user-images.githubusercontent.com/1153921/96195247-20867a00-0f01-11eb-965d-242b0784e9b2.png)
@@ -77,8 +76,8 @@ functions to your advantage, you've proactively recognizing single-node issues u
 
 Overview helps you take the investigation further with quick access to single-node dashboards in Netdata Cloud.
 
-Click on **X Charts** of any composite chart's definition bar to to display a dropdown of contributing contexts and
-nodes contributing. Click on the link icon <img class="img__inline img__inline--link"
+Click on **X Charts** of any composite chart's definition bar to display a dropdown of contributing contexts and nodes
+contributing. Click on the link icon <img class="img__inline img__inline--link"
 src="https://user-images.githubusercontent.com/1153921/95762109-1d219300-0c62-11eb-8daa-9ba509a8e71c.png" /> next to a
 given node to quickly _jump to the same chart in that node's single-node dashboard_ in Netdata Cloud.
 
@@ -90,7 +89,7 @@ investigate historical data, and see like metrics presented meaningfully to help
 All of the familiar [interactions](/docs/visualize/interact-dashboards-charts.md) are available, as is adding any chart
 to a [new dashboard](/docs/visualize/create-dashboards.md).
 
-Using the above example, one of the single-node dashboards reveals similar spike in disk I/O. Interesting enough, it
+Using the above example, one of the single-node dashboards reveals similar spike in disk I/O. Interestingly enough, it
 also shows a maximum disk write of 31 MiB/s at the exact same moment as the composite chart in Overview.
 
 ![A single-node disk I/O chart in Netdata
@@ -102,8 +101,8 @@ gap in metrics history.
 
 ## Nodes view
 
-You can also use the **Nodes view** to monitor the health status and user-configurable key metrics from multiple nodes.
-Read the [Nodes view doc](https://learn.netdata.cloud/docs/cloud/visualize/nodes) for details.
+You can also use the **Nodes view** to monitor the health status and user-configurable key metrics from multiple nodes
+in a War Room. Read the [Nodes view doc](https://learn.netdata.cloud/docs/cloud/visualize/nodes) for details.
 
 ![The Nodes view](https://user-images.githubusercontent.com/1153921/95909704-cb593580-0d53-11eb-88fa-a3416ab09849.png)
 
