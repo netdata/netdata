@@ -206,16 +206,15 @@ Cloud, when creating a new container. If you want to change the hostname of a Ne
 you can safely stop and remove it. You configuration and metrics data reside in persistent volumes and are reattached to
 the recreated container.
 
-If you use `docker-run`, use the `--hostname` option.
+If you use `docker-run`, use the `--hostname` option with `docker run`.
 
 ```bash
 docker run -d --name=netdata \
   --hostname=my_docker_netdata
-  -p 19999:19999 \
 ```
 
-If you use `docker-compose`, add a `hostname: X` key/value pair into your `docker-compose.yml` file, then create the
-container using `docker-compose up -d`.
+If you use `docker-compose`, add a `hostname:` key/value pair into your `docker-compose.yml` file, then create the
+container again using `docker-compose up -d`.
 
 ```yaml
 version: '3'
