@@ -869,8 +869,8 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
 
     int count = 0;
     rrdhost_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+    for (struct label *label = host->labels.head; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
         buffer_strcat(wb, tabs);
 
@@ -881,7 +881,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
         count++;
     }
     buffer_strcat(wb, "\n");
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
     rrdhost_unlock(host);
 }
 

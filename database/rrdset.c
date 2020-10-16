@@ -366,6 +366,7 @@ void rrdset_free(RRDSET *st) {
     // free it
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
+    netdata_rwlock_destroy(&st->state->labels.labels_rwlock);
 
     // free directly allocated members
     freez(st->config_section);
@@ -374,6 +375,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_family);
     freez(st->state->old_context);
+    free_label_list(st->state->labels.head);
     freez(st->state);
 
     switch(st->rrd_memory_mode) {
@@ -835,7 +837,7 @@ RRDSET *rrdset_create_custom(
     st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
     st->type       = config_get(st->config_section, "type", type);
 
-    st->state = mallocz(sizeof(*st->state));
+    st->state = callocz(1, sizeof(*st->state));
     st->family     = config_get(st->config_section, "family", family?family:st->type);
     st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
@@ -887,6 +889,7 @@ RRDSET *rrdset_create_custom(
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
+    netdata_rwlock_init(&st->state->labels.labels_rwlock);
 
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name

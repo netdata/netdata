@@ -157,11 +157,11 @@ PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new
 {
     UNUSED(user);
 
-    if (!host->labels) {
-        host->labels = new_labels;
+    if (!host->labels.head) {
+        host->labels.head = new_labels;
     } else {
         rrdhost_rdlock(host);
-        replace_label_list(host, new_labels);
+        replace_label_list(&host->labels, new_labels);
         rrdhost_unlock(host);
     }
     return PARSER_RC_OK;

@@ -10,13 +10,13 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
         return 0;
 
     errno = 0;
-    struct label *move = host->labels;
+    struct label *move = host->labels.head;
     char cmp[CONFIG_FILE_LINE_MAX+1];
 
     int ret;
     if(move) {
         rrdhost_check_rdlock(host);
-        netdata_rwlock_rdlock(&host->labels_rwlock);
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
         while(move) {
             snprintfz(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
             if (simple_pattern_matches(rt->splabels, move->key) ||
@@ -25,7 +25,7 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
             }
             move = move->next;
         }
-        netdata_rwlock_unlock(&host->labels_rwlock);
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
 
         if(!move) {
             error("Health template '%s' cannot be applied, because the host %s does not have the label(s) '%s'",

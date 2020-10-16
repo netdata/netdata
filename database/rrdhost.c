@@ -187,7 +187,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
-    netdata_rwlock_init(&host->labels_rwlock);
+    netdata_rwlock_init(&host->labels.labels_rwlock);
 
     netdata_mutex_init(&host->aclk_state_lock);
 
@@ -873,7 +873,7 @@ void rrdhost_free(RRDHOST *host) {
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez((void *)host->tags);
-    free_label_list(host->labels);
+    free_label_list(host->labels.head);
     freez((void *)host->os);
     freez((void *)host->timezone);
     freez(host->program_version);
@@ -890,7 +890,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
-    netdata_rwlock_destroy(&host->labels_rwlock);
+    netdata_rwlock_destroy(&host->labels.labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
 
@@ -1217,63 +1217,6 @@ static struct label *rrdhost_load_kubernetes_labels(void)
     return l;
 }
 
-struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
-{
-    size_t key_len = strlen(key), value_len = strlen(value);
-    size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
-    struct label *result = callocz(1,n);
-    if (result != NULL) {
-        char *c = (char *)result;
-        c += sizeof(struct label);
-        strcpy(c, key);
-        result->key = c;
-        c += key_len + 1;
-        strcpy(c, value);
-        result->value = c;
-        result->label_source = label_source;
-        result->key_hash = simple_hash(result->key);
-    }
-    return result;
-}
-
-struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
-{
-    struct label *lab = create_label(key, value, label_source);
-    lab->next = l;
-    return lab;
-}
-
-int label_list_contains(struct label *head, struct label *check)
-{
-    while (head != NULL)
-    {
-        if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
-            return 1;
-        head = head->next;
-    }
-    return 0;
-}
-
-/* Create a list with entries from both lists.
-   If any entry in the low priority list is masked by an entry in the high priorty list then delete it.
-*/
-struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
-{
-    struct label *result = hi_pri;
-    while (lo_pri != NULL)
-    {
-        struct label *current = lo_pri;
-        lo_pri = lo_pri->next;
-        if (!label_list_contains(result, current)) {
-            current->next = result;
-            result = current;
-        }
-        else
-            freez(current);
-    }
-    return result;
-}
-
 void reload_host_labels(void)
 {
     struct label *from_auto = rrdhost_load_auto_labels();
@@ -1286,14 +1229,14 @@ void reload_host_labels(void)
     new_labels = merge_label_lists(new_labels, from_config);
 
     rrdhost_rdlock(localhost);
-    replace_label_list(localhost, new_labels);
+    replace_label_list(&localhost->labels, new_labels);
 
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 
 /*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
-        localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+        localhost->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
 */

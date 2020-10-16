@@ -109,13 +109,12 @@ void free_label_list(struct label *labels)
     }
 }
 
-void replace_label_list(RRDHOST *host, struct label *new_labels)
+void replace_label_list(struct label_index *labels, struct label *new_labels)
 {
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_wrlock(&host->labels_rwlock);
-    struct label *old_labels = host->labels;
-    host->labels = new_labels;
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_wrlock(&labels->labels_rwlock);
+    struct label *old_labels = labels->head;
+    labels->head = new_labels;
+    netdata_rwlock_unlock(&labels->labels_rwlock);
 
     free_label_list(old_labels);
 }
@@ -139,7 +138,7 @@ int label_list_contains(struct label *head, struct label *check)
 }
 
 /* Create a list with entries from both lists.
-   If any entry in the low priority list is masked by an entry in the high priorty list then delete it.
+   If any entry in the low priority list is masked by an entry in the high priority list then delete it.
 */
 struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
 {

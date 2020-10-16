@@ -651,7 +651,7 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
         }
 
         char cmp[CONFIG_FILE_LINE_MAX+1];
-        struct label *move = host->labels;
+        struct label *move = host->labels.head;
         while(move) {
             snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
             if (simple_pattern_matches(rc->splabels, move->key) ||
@@ -682,12 +682,12 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
     rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
 
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
     rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
 
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
 }
 
 void rrdcalc_labels_unlink() {
@@ -698,7 +698,7 @@ void rrdcalc_labels_unlink() {
         if (unlikely(!host->health_enabled))
             continue;
 
-        if (host->labels) {
+        if (host->labels.head) {
             rrdhost_wrlock(host);
 
             rrdcalc_labels_unlink_alarm_from_host(host);

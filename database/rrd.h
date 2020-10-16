@@ -185,6 +185,12 @@ struct label {
     struct label *next;
 };
 
+struct label_index {
+    struct label *head;                     // Label list
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
+    uint32_t labels_flag;                   // Flags for labels
+};
+
 typedef enum strip_quotes {
     DO_NOT_STRIP_QUOTES,
     STRIP_QUOTES
@@ -198,10 +204,11 @@ typedef enum skip_escaped_characters {
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
-extern void replace_label_list(RRDHOST *host, struct label *new_labels);
+extern void replace_label_list(struct label_index *labels, struct label *new_labels);
 extern int is_valid_label_value(char *value);
 extern int is_valid_label_key(char *key);
 extern void free_label_list(struct label *labels);
+extern struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri);
 extern void strip_last_symbol(
     char *str,
     char symbol,
@@ -393,6 +400,7 @@ struct rrdset_volatile {
     char *old_title;
     char *old_family;
     char *old_context;
+    struct label_index labels;
 };
 
 // ----------------------------------------------------------------------------
@@ -818,9 +826,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    struct label *labels;
-    netdata_rwlock_t labels_rwlock;         // lock for the label list
-    uint32_t labels_flag;                   //Flags for labels
+    struct label_index labels;
 
     // ------------------------------------------------------------------------
     // indexes
