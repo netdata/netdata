@@ -295,7 +295,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-            (void) sql_store_host(host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+            (void) sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
             sql_cache_host_charts(host);
         }
         else {
@@ -393,10 +393,10 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_hosts_available++;
 
-#ifdef ENABLE_DBENGINE
-    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-            metalog_commit_update_host(host);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+//            metalog_commit_update_host(host);
+//#endif
     return host;
 }
 
@@ -498,10 +498,10 @@ void rrdhost_update(RRDHOST *host
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
     }
-#ifdef ENABLE_DBENGINE
-    if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-        metalog_commit_update_host(host);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+//        metalog_commit_update_host(host);
+//#endif
     return;
 }
 

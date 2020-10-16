@@ -658,13 +658,13 @@ RRDSET *rrdset_create_custom(
                 sched_yield();
             }
         }
-#ifdef ENABLE_DBENGINE
-        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
-            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
-            metalog_commit_update_chart(st);
-        }
-#endif
+//#ifdef ENABLE_DBENGINE
+//        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+//            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
+//            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
+//            metalog_commit_update_chart(st);
+//        }
+//#endif
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active)
             return st;
@@ -929,7 +929,7 @@ RRDSET *rrdset_create_custom(
     rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        int replace_instead_of_generate = 0;
+//        int replace_instead_of_generate = 0;
 
         st->chart_uuid = sql_find_chart_uuid(host, st, type, id, name);
 //        st->chart_uuid = callocz(1, sizeof(uuid_t));
@@ -960,10 +960,10 @@ RRDSET *rrdset_create_custom(
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
     }
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(host, 1);
-    metalog_commit_update_chart(st);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_upd_objcount(host, 1);
+//    metalog_commit_update_chart(st);
+//#endif
 
     return(st);
 }

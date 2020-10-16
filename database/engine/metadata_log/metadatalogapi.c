@@ -74,125 +74,121 @@ BUFFER *metalog_update_host_buffer(RRDHOST *host)
     return buffer;
 }
 
-void metalog_commit_update_host(RRDHOST *host)
-{
-    struct metalog_instance *ctx;
-    BUFFER *buffer;
-
-    //info("Ignoring metalog_commit_update_host");
-    return;
-    /* Metadata are only available with dbengine */
-    ctx = get_metalog_ctx(host);
-    if (!ctx)
-        return;
-    if (!ctx->initialized) /* metadata log has not been initialized yet */
-        return;
-
-    buffer = metalog_update_host_buffer(host);
-
-    metalog_commit_creation_record(ctx, buffer, &host->host_uuid);
-}
+//void metalog_commit_update_host(RRDHOST *host)
+//{
+//    struct metalog_instance *ctx;
+//    BUFFER *buffer;
+//
+//    /* Metadata are only available with dbengine */
+//    ctx = get_metalog_ctx(host);
+//    if (!ctx)
+//        return;
+//    if (!ctx->initialized) /* metadata log has not been initialized yet */
+//        return;
+//
+//    buffer = metalog_update_host_buffer(host);
+//
+//    metalog_commit_creation_record(ctx, buffer, &host->host_uuid);
+//}
 
 /* compaction_id 0 means it was not called by compaction logic */
-BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id)
-{
-    BUFFER *buffer;
-    RRDHOST *host = st->rrdhost;
+//BUFFER *metalog_update_chart_buffer(RRDSET *st, uint32_t compaction_id)
+//{
+//    BUFFER *buffer;
+//    RRDHOST *host = st->rrdhost;
+//
+//    buffer = buffer_create(1024); /* This will be freed after it has been committed to the metadata log buffer */
+//
+//    rrdset_rdlock(st);
+//
+//    buffer_sprintf(buffer, "CONTEXT %s\n", host->machine_guid);
+//
+//    char uuid_str[37];
+//    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+//    buffer_sprintf(buffer, "GUID %s\n", uuid_str);
+//
+//    // properly set the name for the remote end to parse it
+//    char *name = "";
+//    if(likely(st->name)) {
+//        if(unlikely(strcmp(st->id, st->name))) {
+//            // they differ
+//            name = strchr(st->name, '.');
+//            if(name)
+//                name++;
+//            else
+//                name = "";
+//        }
+//    }
+//
+//    // send the chart
+//    buffer_sprintf(
+//        buffer
+//        , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+//        , st->id
+//        , name
+//        , st->title
+//        , st->units
+//        , st->family
+//        , st->context
+//        , rrdset_type_name(st->chart_type)
+//        , st->priority
+//        , st->update_every
+//        , "" /* archived charts cannot be obsolete */
+//        , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
+//        , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+//        , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
+//        , (st->plugin_name)?st->plugin_name:""
+//        , (st->module_name)?st->module_name:""
+//    );
+//
+//    // send the dimensions
+//    RRDDIM *rd;
+//    rrddim_foreach_read(rd, st) {
+//        char uuid_str[37];
+//
+//        uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
+//        buffer_sprintf(buffer, "GUID %s\n", uuid_str);
+//
+//        buffer_sprintf(
+//            buffer
+//            , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
+//            , rd->id
+//            , rd->name
+//            , rrd_algorithm_name(rd->algorithm)
+//            , rd->multiplier
+//            , rd->divisor
+//            , "" /* archived dimensions cannot be obsolete */
+//            , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
+//            , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+//        );
+//        if (compaction_id && compaction_id > rd->state->compaction_id) {
+//            /* No need to use this dimension again during this compaction cycle */
+//            rd->state->compaction_id = compaction_id;
+//        }
+//    }
+//    rrdset_unlock(st);
+//    return buffer;
+//}
 
-    buffer = buffer_create(1024); /* This will be freed after it has been committed to the metadata log buffer */
-
-    rrdset_rdlock(st);
-
-    buffer_sprintf(buffer, "CONTEXT %s\n", host->machine_guid);
-
-    char uuid_str[37];
-    uuid_unparse_lower(*st->chart_uuid, uuid_str);
-    buffer_sprintf(buffer, "GUID %s\n", uuid_str);
-
-    // properly set the name for the remote end to parse it
-    char *name = "";
-    if(likely(st->name)) {
-        if(unlikely(strcmp(st->id, st->name))) {
-            // they differ
-            name = strchr(st->name, '.');
-            if(name)
-                name++;
-            else
-                name = "";
-        }
-    }
-
-    // send the chart
-    buffer_sprintf(
-        buffer
-        , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
-        , st->id
-        , name
-        , st->title
-        , st->units
-        , st->family
-        , st->context
-        , rrdset_type_name(st->chart_type)
-        , st->priority
-        , st->update_every
-        , "" /* archived charts cannot be obsolete */
-        , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
-        , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
-        , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
-        , (st->plugin_name)?st->plugin_name:""
-        , (st->module_name)?st->module_name:""
-    );
-
-    // send the dimensions
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        char uuid_str[37];
-
-        uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
-        buffer_sprintf(buffer, "GUID %s\n", uuid_str);
-
-        buffer_sprintf(
-            buffer
-            , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
-            , rd->id
-            , rd->name
-            , rrd_algorithm_name(rd->algorithm)
-            , rd->multiplier
-            , rd->divisor
-            , "" /* archived dimensions cannot be obsolete */
-            , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-            , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
-        );
-        if (compaction_id && compaction_id > rd->state->compaction_id) {
-            /* No need to use this dimension again during this compaction cycle */
-            rd->state->compaction_id = compaction_id;
-        }
-    }
-    rrdset_unlock(st);
-    return buffer;
-}
-
-void metalog_commit_update_chart(RRDSET *st)
-{
-    struct metalog_instance *ctx;
-    BUFFER *buffer;
-    //info("Commit update chart %s", st->name);
-    return;
-
-    /* Metadata are only available with dbengine */
-    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
-        return;
-
-    ctx = get_metalog_ctx(st->rrdhost);
-    if (!ctx)
-        return;
-    if (!ctx->initialized) /* metadata log has not been initialized yet */
-        return;
-
-    buffer = metalog_update_chart_buffer(st, 0);
-
-    metalog_commit_creation_record(ctx, buffer, st->chart_uuid);
-}
+//void metalog_commit_update_chart(RRDSET *st)
+//{
+//    struct metalog_instance *ctx;
+//    BUFFER *buffer;
+//
+//    /* Metadata are only available with dbengine */
+//    if (RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)
+//        return;
+//
+//    ctx = get_metalog_ctx(st->rrdhost);
+//    if (!ctx)
+//        return;
+//    if (!ctx->initialized) /* metadata log has not been initialized yet */
+//        return;
+//
+//    buffer = metalog_update_chart_buffer(st, 0);
+//
+//    metalog_commit_creation_record(ctx, buffer, st->chart_uuid);
+//}
 
 void metalog_commit_delete_chart(RRDSET *st)
 {
@@ -221,34 +217,34 @@ void metalog_commit_delete_chart(RRDSET *st)
     metalog_commit_deletion_record(ctx, buffer);
 }
 
-BUFFER *metalog_update_dimension_buffer(RRDDIM *rd)
-{
-    BUFFER *buffer;
-    RRDSET *st = rd->rrdset;
-    char uuid_str[37];
-
-    buffer = buffer_create(128); /* This will be freed after it has been committed to the metadata log buffer */
-
-    uuid_unparse_lower(*st->chart_uuid, uuid_str);
-    buffer_sprintf(buffer, "CONTEXT %s\n", uuid_str);
-    // Activate random GUID
-    uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
-    buffer_sprintf(buffer, "GUID %s\n", uuid_str);
-
-    buffer_sprintf(
-        buffer
-        , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
-        , rd->id
-        , rd->name
-        , rrd_algorithm_name(rd->algorithm)
-        , rd->multiplier
-        , rd->divisor
-        , "" /* archived dimensions cannot be obsolete */
-        , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-        , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
-    );
-    return buffer;
-}
+//BUFFER *metalog_update_dimension_buffer(RRDDIM *rd)
+//{
+//    BUFFER *buffer;
+//    RRDSET *st = rd->rrdset;
+//    char uuid_str[37];
+//
+//    buffer = buffer_create(128); /* This will be freed after it has been committed to the metadata log buffer */
+//
+//    uuid_unparse_lower(*st->chart_uuid, uuid_str);
+//    buffer_sprintf(buffer, "CONTEXT %s\n", uuid_str);
+//    // Activate random GUID
+//    uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
+//    buffer_sprintf(buffer, "GUID %s\n", uuid_str);
+//
+//    buffer_sprintf(
+//        buffer
+//        , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
+//        , rd->id
+//        , rd->name
+//        , rrd_algorithm_name(rd->algorithm)
+//        , rd->multiplier
+//        , rd->divisor
+//        , "" /* archived dimensions cannot be obsolete */
+//        , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
+//        , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+//    );
+//    return buffer;
+//}
 
 void metalog_commit_update_dimension(RRDDIM *rd)
 {
@@ -407,19 +403,13 @@ RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *me
 }
 
 /* This function is called by dbengine rotation logic when the metric has no writers */
-void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
-{
-    UNUSED(ctx);
+//void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
+//{
+//    UNUSED(ctx);
 //    RRDDIM *rd;
 //    RRDSET *st;
 //    RRDHOST *host;
 //    uint8_t empty_chart;
-
-    char uuid_str[37];
-    uuid_unparse_lower(*metric_uuid, uuid_str);
-    info("metalog_delete_dimension_by_uuid %s", uuid_str);
-    return;
-
 //    rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
 //    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
 //        uuid_t multihost_uuid;
@@ -455,7 +445,7 @@ void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metr
 //        rrdset_free(st);
 //        rrdhost_unlock(host);
 //    }
-}
+//}
 
 void metalog_print_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
