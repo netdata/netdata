@@ -98,9 +98,9 @@ function get_lbl_val() {
   return 1
 }
 
-# k8s_get_kubepod_name gets pod or container level cgroup name from the k8s API server.
-# pod name format: 'pod_<namespace>_<pod_name>'
-# container name format: 'cntr_<namespace>_<pod_name>_<container_name>'
+# k8s_get_kubepod_name resolves */kubepods/* cgroup name.
+# pod level cgroup name format: 'pod_<namespace>_<pod_name>'
+# container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
 function k8s_get_kubepod_name() {
   # GKE /sys/fs/cgroup/*/ tree:
   # |-- kubepods
@@ -137,13 +137,18 @@ function k8s_get_kubepod_name() {
   if [[ $clean_id == "kubepods" ]]; then
     name="$clean_id"
   elif [[ $clean_id =~ .+(besteffort|burstable|guaranteed)$ ]]; then
+    # kubepods_<QOS_CLASS>
+    # kubepods_kubepods-<QOS_CLASS>
     name=${clean_id//-/_}
     name=${NAME/#kubepods_kubepods/kubepods}
   elif [[ $clean_id =~ .+pod[a-f0-9_-]+_docker-([a-f0-9]+)$ ]]; then
+    # ...pod<POD_UID>_docker-<CONTAINER_ID> (POD_UID w/ "_")
     cntr_id=${BASH_REMATCH[1]}
   elif [[ $clean_id =~ .+pod[a-f0-9-]+_([a-f0-9]+)$ ]]; then
+    # ...pod<POD_UID>_<CONTAINER_ID>
     cntr_id=${BASH_REMATCH[1]}
   elif [[ $clean_id =~ .+pod([a-f0-9_-]+)$ ]]; then
+    # ...pod<POD_UID> (POD_UID w/ and w/o "_")
     pod_uid=${BASH_REMATCH[1]}
     pod_uid=${pod_uid//_/-}
   fi
@@ -189,6 +194,8 @@ function k8s_get_kubepod_name() {
 
   local containers
   local jq_pod jq_cntr jq_filter
+  # 'namespace="<NAMESPACE>",pod_name="<NAME>",pod_uid="<UID>",container_name="<NAME>",container_ID="<ID>"'
+  # wrong field value is 'null'
   jq_pod='namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"'
   jq_cntr=',container_name=\"\(.name)\",container_id=\"\(.containerID)\"'
   jq_filter=".items[] | \"${jq_pod}\" + (.status.containerStatuses[]? | \"${jq_cntr}\") | sub(\"docker://\";\"\")"
@@ -198,6 +205,9 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
+  # available labels:
+  # namespace, pod_name, pod_uid, container_name, container_id
+  # TODO: check 'null' values after 'jq' and missing values after 'get_lbl_val'
   local labels
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
@@ -209,8 +219,6 @@ function k8s_get_kubepod_name() {
       name="pod_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)"
     fi
   fi
-
-  [ -z "$name" ] && warning "can't"
 
   echo "$name"
   [ -n "$name" ]
