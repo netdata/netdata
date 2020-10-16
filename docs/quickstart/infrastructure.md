@@ -64,7 +64,7 @@ metrics.
 ## Create new dashboards
 
 You can use Netdata Cloud to create new dashboards that match your infrastructure's topology or help you diagnose
-complex issues by aggregating correlated charts from any number of nodes. For exmaple, you could monitor the system CPU
+complex issues by aggregating correlated charts from any number of nodes. For example, you could monitor the system CPU
 from every node in your infrastructure on a single dashboard.
 
 ![An example system CPU

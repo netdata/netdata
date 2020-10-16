@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/o
 # See an overview of your infrastructure
 
 In Netdata Cloud, your nodes are organized into War Rooms. One of the two available views for a War Room is the
-**Overview**, which uses composite charts to display real-time aggregated metrics from all the nodes (or a filtered
+**Overview**, which uses composite charts to display real-time, aggregated metrics from all the nodes (or a filtered
 selection) in a given War Room.
 
 With Overview's composite charts, you can see your infrastructure from a single pane of glass, discover trends or
@@ -33,8 +33,9 @@ Let's walk through some examples of using the Overview to monitor and troublesho
 ### Filter nodes and pick relevant times
 
 While not exclusive to Overview, you can use two important features, [node
-filtering](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) and the [time
-picker](https://learn.netdata.cloud/docs/cloud/war-rooms#time-picker), to widen or narrow your infrastructure monitoring focus.
+filtering](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) and the [time &amp; date
+picker](https://learn.netdata.cloud/docs/cloud/war-rooms#time--date-picker), to widen or narrow your infrastructure
+monitoring focus.
 
 By default, the Overview shows composite charts aggregated from every node in the War Room, but you can change that
 behavior on an ad-hoc basis. The node filter allows you to create complex queries against your infrastructure based on
@@ -42,10 +43,10 @@ the name, OS, or services running on nodes. For example, use `(name contains aws
 apache` to show only nodes that have `aws` in the hostname and are Ubuntu-based, or any nodes that have an Apache
 webserver running on them.
 
-The time picker helps you visualize both small and large timeframes depending on your goals, whether that's establishing
-a baseline of infrastructure performance or targeted root cause analysis of a specific anomaly.
+The time &amp; date picker helps you visualize both small and large timeframes depending on your goals, whether that's
+establishing a baseline of infrastructure performance or targeted root cause analysis of a specific anomaly.
 
-For example, use the **Quick Selector** to pick the 12-hour option first thing in the morning to check your
+For example, use the **Quick Selector** options to pick the 12-hour option first thing in the morning to check your
 infrastructure for any odd behavior overnight. Use the 7-day option to observe trends between various days of the week.
 
 See the [War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms) docs for more details on both features.
@@ -70,7 +71,7 @@ function](https://user-images.githubusercontent.com/1153921/96195247-20867a00-0f
 
 Because you're now looking at the largest magnitude of change on your infrastructure, you know a single node experienced
 31 MiB/s in disk writes. By first using the Overview to gather baseline data, identify anomalies, and use aggregate
-functions to your advantage, you've proactively recognizing single-node issues using an infrastructure-wide interface.
+functions to your advantage, you've proactively recognized single-node issues using an infrastructure-wide interface.
 
 ### Drill down to single-node dashboards
 
