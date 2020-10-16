@@ -202,8 +202,6 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    clean_apps_groups_target(apps_groups_root_target);
-
     freez(global_process_stat);
 
     int ret = fork();
