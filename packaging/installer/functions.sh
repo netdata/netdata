@@ -1052,3 +1052,11 @@ disable_netdata_updater() {
 set_netdata_updater_channel() {
   sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
+
+invalid_claim_args() {
+    if [ $# -eq 3 ] || [ $# -eq 0 ]; then
+        return 1
+    else
+        return 0
+    fi
+}

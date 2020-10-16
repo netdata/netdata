@@ -147,12 +147,7 @@ printf 'LDFLAGS="%s" ' "${LDFLAGS}" >> netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >> netdata-installer.log
 printf "\n" >> netdata-installer.log
 
-REINSTALL_OPTIONS="$(
-  printf "%s" "${*}"
-  printf "\n"
-)"
-# remove options that shown not be inherited by netdata-updater.sh
-REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
+REINSTALL_OPTIONS=""
 
 banner_nonroot_install() {
   cat << NONROOTNOPREFIX
@@ -239,6 +234,10 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --claim-token              Provide a Netdata Cloud claiming token to directly claim the agent during the install.
+  --claim-rooms              Provide a list of Netdata Cloud rooms to claim the agent to during the install.
+  --claim-uri                Provide a Netdata Cloud instance URI to use for claiming during the install.
+  --claim-proxy              Specify a proxy to use for claiming using the other claim options.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -276,13 +275,14 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
-    "--use-system-lws") USE_SYSTEM_LWS=1 ;;
-    "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
+    "--use-system-lws") USE_SYSTEM_LWS=1; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}" ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
-    "--auto-update" | "-u") AUTOUPDATE=1 ;;
+    "--auto-update" | "-u") AUTOUPDATE=; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}" ;;
     "--auto-update-type")
       AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
       case "${AUTO_UPDATE_TYPE}" in
         systemd|interval|crontab)
           shift 1
@@ -293,38 +293,40 @@ while [ -n "${1}" ]; do
           ;;
       esac
       ;;
-    "--stable-channel") RELEASE_CHANNEL="stable" ;;
-    "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi" ;;
-    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi" ;;
-    "--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https" ;;
+    "--stable-channel") RELEASE_CHANNEL="stable"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--nightly-channel") RELEASE_CHANNEL="nightly"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
     "--disable-dbengine")
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine"
       NETDATA_DISABLE_DBENGINE=1
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
-    "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct" ;;
-    "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct" ;;
-    "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat" ;;
-    "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat" ;;
-    "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-kinesis/} --enable-backend-kinesis" ;;
-    "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis" ;;
-    "--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-prometheus-remote-write/} --enable-backend-prometheus-remote-write" ;;
-    "--disable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write" ;;
-    "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb" ;;
-    "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb" ;;
-    "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto" ;;
-    "--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto" ;;
-    "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse" ;;
-    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
-    "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
+    "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-kinesis/} --enable-backend-kinesis"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-prometheus-remote-write/} --enable-backend-prometheus-remote-write"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-go") NETDATA_DISABLE_GO=1; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--enable-ebpf") NETDATA_DISABLE_EBPF=0; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf"; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-cloud/} --disable-cloud"
+        REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       fi
       ;;
     "--require-cloud")
@@ -333,16 +335,30 @@ while [ -n "${1}" ]; do
       else
         NETDATA_REQUIRE_CLOUD=1
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-cloud/} --enable-cloud"
+        REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       fi
       ;;
-    "--build-json-c")
-      NETDATA_BUILD_JSON_C=1
-      ;;
-    "--build-judy")
-      NETDATA_BUILD_JUDY=1
-      ;;
+    "--build-json-c") NETDATA_BUILD_JSON_C=1; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
+    "--build-judy") NETDATA_BUILD_JUDY=1; REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}";;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
+      shift 1
+      ;;
+    "--claim-token")
+      NETDATA_CLAIM_TOKEN="${2}"
+      shift 1
+      ;;
+    "--claim-rooms")
+      NETDATA_CLAIM_ROOMS="${2}"
+      shift 1
+      ;;
+    "--claim-uri")
+      NETDATA_CLAIM_URI="${2}"
+      shift 1
+      ;;
+    "--claim-proxy")
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -proxy ${2}"
       shift 1
       ;;
     "--help" | "-h")
@@ -357,6 +373,19 @@ while [ -n "${1}" ]; do
   esac
   shift 1
 done
+
+if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ] || [ -n "${NETDATA_CLAIM_ROOMS}" ] || [ -n "${NETDATA_CLAIM_URI}" ]; then
+    run_failed "Cloud explicitly disabled but automatic claiming requested."
+    run_failed "Either enable Netdata Cloud, or remove the --claim-* options."
+    exit 1
+  fi
+fi
+
+if invalid_claim_args ${NETDATA_CLAIM_TOKEN} ${NETDATA_CLAIM_ROOMS} ${NETDATA_CLAIM_URI}; then
+    run_failed "Invalid claiming options, either all or none must be specified."
+    exit 1
+fi
 
 make="make"
 # See: https://github.com/netdata/netdata/issues/9163
@@ -1862,6 +1891,17 @@ if [ "${AUTOUPDATE}" = "1" ]; then
   enable_netdata_updater ${AUTO_UPDATE_TYPE} || run_failed "Cannot enable netdata updater tool"
 else
   disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
+fi
+
+# -----------------------------------------------------------------------------
+if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URI}"
+  if ${NETDATA_PREFIX}/bin/netdata-claim.sh -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -uri=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
+    progress "Successfully claimed node"
+  else
+    run_failed "Unable to claim node, you must do so manually."
+    defer_error"Unable to claim node, you must do so manually."
+  fi
 fi
 
 # -----------------------------------------------------------------------------
