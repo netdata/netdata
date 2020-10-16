@@ -102,36 +102,84 @@ function get_lbl_val() {
 # pod name format: 'pod_<namespace>_<pod_name>'
 # container name format: 'cntr_<namespace>_<pod_name>_<container_name>'
 function k8s_get_kubepod_name() {
+  # GKE /sys/fs/cgroup/*/ tree:
+  # |-- kubepods
+  # |   |-- burstable
+  # |   |   |-- pod98cee708-023b-11eb-933d-42010a800193
+  # |   |   |   |-- 922161c98e6ea450bf665226cdc64ca2aa3e889934c2cff0aec4325f8f78ac03
+  # |   |       `-- a5d223eec35e00f5a1c6fa3e3a5faac6148cdc1f03a2e762e873b7efede012d7
+  # |   `-- pode314bbac-d577-11ea-a171-42010a80013b
+  # |       |-- 7d505356b04507de7b710016d540b2759483ed5f9136bb01a80872b08f771930
+  # |       `-- 88ab4683b99cfa7cc8c5f503adf7987dd93a3faa7c4ce0d17d419962b3220d50
+  #
+  # Minikube (v1.8.2) /sys/fs/cgroup/*/ tree:
+  # |-- kubepods.slice
+  # |   |-- kubepods-besteffort.slice
+  # |   |   |-- kubepods-besteffort-pod10fb5647_c724_400c_b9cc_0e6eae3110e7.slice
+  # |   |   |   |-- docker-36e5eb5056dfdf6dbb75c0c44a1ecf23217fe2c50d606209d8130fcbb19fb5a7.scope
+  # |   |   |   `-- docker-87e18c2323621cf0f635c53c798b926e33e9665c348c60d489eef31ee1bd38d7.scope
+  #
+  # NOTE: cgroups plugin uses '_' to join dir names, so it is <parent>_<child>_<child>_...
+
   local funcname="${FUNCNAME[0]}"
   local id="${1}"
 
-  if [[ ! "${id}" =~ ^kube.*_pod.*$ ]]; then
-    warning "${funcname}: '${id}' is not kubepod."
+  if [[ ! $id =~ ^kubepods ]]; then
+    warning "${funcname}: '${id}' is not kubepod cgroup."
     return 1
   fi
 
-  local pod_uid cntr_id
-  IFS=_ read -r pod_uid cntr_id <<< "${id##*_pod}"
+  local clean_id="$id"
+  clean_id=${clean_id//.slice/}
+  clean_id=${clean_id//.scope/}
+
+  local name pod_uid cntr_id
+  if [[ $clean_id == "kubepods" ]]; then
+    name="$clean_id"
+  elif [[ $clean_id =~ .+(besteffort|burstable|guaranteed)$ ]]; then
+    name=${clean_id//-/_}
+    name=${NAME/#kubepods_kubepods/kubepods}
+  elif [[ $clean_id =~ .+pod[a-f0-9_-]+_docker-([a-f0-9]+)$ ]]; then
+    cntr_id=${BASH_REMATCH[1]}
+  elif [[ $clean_id =~ .+pod[a-f0-9-]+_([a-f0-9]+)$ ]]; then
+    cntr_id=${BASH_REMATCH[1]}
+  elif [[ $clean_id =~ .+pod([a-f0-9_-]+)$ ]]; then
+    pod_uid=${BASH_REMATCH[1]}
+    pod_uid=${pod_uid//_/-}
+  fi
+
+  if [ -n "$name" ]; then
+    echo "$name"
+    return 0
+  fi
 
   if [ -z "$pod_uid" ] && [ -z "$cntr_id" ]; then
-    warning "${funcname}: can't extract pod_uid or container_id from '${id}'."
+    warning "${funcname}: can't extract pod_uid or container_id from the cgroup '$id'."
     return 1
   fi
 
-  local data
+  [ -n "$pod_uid" ] && info "${funcname}: cgroup '$id' is a pod(uid:$pod_uid)"
+  [ -n "$cntr_id" ] && info "${funcname}: cgroup '$id' is a container(id:$cntr_id)"
+
+  if ! command -v jq > /dev/null 2>&1; then
+    warning "${funcname}: 'jq' command not available."
+    return 1
+  fi
+
+  local pods
   if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
     local token header url
     token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
     header="Authorization: Bearer $token"
     url="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods"
-    if ! data=$(curl -sSk -H "$header" "$url" 2>&1); then
-      warning "${funcname}: error on curl '${url}': ${data}."
+    if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
+      warning "${funcname}: error on curl '${url}': ${pods}."
       return 1
     fi
   elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
     [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
-    if ! data=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
-      warning "${funcname}: error on 'kubectl get pods --all-namespaces -o json': ${data}."
+    if ! pods=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
+      warning "${funcname}: error on 'kubectl': ${pods}."
       return 1
     fi
   else
@@ -139,47 +187,41 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
-  local jq_pod jq_cont jq_filter
+  local containers
+  local jq_pod jq_cntr jq_filter
   jq_pod='namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"'
-  jq_cont=',container_name=\"\(.name)\",container_id=\"\(.containerID)\"'
-  jq_filter=".items[] | \"${jq_pod}\" + (.status.containerStatuses[]? | \"${jq_cont}\") | sub(\"docker://\";\"\")"
+  jq_cntr=',container_name=\"\(.name)\",container_id=\"\(.containerID)\"'
+  jq_filter=".items[] | \"${jq_pod}\" + (.status.containerStatuses[]? | \"${jq_cntr}\") | sub(\"docker://\";\"\")"
 
-  if ! data=$(jq -r "${jq_filter}" <<< "$data" 2>&1); then
-    warning "${funcname}: error on 'jq -r '${jq_filter}'': ${data}."
+  if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
+    warning "${funcname}: error on 'jq' parse: ${containers}."
     return 1
   fi
 
-  local labels name
+  local labels
   if [ -n "$cntr_id" ]; then
-    if labels=$(grep "$cntr_id" <<< "$data" 2> /dev/null); then
+    if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
       name="cntr_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)_$(get_lbl_val "$labels" container_name)"
     fi
   elif [ -n "$pod_uid" ]; then
-    if labels=$(grep "$pod_uid" -m 1 <<< "$data" 2> /dev/null); then
+    if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
       labels="${labels%%,cont*}"
       name="pod_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)"
     fi
   fi
 
+  [ -z "$name" ] && warning "can't"
+
   echo "$name"
-  [[ -n "$name" ]]
+  [ -n "$name" ]
   return
 }
 
 function k8s_get_name() {
   local funcname="${FUNCNAME[0]}"
-  local orig_id="${1}"
-  local id=${orig_id//.slice/} # minikube ids sanitizing
+  local id="${1}"
 
-  case "$id" in
-    "kubepods" | "kubepods_guaranteed" | "kubepods_burstable" | "kubepods_besteffort")
-      NAME="${id}"
-      ;;
-  esac
-
-  if [ -z "$NAME" ]; then
-    NAME=$(k8s_get_kubepod_name "$id")
-  fi
+  NAME=$(k8s_get_kubepod_name "$id")
 
   if [ -z "${NAME}" ]; then
     warning "${funcname}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
