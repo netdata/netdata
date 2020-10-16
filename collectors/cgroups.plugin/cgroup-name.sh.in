@@ -140,7 +140,7 @@ function k8s_get_kubepod_name() {
     # kubepods_<QOS_CLASS>
     # kubepods_kubepods-<QOS_CLASS>
     name=${clean_id//-/_}
-    name=${NAME/#kubepods_kubepods/kubepods}
+    name=${name/#kubepods_kubepods/kubepods}
   elif [[ $clean_id =~ .+pod[a-f0-9_-]+_docker-([a-f0-9]+)$ ]]; then
     # ...pod<POD_UID>_docker-<CONTAINER_ID> (POD_UID w/ "_")
     cntr_id=${BASH_REMATCH[1]}
@@ -293,8 +293,10 @@ function podman_validate_id() {
 
 # -----------------------------------------------------------------------------
 
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+#[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+#[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="/etc/netdata"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="/usr/lib/netdata/conf.d"
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
