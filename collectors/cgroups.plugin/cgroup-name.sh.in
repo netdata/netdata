@@ -192,14 +192,17 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
-  local containers
-  local jq_pod jq_cntr jq_filter
+  local jq_filter
   # 'namespace="<NAMESPACE>",pod_name="<NAME>",pod_uid="<UID>",container_name="<NAME>",container_ID="<ID>"'
   # wrong field value is 'null'
-  jq_pod='namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"'
-  jq_cntr=',container_name=\"\(.name)\",container_id=\"\(.containerID)\"'
-  jq_filter=".items[] | \"${jq_pod}\" + (.status.containerStatuses[]? | \"${jq_cntr}\") | sub(\"docker://\";\"\")"
+  jq_filter+='.items[] | '
+  jq_filter+='"namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"" + '
+  jq_filter+='(.status.containerStatuses[]? | '
+  jq_filter+='",container_name=\"\(.name)\",container_id=\"\(.containerID)\""'
+  jq_filter+=') | '
+  jq_filter+='sub("docker://";"")'
 
+  local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
     warning "${funcname}: error on 'jq' parse: ${containers}."
     return 1
