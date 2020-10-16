@@ -84,73 +84,77 @@ static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
     BUFFER *buffer;
     RRDHOST *host = NULL;
 
-    ret = find_object_by_guid(uuid, NULL, 0);
-    switch (ret) {
-        case GUID_TYPE_CHAR:
-            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
-            break;
-        case GUID_TYPE_CHART:
-            st = metalog_get_chart_from_uuid(ctx, uuid);
-            if (st) {
-                if (ctx->current_compaction_id > st->rrdhost->compaction_id) {
-                    error("Forcing compaction of HOST %s from CHART %s", st->rrdhost->hostname, st->id);
-                    compact_record_by_uuid(ctx, &st->rrdhost->host_uuid);
-                }
+    info("compact_record_by_uuid");
 
-                if (ctx->current_compaction_id > st->compaction_id) {
-                    st->compaction_id = ctx->current_compaction_id;
-                    buffer = metalog_update_chart_buffer(st, ctx->current_compaction_id);
-                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
-                } else {
-                    debug(D_METADATALOG, "Chart has already been compacted, ignoring record.");
-                }
-            } else {
-                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
-            }
-            break;
-        case GUID_TYPE_DIMENSION:
-            rd = metalog_get_dimension_from_uuid(ctx, uuid);
-            if (rd) {
-                if (ctx->current_compaction_id > rd->rrdset->rrdhost->compaction_id) {
-                    error("Forcing compaction of HOST %s", rd->rrdset->rrdhost->hostname);
-                    compact_record_by_uuid(ctx, &rd->rrdset->rrdhost->host_uuid);
-                }
-                if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
-                    error("Forcing compaction of CHART %s", rd->rrdset->id);
-                    compact_record_by_uuid(ctx, rd->rrdset->chart_uuid);
-                } else if (ctx->current_compaction_id > rd->state->compaction_id) {
-                    rd->state->compaction_id = ctx->current_compaction_id;
-                    buffer = metalog_update_dimension_buffer(rd);
-                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
-                } else {
-                    debug(D_METADATALOG, "Dimension has already been compacted, ignoring record.");
-                }
-            } else {
-                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
-            }
-            break;
-        case GUID_TYPE_HOST:
-            host = metalog_get_host_from_uuid(ctx, uuid);
-            if (unlikely(!host))
-                break;
-            if (ctx->current_compaction_id > host->compaction_id) {
-                host->compaction_id = ctx->current_compaction_id;
-                buffer = metalog_update_host_buffer(host);
-                metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
-            } else {
-                debug(D_METADATALOG, "Host has already been compacted, ignoring record.");
-            }
-            break;
-        case GUID_TYPE_NOTFOUND:
-            debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
-            break;
-        case GUID_TYPE_NOSPACE:
-            error_with_guid(uuid, "Not enough space for object retrieval");
-            break;
-        default:
-            error("Unknown return code %u from find_object_by_guid", ret);
-            break;
-    }
+    return;
+//
+//    ret = find_object_by_guid(uuid, NULL, 0);
+//    switch (ret) {
+//        case GUID_TYPE_CHAR:
+//            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
+//            break;
+//        case GUID_TYPE_CHART:
+//            st = metalog_get_chart_from_uuid(ctx, uuid);
+//            if (st) {
+//                if (ctx->current_compaction_id > st->rrdhost->compaction_id) {
+//                    error("Forcing compaction of HOST %s from CHART %s", st->rrdhost->hostname, st->id);
+//                    compact_record_by_uuid(ctx, &st->rrdhost->host_uuid);
+//                }
+//
+//                if (ctx->current_compaction_id > st->compaction_id) {
+//                    st->compaction_id = ctx->current_compaction_id;
+//                    buffer = metalog_update_chart_buffer(st, ctx->current_compaction_id);
+//                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
+//                } else {
+//                    debug(D_METADATALOG, "Chart has already been compacted, ignoring record.");
+//                }
+//            } else {
+//                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
+//            }
+//            break;
+//        case GUID_TYPE_DIMENSION:
+//            rd = metalog_get_dimension_from_uuid(ctx, uuid);
+//            if (rd) {
+//                if (ctx->current_compaction_id > rd->rrdset->rrdhost->compaction_id) {
+//                    error("Forcing compaction of HOST %s", rd->rrdset->rrdhost->hostname);
+//                    compact_record_by_uuid(ctx, &rd->rrdset->rrdhost->host_uuid);
+//                }
+//                if (ctx->current_compaction_id > rd->rrdset->compaction_id) {
+//                    error("Forcing compaction of CHART %s", rd->rrdset->id);
+//                    compact_record_by_uuid(ctx, rd->rrdset->chart_uuid);
+//                } else if (ctx->current_compaction_id > rd->state->compaction_id) {
+//                    rd->state->compaction_id = ctx->current_compaction_id;
+//                    buffer = metalog_update_dimension_buffer(rd);
+//                    metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
+//                } else {
+//                    debug(D_METADATALOG, "Dimension has already been compacted, ignoring record.");
+//                }
+//            } else {
+//                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
+//            }
+//            break;
+//        case GUID_TYPE_HOST:
+//            host = metalog_get_host_from_uuid(ctx, uuid);
+//            if (unlikely(!host))
+//                break;
+//            if (ctx->current_compaction_id > host->compaction_id) {
+//                host->compaction_id = ctx->current_compaction_id;
+//                buffer = metalog_update_host_buffer(host);
+//                metalog_commit_record(ctx, buffer, METALOG_COMMIT_CREATION_RECORD, uuid, 1);
+//            } else {
+//                debug(D_METADATALOG, "Host has already been compacted, ignoring record.");
+//            }
+//            break;
+//        case GUID_TYPE_NOTFOUND:
+//            debug(D_METADATALOG, "Ignoring nonexistent metadata record.");
+//            break;
+//        case GUID_TYPE_NOSPACE:
+//            error_with_guid(uuid, "Not enough space for object retrieval");
+//            break;
+//        default:
+//            error("Unknown return code %u from find_object_by_guid", ret);
+//            break;
+//    }
 }
 
 /* Returns 0 on success. */

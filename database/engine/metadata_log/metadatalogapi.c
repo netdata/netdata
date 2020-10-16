@@ -79,7 +79,7 @@ void metalog_commit_update_host(RRDHOST *host)
     struct metalog_instance *ctx;
     BUFFER *buffer;
 
-    info("Ignoring metalog_commit_update_host");
+    //info("Ignoring metalog_commit_update_host");
     return;
     /* Metadata are only available with dbengine */
     ctx = get_metalog_ctx(host);
@@ -176,7 +176,7 @@ void metalog_commit_update_chart(RRDSET *st)
 {
     struct metalog_instance *ctx;
     BUFFER *buffer;
-    info("Commit update chart %s", st->name);
+    //info("Commit update chart %s", st->name);
     return;
 
     /* Metadata are only available with dbengine */
@@ -255,7 +255,7 @@ void metalog_commit_update_dimension(RRDDIM *rd)
     struct metalog_instance *ctx;
     BUFFER *buffer;
     RRDSET *st = rd->rrdset;
-    info("Commit update dimension %s", rd->id);
+    //info("Commit update dimension %s", rd->id);
     return;
 
     /* Metadata are only available with dbengine */
@@ -304,147 +304,157 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
 RRDHOST *metalog_get_host_from_uuid(struct metalog_instance *ctx, uuid_t *host_guid)
 {
     UNUSED(ctx);
-    GUID_TYPE ret;
-    char machine_guid[37];
+    UNUSED(host_guid);
+    return NULL;
+//    GUID_TYPE ret;
+//    char machine_guid[37];
 
-    uuid_unparse_lower(*host_guid, machine_guid);
-    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
-    ret = find_object_by_guid(host_guid, NULL, 0);
-    if (unlikely(GUID_TYPE_HOST != ret)) {
-        errno = 0;
-        if (unlikely(!host))
-            error("Host with GUID %s not found in the global map or in the list of hosts", machine_guid);
-        else
-            error("Host with GUID %s not found in the global map", machine_guid);
-    }
-    return host;
+//    uuid_unparse_lower(*host_guid, machine_guid);
+//    RRDHOST *host = rrdhost_find_by_guid(machine_guid, 0);
+//    ret = find_object_by_guid(host_guid, NULL, 0);
+//    if (unlikely(GUID_TYPE_HOST != ret)) {
+//        errno = 0;
+//        if (unlikely(!host))
+//            error("Host with GUID %s not found in the global map or in the list of hosts", machine_guid);
+//        else
+//            error("Host with GUID %s not found in the global map", machine_guid);
+//    }
+//    return host;
 }
 
 RRDSET *metalog_get_chart_from_uuid(struct metalog_instance *ctx, uuid_t *chart_uuid)
 {
-    GUID_TYPE ret;
-    char chart_object[33], chart_fullid[RRD_ID_LENGTH_MAX + 1];
-    uuid_t *machine_guid, *chart_char_guid;
+    UNUSED(ctx);
+    UNUSED(chart_uuid);
+//    GUID_TYPE ret;
+//    char chart_object[33], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+//    uuid_t *machine_guid, *chart_char_guid;
 
-    ret = find_object_by_guid(chart_uuid, chart_object, 33);
-    if (unlikely(GUID_TYPE_CHART != ret))
-        return NULL;
-
-    machine_guid = (uuid_t  *)chart_object;
-    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
-    if (unlikely(!host))
-        return NULL;
-    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
-        errno = 0;
-        error("Metadata host machine GUID does not match the one assosiated with the chart");
-        return NULL;
-    }
-
-    chart_char_guid = (uuid_t *)(chart_object + 16);
-
-    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    if (unlikely(GUID_TYPE_CHAR != ret))
-        return NULL;
-    RRDSET *st = rrdset_find(host, chart_fullid);
-
-    return st;
+    return NULL;
+//
+//    ret = find_object_by_guid(chart_uuid, chart_object, 33);
+//    if (unlikely(GUID_TYPE_CHART != ret))
+//        return NULL;
+//
+//    machine_guid = (uuid_t  *)chart_object;
+//    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+//    if (unlikely(!host))
+//        return NULL;
+//    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+//        errno = 0;
+//        error("Metadata host machine GUID does not match the one assosiated with the chart");
+//        return NULL;
+//    }
+//
+//    chart_char_guid = (uuid_t *)(chart_object + 16);
+//
+//    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
+//    if (unlikely(GUID_TYPE_CHAR != ret))
+//        return NULL;
+//    RRDSET *st = rrdset_find(host, chart_fullid);
+//
+//    return st;
 }
 
 RRDDIM *metalog_get_dimension_from_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
     UNUSED(ctx);
+    UNUSED(metric_uuid);
 
-    GUID_TYPE ret;
-    char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
-    uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
+//    GUID_TYPE ret;
+//    char dim_object[49], chart_object[33], id_str[PLUGINSD_LINE_MAX], chart_fullid[RRD_ID_LENGTH_MAX + 1];
+//    uuid_t *machine_guid, *chart_guid, *chart_char_guid, *dim_char_guid;
 
-    ret = find_object_by_guid(metric_uuid, dim_object, sizeof(dim_object));
-    if (GUID_TYPE_DIMENSION != ret) /* not found */
-        return NULL;
+    return NULL;
 
-    machine_guid = (uuid_t *)dim_object;
-
-    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
-    if (unlikely(!host))
-        return NULL;
-    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
-        errno = 0;
-        error("Metadata host machine GUID does not match the one assosiated with the dimension");
-        return NULL;
-    }
-
-    chart_guid = (uuid_t *)(dim_object + 16);
-    dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
-
-    ret = find_object_by_guid(dim_char_guid, id_str, sizeof(id_str));
-    if (unlikely(GUID_TYPE_CHAR != ret))
-        return NULL;
-
-    ret = find_object_by_guid(chart_guid, chart_object, sizeof(chart_object));
-    if (unlikely(GUID_TYPE_CHART != ret))
-        return NULL;
-    chart_char_guid = (uuid_t *)(chart_object + 16);
-
-    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
-    if (unlikely(GUID_TYPE_CHAR != ret))
-        return NULL;
-    RRDSET *st = rrdset_find(host, chart_fullid);
-    if (!st)
-        return NULL;
-
-    RRDDIM *rd = rrddim_find(st, id_str);
-
-    return rd;
+//    ret = find_object_by_guid(metric_uuid, dim_object, sizeof(dim_object));
+//    if (GUID_TYPE_DIMENSION != ret) /* not found */
+//        return NULL;
+//
+//    machine_guid = (uuid_t *)dim_object;
+//
+//    RRDHOST *host = metalog_get_host_from_uuid(ctx, machine_guid);
+//    if (unlikely(!host))
+//        return NULL;
+//    if (unlikely(uuid_compare(host->host_uuid, *machine_guid))) {
+//        errno = 0;
+//        error("Metadata host machine GUID does not match the one assosiated with the dimension");
+//        return NULL;
+//    }
+//
+//    chart_guid = (uuid_t *)(dim_object + 16);
+//    dim_char_guid = (uuid_t *)(dim_object + 16 + 16);
+//
+//    ret = find_object_by_guid(dim_char_guid, id_str, sizeof(id_str));
+//    if (unlikely(GUID_TYPE_CHAR != ret))
+//        return NULL;
+//
+//    ret = find_object_by_guid(chart_guid, chart_object, sizeof(chart_object));
+//    if (unlikely(GUID_TYPE_CHART != ret))
+//        return NULL;
+//    chart_char_guid = (uuid_t *)(chart_object + 16);
+//
+//    ret = find_object_by_guid(chart_char_guid, chart_fullid, RRD_ID_LENGTH_MAX + 1);
+//    if (unlikely(GUID_TYPE_CHAR != ret))
+//        return NULL;
+//    RRDSET *st = rrdset_find(host, chart_fullid);
+//    if (!st)
+//        return NULL;
+//
+//    RRDDIM *rd = rrddim_find(st, id_str);
+//
+//    return rd;
 }
 
 /* This function is called by dbengine rotation logic when the metric has no writers */
 void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
-    RRDDIM *rd;
-    RRDSET *st;
-    RRDHOST *host;
-    uint8_t empty_chart;
+    UNUSED(ctx);
+//    RRDDIM *rd;
+//    RRDSET *st;
+//    RRDHOST *host;
+//    uint8_t empty_chart;
 
     char uuid_str[37];
     uuid_unparse_lower(*metric_uuid, uuid_str);
     info("metalog_delete_dimension_by_uuid %s", uuid_str);
     return;
 
-    rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
-    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
-        uuid_t multihost_uuid;
-
-        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->machine_guid, metric_uuid, &multihost_uuid);
-        rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
-    }
-    if(!rd) {
-        info("Rotated unknown archived metric.");
-        return;
-    }
-    st = rd->rrdset;
-    host = st->rrdhost;
-
-    /* In case there are active metrics in a different database engine do not delete the dimension object */
-    if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE))
-        return;
-
-    /* Since the metric has no writer it will not be commited to the metadata log by rrddim_free_custom().
-     * It must be commited explicitly before calling rrddim_free_custom(). */
-    metalog_commit_delete_dimension(rd);
-
-    rrdset_wrlock(st);
-    rrddim_free_custom(st, rd, 1);
-    empty_chart = (NULL == st->dimensions);
-    rrdset_unlock(st);
-
-    if (empty_chart) {
-        rrdhost_wrlock(host);
-        rrdset_rdlock(st);
-        rrdset_delete_custom(st, 1);
-        rrdset_unlock(st);
-        rrdset_free(st);
-        rrdhost_unlock(host);
-    }
+//    rd = metalog_get_dimension_from_uuid(ctx, metric_uuid);
+//    if (!rd) { /* in the case of legacy UUID convert to multihost and try again */
+//        uuid_t multihost_uuid;
+//
+//        rrdeng_convert_legacy_uuid_to_multihost(ctx->rrdeng_ctx->machine_guid, metric_uuid, &multihost_uuid);
+//        rd = metalog_get_dimension_from_uuid(ctx, &multihost_uuid);
+//    }
+//    if(!rd) {
+//        info("Rotated unknown archived metric.");
+//        return;
+//    }
+//    st = rd->rrdset;
+//    host = st->rrdhost;
+//
+//    /* In case there are active metrics in a different database engine do not delete the dimension object */
+//    if (unlikely(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE))
+//        return;
+//
+//    /* Since the metric has no writer it will not be commited to the metadata log by rrddim_free_custom().
+//     * It must be commited explicitly before calling rrddim_free_custom(). */
+//    metalog_commit_delete_dimension(rd);
+//
+//    rrdset_wrlock(st);
+//    rrddim_free_custom(st, rd, 1);
+//    empty_chart = (NULL == st->dimensions);
+//    rrdset_unlock(st);
+//
+//    if (empty_chart) {
+//        rrdhost_wrlock(host);
+//        rrdset_rdlock(st);
+//        rrdset_delete_custom(st, 1);
+//        rrdset_unlock(st);
+//        rrdset_free(st);
+//        rrdhost_unlock(host);
+//    }
 }
 
 void metalog_print_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)

@@ -284,42 +284,44 @@ PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
     RRDSET *st;
     RRDDIM *rd;
 
-    ret = find_object_by_guid(uuid, NULL, 0);
-    switch (ret) {
-        case GUID_TYPE_CHAR:
-            fatal_assert(0);
-            break;
-        case GUID_TYPE_CHART:
-            st = metalog_get_chart_from_uuid(ctx, uuid);
-            if (st) {
-                host = st->rrdhost;
-                rrdhost_wrlock(host);
-                rrdset_free(st);
-                rrdhost_unlock(host);
-            } else {
-                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
-            }
-            break;
-        case GUID_TYPE_DIMENSION:
-            rd = metalog_get_dimension_from_uuid(ctx, uuid);
-            if (rd) {
-                st = rd->rrdset;
-                rrdset_wrlock(st);
-                rrddim_free_custom(st, rd, 0);
-                rrdset_unlock(st);
-            }
-            else {
-                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
-            }
-            break;
-        case GUID_TYPE_HOST:
-            /* Ignore for now */
-            break;
-        default:
-            break;
-    }
-
     return PARSER_RC_OK;
+//
+//    ret = find_object_by_guid(uuid, NULL, 0);
+//    switch (ret) {
+//        case GUID_TYPE_CHAR:
+//            fatal_assert(0);
+//            break;
+//        case GUID_TYPE_CHART:
+//            st = metalog_get_chart_from_uuid(ctx, uuid);
+//            if (st) {
+//                host = st->rrdhost;
+//                rrdhost_wrlock(host);
+//                rrdset_free(st);
+//                rrdhost_unlock(host);
+//            } else {
+//                debug(D_METADATALOG, "Ignoring nonexistent chart metadata record.");
+//            }
+//            break;
+//        case GUID_TYPE_DIMENSION:
+//            rd = metalog_get_dimension_from_uuid(ctx, uuid);
+//            if (rd) {
+//                st = rd->rrdset;
+//                rrdset_wrlock(st);
+//                rrddim_free_custom(st, rd, 0);
+//                rrdset_unlock(st);
+//            }
+//            else {
+//                debug(D_METADATALOG, "Ignoring nonexistent dimension metadata record.");
+//            }
+//            break;
+//        case GUID_TYPE_HOST:
+//            /* Ignore for now */
+//            break;
+//        default:
+//            break;
+//    }
+//
+//    return PARSER_RC_OK;
 }
 
 void metalog_pluginsd_state_init(struct metalog_pluginsd_state *state, struct metalog_instance *ctx)

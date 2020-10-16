@@ -390,7 +390,7 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_DBENGINE:
 #ifdef ENABLE_DBENGINE
             if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                free_uuid(st->chart_uuid);
+                //free_uuid(st->chart_uuid);
                 freez(st->chart_uuid);
             }
 #endif
