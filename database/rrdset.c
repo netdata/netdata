@@ -1906,3 +1906,20 @@ after_second_database_work:
 
     netdata_thread_enable_cancelability();
 }
+
+void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source)
+{
+    st->state->new_labels = add_label_to_list(st->state->new_labels, key, value, source);
+}
+
+void rrdset_finalize_labels(RRDSET *st)
+{
+    struct label *new_labels = st->state->new_labels;
+    struct label_index *labels = &st->state->labels;
+
+    if (labels->head) {
+        labels->head = new_labels;
+    } else {
+        replace_label_list(labels, new_labels);
+    }
+}

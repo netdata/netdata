@@ -2,6 +2,36 @@
 
 #include "rrdset2json.h"
 
+void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
+{
+    char tabs[11];
+    struct label_index *labels = &st->state->labels;
+
+    if (indentation > 10)
+        indentation = 10;
+
+    tabs[0] = '\0';
+    while (indentation) {
+        strcat(tabs, "\t");
+        indentation--;
+    }
+
+    int count = 0;
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
+    for (struct label *label = labels->head; label; label = label->next) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+        buffer_strcat(wb, tabs);
+
+        char value[CONFIG_MAX_VALUE * 2 + 1];
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
+
+        count++;
+    }
+    buffer_strcat(wb, "\n");
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+}
+
 // generate JSON for the /api/v1/chart API call
 
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
@@ -115,9 +145,13 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             alarms++;
         }
         buffer_sprintf(wb,
-                       "\n\t\t\t}"
+                       "\n\t\t\t},"
         );
     }
+    buffer_strcat(wb, "\n\t\t\t\"chart_labels\": {\n");
+    chart_labels2json(st, wb, 2);
+    buffer_strcat(wb, "\t\t\t}\n");
+
 
     buffer_sprintf(wb,
             "\n\t\t}"
