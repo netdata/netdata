@@ -22,13 +22,14 @@ static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
 static ebpf_data_t socket_data;
 
-static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
-static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
+ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
+int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -1341,6 +1342,7 @@ void *ebpf_socket_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
@@ -1359,6 +1361,7 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
+    read_thread_closed = 1;
     return NULL;
 }
 
@@ -1480,6 +1483,10 @@ static void ebpf_socket_update_apps_data()
  *
  *****************************************************************/
 
+struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                               NULL, NULL, 1, NULL,
+                                               NULL, ebpf_socket_read_hash };
+
 /**
  * Main loop for this collector.
  *
@@ -1493,10 +1500,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, ebpf_socket_read_hash };
-    socket_threads.thread = mallocz(sizeof(netdata_thread_t));;
+    socket_threads.thread = mallocz(sizeof(netdata_thread_t));
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
                           NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
@@ -1670,6 +1674,14 @@ static void ebpf_socket_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 200*USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
+
     freez(socket_aggregated_data);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
@@ -1696,6 +1708,8 @@ static void ebpf_socket_cleanup(void *ptr)
 
     pthread_mutex_destroy(&nv_mutex);
     freez(socket_data.map_fd);
+
+    freez(socket_threads.thread);
     finalized_threads = 1;
 }
 

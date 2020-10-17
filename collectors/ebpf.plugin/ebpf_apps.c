@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
@@ -924,13 +925,18 @@ void cleanup_exited_pids()
             p = p->next;
             del_pid_entry(r);
 
+            // Clean process structure
             freez(global_process_stats[r]);
             global_process_stats[r] = NULL;
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-
             prev_apps_data[r] = NULL;
+
+            // Clean socket structures
+            freez(socket_bandwidth_curr[r]);
+            socket_bandwidth_curr[r] = NULL;
+            socket_bandwidth_prev[r] = NULL;
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1041,12 +1047,18 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+            // Clean Process structures
             freez(w);
             global_process_stats[key] = NULL;
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
             prev_apps_data[key] = NULL;
+
+            // Clean socket structures
+            freez(socket_bandwidth_curr[key]);
+            socket_bandwidth_curr[key] = NULL;
+            socket_bandwidth_prev[key] = NULL;
 
             pids = pids->next;
             continue;
