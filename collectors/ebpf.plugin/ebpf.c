@@ -69,6 +69,7 @@ int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
 static int isrh;
+uint32_t finalized_threads = 1;
 
 pthread_mutex_t lock;
 pthread_mutex_t collect_data_mutex;

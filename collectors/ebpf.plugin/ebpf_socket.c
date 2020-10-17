@@ -1686,6 +1686,7 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_hostnames(network_viewer_opt.excluded_hostnames);
 
     pthread_mutex_destroy(&nv_mutex);
+    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -1804,6 +1805,7 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_create_global_charts(em);
 
+    finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_time * USEC_PER_SEC), em);

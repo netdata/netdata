@@ -912,7 +912,15 @@ void clean_apps_structures(struct target *ptr) {
  */
 static void ebpf_process_cleanup(void *ptr)
 {
-    (void)ptr;
+    UNUSED(ptr);
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 200*USEC_PER_MS;
+    while (!finalized_threads) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
 
     freez(process_aggregated_data);
     freez(process_publish_aggregated);

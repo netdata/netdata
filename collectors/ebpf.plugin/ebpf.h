@@ -209,6 +209,7 @@ extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;
 extern size_t all_pids_count;
 extern int update_every;
+extern uint32_t finalized_threads;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
