@@ -8,6 +8,7 @@
 
 #include "../libnetdata.h"
 
+/*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
     int fd = open(filename, O_WRONLY | O_APPEND, 0);
@@ -56,6 +57,7 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 
     return 0;
 }
+*/
 
 //----------------------------------------------------------------------------------------------------------------------
 

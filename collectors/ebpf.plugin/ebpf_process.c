@@ -923,7 +923,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(current_apps_data);
     freez(prev_apps_data);
 
-    //clean_apps_structures(apps_groups_default_target);
     clean_apps_structures(apps_groups_root_target);
     freez(process_data.map_fd);
 }

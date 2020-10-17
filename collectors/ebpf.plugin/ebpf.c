@@ -180,13 +180,13 @@ static void change_events()
  * Clean Loaded Events
  *
  * This function cleans the events previous loaded on Linux.
- */
 void clean_loaded_events()
 {
     int event_pid;
     for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
         clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
 }
+ */
 
 /**
  * Close the collector gracefully
@@ -204,6 +204,7 @@ static void ebpf_exit(int sig)
 
     freez(global_process_stat);
 
+    /*
     int ret = fork();
     if (ret < 0) // error
         error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
@@ -233,6 +234,7 @@ static void ebpf_exit(int sig)
     } else { // parent
         exit(0);
     }
+     */
 
     exit(sig);
 }
@@ -1964,7 +1966,7 @@ int main(int argc, char **argv)
     };
 
     change_events();
-    clean_loaded_events();
+    //clean_loaded_events();
 
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
