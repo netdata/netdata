@@ -1650,6 +1650,15 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
+void clean_thread_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(socket_bandwidth_curr[pids->pid]);
+
+        pids = pids->next;
+    }
+}
+
 /**
  * Clean up the main thread.
  *
@@ -1665,7 +1674,7 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    freez(socket_data.map_fd);
+    clean_thread_structures();
     freez(socket_bandwidth_curr);
     freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
@@ -1686,6 +1695,7 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_hostnames(network_viewer_opt.excluded_hostnames);
 
     pthread_mutex_destroy(&nv_mutex);
+    freez(socket_data.map_fd);
     finalized_threads = 1;
 }
 
