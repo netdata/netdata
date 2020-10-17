@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.26.0...HEAD)
+
+**Merged pull requests:**
+
+- Removed redundant build dependencies from Debian control file. [\#10085](https://github.com/netdata/netdata/pull/10085) ([alexmyczko](https://github.com/alexmyczko))
+- Update README.md [\#10067](https://github.com/netdata/netdata/pull/10067) ([andrewm4894](https://github.com/andrewm4894))
+
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...v1.26.0)
@@ -241,8 +250,6 @@
 
 -  Fix the unittest execution [\#9445](https://github.com/netdata/netdata/pull/9445) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix children version on stream [\#9438](https://github.com/netdata/netdata/pull/9438) ([thiagoftsm](https://github.com/thiagoftsm))
-- Disallow dimensions and chart being obsolete and archived simultaneously. [\#9436](https://github.com/netdata/netdata/pull/9436) ([mfundul](https://github.com/mfundul))
-- Fix internal registry  [\#9434](https://github.com/netdata/netdata/pull/9434) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.23.0](https://github.com/netdata/netdata/tree/v1.23.0) (2020-06-25)
 
