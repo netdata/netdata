@@ -38,6 +38,8 @@ netdata_socket_t *socket_values;
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
 static int *map_fd = NULL;
+static struct bpf_object *objects = NULL;
+static struct bpf_link **probe_links = NULL;
 
 /*****************************************************************
  *
@@ -1710,6 +1712,14 @@ static void ebpf_socket_cleanup(void *ptr)
     freez(socket_data.map_fd);
 
     freez(socket_threads.thread);
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
     finalized_threads = 1;
 }
 
@@ -1817,8 +1827,8 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     set_local_pointers(em);
-    if (ebpf_load_program(
-            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, socket_data.map_fd)) {
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
+    if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }

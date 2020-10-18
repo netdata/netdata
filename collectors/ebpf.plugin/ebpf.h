@@ -31,12 +31,6 @@
 
 #include "ebpf_apps.h"
 
-typedef enum {
-    MODE_RETURN = 0, // This attaches kprobe when the function returns
-    MODE_DEVMODE,    // This stores log given description about the errors raised
-    MODE_ENTRY       // This attaches kprobe when the function is called
-} netdata_run_mode_t;
-
 typedef struct netdata_syscall_stat {
     unsigned long bytes;               // total number of bytes
     uint64_t call;                     // total number of calls
@@ -73,20 +67,6 @@ typedef struct netdata_error_report {
     int type;
     int err;
 } netdata_error_report_t;
-
-typedef struct ebpf_module {
-    const char *thread_name;
-    const char *config_name;
-    int enabled;
-    void *(*start_routine)(void *);
-    int update_time;
-    int global_charts;
-    int apps_charts;
-    netdata_run_mode_t mode;
-    netdata_ebpf_events_t *probes;
-    uint32_t thread_id;
-    int optional;
-} ebpf_module_t;
 
 extern ebpf_module_t ebpf_modules[];
 #define EBPF_MODULE_PROCESS_IDX 0

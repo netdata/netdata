@@ -31,6 +31,8 @@ ebpf_process_publish_apps_t **prev_apps_data = NULL;
 int process_enabled = 0;
 
 static int *map_fd = NULL;
+static struct bpf_object *objects = NULL;
+static struct bpf_link **probe_links = NULL;
 
 /*****************************************************************
  *
@@ -933,6 +935,14 @@ static void ebpf_process_cleanup(void *ptr)
 
     clean_apps_structures(apps_groups_root_target);
     freez(process_data.map_fd);
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
 }
 
 /*****************************************************************
@@ -1049,8 +1059,8 @@ void *ebpf_process_thread(void *ptr)
     }
 
     set_local_pointers();
-    if (ebpf_load_program(
-            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, process_data.map_fd)) {
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
+    if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
