@@ -407,6 +407,7 @@ class GPU:
             if p['username']:
                 if self.exclude_zero_memory_users and p['used_memory'] == 0:
                     continue
+                users.add(p['username'])
                 key = 'user_mem_{0}'.format(p['username'])
                 if key in data:
                     data[key] += p['used_memory']
