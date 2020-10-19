@@ -142,6 +142,7 @@ void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
     ebpf_network_viewer_port_list_t *move = *clean;
     while (move) {
         ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
         freez(move);
 
         move = next;
