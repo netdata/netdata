@@ -355,8 +355,7 @@ You can set the following values for each configuration option:
     Background noise level.    
     
 -   **Discarded packets**
-    
-   Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets ost in relation with specific wireless operations (`misc`). 
+    Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets lost in relation with specific wireless operations (`misc`). 
     
 -   **Missed beacon**    
      Number of periodic beacons from the cell or the access point the interface has missed.
