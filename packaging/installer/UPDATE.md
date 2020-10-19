@@ -24,28 +24,50 @@ you installed it.** Choose from the following list to see the appropriate update
 
 -   [One-line installer script (`kickstart.sh`)](#one-line-installer-script-kickstartsh)
 -   [`.deb` or `.rpm` packages](#deb-or-rpm-packages)
--   [Pre-built static binary for 64-bit systems
-    (`kickstart-static64.sh`)](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh)
+-   [Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh)
 -   [Docker](#docker)
 -   [macOS](#macos)
 -   [Manual installation from Git](#manual-installation-from-git)
+
+#### How to determine which install method you used
+
+First, see [here](https://learn.netdata.cloud/docs/configure/nodes#the-netdata-config-directory) to figure out
+where your user configuration files for Netdata are.
+
+Once you have figured this out, look for a file called `.environment` in this directory (you will need to use
+`ls -a` to see it, as it will not be listed by default by a regular `ls` command). If it is not there, you used
+package manager to install netdata and need to update it through that package manager. If the `environment` file
+is present, check the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using
+`kickstart-static64.sh`.  Otherwise you installed using `kickstart.sh`.
 
 ## One-line installer script (`kickstart.sh`)
 
 If you installed Netdata using our one-line automatic installation script, run it again to update Netdata. Any custom
 settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists during this process.
 
-This script downloads the latest Netdata source (either the nightly or stable version), compiles Netdata, and updates it
-via reinstallation.
+This script will automatically run the update script that was installed as part of the initial install (even if
+you disabled automatic updates) and preserve the existing install options you specified.
+
+If you installed Netdata using an installation prefix, you will need to add an `--install` option specifying
+that prefix to this command to make sure it finds Netdata.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-> ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
-> want to retain those settings, you need to set them again during this process. See the [`kickstart.sh`
-> documentation](methods/kickstart.md#optional-parameters-to-alter-your-installation) for more information on these
-> parameters and what they do.
+In the event that this command fails, there may be an issue with the installed update script. In such cases, you
+can instead use the following command to run an update as if it were a clean install (this will still preserve
+any user configuration).
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --reinstall
+```
+
+If using this method, you will need to pass any options you passed during the original installation process. To
+determine what options you passed, start by finding the `.environment` file for your install as described above in
+[How to determine which install method you used](#how-to-determine-which-install-method-you-used). Once you have
+found this file, look at the value of the `REINSTALL_OPTIONS` line. This is the list of additional options you
+need to pass to the above command.
 
 ## `.deb` or `.rpm` packages
 
@@ -70,17 +92,26 @@ If you installed Netdata using the pre-built static binary, run the `kickstart-s
 Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists
 during this process.
 
-This script downloads the latest Netdata source (either the nightly or stable version), compiles Netdata, and updates it
-via reinstallation.
+This script will automatically run the update script that was installed as part of the initial install (even if
+you disabled automatic updates) and preserve the existing install options you specified.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
-> ⚠️ If you installed Netdata with any optional parameters, such as `--no-updates` to disable automatic updates, and
-> want to retain those settings, you need to set them again during this process. See the [`kickstart-static64.sh`
-> documentation](methods/kickstart-64.md#optional-parameters-to-alter-your-installation) for more information on these
-> parameters and what they do.
+In the event that this command fails, there may be an issue with the installed update script. In such cases, you
+can instead use the following command to run an update as if it were a clean install (this will still preserve
+any user configuration).
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --reinstall
+```
+
+If using this method, you will need to pass any options you passed during the original installation process. To
+determine what options you passed, start by finding the `.environment` file for your install as described above in
+[How to determine which install method you used](#how-to-determine-which-install-method-you-used). Once you have
+found this file, look at the value of the `REINSTALL_OPTIONS` line. This is the list of additional options you
+need to pass to the above command.
 
 ## Docker
 
