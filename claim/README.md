@@ -194,6 +194,20 @@ might be having with the ACLK or claiming process.
 
 Use these keys and the information below to troubleshoot the ACLK.
 
+#### bash: netdata-claim.sh: command not found
+
+If you run the claiming script and see a `command not found` error, the claiming script is not in your system's `$PATH`.
+Netdata expects this file at `/usr/sbin/`, but some systems may have installed the script in `/opt/netdata/usr/sbin/` or
+`/opt/netdata/bin/`.
+
+Check those locations for the existence of the `netdata-claim.sh` file. When you find it, run the following commands to
+claim your node.
+
+```bash
+sudo chmod +x netdata-claim.sh
+sudo ./netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+```
+
 #### Claiming on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
 If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
