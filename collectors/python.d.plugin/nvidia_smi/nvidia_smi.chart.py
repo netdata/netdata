@@ -404,7 +404,7 @@ class GPU:
         for p in processes:
             data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
             if p['username']:
-                users.add(p['username'])
+                if p['used_memory'] > 0 : users.add(p['username'])
                 key = 'user_mem_{0}'.format(p['username'])
                 if key in data:
                     data[key] += p['used_memory']
