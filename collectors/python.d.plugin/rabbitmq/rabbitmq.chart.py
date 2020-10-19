@@ -262,7 +262,7 @@ class QueueStatsBuilder:
         self.stats = raw_stats
 
     def id(self):
-        return (self.stats['vhost'], self.stats['name'])
+        return self.stats['vhost'], self.stats['name']
 
     def queue_stats(self):
         vhost, name = self.id()
