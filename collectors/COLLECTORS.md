@@ -345,7 +345,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
     collector.
 -   [Disk space](/collectors/diskspace.plugin/README.md): Collect disk space usage metrics on Linux mount points.
 -   [Files and directories](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/filecheck): Gather
-    metrics about the existence, modification, and size of files or directories.
+    metrics about the existence, modification time, and size of files or directories.
 -   [ioping.plugin](/collectors/ioping.plugin/README.md): Measure disk read/write latency.
 -   [NFS file servers and clients](/collectors/proc.plugin/README.md): Gather operations, utilization, and space usage
     using the the `proc.plugin` collector.
