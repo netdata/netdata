@@ -169,7 +169,7 @@ comprehensive example using both.
 #### Alarm line `module`
 
 The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
-list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for some examples. For
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For
 example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
