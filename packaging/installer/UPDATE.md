@@ -42,7 +42,7 @@ The location of your user configuration files is the path on the `config directo
 
 Once you have figured this out, look for a file called `.environment` in this directory. If it is not there, you
 used a package manager to install Netdata, and need to update it through that package manager. If the `.environment` file is present, check
-the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using `kickstart-static64.sh`,
+the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using `kickstart-static64.sh`.
 otherwise you installed using `kickstart.sh`.
 
 ## One-line installer script (`kickstart.sh`)
