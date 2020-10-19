@@ -53,7 +53,7 @@ settings present in your Netdata configuration directory (typically at `/etc/net
 This script will automatically run the update script that was installed as part of the initial install (even if
 you disabled automatic updates) and preserve the existing install options you specified.
 
-Note that if you installed Netdata using an installation prefix, you will need to ad a `--install` option specifying
+If you installed Netdata using an installation prefix, you will need to add an `--install` option specifying
 that prefix to this command to make sure it finds Netdata.
 
 ```bash
