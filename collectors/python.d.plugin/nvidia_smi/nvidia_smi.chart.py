@@ -288,9 +288,10 @@ def get_username_by_pid_safe(pid, passwd_file):
 
 
 class GPU:
-    def __init__(self, num, root):
+    def __init__(self, num, root, exclude_zero_memory_users=False):
         self.num = num
         self.root = root
+        self.exclude_zero_memory_users = exclude_zero_memory_users
 
     def id(self):
         return self.root.get('id')
@@ -404,13 +405,13 @@ class GPU:
         for p in processes:
             data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
             if p['username']:
-                if not(self.exclude_zero_memory_allocated_users) or p['used_memory'] > 0:
+                if p['used_memory'] > 0 or not self.exclude_zero_memory_users:
                     users.add(p['username'])
-                key = 'user_mem_{0}'.format(p['username'])
-                if key in data:
-                    data[key] += p['used_memory']
-                else:
-                    data[key] = p['used_memory']
+            key = 'user_mem_{0}'.format(p['username'])
+            if key in data:
+                data[key] += p['used_memory']
+            else:
+                data[key] = p['used_memory']
         data['user_num'] = len(users)
 
         return dict(
@@ -425,7 +426,7 @@ class Service(SimpleService):
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
         poll = int(configuration.get('poll_seconds', 1))
-        self.exclude_zero_memory_allocated_users = configuration.get('exclude_zero_memory_allocated_users', False)
+        self.exclude_zero_memory_users = configuration.get('exclude_zero_memory_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
     def get_data_loop_mode(self):
@@ -456,7 +457,7 @@ class Service(SimpleService):
 
         data = dict()
         for idx, root in enumerate(parsed.findall('gpu')):
-            gpu = GPU(idx, root)
+            gpu = GPU(idx, root, self.exclude_zero_memory_users)
             data.update(gpu.data())
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
