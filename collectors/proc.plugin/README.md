@@ -334,7 +334,7 @@ The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]
     missed beacon for all interface = yes
 ```
 
-For all configuration options:
+You can set the following values for each configuration option:
 
 -   `auto` = enable monitoring if the collected values are not zero
 -   `yes` = enable monitoring
