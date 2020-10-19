@@ -41,7 +41,7 @@ curl -sS http://localhost:19999/netdata.conf | grep 'config directory'
 The location of your user configuration files is the path on the `config directory` line in the output of that command.
 
 Once you have figured this out, look for a file called `.environment` in this directory. If it is not there, you
-used package manager to install netdata and need to update it through that package manager. If it is there, check
+used a package manager to install Netdata, and need to update it through that package manager. If the `.environment` file is present, check
 the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using `kickstart-static64.sh`,
 otherwise you installed using `kickstart.sh`.
 
