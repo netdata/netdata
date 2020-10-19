@@ -1896,7 +1896,7 @@ fi
 # -----------------------------------------------------------------------------
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URI}"
-  if ${NETDATA_PREFIX}/bin/netdata-claim.sh -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -uri=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
+  if ${NETDATA_PREFIX:-/usr}/bin/netdata-claim.sh -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -uri=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
   else
     run_failed "Unable to claim node, you must do so manually."
