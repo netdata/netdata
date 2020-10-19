@@ -404,7 +404,8 @@ class GPU:
         for p in processes:
             data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
             if p['username']:
-                if p['used_memory'] > 0 : users.add(p['username'])
+                if not(self.exclude_zero_memory_allocated_users) or p['used_memory'] > 0: 
+                    users.add(p['username'])
                 key = 'user_mem_{0}'.format(p['username'])
                 if key in data:
                     data[key] += p['used_memory']
@@ -424,6 +425,7 @@ class Service(SimpleService):
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
         poll = int(configuration.get('poll_seconds', 1))
+        self.exclude_zero_memory_allocated_users = configuration.get('exclude_zero_memory_allocated_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
     def get_data_loop_mode(self):
