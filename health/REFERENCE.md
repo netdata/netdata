@@ -61,7 +61,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
 | [`plugin`](#alarm-line-plugin)                      | no              | Restrict alarm to only certain plugin.                                                |
-| [`module`](#alarm-line-module)                      | no              | Restrict alarm to only certain module.                                                |
+| [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
