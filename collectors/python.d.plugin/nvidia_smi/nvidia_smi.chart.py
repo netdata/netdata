@@ -405,13 +405,13 @@ class GPU:
         for p in processes:
             data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
             if p['username']:
-                if p['used_memory'] > 0 or not self.exclude_zero_memory_users:
-                    users.add(p['username'])
-            key = 'user_mem_{0}'.format(p['username'])
-            if key in data:
-                data[key] += p['used_memory']
-            else:
-                data[key] = p['used_memory']
+                if self.exclude_zero_memory_users and p['used_memory'] == 0:
+                    continue
+                key = 'user_mem_{0}'.format(p['username'])
+                if key in data:
+                    data[key] += p['used_memory']
+                else:
+                    data[key] = p['used_memory']
         data['user_num'] = len(users)
 
         return dict(
