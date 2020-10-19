@@ -346,7 +346,7 @@ You can set the following values for each configuration option:
     The current state of the interface. This is a device-dependent option.
 
 -   **Link**    
-    Overall quality  of  the  link. 
+    Overall quality of the link. 
 
 -   **Level**
     Received signal strength (RSSI), which indicates how strong the received signal is.
