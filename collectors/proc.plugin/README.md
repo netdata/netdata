@@ -325,7 +325,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 ### Monitoring wireless network interfaces
 
-The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` of your `netdata.conf` file.
+The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` section of your `netdata.conf` file.
 
 ```conf
     status for all interfaces = yes
