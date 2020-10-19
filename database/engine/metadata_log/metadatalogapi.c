@@ -36,43 +36,43 @@ void metalog_upd_objcount(RRDHOST *host, int count)
     rrd_atomic_fetch_add(&ctx->objects_nr, count);
 }
 
-BUFFER *metalog_update_host_buffer(RRDHOST *host)
-{
-    BUFFER *buffer;
-    buffer = buffer_create(4096); /* This will be freed after it has been committed to the metadata log buffer */
-
-    rrdhost_rdlock(host);
-
-    buffer_sprintf(buffer,
-                   "HOST \"%s\" \"%s\" \"%s\" %d \"%s\" \"%s\" \"%s\"\n",
-//                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\""  /* system */
-//                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", /* info   */
-                   host->machine_guid,
-                   host->hostname,
-                   host->registry_hostname,
-                   default_rrd_update_every,
-                   host->os,
-                   host->timezone,
-                   (host->tags) ? host->tags : "");
-
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    struct label *labels = host->labels;
-    while (labels) {
-        buffer_sprintf(buffer
-            , "LABEL \"%s\" = %d %s\n"
-            , labels->key
-            , (int)labels->label_source
-            , labels->value);
-
-        labels = labels->next;
-    }
-    netdata_rwlock_unlock(&host->labels_rwlock);
-
-    buffer_strcat(buffer, "OVERWRITE labels\n");
-
-    rrdhost_unlock(host);
-    return buffer;
-}
+//BUFFER *metalog_update_host_buffer(RRDHOST *host)
+//{
+//    BUFFER *buffer;
+//    buffer = buffer_create(4096); /* This will be freed after it has been committed to the metadata log buffer */
+//
+//    rrdhost_rdlock(host);
+//
+//    buffer_sprintf(buffer,
+//                   "HOST \"%s\" \"%s\" \"%s\" %d \"%s\" \"%s\" \"%s\"\n",
+////                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\""  /* system */
+////                 "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"", /* info   */
+//                   host->machine_guid,
+//                   host->hostname,
+//                   host->registry_hostname,
+//                   default_rrd_update_every,
+//                   host->os,
+//                   host->timezone,
+//                   (host->tags) ? host->tags : "");
+//
+//    netdata_rwlock_rdlock(&host->labels_rwlock);
+//    struct label *labels = host->labels;
+//    while (labels) {
+//        buffer_sprintf(buffer
+//            , "LABEL \"%s\" = %d %s\n"
+//            , labels->key
+//            , (int)labels->label_source
+//            , labels->value);
+//
+//        labels = labels->next;
+//    }
+//    netdata_rwlock_unlock(&host->labels_rwlock);
+//
+//    buffer_strcat(buffer, "OVERWRITE labels\n");
+//
+//    rrdhost_unlock(host);
+//    return buffer;
+//}
 
 //void metalog_commit_update_host(RRDHOST *host)
 //{
