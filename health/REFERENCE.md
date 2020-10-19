@@ -155,7 +155,7 @@ hosts: server1 server2 database* !redis3 redis*
 #### Alarm line `plugin`
 
 The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
-list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for details. For example,
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
 you can create a filter for an alarm that applies specifically to `python.d.plugin`:
 
 ```yaml
