@@ -31,19 +31,14 @@ you installed it.** Choose from the following list to see the appropriate update
 
 #### How to determine which install method you used
 
-First, figure out where your user configuration files for Netdata are, normally this is `/etc/netdata`
-or `/opt/netdata/etc/netdata`. You can determine this from the system you installed by running the following command:
+First, see [here](https://learn.netdata.cloud/docs/configure/nodes#the-netdata-config-directory) to figure out
+where your user configuration files for Netdata are.
 
-```bash
-curl -sS http://localhost:19999/netdata.conf | grep 'config directory'
-```
-
-The location of your user configuration files is the path on the `config directory` line in the output of that command.
-
-Once you have figured this out, look for a file called `.environment` in this directory. If it is not there, you
-used a package manager to install Netdata, and need to update it through that package manager. If the `.environment` file is present, check
-the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using `kickstart-static64.sh`.
-Otherwise you installed using `kickstart.sh`.
+Once you have figured this out, look for a file called `.environment` in this directory (you will need to use
+`ls -a` to see it, as it will not be listed by default by a regular `ls` command). If it is not there, you used
+package manager to install netdata and need to update it through that package manager. If the `environment` file
+is present, check the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using
+`kickstart-static64.sh`.  Otherwise you installed using `kickstart.sh`.
 
 ## One-line installer script (`kickstart.sh`)
 
