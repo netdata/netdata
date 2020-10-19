@@ -282,9 +282,12 @@ class Service(UrlService):
         )
         self.node_name = str()
         self.vhost = VhostStatsBuilder()
-        self.queue = QueueStatsBuilder()
         self.collected_vhosts = set()
-        self.collected_queues = set()
+        self.collect_queues_metrics = configuration.get('collect_queues_metrics', False)
+        self.debug("collect_queues_metrics is {0}".format("enabled" if self.collect_queues_metrics else "disabled"))
+        if self.collect_queues_metrics:
+            self.queue = QueueStatsBuilder()
+            self.collected_queues = set()
 
     def _get_data(self):
         data = dict()
@@ -305,9 +308,10 @@ class Service(UrlService):
         if stats:
             data.update(stats)
 
-        stats = self.get_queues_stats()
-        if stats:
-            data.update(stats)
+        if self.collect_queues_metrics:
+            stats = self.get_queues_stats()
+            if stats:
+                data.update(stats)
 
         return data or None
 
