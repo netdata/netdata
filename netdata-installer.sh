@@ -1900,7 +1900,7 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
     progress "Successfully claimed node"
   else
     run_failed "Unable to claim node, you must do so manually."
-    defer_error"Unable to claim node, you must do so manually."
+    defer_error "Unable to claim node, you must do so manually."
   fi
 fi
 
