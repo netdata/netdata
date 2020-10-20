@@ -181,7 +181,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
         r->read_buffer[scan] = 0;
         return &r->read_buffer[start];
     }
-    memcpy(r->read_buffer, &r->read_buffer[start], r->read_len - start);
+    memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
     r->read_len -= start;
     return NULL;
 }
