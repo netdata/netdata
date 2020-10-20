@@ -214,12 +214,21 @@ function k8s_get_kubepod_name() {
   local labels
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
-      name="cntr_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)_$(get_lbl_val "$labels" container_name)"
+      labels+=',kind="container"'
+      name="cntr"
+      name+="_$(get_lbl_val "$labels" namespace)"
+      name+="_$(get_lbl_val "$labels" pod_name)"
+      name+="_$(get_lbl_val "$labels" container_name)"
+      name+=" $labels"
     fi
   elif [ -n "$pod_uid" ]; then
     if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
       labels="${labels%%,cont*}"
-      name="pod_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)"
+      labels+=',kind="pod"'
+      name="pod"
+      name+="_$(get_lbl_val "$labels" namespace)"
+      name+="_$(get_lbl_val "$labels" pod_name)"
+      name+=" $labels"
     fi
   fi
 
@@ -246,7 +255,15 @@ function k8s_get_name() {
     NAME_NOT_FOUND=3
   else
     NAME="k8s_${NAME}"
-    info "${funcname}: cgroup '${id}' has chart name '${NAME}'"
+
+    local name labels
+    name=${NAME%% *}
+    labels=${NAME#* }
+    if [ "$name" != "$labels" ]; then
+      info "${funcname}: cgroup '${id}' has chart name '${name}', labels '${labels}"
+    else
+      info "${funcname}: cgroup '${id}' has chart name '${NAME}'"
+    fi
   fi
 }
 
