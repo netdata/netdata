@@ -989,36 +989,38 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # ebpf.plugin
 
-PKG_CHECK_MODULES(
-    [LIBELF],
-    [libelf],
-    [have_libelf=yes],
-    [have_libelf=no]
-)
+if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
+    PKG_CHECK_MODULES(
+        [LIBELF],
+        [libelf],
+        [have_libelf=yes],
+        [have_libelf=no]
+    )
 
-AC_CHECK_TYPE(
-    [struct bpf_prog_info],
-    [have_bpf=yes],
-    [have_bpf=no],
-    [#include <linux/bpf.h>]
-)
+    AC_CHECK_TYPE(
+        [struct bpf_prog_info],
+        [have_bpf=yes],
+        [have_bpf=no],
+        [#include <linux/bpf.h>]
+    )
 
-AC_CHECK_FILE(
-    externaldeps/libbpf/libbpf.a,
-    [have_libbpf=yes],
-    [have_libbpf=no]
-)
+    AC_CHECK_FILE(
+        externaldeps/libbpf/libbpf.a,
+        [have_libbpf=yes],
+        [have_libbpf=no]
+    )
 
-AC_MSG_CHECKING([if ebpf.plugin should be enabled])
-if test "${build_target}" = "linux" -a \
-        "${enable_ebpf}" != "no" -a \
-        "${have_libelf}" = "yes" -a \
-        "${have_bpf}" = "yes" -a \
-        "${have_libbpf}" = "yes"; then
-    OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
-    OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
-    AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
-    enable_ebpf="yes"
+    AC_MSG_CHECKING([if ebpf.plugin should be enabled])
+    if test "${have_libelf}" = "yes" -a \
+            "${have_bpf}" = "yes" -a \
+            "${have_libbpf}" = "yes"; then
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
+        OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
+        AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
+        enable_ebpf="yes"
+    else
+        enable_ebpf="no"
+    fi
 else
     enable_ebpf="no"
 fi
