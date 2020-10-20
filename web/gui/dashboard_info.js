@@ -50,6 +50,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for network interfaces.'
     },
 
+    'wireless': {
+        title: 'Wireless Interfaces',
+        icon: '<i class="fas fa-wifi"></i>',
+        info: 'Performance metrics for wireless interfaces.'
+    },
+
     'ip': {
         title: 'Networking Stack',
         icon: '<i class="fas fa-cloud"></i>',
