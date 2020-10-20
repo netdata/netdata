@@ -201,7 +201,7 @@ function k8s_get_kubepod_name() {
   jq_filter+='(.status.containerStatuses[]? | '
   jq_filter+='",container_name=\"\(.name)\",container_id=\"\(.containerID)\""'
   jq_filter+=') | '
-  jq_filter+='sub("docker://";"")'
+  jq_filter+='sub("docker://";"")' # containerID: docker://a346da9bc0...
 
   local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
