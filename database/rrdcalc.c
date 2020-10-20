@@ -108,10 +108,22 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 }
 
+static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
+    if (rc->module_match && !simple_pattern_matches(rc->module_pattern, st->module_name))
+        return 0;
+
+    if (rc->plugin_match && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+        return 0;
+
+    return 1;
+}
+
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if(     (rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
-            (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name)))
-        return 1;
+    if(((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
+        (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) &&
+        rrdcalc_test_additional_restriction(rc, st)) {
+            return 1;
+    }
 
     return 0;
 }
@@ -564,6 +576,10 @@ void rrdcalc_free(RRDCALC *rc) {
     simple_pattern_free(rc->spdim);
     freez(rc->labels);
     simple_pattern_free(rc->splabels);
+    freez(rc->module_match);
+    simple_pattern_free(rc->module_pattern);
+    freez(rc->plugin_match);
+    simple_pattern_free(rc->plugin_pattern);
     freez(rc);
 }
 
