@@ -76,51 +76,178 @@ function docker_like_get_name_api() {
 	return 0
 }
 
-function k8s_get_name() {
-	if [[ "${1}" =~ ^kube.*_pod.*$ ]]; then
-		local id="${1##*_pod}"
-	else
-		# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
-		local id="${1##*_}"
-		if [ "${id}" == "${1}" ]; then
-			id="${1##*/}"
-		fi
-	fi
-	if command -v jq >/dev/null 2>&1; then
-		if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
-			KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
-			NAME="$(
-			curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
-			jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' |
-			grep "$id" |
-			cut -d' ' -f1
-			)"
-		elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
-			if [[ -z ${KUBE_CONFIG+x} ]]; then
-				KUBE_CONFIG="/etc/kubernetes/admin.conf"
-			fi
-			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
-				#shellcheck disable=SC2086
-				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' |
-				jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_" + (.status.containerStatuses[]? | "\(.name) \(.containerID)")' |
-				grep "$id" |
-				cut -d' ' -f1
-				)"
-			else
-				warning "kubectl cannot get pod list, check for configuration file in $KUBE_CONFIG, or set this path to env \$KUBE_CONFIG"
-			fi
-		fi
-	else
-		warning "jq command not available, k8s_get_name() cannot execute. Please install jq should you wish for k8s to be fully functional"
-	fi
+# get_lbl_val returns the value for the label with the given name.
+# Returns "null" string if the label doesn't exist.
+# Expected labels format: 'name="value",...'.
+function get_lbl_val() {
+  local labels want_name
+  labels="${1}"
+  want_name="${2}"
 
-	if [ -z "${NAME}" ]; then
-		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id} and disabling it"
-		NAME="${id}"
-		NAME_NOT_FOUND=3
-	else
-		info "k8s containerID '${id}' has chart name (namespace_podname_poduid_containername) '${NAME}'"
-	fi
+  IFS=, read -ra labels <<< "$labels"
+
+  local lname lval
+  for l in "${labels[@]}"; do
+    IFS="=" read -r lname lval <<< "$l"
+    if [ "$want_name" = "$lname" ] && [ -n "$lval" ]; then
+      echo "${lval:1:-1}" # trim "
+      return 0
+    fi
+  done
+
+  echo "null"
+  return 1
+}
+
+# k8s_get_kubepod_name resolves */kubepods/* cgroup name.
+# pod level cgroup name format: 'pod_<namespace>_<pod_name>'
+# container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
+function k8s_get_kubepod_name() {
+  # GKE /sys/fs/cgroup/*/ tree:
+  # |-- kubepods
+  # |   |-- burstable
+  # |   |   |-- pod98cee708-023b-11eb-933d-42010a800193
+  # |   |   |   |-- 922161c98e6ea450bf665226cdc64ca2aa3e889934c2cff0aec4325f8f78ac03
+  # |   |       `-- a5d223eec35e00f5a1c6fa3e3a5faac6148cdc1f03a2e762e873b7efede012d7
+  # |   `-- pode314bbac-d577-11ea-a171-42010a80013b
+  # |       |-- 7d505356b04507de7b710016d540b2759483ed5f9136bb01a80872b08f771930
+  # |       `-- 88ab4683b99cfa7cc8c5f503adf7987dd93a3faa7c4ce0d17d419962b3220d50
+  #
+  # Minikube (v1.8.2) /sys/fs/cgroup/*/ tree:
+  # |-- kubepods.slice
+  # |   |-- kubepods-besteffort.slice
+  # |   |   |-- kubepods-besteffort-pod10fb5647_c724_400c_b9cc_0e6eae3110e7.slice
+  # |   |   |   |-- docker-36e5eb5056dfdf6dbb75c0c44a1ecf23217fe2c50d606209d8130fcbb19fb5a7.scope
+  # |   |   |   `-- docker-87e18c2323621cf0f635c53c798b926e33e9665c348c60d489eef31ee1bd38d7.scope
+  #
+  # NOTE: cgroups plugin uses '_' to join dir names, so it is <parent>_<child>_<child>_...
+
+  local funcname="${FUNCNAME[0]}"
+  local id="${1}"
+
+  if [[ ! $id =~ ^kubepods ]]; then
+    warning "${funcname}: '${id}' is not kubepod cgroup."
+    return 1
+  fi
+
+  local clean_id="$id"
+  clean_id=${clean_id//.slice/}
+  clean_id=${clean_id//.scope/}
+
+  local name pod_uid cntr_id
+  if [[ $clean_id == "kubepods" ]]; then
+    name="$clean_id"
+  elif [[ $clean_id =~ .+(besteffort|burstable|guaranteed)$ ]]; then
+    # kubepods_<QOS_CLASS>
+    # kubepods_kubepods-<QOS_CLASS>
+    name=${clean_id//-/_}
+    name=${name/#kubepods_kubepods/kubepods}
+  elif [[ $clean_id =~ .+pod[a-f0-9_-]+_docker-([a-f0-9]+)$ ]]; then
+    # ...pod<POD_UID>_docker-<CONTAINER_ID> (POD_UID w/ "_")
+    cntr_id=${BASH_REMATCH[1]}
+  elif [[ $clean_id =~ .+pod[a-f0-9-]+_([a-f0-9]+)$ ]]; then
+    # ...pod<POD_UID>_<CONTAINER_ID>
+    cntr_id=${BASH_REMATCH[1]}
+  elif [[ $clean_id =~ .+pod([a-f0-9_-]+)$ ]]; then
+    # ...pod<POD_UID> (POD_UID w/ and w/o "_")
+    pod_uid=${BASH_REMATCH[1]}
+    pod_uid=${pod_uid//_/-}
+  fi
+
+  if [ -n "$name" ]; then
+    echo "$name"
+    return 0
+  fi
+
+  if [ -z "$pod_uid" ] && [ -z "$cntr_id" ]; then
+    warning "${funcname}: can't extract pod_uid or container_id from the cgroup '$id'."
+    return 1
+  fi
+
+  [ -n "$pod_uid" ] && info "${funcname}: cgroup '$id' is a pod(uid:$pod_uid)"
+  [ -n "$cntr_id" ] && info "${funcname}: cgroup '$id' is a container(id:$cntr_id)"
+
+  if ! command -v jq > /dev/null 2>&1; then
+    warning "${funcname}: 'jq' command not available."
+    return 1
+  fi
+
+  local pods
+  if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+    local token header url
+    token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
+    header="Authorization: Bearer $token"
+    url="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods"
+    if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
+      warning "${funcname}: error on curl '${url}': ${pods}."
+      return 1
+    fi
+  elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
+    [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
+    if ! pods=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
+      warning "${funcname}: error on 'kubectl': ${pods}."
+      return 1
+    fi
+  else
+    warning "${funcname}: not inside the k8s cluster and 'kubectl' command not available."
+    return 1
+  fi
+
+  local jq_filter
+  # 'namespace="<NAMESPACE>",pod_name="<NAME>",pod_uid="<UID>",container_name="<NAME>",container_ID="<ID>"'
+  # wrong field value is 'null'
+  jq_filter+='.items[] | '
+  jq_filter+='"namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"" + '
+  jq_filter+='(.status.containerStatuses[]? | '
+  jq_filter+='",container_name=\"\(.name)\",container_id=\"\(.containerID)\""'
+  jq_filter+=') | '
+  jq_filter+='sub("docker://";"")'
+
+  local containers
+  if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
+    warning "${funcname}: error on 'jq' parse: ${containers}."
+    return 1
+  fi
+
+  # available labels:
+  # namespace, pod_name, pod_uid, container_name, container_id
+  local labels
+  if [ -n "$cntr_id" ]; then
+    if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
+      name="cntr_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)_$(get_lbl_val "$labels" container_name)"
+    fi
+  elif [ -n "$pod_uid" ]; then
+    if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
+      labels="${labels%%,cont*}"
+      name="pod_$(get_lbl_val "$labels" namespace)_$(get_lbl_val "$labels" pod_name)"
+    fi
+  fi
+
+  # jq filter nonexistent field and nonexistent label value is 'null'
+  if [[ $name =~ _null(_|$) ]]; then
+    warning "${funcname}: invalid name: $name (cgroup '$id')"
+    name=""
+  fi
+
+  echo "$name"
+  [ -n "$name" ]
+  return
+}
+
+function k8s_get_name() {
+  local funcname="${FUNCNAME[0]}"
+  local id="${1}"
+
+  NAME=$(k8s_get_kubepod_name "$id")
+
+  if [ -z "${NAME}" ]; then
+    warning "${funcname}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
+    NAME="${id}"
+    NAME_NOT_FOUND=3
+  else
+    NAME="k8s_${NAME}"
+    info "${funcname}: cgroup '${id}' has chart name '${NAME}'"
+  fi
 }
 
 function docker_get_name() {
