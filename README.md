@@ -30,14 +30,15 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 People get addicted to Netdata. Once you use it on your systems, there's no going back! _You've been warned..._
 
-![Users who are addicted to Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
+![Users who are addicted to
+Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.25.0, September 15, 2020**
+> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.26.0, October 14, 2020**
 >
-> The v1.25.0 release of the Netdata Agent is focused on improving Netdata's usability across the board. We added more
-> customization to how the Prometheus collector implemented in v1.24 meaningfully visualizes metrics. In addition, we've
-> focused on fixing bugs and ensuring that core functionality of the Netdata Agent, such as the ACLK, works more
-> efficiently.
+> The v1.26.0 release of the Netdata Agent brings exciting new collectors written in Go, a new integration with the
+> DevOps startup StackPulse, and massive improvements to the way users navigate Netdata's documentation. We've also
+> added compatibility with an exciting new feature that's coming soon to Netdata Cloud—stay tuned! This release contains
+> 3 new collectors, 1 new notifcation method, 21 improvements, 13 documentation updates, and 12 bug fixes.
 
 ## Menu
 
@@ -52,7 +53,8 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 
 ## Features
 
-![Netdata in action](https://user-images.githubusercontent.com/1153921/95625372-40afc800-0a2d-11eb-8425-3355c8c4a3f3.gif)
+![Netdata in
+action](https://user-images.githubusercontent.com/1153921/95625372-40afc800-0a2d-11eb-8425-3355c8c4a3f3.gif)
 
 Here's what you can expect from Netdata:
 
@@ -169,10 +171,11 @@ The result is a highly efficient, low-latency system, supporting multiple reader
 
 ## Infographic
 
-This is a high-level overview of Netdata features and architecture. Click on it to view an interactive version, which has
-links to our documentation.
+This is a high-level overview of Netdata features and architecture. Click on it to view an interactive version, which
+has links to our documentation.
 
-[![An infographic of how Netdata works](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
+[![An infographic of how Netdata
+works](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
 
 ## Documentation
 
