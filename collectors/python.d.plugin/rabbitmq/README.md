@@ -69,6 +69,27 @@ Per Vhost charts:
     -   redeliver
     -   return_unroutable
 
+2. Per Queue charts:
+
+    1. **Queued Messages**
+
+        - messages
+        - paged_out
+        - persistent
+        - ready
+        - unacknowledged
+
+    2. **Queue Messages stats**
+
+        -   ack
+        -   confirm
+        -   deliver
+        -   get
+        -   get_no_ack
+        -   publish
+        -   redeliver
+        -   return_unroutable
+
 ## Configuration
 
 Edit the `python.d/rabbitmq.conf` configuration file using `edit-config` from the your agent's [config

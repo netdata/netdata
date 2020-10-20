@@ -2539,6 +2539,16 @@ netdataDashboard.context = {
         colors: NETDATA.colors[3]
     },
 
+    'rabbitmq.queue_messages': {
+        info: 'Total amount of messages and their states in this queue.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.queue_messages_stats': {
+        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
+        colors: NETDATA.colors[3]
+    },
+
     // ------------------------------------------------------------------------
     // ntpd
 
