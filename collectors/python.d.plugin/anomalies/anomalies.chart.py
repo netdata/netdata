@@ -270,7 +270,7 @@ class Service(SimpleService):
         data_probability, data_anomaly = {}, {}
         for model in self.fitted_at.keys():
             X_model = self.get_array_cols(feature_colnames, X, starts_with=model)
-            try:    
+            try:
                 data_probability[model + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 100
                 data_anomaly[model + '_anomaly'] = self.models[model].predict(X_model)[-1]
             except Exception as e:
