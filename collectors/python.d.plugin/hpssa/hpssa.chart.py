@@ -181,8 +181,8 @@ class HPSSA(object):
                 break
             elif array_regex.match(line):
                 self.parse_array(adapter)
-            elif line == 'Unassigned':
-                self.parse_unassigned_physical_drives(adapter)
+            elif line == 'Unassigned' or line == 'HBA Drives':
+                self.parse_physical_drives(adapter)
             elif ignored_sections_regex.match(line):
                 self.parse_ignored_section()
             else:
@@ -225,7 +225,7 @@ class HPSSA(object):
                 self.rewind()
                 break
 
-    def parse_unassigned_physical_drives(self, adapter):
+    def parse_physical_drives(self, adapter):
         for line in self:
             match = drive_regex.match(line)
             if match:
