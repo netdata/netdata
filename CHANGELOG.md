@@ -6,9 +6,21 @@
 
 **Merged pull requests:**
 
+- Rewrite the repository's main README [\#10108](https://github.com/netdata/netdata/pull/10108) ([joelhans](https://github.com/joelhans))
+- Update supported collectors list with new collectors [\#10102](https://github.com/netdata/netdata/pull/10102) ([joelhans](https://github.com/joelhans))
 - Added more robust doucmentation around updates. [\#10100](https://github.com/netdata/netdata/pull/10100) ([Ferroin](https://github.com/Ferroin))
+- nvidia\_smi: Not count users with zero memory allocated [\#10098](https://github.com/netdata/netdata/pull/10098) ([scatenag](https://github.com/scatenag))
+- Replace memcpy\(\) with memmove\(\) for overlapping memory ranges. [\#10097](https://github.com/netdata/netdata/pull/10097) ([mfundul](https://github.com/mfundul))
+- collectors/cgroups: filter pod level cgroups [\#10095](https://github.com/netdata/netdata/pull/10095) ([ilyam8](https://github.com/ilyam8))
+- Add support for HBA drives in hpssa.chart.py [\#10093](https://github.com/netdata/netdata/pull/10093) ([martinpal](https://github.com/martinpal))
 - Removed redundant build dependencies from Debian control file. [\#10085](https://github.com/netdata/netdata/pull/10085) ([alexmyczko](https://github.com/alexmyczko))
+- collectors/cgroups: fix resolving container names in k8s [\#10072](https://github.com/netdata/netdata/pull/10072) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#10067](https://github.com/netdata/netdata/pull/10067) ([andrewm4894](https://github.com/andrewm4894))
+- Add per queue charts in rabbitmq.chart.py [\#10064](https://github.com/netdata/netdata/pull/10064) ([fayak](https://github.com/fayak))
+- Wireless statistics [\#10052](https://github.com/netdata/netdata/pull/10052) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix formatting source code blocks in custom dashboard page [\#10050](https://github.com/netdata/netdata/pull/10050) ([atnartur](https://github.com/atnartur))
+- New alarm entities [\#10041](https://github.com/netdata/netdata/pull/10041) ([thiagoftsm](https://github.com/thiagoftsm))
+- Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
@@ -238,10 +250,6 @@
 - Add guide for monitoring a k8s cluster with Netdata [\#9466](https://github.com/netdata/netdata/pull/9466) ([joelhans](https://github.com/joelhans))
 - Add codeowners to exporting engine folder [\#9465](https://github.com/netdata/netdata/pull/9465) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update exporting engine to read the prefix option from instance config sections [\#9463](https://github.com/netdata/netdata/pull/9463) ([vlvkobal](https://github.com/vlvkobal))
-- Fix a Coverity defect for resource leaks [\#9462](https://github.com/netdata/netdata/pull/9462) ([vlvkobal](https://github.com/vlvkobal))
-- Fix the exporting engine unit tests [\#9460](https://github.com/netdata/netdata/pull/9460) ([vlvkobal](https://github.com/vlvkobal))
-- Wrap exporting engine header definitions in compilation conditions [\#9458](https://github.com/netdata/netdata/pull/9458) ([candrews](https://github.com/candrews))
-- Properly include eBPF collector in binary packages. [\#9450](https://github.com/netdata/netdata/pull/9450) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
