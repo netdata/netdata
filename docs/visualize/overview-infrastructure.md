@@ -20,8 +20,8 @@ Overview](https://user-images.githubusercontent.com/1153921/95912630-e75ed600-0d
 ## Using the Overview
 
 > ⚠️ In order for nodes to contribute to composite charts, and thus the Overview UI, they must run v1.26.0 or later of
-> the Netdata Agent. See our [update docs](/docs/agent/packaging/installer/update) for the preferred update method based
-> on how you installed the Agent.
+> the Netdata Agent. See our [update docs](/packaging/installer/UPDATE.md) for the preferred update method based on how
+> you installed the Agent.
 
 The Overview uses roughly the same interface as local Agent dashboards or single-node dashboards in Netdata Cloud. By
 showing all available metrics from all your nodes in a single interface, Netdata Cloud helps you visualize the overall
@@ -117,6 +117,6 @@ highlight timeframes for targeted analysis, and more.
 
 -   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
 -   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
--   [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes-view)
+-   [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Foverview-infrastructure&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
