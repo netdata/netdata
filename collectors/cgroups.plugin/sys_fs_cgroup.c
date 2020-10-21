@@ -600,6 +600,9 @@ struct cgroup {
 
     char *chart_title;
 
+    char *chart_labels;
+    LABEL_SOURCE chart_label_source;
+
     struct cpuacct_stat cpuacct_stat;
     struct cpuacct_usage cpuacct_usage;
 
@@ -1306,6 +1309,15 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
                 }
 
                 if(likely(cg->pending_renames < 2)) {
+                    if (!strncmp(s, "k8s_", 4)) {
+                        char *labels = s;
+                        
+                        s = mystrsep(&labels, " ");
+                        freez(cg->chart_labels);
+                        cg->chart_labels = strdupz(labels);
+                        cg->chart_label_source = LABEL_SOURCE_KUBERNETES;
+                    }
+
                     freez(cg->chart_title);
                     cg->chart_title = cgroup_title_strdupz(s);
 
@@ -1507,6 +1519,8 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->id);
     freez(cg->chart_id);
     freez(cg->chart_title);
+
+    freez(cg->chart_labels);
 
     freez(cg);
 
@@ -2014,6 +2028,63 @@ static inline void find_all_cgroups() {
 // generate charts
 
 #define CHART_TITLE_MAX 300
+
+void add_chart_labels(RRDSET *st, char *labels, LABEL_SOURCE source)
+{
+    if (!labels)
+        return;
+
+    char *copied_labels = strdupz(labels);
+    char *s = copied_labels;
+
+    while (s) {
+        char *key = mystrsep(&s, "=");
+        char *value = mystrsep(&s, ",");
+        value = strip_double_quotes(value, 1);
+        rrdset_add_label_to_new_list(st, key, value, source);
+    }
+
+    rrdset_finalize_labels(st);
+
+    freez(copied_labels);
+
+    return;
+}
+
+RRDSET *rrdset_create_with_labels(
+    const char *type,
+    const char *id,
+    const char *name,
+    const char *family,
+    const char *context,
+    const char *title,
+    const char *units,
+    const char *plugin,
+    const char *module,
+    long priority,
+    int update_every,
+    RRDSET_TYPE chart_type,
+    char *labels,
+    LABEL_SOURCE label_source)
+{
+    RRDSET *st = rrdset_create_localhost(
+        type,
+        id,
+        name,
+        family,
+        context,
+        title,
+        units,
+        plugin,
+        module,
+        priority,
+        update_every,
+        chart_type);
+
+    add_chart_labels(st, labels, label_source);
+
+    return st;
+}
 
 void update_systemd_services_charts(
           int update_every
@@ -3008,7 +3079,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_cpu)) {
                 snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
 
-                cg->st_cpu = rrdset_create_localhost(
+                cg->st_cpu = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "cpu"
                         , NULL
@@ -3021,6 +3092,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority
                         , update_every
                         , RRDSET_TYPE_STACKED
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
@@ -3078,7 +3151,7 @@ void update_cgroup_charts(int update_every) {
                         if(unlikely(!cg->st_cpu_limit)) {
                             snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits for cgroup %s", cg->chart_title);
 
-                            cg->st_cpu_limit = rrdset_create_localhost(
+                            cg->st_cpu_limit = rrdset_create_with_labels(
                                     cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                                     , "cpu_limit"
                                     , NULL
@@ -3091,6 +3164,8 @@ void update_cgroup_charts(int update_every) {
                                     , cgroup_containers_chart_priority - 1
                                     , update_every
                                     , RRDSET_TYPE_LINE
+                                    , cg->chart_labels
+                                    , cg->chart_label_source
                             );
 
                             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
@@ -3131,7 +3206,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_cpu_per_core)) {
                 snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
 
-                cg->st_cpu_per_core = rrdset_create_localhost(
+                cg->st_cpu_per_core = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "cpu_per_core"
                         , NULL
@@ -3144,6 +3219,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 100
                         , update_every
                         , RRDSET_TYPE_STACKED
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 for(i = 0; i < cg->cpuacct_usage.cpus; i++) {
@@ -3165,7 +3242,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_mem)) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
 
-                cg->st_mem = rrdset_create_localhost(
+                cg->st_mem = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem"
                         , NULL
@@ -3178,6 +3255,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 210
                         , update_every
                         , RRDSET_TYPE_STACKED
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_mem, "cache", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3222,7 +3301,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_writeback)) {
                 snprintfz(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->chart_title);
 
-                cg->st_writeback = rrdset_create_localhost(
+                cg->st_writeback = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "writeback"
                         , NULL
@@ -3235,6 +3314,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 300
                         , update_every
                         , RRDSET_TYPE_AREA
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 if(cg->memory.detailed_has_dirty)
@@ -3255,7 +3336,7 @@ void update_cgroup_charts(int update_every) {
                 if(unlikely(!cg->st_mem_activity)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Activity for cgroup %s", cg->chart_title);
 
-                    cg->st_mem_activity = rrdset_create_localhost(
+                    cg->st_mem_activity = rrdset_create_with_labels(
                             cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                             , "mem_activity"
                             , NULL
@@ -3268,6 +3349,8 @@ void update_cgroup_charts(int update_every) {
                             , cgroup_containers_chart_priority + 400
                             , update_every
                             , RRDSET_TYPE_LINE
+                            , cg->chart_labels
+                            , cg->chart_label_source
                     );
 
                     rrddim_add(cg->st_mem_activity, "pgpgin", "in", system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3284,7 +3367,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_pgfaults)) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults for cgroup %s", cg->chart_title);
 
-                cg->st_pgfaults = rrdset_create_localhost(
+                cg->st_pgfaults = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "pgfaults"
                         , NULL
@@ -3297,6 +3380,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 500
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_pgfaults, "pgfault", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3314,7 +3399,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_mem_usage)) {
                 snprintfz(title, CHART_TITLE_MAX, "Used Memory %sfor cgroup %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"", cg->chart_title);
 
-                cg->st_mem_usage = rrdset_create_localhost(
+                cg->st_mem_usage = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem_usage"
                         , NULL
@@ -3327,6 +3412,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 200
                         , update_every
                         , RRDSET_TYPE_STACKED
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3375,7 +3462,7 @@ void update_cgroup_charts(int update_every) {
                     if(unlikely(!cg->st_mem_usage_limit)) {
                         snprintfz(title, CHART_TITLE_MAX, "Used RAM without Cache within the limits for cgroup %s", cg->chart_title);
 
-                        cg->st_mem_usage_limit = rrdset_create_localhost(
+                        cg->st_mem_usage_limit = rrdset_create_with_labels(
                                 cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                                 , "mem_usage_limit"
                                 , NULL
@@ -3388,6 +3475,8 @@ void update_cgroup_charts(int update_every) {
                                 , cgroup_containers_chart_priority + 199
                                 , update_every
                                 , RRDSET_TYPE_STACKED
+                                , cg->chart_labels
+                                , cg->chart_label_source
                         );
 
                         rrddim_add(cg->st_mem_usage_limit, "available", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3417,7 +3506,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_mem_failcnt)) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
 
-                cg->st_mem_failcnt = rrdset_create_localhost(
+                cg->st_mem_failcnt = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem_failcnt"
                         , NULL
@@ -3430,6 +3519,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 250
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_mem_failcnt, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3445,7 +3536,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_io)) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_io = rrdset_create_localhost(
+                cg->st_io = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "io"
                         , NULL
@@ -3458,6 +3549,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_AREA
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3475,7 +3568,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_serviced_ops)) {
                 snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_serviced_ops = rrdset_create_localhost(
+                cg->st_serviced_ops = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "serviced_ops"
                         , NULL
@@ -3488,6 +3581,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3505,7 +3600,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_throttle_io)) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_throttle_io = rrdset_create_localhost(
+                cg->st_throttle_io = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "throttle_io"
                         , NULL
@@ -3518,6 +3613,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_AREA
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3535,7 +3632,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_throttle_serviced_ops)) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_throttle_serviced_ops = rrdset_create_localhost(
+                cg->st_throttle_serviced_ops = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "throttle_serviced_ops"
                         , NULL
@@ -3548,6 +3645,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3565,7 +3664,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_queued_ops)) {
                 snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_queued_ops = rrdset_create_localhost(
+                cg->st_queued_ops = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "queued_ops"
                         , NULL
@@ -3578,6 +3677,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 2000
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -3595,7 +3696,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_merged_ops)) {
                 snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks) for cgroup %s", cg->chart_title);
 
-                cg->st_merged_ops = rrdset_create_localhost(
+                cg->st_merged_ops = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "merged_ops"
                         , NULL
@@ -3608,6 +3709,8 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 2100
                         , update_every
                         , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
                 );
 
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3628,7 +3731,7 @@ void update_cgroup_charts(int update_every) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "CPU pressure for cgroup %s", cg->chart_title);
 
-                    chart = res->some.st = rrdset_create_localhost(
+                    chart = res->some.st = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "cpu_pressure"
                         , NULL
@@ -3639,8 +3742,11 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 2200
-                        , update_every,
-                        RRDSET_TYPE_LINE);
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
+                    );
 
                     res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -3658,7 +3764,7 @@ void update_cgroup_charts(int update_every) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory pressure for cgroup %s", cg->chart_title);
 
-                    chart = res->some.st = rrdset_create_localhost(
+                    chart = res->some.st = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem_pressure"
                         , NULL
@@ -3669,8 +3775,11 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 2300
-                        , update_every,
-                        RRDSET_TYPE_LINE);
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
+                        );
 
                     res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -3687,7 +3796,7 @@ void update_cgroup_charts(int update_every) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory full pressure for cgroup %s", cg->chart_title);
 
-                    chart = res->full.st = rrdset_create_localhost(
+                    chart = res->full.st = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "mem_full_pressure"
                         , NULL
@@ -3698,8 +3807,11 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 2350
-                        , update_every,
-                        RRDSET_TYPE_LINE);
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
+                        );
 
                     res->full.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     res->full.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -3717,7 +3829,7 @@ void update_cgroup_charts(int update_every) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O pressure for cgroup %s", cg->chart_title);
 
-                    chart = res->some.st = rrdset_create_localhost(
+                    chart = res->some.st = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "io_pressure"
                         , NULL
@@ -3728,8 +3840,11 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 2400
-                        , update_every,
-                        RRDSET_TYPE_LINE);
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
+                        );
 
                     res->some.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     res->some.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -3746,7 +3861,7 @@ void update_cgroup_charts(int update_every) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O full pressure for cgroup %s", cg->chart_title);
 
-                    chart = res->full.st = rrdset_create_localhost(
+                    chart = res->full.st = rrdset_create_with_labels(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                         , "io_full_pressure"
                         , NULL
@@ -3757,8 +3872,11 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , cgroup_containers_chart_priority + 2450
-                        , update_every,
-                        RRDSET_TYPE_LINE);
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                        , cg->chart_labels
+                        , cg->chart_label_source
+                        );
 
                     res->full.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                     res->full.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
