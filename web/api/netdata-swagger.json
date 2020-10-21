@@ -130,8 +130,8 @@
           {
             "name": "chart",
             "in": "query",
-            "description": "The id of the chart as returned by the /charts call.",
-            "required": true,
+            "description": "The id of the chart as returned by the /charts call. Note chart or context must be specified",
+            "required": false,
             "allowEmptyValue": false,
             "schema": {
               "type": "string",
@@ -142,7 +142,7 @@
           {
             "name": "context",
             "in": "query",
-            "description": "The context of the chart as returned by the /charts call.",
+            "description": "The context of the chart as returned by the /charts call. Note chart or context must be specified",
             "required": false,
             "allowEmptyValue": false,
             "schema": {
@@ -340,7 +340,7 @@
             "description": "Bad request - the body will include a message stating what is wrong."
           },
           "404": {
-            "description": "No chart with the given id is found."
+            "description": "Chart or context is not found. The supplied chart or context will be reported."
           },
           "500": {
             "description": "Internal server error. This usually means the server is out of memory."
