@@ -236,10 +236,10 @@ If you don't already have a Netdata Cloud account, go [sign in](https://app.netd
 Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of node
 claiming and other fundamentals.
 
-Add more charts to the Nodes view by clicking on the gear icon at the far end of the table. Click on the **Context**
-input and scroll until you find the eBPF chart you're interested in, or type in the name of the context directly. Maybe
-something like `apps.vfs_write_call`? Next, click on the **Dimensions** input and find the `dev` dimension, or maybe
-`apache`/`redis` if you set your `apps_groups.conf` up like the examples above.
+Add more charts to a War Room's Overview, or the Nodes view, by clicking on the gear icon at the far end of the table.
+Click on the **Context** input and scroll until you find the eBPF chart you're interested in, or type in the name of the
+context directly. Maybe something like `apps.vfs_write_call`? Next, click on the **Dimensions** input and find the `dev`
+dimension, or maybe `apache`/`redis` if you set your `apps_groups.conf` up like the examples above.
 
 Click **Save** to add the chart for all your claimed nodes. Now you can see how your application interacts with multiple
 Linux kernels on multiple Linux systems. 

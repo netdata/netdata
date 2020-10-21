@@ -165,9 +165,9 @@ You can also show these exporting engine metrics on Netdata Cloud. If you don't 
 in](https://app.netdata.cloud) and get started for free. If you need some help along the way, read the [get started with
 Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started).
 
-Add more metrics to the Nodes view by clicking on the **Add metric** button, then typing `exporting` into the context
-field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any others
-you've customized in Netdata Cloud.
+Add more metrics to a War Room's Nodes view by clicking on the **Add metric** button, then typing `exporting` into the
+context field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any
+others you've customized in Netdata Cloud.
 
 ![Exporting engine metrics in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/83902769-db139e00-a711-11ea-828e-aa7e32b04c75.png)
