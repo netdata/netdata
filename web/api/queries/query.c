@@ -1566,8 +1566,6 @@ RRDR *rrd2rrdr(
     int rrd_update_every;
     int absolute_period_requested;
 
-//    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-
     time_t first_entry_t;
     time_t last_entry_t;
     if (context_param_list) {
