@@ -13,7 +13,6 @@ typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
-typedef struct context_param CONTEXT_PARAM;
 
 // forward declarations
 struct rrddim_volatile;
@@ -23,6 +22,13 @@ struct rrdeng_page_descr;
 struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
+
+#include <time.h>
+typedef struct context_param {
+    RRDDIM *rd;
+    time_t first_entry_t;
+    time_t last_entry_t;
+} CONTEXT_PARAM;
 
 #include "../daemon/common.h"
 #include "web/api/queries/query.h"
