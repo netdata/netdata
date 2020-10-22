@@ -345,84 +345,84 @@ int sql_cache_chart_dimensions(RRDSET *st)
  * GUID lookup function
  */
 
-GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size)
-{
-    UNUSED(object);
-    UNUSED(max_size);
-    static sqlite3_stmt *res = NULL;
-    int rc;
-
-    int guid_type = GUID_TYPE_NOTFOUND;
-
-    if (unlikely(!db)) {
-        errno = 0;
-        error("Database not initialized");
-        return guid_type;
-    }
-
-    if (!res) {
-        rc = sqlite3_prepare_v2(
-            db,
-            "select 1 from host where host_id=@guid union "
-            "select 2 from chart where chart_id=@guid union "
-            "select 3 from dimension where dim_id=@guid;",
-            -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            errno = 0;
-            error("Failed to prepare statement to lookup GUIDs, rc = %d", rc);
-            goto failed;
-        }
-    }
-
-    rc = sqlite3_bind_blob(res, 1, uuid, 16, SQLITE_TRANSIENT);
-    if (rc != SQLITE_OK) {
-        errno = 0;
-        error("Failed to bind UUID to select statement, rc = %d", rc);
-        goto failed;
-    }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    unsigned long long start = now_realtime_usec();
-#endif
-    int retries = SQLITE_SELECT_MAX;
-    while (retries && (rc = sqlite3_step(res)) != SQLITE_DONE) {
-        if (likely(rc == SQLITE_ROW)) {
-            guid_type = sqlite3_column_int(res, 0);
-            break;
-        }
-        usleep(SQLITE_SELECT_DELAY * USEC_PER_MS);
-        retries--;
-    }
-    if (unlikely(!retries)) {
-        errno = 0;
-        error("Failed to lookup UUID in the database");
-        goto failed;
-    }
-#ifdef NETDATA_INTERNAL_CHECKS
-    char dim_str[37];
-    uuid_unparse_lower(*uuid, dim_str);
-    unsigned long long end = now_realtime_usec();
-    debug(
-        D_SQLITE, "Find UUID [%s]=%d in %llu usec, retries = %d", dim_str, guid_type, end - start,
-        SQLITE_SELECT_MAX - retries);
-#endif
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        errno = 0;
-        error("Failed to reset prepared statement in UUID lookup, rc = %d", rc);
-    }
-    return guid_type;
-
-failed:
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        errno = 0;
-        error("Failed to finalize prepared statement in UUID lookup, rc = %d", rc);
-    }
-    res = NULL;
-    return guid_type;
-}
+//GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size)
+//{
+//    UNUSED(object);
+//    UNUSED(max_size);
+//    static sqlite3_stmt *res = NULL;
+//    int rc;
+//
+//    int guid_type = GUID_TYPE_NOTFOUND;
+//
+//    if (unlikely(!db)) {
+//        errno = 0;
+//        error("Database not initialized");
+//        return guid_type;
+//    }
+//
+//    if (!res) {
+//        rc = sqlite3_prepare_v2(
+//            db,
+//            "select 1 from host where host_id=@guid union "
+//            "select 2 from chart where chart_id=@guid union "
+//            "select 3 from dimension where dim_id=@guid;",
+//            -1, &res, 0);
+//        if (rc != SQLITE_OK) {
+//            errno = 0;
+//            error("Failed to prepare statement to lookup GUIDs, rc = %d", rc);
+//            goto failed;
+//        }
+//    }
+//
+//    rc = sqlite3_bind_blob(res, 1, uuid, 16, SQLITE_TRANSIENT);
+//    if (rc != SQLITE_OK) {
+//        errno = 0;
+//        error("Failed to bind UUID to select statement, rc = %d", rc);
+//        goto failed;
+//    }
+//
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    unsigned long long start = now_realtime_usec();
+//#endif
+//    int retries = SQLITE_SELECT_MAX;
+//    while (retries && (rc = sqlite3_step(res)) != SQLITE_DONE) {
+//        if (likely(rc == SQLITE_ROW)) {
+//            guid_type = sqlite3_column_int(res, 0);
+//            break;
+//        }
+//        usleep(SQLITE_SELECT_DELAY * USEC_PER_MS);
+//        retries--;
+//    }
+//    if (unlikely(!retries)) {
+//        errno = 0;
+//        error("Failed to lookup UUID in the database");
+//        goto failed;
+//    }
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    char dim_str[37];
+//    uuid_unparse_lower(*uuid, dim_str);
+//    unsigned long long end = now_realtime_usec();
+//    debug(
+//        D_SQLITE, "Find UUID [%s]=%d in %llu usec, retries = %d", dim_str, guid_type, end - start,
+//        SQLITE_SELECT_MAX - retries);
+//#endif
+//
+//    rc = sqlite3_reset(res);
+//    if (unlikely(rc != SQLITE_OK)) {
+//        errno = 0;
+//        error("Failed to reset prepared statement in UUID lookup, rc = %d", rc);
+//    }
+//    return guid_type;
+//
+//failed:
+//    rc = sqlite3_finalize(res);
+//    if (unlikely(rc != SQLITE_OK)) {
+//        errno = 0;
+//        error("Failed to finalize prepared statement in UUID lookup, rc = %d", rc);
+//    }
+//    res = NULL;
+//    return guid_type;
+//}
 //
 //GUID_TYPE sql_add_dimension_guid(uuid_t *uuid, uuid_t *chart)
 //{

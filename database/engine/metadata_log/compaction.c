@@ -78,11 +78,13 @@ static void compaction_test_quota(struct metalog_worker_config *wc)
 
 static void compact_record_by_uuid(struct metalog_instance *ctx, uuid_t *uuid)
 {
-    GUID_TYPE ret;
-    RRDSET *st;
-    RRDDIM *rd;
-    BUFFER *buffer;
-    RRDHOST *host = NULL;
+    UNUSED(ctx);
+    UNUSED(uuid);
+//    GUID_TYPE ret;
+//    RRDSET *st;
+//    RRDDIM *rd;
+//    BUFFER *buffer;
+//    RRDHOST *host = NULL;
 
     info("compact_record_by_uuid");
 

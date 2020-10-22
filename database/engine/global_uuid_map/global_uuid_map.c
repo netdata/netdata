@@ -275,19 +275,19 @@
 //    return 0;
 //}
 
-void init_global_guid_map()
-{
-    static int init = 0;
-
-    if (init)
-        return;
-
-    init = 1;
-    info("Configuring locking mechanism for global GUID map");
-//    fatal_assert(0 == uv_rwlock_init(&guid_lock));
-//    fatal_assert(0 == uv_rwlock_init(&object_lock));
-//    fatal_assert(0 == uv_rwlock_init(&global_lock));
-    return;
-}
+//void init_global_guid_map()
+//{
+//    static int init = 0;
+//
+//    if (init)
+//        return;
+//
+//    init = 1;
+//    info("Configuring locking mechanism for global GUID map");
+////    fatal_assert(0 == uv_rwlock_init(&guid_lock));
+////    fatal_assert(0 == uv_rwlock_init(&object_lock));
+////    fatal_assert(0 == uv_rwlock_init(&global_lock));
+//    return;
+//}
 
 

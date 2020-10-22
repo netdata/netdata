@@ -209,80 +209,84 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
-    GUID_TYPE ret;
+    UNUSED(user);
+    UNUSED(uuid);
+//    GUID_TYPE ret;
     //struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
     //struct metalog_instance *ctx = state->ctx;
-    char object[49], chart_object[33], id_str[1024];
-    uuid_t *chart_guid, *chart_char_guid;
-    RRDHOST *host;
+//    char object[49], chart_object[33], id_str[1024];
+//    uuid_t *chart_guid, *chart_char_guid;
+//    RRDHOST *host;
     return PARSER_RC_OK;
 
 
-    ret = find_object_by_guid(uuid, object, 49);
-    switch (ret) {
-        case GUID_TYPE_NOTFOUND:
-            error_with_guid(uuid, "Failed to find valid context");
-            break;
-        case GUID_TYPE_CHAR:
-            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
-            break;
-        case GUID_TYPE_CHART:
-        case GUID_TYPE_DIMENSION:
-            host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
-            if (unlikely(!host))
-                break;
-            switch (ret) {
-                case GUID_TYPE_CHART:
-                    chart_char_guid = (uuid_t *)(object + 16);
-
-                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    if (unlikely(GUID_TYPE_CHAR != ret))
-                        error_with_guid(uuid, "Failed to find valid chart name");
-                    else
-                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
-                    break;
-                case GUID_TYPE_DIMENSION:
-                    chart_guid = (uuid_t *)(object + 16);
-
-                    ret = find_object_by_guid(chart_guid, chart_object, 33);
-                    if (unlikely(GUID_TYPE_CHART != ret)) {
-                        error_with_guid(uuid, "Failed to find valid chart");
-                        break;
-                    }
-                    chart_char_guid = (uuid_t *)(object + 16);
-
-                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
-                    if (unlikely(GUID_TYPE_CHAR != ret))
-                        error_with_guid(uuid, "Failed to find valid chart name");
-                    else
-                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case GUID_TYPE_HOST:
-            ((PARSER_USER_OBJECT *)user)->host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
-            break;
-        case GUID_TYPE_NOSPACE:
-            error_with_guid(uuid, "Not enough space for object retrieval");
-            break;
-        default:
-            error("Unknown return code %u from find_object_by_guid", ret);
-            break;
-    }
-
-    return PARSER_RC_OK;
+//    ret = find_object_by_guid(uuid, object, 49);
+//    switch (ret) {
+//        case GUID_TYPE_NOTFOUND:
+//            error_with_guid(uuid, "Failed to find valid context");
+//            break;
+//        case GUID_TYPE_CHAR:
+//            error_with_guid(uuid, "Ignoring unexpected type GUID_TYPE_CHAR");
+//            break;
+//        case GUID_TYPE_CHART:
+//        case GUID_TYPE_DIMENSION:
+//            host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
+//            if (unlikely(!host))
+//                break;
+//            switch (ret) {
+//                case GUID_TYPE_CHART:
+//                    chart_char_guid = (uuid_t *)(object + 16);
+//
+//                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+//                    if (unlikely(GUID_TYPE_CHAR != ret))
+//                        error_with_guid(uuid, "Failed to find valid chart name");
+//                    else
+//                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+//                    break;
+//                case GUID_TYPE_DIMENSION:
+//                    chart_guid = (uuid_t *)(object + 16);
+//
+//                    ret = find_object_by_guid(chart_guid, chart_object, 33);
+//                    if (unlikely(GUID_TYPE_CHART != ret)) {
+//                        error_with_guid(uuid, "Failed to find valid chart");
+//                        break;
+//                    }
+//                    chart_char_guid = (uuid_t *)(object + 16);
+//
+//                    ret = find_object_by_guid(chart_char_guid, id_str, RRD_ID_LENGTH_MAX + 1);
+//                    if (unlikely(GUID_TYPE_CHAR != ret))
+//                        error_with_guid(uuid, "Failed to find valid chart name");
+//                    else
+//                        ((PARSER_USER_OBJECT *)user)->st = rrdset_find(host, id_str);
+//                    break;
+//                default:
+//                    break;
+//            }
+//            break;
+//        case GUID_TYPE_HOST:
+//            ((PARSER_USER_OBJECT *)user)->host = metalog_get_host_from_uuid(NULL, (uuid_t *) &object);
+//            break;
+//        case GUID_TYPE_NOSPACE:
+//            error_with_guid(uuid, "Not enough space for object retrieval");
+//            break;
+//        default:
+//            error("Unknown return code %u from find_object_by_guid", ret);
+//            break;
+//    }
+//
+//    return PARSER_RC_OK;
 }
 
 PARSER_RC metalog_pluginsd_tombstone_action(void *user, uuid_t *uuid)
 {
-    GUID_TYPE ret;
-    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    struct metalog_instance *ctx = state->ctx;
-    RRDHOST *host = NULL;
-    RRDSET *st;
-    RRDDIM *rd;
+    UNUSED(user);
+    UNUSED(uuid);
+//    GUID_TYPE ret;
+//    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
+//    struct metalog_instance *ctx = state->ctx;
+//    RRDHOST *host = NULL;
+//    RRDSET *st;
+//    RRDDIM *rd;
 
     return PARSER_RC_OK;
 //
