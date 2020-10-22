@@ -67,10 +67,14 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
+# use http or https to pull data
+protocol: 'http'
 # what host to pull data from.
 host: '127.0.0.1:19999'
 # what charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
 charts_in_scope: 'system\..*'
+# charts to exclude, useful if you would like to exclude some charts from charts_in_scope (should be a ',' seperated string like 'chart.name,chart.name').
+charts_to_exclude: 'system.uptime,system.entropy'
 # what model to use - can be one of 'pca', 'hbos', 'iforest', 'cblof', 'loda', 'copod' or 'feature_bagging'. More details here: https://pyod.readthedocs.io/en/latest/pyod.models.html.
 model: 'pca'
 # max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.

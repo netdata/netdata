@@ -50,6 +50,9 @@ class Service(SimpleService):
         self.host = self.configuration.get('host', '127.0.0.1:19999')
         self.charts_regex = re.compile(self.configuration.get('charts_regex','system\..*'))
         self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
+        self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
+        if len(self.charts_to_exclude) > 0:
+            self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
         self.model = self.configuration.get('model', 'pca')
         self.train_max_n = self.configuration.get('train_max_n', 100000)
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
