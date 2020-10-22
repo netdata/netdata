@@ -5,8 +5,8 @@
 * @ktsaou @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @knatsakis
-.github/ @Ferroin @knatsakis
+.travis/ @Ferroin @knatsakis @kaskavel
+.github/ @Ferroin @knatsakis @kaskavel
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
@@ -38,6 +38,7 @@ packaging/ @Ferroin @knatsakis
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @knatsakis
+tests/ @Ferroin @knatsakis @kaskavel
 web/ @thiagoftsm @mfundul @vlvkobal
 web/gui/ @jacekkolasa
 
@@ -48,7 +49,7 @@ Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
 .gitignore @Ferroin @knatsakis
-.travis.yml @Ferroin @knatsakis
+.travis.yml @Ferroin @knatsakis @kaskavel
 .lgtm.yml @Ferroin @knatsakis
 .eslintrc @Ferroin @knatsakis
 .eslintignore @Ferroin @knatsakis
