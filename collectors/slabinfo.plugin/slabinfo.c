@@ -163,12 +163,12 @@ struct slabinfo *read_file_slabinfo() {
     slabdebug("-> Reading procfile %s", PLUGIN_SLABINFO_PROCFILE);
 
     static procfile *ff = NULL;
-	static long slab_pagesize = 0;
+    static long slab_pagesize = 0;
 
-	if (unlikely(!slab_pagesize)) {
-		slab_pagesize = sysconf(_SC_PAGESIZE);
-		slabdebug("   Discovered pagesize: %ld", slab_pagesize);
-	}
+    if (unlikely(!slab_pagesize)) {
+        slab_pagesize = sysconf(_SC_PAGESIZE);
+        slabdebug("   Discovered pagesize: %ld", slab_pagesize);
+    }
 
     if(unlikely(!ff)) {
         ff = procfile_reopen(ff, PLUGIN_SLABINFO_PROCFILE, " ,:" , PROCFILE_FLAG_DEFAULT);
