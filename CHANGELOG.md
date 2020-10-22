@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fixed compile error in CENTOS 6 [\#10110](https://github.com/netdata/netdata/pull/10110) ([stelfrag](https://github.com/stelfrag))
+- installer: update go.d.plugin version to v0.24.0 [\#10109](https://github.com/netdata/netdata/pull/10109) ([ilyam8](https://github.com/ilyam8))
 - Rewrite the repository's main README [\#10108](https://github.com/netdata/netdata/pull/10108) ([joelhans](https://github.com/joelhans))
 - Update supported collectors list with new collectors [\#10102](https://github.com/netdata/netdata/pull/10102) ([joelhans](https://github.com/joelhans))
 - Added more robust doucmentation around updates. [\#10100](https://github.com/netdata/netdata/pull/10100) ([Ferroin](https://github.com/Ferroin))
@@ -14,6 +16,7 @@
 - collectors/cgroups: filter pod level cgroups [\#10095](https://github.com/netdata/netdata/pull/10095) ([ilyam8](https://github.com/ilyam8))
 - Add support for HBA drives in hpssa.chart.py [\#10093](https://github.com/netdata/netdata/pull/10093) ([martinpal](https://github.com/martinpal))
 - Removed redundant build dependencies from Debian control file. [\#10085](https://github.com/netdata/netdata/pull/10085) ([alexmyczko](https://github.com/alexmyczko))
+- Add documentation for Cloud Overview [\#10082](https://github.com/netdata/netdata/pull/10082) ([joelhans](https://github.com/joelhans))
 - collectors/cgroups: fix resolving container names in k8s [\#10072](https://github.com/netdata/netdata/pull/10072) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#10067](https://github.com/netdata/netdata/pull/10067) ([andrewm4894](https://github.com/andrewm4894))
 - Add per queue charts in rabbitmq.chart.py [\#10064](https://github.com/netdata/netdata/pull/10064) ([fayak](https://github.com/fayak))
@@ -221,7 +224,6 @@
 - Network Viewer options [\#9495](https://github.com/netdata/netdata/pull/9495) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use the libbpf library for the eBPF plugin [\#9490](https://github.com/netdata/netdata/pull/9490) ([vlvkobal](https://github.com/vlvkobal))
 - Implemented the HOST command in metadata log replay [\#9489](https://github.com/netdata/netdata/pull/9489) ([stelfrag](https://github.com/stelfrag))
-- Add documentation to provide a comprehensive guide for package maintainers [\#9467](https://github.com/netdata/netdata/pull/9467) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
@@ -247,9 +249,6 @@
 - Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
 - Fix vulnerability in JSON parsing [\#9491](https://github.com/netdata/netdata/pull/9491) ([underhood](https://github.com/underhood))
 - Fix potential memory leak in ebpf.plugin [\#9484](https://github.com/netdata/netdata/pull/9484) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add guide for monitoring a k8s cluster with Netdata [\#9466](https://github.com/netdata/netdata/pull/9466) ([joelhans](https://github.com/joelhans))
-- Add codeowners to exporting engine folder [\#9465](https://github.com/netdata/netdata/pull/9465) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update exporting engine to read the prefix option from instance config sections [\#9463](https://github.com/netdata/netdata/pull/9463) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
