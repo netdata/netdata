@@ -101,13 +101,21 @@ paths:
       parameters:
         - name: chart
           in: query
-          description: The id of the chart as returned by the /charts call.
-          required: true
+          description: The id of the chart as returned by the /charts call. Note chart or context must be specified
+          required: false
           allowEmptyValue: false
           schema:
             type: string
             format: as returned by /charts
             default: system.cpu
+        - name: context
+          in: query
+          description: The context of the chart as returned by the /charts call. Note chart or context must be specified
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: as returned by /charts
         - name: dimension
           in: query
           description: Zero, one or more dimension ids or names, as returned by the /chart
@@ -125,11 +133,10 @@ paths:
           description: "This parameter can either be an absolute timestamp specifying the
             starting point of the data to be returned, or a relative number of
             seconds (negative, relative to parameter: before). Netdata will
-            assume it is a relative number if it is less that 3 years (in
-            seconds). Netdata will adapt this parameter to the boundaries of the
-            round robin database. The default is the beginning of the round
-            robin database (i.e. by default netdata will attempt to return data
-            for the entire database)."
+            assume it is a relative number if it is less that 3 years (in seconds).
+            If not specified the default is -600 seconds. Netdata will adapt this
+            parameter to the boundaries of the round robin database unless the allow_past
+            option is specified."
           required: true
           allowEmptyValue: false
           schema:
@@ -243,6 +250,7 @@ paths:
                 - match-ids
                 - match-names
                 - showcustomvars
+                - allow_past
             default:
               - seconds
               - jsonwrap
@@ -285,7 +293,7 @@ paths:
         "400":
           description: Bad request - the body will include a message stating what is wrong.
         "404":
-          description: No chart with the given id is found.
+          description: Chart or context is not found. The supplied chart or context will be reported.
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
