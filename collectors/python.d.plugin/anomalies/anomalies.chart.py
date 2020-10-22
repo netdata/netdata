@@ -18,7 +18,6 @@ from pyod.models.iforest import IForest
 from pyod.models.cblof import CBLOF
 from pyod.models.feature_bagging import FeatureBagging
 from pyod.models.copod import COPOD
-from pyod.models.hbos import HBOS as DefaultModel
 from sklearn.preprocessing import MinMaxScaler
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -90,7 +89,7 @@ class Service(SimpleService):
         elif self.model == 'hbos':
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         else:
-            self.models = {model: DefaultModel(contamination=self.contamination) for model in self.models_in_scope}
+            self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         self.scaler = MinMaxScaler()
         self.fitted_at = {}
         self.df_predict = pd.DataFrame()
@@ -243,7 +242,7 @@ class Service(SimpleService):
                 self.n_fit_fail += 1
                 self.info(e)
                 self.info(f'training failed for {model} at run_counter {self.runs_counter}, defaulting to hbos model.')
-                self.models[model] = DefaultModel(contamination=self.contamination)
+                self.models[model] = HBOS(contamination=self.contamination)
                 self.models[model].fit(X_train)
             self.fitted_at[model] = self.runs_counter
 
