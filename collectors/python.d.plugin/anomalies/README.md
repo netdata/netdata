@@ -38,7 +38,7 @@ Then, as the issue passes, the anomaly probabilities should settle back down int
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.23 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.24 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Configuration

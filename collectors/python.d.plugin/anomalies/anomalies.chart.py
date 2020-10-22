@@ -46,9 +46,10 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+        self.protocol = self.configuration.get('protocol', 'http')
         self.host = self.configuration.get('host', '127.0.0.1:19999')
         self.charts_regex = re.compile(self.configuration.get('charts_regex','system\..*'))
-        self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys()]))
+        self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
         self.model = self.configuration.get('model', 'pca')
         self.train_max_n = self.configuration.get('train_max_n', 100000)
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
@@ -208,7 +209,7 @@ class Service(SimpleService):
         after =  before - self.train_n_secs
 
         # get training data
-        df_train = get_data(self.host, self.charts_in_scope, after=after, before=before, sort_cols=True, numeric_only=True).ffill()
+        df_train = get_data(self.host, self.charts_in_scope, after=after, before=before, sort_cols=True, numeric_only=True, protocol=self.protocol).ffill()
         self.set_expected_cols(df_train)
         df_train = df_train[self.expected_cols]
         if self.custom_models:
@@ -249,7 +250,7 @@ class Service(SimpleService):
         :return: (<dict>,<dict>) tuple of dictionaries, one for probability scores and the other for anomaly predictions.
         """
         # get recent data to predict on
-        df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, sort_cols=True)[self.expected_cols]
+        df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, sort_cols=True, protocol=self.protocol)[self.expected_cols]
         if self.custom_models:
             df_allmetrics = self.add_custom_models_dims(df_allmetrics)
         self.df_allmetrics = self.df_allmetrics.append(df_allmetrics).ffill().tail((self.lags_n + self.smooth_n + self.diffs_n) * 2)
