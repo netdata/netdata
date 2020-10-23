@@ -19,6 +19,7 @@ typedef struct context_param CONTEXT_PARAM;
 struct rrddim_volatile;
 struct rrdset_volatile;
 struct context_param;
+struct label;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;

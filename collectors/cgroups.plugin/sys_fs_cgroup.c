@@ -1228,7 +1228,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
 
             // register a device rename to proc_net_dev.c
-            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
+            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id, cg->chart_labels);
         }
     }
 
