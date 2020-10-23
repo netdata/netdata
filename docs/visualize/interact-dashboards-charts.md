@@ -81,7 +81,7 @@ height](https://user-images.githubusercontent.com/1153921/93497272-1acb5380-f8c5
 
 Netdata Cloud now supports composite charts in the Overview interface. Composite charts come with a few additional UI
 elements and varied interactions, such as the location of dimensions and a utility bar for configuring the state of
-individual composite charts. All of these de4tails are covered in the [Overview
+individual composite charts. All of these details are covered in the [Overview
 reference](https://learn.netdata.cloud/docs/cloud/visualize/overview) doc.
 
 ## What's next?
