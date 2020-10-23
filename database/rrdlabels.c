@@ -126,6 +126,17 @@ struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_S
     return lab;
 }
 
+void update_label_list(struct label **labels, struct label *new_labels)
+{
+    free_label_list(*labels);
+
+    while (new_labels != NULL)
+    {
+        *labels = add_label_to_list(*labels, new_labels->key, new_labels->value, new_labels->label_source);
+        new_labels = new_labels->next;
+    }
+}
+
 int label_list_contains(struct label *head, struct label *check)
 {
     while (head != NULL)

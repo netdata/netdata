@@ -203,7 +203,8 @@ typedef enum skip_escaped_characters {
 
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
-struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern void update_label_list(struct label **labels, struct label *new_labels);
 extern void replace_label_list(struct label_index *labels, struct label *new_labels);
 extern int is_valid_label_value(char *value);
 extern int is_valid_label_key(char *key);
@@ -217,6 +218,7 @@ extern char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_
 void reload_host_labels(void);
 extern void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source);
 extern void rrdset_finalize_labels(RRDSET *st);
+extern void rrdset_update_labels(RRDSET *st, struct label *labels);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric

@@ -1923,3 +1923,12 @@ void rrdset_finalize_labels(RRDSET *st)
         replace_label_list(labels, new_labels);
     }
 }
+
+void rrdset_update_labels(RRDSET *st, struct label *labels)
+{
+    if (!labels)
+        return;
+
+    update_label_list(&st->state->new_labels, labels);
+    rrdset_finalize_labels(st);
+}
