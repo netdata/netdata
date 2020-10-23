@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Disregard host tags configuration pointer [\#10121](https://github.com/netdata/netdata/pull/10121) ([mfundul](https://github.com/mfundul))
+- Fix platform dependent printf format [\#10120](https://github.com/netdata/netdata/pull/10120) ([Saruspete](https://github.com/Saruspete))
+- Added new data query option "allow\_past" [\#10112](https://github.com/netdata/netdata/pull/10112) ([stelfrag](https://github.com/stelfrag))
 - Fixed compile error in CENTOS 6 [\#10110](https://github.com/netdata/netdata/pull/10110) ([stelfrag](https://github.com/stelfrag))
 - installer: update go.d.plugin version to v0.24.0 [\#10109](https://github.com/netdata/netdata/pull/10109) ([ilyam8](https://github.com/ilyam8))
 - Rewrite the repository's main README [\#10108](https://github.com/netdata/netdata/pull/10108) ([joelhans](https://github.com/joelhans))
@@ -24,6 +27,7 @@
 - Fix formatting source code blocks in custom dashboard page [\#10050](https://github.com/netdata/netdata/pull/10050) ([atnartur](https://github.com/atnartur))
 - New alarm entities [\#10041](https://github.com/netdata/netdata/pull/10041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
+- Completely hide SSO iframe [\#10027](https://github.com/netdata/netdata/pull/10027) ([Jiab77](https://github.com/Jiab77))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
@@ -174,7 +178,6 @@
 - Add Network viewer charts [\#9591](https://github.com/netdata/netdata/pull/9591) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix MySQL collector documentation to mention `netdata` user [\#9555](https://github.com/netdata/netdata/pull/9555) ([mrbarletta](https://github.com/mrbarletta))
 - Update supported collectors doc to organize by type [\#9513](https://github.com/netdata/netdata/pull/9513) ([joelhans](https://github.com/joelhans))
-- Add and document support for reading container names from Podman in cgroups.plugin [\#9474](https://github.com/netdata/netdata/pull/9474) ([K900](https://github.com/K900))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
