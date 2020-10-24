@@ -29,58 +29,58 @@ typedef enum {
     METALOG_STATUS_INITIALIZED
 } metalog_state_t;
 
-struct metalog_record_io_descr {
-    BUFFER *buffer;
-    struct completion *completion;
-    int compacting; /* When 0 append at the end of the metadata log file list.
-                       When 1 append to the temporary compaction metadata log file list. */
-    uuid_t uuid;
-};
+//struct metalog_record_io_descr {
+//    BUFFER *buffer;
+//    struct completion *completion;
+//    int compacting; /* When 0 append at the end of the metadata log file list.
+//                       When 1 append to the temporary compaction metadata log file list. */
+//    uuid_t uuid;
+//};
 
-enum metalog_opcode {
-    /* can be used to return empty status or flush the command queue */
-    METALOG_NOOP = 0,
+//enum metalog_opcode {
+//    /* can be used to return empty status or flush the command queue */
+//    METALOG_NOOP = 0,
+//
+//    METALOG_SHUTDOWN,
+//    METALOG_COMMIT_CREATION_RECORD,
+//    METALOG_COMMIT_DELETION_RECORD,
+//    METALOG_COMPACTION_FLUSH,
+//    METALOG_QUIESCE,
+//
+//    METALOG_MAX_OPCODE
+//};
 
-    METALOG_SHUTDOWN,
-    METALOG_COMMIT_CREATION_RECORD,
-    METALOG_COMMIT_DELETION_RECORD,
-    METALOG_COMPACTION_FLUSH,
-    METALOG_QUIESCE,
+//struct metalog_cmd {
+//    enum metalog_opcode opcode;
+//    struct metalog_record_io_descr record_io_descr;
+//};
 
-    METALOG_MAX_OPCODE
-};
+//#define METALOG_CMD_Q_MAX_SIZE (2048)
+//
+//struct metalog_cmdqueue {
+//    unsigned head, tail;
+//    struct metalog_cmd cmd_array[METALOG_CMD_Q_MAX_SIZE];
+//};
 
-struct metalog_cmd {
-    enum metalog_opcode opcode;
-    struct metalog_record_io_descr record_io_descr;
-};
-
-#define METALOG_CMD_Q_MAX_SIZE (2048)
-
-struct metalog_cmdqueue {
-    unsigned head, tail;
-    struct metalog_cmd cmd_array[METALOG_CMD_Q_MAX_SIZE];
-};
-
-struct metalog_worker_config {
-    struct metalog_instance *ctx;
-
-    uv_thread_t thread;
-    uv_loop_t *loop;
-    uv_async_t async;
-
-    /* metadata log file comapaction thread */
-    uv_thread_t *now_compacting_files;
-    unsigned long cleanup_thread_compacting_files; /* set to 0 when now_compacting_files is still running */
-
-    /* FIFO command queue */
-    uv_mutex_t cmd_mutex;
-    uv_cond_t cmd_cond;
-    volatile unsigned queue_size;
-    struct metalog_cmdqueue cmd_queue;
-
-    int error;
-};
+//struct metalog_worker_config {
+//    struct metalog_instance *ctx;
+//
+//    uv_thread_t thread;
+//    uv_loop_t *loop;
+//    uv_async_t async;
+//
+//    /* metadata log file comapaction thread */
+//    uv_thread_t *now_compacting_files;
+//    unsigned long cleanup_thread_compacting_files; /* set to 0 when now_compacting_files is still running */
+//
+//    /* FIFO command queue */
+//    uv_mutex_t cmd_mutex;
+//    uv_cond_t cmd_cond;
+//    volatile unsigned queue_size;
+//    struct metalog_cmdqueue cmd_queue;
+//
+//    int error;
+//};
 
 /*
  * Debug statistics not used by code logic.
@@ -103,16 +103,16 @@ struct metalog_statistics {
 
 struct metalog_instance {
     struct rrdengine_instance *rrdeng_ctx;
-    struct metalog_worker_config worker_config;
-    struct completion metalog_completion;
+//    struct metalog_worker_config worker_config;
+//    struct completion metalog_completion;
     struct metadata_record_commit_log records_log;
     struct metadata_logfile_list metadata_logfiles;
     struct parser_user_object *metalog_parser_object;
     struct logfile_compaction_state compaction_state;
-    uint32_t current_compaction_id; /* Every compaction run increments this by 1 */
+    //uint32_t current_compaction_id; /* Every compaction run increments this by 1 */
     unsigned long disk_space;
-    unsigned long records_nr;
-    unsigned long objects_nr; /* total objects (hosts, charts, dimensions) monitored in this context */
+//    unsigned long records_nr;
+//    unsigned long objects_nr; /* total objects (hosts, charts, dimensions) monitored in this context */
     uint8_t initialized; /* set to 1 to mark context initialized */
     unsigned last_fileno; /* newest index of metadata log file */
 
@@ -125,15 +125,15 @@ struct metalog_instance {
     struct metalog_statistics stats;
 };
 
-extern void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode,
-                                  uuid_t *uuid, int compacting);
-    extern int init_metadata_logfiles(struct metalog_instance *ctx);
-extern void finalize_metadata_logfiles(struct metalog_instance *ctx);
-extern void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc);
-extern void metalog_test_quota(struct metalog_worker_config *wc);
-extern void metalog_worker(void* arg);
-extern void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd);
-extern struct metalog_cmd metalog_deq_cmd(struct metalog_worker_config *wc);
-extern void error_with_guid(uuid_t *uuid, char *reason);
-extern void info_with_guid(uuid_t *uuid, char *reason);
+//extern void metalog_commit_record(struct metalog_instance *ctx, BUFFER *buffer, enum metalog_opcode opcode,
+//                                  uuid_t *uuid, int compacting);
+//    extern int init_metadata_logfiles(struct metalog_instance *ctx);
+//extern void finalize_metadata_logfiles(struct metalog_instance *ctx);
+//extern void metalog_try_link_new_metadata_logfile(struct metalog_worker_config *wc);
+//extern void metalog_test_quota(struct metalog_worker_config *wc);
+//extern void metalog_worker(void* arg);
+//extern void metalog_enq_cmd(struct metalog_worker_config *wc, struct metalog_cmd *cmd);
+//extern struct metalog_cmd metalog_deq_cmd(struct metalog_worker_config *wc);
+//extern void error_with_guid(uuid_t *uuid, char *reason);
+//extern void info_with_guid(uuid_t *uuid, char *reason);
 #endif /* NETDATA_METADATALOG_H */

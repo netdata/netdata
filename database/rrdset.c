@@ -397,9 +397,9 @@ void rrdset_free(RRDSET *st) {
             freez(st);
             break;
     }
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(host, -1);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_upd_objcount(host, -1);
+//#endif
 
 }
 

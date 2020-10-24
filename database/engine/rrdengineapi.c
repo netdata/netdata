@@ -982,7 +982,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     fatal_assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_rrd_files(ctx);
-    metalog_exit(ctx->metalog_ctx);
+    //metalog_exit(ctx->metalog_ctx);
     free_page_cache(ctx);
 
     if (ctx != &multidb_ctx) {
@@ -1008,6 +1008,6 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
     wait_for_completion(&ctx->rrdengine_completion);
     destroy_completion(&ctx->rrdengine_completion);
 
-    metalog_prepare_exit(ctx->metalog_ctx);
+    //metalog_prepare_exit(ctx->metalog_ctx);
 }
 

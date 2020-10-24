@@ -331,7 +331,7 @@ RRDHOST *rrdhost_create(const char *hostname,
             return host;
         }
 
-        metalog_upd_objcount(host, 1);
+        //metalog_upd_objcount(host, 1);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif

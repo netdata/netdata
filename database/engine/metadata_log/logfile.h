@@ -66,31 +66,31 @@ struct metadata_record_commit_log {
     unsigned buf_size;
 };
 
-extern void mlf_record_insert(struct metadata_logfile *metalogfile, struct metalog_record *record);
-extern struct metalog_record *mlf_record_get_first(struct metadata_logfile *metalogfile);
-extern struct metalog_record *mlf_record_get_next(struct metadata_logfile *metalogfile);
-extern void mlf_flush_records_buffer(struct metalog_worker_config *wc, struct metadata_record_commit_log *records_log,
-                                     struct metadata_logfile_list *metadata_logfiles);
-extern void *mlf_get_records_buffer(struct metalog_worker_config *wc, struct metadata_record_commit_log *records_log,
-                                    struct metadata_logfile_list *metadata_logfiles, unsigned size);
-extern void metadata_logfile_list_insert(struct metadata_logfile_list *metadata_logfiles,
-                                         struct metadata_logfile *metalogfile);
-extern void metadata_logfile_list_delete(struct metadata_logfile_list *metadata_logfiles,
-                                         struct metadata_logfile *metalogfile);
+//extern void mlf_record_insert(struct metadata_logfile *metalogfile, struct metalog_record *record);
+//extern struct metalog_record *mlf_record_get_first(struct metadata_logfile *metalogfile);
+//extern struct metalog_record *mlf_record_get_next(struct metadata_logfile *metalogfile);
+//extern void mlf_flush_records_buffer(struct metalog_worker_config *wc, struct metadata_record_commit_log *records_log,
+//                                     struct metadata_logfile_list *metadata_logfiles);
+//extern void *mlf_get_records_buffer(struct metalog_worker_config *wc, struct metadata_record_commit_log *records_log,
+//                                    struct metadata_logfile_list *metadata_logfiles, unsigned size);
+//extern void metadata_logfile_list_insert(struct metadata_logfile_list *metadata_logfiles,
+//                                         struct metadata_logfile *metalogfile);
+//extern void metadata_logfile_list_delete(struct metadata_logfile_list *metadata_logfiles,
+//                                         struct metadata_logfile *metalogfile);
 extern void generate_metadata_logfile_path(struct metadata_logfile *metadatalog, char *str, size_t maxlen);
-extern void metadata_logfile_init(struct metadata_logfile *metadatalog, struct metalog_instance *ctx,
-                              unsigned tier, unsigned fileno);
+//extern void metadata_logfile_init(struct metadata_logfile *metadatalog, struct metalog_instance *ctx,
+//                              unsigned tier, unsigned fileno);
 extern int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_starting_fileno,
                                    unsigned new_fileno);
 extern int close_metadata_logfile(struct metadata_logfile *metadatalog);
-extern int fsync_metadata_logfile(struct metadata_logfile *metalogfile);
+//extern int fsync_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int unlink_metadata_logfile(struct metadata_logfile *metalogfile);
-extern int destroy_metadata_logfile(struct metadata_logfile *metalogfile);
-extern int create_metadata_logfile(struct metadata_logfile *metalogfile);
+//extern int destroy_metadata_logfile(struct metadata_logfile *metalogfile);
+//extern int create_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile *logfile);
 extern void init_metadata_record_log(struct metadata_record_commit_log *records_log);
-extern int add_new_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile_list *logfile_list,
-                                    unsigned tier, unsigned fileno);
+//extern int add_new_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile_list *logfile_list,
+//                                    unsigned tier, unsigned fileno);
 extern int init_metalog_files(struct metalog_instance *ctx);
 extern void finalize_metalog_files(struct metalog_instance *ctx);
 

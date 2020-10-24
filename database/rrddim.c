@@ -463,10 +463,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if (netdata_cloud_setting)
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(st->rrdhost, 1);
-    metalog_commit_update_dimension(rd);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_upd_objcount(st->rrdhost, 1);
+//    metalog_commit_update_dimension(rd);
+//#endif
 
     return(rd);
 }
@@ -544,9 +544,9 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != rrd_memory_mode))
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(st->rrdhost, -1);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_upd_objcount(st->rrdhost, -1);
+//#endif
 }
 
 
@@ -603,9 +603,9 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     if (netdata_cloud_setting)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_commit_update_dimension(rd);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_commit_update_dimension(rd);
+//#endif
 
 }
 
@@ -617,9 +617,9 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     if (netdata_cloud_setting)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_commit_update_dimension(rd);
-#endif
+//#ifdef ENABLE_DBENGINE
+//    metalog_commit_update_dimension(rd);
+//#endif
 }
 
 // ----------------------------------------------------------------------------
