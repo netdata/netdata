@@ -59,6 +59,12 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     int is_multihost_child = 0;
     RRDHOST *host = rd->rrdset->rrdhost;
 
+    if (unlikely(!dim_uuid)) {
+        errno = 0;
+        error("FAILED to generate GUID for %s", rd->id);
+        fatal_assert(0);
+    }
+
     ctx = get_rrdeng_ctx_from_host(rd->rrdset->rrdhost);
     if (unlikely(!ctx)) {
         error("Failed to fetch multidb context");

@@ -929,9 +929,14 @@ RRDSET *rrdset_create_custom(
     rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-//        int replace_instead_of_generate = 0;
+        //        int replace_instead_of_generate = 0;
 
         st->chart_uuid = sql_find_chart_uuid(host, st, type, id, name);
+        if (unlikely(!st->chart_uuid)) {
+            errno = 0;
+            error("FAILED to generate GUID for %s", st->id);
+            fatal_assert(0);
+        }
 //        st->chart_uuid = callocz(1, sizeof(uuid_t));
 //        if (NULL != chart_uuid) {
 //            replace_instead_of_generate = 1;

@@ -619,11 +619,9 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const c
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    if (name) {
-        rc = sqlite3_bind_text(res, 4, name?name:id, -1, SQLITE_TRANSIENT);
-        if (unlikely(rc != SQLITE_OK))
-            goto bind_fail;
-    }
+    rc = sqlite3_bind_text(res, 4, name ? name : id, -1, SQLITE_TRANSIENT);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
 
     rc = sqlite3_step(res);
 
