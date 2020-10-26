@@ -286,6 +286,12 @@ int sql_cache_host_charts(RRDHOST *host)
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, 16, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        errno = 0;
+        error("Failed to bind host_uuid to find host charts");
+        sqlite3_finalize(res);
+        return 0;
+    }
     int count = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         add_in_uuid_cache(
