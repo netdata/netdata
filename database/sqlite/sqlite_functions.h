@@ -26,8 +26,8 @@
 #define SQL_STORE_DIMENSION                                                                                           \
     "INSERT OR REPLACE into dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) values (?0001,?0002,?0003,?0004,?0005,?0006,?0007);"
 
-extern int sql_init_database();
-extern int sql_close_database();
+extern int sql_init_database(void);
+extern int sql_close_database(void);
 
 extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *timezone, const char *tags);
 extern int sql_store_chart(

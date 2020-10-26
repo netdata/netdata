@@ -76,7 +76,7 @@ uint32_t desired_pages = 0;
  * Initialize the SQLite database
  * Return 0 on success
  */
-int sql_init_database()
+int sql_init_database(void)
 {
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
@@ -132,7 +132,7 @@ int sql_init_database()
  * Close the sqlite database
  */
 
-int sql_close_database()
+int sql_close_database(void)
 {
     //    char *err_msg = NULL;
     int rc;
@@ -161,7 +161,7 @@ int sql_close_database()
 /*
  * Return the database size in MiB
  */
-int sql_database_size()
+int sql_database_size(void)
 {
     sqlite3_stmt *chk_size;
     int rc;
@@ -285,7 +285,7 @@ int sql_cache_host_charts(RRDHOST *host)
             return 0;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
         errno = 0;
         error("Failed to bind host_uuid to find host charts");
@@ -326,7 +326,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(st->chart_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
         errno = 0;
         error("Failed to bind chart_uuid to find chart dimensions");
@@ -501,7 +501,7 @@ uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(st->chart_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -539,7 +539,7 @@ found:
             error("Failed to prepare statement to update active dimensions");
             return uuid;
         }
-        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
+        rc = sqlite3_bind_blob(res1, 1, uuid, sizeof(*uuid), SQLITE_TRANSIENT);
         if (likely(rc == SQLITE_OK)) {
             int retry_count = SQLITE_INSERT_MAX;
             while (retry_count-- && (rc = sqlite3_step(res1) != SQLITE_DONE)) {
@@ -607,7 +607,7 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const c
 //    int id_id = sqlite3_bind_parameter_index(res, "@id");
 //    int name_id = sqlite3_bind_parameter_index(res, "@name");
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
@@ -661,7 +661,7 @@ found:
             info("SQLITE: failed to bind to update charts");
             return NULL;
         }
-        rc = sqlite3_bind_blob(res1, 1, uuid, 16, SQLITE_TRANSIENT);
+        rc = sqlite3_bind_blob(res1, 1, uuid, sizeof(*uuid), SQLITE_TRANSIENT);
         // TODO: check return code etc
         rc = sqlite3_step(res1);
         sqlite3_reset(res1);
@@ -705,7 +705,7 @@ int sql_store_host(
 //        return 1;
 //    }
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -778,12 +778,12 @@ int sql_store_chart(
     }
 
     param++;
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_blob(res, 2, host_uuid, 16, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 2, host_uuid, sizeof(*host_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -903,11 +903,11 @@ int sql_store_dimension(
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, dim_uuid, 16, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_blob(res, 2, chart_uuid, 16, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 2, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
