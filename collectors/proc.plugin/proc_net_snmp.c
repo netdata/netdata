@@ -998,7 +998,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
