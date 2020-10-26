@@ -2126,7 +2126,7 @@ EOF
 
   httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
-  if [ "${httpcode}" = "202" ]; then
+  if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
   else
     error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
