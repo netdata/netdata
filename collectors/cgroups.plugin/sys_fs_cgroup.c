@@ -1287,8 +1287,18 @@ char *parse_k8s_data(struct label **labels, char *data)
 
     while (data) {
         char *key = mystrsep(&data, "=");
-        char *value = mystrsep(&data, ",");
+
+        char *value;
+        if (data && *data == ',') {
+            value = "";
+            *data++ = '\0';
+        } else {
+            value = mystrsep(&data, ",");
+        }
         value = strip_double_quotes(value, 1);
+
+        if (!key || *key == '\0' || !value || *value == '\0')
+            continue;
 
         *labels = add_label_to_list(*labels, key, value, LABEL_SOURCE_KUBERNETES);
     }
