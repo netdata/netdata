@@ -126,6 +126,14 @@ jobs:
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 18.04"
 
+    - name: Run netdata lifecycle, on Ubuntu 20.04
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:20.04" tests/updater_checks.sh && break; done'
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 20.04"
+
+    - name: Run netdata lifecycle, on Ubuntu 20.10
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:20.10" tests/updater_checks.sh && break; done'
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 20.10"
+
       # Centos runs
     - name: Run netdata lifecycle on CentOS 7
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh && break; done '
@@ -144,6 +152,10 @@ jobs:
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
 
+    - name: Run netdata lifecycle, on openSUSE 15.2
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.2" tests/updater_checks.sh && break; done'
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.2"
+
     - name: Run netdata lifecycle, on openSUSE Tumbleweed
       script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh && break; done'
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/tumbleweed:latest"
@@ -159,9 +171,13 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
-    - name: Run netdata lifecycle, on Fedora 31
-      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh && break; done'
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
+    - name: Run netdata lifecycle, on Fedora 32
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:32" tests/updater_checks.sh && break; done'
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 32"
+
+    - name: Run netdata lifecycle, on Fedora 33
+      script: 'for i in $(seq 0 4); do printf "[XXX: Run #%s]\n" "$i";docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:33" tests/updater_checks.sh && break; done'
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 33"
 
     - name: DEB package test
       git:
@@ -290,6 +306,14 @@ jobs:
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
 
+    - name: "Build & Publish DEB package for ubuntu/groovy"
+      <<: *DEB_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) DEB( Ubuntu)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="groovy" BUILD_STRING="ubuntu/groovy"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
     - name: "Build & Publish DEB package for debian/buster"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
@@ -352,11 +376,19 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-    - name: "Build & Publish RPM package for Fedora 31"
+    - name: "Build & Publish RPM package for Fedora 32"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
       env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="32" BUILD_STRING="fedora/32"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish RPM package for Fedora 33"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="33" BUILD_STRING="fedora/33"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
@@ -365,6 +397,14 @@ jobs:
       if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.1" BUILD_STRING="opensuse/15.1"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish RPM package for openSUSE 15.2"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.2" BUILD_STRING="opensuse/15.2"
         - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
         - ALLOW_SOFT_FAILURE_HERE=true
     # ###### End of packaging workflow section ###### #
