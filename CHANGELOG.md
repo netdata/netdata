@@ -251,7 +251,6 @@
 - Fix ACLK protocol version always parsed as 0 [\#9502](https://github.com/netdata/netdata/pull/9502) ([underhood](https://github.com/underhood))
 - Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
 - Fix vulnerability in JSON parsing [\#9491](https://github.com/netdata/netdata/pull/9491) ([underhood](https://github.com/underhood))
-- Fix potential memory leak in ebpf.plugin [\#9484](https://github.com/netdata/netdata/pull/9484) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
