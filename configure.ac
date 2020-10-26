@@ -676,7 +676,7 @@ if test "$enable_cloud" != "no"; then
         fi
     else
         AC_CHECK_LIB([websockets],
-            [lws_ring_create],
+            [lws_get_vhost_by_name],
             [OPTIONAL_LWS_LIBS="-lwebsockets"],
             [AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])])
     fi
