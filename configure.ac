@@ -666,6 +666,7 @@ if test "$enable_cloud" != "no"; then
             LWS_CFLAGS="-I ${bundled_lws_dir}/include"
             OPTIONAL_LWS_LIBS="${bundled_lws_dir}/libwebsockets.a"
             AC_MSG_RESULT([yes])
+            AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
         else
             AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
             # this should be error if installer ever changes default to system
