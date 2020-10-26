@@ -68,7 +68,9 @@
 #ifdef ACLK_NO_LWS
 #define FEAT_LWS "NO"
 #else
+#ifdef ENABLE_ACLK
 #include <libwebsockets.h>
+#endif
 #ifdef BUNDLED_LWS
 #define FEAT_LWS "YES static"
 #else
