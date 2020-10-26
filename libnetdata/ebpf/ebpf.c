@@ -282,7 +282,6 @@ static int select_file(char *name, const char *program, size_t length, int mode,
     return ret;
 }
 
-//give ojs as arg and get link as result
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string, struct bpf_object **obj, int *map_fd)
 {
     char lpath[4096];
@@ -298,7 +297,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         info("Cannot load program: %s", lpath);
         return NULL;
     } else {
-        info("The eBPF program %s was loaded with success.",em->thread_name);
+        info("The eBPF program %s was loaded with success.", em->thread_name);
     }
 
     struct bpf_map *map;

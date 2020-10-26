@@ -877,8 +877,7 @@ void clean_global_memory() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         uint32_t pid = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[pid];
-        freez(w);
+        freez(global_process_stats[pid]);
 
         bpf_map_delete_elem(pid_fd, &pid);
         freez(current_apps_data[pid]);
