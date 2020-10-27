@@ -37,7 +37,6 @@ static uv_mutex_t sqlite_add_page;
 static uint32_t page_size;
 static uint32_t page_count;
 static uint32_t free_page_count;
-//static uint32_t delete_rows;
 
 /*
  * Database parameters
@@ -68,33 +67,28 @@ static void store_active_chart(uuid_t *chart_uuid)
     int rc;
 
     if (unlikely(!db)) {
-        errno = 0;
         error_report("Database has not been initialized");
         return;
     }
 
     rc = sqlite3_prepare_v2(db, SQL_STORE_ACTIVE_CHART, -1, &res, 0);
     if (rc != SQLITE_OK) {
-        errno = 0;
         error_report("Failed to prepare statement to store active chart, rc = %d", rc);
         return;
     }
     rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
-        errno = 0;
         error_report("Failed to bind input parameter to store active chart, rc = %d", rc);
         goto done;
     }
     rc = execute_insert(res);
     if (rc != SQLITE_DONE) {
-        errno = 0;
         error_report("Failed to store active chart, rc = %d", rc);
     }
 
 done:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK)) {
-        errno = 0;
         error_report("Failed to finalize statement in store dimension, rc = %d", rc);
     }
     return;
@@ -180,16 +174,15 @@ void sql_close_database(void)
 
     info("Closing SQLite database");
     rc = sqlite3_close(db);
-    if (rc != SQLITE_OK) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database", rc);
-    }
     return;
-        //        uv_mutex_lock(&sqlite_add_page);
-        //        if (pending_page_inserts) {
-        //            info("Writing final transactions %u", pending_page_inserts);
-        //            sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
-        //            pending_page_inserts = 0;
-        //        }
+//    uv_mutex_lock(&sqlite_add_page);
+//    if (pending_page_inserts) {
+//        info("Writing final transactions %u", pending_page_inserts);
+//        sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
+//        pending_page_inserts = 0;
+//    }
 }
 
 /*
@@ -312,6 +305,8 @@ int sql_cache_host_charts(RRDHOST *host)
     if (!db)
         return 0;
 
+    int count = 0;
+
     if (!res) {
         rc = sqlite3_prepare_v2(
             db, "select chart_id, type, id, name from chart where host_id = @host;", -1, &res, 0);
@@ -322,17 +317,20 @@ int sql_cache_host_charts(RRDHOST *host)
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
         error_report("Failed to bind host_uuid to find host charts");
-        sqlite3_finalize(res);
-        return 0;
+        goto done;
     }
-    int count = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         add_in_uuid_cache(
             &host->uuid_cache, (uuid_t *)sqlite3_column_blob(res, 0), (const char *)sqlite3_column_text(res, 1),
             (const char *)sqlite3_column_text(res, 2), (const char *)sqlite3_column_text(res, 3));
         count++;
     }
-    sqlite3_finalize(res);
+
+done:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to finalize statement when loading host charts, rc = %d", rc);
+    }
     return count;
 #else
     return 0;
@@ -349,6 +347,8 @@ int sql_cache_chart_dimensions(RRDSET *st)
         return 0;
     }
 
+    int count = 0;
+
     if (!res) {
         rc = sqlite3_prepare_v2(db, "select dim_id, id, name from dimension where chart_id = @chart;", -1, &res, 0);
         if (rc != SQLITE_OK) {
@@ -360,17 +360,19 @@ int sql_cache_chart_dimensions(RRDSET *st)
     rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(st->chart_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
         error_report("Failed to bind chart_uuid to find chart dimensions");
-        sqlite3_finalize(res);
-        return 0;
-    }
-    int count = 0;
+        goto done;
+
     while (sqlite3_step(res) == SQLITE_ROW) {
         add_in_uuid_cache(
             &st->state->uuid_cache, (uuid_t *)sqlite3_column_blob(res, 0), NULL,
             (const char *)sqlite3_column_text(res, 1), (const char *)sqlite3_column_text(res, 2));
         count++;
     }
-    sqlite3_finalize(res);
+done:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to finalize statement when loading chart dimensions, rc = %d", rc);
+    }
     return count;
 #else
     return 0;
