@@ -23,11 +23,21 @@
     "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
     "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
 
+#define SQL_FIND_CHART_UUID                                                                                            \
+    "select chart_id from chart where host_id = @host and type=@type and id=@id and (name is null or name=@name);"
+
+#define SQL_STORE_ACTIVE_CHART                                                                                         \
+    "insert or replace into chart_active (chart_id, date_created) values (@id, strftime('%s'));"
+
 #define SQL_STORE_DIMENSION                                                                                           \
     "INSERT OR REPLACE into dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) values (?0001,?0002,?0003,?0004,?0005,?0006,?0007);"
 
+#define SQL_FIND_DIMENSION_UUID "select dim_id from dimension where chart_id=@chart and id=@id and name=@name;"
+
+#define SQL_STORE_ACTIVE_DIMENSION                                                                                     \
+    "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
 extern int sql_init_database(void);
-extern int sql_close_database(void);
+extern void sql_close_database(void);
 
 extern int sql_store_host(uuid_t *guid, const char *hostname, const char *registry_hostname, int update_every, const char *os, const char *timezone, const char *tags);
 extern int sql_store_chart(

@@ -637,13 +637,17 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
+#ifdef ENABLE_DBENGINE
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if (unlikely(sql_init_database())) {
+            return 1;
+        }
+    }
+#endif
+
     health_init();
 
     rrdpush_init();
-
-#ifdef ENABLE_DBENGINE
-    sql_init_database();
-#endif
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
