@@ -6,7 +6,7 @@
 #define ENABLE_CACHE_DIMENSIONS 1
 
 
-#define error_report(x, args...) { errno = 0; error(x, ##args); }
+#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
@@ -58,12 +58,39 @@ static int execute_insert(sqlite3_stmt *res)
 }
 
 /*
+ * Store a chart or dimension UUID in  chart_active or dimension_active
+ * The statement that will be prepared determines that
+ *
+ */
+
+static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t *uuid)
+{
+    int rc;
+
+    // Check if we should need to prepare the statement
+    if (!*res) {
+        rc = sqlite3_prepare_v2(db, statement, -1, res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store active object, rc = %d", rc);
+            return rc;
+        }
+    }
+
+    rc = sqlite3_bind_blob(*res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to bind input parameter to store active object, rc = %d", rc);
+    else
+        rc = execute_insert(*res);
+    return rc;
+}
+
+/*
  * Marks a chart with UUID as active
  * Input: UUID
  */
 static void store_active_chart(uuid_t *chart_uuid)
 {
-    sqlite3_stmt *res;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db)) {
@@ -71,26 +98,13 @@ static void store_active_chart(uuid_t *chart_uuid)
         return;
     }
 
-    rc = sqlite3_prepare_v2(db, SQL_STORE_ACTIVE_CHART, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to store active chart, rc = %d", rc);
-        return;
-    }
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_TRANSIENT);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to bind input parameter to store active chart, rc = %d", rc);
-        goto done;
-    }
-    rc = execute_insert(res);
-    if (rc != SQLITE_DONE) {
+    rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_CHART, chart_uuid);
+    if (rc != SQLITE_DONE)
         error_report("Failed to store active chart, rc = %d", rc);
-    }
 
-done:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to finalize statement in store dimension, rc = %d", rc);
-    }
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement in store active chart, rc = %d", rc);
     return;
 }
 
@@ -103,25 +117,18 @@ static void store_active_dimension(uuid_t *dimension_uuid)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    rc = sqlite3_prepare_v2(db, SQL_STORE_ACTIVE_DIMENSION, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to update active dimensions");
-        goto done;
-    }
-    rc = sqlite3_bind_blob(res, 1, dimension_uuid, sizeof(*dimension_uuid), SQLITE_TRANSIENT);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind parameter to update active dimensions");
-        goto done;
-    }
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to mark dimension as active, rc = %d", rc);
+    if (unlikely(!db)) {
+        error_report("Database has not been initialized");
+        return;
     }
 
-done:
+    rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_DIMENSION, dimension_uuid);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to store active chart, rc = %d", rc);
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement in store dimension, rc = %d", rc);
+        error_report("Failed to finalize statement in store active dimension, rc = %d", rc);
     return;
 }
 
@@ -339,8 +346,9 @@ done:
 int sql_cache_chart_dimensions(RRDSET *st)
 {
 #ifdef ENABLE_CACHE_DIMENSIONS
-    int rc;
     sqlite3_stmt *res = NULL;
+    int rc;
+
     if (!db) {
         error_report("Database has not been initialized");
         return 0;
@@ -356,7 +364,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(st->chart_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
         error_report("Failed to bind chart_uuid to find chart dimensions");
         goto done;
@@ -406,7 +414,7 @@ uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(st->chart_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_TRANSIENT);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -426,9 +434,8 @@ uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
     else {
         uuid_generate(*uuid);
         rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
-        if (unlikely(rc)) {
+        if (unlikely(rc))
             error_report("Failed to store dimension metadata in the database");
-        }
     }
     sqlite3_reset(res);
     sqlite3_finalize(res);
@@ -694,10 +701,9 @@ int sql_store_chart(
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_step(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store chart, rc = %d", rc);
-    }
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK)) {
@@ -718,7 +724,7 @@ int sql_store_dimension(
     uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
     collected_number divisor, int algorithm)
 {
-    sqlite3_stmt *res;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db)) {
@@ -760,16 +766,13 @@ int sql_store_dimension(
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_step(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store chart, rc = %d", rc);
-    }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in store dimension, rc = %d", rc);
-    }
-
     return 0;
 
 bind_fail:
