@@ -262,7 +262,7 @@ CHARTS = {
                     'line'],
         'lines': [],
         'attrs': [ATTR5],
-        'algo': ABSOLUTE,
+        'algo': INCREMENTAL,
     },
     'reserved_block_count': {
         'options': [None, 'Reserved Block Count', 'percentage', 'wear', 'smartd_log.reserved_block_count', 'line'],
