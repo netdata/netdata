@@ -74,8 +74,8 @@ Here's what you can expect from Netdata:
 -   **Scales to infinity**: You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
     centralized by default, so there is no limit.
 -   **Several operating modes**: Autonomous host monitoring (the default), headless data collector, forwarding proxy,
-    store and forward proxy, central multi-host monitoring, in all possible configurations. Use diferent metrics
-    retention polocies per node and run with or without health monitoring.
+    store and forward proxy, central multi-host monitoring, in all possible configurations. Use different metrics
+    retention policies per node and run with or without health monitoring.
 
 Netdata works with tons of applications, notifications platforms, and other time-series databases:
 
