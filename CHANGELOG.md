@@ -18,6 +18,7 @@
 - Replace memcpy\(\) with memmove\(\) for overlapping memory ranges. [\#10097](https://github.com/netdata/netdata/pull/10097) ([mfundul](https://github.com/mfundul))
 - collectors/cgroups: filter pod level cgroups [\#10095](https://github.com/netdata/netdata/pull/10095) ([ilyam8](https://github.com/ilyam8))
 - Add support for HBA drives in hpssa.chart.py [\#10093](https://github.com/netdata/netdata/pull/10093) ([martinpal](https://github.com/martinpal))
+- Add documentation for configuring/editing hostnames of Docker-run Agents [\#10087](https://github.com/netdata/netdata/pull/10087) ([joelhans](https://github.com/joelhans))
 - Removed redundant build dependencies from Debian control file. [\#10085](https://github.com/netdata/netdata/pull/10085) ([alexmyczko](https://github.com/alexmyczko))
 - Add documentation for Cloud Overview [\#10082](https://github.com/netdata/netdata/pull/10082) ([joelhans](https://github.com/joelhans))
 - collectors/cgroups: fix resolving container names in k8s [\#10072](https://github.com/netdata/netdata/pull/10072) ([ilyam8](https://github.com/ilyam8))
@@ -224,9 +225,6 @@
 - Suppress warning -Wformat-truncation in ACLK [\#9547](https://github.com/netdata/netdata/pull/9547) ([underhood](https://github.com/underhood))
 - Add 1.23.1 and 1.23.0 to news section [\#9518](https://github.com/netdata/netdata/pull/9518) ([joelhans](https://github.com/joelhans))
 - Implemented default disk space size calculation for multihost db [\#9504](https://github.com/netdata/netdata/pull/9504) ([stelfrag](https://github.com/stelfrag))
-- Network Viewer options [\#9495](https://github.com/netdata/netdata/pull/9495) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use the libbpf library for the eBPF plugin [\#9490](https://github.com/netdata/netdata/pull/9490) ([vlvkobal](https://github.com/vlvkobal))
-- Implemented the HOST command in metadata log replay [\#9489](https://github.com/netdata/netdata/pull/9489) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
@@ -249,8 +247,6 @@
 - Fix python.d crashes by adding a lock to stdout write function [\#9508](https://github.com/netdata/netdata/pull/9508) ([ilyam8](https://github.com/ilyam8))
 - Fix the check condition for chart name change [\#9503](https://github.com/netdata/netdata/pull/9503) ([stelfrag](https://github.com/stelfrag))
 - Fix ACLK protocol version always parsed as 0 [\#9502](https://github.com/netdata/netdata/pull/9502) ([underhood](https://github.com/underhood))
-- Fix broken link in Kavenegar notification doc [\#9492](https://github.com/netdata/netdata/pull/9492) ([joelhans](https://github.com/joelhans))
-- Fix vulnerability in JSON parsing [\#9491](https://github.com/netdata/netdata/pull/9491) ([underhood](https://github.com/underhood))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
