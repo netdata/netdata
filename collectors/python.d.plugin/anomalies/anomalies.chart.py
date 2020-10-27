@@ -211,7 +211,7 @@ class Service(SimpleService):
         after =  before - self.train_n_secs
 
         # get training data
-        df_train = get_data(self.host, self.charts_in_scope, after=after, before=before, sort_cols=True, numeric_only=True, protocol=self.protocol).ffill()
+        df_train = get_data(self.host, self.charts_in_scope, after=after, before=before, sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32').ffill()
         self.set_expected_cols(df_train)
         df_train = df_train[self.expected_cols]
         if self.custom_models:
@@ -252,7 +252,7 @@ class Service(SimpleService):
         :return: (<dict>,<dict>) tuple of dictionaries, one for probability scores and the other for anomaly predictions.
         """
         # get recent data to predict on
-        df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, sort_cols=True, protocol=self.protocol)[self.expected_cols]
+        df_allmetrics = get_allmetrics(self.host, self.charts_in_scope, wide=True, sort_cols=True, protocol=self.protocol, numeric_only=True, float_size='float32')[self.expected_cols]
         if self.custom_models:
             df_allmetrics = self.add_custom_models_dims(df_allmetrics)
         self.df_allmetrics = self.df_allmetrics.append(df_allmetrics).ffill().tail((self.lags_n + self.smooth_n + self.diffs_n) * 2)
