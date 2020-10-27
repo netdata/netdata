@@ -194,14 +194,18 @@ function k8s_get_kubepod_name() {
   fi
 
   local jq_filter
-  # 'namespace="<NAMESPACE>",pod_name="<NAME>",pod_uid="<UID>",container_name="<NAME>",container_ID="<ID>"'
-  # wrong field value is 'null'
-  jq_filter+='.items[] | '
-  jq_filter+='"namespace=\"\(.metadata.namespace)\",pod_name=\"\(.metadata.name)\",pod_uid=\"\(.metadata.uid)\"" + '
-  jq_filter+='(.status.containerStatuses[]? | '
-  jq_filter+='",container_name=\"\(.name)\",container_id=\"\(.containerID)\""'
-  jq_filter+=') | '
-  jq_filter+='sub("docker://";"")' # containerID: docker://a346da9bc0...
+  jq_filter+='.items[] | "'
+  jq_filter+='namespace=\"\(.metadata.namespace)\",'
+  jq_filter+='pod_name=\"\(.metadata.name)\",'
+  jq_filter+='pod_uid=\"\(.metadata.uid)\",'
+  jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",")),'
+  jq_filter+='node_name=\"\(.spec.nodeName)\",'
+  jq_filter+='" + '
+  jq_filter+='(.status.containerStatuses[]? | "'
+  jq_filter+='container_name=\"\(.name)\",'
+  jq_filter+='container_id=\"\(.containerID)\"'
+  jq_filter+='") | '
+  jq_filter+='sub("docker://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
 
   local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
@@ -210,7 +214,7 @@ function k8s_get_kubepod_name() {
   fi
 
   # available labels:
-  # namespace, pod_name, pod_uid, container_name, container_id
+  # namespace, pod_name, pod_uid, container_name, container_id, node_name
   local labels
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
