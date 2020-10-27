@@ -198,7 +198,7 @@ function k8s_get_kubepod_name() {
   jq_filter+='namespace=\"\(.metadata.namespace)\",'
   jq_filter+='pod_name=\"\(.metadata.name)\",'
   jq_filter+='pod_uid=\"\(.metadata.uid)\",'
-  jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",")),'
+  jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
   jq_filter+='node_name=\"\(.spec.nodeName)\",'
   jq_filter+='" + '
   jq_filter+='(.status.containerStatuses[]? | "'
