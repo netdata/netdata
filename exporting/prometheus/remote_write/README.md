@@ -24,7 +24,7 @@ To enable data exporting to a storage provider using the Prometheus remote write
 in the Netdata configuration directory and set the following options:
 
 ```conf
-[remote_write:my_instance]
+[prometheus_remote_write:my_instance]
     enabled = yes
     destination = example.domain:example_port
     remote write URL path = /receive
