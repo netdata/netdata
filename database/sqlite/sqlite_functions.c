@@ -328,9 +328,8 @@ int sql_cache_host_charts(RRDHOST *host)
 
 done:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when loading host charts, rc = %d", rc);
-    }
     return count;
 #else
     return 0;
@@ -361,6 +360,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
     if (rc != SQLITE_OK) {
         error_report("Failed to bind chart_uuid to find chart dimensions");
         goto done;
+    }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         add_in_uuid_cache(
@@ -370,9 +370,8 @@ int sql_cache_chart_dimensions(RRDSET *st)
     }
 done:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when loading chart dimensions, rc = %d", rc);
-    }
     return count;
 #else
     return 0;
