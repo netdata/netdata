@@ -279,9 +279,13 @@ class Service(SimpleService):
             except Exception as e:
                 self.info(X_model)
                 self.info(e)
-                self.info(f'prediction failed for {model} at run_counter {self.runs_counter}, using last prediction instead.')
-                data_probability[model + '_prob'] = self.data_latest[model + '_prob']
-                data_anomaly[model + '_anomaly'] = self.data_latest[model + '_anomaly']
+                if model + '_prob' in self.data_latest:
+                    self.info(f'prediction failed for {model} at run_counter {self.runs_counter}, using last prediction instead.')
+                    data_probability[model + '_prob'] = self.data_latest[model + '_prob']
+                    data_anomaly[model + '_anomaly'] = self.data_latest[model + '_anomaly']
+                else:
+                    self.info(f'prediction failed for {model} at run_counter {self.runs_counter}, skipping as no previous prediction.')
+                    continue
 
         return data_probability, data_anomaly
 
