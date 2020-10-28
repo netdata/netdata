@@ -24,6 +24,8 @@
 #define KCYN "\x1B[36m"
 #define KWHT "\x1B[37m"
 
+#define UNUSED(x) (void)(x)
+
 int total_fails = 0;
 int total_tests = 0;
 int total_checks = 0;
@@ -166,6 +168,7 @@ static void test_rbuf_bump_head_bsize(size_t size)
 static void test_rbuf_bump_head()
 {
     TEST_DECL();
+    UNUSED(subtest_no);
 
     size_t test_sizes[] = { 1, 2, 3, 5, 6, 7, 8, 100, 99999, 0 };
     for (int i = 0; test_sizes[i]; i++)
