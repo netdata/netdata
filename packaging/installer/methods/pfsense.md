@@ -16,7 +16,7 @@ Netdata, Judy and Python are downloaded from the FreeBSD repository.
 ```sh
 pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/json-c-0.14.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/json-c-0.15_1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.6.20.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.20.txz
