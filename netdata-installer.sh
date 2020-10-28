@@ -236,7 +236,7 @@ USAGE: ${PROGRAM} [options]
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
   --claim-token              Provide a Netdata Cloud claiming token to directly claim the agent during the install.
   --claim-rooms              Provide a list of Netdata Cloud rooms to claim the agent to during the install.
-  --claim-uri                Provide a Netdata Cloud instance URI to use for claiming during the install.
+  --claim-url                Provide a Netdata Cloud instance URI to use for claiming during the install.
   --claim-proxy              Specify a proxy to use for claiming using the other claim options.
 
 Netdata will by default be compiled with gcc optimization -O2
@@ -353,8 +353,8 @@ while [ -n "${1}" ]; do
       NETDATA_CLAIM_ROOMS="${2}"
       shift 1
       ;;
-    "--claim-uri")
-      NETDATA_CLAIM_URI="${2}"
+    "--claim-url")
+      NETDATA_CLAIM_URL="${2}"
       shift 1
       ;;
     "--claim-proxy")
@@ -375,14 +375,14 @@ while [ -n "${1}" ]; do
 done
 
 if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-  if [ -n "${NETDATA_CLAIM_TOKEN}" ] || [ -n "${NETDATA_CLAIM_ROOMS}" ] || [ -n "${NETDATA_CLAIM_URI}" ]; then
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ] || [ -n "${NETDATA_CLAIM_ROOMS}" ] || [ -n "${NETDATA_CLAIM_URL}" ]; then
     run_failed "Cloud explicitly disabled but automatic claiming requested."
     run_failed "Either enable Netdata Cloud, or remove the --claim-* options."
     exit 1
   fi
 fi
 
-if invalid_claim_args ${NETDATA_CLAIM_TOKEN} ${NETDATA_CLAIM_ROOMS} ${NETDATA_CLAIM_URI}; then
+if invalid_claim_args ${NETDATA_CLAIM_TOKEN} ${NETDATA_CLAIM_ROOMS} ${NETDATA_CLAIM_URL}; then
     run_failed "Invalid claiming options, either all or none must be specified."
     exit 1
 fi
@@ -1895,14 +1895,14 @@ fi
 
 # -----------------------------------------------------------------------------
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-  progress "Attempting to claim agent to ${NETDATA_CLAIM_URI}"
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   if [ -z "${NETDATA_PREFIX}" ] ; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   else
     NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/bin/netdata-claim.sh"
   fi
 
-  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
+  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
   else
     run_failed "Unable to claim node, you must do so manually."
