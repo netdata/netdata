@@ -23,7 +23,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.20.t
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cffi-1.14.3.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-six-1.15.0.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cryptography-2.6.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.8.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.10.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.7,1.txz
