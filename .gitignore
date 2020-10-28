@@ -2,3 +2,4 @@ build/*
 !build/.keep
 libringbuffer.*
 test
+.vscode
