@@ -53,6 +53,8 @@ extern uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, 
 extern int sql_cache_chart_dimensions(RRDSET *st);
 extern int sql_cache_host_charts(RRDHOST *host);
 
+extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
+
 //GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

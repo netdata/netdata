@@ -359,7 +359,7 @@ inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_cl
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 1);
+    sql_rrdset2json(host, w->response.data);
     return HTTP_RESP_OK;
 }
 
