@@ -44,7 +44,7 @@ X seconds (though, it can send them per second if you need it to).
         also be configured). Learn more in our guide to [export and visualize Netdata metrics in
         Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
     -   [**JSON** document databases](/exporting/json/README.md)
-    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext, HTTP, or HTTPS interfaces. Metrics are sent to
+    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
         OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
     -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
     -   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
@@ -173,8 +173,10 @@ You can configure each connector individually using the available [options](#opt
 -   `[prometheus:exporter]` defines settings for Prometheus exporter API queries (e.g.:
     `http://NODE:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`).
 -   `[<type>:<name>]` keeps settings for a particular exporting connector instance, where:
-  -   `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http | opentsdb:https |
-      prometheus_remote_write | json | kinesis | pubsub | mongodb
+  -   `type` selects the exporting connector type: graphite | opentsdb:telnet | opentsdb:http |
+      prometheus_remote_write | json | kinesis | pubsub | mongodb. For graphite, opentsdb,
+      json, and prometheus_remote_write connectors you can also use `:http` or `:https` modifiers
+      (e.g.: `opentsdb:https`).
   -   `name` can be arbitrary instance name you chose.
 
 ### Options
@@ -269,6 +271,13 @@ Configure individual connectors and override any global settings with the follow
 > exporting connectors. The parsing is supported for graphite, json, opentsdb, and prometheus (default) backend types.
 > You can check how the host tags were parsed using the /api/v1/info API call. But, keep in mind that backends subsystem
 > is deprecated and will be deleted soon. Please move your existing tags to the `[host labels]` section.
+
+## HTTPS
+
+Netdata can send metrics to external databases using the TLS/SSL protocol. Unfortunately, some of
+them does not support encrypted connections, so you will have to configure a reverse proxy to enable
+HTTPS communication between Netdata and an external database. You can set up a reverse proxy with
+[Nginx](/docs/Running-behind-nginx.md).
 
 ## Exporting engine monitoring
 

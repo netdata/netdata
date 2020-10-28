@@ -30,6 +30,9 @@ in the Netdata configuration directory and set the following options:
     remote write URL path = /receive
 ```
 
+You can also add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example:
+`remote_write:https:my_instance`.
+
 `remote write URL path` is used to set an endpoint path for the remote write protocol. The default value is `/receive`.
 For example, if your endpoint is `http://example.domain:example_port/storage/read`:
 
