@@ -446,12 +446,35 @@ static void test_rbuf_push()
         CHECK_EQ(buff->data[i], i + ASCII_A, "Check data");
 }
 
+#define TEST_RBUF_FIND_BYTES_SIZE 10
+void test_rbuf_find_bytes()
+{
+    TEST_DECL();
+    rbuf_t buff = rbuf_create(TEST_RBUF_FIND_BYTES_SIZE);
+    char *filler_3 = "   ";
+    char *needle = "needle";
+    int idx;
+    char *ptr;
+
+    // make sure needle is wrapped aroung in the buffer
+    // to test we still can find it
+    // target "edle    ne"
+    rbuf_bump_head(buff, TEST_RBUF_FIND_BYTES_SIZE / 2);
+    rbuf_push(buff, filler_3, strlen(filler_3));
+    rbuf_bump_tail(buff, TEST_RBUF_FIND_BYTES_SIZE / 2);
+    rbuf_push(buff, needle, strlen(needle));
+    ptr = rbuf_find_bytes(buff, needle, strlen(needle), &idx);
+    CHECK_EQ(ptr, buff->data + (TEST_RBUF_FIND_BYTES_SIZE / 2) + strlen(filler_3), "Pointer to needle correct");
+    CHECK_EQ(idx, ptr - buff->tail, "Check needle index");
+}
+
 int main()
 {
     test_rbuf_bump_head();
     test_rbuf_bump_tail();
     test_rbuf_get_linear_insert_range();
     test_rbuf_push();
+    test_rbuf_find_bytes();
 
     printf(
         KNRM "Total Tests %d, Total Checks %d, Successful Checks %d, Failed Checks %d\n",
