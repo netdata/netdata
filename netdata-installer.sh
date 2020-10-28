@@ -694,7 +694,7 @@ build_judy() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || return 1
@@ -777,7 +777,7 @@ build_jsonc() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
@@ -848,7 +848,7 @@ bundle_jsonc
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
   popd > /dev/null || exit 1
 }
 
