@@ -1,20 +1,28 @@
 <!--
----
 title: "Install Netdata on pfSense"
+description: "Install Netdata on pfSense to monitor the health and performance of firewalls with thousands of real-time, per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
----
 -->
 
 # Install Netdata on pfSense
 
-To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt
-within the pfSense web interface).
+> 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
+> details of the installation process, such as version numbers for downloadable packages, before proceeding.
+>
+> You can help improve this document by [submitting a
+> PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md) with your recommended
+> improvements or changes. Thank you!
 
-Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense,
-Netdata, Judy and Python are downloaded from the FreeBSD repository.
+To install Netdata on pfSense, first run the following command (within a shell or under the **Diagnostics/Command**
+prompt within the pfSense web interface).
+
+```bash
+pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
+```
+
+Then run the following commands to download Netdata and various dependencies from the FreeBSD repository.
 
 ```sh
-pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.4.5.1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
@@ -30,9 +38,9 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.2.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.20.0_3.txz
 ```
 
-**Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
-in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its
-URL instead, or you can try manually changing the Netdata version in the URL to the latest version.
+> ❕ If any of the above commands return a `Not Found` error, you need to manually search for the latest package from the
+> [FreeBSD repository](https://www.freebsd.org/ports/). Search for the package's name, such as `py37-cffi`, find the
+> latest version number, and update the command accordingly.
 
 **Note:** On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install Python from the FreeBSD repository as instructed above.
 

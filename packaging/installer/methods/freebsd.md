@@ -1,13 +1,20 @@
 <!--
----
 title: "Install Netdata on FreeBSD"
+description: "Install Netdata on FreeBSD to monitor the health and performance of bare metal or VMs with thousands of real-time, per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
----
 -->
 
 # Install Netdata on FreeBSD
 
+> 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
+> details of the installation process, such as version numbers for downloadable packages, before proceeding.
+>
+> You can help improve this document by [submitting a
+> PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md) with your recommended
+> improvements or changes. Thank you!
+
 ## Install latest version
+
 This is how to install the latest Netdata version on FreeBSD:
 
 Install required packages (**need root permission**):
