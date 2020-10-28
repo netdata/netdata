@@ -1902,7 +1902,7 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
     NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/bin/netdata-claim.sh"
   fi
 
-  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -uri=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
+  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URI} ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
   else
     run_failed "Unable to claim node, you must do so manually."
