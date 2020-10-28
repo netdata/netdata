@@ -37,6 +37,7 @@
 #  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
 #  - Dynatrace Event by @illumine
 #  - Stackpulse Event by @thiagoftsm
+#  - Opsgenie by @thiaoftsm #9858
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -386,6 +387,9 @@ SEND_DYNATRACE=
 # stackpulse configs
 STACKPULSE_WEBHOOK=
 
+# opsgenie configs
+OPSGENIE_API_KEY=
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -532,6 +536,9 @@ filter_recipient_by_criticality() {
   [ -z "${DYNATRACE_TAG_VALUE}" ] ||
   [ -z "${DYNATRACE_EVENT}" ]; } && SEND_DYNATRACE="NO"
 
+# check opsgenie
+[ -z "${OPSGENIE_API_KEY}" ] && SEND_OPSGENIE="NO"
+
 # check matrix
 { [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
@@ -559,7 +566,8 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
 	[ "${SEND_MSTEAM}" = "YES" ] ||
 	[ "${SEND_DYNATRACE}" = "YES" ] ||
-	[ "${SEND_STACKPULSE}" = "YES" ]; then
+	[ "${SEND_STACKPULSE}" = "YES" ] ||
+	[ "${SEND_OPSGENIE}" = "YES" ]; then
 	# if we need curl, check for the curl command
 	if [ -z "${curl}" ]; then
 		curl="$(command -v curl 2>/dev/null)"
@@ -588,6 +596,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_CUSTOM="NO"
 		SEND_DYNATRACE="NO"
 		SEND_STACKPULSE="NO"
+		SEND_OPSGENIE="NO"
 	fi
 fi
 
@@ -717,8 +726,9 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_SMS}" \
 	"${SEND_MSTEAM}" \
 	"${SEND_DYNATRACE}" \
-	"${SEND_STACKPULSE}" ; do
-	
+	"${SEND_STACKPULSE}" \
+	"${SEND_OPSGENIE}" ; do
+
 	if [ "${method}" == "YES" ]; then
 		proceed=1
 		break
@@ -2073,6 +2083,60 @@ EOF
   return 0
 }
 # -----------------------------------------------------------------------------
+# Opsgenie sender
+
+send_opsgenie() {
+  local payload httpcode oldv currv
+  [ "${SEND_OPSGENIE}" != "YES" ] && return 1
+
+  if [ -z "${OPSGENIE_API_KEY}" ] ; then
+    info "Can't send Opsgenie notification, because OPSGENIE_API_KEY is not defined"
+    return 1
+  fi
+
+  # We are sending null when values are nan to avoid errors while JSON message is parsed
+  [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
+  [ "${value}" != "nan" ] && currv="${value}" || currv="null"
+
+  payload=$(cat <<EOF
+  {
+    "host" : "${host}",
+    "unique_id" : "${unique_id}",
+    "alarmId" : ${alarm_id},
+    "eventId" : ${event_id},
+    "chart" : "${chart}",
+    "when": ${when},
+    "name" : "${name}",
+    "family" : "${family}",
+    "status" : "${status}",
+    "old_status" : "${old_status}",
+    "value" : ${currv},
+    "old_value" : ${oldv},
+    "duration": ${duration},
+    "non_clear_duration": ${non_clear_duration},
+    "units" : "${units}",
+    "info" : "${status_message}, ${info}",
+    "calc_expression" : "${calc_expression}",
+    "total_warnings" : "${total_warnings}",
+    "total_critical" : "${total_critical}",
+    "src" : "${src}"
+  }
+EOF
+)
+
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
+  # https://docs.opsgenie.com/docs/alert-api#create-alert
+  if [ "${httpcode}" = "200" ]; then
+    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+  else
+    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    return 1
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -2589,11 +2653,15 @@ SENT_EMAIL=$?
 send_dynatrace "${host}" "${chart}" "${name}"  "${status}"
 SENT_DYNATRACE=$?
 
-
 # -----------------------------------------------------------------------------
-# send the EVENT to Dynatrace
+# send the EVENT to Stackpulse
 send_stackpulse
 SENT_STACKPULSE=$?
+
+# -----------------------------------------------------------------------------
+# send messages to Opsgenie
+send_opsgenie
+SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------
 # let netdata know
@@ -2623,7 +2691,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_SMS}" \
 	"${SENT_MSTEAM}" \
 	"${SENT_DYNATRACE}" \
-	"${SENT_STACKPULSE}" ; do
+	"${SENT_STACKPULSE}" \
+  "${SENT_OPSGENIE}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0

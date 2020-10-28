@@ -35,6 +35,7 @@ include hangouts/Makefile.inc
 include irc/Makefile.inc
 include kavenegar/Makefile.inc
 include messagebird/Makefile.inc
+include opsgenie/Makefile.inc
 include pagerduty/Makefile.inc
 include pushbullet/Makefile.inc
 include pushover/Makefile.inc
