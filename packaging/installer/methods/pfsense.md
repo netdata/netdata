@@ -28,7 +28,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.t
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.7,1.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.23.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.26.0.txz
 ```
 
 **Note:** If you receive a `Not Found` error at any of the commands above, you will either need to manually look
