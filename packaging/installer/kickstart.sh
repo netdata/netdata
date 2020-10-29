@@ -348,6 +348,10 @@ while [ -n "${1}" ]; do
       NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -proxy ${2}"
       shift 1
       ;;
+    "--dont-start-it")
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+      ;;
     "--install")
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install ${2}"
       NETDATA_PREFIX="${2}"

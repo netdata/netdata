@@ -232,7 +232,10 @@ while [ -n "${1}" ]; do
     "--dont-wait") opts="${opts} --accept" ;;
     "--non-interactive") opts="${opts} --accept" ;;
     "--accept") opts="${opts} --accept" ;;
-    "--dont-start-it") NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}" ;;
+    "--dont-start-it")
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+      ;;
     "--no-updates") NETDATA_UPDATES="" ;;
     "--stable-channel")
       RELEASE_CHANNEL="stable"
