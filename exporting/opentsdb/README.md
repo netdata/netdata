@@ -1,5 +1,5 @@
 <!--
-title: "Export metrics to OpenTSDB with HTTP"
+title: "Export metrics to OpenTSDB"
 description: "Archive your Agent's metrics to an OpenTSDB database for long-term storage and further analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/opentsdb/README.md
 sidebar_label: OpenTSDB

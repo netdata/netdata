@@ -605,8 +605,7 @@ static void test_simple_connector_worker(void **state)
 
     __real_mark_scheduled_instances(engine);
 
-    struct simple_connector_data *simple_connector_data = 
-        callocz(1, sizeof(struct simple_connector_data));
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = simple_connector_data;
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->first_buffer = simple_connector_data->last_buffer;
@@ -626,19 +625,16 @@ static void test_simple_connector_worker(void **state)
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 2);
     expect_not_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
-    expect_string(
-        __wrap_send, buf, "");
+    expect_string(__wrap_send, buf, "");
     expect_value(__wrap_send, len, 0);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
-    
+
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 2);
     expect_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
-    expect_string(
-        __wrap_send, buf, "test buffer");
+    expect_string(__wrap_send, buf, "test buffer");
     expect_value(__wrap_send, len, 11);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
-    
 
     expect_function_call(__wrap_send_internal_metrics);
     expect_value(__wrap_send_internal_metrics, instance, instance);
@@ -1161,8 +1157,7 @@ static void test_prometheus_remote_write_prepare_header(void **state)
     instance->config.connector_specific_config = connector_specific_config;
     connector_specific_config->remote_write_path = strdupz("/receive");
 
-    struct simple_connector_data *simple_connector_data = 
-        callocz(1, sizeof(struct simple_connector_data));
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = simple_connector_data;
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->last_buffer->header = buffer_create(0);
@@ -1206,8 +1201,7 @@ static void test_format_host_prometheus_remote_write(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
-    struct simple_connector_data *simple_connector_data =
-        mallocz(sizeof(struct simple_connector_data *));
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
     instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));
@@ -1249,8 +1243,7 @@ static void test_format_dimension_prometheus_remote_write(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-    struct simple_connector_data *simple_connector_data =
-        mallocz(sizeof(struct simple_connector_data *));
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
     instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));
@@ -1280,8 +1273,7 @@ static void test_format_batch_prometheus_remote_write(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-    struct simple_connector_data *simple_connector_data =
-        mallocz(sizeof(struct simple_connector_data *));
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
     instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));

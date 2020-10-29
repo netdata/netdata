@@ -6,22 +6,24 @@ struct prometheus_output_options {
     char *name;
     PROMETHEUS_OUTPUT_OPTIONS flag;
 } prometheus_output_flags_root[] = {
-        { "help",       PROMETHEUS_OUTPUT_HELP       },
-        { "types",      PROMETHEUS_OUTPUT_TYPES      },
-        { "names",      PROMETHEUS_OUTPUT_NAMES      },
-        { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
-        { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
-        { "oldunits",   PROMETHEUS_OUTPUT_OLDUNITS   },
-        { "hideunits",  PROMETHEUS_OUTPUT_HIDEUNITS  },
-        // terminator
-        { NULL, PROMETHEUS_OUTPUT_NONE },
+    { "help",       PROMETHEUS_OUTPUT_HELP       },
+    { "types",      PROMETHEUS_OUTPUT_TYPES      },
+    { "names",      PROMETHEUS_OUTPUT_NAMES      },
+    { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
+    { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
+    { "oldunits",   PROMETHEUS_OUTPUT_OLDUNITS   },
+    { "hideunits",  PROMETHEUS_OUTPUT_HIDEUNITS  },
+    // terminator
+    { NULL, PROMETHEUS_OUTPUT_NONE },
 };
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_backend_options = global_backend_options;
-    PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?PROMETHEUS_OUTPUT_NAMES:0);
+    PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options =
+        PROMETHEUS_OUTPUT_TIMESTAMPS |
+        ((global_backend_options & BACKEND_OPTION_SEND_NAMES) ? PROMETHEUS_OUTPUT_NAMES : 0);
     const char *prometheus_prefix = global_backend_prefix;
 
     while(url) {

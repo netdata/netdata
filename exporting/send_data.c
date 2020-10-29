@@ -9,7 +9,8 @@
  * @param options an instance data structure.
  * @return Returns 1 if TLS should be enabled, 0 otherwise.
  */
-static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type, EXPORTING_OPTIONS options) {
+static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type, EXPORTING_OPTIONS options)
+{
     return (type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP ||
             type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP ||
             type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP ||
@@ -406,10 +407,18 @@ void simple_connector_worker(void *instance_p)
             stats->buffered_metrics = 0;
 
             // reset the internal monitoring chart counters
-            connector_specific_data->total_buffered_metrics = stats->buffered_bytes = stats->receptions =
-                stats->received_bytes = stats->sent_metrics = stats->sent_bytes = stats->transmission_successes =
-                    stats->transmission_failures = stats->reconnects = stats->data_lost_events = stats->lost_metrics =
-                        stats->lost_bytes = 0;
+            connector_specific_data->total_buffered_metrics =
+            stats->buffered_bytes =
+            stats->receptions =
+            stats->received_bytes =
+            stats->sent_metrics =
+            stats->sent_bytes =
+            stats->transmission_successes =
+            stats->transmission_failures =
+            stats->reconnects =
+            stats->data_lost_events =
+            stats->lost_metrics =
+            stats->lost_bytes = 0;
 
             uv_mutex_unlock(&instance->mutex);
         }

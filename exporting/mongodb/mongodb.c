@@ -291,7 +291,6 @@ void mongodb_connector_worker(void *instance_p)
             instance->data_is_ready = 0;
         }
 
-
         if (unlikely(instance->engine->exit)) {
             uv_mutex_unlock(&instance->mutex);
             break;

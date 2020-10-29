@@ -322,7 +322,8 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
  * @param instance an instance data structure.
  * @return Always returns 0.
  */
-int open_batch_json_http(struct instance *instance){
+int open_batch_json_http(struct instance *instance)
+{
     buffer_strcat(instance->buffer, "[\n");
 
     return 0;
@@ -334,7 +335,8 @@ int open_batch_json_http(struct instance *instance){
  * @param instance an instance data structure.
  * @return Always returns 0.
  */
-int close_batch_json_http(struct instance *instance){
+int close_batch_json_http(struct instance *instance)
+{
     buffer_strcat(instance->buffer, "\n]\n");
 
     simple_connector_end_batch(instance);

@@ -234,19 +234,17 @@ void security_start_ssl(int selector) {
  *
  * Clean all the allocated contexts from netdata.
  */
-void security_clean_openssl() {
-	if (netdata_srv_ctx)
-	{
-		SSL_CTX_free(netdata_srv_ctx);
-	}
+void security_clean_openssl()
+{
+    if (netdata_srv_ctx) {
+        SSL_CTX_free(netdata_srv_ctx);
+    }
 
-    if (netdata_client_ctx)
-    {
+    if (netdata_client_ctx) {
         SSL_CTX_free(netdata_client_ctx);
     }
 
-    if ( netdata_exporting_ctx )
-    {
+    if (netdata_exporting_ctx) {
         SSL_CTX_free(netdata_exporting_ctx);
     }
 
