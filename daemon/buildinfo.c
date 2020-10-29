@@ -200,7 +200,7 @@ void print_build_info(void) {
     printf("    libcap:                  %s\n", FEAT_LIBCAP);
     printf("    libcrypto:               %s\n", FEAT_CRYPTO);
     printf("    libm:                    %s\n", FEAT_LIBM);
-#if defined(ENABLE_ACLK) && !defined(ACLK_NO_LWS)
+#if defined(ENABLE_ACLK)
     printf("    LWS:                     %s v%d.%d.%d\n", FEAT_LWS, LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
 #else
     printf("    LWS:                     %s\n", FEAT_LWS);
