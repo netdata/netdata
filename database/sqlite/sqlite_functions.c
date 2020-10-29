@@ -12,19 +12,19 @@ const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
     "PRAGMA journal_size_limit=17179869184;",
     "ATTACH ':memory:' as ram;",
-    "CREATE TABLE IF NOT EXISTS host (host_id blob PRIMARY KEY, hostname text, "
+    "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
     "registry_hostname text, update_every int, os text, timezone text, tags text);",
-    "CREATE TABLE IF NOT EXISTS chart (chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
+    "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
     "chart_type int, memory_mode int, history_entries);",
     "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
     "multiplier int, divisor int , algorithm int, options text);",
-    "CREATE TABLE label if not exists (uuid blob, key text, value text, source int, PRIMARY KEY(key, uuid)) without rowid;",
+    "CREATE TABLE IF NOT EXISTS label(uuid blob, key text, value text, source int, PRIMARY KEY(key, uuid)) without rowid;",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
-    "CREATE INDEX IF NOT EXISTS ind_host on chart (host_id);",
-    "CREATE INDEX IF NOT EXISTS ind_chart on dimension (chart_id);",
-    "CREATE INDEX IF NOT EXISTS ind_uuid on label (uuid);",
+    "CREATE INDEX IF NOT EXISTS ind_host on chart(host_id);",
+    "CREATE INDEX IF NOT EXISTS ind_chart on dimension(chart_id);",
+    "CREATE INDEX IF NOT EXISTS ind_uuid on label(uuid);",
 
     "delete from chart_active;",
     "delete from dimension_active;",
