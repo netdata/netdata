@@ -11,7 +11,6 @@
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
     "PRAGMA journal_size_limit=17179869184;",
-    "ATTACH ':memory:' as ram;",
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
     "registry_hostname text, update_every int, os text, timezone text, tags text);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
@@ -39,10 +38,7 @@ static uint32_t page_size;
 static uint32_t page_count;
 static uint32_t free_page_count;
 
-/*
- * Database parameters
- */
-uint32_t sqlite_disk_quota_mb; // quota specified in the database
+uint32_t sqlite_disk_quota_mb;
 uint32_t desired_pages = 0;
 
 static int execute_insert(sqlite3_stmt *res)
