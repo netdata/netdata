@@ -19,11 +19,12 @@ const char *database_config[] = {
     "chart_type int, memory_mode int, history_entries);",
     "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
     "multiplier int, divisor int , algorithm int, options text);",
-
+    "CREATE TABLE label if not exists (uuid blob, key text, value text, source int, PRIMARY KEY(key, uuid)) without rowid;",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_host on chart (host_id);",
     "CREATE INDEX IF NOT EXISTS ind_chart on dimension (chart_id);",
+    "CREATE INDEX IF NOT EXISTS ind_uuid on label (uuid);",
 
     "delete from chart_active;",
     "delete from dimension_active;",
