@@ -19,6 +19,11 @@ https://developers.google.com/hangouts/chat/how-tos/webhooks
 
 Set the webhook URIs and room names in `health_alarm_notify.conf`. To edit it on your system, run `/etc/netdata/edit-config health_alarm_notify.conf`):
 
+## Threads (optional)
+
+Instead to receive alarms on different threads, Netdata allows you to concentrate them inside an unique thread when
+the variable `HANGOUTS_WEBHOOK_THREAD[NAME]` is set. 
+
 ```
 #------------------------------------------------------------------------------
 # hangouts (google hangouts chat) global notification options
@@ -30,6 +35,8 @@ SEND_HANGOUTS="YES"
 # HANGOUTS_WEBHOOK_URI[ROOM_NAME]="URLforroom1"
 HANGOUTS_WEBHOOK_URI[systems]="https://chat.googleapis.com/v1/spaces/AAAAXXXXXXX/..."
 HANGOUTS_WEBHOOK_URI[development]="https://chat.googleapis.com/v1/spaces/AAAAYYYYY/..."
+# On Hangouts, copy a thread link and change the values for space and thread
+# HANGOUTS_WEBHOOK_THREAD[systems]="spaces/AAAAXXXXXXX/threads/XXXXXXXXXXX"
 # if a DEFAULT_RECIPIENT_HANGOUTS are not configured,
 # notifications wouldn't be send to hangouts rooms.
 # DEFAULT_RECIPIENT_HANGOUTS="systems development|critical"
