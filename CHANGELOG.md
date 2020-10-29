@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Update README.md [\#10146](https://github.com/netdata/netdata/pull/10146) ([WBTMagnum](https://github.com/WBTMagnum))
+- fix configuration category in docs/prometheus\_remote\_write [\#10145](https://github.com/netdata/netdata/pull/10145) ([OdysLam](https://github.com/OdysLam))
 - dashboard@2.7.4 [\#10122](https://github.com/netdata/netdata/pull/10122) ([jacekkolasa](https://github.com/jacekkolasa))
 - Disregard host tags configuration pointer [\#10121](https://github.com/netdata/netdata/pull/10121) ([mfundul](https://github.com/mfundul))
 - Fix platform dependent printf format [\#10120](https://github.com/netdata/netdata/pull/10120) ([Saruspete](https://github.com/Saruspete))
@@ -19,6 +20,7 @@
 - Added more robust doucmentation around updates. [\#10100](https://github.com/netdata/netdata/pull/10100) ([Ferroin](https://github.com/Ferroin))
 - nvidia\_smi: Not count users with zero memory allocated [\#10098](https://github.com/netdata/netdata/pull/10098) ([scatenag](https://github.com/scatenag))
 - Replace memcpy\(\) with memmove\(\) for overlapping memory ranges. [\#10097](https://github.com/netdata/netdata/pull/10097) ([mfundul](https://github.com/mfundul))
+- ebpf memory cleanup [\#10096](https://github.com/netdata/netdata/pull/10096) ([thiagoftsm](https://github.com/thiagoftsm))
 - collectors/cgroups: filter pod level cgroups [\#10095](https://github.com/netdata/netdata/pull/10095) ([ilyam8](https://github.com/ilyam8))
 - Add support for HBA drives in hpssa.chart.py [\#10093](https://github.com/netdata/netdata/pull/10093) ([martinpal](https://github.com/martinpal))
 - Add documentation for configuring/editing hostnames of Docker-run Agents [\#10087](https://github.com/netdata/netdata/pull/10087) ([joelhans](https://github.com/joelhans))
@@ -32,6 +34,7 @@
 - New alarm entities [\#10041](https://github.com/netdata/netdata/pull/10041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
 - Completely hide SSO iframe [\#10027](https://github.com/netdata/netdata/pull/10027) ([Jiab77](https://github.com/Jiab77))
+- Opsgenie integration [\#9879](https://github.com/netdata/netdata/pull/9879) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
@@ -244,9 +247,6 @@
 - Update apps\_groups.conf [\#9535](https://github.com/netdata/netdata/pull/9535) ([AliMickey](https://github.com/AliMickey))
 - Fix PyMySQL library to respect `my.cnf` parameter [\#9526](https://github.com/netdata/netdata/pull/9526) ([anirudhdggl](https://github.com/anirudhdggl))
 - Remove health from archived metrics [\#9520](https://github.com/netdata/netdata/pull/9520) ([mfundul](https://github.com/mfundul))
-- Fix now\_ms in charts.d collector to prevent tc-qos-helper crashes [\#9510](https://github.com/netdata/netdata/pull/9510) ([ilyam8](https://github.com/ilyam8))
-- Fix an issue with random crashes when updating a chart's metadata on the fly [\#9509](https://github.com/netdata/netdata/pull/9509) ([stelfrag](https://github.com/stelfrag))
-- Fix python.d crashes by adding a lock to stdout write function [\#9508](https://github.com/netdata/netdata/pull/9508) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
