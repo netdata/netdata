@@ -55,6 +55,8 @@ extern int sql_cache_host_charts(RRDHOST *host);
 
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
+extern RRDHOST *sql_create_host_by_uuid(char *guid);
+
 //GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

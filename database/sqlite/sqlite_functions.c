@@ -985,3 +985,64 @@ failed:
 
     return;
 }
+
+#define SELECT_HOST "select host_id, registry_hostname, update_every, os, timezone, tags from host where hostname = @hostname;"
+
+RRDHOST *sql_create_host_by_uuid(char *hostname)
+{
+    int rc;
+    RRDHOST *host = NULL;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db, SELECT_HOST, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host");
+        return NULL;
+    }
+
+    rc = sqlite3_bind_text(res, 1, hostname, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind hostname parameter to fetch host information");
+        return NULL;
+    }
+
+    rc = sqlite3_step(res);
+    if (unlikely(rc != SQLITE_ROW)) {
+        error_report("Failed find hostname %s", hostname);
+        goto failed;
+    }
+
+    host = callocz(1, sizeof(RRDHOST));
+
+    host->rrd_update_every = sqlite3_column_int(res, 2);
+    host->rrd_history_entries = 0;
+    host->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+
+    host->hostname = strdupz(hostname);
+    uuid_unparse_lower((uuid_t *) sqlite3_column_blob(res, 0), host->machine_guid);
+    uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
+
+    host->os = strdupz((const char *) sqlite3_column_text(res, 3));
+
+    char *tags = sqlite3_column_text(res, 5);
+    host->tags = (tags && *tags) ? strdupz(tags) : NULL;
+
+    char *timezone = strdupz((const char *) sqlite3_column_text(res, 4));
+    host->timezone = strdupz((timezone && *timezone) ? timezone : "unknown");
+
+    host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
+    host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
+
+    char *registry_hostname = strdupz((const char *) sqlite3_column_text(res, 1));
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : host->hostname);
+
+    host->system_info = NULL;
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when read host information");
+
+    return host;
+}
