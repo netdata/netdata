@@ -201,7 +201,7 @@ class Service(SimpleService):
 
         return arr, colnames
 
-    def train(self):
+    def train(self, models_to_train=None):
         """Pull required training data and train a model for each specified model.
 
         :return:
@@ -226,14 +226,16 @@ class Service(SimpleService):
         self.info(f'training complete in {round(time.time() - now, 2)} seconds (runs_counter={self.runs_counter}, model={self.model}, train_n_secs={self.train_n_secs}, models={len(self.fitted_at)}, n_fit_success={self.n_fit_success}, n_fit_fails={self.n_fit_fail}).')
         self.debug(f'self.fitted_at = {self.fitted_at}')
 
-    def try_fit(self, X, feature_colnames):
+    def try_fit(self, X, feature_colnames, models_to_train=None):
         """Try fit each model and try to fallback to a default model if fit fails for any reason.
 
         :param X <np.ndarray>: feature vector.
         :param feature_colnames <list>: list of corresponding feature names.
         """
+        if models_to_train is None:
+            models_to_train = list(self.models.keys())
         self.n_fit_fail, self.n_fit_success = 0, 0
-        for model in self.models:
+        for model in models_to_train:
             X_train = self.get_array_cols(feature_colnames, X, starts_with=model)
             try:
                 self.models[model].fit(X_train)
@@ -291,7 +293,9 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        if len(self.fitted_at.keys()) < len(self.models) or self.runs_counter % self.train_every_n == 0:
+        if len(self.fitted_at) < len(self.models):
+            self.train(models_to_train=[m for m in self.models if m not in self.fitted_at])
+        elif self.runs_counter % self.train_every_n == 0:
             self.train()
 
         data_probability, data_anomaly = self.predict()
