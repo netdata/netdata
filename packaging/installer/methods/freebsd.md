@@ -26,7 +26,7 @@ pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy
 Download Netdata:
 
 ```sh
-fetch https://github.com/netdata/netdata/releases/download/v1.25.0/netdata-v1.25.0.tar.gz
+fetch https://github.com/netdata/netdata/releases/download/v1.26.0/netdata-v1.26.0.tar.gz
 ```
 
 Unzip the downloaded file:
