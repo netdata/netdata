@@ -354,7 +354,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     (void)url;
 
     buffer_flush(w->response.data);

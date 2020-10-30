@@ -1252,6 +1252,11 @@ extern RRDHOST *rrdhost_create(
 
 #endif /* NETDATA_RRD_INTERNALS */
 
+extern void set_host_properties(
+    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
+    const char *guid, const char *os, const char *tags, const char *tzone, const char *program_name,
+    const char *program_version);
+
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
 

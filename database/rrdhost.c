@@ -103,6 +103,28 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
     host->hash_machine_guid = simple_hash(host->machine_guid);
 }
 
+void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname,
+                         const char *registry_hostname, const char *guid, const char *os, const char *tags,
+                         const char *tzone, const char *program_name, const char *program_version)
+{
+
+    host->rrd_update_every = update_every;
+    host->rrd_memory_mode = memory_mode;
+
+    host->hostname = strdupz(hostname);
+
+    rrdhost_init_machine_guid(host, guid);
+
+    rrdhost_init_os(host, os);
+    rrdhost_init_timezone(host, tzone);
+    rrdhost_init_tags(host, tags);
+
+    host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
+    host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
+
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : host->hostname);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -139,9 +161,12 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every    = (update_every > 0)?update_every:1;
+    set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, hostname, registry_hostname, guid, os,
+                        tags, timezone, program_name, program_version);
+
+    //host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
-    host->rrd_memory_mode     = memory_mode;
+    //host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE) /*|| is_archived*/) ? 0 : health_enabled;
 
     host->sender = mallocz(sizeof(*host->sender));
@@ -170,16 +195,16 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_mutex_init(&host->claimed_id_lock);
 
-    rrdhost_init_hostname(host, hostname);
-    rrdhost_init_machine_guid(host, guid);
+    //rrdhost_init_hostname(host, hostname);
+    //rrdhost_init_machine_guid(host, guid);
 
-    rrdhost_init_os(host, os);
-    rrdhost_init_timezone(host, timezone);
-    rrdhost_init_tags(host, tags);
+    //rrdhost_init_os(host, os);
+    //rrdhost_init_timezone(host, timezone);
+    //rrdhost_init_tags(host, tags);
 
-    host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
-    host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
+    //host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
+    //host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
+    //host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     host->system_info = system_info;
 

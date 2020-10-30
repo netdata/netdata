@@ -1385,6 +1385,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(host) {
             int rc = web_client_process_url(host, w, url);
             if (release_host) {
+                freez(host->hostname);
                 freez((char *) host->os);
                 freez((char *) host->tags);
                 freez((char *) host->timezone);

@@ -1009,40 +1009,28 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     rc = sqlite3_step(res);
     if (unlikely(rc != SQLITE_ROW)) {
-        error_report("Failed find hostname %s", hostname);
+        error_report("Failed to find hostname %s", hostname);
         goto failed;
     }
 
+    char uuid_str[37];
+    uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 0)), uuid_str);
+
     host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every = sqlite3_column_int(res, 2);
-    host->rrd_history_entries = 0;
-    host->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    set_host_properties(host, sqlite3_column_int(res, 2), RRD_MEMORY_MODE_DBENGINE, hostname,
+                            (char *) sqlite3_column_text(res, 1), (const char *) uuid_str,
+                        (char *) sqlite3_column_text(res, 3), (char *) sqlite3_column_text(res, 5),
+                        (char *) sqlite3_column_text(res, 4), NULL, NULL);
 
-    host->hostname = strdupz(hostname);
-    uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 0)), host->machine_guid);
     uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
-
-    host->os = strdupz((const char *) sqlite3_column_text(res, 3));
-
-    char *tags = (char *) sqlite3_column_text(res, 5);
-    host->tags = (tags && *tags) ? strdupz(tags) : NULL;
-
-    char *tzone = strdupz((const char *) sqlite3_column_text(res, 4));
-    host->timezone = strdupz((tzone && *tzone) ? tzone : "unknown");
-
-    host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
-    host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
-
-    char *registry_hostname = strdupz((const char *) sqlite3_column_text(res, 1));
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : host->hostname);
 
     host->system_info = NULL;
 
 failed:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when read host information");
+        error_report("Failed to finalize the prepared statement when reading host information");
 
     return host;
 }
