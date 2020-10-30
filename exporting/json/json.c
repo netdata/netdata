@@ -95,10 +95,6 @@ int init_json_http_instance(struct instance *instance)
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
-    if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for json exporting connector instance %s", instance->config.name);
-        return 1;
-    }
 
     simple_connector_init(instance);
 
