@@ -32,8 +32,6 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
         connector_specific_config->remote_write_path,
         instance->config.destination,
         buffer_strlen(simple_connector_data->last_buffer->buffer));
-
-    return;
 }
 
 /**
