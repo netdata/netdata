@@ -1020,16 +1020,16 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     host->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
 
     host->hostname = strdupz(hostname);
-    uuid_unparse_lower((uuid_t *) sqlite3_column_blob(res, 0), host->machine_guid);
+    uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 0)), host->machine_guid);
     uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
     host->os = strdupz((const char *) sqlite3_column_text(res, 3));
 
-    char *tags = sqlite3_column_text(res, 5);
+    char *tags = (char *) sqlite3_column_text(res, 5);
     host->tags = (tags && *tags) ? strdupz(tags) : NULL;
 
-    char *timezone = strdupz((const char *) sqlite3_column_text(res, 4));
-    host->timezone = strdupz((timezone && *timezone) ? timezone : "unknown");
+    char *tzone = strdupz((const char *) sqlite3_column_text(res, 4));
+    host->timezone = strdupz((tzone && *tzone) ? tzone : "unknown");
 
     host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
     host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
