@@ -27,6 +27,12 @@ larger dataset than your system's available RAM.
 The database engine is currently the default method of storing metrics, but if you're not sure which database you're
 using, check out your `netdata.conf` file and look for the `memory mode` setting:
 
+```bash
+# navigate to and open your netdata.conf file to make changes if needed
+cd /etc/netdata/
+sudo ./edit-config netdata.conf
+```
+
 ```conf
 [global]
     memory mode = dbengine
