@@ -13,7 +13,6 @@ char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
  * Prepare HTTP header
  *
  * @param instance an instance data structure.
- * @return Returns 0 on success, 1 on failure.
  */
 void prometheus_remote_write_prepare_header(struct instance *instance)
 {
