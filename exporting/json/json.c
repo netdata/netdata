@@ -261,7 +261,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
 
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         if (buffer_strlen((BUFFER *)instance->buffer) > 2)
-        buffer_strcat(instance->buffer, ",\n");
+            buffer_strcat(instance->buffer, ",\n");
     }
 
     buffer_sprintf(
@@ -341,7 +341,7 @@ int close_batch_json_http(struct instance *instance)
 }
 
 /**
- * Ppepare HTTP header
+ * Prepare HTTP header
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
