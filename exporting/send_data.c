@@ -170,7 +170,7 @@ void simple_connector_send_buffer(
 #endif
 
     struct stats *stats = &instance->stats;
-    ssize_t written = -1;
+    ssize_t written;
     size_t header_len = buffer_strlen(header);
     size_t buffer_len = buffer_strlen(buffer);
 
