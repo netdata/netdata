@@ -374,6 +374,7 @@ IRC_NETWORK=
 
 # hangouts configs
 declare -A HANGOUTS_WEBHOOK_URI
+declare -A HANGOUTS_WEBHOOK_THREAD
 
 # dynatrace configs
 DYNATRACE_SPACE=
