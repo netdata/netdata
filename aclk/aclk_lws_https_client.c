@@ -12,6 +12,8 @@
 struct simple_hcc_data {
     char *data;
     size_t data_size;
+    size_t written;
+    char lws_work_buffer[1024 + LWS_PRE];
     char *payload;
     int response_code;
     int done;
@@ -28,6 +30,10 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
     switch (reason) {
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ");
+        if (perconn_data->data_size - 1 - perconn_data->written < len)
+            return 1;
+        memcpy(&perconn_data->data[perconn_data->written], in, len);
+        perconn_data->written += len;
         return 0;
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP");
@@ -35,11 +41,11 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
             error("Missing Per Connect Data");
             return -1;
         }
-        ptr = perconn_data->data;
-        n = perconn_data->data_size - 1;
+        n = sizeof(perconn_data->lws_work_buffer) - LWS_PRE;
+        ptr = perconn_data->lws_work_buffer + LWS_PRE;
         if (lws_http_client_read(wsi, &ptr, &n) < 0)
             return -1;
-        ptr[n] = '\0';
+        perconn_data->data[perconn_data->written] = '\0';
         return 0;
     case LWS_CALLBACK_WSI_DESTROY:
         debug(D_ACLK, "LWS_CALLBACK_WSI_DESTROY");
