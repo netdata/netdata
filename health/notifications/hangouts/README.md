@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Send notifications to Google Hangouts
 
-[Google Hangouts](https://hangouts.google.com/) is cross-platform messaging app developed by Google. You can configure
+[Google Hangouts](https://hangouts.google.com/) is a cross-platform messaging app developed by Google. You can configure
 Netdata to send alarm notifications to a Hangouts room in order to stay aware of possible health or performance issues
 on your nodes. Here's an example of the notification in action:
 
