@@ -374,6 +374,7 @@ IRC_NETWORK=
 
 # hangouts configs
 declare -A HANGOUTS_WEBHOOK_URI
+declare -A HANGOUTS_WEBHOOK_THREAD
 
 # dynatrace configs
 DYNATRACE_SPACE=
@@ -1886,7 +1887,7 @@ send_sms() {
 # hangouts sender
 
 send_hangouts() {
-	local rooms="${1}" httpcode sent=0 room color payload webhook
+	local rooms="${1}" httpcode sent=0 room color payload webhook thread
 
 	[ "${SEND_HANGOUTS}" != "YES" ] && return 1
 
@@ -1901,6 +1902,9 @@ send_hangouts() {
 		if [ -z "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
 			info "Can't send Hangouts notification for: ${host} ${chart}.${name} to room ${room}. HANGOUTS_WEBHOOK_URI[$room] not defined"
 		else
+			if [ -n "${HANGOUTS_WEBHOOK_THREAD[$room]}" ]; then
+				thread="\"name\" : \"${HANGOUTS_WEBHOOK_THREAD[$room]}\""
+			fi
 			webhook="${HANGOUTS_WEBHOOK_URI[$room]}"
 			payload="$(
 				cat <<EOF
@@ -1967,7 +1971,10 @@ send_hangouts() {
 								}
 							]
 						}
-					]
+					],
+					"thread": {
+						$thread
+					}
 				}
 EOF
 				)"
