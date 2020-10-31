@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Update CODE\_OF\_CONDUCT.md [\#10161](https://github.com/netdata/netdata/pull/10161) ([aabatangle](https://github.com/aabatangle))
+- Hangout thread [\#10160](https://github.com/netdata/netdata/pull/10160) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update the version of libJudy that we bundle to 1.0.5-netdata2 [\#10158](https://github.com/netdata/netdata/pull/10158) ([Ferroin](https://github.com/Ferroin))
 - Update README.md [\#10146](https://github.com/netdata/netdata/pull/10146) ([WBTMagnum](https://github.com/WBTMagnum))
 - fix configuration category in docs/prometheus\_remote\_write [\#10145](https://github.com/netdata/netdata/pull/10145) ([OdysLam](https://github.com/OdysLam))
@@ -36,6 +37,7 @@
 - New alarm entities [\#10041](https://github.com/netdata/netdata/pull/10041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
 - Completely hide SSO iframe [\#10027](https://github.com/netdata/netdata/pull/10027) ([Jiab77](https://github.com/Jiab77))
+- allows use of system libwebsockets instead of bundled one [\#9984](https://github.com/netdata/netdata/pull/9984) ([underhood](https://github.com/underhood))
 - Opsgenie integration [\#9879](https://github.com/netdata/netdata/pull/9879) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
@@ -230,7 +232,6 @@
 - Revert the eBPF package bundling that breaks the release and DEB packages. [\#9552](https://github.com/netdata/netdata/pull/9552) ([prologic](https://github.com/prologic))
 - Read socket information from kernel ring [\#9549](https://github.com/netdata/netdata/pull/9549) ([thiagoftsm](https://github.com/thiagoftsm))
 - Suppress warning -Wformat-truncation in ACLK [\#9547](https://github.com/netdata/netdata/pull/9547) ([underhood](https://github.com/underhood))
-- Add 1.23.1 and 1.23.0 to news section [\#9518](https://github.com/netdata/netdata/pull/9518) ([joelhans](https://github.com/joelhans))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
@@ -247,7 +248,6 @@
 - Fix transition from archived to active charts not generating alarms [\#9536](https://github.com/netdata/netdata/pull/9536) ([mfundul](https://github.com/mfundul))
 - Update apps\_groups.conf [\#9535](https://github.com/netdata/netdata/pull/9535) ([AliMickey](https://github.com/AliMickey))
 - Fix PyMySQL library to respect `my.cnf` parameter [\#9526](https://github.com/netdata/netdata/pull/9526) ([anirudhdggl](https://github.com/anirudhdggl))
-- Remove health from archived metrics [\#9520](https://github.com/netdata/netdata/pull/9520) ([mfundul](https://github.com/mfundul))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
