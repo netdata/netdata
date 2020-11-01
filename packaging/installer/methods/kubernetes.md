@@ -97,7 +97,7 @@ make your edits, and pass the changed file to `helm install`/`helm upgrade`.
 First, copy the file to your administrative system.
 
 ```bash
-curl https://raw.githubusercontent.com/netdata/helmchart/master/charts/netdata/sdconfig/child.yml .
+curl https://raw.githubusercontent.com/netdata/helmchart/master/charts/netdata/sdconfig/child.yml -o child.yml
 ```
 
 Edit the new `child.yml` file according to your needs. See the [Helm chart
