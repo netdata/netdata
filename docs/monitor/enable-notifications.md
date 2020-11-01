@@ -43,7 +43,7 @@ platform.
 
 ## Enable email notifications
 
-To use [email notifications]/health/notifications/email/README.md), you need
+To use [email notifications](/health/notifications/email/README.md), you need
 [`sendmail`](http://www.postfix.org/sendmail.1.html) or an equivalent installed on your system.
 
 Edit the `health_alarm_notify.conf` file, which resides in your Netdata [config
