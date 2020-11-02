@@ -698,7 +698,10 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 
         s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
         if(name == name_end) {
-            s = statsd_parse_skip_spaces(s);
+            if (*s) {
+                s++;
+                s = statsd_parse_skip_spaces(s);
+            }
             continue;
         }
 
