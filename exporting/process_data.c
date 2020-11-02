@@ -397,13 +397,11 @@ int simple_connector_end_batch(struct instance *instance)
 
     buffer_flush(instance_buffer);
 
-    BUFFER *header = last_buffer->header;
-    if (header) {
-        buffer_flush(header);
-    } else {
-        header = buffer_create(0);
-        last_buffer->header = header;
-    }
+    if (last_buffer->header)
+        buffer_flush(last_buffer->header);
+    else
+        last_buffer->header = buffer_create(0);
+
     if (instance->prepare_header)
         instance->prepare_header(instance);
 
