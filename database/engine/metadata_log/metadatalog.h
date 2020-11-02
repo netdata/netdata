@@ -16,7 +16,7 @@
 struct metalog_instance;
 struct parser_user_object;
 
-#define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
+//#define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
 #define METALOG_FILE_NUMBER_SCAN_TMPL "%5u-%5u"
 #define METALOG_FILE_NUMBER_PRINT_TMPL "%5.5u-%5.5u"
@@ -56,7 +56,7 @@ struct metalog_instance {
 //                      * 2 is set after all threads have finished running
 //                      */
 
-    struct metalog_statistics stats;
+//    struct metalog_statistics stats;
 };
 
 #endif /* NETDATA_METADATALOG_H */

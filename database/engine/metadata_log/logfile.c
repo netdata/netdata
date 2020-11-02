@@ -32,7 +32,7 @@ void metadata_logfile_init(struct metadata_logfile *metalogfile, struct metalog_
 
 int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_starting_fileno, unsigned new_fileno)
 {
-    struct metalog_instance *ctx = metalogfile->ctx;
+    //struct metalog_instance *ctx = metalogfile->ctx;
     uv_fs_t req;
     int ret;
     char oldpath[RRDENG_PATH_MAX], newpath[RRDENG_PATH_MAX];
@@ -49,7 +49,7 @@ int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_s
     ret = uv_fs_rename(NULL, &req, oldpath, newpath, NULL);
     if (ret < 0) {
         error("uv_fs_rename(%s): %s", oldpath, uv_strerror(ret));
-        ++ctx->stats.fs_errors; /* this is racy, may miss some errors */
+        //++ctx->stats.fs_errors; /* this is racy, may miss some errors */
         rrd_stat_atomic_add(&global_fs_errors, 1);
         /* restore previous values */
         metalogfile->starting_fileno = backup_starting_fileno;
@@ -60,29 +60,29 @@ int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_s
     return ret;
 }
 
-int close_metadata_logfile(struct metadata_logfile *metalogfile)
-{
-    struct metalog_instance *ctx = metalogfile->ctx;
-    uv_fs_t req;
-    int ret;
-    char path[RRDENG_PATH_MAX];
-
-    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
-
-    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
-    if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
-    }
-    uv_fs_req_cleanup(&req);
-
-    return ret;
-}
+//int close_metadata_logfile(struct metadata_logfile *metalogfile)
+//{
+//    struct metalog_instance *ctx = metalogfile->ctx;
+//    uv_fs_t req;
+//    int ret;
+//    char path[RRDENG_PATH_MAX];
+//
+//    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+//
+//    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
+//    if (ret < 0) {
+//        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+////        ++ctx->stats.fs_errors;
+//        rrd_stat_atomic_add(&global_fs_errors, 1);
+//    }
+//    uv_fs_req_cleanup(&req);
+//
+//    return ret;
+//}
 
 int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
 {
-    struct metalog_instance *ctx = metalogfile->ctx;
+    //struct metalog_instance *ctx = metalogfile->ctx;
     uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
@@ -92,7 +92,7 @@ int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
         error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
+//        ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
     uv_fs_req_cleanup(&req);
@@ -100,43 +100,43 @@ int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
     return ret;
 }
 
-int destroy_metadata_logfile(struct metadata_logfile *metalogfile)
-{
-    struct metalog_instance *ctx = metalogfile->ctx;
-    uv_fs_t req;
-    int ret;
-    char path[RRDENG_PATH_MAX];
-
-    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
-
-    ret = uv_fs_ftruncate(NULL, &req, metalogfile->file, 0, NULL);
-    if (ret < 0) {
-        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
-    if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
-    }
-    uv_fs_req_cleanup(&req);
-
-//    ++ctx->stats.metadata_logfile_deletions;
-
-    return ret;
-}
+//int destroy_metadata_logfile(struct metadata_logfile *metalogfile)
+//{
+//    struct metalog_instance *ctx = metalogfile->ctx;
+//    uv_fs_t req;
+//    int ret;
+//    char path[RRDENG_PATH_MAX];
+//
+//    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+//
+//    ret = uv_fs_ftruncate(NULL, &req, metalogfile->file, 0, NULL);
+//    if (ret < 0) {
+//        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+////        ++ctx->stats.fs_errors;
+//        rrd_stat_atomic_add(&global_fs_errors, 1);
+//    }
+//    uv_fs_req_cleanup(&req);
+//
+//    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
+//    if (ret < 0) {
+//        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+////        ++ctx->stats.fs_errors;
+//        rrd_stat_atomic_add(&global_fs_errors, 1);
+//    }
+//    uv_fs_req_cleanup(&req);
+//
+//    ret = uv_fs_unlink(NULL, &req, path, NULL);
+//    if (ret < 0) {
+//        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+////        ++ctx->stats.fs_errors;
+//        rrd_stat_atomic_add(&global_fs_errors, 1);
+//    }
+//    uv_fs_req_cleanup(&req);
+//
+////    ++ctx->stats.metadata_logfile_deletions;
+//
+//    return ret;
+//}
 
 static int check_metadata_logfile_superblock(uv_file file)
 {
@@ -199,13 +199,13 @@ void replay_record(struct metadata_logfile *metalogfile, struct rrdeng_metalog_r
 /* This function only works with buffered I/O */
 static inline int metalogfile_read(struct metadata_logfile *metalogfile, void *buf, size_t len, uint64_t offset)
 {
-    struct metalog_instance *ctx;
+//    struct metalog_instance *ctx;
     uv_file file;
     uv_buf_t iov;
     uv_fs_t req;
     int ret;
 
-    ctx = metalogfile->ctx;
+//    ctx = metalogfile->ctx;
     file = metalogfile->file;
     iov = uv_buf_init(buf, len);
     ret = uv_fs_read(NULL, &req, file, &iov, 1, offset, NULL);
@@ -213,14 +213,14 @@ static inline int metalogfile_read(struct metadata_logfile *metalogfile, void *b
         fatal("uv_fs_read: %s", uv_strerror(ret));
     }
     if (req.result < 0) {
-        ++ctx->stats.io_errors;
+//        ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         error("%s: uv_fs_read - %s - record at offset %"PRIu64"(%u) in metadata logfile %u-%u.", __func__,
               uv_strerror((int)req.result), offset, (unsigned)len, metalogfile->starting_fileno, metalogfile->fileno);
     }
     uv_fs_req_cleanup(&req);
-    ctx->stats.io_read_bytes += len;
-    ++ctx->stats.io_read_requests;
+//    ctx->stats.io_read_bytes += len;
+//    ++ctx->stats.io_read_requests;
 
     return ret;
 }
@@ -313,6 +313,7 @@ static void iterate_records(struct metadata_logfile *metalogfile)
 
 int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile *metalogfile)
 {
+    UNUSED(ctx);
     uv_fs_t req;
     uv_file file;
     int ret, fd, error;
@@ -322,7 +323,7 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     generate_metadata_logfile_path(metalogfile, path, sizeof(path));
     fd = open_file_buffered_io(path, O_RDWR, &file);
     if (fd < 0) {
-        ++ctx->stats.fs_errors;
+//        ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         return fd;
     }
@@ -335,8 +336,8 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     ret = check_metadata_logfile_superblock(file);
     if (ret)
         goto error;
-    ctx->stats.io_read_bytes += sizeof(struct rrdeng_jf_sb);
-    ++ctx->stats.io_read_requests;
+//    ctx->stats.io_read_bytes += sizeof(struct rrdeng_jf_sb);
+//    ++ctx->stats.io_read_requests;
 
     metalogfile->file = file;
     metalogfile->pos = file_size;
@@ -351,7 +352,7 @@ error:
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
+//        ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
     uv_fs_req_cleanup(&req);
@@ -385,7 +386,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
         error("uv_fs_scandir(%s): %s", dbfiles_path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
+//        ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         return ret;
     }
