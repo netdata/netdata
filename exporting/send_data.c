@@ -170,7 +170,8 @@ void simple_connector_send_buffer(
 #endif
 
     struct stats *stats = &instance->stats;
-    ssize_t written;
+    ssize_t header_sent_bytes = 0;
+    ssize_t buffer_sent_bytes = 0;
     size_t header_len = buffer_strlen(header);
     size_t buffer_len = buffer_strlen(buffer);
 
@@ -178,40 +179,45 @@ void simple_connector_send_buffer(
     if (exporting_tls_is_enabled(instance->config.type, options) &&
         connector_specific_data->conn &&
         connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-        written = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
-        written += (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), buffer_len);
+        if (header_len)
+            header_sent_bytes = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(header), header_len);
+        if ((size_t)header_sent_bytes == header_len)
+            buffer_sent_bytes = (ssize_t)SSL_write(connector_specific_data->conn, buffer_tostring(buffer), buffer_len);
     } else {
-        written = send(*sock, buffer_tostring(header), header_len, flags);
-        written += send(*sock, buffer_tostring(buffer), buffer_len, flags);
+        if (header_len)
+            header_sent_bytes = send(*sock, buffer_tostring(header), header_len, flags);
+        if ((size_t)header_sent_bytes == header_len)
+            buffer_sent_bytes = send(*sock, buffer_tostring(buffer), buffer_len, flags);
     }
 #else
-    written = send(*sock, buffer_tostring(header), header_len, flags);
-    written += send(*sock, buffer_tostring(buffer), buffer_len, flags);
+    if (header_len)
+        header_sent_bytes = send(*sock, buffer_tostring(header), header_len, flags);
+    if ((size_t)header_sent_bytes == header_len)
+        buffer_sent_bytes = send(*sock, buffer_tostring(buffer), buffer_len, flags);
 #endif
 
-    if(written != -1 && (size_t)written == (header_len + buffer_len)) {
+    if ((size_t)buffer_sent_bytes == buffer_len) {
         // we sent the data successfully
         stats->transmission_successes++;
         stats->sent_metrics += buffered_metrics;
-        stats->sent_bytes += written;
+        stats->sent_bytes += buffer_sent_bytes;
 
         // reset the failures count
         *failures = 0;
 
         // empty the buffer
         buffer_flush(buffer);
-    }
-    else {
+    } else {
         // oops! we couldn't send (all or some of the) data
         error(
             "EXPORTING: failed to write data to '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.",
             instance->config.destination,
             buffer_len,
-            written);
+            buffer_sent_bytes);
         stats->transmission_failures++;
 
-        if(written != -1)
-            stats->sent_bytes += written;
+        if(buffer_sent_bytes != -1)
+            stats->sent_bytes += buffer_sent_bytes;
 
         // increment the counter we check for data loss
         (*failures)++;
