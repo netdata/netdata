@@ -588,7 +588,7 @@ static void test_simple_connector_send_buffer(void **state)
 
     assert_int_equal(failures, 0);
     assert_int_equal(stats->transmission_successes, 1);
-    assert_int_equal(stats->sent_bytes, 24);
+    assert_int_equal(stats->sent_bytes, 12);
     assert_int_equal(stats->sent_metrics, 1);
     assert_int_equal(stats->transmission_failures, 0);
 
@@ -612,6 +612,7 @@ static void test_simple_connector_worker(void **state)
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
 
+    buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
 
     expect_function_call(__wrap_connect_to_one_of);
@@ -625,8 +626,8 @@ static void test_simple_connector_worker(void **state)
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 2);
     expect_not_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
-    expect_string(__wrap_send, buf, "");
-    expect_value(__wrap_send, len, 0);
+    expect_string(__wrap_send, buf, "test header");
+    expect_value(__wrap_send, len, 11);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
     expect_function_call(__wrap_send);
