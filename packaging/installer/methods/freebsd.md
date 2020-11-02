@@ -29,6 +29,13 @@ Download Netdata:
 fetch https://github.com/netdata/netdata/releases/download/v1.26.0/netdata-v1.26.0.tar.gz
 ```
 
+> ⚠️ Verify the latest version by either navigating to [Netdata's latest
+> release](https://github.com/netdata/netdata/releases/latest) or using `curl`:
+>
+> ```bash
+> basename $(curl -Ls -o /dev/null -w %{url_effective} https://github.com/netdata/netdata/releases/latest)
+> ```
+
 Unzip the downloaded file:
 
 ```sh
