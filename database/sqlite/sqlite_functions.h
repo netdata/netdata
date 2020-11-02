@@ -11,7 +11,6 @@
  * Initialize a database
  */
 
-#define SQLITE_WAL_SIZE (8 * 1024 * 1024 * 1024)
 #define SQLITE_SELECT_MAX   (10)        // Max select retries
 #define SQLITE_INSERT_MAX   (10)        // Max select retries
 #define SQLITE_SELECT_DELAY (50)        // select delay in MS between retries
@@ -56,7 +55,5 @@ extern int sql_cache_host_charts(RRDHOST *host);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
-
-//GUID_TYPE sql_find_object_by_guid(uuid_t *uuid, char *object, int max_size);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H

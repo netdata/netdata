@@ -806,10 +806,6 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_
     }
     *dimensions_count += dimensions;
     buffer_sprintf(wb, "\n\t\t\t}");
-
-//    rc = sqlite3_finalize(res_dim);
-//    if (unlikely(rc != SQLITE_OK))
-//        return;
 }
 
 #define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, module, unit, chart_type, update_every from chart where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
@@ -918,9 +914,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             rrdset_type_name(sqlite3_column_int(res_chart, 11)));
 
         sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), wb, &dimensions);
-        //if (dimensions)
-        //    buffer_strcat(wb, ",\n\t\t\t\t\"");
-        //else
+
         rc = sqlite3_reset(res_dim);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset the prepared statement when reading archived chart dimensions");
