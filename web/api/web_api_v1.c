@@ -652,6 +652,9 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     int redirects = 0;
 */
 
+	// Don't cache registry responses
+    buffer_no_cacheable(w->response.data);
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
