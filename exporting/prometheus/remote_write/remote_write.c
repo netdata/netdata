@@ -191,19 +191,17 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
     prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
     prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-    if (likely(can_send_rrdset(instance, st))) {
-        as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
-        homogeneous = 1;
-        if (as_collected) {
-            if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
-                rrdset_update_heterogeneous_flag(st);
+    as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
+    homogeneous = 1;
+    if (as_collected) {
+        if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+            rrdset_update_heterogeneous_flag(st);
 
-            if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
-                homogeneous = 0;
-        } else {
-            if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
-                prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
-        }
+        if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+            homogeneous = 0;
+    } else {
+        if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
+            prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
     }
 
     return 0;
