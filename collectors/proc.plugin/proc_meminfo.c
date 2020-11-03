@@ -145,7 +145,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    // http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
+    // http://calimeroteknik.free.fr/blag/?article20/really-used-memory-on-gnu-linux
     unsigned long long MemCached = Cached + SReclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
 
@@ -526,4 +526,3 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     return 0;
 }
-
