@@ -35,7 +35,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             Writeback = 0,
             //AnonPages = 0,
             //Mapped = 0,
-            //Shmem = 0,
+            Shmem = 0,
             Slab = 0,
             SReclaimable = 0,
             SUnreclaim = 0,
@@ -92,7 +92,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "Writeback", &Writeback);
         //arl_expect(arl_base, "AnonPages", &AnonPages);
         //arl_expect(arl_base, "Mapped", &Mapped);
-        //arl_expect(arl_base, "Shmem", &Shmem);
+        arl_expect(arl_base, "Shmem", &Shmem);
         arl_expect(arl_base, "Slab", &Slab);
         arl_expect(arl_base, "SReclaimable", &SReclaimable);
         arl_expect(arl_base, "SUnreclaim", &SUnreclaim);
@@ -146,7 +146,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     // http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
-    unsigned long long MemCached = Cached + SReclaimable;
+    unsigned long long MemCached = Cached + SReclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
 
     if(do_ram) {
