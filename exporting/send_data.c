@@ -64,7 +64,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 {
     static BUFFER *response = NULL;
     if (!response)
-        response = buffer_create(1);
+        response = buffer_create(4096);
 
     struct stats *stats = &instance->stats;
 #ifdef ENABLE_HTTPS
@@ -79,8 +79,6 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 
     // loop through to collect all data
     while (*sock != -1 && errno != EWOULDBLOCK) {
-        buffer_need_bytes(response, 4096);
-
         ssize_t r;
 #ifdef ENABLE_HTTPS
         if (exporting_tls_is_enabled(instance->config.type, options) &&
