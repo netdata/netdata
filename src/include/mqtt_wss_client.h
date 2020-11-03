@@ -41,6 +41,9 @@ struct mqtt_connect_params {
     const char *clientid;
     const char *username;
     const char *password;
+    const char *will_topic;
+    const void *will_msg;
+    size_t will_msg_len;
 };
 
 /* Will block until the MQTT over WSS connection is established or return error
