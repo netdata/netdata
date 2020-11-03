@@ -350,7 +350,7 @@ void avl_unlock(avl_tree_lock *t) {
 // operations with locking
 
 void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
-    avl_init(&tree->avl_tree, compar);
+    avl_init(&tree->avl_tree_instance, compar);
 
 #ifndef AVL_WITHOUT_PTHREADS
     int lock;
@@ -369,21 +369,21 @@ void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/
 
 avl *avl_search_lock(avl_tree_lock *tree, avl *item) {
     avl_read_lock(tree);
-    avl *ret = avl_search(&tree->avl_tree, item);
+    avl *ret = avl_search(&tree->avl_tree_instance, item);
     avl_unlock(tree);
     return ret;
 }
 
 avl * avl_remove_lock(avl_tree_lock *tree, avl *item) {
     avl_write_lock(tree);
-    avl *ret = avl_remove(&tree->avl_tree, item);
+    avl *ret = avl_remove(&tree->avl_tree_instance, item);
     avl_unlock(tree);
     return ret;
 }
 
 avl *avl_insert_lock(avl_tree_lock *tree, avl *item) {
     avl_write_lock(tree);
-    avl * ret = avl_insert(&tree->avl_tree, item);
+    avl * ret = avl_insert(&tree->avl_tree_instance, item);
     avl_unlock(tree);
     return ret;
 }
@@ -391,7 +391,7 @@ avl *avl_insert_lock(avl_tree_lock *tree, avl *item) {
 int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     int ret;
     avl_read_lock(tree);
-    ret = avl_traverse(&tree->avl_tree, callback, data);
+    ret = avl_traverse(&tree->avl_tree_instance, callback, data);
     avl_unlock(tree);
     return ret;
 }

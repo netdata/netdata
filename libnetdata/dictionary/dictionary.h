@@ -13,7 +13,7 @@ struct dictionary_stats {
 };
 
 typedef struct name_value {
-    avl avl;                // the index - this has to be first!
+    avl avl_instance;       // the index - this has to be first!
 
     uint32_t hash;          // a simple hash to speed up searching
                             // we first compare hashes, and only if the hashes are equal we do string comparisons

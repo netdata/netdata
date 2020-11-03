@@ -40,7 +40,7 @@ typedef struct avl_tree {
 } avl_tree;
 
 typedef struct avl_tree_lock {
-    avl_tree avl_tree;
+    avl_tree avl_tree_instance;
 
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
