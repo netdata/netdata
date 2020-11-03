@@ -43,7 +43,7 @@ web/ @thiagoftsm @mfundul @vlvkobal
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @knatsakis
+*.am @Ferroin
 *.md @joelhans
 Dockerfile* @Ferroin @knatsakis
 
