@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Remove knatsakis from makefile code ownership. [\#10184](https://github.com/netdata/netdata/pull/10184) ([Ferroin](https://github.com/Ferroin))
+- Don't cache registry responses [\#10181](https://github.com/netdata/netdata/pull/10181) ([cakrit](https://github.com/cakrit))
+- Fix an infinite loop in the statsd plugin [\#10180](https://github.com/netdata/netdata/pull/10180) ([vlvkobal](https://github.com/vlvkobal))
+- dashboard v2.7.5 [\#10179](https://github.com/netdata/netdata/pull/10179) ([jacekkolasa](https://github.com/jacekkolasa))
+- Add notices to FreeBSD/pfSense docs that they are community-supported [\#10171](https://github.com/netdata/netdata/pull/10171) ([joelhans](https://github.com/joelhans))
 - Update CODE\_OF\_CONDUCT.md [\#10161](https://github.com/netdata/netdata/pull/10161) ([aabatangle](https://github.com/aabatangle))
 - Hangout thread [\#10160](https://github.com/netdata/netdata/pull/10160) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update the version of libJudy that we bundle to 1.0.5-netdata2 [\#10158](https://github.com/netdata/netdata/pull/10158) ([Ferroin](https://github.com/Ferroin))
@@ -241,12 +246,6 @@
 
 - Fix SHA256 handling in eBPF bundling code. [\#9546](https://github.com/netdata/netdata/pull/9546) ([Ferroin](https://github.com/Ferroin))
 - Disable failing unit tests in CMake build [\#9545](https://github.com/netdata/netdata/pull/9545) ([vlvkobal](https://github.com/vlvkobal))
-- Fix compilation warnings [\#9544](https://github.com/netdata/netdata/pull/9544) ([vlvkobal](https://github.com/vlvkobal))
-- Fixed stored number accuracy [\#9540](https://github.com/netdata/netdata/pull/9540) ([stelfrag](https://github.com/stelfrag))
-- Add eBPF bundling script to `make dist`. [\#9539](https://github.com/netdata/netdata/pull/9539) ([Ferroin](https://github.com/Ferroin))
-- Fix CMake build failing if ACLK is disabled [\#9537](https://github.com/netdata/netdata/pull/9537) ([underhood](https://github.com/underhood))
-- Fix transition from archived to active charts not generating alarms [\#9536](https://github.com/netdata/netdata/pull/9536) ([mfundul](https://github.com/mfundul))
-- Update apps\_groups.conf [\#9535](https://github.com/netdata/netdata/pull/9535) ([AliMickey](https://github.com/AliMickey))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
