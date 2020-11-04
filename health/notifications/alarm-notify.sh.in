@@ -983,47 +983,59 @@ send_kafka() {
 # pagerduty.com sender
 
 send_pd() {
-  local recipients="${1}" sent=0
+  local recipients="${1}" sent=0 severity current_time
   unset t
   case ${status} in
-  CLEAR) t='resolve' ;;
-  WARNING) t='trigger' ;;
-  CRITICAL) t='trigger' ;;
+  CLEAR) t='resolve' ; severity='info' ;;
+  WARNING) t='trigger' ; severity='warning' ;;
+  CRITICAL) t='trigger' ; severity='critical' ;;
   esac
 
   if [ ${SEND_PD} = "YES" ] && [ -n "${t}" ]; then
+    if [ "$(uname)" == "Linux" ]; then
+      current_time=$(date -d @${when} +'%Y-%m-%dT%H:%M:%S.000')
+    else
+      current_time=$(date -r ${when} +'%Y-%m-%dT%H:%M:%S.000')
+    fi
     for PD_SERVICE_KEY in ${recipients}; do
       d="${status} ${name} = ${value_string} - ${host}, ${family}"
       payload="$(
         cat <<EOF
             {
-              "service_key": "${PD_SERVICE_KEY}",
-              "event_type": "${t}",
-              "incident_key" : "${alarm_id}",
-              "description": "${d}",
-              "details": {
-                "value_w_units": "${value_string}",
-                "when": "${when}",
-                "duration" : "${duration}",
-                "roles": "${roles}",
-                "alarm_id" : "${alarm_id}",
-                "name" : "${name}",
-                "chart" : "${chart}",
-                "family" : "${family}",
-                "status" : "${status}",
-                "old_status" : "${old_status}",
-                "value" : "${value}",
-                "old_value" : "${old_value}",
-                "src" : "${src}",
-                "non_clear_duration" : "${non_clear_duration}",
-                "units" : "${units}",
-                "info" : "${info}"
-              }
+              "payload" : {
+                "summary": "${info:0:1024}",
+                "source" : "${args_host}",
+                "severity" : "${severity}",
+                "timestamp" : "${current_time}",
+                "group" : "${family}",
+                "class" : "${chart}",
+                "custom_details": {
+                  "value_w_units": "${value_string}",
+                  "when": "${when}",
+                  "duration" : "${duration}",
+                  "roles": "${roles}",
+                  "alarm_id" : "${alarm_id}",
+                  "name" : "${name}",
+                  "chart" : "${chart}",
+                  "family" : "${family}",
+                  "status" : "${status}",
+                  "old_status" : "${old_status}",
+                  "value" : "${value}",
+                  "old_value" : "${old_value}",
+                  "src" : "${src}",
+                  "non_clear_duration" : "${non_clear_duration}",
+                  "units" : "${units}",
+                  "info" : "${info}"
+                }
+              },
+              "routing_key": "${PD_SERVICE_KEY}",
+              "event_action": "${t}",
+              "dedup_key": "${unique_id}"
             }
 EOF
       )"
-      httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/generic/2010-04-15/create_event.json")
-      if [ "${httpcode}" = "200" ]; then
+      httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/v2/enqueue")
+      if [ "${httpcode}" = "202" ]; then
         info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
         sent=$((sent + 1))
       else
