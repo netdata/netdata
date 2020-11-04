@@ -64,6 +64,8 @@ extern long get_system_cpus(void);
 extern pid_t pid_max;
 extern pid_t get_system_pid_max(void);
 
+extern int get_system_fd_max(void);
+
 extern unsigned int system_hz;
 extern void get_system_HZ(void);
 

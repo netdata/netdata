@@ -508,6 +508,8 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
+        maxfdperc = 0;
+        usedfdperc = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -2191,7 +2193,11 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds[fdid].cache_iterations_counter = p->fds[fdid].cache_iterations_reset;
         }
     }
-
+    usedfdperc = (p->fds_size * 100) / get_system_fd_max();
+    if (usedfdperc >= maxfdperc){
+        maxfdperc = usedfdperc;
+    }
+    //maxfdperc = p->fds_size;
     closedir(fds);
 #endif
     cleanup_negative_pid_fds(p);
@@ -3195,6 +3201,8 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&me_last, &me, sizeof(struct rusage));
     }
 
+    int fdperc = maxfdperc;
+
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
         created_charts = 1;
@@ -3211,6 +3219,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "DIMENSION link_changes '' incremental 1 1\n"
                 "DIMENSION pids '' absolute 1 1\n"
                 "DIMENSION fds '' absolute 1 1\n"
+                "DIMENSION fdperc '' absolute 1 1\n"
                 "DIMENSION targets '' absolute 1 1\n"
                 "DIMENSION new_pids 'new pids' incremental 1 1\n"
                 , update_every
@@ -3254,6 +3263,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         "SET link_changes = %zu\n"
         "SET pids = %zu\n"
         "SET fds = %d\n"
+        "SET fdperc = %d\n"
         "SET targets = %zu\n"
         "SET new_pids = %zu\n"
         "END\n"
@@ -3268,6 +3278,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , links_changed_counter
         , all_pids_count
         , all_files_len
+        , fdperc
         , apps_groups_targets_count
         , targets_assignment_counter
         );
