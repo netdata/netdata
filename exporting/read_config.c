@@ -439,14 +439,22 @@ struct engine *read_exporting_config()
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
 
 #ifdef ENABLE_HTTPS
+
+#define STR_GRAPHITE_HTTPS "graphite:https"
+#define STR_JSON_HTTPS "json:https"
+#define STR_OPENTSDB_HTTPS "opentsdb:https"
+#define STR_PROMETHEUS_REMOTE_WRITE_HTTPS "prometheus_remote_write:https"
+
         if ((tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP &&
-             !strncmp(tmp_ci_list->local_ci.connector_name, "graphite:https", 14)) ||
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_GRAPHITE_HTTPS, strlen(STR_GRAPHITE_HTTPS))) ||
             (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP &&
-             !strncmp(tmp_ci_list->local_ci.connector_name, "json:https", 10)) ||
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_JSON_HTTPS, strlen(STR_JSON_HTTPS))) ||
             (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP &&
-             !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) ||
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_OPENTSDB_HTTPS, strlen(STR_OPENTSDB_HTTPS))) ||
             (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE &&
-             !strncmp(tmp_ci_list->local_ci.connector_name, "prometheus_remote_write:https", 29))) {
+             !strncmp(
+                 tmp_ci_list->local_ci.connector_name, STR_PROMETHEUS_REMOTE_WRITE_HTTPS,
+                 strlen(STR_PROMETHEUS_REMOTE_WRITE_HTTPS)))) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
         }
 #endif
