@@ -23,7 +23,7 @@ typedef struct name_value {
 } NAME_VALUE;
 
 typedef struct dictionary {
-    avl_tree values_index;
+    avl_tree_type values_index;
 
     uint8_t flags;
 

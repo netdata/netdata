@@ -17,7 +17,7 @@
 
 /* Search |tree| for an item matching |item|, and return it if found.
      Otherwise return |NULL|. */
-avl *avl_search(avl_tree *tree, avl *item) {
+avl *avl_search(avl_tree_type *tree, avl *item) {
     avl *p;
 
     // assert (tree != NULL && item != NULL);
@@ -40,7 +40,7 @@ avl *avl_search(avl_tree *tree, avl *item) {
      If a duplicate item is found in the tree,
      returns a pointer to the duplicate without inserting |item|.
  */
-avl *avl_insert(avl_tree *tree, avl *item) {
+avl *avl_insert(avl_tree_type *tree, avl *item) {
     avl *y, *z; /* Top node to update balance factor, and parent. */
     avl *p, *q; /* Iterator, and parent. */
     avl *n;     /* Newly inserted node. */
@@ -136,7 +136,7 @@ avl *avl_insert(avl_tree *tree, avl *item) {
 
 /* Deletes from |tree| and returns an item matching |item|.
      Returns a null pointer if no matching item found. */
-avl *avl_remove(avl_tree *tree, avl *item) {
+avl *avl_remove(avl_tree_type *tree, avl *item) {
     /* Stack of nodes. */
     avl *pa[AVL_MAX_HEIGHT]; /* Nodes. */
     unsigned char da[AVL_MAX_HEIGHT];    /* |avl_link[]| indexes. */
@@ -306,7 +306,7 @@ int avl_walker(avl *node, int (*callback)(void * /*entry*/, void * /*data*/), vo
     return total;
 }
 
-int avl_traverse(avl_tree *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+int avl_traverse(avl_tree_type *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     if(tree->root)
         return avl_walker(tree->root, callback, data);
     else
@@ -350,7 +350,7 @@ void avl_unlock(avl_tree_lock *t) {
 // operations with locking
 
 void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
-    avl_init(&tree->avl_tree_instance, compar);
+    avl_init(&tree->avl_tree, compar);
 
 #ifndef AVL_WITHOUT_PTHREADS
     int lock;
@@ -369,21 +369,21 @@ void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/
 
 avl *avl_search_lock(avl_tree_lock *tree, avl *item) {
     avl_read_lock(tree);
-    avl *ret = avl_search(&tree->avl_tree_instance, item);
+    avl *ret = avl_search(&tree->avl_tree, item);
     avl_unlock(tree);
     return ret;
 }
 
 avl * avl_remove_lock(avl_tree_lock *tree, avl *item) {
     avl_write_lock(tree);
-    avl *ret = avl_remove(&tree->avl_tree_instance, item);
+    avl *ret = avl_remove(&tree->avl_tree, item);
     avl_unlock(tree);
     return ret;
 }
 
 avl *avl_insert_lock(avl_tree_lock *tree, avl *item) {
     avl_write_lock(tree);
-    avl * ret = avl_insert(&tree->avl_tree_instance, item);
+    avl * ret = avl_insert(&tree->avl_tree, item);
     avl_unlock(tree);
     return ret;
 }
@@ -391,12 +391,12 @@ avl *avl_insert_lock(avl_tree_lock *tree, avl *item) {
 int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     int ret;
     avl_read_lock(tree);
-    ret = avl_traverse(&tree->avl_tree_instance, callback, data);
+    ret = avl_traverse(&tree->avl_tree, callback, data);
     avl_unlock(tree);
     return ret;
 }
 
-void avl_init(avl_tree *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
+void avl_init(avl_tree_type *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
     tree->root = NULL;
     tree->compar = compar;
 }

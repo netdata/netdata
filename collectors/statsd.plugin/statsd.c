@@ -22,7 +22,7 @@
 #define STATSD_FIRST_PTR_MUTEX_UNLOCK(index) netdata_mutex_unlock(&((index)->first_mutex))
 #define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DEFAULT
 #else
-#define STATSD_AVL_TREE avl_tree
+#define STATSD_AVL_TREE avl_tree_type
 #define STATSD_AVL_INSERT avl_insert
 #define STATSD_AVL_SEARCH avl_search
 #define STATSD_AVL_INDEX_INIT { .root = NULL, .compar = statsd_metric_compare }
