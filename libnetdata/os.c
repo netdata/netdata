@@ -69,21 +69,9 @@ unsigned int fd_max = 1024;
 
 int get_system_fd_max(void) {
 #ifdef __APPLE__
-    // As we currently do not know a solution to query pid_max from the os
-        // we use the number defined in bsd/sys/proc_internal.h in XNU sources
-        pid_max = 99999;
-        return pid_max;
+    return fd_max;
 #elif __FreeBSD__
-    int32_t tmp_pid_max;
-
-        if (unlikely(GETSYSCTL_BY_NAME("kern.pid_max", tmp_pid_max))) {
-            pid_max = 99999;
-            error("Assuming system's maximum pid is %d.", pid_max);
-        } else {
-            pid_max = tmp_pid_max;
-        }
-
-        return pid_max;
+    return fd_max;
 #else
 
     static char read = 0;
