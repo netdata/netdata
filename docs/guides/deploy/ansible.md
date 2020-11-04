@@ -19,10 +19,11 @@ code?
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
 code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
 those operations over standard and secure SSH connections. There's no agent to install on the remote system, so all you
-have to worry about is your application and your monitoring software.
+have to worry about is your application and your monitoring software. 
 
-The best thing about Ansible is every operation it makes is **idempotent**. From the [Ansible
-glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+Ansible has some competition from the likes of [Puppet](https://puppet.com/), [Chef](https://www.chef.io/), or even
+[Terraform](https://www.hashicorp.com/products/terraform), but the most valuable feature about Ansible is that every is
+**idempotent**. From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
 > repeatedly without any intervening actions.
@@ -32,8 +33,9 @@ operate. When you deploy Netdata with Ansible, you're also deploying _monitoring
 
 In this guide, we'll walk through the process of using an [Ansible
 playbook](https://github.com/netdata/community/tree/main/netdata-agent-deployment/ansible-quickstart) to automatically
-deploy the Netdata Agent to any number of distributed nodes, claim each one to your Netdata Cloud account to create an
-infrastructure monitoring solution in a matter of minutes.
+deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and claim them to
+your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
+minutes.
 
 ## Prerequisites
 
@@ -159,9 +161,9 @@ Some of the best places to start:
 -   [Interact with dashboards and charts](/docs/visualize/interact-dashboards-charts.md)
 -   [Change how long Netdata stores metrics](/docs/store/change-metrics-storage.md)
 
-We're looking for more deployment strategies, whether via Ansible or other provisioning/infrastructure as code software,
-in our [community repo](https://github.com/netdata/community). Anyone is able to fork the repo and submit a PR, either
-to improve this playbook, extend it, or create an entirely new Ansible experience for deploying Netdata across entire
-infrastructure.
+We're looking for more deployment and configuration management strategies, whether via Ansible or other
+provisioning/infrastructure as code software, such as Chef or Puppet, in our [community
+repo](https://github.com/netdata/community). Anyone is able to fork the repo and submit a PR, either to improve this
+playbook, extend it, or create an entirely new experience for deploying Netdata across entire infrastructure.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fdeploy%2Fansible.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
