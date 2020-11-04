@@ -37,14 +37,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos),
                              void (*puback_callback)(uint16_t packet_id));
 
-struct mqtt_connect_params {
-    const char *clientid;
-    const char *username;
-    const char *password;
-    const char *will_topic;
-    const void *will_msg;
-    size_t will_msg_len;
-};
+struct mqtt_connect_params;
 
 /* Will block until the MQTT over WSS connection is established or return error
  * @param client mqtt_wss_client which should connect
@@ -63,6 +56,16 @@ enum mqtt_wss_publish_flags {
     MQTT_WSS_PUB_QOS2    = 0x2,
     MQTT_WSS_PUB_QOSMASK = 0x3,
     MQTT_WSS_PUB_RETAIN  = 0x4
+};
+
+struct mqtt_connect_params {
+    const char *clientid;
+    const char *username;
+    const char *password;
+    const char *will_topic;
+    const void *will_msg;
+    enum mqtt_wss_publish_flags will_flags;
+    size_t will_msg_len;
 };
 
 /* Publishes MQTT message

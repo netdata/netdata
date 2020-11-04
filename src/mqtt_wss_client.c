@@ -306,6 +306,11 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     SSL_set_connect_state(client->ssl);
     SSL_connect(client->ssl);
 
+    uint8_t mqtt_flags = (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK) << 3;
+    if (mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN)
+        mqtt_flags |= MQTT_CONNECT_WILL_RETAIN;
+    mqtt_flags |= MQTT_CONNECT_CLEAN_SESSION;
+
     enum MQTTErrors ret = mqtt_connect(client->mqtt_client,
                                        mqtt_params->clientid,
                                        mqtt_params->will_topic,
@@ -313,7 +318,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
                                        (mqtt_params->will_msg ? mqtt_params->will_msg_len : 0),
                                        mqtt_params->username,
                                        mqtt_params->password,
-                                       MQTT_CONNECT_CLEAN_SESSION,
+                                       mqtt_flags,
                                        400);
     if (ret != MQTT_OK) {
         mws_error(client->log, "Error with MQTT connect \"%s\"", mqtt_error_str(ret));
