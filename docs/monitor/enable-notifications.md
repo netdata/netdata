@@ -6,19 +6,45 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/ena
 
 # Enable notifications
 
-Netdata comes with a notification system that supports more than a dozen services, such as email, Slack, PagerDuty,
-Twilio, Amazon SNS, Discord, and much more. You can enable as many platforms as you want, and configure them to match
-your organization's needs with features like role-based notifications.
+Netdata comes with a [notification system](/health/notifications/README.md) that supports more than a dozen services,
+such as email, Slack, PagerDuty, Twilio, Amazon SNS, Discord, and much more. You can enable as many platforms as you
+want, and configure them to match your organization's needs with features like role-based notifications.
 
-To see all the supported platforms, visit our [notifications](/health/notifications/README.md) doc.
+## Supported notification platforms
+
+-   [**alerta.io**](/health/notifications/alerta/README.md)
+-   [**Amazon SNS**](/health/notifications/awssns/README.md)
+-   [**Custom endpoint**](/health/notifications/custom/README.md)
+-   [**Discord**](/health/notifications/discord/README.md)
+-   [**Dynatrace**](/health/notifications/dynatrace/README.md)
+-   [**Email**](/health/notifications/email/README.md)
+-   [**Flock**](/health/notifications/flock/README.md)
+-   [**Google Hangouts**](/health/notifications/hangouts/README.md)
+-   [**IRC**](/health/notifications/irc/README.md)
+-   [**Kavenegar**](/health/notifications/kavenegar/README.md)
+-   [**Matrix**](/health/notifications/matrix/README.md)
+-   [**Messagebird**](/health/notifications/messagebird/README.md)
+-   [**Netdata Agent dashboard**](/health/notifications/web/README.md)
+-   [**Opsgenie**](/health/notifications/opsgenie/README.md)
+-   [**PagerDuty**](/health/notifications/pagerduty/README.md)
+-   [**Prowl**](/health/notifications/prowl/README.md)
+-   [**PushBullet**](/health/notifications/pushbullet/README.md)
+-   [**PushOver**](/health/notifications/pushover/README.md)
+-   [**Rocket.Chat**](/health/notifications/rocketchat/README.md)
+-   [**Slack**](/health/notifications/slack/README.md)
+-   [**SMS Server Tools 3**](/health/notifications/smstools3/README.md)
+-   [**StackPulse**](/health/notifications/stackpulse/README.md)
+-   [**Syslog**](/health/notifications/syslog/README.md)
+-   [**Telegram**](/health/notifications/telegram/README.md)
+-   [**Twilio**](/health/notifications/twilio/README.md)
 
 This doc covers enabling email and Slack notifications, but the same process applies to enabling any other notification
 platform.
 
 ## Enable email notifications
 
-To use email notifications, you need [`sendmail`](http://www.postfix.org/sendmail.1.html) or an equivalent installed on
-your system.
+To use [email notifications](/health/notifications/email/README.md), you need
+[`sendmail`](http://www.postfix.org/sendmail.1.html) or an equivalent installed on your system.
 
 Edit the `health_alarm_notify.conf` file, which resides in your Netdata [config
 directory](/docs/configure/nodes.md#netdata-config-directory).

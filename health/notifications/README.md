@@ -1,11 +1,10 @@
 <!--
----
-title: "Netdata alarm notifications"
+title: "Alarm notifications"
+description: "Reference documentation for Netdata's alarm notification feature, which supports dozens of endpoints, user roles, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md
----
 -->
 
-# Netdata alarm notifications
+# Alarm notifications
 
 The `exec` line in health configuration defines an external script that will be called once
 the alarm is triggered. The default script is `alarm-notify.sh`.
