@@ -7,9 +7,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/depl
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](https://learn.netdata.cloud/docs/get) is zero-configuration, highly adapatable, and
-compatible with tons of different operating systems and Linux distributions. You can use it on bare metal,
-VMs,containers, and everything in-between.
+Netdata's [one-line kickstart](https://learn.netdata.cloud/docs/get) is zero-configuration, highly adaptable, and
+compatible with tons of different operating systems and Linux distributions. You can use it on bare metal, VMs,
+containers, and everything in-between.
 
 But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible. What if you need to
 deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
@@ -17,9 +17,9 @@ repeatable, and idempotent? What if you want to write and deploy your infrastruc
 code?
 
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
-code tool. Ansible uses **playbooks** to glue many standardized operations together in a simple syntax, then run those
-operations over standard and secure SSH connections. There's no agent to install on the remote system, so all you have
-to worry about is your application and your monitoring software.
+code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
+those operations over standard and secure SSH connections. There's no agent to install on the remote system, so all you
+have to worry about is your application and your monitoring software.
 
 The best thing about Ansible is every operation it makes is **idempotent**. From the [Ansible
 glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
@@ -27,7 +27,7 @@ glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
 > repeatedly without any intervening actions.
 
-This means you can run the an Ansible playbook against your nodes any number of times without affecting how they
+Idempotency means you can run an Ansible playbook against your nodes any number of times without affecting how they
 operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
 
 In this guide, we'll walk through the process of using an [Ansible
@@ -38,7 +38,7 @@ infrastructure monitoring solution in a matter of minutes.
 ## Prerequisites
 
 -   A Netdata Cloud account. [Sign in and create one](https://app.netdata.cloud) if you don't have one already.
--   An administation system with [Ansible](https://www.ansible.com/) installed.
+-   An administration system with [Ansible](https://www.ansible.com/) installed.
 -   One or more nodes that your administration system can access via [SSH public
     keys](https://git-scm.com/book/en/v2/Git-on-the-Server-Generating-Your-SSH-Public-Key) (preferably password-less).
 
@@ -63,8 +63,8 @@ cd ansible
 ### Edit the `hosts` file
 
 The `hosts` file contains a list of IP addresses or hostnames that Ansible will try to run the playbook against. The
-`hosts` file that comes with the repository contains two example IP addresses, which you should either delete or replace
-according to the IP address/hostname of your nodes. 
+`hosts` file that comes with the repository contains two example IP addresses, which you should replace according to the
+IP address/hostname of your nodes. 
 
 ```conf
 203.0.113.0  hostname=node-01
@@ -149,10 +149,10 @@ want to do with Netdata, so use those categories to dive in.
 Some of the best places to start:
 
 -   [Enable or configure a collector](/docs/collect/enable-configure.md)
--   [Supported collectors list](/docs/agent/collectors/COLLECTORS.md)
+-   [Supported collectors list](/collectors/COLLECTORS.md)
 -   [See an overview of your infrastructure](/docs/visualize/overview-infrastructure.md)
 -   [Interact with dashboards and charts](/docs/visualize/interact-dashboards-charts.md)
--   [Change how long Netdata stores metrics](/docs/store/change-metrics-storage)
+-   [Change how long Netdata stores metrics](/docs/store/change-metrics-storage.md)
 
 We're looking for more deployment strategies, whether via Ansible or other provisioning/infrastructure as code software,
 in our [community repo](https://github.com/netdata/community). Anyone is able to fork the repo and submit a PR, either
