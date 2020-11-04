@@ -14,6 +14,9 @@ To use the Pub/Sub service for metric collecting and processing, you should firs
 Pub/Sub support is also dependent on the dependencies of those libraries, like `protobuf`, `protoc`, and `grpc`. Next,
 Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
 
+> You [cannot compile Netdata](https://github.com/netdata/netdata/issues/10193) with Pub/Sub support enabled using
+> `grpc` 1.32 or higher.
+>
 > Some distributions don't have `.cmake` files in packages. To build the C++ Proto Libraries on such distributions we
 > advise you to delete `protobuf`, `protoc`, and `grpc` related packages and
 > [install](https://github.com/grpc/grpc/blob/master/BUILDING.md) `grpc` with its dependencies from source.
