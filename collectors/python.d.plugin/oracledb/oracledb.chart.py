@@ -34,6 +34,9 @@ ORDER = [
     'tablespace_size',
     'tablespace_usage',
     'tablespace_usage_in_percent',
+    'allocated_size',
+    'allocated_usage',
+    'allocated_usage_in_percent',
 ]
 
 CHARTS = {
