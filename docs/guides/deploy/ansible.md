@@ -133,10 +133,15 @@ ansible-playbook -i hosts tasks/main.yml
 
 Ansible first connects to your node(s) via SSH, then [collects
 facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system.
-This playbook doesn't use these facts, but could be extended to set up specific types of systems based on the makeup of
-your infrastructure.
+This playbook doesn't use these facts, but you could expand it to provision specific types of systems based on the
+makeup of your infrastructure.
 
-Next, Ansible makes changes 
+Next, Ansible makes changes to each node according to the `tasks` defined in the playbook, and
+[returns](https://docs.ansible.com/ansible/latest/reference_appendices/common_return_values.html#changed) whether each
+task results in a changed, failure, or was skipped entirely.
+
+The task to install Netdata will take a few minutes per node, so be patient! Once the playbook reaches the claiming
+task, your nodes start populating your Space in Netdata Cloud.
 
 ## What's next?
 
