@@ -63,6 +63,8 @@ CapabilityBoundingSet=CAP_SYS_RESOURCE
 CapabilityBoundingSet=CAP_NET_RAW
 # is required for cgroups plugin
 CapabilityBoundingSet=CAP_SYS_CHROOT
+# is required for plugins that use sudo
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID
 
 # Sandboxing
 ProtectSystem=full
