@@ -69,13 +69,19 @@ int is_valid_connector(char *type, int check_reserved)
 
     if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return rc;
+    } else if (!strcmp(type, "graphite:http") || !strcmp(type, "graphite:https")) {
+        return rc;
+    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+        return rc;
+    } else if (!strcmp(type, "json:http") || !strcmp(type, "json:https")) {
+        return rc;
     } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
         return rc;
     } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
         return rc;
-    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
-        return rc;
     } else if (!strcmp(type, "prometheus_remote_write")) {
+        return rc;
+    } else if (!strcmp(type, "prometheus_remote_write:http") || !strcmp(type, "prometheus_remote_write:https")) {
         return rc;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return rc;
