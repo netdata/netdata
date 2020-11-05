@@ -10,7 +10,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/CODE_OF_CONDUCT.
 ## Our Pledge
 
 In the interest of fostering an open and welcoming environment, we as
-contributors,maintainers and community members pledge to making participation in our project and
+contributors, maintainers and community members pledge to making participation in our project and
 our community a harassment-free experience for everyone, regardless of age, body
 size, disability, ethnicity, sex characteristics, gender identity and expression,
 level of experience, education, socio-economic status, nationality, personal
