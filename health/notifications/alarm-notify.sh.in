@@ -984,7 +984,7 @@ send_kafka() {
 # pagerduty.com sender
 
 send_pd() {
-  local recipients="${1}" sent=0 severity current_time payload url
+  local recipients="${1}" sent=0 severity current_time payload url response_code
   unset t
   case ${status} in
   CLEAR) t='resolve' ; severity='info' ;;
@@ -1037,6 +1037,7 @@ send_pd() {
 EOF
         )"
         url="https://events.pagerduty.com/v2/enqueue"
+        response_code="202"
       else
         payload="$(
           cat <<EOF
@@ -1067,9 +1068,10 @@ EOF
 EOF
         )"
         url="https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+        response_code="200"
       fi
       httpcode=$(docurl -X POST --data "${payload}" ${url})
-      if [ "${httpcode}" = "202" ]; then
+      if [ "${httpcode}" = "${response_code}" ]; then
         info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
         sent=$((sent + 1))
       else
