@@ -23,9 +23,6 @@ from sklearn.preprocessing import MinMaxScaler
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
-priority = 50
-update_every: 2
-
 ORDER = ['probability', 'anomaly']
 
 CHARTS = {

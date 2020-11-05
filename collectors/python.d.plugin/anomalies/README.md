@@ -67,10 +67,13 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
+# ----------------------------------------------------------------------
+# Global Variables
+# These variables set the defaults for all JOBs, however each JOB
+# may define its own, overriding the defaults.
+
 # use http or https to pull data
 protocol: 'http'
-# what host to pull data from.
-host: '127.0.0.1:19999'
 # what charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
 charts_in_scope: 'system\..*'
 # charts to exclude, useful if you would like to exclude some charts from charts_in_scope (should be a ',' seperated string like 'chart.name,chart.name').
@@ -102,6 +105,24 @@ contamination: 0.001
 #   dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
 # set to true to normalize, using min-max standardization, features used for the custom models. Useful if your custom models contain dimensions on very different scales. Usually best to leave as false.
 #custom_models_normalize: false
+
+# ----------------------------------------------------------------------
+# JOBS (data collection sources)
+
+local:
+  name : 'local'
+  host  : '127.0.0.1:19999' 
+
+# example additional job if you want to also pull data from a child streaming to your 
+# local parent or even a remote node so long as the Netdata REST API is accessible. 
+#mychildnode1:
+#  name : 'mychildnode1'
+#  host  : '127.0.0.1:19999/host/mychildnode1'
+
+# example to also pull from remote demo london node.
+#london:
+#  name : 'london'
+#  host  : 'london.my-netdata.io'
 ```
 
 ## Custom Models
