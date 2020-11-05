@@ -1472,9 +1472,6 @@ static void ebpf_socket_update_apps_data()
 
         ebpf_socket_fill_publish_apps(key, eb);
 
-        if (eb[0].removed)
-            bpf_map_delete_elem(fd, &key);
-
         pids = pids->next;
     }
 }

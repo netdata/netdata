@@ -369,7 +369,6 @@ typedef struct ebpf_bandwidth {
     uint64_t ct;           //Last timestamp
     uint64_t sent;         //Bytes sent
     uint64_t received;     //Bytes received
-    unsigned char removed; //Remove the PID from table
 } ebpf_bandwidth_t;
 
 /**
