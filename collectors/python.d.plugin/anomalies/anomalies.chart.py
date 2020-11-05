@@ -6,6 +6,7 @@
 import time
 from datetime import datetime
 import re
+import warnings
 
 import requests
 import numpy as np
@@ -22,6 +23,9 @@ from sklearn.preprocessing import MinMaxScaler
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
+# ignore some sklearn/numpy warnings that are ok
+warnings.filterwarnings('ignore', r'All-NaN slice encountered')
+warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
 
 ORDER = ['probability', 'anomaly']
 
