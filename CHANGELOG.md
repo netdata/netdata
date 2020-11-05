@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Inform users about an issue with the newest gRPC versions [\#10194](https://github.com/netdata/netdata/pull/10194) ([vlvkobal](https://github.com/vlvkobal))
+- fix: make comma optional when parsing ipsec trafficstatus [\#10190](https://github.com/netdata/netdata/pull/10190) ([wash2](https://github.com/wash2))
 - Remove knatsakis from makefile code ownership. [\#10184](https://github.com/netdata/netdata/pull/10184) ([Ferroin](https://github.com/Ferroin))
 - Don't cache registry responses [\#10181](https://github.com/netdata/netdata/pull/10181) ([cakrit](https://github.com/cakrit))
 - Fix an infinite loop in the statsd plugin [\#10180](https://github.com/netdata/netdata/pull/10180) ([vlvkobal](https://github.com/vlvkobal))
 - dashboard v2.7.5 [\#10179](https://github.com/netdata/netdata/pull/10179) ([jacekkolasa](https://github.com/jacekkolasa))
 - Add notices to FreeBSD/pfSense docs that they are community-supported [\#10171](https://github.com/netdata/netdata/pull/10171) ([joelhans](https://github.com/joelhans))
+- Add supported notification platforms to docs [\#10170](https://github.com/netdata/netdata/pull/10170) ([joelhans](https://github.com/joelhans))
 - Update CODE\_OF\_CONDUCT.md [\#10161](https://github.com/netdata/netdata/pull/10161) ([aabatangle](https://github.com/aabatangle))
 - Hangout thread [\#10160](https://github.com/netdata/netdata/pull/10160) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update the version of libJudy that we bundle to 1.0.5-netdata2 [\#10158](https://github.com/netdata/netdata/pull/10158) ([Ferroin](https://github.com/Ferroin))
@@ -236,16 +239,10 @@
 - health/megacli: change all instances of alarm to template [\#9553](https://github.com/netdata/netdata/pull/9553) ([tinyhammers](https://github.com/tinyhammers))
 - Revert the eBPF package bundling that breaks the release and DEB packages. [\#9552](https://github.com/netdata/netdata/pull/9552) ([prologic](https://github.com/prologic))
 - Read socket information from kernel ring [\#9549](https://github.com/netdata/netdata/pull/9549) ([thiagoftsm](https://github.com/thiagoftsm))
-- Suppress warning -Wformat-truncation in ACLK [\#9547](https://github.com/netdata/netdata/pull/9547) ([underhood](https://github.com/underhood))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.23.1...v1.23.2)
-
-**Merged pull requests:**
-
-- Fix SHA256 handling in eBPF bundling code. [\#9546](https://github.com/netdata/netdata/pull/9546) ([Ferroin](https://github.com/Ferroin))
-- Disable failing unit tests in CMake build [\#9545](https://github.com/netdata/netdata/pull/9545) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.23.1](https://github.com/netdata/netdata/tree/v1.23.1) (2020-07-01)
 
