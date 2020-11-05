@@ -58,6 +58,8 @@ class Service(SimpleService):
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
         self.offset_n_secs = self.configuration.get('offset_n_secs', 0)
         self.train_every_n = self.configuration.get('train_every_n', 900)
+        self.initial_train_data_after = self.configuration.get('initial_train_data_after', 0)
+        self.initial_train_data_before = self.configuration.get('initial_train_data_before', 0)
         self.contamination = self.configuration.get('contamination', 0.001)
         self.lags_n = self.configuration.get('lags_n', 5)
         self.smooth_n = self.configuration.get('smooth_n', 3)
@@ -202,14 +204,18 @@ class Service(SimpleService):
 
         return arr, colnames
 
-    def train(self, models_to_train=None):
+    def train(self, models_to_train=None, train_data_after=0, train_data_before=0):
         """Pull required training data and train a model for each specified model.
 
         :return:
         """
         now = datetime.now().timestamp()
-        before = int(now) - self.offset_n_secs
-        after =  before - self.train_n_secs
+        if train_data_after > 0 and train_data_before > 0:
+            before = train_data_before
+            after = train_data_after
+        else:
+            before = int(now) - self.offset_n_secs
+            after =  before - self.train_n_secs
 
         # get training data
         df_train = get_data(self.host, self.charts_in_scope, after=after, before=before, sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32').ffill()
@@ -224,7 +230,7 @@ class Service(SimpleService):
 
         # train model
         self.try_fit(X, feature_colnames)
-        self.info(f'training complete in {round(time.time() - now, 2)} seconds (runs_counter={self.runs_counter}, model={self.model}, train_n_secs={self.train_n_secs}, models={len(self.fitted_at)}, n_fit_success={self.n_fit_success}, n_fit_fails={self.n_fit_fail}).')
+        self.info(f'training complete in {round(time.time() - now, 2)} seconds (runs_counter={self.runs_counter}, model={self.model}, train_n_secs={self.train_n_secs}, models={len(self.fitted_at)}, n_fit_success={self.n_fit_success}, n_fit_fails={self.n_fit_fail}, after={after}, before={before}).')
         self.debug(f'self.fitted_at = {self.fitted_at}')
 
     def try_fit(self, X, feature_colnames, models_to_train=None):
@@ -295,8 +301,12 @@ class Service(SimpleService):
     def get_data(self):
 
         if len(self.fitted_at) < len(self.models):
-            self.train(models_to_train=[m for m in self.models if m not in self.fitted_at])
-        elif self.runs_counter % self.train_every_n == 0:
+            self.train(
+                models_to_train=[m for m in self.models if m not in self.fitted_at], 
+                train_data_after=self.initial_train_data_after, 
+                train_data_before=self.initial_train_data_before
+                )
+        elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
 
         data_probability, data_anomaly = self.predict()

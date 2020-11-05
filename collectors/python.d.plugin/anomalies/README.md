@@ -67,53 +67,50 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
-# ----------------------------------------------------------------------
-# Global Variables
-# These variables set the defaults for all JOBs, however each JOB
-# may define its own, overriding the defaults.
+# host to pull data from
+host: '127.0.0.1:19999'
 
-# update_every sets the default data collection frequency.
-# If unset, the python.d.plugin default is used.
-update_every: 2
-
-# priority controls the order of charts at the netdata dashboard.
-# Lower numbers move the charts towards the top of the page.
-# If unset, the default for python.d.plugin is used.
-priority: 101
-
-# use http or https to pull data
+# Use http or https to pull data
 protocol: 'http'
 
-# what charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
+# What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
 charts_in_scope: 'system\..*'
 
-# charts to exclude, useful if you would like to exclude some charts from charts_in_scope. 
+# Charts to exclude, useful if you would like to exclude some charts from charts_in_scope. 
 # Note: should be a ',' separated string like 'chart.name,chart.name'.
 charts_to_exclude: 'system.uptime,system.entropy'
 
-# what model to use - can be one of 'pca', 'hbos', 'iforest', 'cblof', 'loda', 'copod' or 'feature_bagging'. 
+# What model to use - can be one of 'pca', 'hbos', 'iforest', 'cblof', 'loda', 'copod' or 'feature_bagging'. 
 # More details here: https://pyod.readthedocs.io/en/latest/pyod.models.html.
 model: 'pca'
 
-# max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.
+# Max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.
 train_max_n: 100000
 
-# how often to re-train the model (assuming update_every=2 then train_every_n=900 represents (re)training every 30 minutes).
+# How often to re-train the model (assuming update_every=2 then train_every_n=900 represents (re)training every 30 minutes).
+# Note: If you want to turn off re-training set train_every_n=0 and after initial training the models will not be retrained.
 train_every_n: 900
 
-# the length of the window of data to train on (14400 = last 4 hours).
+# The length of the window of data to train on (14400 = last 4 hours).
 train_n_secs: 14400
 
-# if you would like to ignore recent data in training then you can offset it by offset_n_secs.
+# If you would like to train the model for the first time on a specific window then you can define it using the below two variables.
+# Start of training data for initial model.
+# initial_train_data_after: 1604578857
+
+# End of training data for initial model.
+# initial_train_data_before: 1604593257
+
+# If you would like to ignore recent data in training then you can offset it by offset_n_secs.
 offset_n_secs: 0
 
-# how many lagged values of each dimension to include in the 'feature vector' each model is trained on.
+# How many lagged values of each dimension to include in the 'feature vector' each model is trained on.
 lags_n: 5
 
-# how much smoothing to apply to each dimension in the 'feature vector' each model is trained on.
+# How much smoothing to apply to each dimension in the 'feature vector' each model is trained on.
 smooth_n: 3
 
-# how many differences to take in preprocessing your data. 
+# How many differences to take in preprocessing your data. 
 # diffs_n=0 would mean training models on the raw values of each dimension.
 # diffs_n=1 means everything is done in terms of differences.
 diffs_n: 1
@@ -123,37 +120,19 @@ diffs_n: 1
 # Some discussion here: https://github.com/yzhao062/pyod/issues/144
 contamination: 0.001
 
-# define any custom models you would like to create anomaly probabilties for, some examples below to show how.
-# for example below example creates two custom models, one to run anomaly detection on the netdata user 
+# Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
+# For example below example creates two custom models, one to run anomaly detection on the netdata user 
 # and one on the apps metrics for python.d.plugin.
-#custom_models:
-# - name: 'user_netdata'
-#   dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
-# - name: 'apps_python_d_plugin'
-#   dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
+# custom_models:
+#  - name: 'user_netdata'
+#    dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
+#  - name: 'apps_python_d_plugin'
+#    dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
 
-# set to true to normalize, using min-max standardization, features used for the custom models. 
+# Set to true to normalize, using min-max standardization, features used for the custom models. 
 # Useful if your custom models contain dimensions on very different scales. 
 # Usually best to leave as false.
-#custom_models_normalize: false
-
-# ----------------------------------------------------------------------
-# JOBS (data collection sources)
-
-local:
-  name : 'local'
-  host  : '127.0.0.1:19999' 
-
-# example additional job if you want to also pull data from a child streaming to your 
-# local parent or even a remote node so long as the Netdata REST API is accessible. 
-#mychildnode1:
-#  name : 'mychildnode1'
-#  host  : '127.0.0.1:19999/host/mychildnode1'
-
-# example to also pull from remote demo london node.
-#london:
-#  name : 'london'
-#  host  : 'london.my-netdata.io'
+# custom_models_normalize: false
 ```
 
 ## Custom Models
