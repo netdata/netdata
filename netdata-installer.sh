@@ -239,6 +239,7 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --use-wolfssl              Force use of WolfSSL instead the default (OpenSSL)
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -340,6 +341,9 @@ while [ -n "${1}" ]; do
       ;;
     "--build-judy")
       NETDATA_BUILD_JUDY=1
+      ;;
+    "--use-wolfssl")
+      NETDATA_USE_WOLFSSL=1
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"

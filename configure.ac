@@ -155,6 +155,12 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
+    [wolfssl],
+    [AS_HELP_STRING([--use-wolfssl], [Enable SSL support with WolfSSL @<:@default autodetect@:>@])],
+    ,
+    [enable_wolfssl="no"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -378,6 +384,32 @@ OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
 # -----------------------------------------------------------------------------
+# WolfSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [wolfssl],
+    [wolfSSL_Init],
+    [WOLFSSL_LIBS="-lwolfssl"]
+)
+
+AC_CHECK_LIB(
+    [wolfssl],
+    [wolfSSL_X509_VERIFY_PARAM_set1_host],
+    [wolfssl_host_validation="yes"],
+    [wolfssl_host_validation="no"]
+)
+
+test -z "${WOLFSSL_LIBS}" || \
+    AC_DEFINE([HAVE_CRYPTO], [1], [libwolfssl availability])
+
+if test "${wolfssl_host_validation}" = "no"; then
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
+    AC_MSG_WARN([DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.])
+else
+    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [1], [ssl host validation])
+fi
+
+# -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
 
 AC_CHECK_LIB(
@@ -463,6 +495,9 @@ fi
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
+test "${enable_wolfssl}" = "yes" -a -z "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([WolfSSL required for HTTPS but not found. Try installing 'libwolfssl-dev' or 'wolfssl-devel'.])
+
 test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
@@ -486,7 +521,7 @@ AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 AC_MSG_CHECKING([if netdata https should be used])
-if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
+if test "${enable_https}" != "no" -a "${SSL_LIBS}" -a "${enable_wolfssl}" != "yes"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
@@ -494,6 +529,17 @@ if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
 else
     enable_https="no"
 fi
+
+if test "${enable_https}" != "no" -a "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" == "yes"; then
+    enable_https="yes"
+    AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    AC_DEFINE([ENABLE_WOLFSSL], [1], [netdata is working with WolfSSL])
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
+else
+enable_https="no"
+fi
+
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
