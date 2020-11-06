@@ -45,7 +45,8 @@ int main()
     struct mqtt_connect_params params = {
         .clientid = "test",
         .username = "anon",
-        .password = "anon"
+        .password = "anon",
+        .keep_alive = 10
     };
 
     while (mqtt_wss_connect(client, "127.0.0.1", 9002, &params)) {

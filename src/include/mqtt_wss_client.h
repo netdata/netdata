@@ -66,6 +66,7 @@ struct mqtt_connect_params {
     const void *will_msg;
     enum mqtt_wss_publish_flags will_flags;
     size_t will_msg_len;
+    int keep_alive;
 };
 
 /* Publishes MQTT message

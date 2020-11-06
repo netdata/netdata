@@ -320,7 +320,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
                                        mqtt_params->username,
                                        mqtt_params->password,
                                        mqtt_flags,
-                                       400);
+                                       (mqtt_params->keep_alive ? mqtt_params->keep_alive : 400));
     if (ret != MQTT_OK) {
         mws_error(client->log, "Error with MQTT connect \"%s\"", mqtt_error_str(ret));
         return 1;
