@@ -21,35 +21,13 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
  * @param ret the return of the caller
  */
 static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
-    (void)ssl;
+    UNUSED(ssl);
     if (where & SSL_CB_ALERT) {
         debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
     }
 }
 
-/**
- * OpenSSL Library
- *
- * Starts the openssl library for the Netdata.
- */
-void security_openssl_library()
-{
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-# if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
-    OPENSSL_config(NULL);
-# endif
-
-    SSL_load_error_strings();
-
-    SSL_library_init();
-#else
-    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
-        error("SSL library cannot be initialized.");
-    }
-#endif
-}
-
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
+#if defined(OPENSSL_VERSION_110) || defined(NETDATA_HTTPS_WITH_WOLFSSL)
 /**
  * TLS version
  *
@@ -87,14 +65,11 @@ int tls_select_version(const char *lversion) {
  * @param ctx the initialized SSL context.
  * @param side 0 means server, and 1 client.
  */
-void security_openssl_common_options(SSL_CTX *ctx, int side) {
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
+void security_common_options(SSL_CTX *ctx, int side) {
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110 || defined(NETDATA_HTTPS_WITH_WOLFSSL)
     if (!side) {
         int version =  tls_select_version(tls_version) ;
-#endif
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
-#else
+
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
         SSL_CTX_set_max_proto_version(ctx, version);
 
@@ -103,16 +78,45 @@ void security_openssl_common_options(SSL_CTX *ctx, int side) {
                 error("SSL error. cannot set the cipher list");
             }
         }
-    }
 #endif
 
+#if defined(OPENSSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#endif
+#endif
+    }
+
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+}
+
+#ifdef NETDATA_HTTPS_WITH_OPENSSL
+/**
+ * OpenSSL Library
+ *
+ * Starts the openssl library for Netdata.
+ */
+void security_openssl_library()
+{
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+# if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
+    OPENSSL_config(NULL);
+# endif
+
+    SSL_load_error_strings();
+
+    SSL_library_init();
+#else
+    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
+        error("SSL library cannot be initialized.");
+    }
+#endif
 }
 
 /**
  * Initialize Openssl Client
  *
- * Starts the client context with TLS 1.2.
+ * Starts the client context with TLS.
  *
  * @return It returns the context on success or NULL otherwise
  */
@@ -144,7 +148,7 @@ SSL_CTX * security_initialize_openssl_client() {
 /**
  * Initialize OpenSSL server
  *
- * Starts the server context with TLS 1.2 and load the certificate.
+ * Starts the server context with TLS and load the certificate.
  *
  * @return It returns the context on success or NULL otherwise
  */
@@ -153,7 +157,6 @@ static SSL_CTX * security_initialize_openssl_server() {
     char lerror[512];
 	static int netdata_id_context = 1;
 
-    //TO DO: Confirm the necessity to check return for other OPENSSL function
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if (!ctx) {
@@ -171,7 +174,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     SSL_CTX_use_certificate_chain_file(ctx, security_cert);
 #endif
-    security_openssl_common_options(ctx, 0);
+    security_common_options(ctx, 0);
 
     SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
 
@@ -192,6 +195,82 @@ static SSL_CTX * security_initialize_openssl_server() {
 
     return ctx;
 }
+#endif
+
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+/**
+ * WolfSSL Library
+ *
+ * Starts the wolfssl library for Netdata.
+ */
+void security_wolfssl_library()
+{
+    if (wolfSSL_Init() != SSL_SUCCESS)
+        error("Cannot initialize WolfSSL library.");
+}
+
+/**
+ * Initialize WolfSSL Client
+ *
+ * Starts the client context with TLS.
+ *
+ * @return It returns the context on success or NULL otherwise
+ */
+SSL_CTX * security_initialize_wolfssl_client() {
+    SSL_CTX *ctx;
+    ctx = SSL_CTX_new(TLS_client_method());
+    if(ctx) {
+        SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
+#if defined(TLS_MAX_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS_MAX_VERSION);
+#elif defined(TLS1_3_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+#elif defined(TLS1_2_VERSION)
+        SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
+#endif
+    }
+
+    return ctx;
+}
+
+/**
+ * Initialize WolfSSL server
+ *
+ * Starts the server context with TLS and load the certificate.
+ *
+ * @return It returns the context on success or NULL otherwise
+ */
+static SSL_CTX * security_initialize_wolfssl_server() {
+    SSL_CTX *ctx;
+    char lerror[512];
+	static int netdata_id_context = 1;
+
+    ctx = SSL_CTX_new(TLS_server_method());
+    if (!ctx) {
+		error("Cannot create a new SSL context, netdata won't encrypt communication");
+        return NULL;
+    }
+
+    SSL_CTX_use_certificate_chain_file(ctx, security_cert);
+    security_common_options(ctx, 0);
+
+    SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
+
+    if (!SSL_CTX_check_private_key(ctx)) {
+        ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
+		error("SSL cannot check the private key: %s",lerror);
+        SSL_CTX_free(ctx);
+        return NULL;
+    }
+
+	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
+    SSL_CTX_set_info_callback(ctx,security_info_callback);
+
+    debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
+
+    return ctx;
+}
+#endif
 
 /**
  * Start SSL
@@ -211,14 +290,24 @@ void security_start_ssl(int selector) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }
-
+#ifdef NETDATA_HTTPS_WITH_OPENSSL
             netdata_srv_ctx =  security_initialize_openssl_server();
+#endif
+
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+            netdata_srv_ctx =  security_initialize_wolfssl_server();
+#endif
             break;
         }
         case NETDATA_SSL_CONTEXT_STREAMING: {
+#ifdef NETDATA_HTTPS_WITH_OPENSSL
             netdata_client_ctx = security_initialize_openssl_client();
+#endif
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+            netdata_client_ctx = security_initialize_wolfssl_client();
+#endif
             //This is necessary for the stream, because it is working sometimes with nonblock socket.
-            //It returns the bitmask afte to change, there is not any description of errors in the documentation
+            //It returns the bitmask after to change, there is not any description of errors in the documentation
             SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
@@ -234,7 +323,7 @@ void security_start_ssl(int selector) {
  *
  * Clean all the allocated contexts from netdata.
  */
-void security_clean_openssl()
+void security_clean_ssl()
 {
     if (netdata_srv_ctx) {
         SSL_CTX_free(netdata_srv_ctx);
@@ -248,10 +337,17 @@ void security_clean_openssl()
         SSL_CTX_free(netdata_exporting_ctx);
     }
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#ifdef OPENSSL_VERSION_NUMBER
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110 && NETDATA_HTTPS_WITH_OPENSSL
     ERR_free_strings();
 #endif
+#endif
+
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+    wolfSSL_Cleanup();
+#endif
 }
+
 
 /**
  * Process accept
