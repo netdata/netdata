@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <string.h>
+#include <time.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -358,14 +359,41 @@ static inline void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
         client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
 }
 
-// TODO handle case if timeout_ms > MQTT keep alive!
-// shoud be easy but keeping it as it is for now
-// as we will use timeout_ms of 1s for now
+static int handle_mqtt(mqtt_wss_client client)
+{
+    if(client->ws_client->state == WS_ESTABLISHED) {
+        // we need to call this only if there has been some movements
+        // - read side is handled by POLLIN and ws_client_process
+        // - write side is handled by PIPE write every time we send MQTT
+        // message ensuring we wake up from poll
+        enum MQTTErrors mqtt_ret = mqtt_sync(client->mqtt_client);
+        if (mqtt_ret != MQTT_OK) {
+            mws_error(client->log, "Error mqtt_sync MQTT \"%s\"", mqtt_error_str(mqtt_ret));
+            client->mqtt_connected = 0;
+            return 1;
+        }
+        if (client->mqtt_didnt_finish_write) {
+            client->mqtt_didnt_finish_write = 0;
+            client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
+        }
+    }
+    return 0;
+}
+
+#define SEC_TO_MSEC 1000
+static inline long int t_till_next_keepalive_ms(struct mqtt_client *mqtt)
+{
+    long int next_mqtt_keep_alive = (mqtt->time_of_last_send * SEC_TO_MSEC)
+        + (mqtt->keep_alive * (SEC_TO_MSEC * 0.75 /* SEND IN ADVANCE */));
+    return(next_mqtt_keep_alive - (MQTT_PAL_TIME() * SEC_TO_MSEC));
+}
+
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 {
     char *ptr;
     size_t size;
     int ret;
+    int send_keepalive = 0;
 
 #ifdef DEBUG_ULTRA_VERBOSE
     mws_debug(client->log, ">>>>> mqtt_wss_service <<<<<");
@@ -375,22 +403,45 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         (client->poll_fds[POLLFD_PIPE].events & POLLIN) ? "PIPE_POLLIN" : "" );
 #endif
 
-    if ((ret = poll(client->poll_fds, 2, timeout_ms > 0 ? timeout_ms : -1)) < 0) {
+    // Check user requested TO doesn't interfeere with MQTT keep alives
+    long int till_next_keep_alive = t_till_next_keepalive_ms(client->mqtt_client);
+    if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
+        #ifdef DEBUG_ULTRA_VERBOSE
+            mws_debug(client->log, "Shortening Timeout requested %d to %d to ensure keep-alive can be sent", timeout_ms, till_next_keep_alive);
+        #endif
+        timeout_ms = till_next_keep_alive;
+        send_keepalive = 1;
+    }
+
+    if ((ret = poll(client->poll_fds, 2, timeout_ms >= 0 ? timeout_ms : -1)) < 0) {
         mws_error(client->log, "poll error \"%s\"", strerror(errno));
         return -2;
     }
-    // if poll TO expires we don't want to do anything differently
-    if (ret == 0)
-        return 0;
-
-    client->poll_fds[POLLFD_SOCKET].events = 0;
 
 #ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(client->log, "Poll events happened: %s%s%s",
+    mws_debug(client->log, "Poll events happened: %s%s%s%s",
         (client->poll_fds[POLLFD_SOCKET].revents & POLLIN)  ? "SOCKET_POLLIN " : "",
         (client->poll_fds[POLLFD_SOCKET].revents & POLLOUT) ? "SOCKET_POLLOUT " : "",
-        (client->poll_fds[POLLFD_PIPE].revents & POLLIN) ? "PIPE_POLLIN" : "" );
+        (client->poll_fds[POLLFD_PIPE].revents & POLLIN) ? "PIPE_POLLIN " : "",
+        (!ret) ? "POLL_TIMEOUT" : "");
 #endif
+
+    if (ret == 0) {
+        if (send_keepalive) {
+            // otherwise we shortened the timeout ourselves to take care of
+            // MQTT keep alives
+#ifdef DEBUG_ULTRA_VERBOSE
+            mws_debug(client->log, "Forcing MQTT Ping/keep-alive");
+#endif
+            mqtt_ping(client->mqtt_client);
+        } else {
+            // if poll timed out and user requested timeout was being used
+            // return here let user do his work and he will call us back soon
+            return 0;
+        }
+    }
+
+    client->poll_fds[POLLFD_SOCKET].events = 0;
 
     if ((ptr = rbuf_get_linear_insert_range(client->ws_client->buf_read, &size))) {
         if((ret = SSL_read(client->ssl, ptr, size)) > 0) {
@@ -419,22 +470,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
     }
 
-    if(client->ws_client->state == WS_ESTABLISHED) {
-        // we need to call this only if there has been some movements
-        // - read side is handled by POLLIN and ws_client_process
-        // - write side is handled by PIPE write every time we send MQTT
-        // message ensuring we wake up from poll
-        enum MQTTErrors mqtt_ret = mqtt_sync(client->mqtt_client);
-        if (mqtt_ret != MQTT_OK) {
-            mws_error(client->log, "Error mqtt_sync MQTT \"%s\"", mqtt_error_str(mqtt_ret));
-            client->mqtt_connected = 0;
-            return 1;
-        }
-        if (client->mqtt_didnt_finish_write) {
-            client->mqtt_didnt_finish_write = 0;
-            client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
-        }
-    }
+    if (handle_mqtt(client))
+        return 1;
 
     if ((ptr = rbuf_get_linear_read_range(client->ws_client->buf_write, &size))) {
 #ifdef DEBUG_ULTRA_VERBOSE
@@ -442,7 +479,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
         if ((ret = SSL_write(client->ssl, ptr, size)) > 0) {
 #ifdef DEBUG_ULTRA_VERBOSE
-            mws_debug(client->log, "SSL_Write: Written %d.", ret);
+            mws_debug(client->log, "SSL_Write: Written %d of avail %d.", ret, size);
 #endif
             rbuf_bump_tail(client->ws_client->buf_write, ret);
         } else {
