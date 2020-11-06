@@ -31,6 +31,7 @@
 #define UNIT_LOG_PREFIX "ws_client: "
 #define FATAL(fmt, ...) mws_fatal(client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
 #define ERROR(fmt, ...) mws_error(client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
+#define WARN(fmt, ...)  mws_warn (client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
 #define INFO(fmt, ...)  mws_info (client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
 #define DEBUG(fmt, ...) mws_debug(client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
 
@@ -427,15 +428,13 @@ static int check_opcode(ws_client *client,enum websocket_opcode oc)
 {
     switch(oc) {
         case WS_OP_BINARY_FRAME:
+        case WS_OP_CONNECTION_CLOSE:
             return 0;
         case WS_OP_CONTINUATION_FRAME:
             FATAL("WS_OP_CONTINUATION_FRAME NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_TEXT_FRAME:
             FATAL("WS_OP_TEXT_FRAME NOT IMPLEMENTED YET!!!!");
-            return 0;
-        case WS_OP_CONNECTION_CLOSE:
-            FATAL("WS_OP_CONNECTION_CLOSE NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_PING:
             FATAL("WS_OP_PING NOT IMPLEMENTED YET!!!!");
@@ -445,6 +444,21 @@ static int check_opcode(ws_client *client,enum websocket_opcode oc)
             return 0;
         default:
             return WS_CLIENT_PROTOCOL_ERROR;
+    }
+}
+
+static inline void ws_client_rx_post_hdr_state(ws_client *client)
+{
+    switch(client->rx.opcode) {
+        case WS_OP_BINARY_FRAME:
+            client->rx.parse_state = WS_PAYLOAD_DATA;
+            return;
+        case WS_OP_CONNECTION_CLOSE:
+            client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE;
+            return;
+        default:
+            client->rx.parse_state = WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD;
+            return;
     }
 }
 
@@ -481,20 +495,20 @@ int ws_client_process_rx_ws(ws_client *client)
                     break;
                 default:
                     client->rx.payload_length = buf[1];
-                    client->rx.parse_state = WS_PAYLOAD_DATA;
+                    ws_client_rx_post_hdr_state(client);
             }
             break;
         case WS_PAYLOAD_EXTENDED_16:
             BUF_READ_CHECK_AT_LEAST(2);
             rbuf_pop(client->buf_read, buf, 2);
             client->rx.payload_length = be16toh(*((uint16_t *)buf));
-            client->rx.parse_state = WS_PAYLOAD_DATA;
+            ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_EXTENDED_64:
             BUF_READ_CHECK_AT_LEAST(LONGEST_POSSIBLE_HDR_PART);
             rbuf_pop(client->buf_read, buf, LONGEST_POSSIBLE_HDR_PART);
             client->rx.payload_length = be64toh(*((uint64_t *)buf));
-            client->rx.parse_state = WS_PAYLOAD_DATA;
+            ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_DATA:
             // TODO not pretty?
@@ -512,9 +526,74 @@ int ws_client_process_rx_ws(ws_client *client)
                 rbuf_bump_head(client->buf_to_mqtt, size);
                 client->rx.payload_processed += size;
             }
+            client->rx.parse_state = WS_PACKET_DONE;
+            break;
+        case WS_PAYLOAD_CONNECTION_CLOSE:
+            // for WS_OP_CONNECTION_CLOSE allowed is
+            // a) empty payload
+            // b) 2byte reason code
+            // c) 2byte reason code followed by message
+            if (client->rx.payload_length == 1) {
+                ERROR("WebScoket CONNECTION_CLOSE can't have payload of size 1");
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
+            if (!client->rx.payload_length) {
+                INFO("WebSocket server closed the connection without giving reason.");
+                client->rx.parse_state = WS_PACKET_DONE;
+                break;
+            }
+            client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE_EC;
+            break;
+        case WS_PAYLOAD_CONNECTION_CLOSE_EC:
+            BUF_READ_CHECK_AT_LEAST(sizeof(uint16_t));
+
+            rbuf_pop(client->buf_read, buf, sizeof(uint16_t));
+            client->rx.specific_data.op_close.ec = be16toh(*((uint16_t *)buf));
+            client->rx.payload_processed += sizeof(uint16_t);
+
+            if(client->rx.payload_processed == client->rx.payload_length) {
+                INFO("WebSocket server closed the connection with EC=%d. Without message.",
+                    client->rx.specific_data.op_close.ec);
+                client->rx.parse_state = WS_PACKET_DONE;
+                break;
+            }
+            client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE_MSG;
+            break;
+        case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
+            if (!client->rx.specific_data.op_close.reason)
+                client->rx.specific_data.op_close.reason = malloc(client->rx.payload_length + 1);
+
+            while (client->rx.payload_processed < client->rx.payload_length) {
+                if (!rbuf_bytes_available(client->buf_read))
+                    return WS_CLIENT_NEED_MORE_BYTES;
+                client->rx.payload_processed += rbuf_pop(client->buf_read,
+                                                         &client->rx.specific_data.op_close.reason[client->rx.payload_processed - sizeof(uint16_t)],
+                                                         client->rx.payload_length - client->rx.payload_processed);
+            }
+            client->rx.specific_data.op_close.reason[client->rx.payload_length] = 0;
+            INFO("WebSocket server closed the connection with EC=%d and reason \"%s\"",
+                client->rx.specific_data.op_close.ec,
+                client->rx.specific_data.op_close.reason);
+            free(client->rx.specific_data.op_close.reason);
+            client->rx.specific_data.op_close.reason = NULL;
+            client->rx.parse_state = WS_PACKET_DONE;
+            break;
+        case WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD:
+            BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
+            WARN("Skipping Websocket Packet of unsupported/unknown type");
+            if (client->rx.payload_length)
+                rbuf_bump_tail(client->buf_read, client->rx.payload_length);
+            client->rx.parse_state = WS_PACKET_DONE;
+            return WS_CLIENT_PARSING_DONE;
+        case WS_PACKET_DONE:
             client->rx.parse_state = WS_FIRST_2BYTES;
             client->rx.payload_processed = 0;
+            if (client->rx.opcode == WS_OP_CONNECTION_CLOSE)
+                return WS_CLIENT_CONNECTION_CLOSED;
             return WS_CLIENT_PARSING_DONE;
+        default:
+            FATAL("Unknown parse state");
+            return WS_CLIENT_INTERNAL_ERROR;
     }
     return 0;
 }
@@ -540,6 +619,10 @@ int ws_client_process(ws_client *client)
                 ret = ws_client_process_rx_ws(client);
                 if (ret == WS_CLIENT_PROTOCOL_ERROR)
                     client->state = WS_ERROR;
+                if (ret == WS_CLIENT_CONNECTION_CLOSED) {
+                    //TODO HANDLE PROPERLY
+                    client->state = WS_ERROR;
+                }
                 // if ret == 0 we can continue parsing
                 // if ret == WS_CLIENT_PARSING_DONE we processed
                 //    one websocket packet and attempt processing

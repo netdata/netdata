@@ -19,10 +19,12 @@
 
 #include <stdint.h>
 
-#define WS_CLIENT_NEED_MORE_BYTES  0x10
-#define WS_CLIENT_PARSING_DONE     0x11
-#define WS_CLIENT_PROTOCOL_ERROR  -0x10
-#define WS_CLIENT_BUFFER_FULL     -0x11
+#define WS_CLIENT_NEED_MORE_BYTES     0x10
+#define WS_CLIENT_PARSING_DONE        0x11
+#define WS_CLIENT_CONNECTION_CLOSED   0x12
+#define WS_CLIENT_PROTOCOL_ERROR     -0x10
+#define WS_CLIENT_BUFFER_FULL        -0x11
+#define WS_CLIENT_INTERNAL_ERROR     -0x12
 
 enum websocket_client_conn_state {
     WS_RAW = 0,
@@ -44,7 +46,12 @@ enum websocket_client_rx_ws_parse_state {
     WS_FIRST_2BYTES = 0,
     WS_PAYLOAD_EXTENDED_16,
     WS_PAYLOAD_EXTENDED_64,
-    WS_PAYLOAD_DATA
+    WS_PAYLOAD_DATA, // BINARY payload to be passed to MQTT
+    WS_PAYLOAD_CONNECTION_CLOSE,
+    WS_PAYLOAD_CONNECTION_CLOSE_EC,
+    WS_PAYLOAD_CONNECTION_CLOSE_MSG,
+    WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD,
+    WS_PACKET_DONE
 };
 
 enum websocket_opcode {
@@ -54,6 +61,11 @@ enum websocket_opcode {
     WS_OP_CONNECTION_CLOSE   = 0x8,
     WS_OP_PING               = 0x9,
     WS_OP_PONG               = 0xA
+};
+
+struct ws_op_close_payload {
+    uint16_t ec;
+    char *reason;
 };
 
 typedef struct websocket_client {
@@ -72,6 +84,9 @@ typedef struct websocket_client {
         enum websocket_opcode opcode;
         uint64_t payload_length;
         uint64_t payload_processed;
+        union {
+            struct ws_op_close_payload op_close;
+        } specific_data;
     } rx;
 
     rbuf_t buf_read;    // from SSL
