@@ -29,8 +29,22 @@
 
 #ifdef ENABLE_HTTPS
 #define FEAT_NATIVE_HTTPS "YES"
+#ifdef NETDATA_HTTPS_WITH_OPENSSL
+#define FEAT_HTTPS_OPENSSL_LIBRARY "YES"
+#else
+#define FEAT_HTTPS_OPENSSL_LIBRARY "NO"
+#endif
+
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+#define FEAT_HTTPS_WOLFSSL_LIBRARY "YES"
+#else
+#define FEAT_HTTPS_WOLFSSL_LIBRARY "NO"
+#endif
+
 #else
 #define FEAT_NATIVE_HTTPS "NO"
+#define FEAT_HTTPS_WOLFSSL_LIBRARY "NO"
+#define FEAT_HTTPS_OPENSSL_LIBRARY "NO"
 #endif
 
 // Optional libraries
@@ -191,6 +205,8 @@ void print_build_info(void) {
     printf("Features:\n");
     printf("    dbengine:                %s\n", FEAT_DBENGINE);
     printf("    Native HTTPS:            %s\n", FEAT_NATIVE_HTTPS);
+    printf("    HTTPS with OpenSSL:      %s\n", FEAT_HTTPS_OPENSSL_LIBRARY);
+    printf("    HTTPS with WolfSSL:      %s\n", FEAT_HTTPS_WOLFSSL_LIBRARY);
     printf("    Netdata Cloud:           %s\n", FEAT_CLOUD);
     printf("    TLS Host Verification:   %s\n", FEAT_TLS_HOST_VERIFY);
 

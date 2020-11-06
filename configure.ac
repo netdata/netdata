@@ -524,6 +524,7 @@ AC_MSG_CHECKING([if netdata https should be used])
 if test "${enable_https}" != "no" -a "${SSL_LIBS}" -a "${enable_wolfssl}" != "yes"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    AC_DEFINE([NETDATA_HTTPS_WITH_OPENSSL], [1], [netdata is compiled against OpenSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
@@ -533,7 +534,7 @@ fi
 if test "${enable_https}" != "no" -a "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" == "yes"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
-    AC_DEFINE([ENABLE_WOLFSSL], [1], [netdata is working with WolfSSL])
+    AC_DEFINE([NETDATA_HTTPS_WITH_WOLFSSL], [1], [netdata is compiled against WolfSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
 else
