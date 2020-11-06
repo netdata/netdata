@@ -20,6 +20,51 @@ struct aclk_metrics aclk_metrics = {
 
 struct aclk_metrics_per_sample aclk_metrics_per_sample;
 
+struct aclk_mat_metrics aclk_mat_metrics = {
+#ifdef NETDATA_INTERNAL_CHECKS
+    .latency = { .name = "aclk_latency_mqtt",
+                 .prio = 200002,
+                 .st = NULL,
+                 .rd_avg = NULL,
+                 .rd_max = NULL,
+                 .rd_total = NULL,
+                 .unit = "ms",
+                 .title = "ACLK Message Publish Latency" },
+#endif
+
+    .cloud_q_db_query_time = { .name = "aclk_db_query_time",
+                               .prio = 200006,
+                               .st = NULL,
+                               .rd_avg = NULL,
+                               .rd_max = NULL,
+                               .rd_total = NULL,
+                               .unit = "us",
+                               .title = "Time it took to process cloud requested DB queries" },
+
+    .cloud_q_recvd_to_processed = { .name = "aclk_cloud_q_recvd_to_processed",
+                                    .prio = 200007,
+                                    .st = NULL,
+                                    .rd_avg = NULL,
+                                    .rd_max = NULL,
+                                    .rd_total = NULL,
+                                    .unit = "us",
+                                    .title = "Time from receiving the Cloud Query until it was picked up "
+                                             "by query thread (just before passing to the database)." }
+};
+
+void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement)
+{
+    if (aclk_stats_enabled) {
+        ACLK_STATS_LOCK;
+        if (metric->max < measurement)
+            metric->max = measurement;
+
+        metric->total += measurement;
+        metric->count++;
+        ACLK_STATS_UNLOCK;
+    }
+}
+
 static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struct aclk_metrics *permanent)
 {
     static RRDSET *st_aclkstats = NULL;
@@ -60,33 +105,6 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
 
     rrdset_done(st_query_thread);
 }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-static void aclk_stats_latency(struct aclk_metrics_per_sample *per_sample)
-{
-    static RRDSET *st = NULL;
-    static RRDDIM *rd_avg = NULL;
-    static RRDDIM *rd_max = NULL;
-
-    if (unlikely(!st)) {
-        st = rrdset_create_localhost(
-            "netdata", "aclk_latency_mqtt", NULL, "aclk", NULL, "ACLK Message Publish Latency", "ms",
-            "netdata", "stats", 200002, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-
-        rd_avg = rrddim_add(st, "avg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st);
-    if(per_sample->latency_count)
-        rrddim_set_by_pointer(st, rd_avg, roundf((float)per_sample->latency_total / per_sample->latency_count));
-    else
-        rrddim_set_by_pointer(st, rd_avg, 0);
-
-    rrddim_set_by_pointer(st, rd_max, per_sample->latency_max);
-
-    rrdset_done(st);
-}
-#endif
 
 static void aclk_stats_write_q(struct aclk_metrics_per_sample *per_sample)
 {
@@ -181,32 +199,27 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     rrdset_done(st);
 }
 
-static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_mat_metric_process(struct aclk_metric_mat *metric, struct aclk_metric_mat_data *data)
 {
-    static RRDSET *st = NULL;
-    static RRDDIM *rd_rq_avg = NULL;
-    static RRDDIM *rd_rq_max = NULL;
-    static RRDDIM *rd_rq_total = NULL;
+    if(unlikely(!metric->st)) {
+        metric->st = rrdset_create_localhost(
+            "netdata", metric->name, NULL, "aclk", NULL, metric->title, metric->unit, "netdata", "stats", metric->prio,
+            localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
-    if (unlikely(!st)) {
-        st = rrdset_create_localhost(
-            "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
-            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-
-        rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_total = rrddim_add(st, "total", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        metric->rd_avg   = rrddim_add(metric->st, "avg",   NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        metric->rd_max   = rrddim_add(metric->st, "max",   NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        metric->rd_total = rrddim_add(metric->st, "total", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     } else
-        rrdset_next(st);
+        rrdset_next(metric->st);
 
-    if(per_sample->cloud_q_process_count)
-        rrddim_set_by_pointer(st, rd_rq_avg, roundf((float)per_sample->cloud_q_process_total / per_sample->cloud_q_process_count));
+    if(data->count)
+        rrddim_set_by_pointer(metric->st, metric->rd_avg, roundf((float)data->total / data->count));
     else
-        rrddim_set_by_pointer(st, rd_rq_avg, 0);
-    rrddim_set_by_pointer(st, rd_rq_max, per_sample->cloud_q_process_max);
-    rrddim_set_by_pointer(st, rd_rq_total, per_sample->cloud_q_process_total);
+        rrddim_set_by_pointer(metric->st, metric->rd_avg, 0);
+    rrddim_set_by_pointer(metric->st, metric->rd_max, data->max);
+    rrddim_set_by_pointer(metric->st, metric->rd_total, data->total);
 
-    rrdset_done(st);
+    rrdset_done(metric->st);
 }
 
 void aclk_stats_thread_cleanup()
@@ -255,16 +268,18 @@ void *aclk_stats_main_thread(void *ptr)
 
         aclk_stats_collect(&per_sample, &permanent);
         aclk_stats_query_queue(&per_sample);
-#ifdef NETDATA_INTERNAL_CHECKS
-        aclk_stats_latency(&per_sample);
-#endif
+
         aclk_stats_write_q(&per_sample);
         aclk_stats_read_q(&per_sample);
 
         aclk_stats_cloud_req(&per_sample);
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
-        aclk_stats_query_time(&per_sample);
+#ifdef NETDATA_INTERNAL_CHECKS
+        aclk_stats_mat_metric_process(&aclk_mat_metrics.latency, &per_sample.latency);
+#endif
+        aclk_stats_mat_metric_process(&aclk_mat_metrics.cloud_q_db_query_time, &per_sample.cloud_q_db_query_time);
+        aclk_stats_mat_metric_process(&aclk_mat_metrics.cloud_q_recvd_to_processed, &per_sample.cloud_q_recvd_to_processed);
     }
 
     return 0;
