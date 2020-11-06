@@ -79,7 +79,7 @@ jobs:
       - name: Verify & Set distfile
         run: |
           ls -lah netdata-*.tar.gz
-          echo "::set-env name=DISTFILE::$(ls netdata-*.tar.gz)"
+          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
       - name: Run run_install_with_dist_file.sh
         run: |
           ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
