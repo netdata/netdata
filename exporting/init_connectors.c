@@ -115,6 +115,9 @@ void simple_connector_init(struct instance *instance)
     struct simple_connector_data *connector_specific_data =
         (struct simple_connector_data *)instance->connector_specific_data;
 
+    if (connector_specific_data->first_buffer)
+        return;
+
     // create a ring buffer
     struct simple_connector_buffer *first_buffer = NULL;
 
