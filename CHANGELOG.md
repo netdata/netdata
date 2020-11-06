@@ -46,6 +46,7 @@
 - Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
 - Completely hide SSO iframe [\#10027](https://github.com/netdata/netdata/pull/10027) ([Jiab77](https://github.com/Jiab77))
 - allows use of system libwebsockets instead of bundled one [\#9984](https://github.com/netdata/netdata/pull/9984) ([underhood](https://github.com/underhood))
+- Add HTTP and HTTPS support to the simple exporting connector [\#9911](https://github.com/netdata/netdata/pull/9911) ([vlvkobal](https://github.com/vlvkobal))
 - Opsgenie integration [\#9879](https://github.com/netdata/netdata/pull/9879) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
@@ -236,9 +237,6 @@
 - python.d: add job file lock registry [\#9564](https://github.com/netdata/netdata/pull/9564) ([ilyam8](https://github.com/ilyam8))
 - Adding pihole to the dns app group [\#9557](https://github.com/netdata/netdata/pull/9557) ([bmatheny](https://github.com/bmatheny))
 - Implemented multihost database [\#9556](https://github.com/netdata/netdata/pull/9556) ([stelfrag](https://github.com/stelfrag))
-- health/megacli: change all instances of alarm to template [\#9553](https://github.com/netdata/netdata/pull/9553) ([tinyhammers](https://github.com/tinyhammers))
-- Revert the eBPF package bundling that breaks the release and DEB packages. [\#9552](https://github.com/netdata/netdata/pull/9552) ([prologic](https://github.com/prologic))
-- Read socket information from kernel ring [\#9549](https://github.com/netdata/netdata/pull/9549) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
