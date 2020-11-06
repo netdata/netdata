@@ -295,6 +295,7 @@ extern char *read_by_filename(char *filename, long *file_size);
 
 /* misc. */
 #define UNUSED(x) (void)(x)
+#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);

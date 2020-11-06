@@ -6,7 +6,6 @@
 #define ENABLE_CACHE_DIMENSIONS 1
 
 
-#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
@@ -32,8 +31,8 @@ const char *database_config[] = {
 
 sqlite3 *db_meta = NULL;
 
-static uv_mutex_t sqlite_lookup;
-static uv_mutex_t sqlite_add_page;
+//static uv_mutex_t sqlite_lookup;
+//static uv_mutex_t sqlite_add_page;
 static uint32_t page_size;
 static uint32_t page_count;
 static uint32_t free_page_count;
@@ -142,8 +141,8 @@ int sql_init_database(void)
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-    fatal_assert(0 == uv_mutex_init(&sqlite_lookup));
-    fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
+//    fatal_assert(0 == uv_mutex_init(&sqlite_lookup));
+//    fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
     rc = sqlite3_open(sqlite_database, &db_meta);
@@ -183,12 +182,6 @@ void sql_close_database(void)
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database", rc);
     return;
-//    uv_mutex_lock(&sqlite_add_page);
-//    if (pending_page_inserts) {
-//        info("Writing final transactions %u", pending_page_inserts);
-//        sqlite3_exec(db_page, "COMMIT TRANSACTION;", 0, 0, &err_msg);
-//        pending_page_inserts = 0;
-//    }
 }
 
 /*
