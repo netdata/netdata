@@ -709,9 +709,8 @@ int sql_store_chart(
         error_report("Failed to store chart, rc = %d", rc);
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement in chart store function, rc = %d", rc);
-    }
 
     return 0;
 
@@ -771,7 +770,7 @@ int sql_store_dimension(
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store chart, rc = %d", rc);
+        error_report("Failed to store dimension, rc = %d", rc);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
