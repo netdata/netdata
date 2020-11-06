@@ -35,22 +35,19 @@ the Netdata dashboard using an ingress controller.
 
 ## Install the Netdata Helm chart
 
-Download the [Netdata Helm chart](https://github.com/netdata/helmchart) on the administative system where you have the
-`helm` binary installed.
+We recommend you install the Helm chart using our Helm repository. In the `helm install` command, replace `netdata` with
+the release name of your choice.
 
 ```bash
-git clone https://github.com/netdata/helmchart.git netdata-helmchart
+helm repo add netdata https://netdata.github.io/helmchart/
+helm install netdata netdata/netdata
 ```
 
-> You may not need to configure the Helm chart to get a functioning service on your cluster, but you should read the
-> sections on [configuring the Helm chart](#configure-the-netdata-helm-chart) and [configuring service
-> discovery](#configure-service-discovery) for details.
+> You can also install the Netdata Helm chart by cloning the
+> [repository](https://artifacthub.io/packages/helm/netdata/netdata#install-by-cloning-the-repository) and manually
+> running Helm against the included chart.
 
-Install the Helm chart to your cluster with `helm install`:
-
-```bash
-helm install netdata ./netdata-helmchart
-```
+### Post-installation
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
 `parent` pod, and three `child` pods.
@@ -65,16 +62,18 @@ Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
 on your cluster's setup.
 
-To change a setting, use the `--set` or `--values` arguments along with `helm install`:
+To change a setting, use the `--set` or `--values` arguments with `helm install`, for the initial deployment, or `helm upgrade` to upgrade an existing deployment. 
 
 ```bash
-helm install --set a.b.c=xyz netdata ./netdata-helmchart
+helm install --set a.b.c=xyz netdata netdata/netdata
+helm upgrade --set a.b.c=xyz netdata netdata/netdata
 ```
 
-For example, to change the size of the persistent metrics volume, you would run the following:
+For example, to change the size of the persistent metrics volume on the parent node:
 
 ```bash
-helm install --set parent.database.volumesize=4Gi ./netdata-helmchart
+helm install --set parent.database.volumesize=4Gi netdata netdata/netdata
+helm upgrade --set parent.database.volumesize=4Gi netdata netdata/netdata
 ```
 
 ### Configure service discovery
@@ -89,27 +88,27 @@ discovery currently supports [popular
 applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered
 by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
 
-If you haven't changed listening ports or other defaults, service discovery should find your pods, create the proper
-configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
+If you haven't changed listening ports, image names, or other defaults, service discovery should find your pods, create
+the proper configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
 
-However, if you have changed some of these defaults, you'll need to copy the `netdata-helmchart/sdconfig/child.yml`
-file, edit it, and pass the changed file to `helm install`/`helm upgrade`. 
+However, if you have changed some of these defaults, you need to copy a file from the Netdata Helm chart repository,
+make your edits, and pass the changed file to `helm install`/`helm upgrade`.
 
-First, copy the file to a new location outside the `netdata-helmchart` directory. The destination can be anywhere you
-like, but the following examples assume it resides next to the `netdata-helmchart` directory.
+First, copy the file to your administrative system.
 
 ```bash
-cp netdata-helmchart/sdconfig/child.yml .
+curl https://raw.githubusercontent.com/netdata/helmchart/master/charts/netdata/sdconfig/child.yml -o child.yml
 ```
 
 Edit the new `child.yml` file according to your needs. See the [Helm chart
-configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details. You can then run
-`helm install`/`helm upgrade` with the `--set-file` argument to use your configured `child.yml` file instead of the
-default, changing the path if you copied it elsewhere.
+configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details. 
+
+You can then run `helm install`/`helm upgrade` with the `--set-file` argument to use your configured `child.yml` file
+instead of the default, changing the path if you copied it elsewhere.
 
 ```bash
-helm install --set-file sd.child.configmap.from.value=./child.yml netdata ./netdata-helmchart
-helm upgrade --set-file sd.child.configmap.from.value=./child.yml netdata ./netdata-helmchart
+helm install --set-file sd.child.configmap.from.value=./child.yml netdata netdata/netdata
+helm upgrade --set-file sd.child.configmap.from.value=./child.yml netdata netdata/netdata
 ```
 
 Your configured service discovery is now pushed to your cluster.
@@ -154,7 +153,7 @@ Ensure persistence is enabled on the parent pod by running the following `helm u
 helm upgrade \
   --set parent.database.persistence=true \
   --set parent.alarms.persistence=true \
-  netdata ./netdata-helmchart
+  netdata netdata/netdata
 ```
 
 Next, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**. Click
@@ -175,7 +174,7 @@ helm upgrade \
   --set parent.claiming.enabled=true \
   --set parent.claiming.token="TOKEN" \
   --set parent.claiming.rooms="ROOM1,ROOM2" \
-  netdata ./netdata-helmchart
+  netdata netdata/netdata
 ```
 
 The cluster terminates the old parent pod and creates a new one with the proper claiming configuration. You can see your
@@ -188,11 +187,11 @@ Cloud](https://user-images.githubusercontent.com/1153921/94497340-c1f49880-01ab-
 
 ## Update/reinstall the Netdata Helm chart
 
-If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata` 
-with the name of the release if you changed it upon installtion:
+If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata`
+with the name of the release, if you changed it upon installtion:
 
 ```bash
-helm upgrade netdata ./netdata-helmchart
+helm upgrade netdata netdata/netdata
 ```
 
 ## What's next?
