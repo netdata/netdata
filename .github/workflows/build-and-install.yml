@@ -29,7 +29,7 @@ jobs:
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-            #- 'centos:8'
+          - 'centos:8'
           - 'centos:7'
           - 'clearlinux:latest'
           - 'debian:10'
@@ -63,8 +63,8 @@ jobs:
           - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi'
 
-            #- distro: 'centos:8'
-            #rmjsonc: 'dnf remove -y json-c-devel'
+          - distro: 'centos:8'
+            rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'debian:10'
             pre: 'apt-get update'
@@ -129,24 +129,23 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          # XXX: CentOS 8.x is broken (libjudy)
-          # - 'centos:8'
+          - 'centos:8'
           - 'debian:buster'
           - 'fedora:32'
           - 'ubuntu:20.04'
         include:
-          #- distro: 'centos:8'
-          #  pre: >-
-          #    yum -y update &&
-          #    yum -y groupinstall 'Development Tools' &&
-          #    yum -y install libcurl-devel openssl-devel libuuid-devel
-          #  build_kinesis: >-
-          #    git clone https://github.com/aws/aws-sdk-cpp.git &&
-          #    cmake -DCMAKE_INSTALL_PREFIX=/usr
-          #    -DBUILD_ONLY=kinesis
-          #    ./aws-sdk-cpp &&
-          #    make &&
-          #    make install
+          - distro: 'centos:8'
+            pre: >-
+              yum -y update &&
+              yum -y groupinstall 'Development Tools' &&
+              yum -y install libcurl-devel openssl-devel libuuid-devel
+            build_kinesis: >-
+              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
           - distro: 'debian:buster'
             pre: >-
               apt-get update &&
