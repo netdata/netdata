@@ -920,6 +920,18 @@ if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
 fi
 
 # -----------------------------------------------------------------------------
+# By default, `git` does not update local tags based on remotes. Because
+# we use the most recent tag as part of our version determination in
+# our build, this can lead to strange versions that look ancient but are
+# actually really recent. To avoid this, try and fetch tags if we're
+# working in a git checkout.
+if [ -d ./.git ] ; then
+  echo >&2
+  progress "Updating tags in git to ensure a consistent version number"
+  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
+fi
+
+# -----------------------------------------------------------------------------
 echo >&2
 progress "Run autotools to configure the build environment"
 
