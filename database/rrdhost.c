@@ -111,7 +111,7 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
     host->rrd_update_every = update_every;
     host->rrd_memory_mode = memory_mode;
 
-    host->hostname = strdupz(hostname);
+    rrdhost_init_hostname(host, hostname);
 
     rrdhost_init_machine_guid(host, guid);
 

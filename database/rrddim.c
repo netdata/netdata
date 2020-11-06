@@ -393,7 +393,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->state = mallocz(sizeof(*rd->state));
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        uuid_t *dim_uuid = sql_find_dim_uuid(st, rd);
+        uuid_t *dim_uuid = find_dimension_uuid(st, rd);
+        if (unlikely(!dim_uuid))
+            dim_uuid = create_dimension_uuid(st, rd);
+        store_active_dimension(dim_uuid);
         rrdeng_metric_init(rd, dim_uuid);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;

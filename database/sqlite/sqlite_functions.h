@@ -47,7 +47,9 @@ extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char 
                                collected_number divisor, int algorithm);
 
 // Lookup UUIDs in the database
-extern uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd); //char *id, char *name, collected_number multiplier, collected_number divisor, int algorithm);
+extern uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd);
+extern uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd);
+extern void store_active_dimension(uuid_t *dimension_uuid);
 extern uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const char *id, const char *name);
 extern int sql_cache_chart_dimensions(RRDSET *st);
 extern int sql_cache_host_charts(RRDHOST *host);

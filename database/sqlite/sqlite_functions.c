@@ -30,7 +30,7 @@ const char *database_config[] = {
     NULL
 };
 
-sqlite3 *db = NULL;
+sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_lookup;
 static uv_mutex_t sqlite_add_page;
@@ -45,12 +45,15 @@ static int execute_insert(sqlite3_stmt *res)
 {
     int rc;
 
-    int retry_count = SQLITE_INSERT_MAX;
-    while (retry_count-- && ((rc = sqlite3_step(res)) != SQLITE_DONE)) {
-        if (rc != SQLITE_BUSY)
+    while ((rc = sqlite3_step(res)) != SQLITE_DONE || unlikely(netdata_exit)) {
+        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED))
+            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+        else {
+            error_report("SQLite error %d", rc);
             break;
-        usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+        }
     }
+
     return rc;
 }
 
@@ -65,7 +68,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
 
     // Check if we should need to prepare the statement
     if (!*res) {
-        rc = sqlite3_prepare_v2(db, statement, -1, res, 0);
+        rc = sqlite3_prepare_v2(db_meta, statement, -1, res, 0);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store active object, rc = %d", rc);
             return rc;
@@ -89,7 +92,7 @@ static void store_active_chart(uuid_t *chart_uuid)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db)) {
+    if (unlikely(!db_meta)) {
         error_report("Database has not been initialized");
         return;
     }
@@ -108,12 +111,12 @@ static void store_active_chart(uuid_t *chart_uuid)
  * Marks a dimension with UUID as active
  * Input: UUID
  */
-static void store_active_dimension(uuid_t *dimension_uuid)
+void store_active_dimension(uuid_t *dimension_uuid)
 {
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db)) {
+    if (unlikely(!db_meta)) {
         error_report("Database has not been initialized");
         return;
     }
@@ -143,7 +146,7 @@ int sql_init_database(void)
     fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
-    rc = sqlite3_open(sqlite_database, &db);
+    rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s", sqlite_database);
         return 1;
@@ -153,7 +156,7 @@ int sql_init_database(void)
 
     for (int i = 0; database_config[i]; i++) {
         debug(D_SQLITE, "Executing %s", database_config[i]);
-        rc = sqlite3_exec(db, database_config[i], 0, 0, &err_msg);
+        rc = sqlite3_exec(db_meta, database_config[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", database_config[i]);
@@ -172,11 +175,11 @@ int sql_init_database(void)
 void sql_close_database(void)
 {
     int rc;
-    if (unlikely(!db))
+    if (unlikely(!db_meta))
         return;
 
     info("Closing SQLite database");
-    rc = sqlite3_close(db);
+    rc = sqlite3_close(db_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database", rc);
     return;
@@ -196,7 +199,7 @@ int sql_database_size(void)
     sqlite3_stmt *chk_size;
     int rc;
 
-    rc = sqlite3_prepare_v2(db, "pragma page_count;", -1, &chk_size, 0);
+    rc = sqlite3_prepare_v2(db_meta, "pragma page_count;", -1, &chk_size, 0);
     if (rc != SQLITE_OK)
         return 0;
 
@@ -205,7 +208,7 @@ int sql_database_size(void)
 
     sqlite3_finalize(chk_size);
 
-    rc = sqlite3_prepare_v2(db, "pragma freelist_count;", -1, &chk_size, 0);
+    rc = sqlite3_prepare_v2(db_meta, "pragma freelist_count;", -1, &chk_size, 0);
     if (rc != SQLITE_OK)
         return 0;
 
@@ -215,7 +218,7 @@ int sql_database_size(void)
     sqlite3_finalize(chk_size);
 
     if (unlikely(!page_size)) {
-        rc = sqlite3_prepare_v2(db, "pragma page_size;", -1, &chk_size, 0);
+        rc = sqlite3_prepare_v2(db_meta, "pragma page_size;", -1, &chk_size, 0);
         if (rc != SQLITE_OK)
             return 0;
 
@@ -305,14 +308,14 @@ int sql_cache_host_charts(RRDHOST *host)
     int rc;
     sqlite3_stmt *res = NULL;
 
-    if (!db)
+    if (!db_meta)
         return 0;
 
     int count = 0;
 
     if (!res) {
         rc = sqlite3_prepare_v2(
-            db, "select chart_id, type, id, name from chart where host_id = @host;", -1, &res, 0);
+            db_meta, "select chart_id, type, id, name from chart where host_id = @host;", -1, &res, 0);
         if (rc != SQLITE_OK)
             return 0;
     }
@@ -345,7 +348,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!db) {
+    if (!db_meta) {
         error_report("Database has not been initialized");
         return 0;
     }
@@ -353,7 +356,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
     int count = 0;
 
     if (!res) {
-        rc = sqlite3_prepare_v2(db, "select dim_id, id, name from dimension where chart_id = @chart;", -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_meta, "select dim_id, id, name from dimension where chart_id = @chart;", -1, &res, 0);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to find chart dimensions");
             return 0;
@@ -383,7 +386,7 @@ done:
 }
 
 
-uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
+uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 {
     sqlite3_stmt *res = NULL;
     uuid_t *uuid = NULL;
@@ -400,12 +403,10 @@ uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
         goto found;
     }
 
-    //netdata_mutex_lock(&sqlite_find_uuid);
     if (!res) {
-        rc = sqlite3_prepare_v2(db, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
         if (rc != SQLITE_OK) {
             error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
-            //netdata_mutex_unlock(&sqlite_find_uuid);
             return NULL;
         }
     }
@@ -424,26 +425,32 @@ uuid_t *sql_find_dim_uuid(RRDSET *st, RRDDIM *rd)
 
     rc = sqlite3_step(res);
 
-    uuid = mallocz(sizeof(uuid_t));
-    if (likely(rc == SQLITE_ROW))
+    if (likely(rc == SQLITE_ROW)) {
+        uuid = mallocz(sizeof(uuid_t));
         uuid_copy(*uuid, sqlite3_column_blob(res, 0));
-    else {
-        uuid_generate(*uuid);
-        rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
-        if (unlikely(rc))
-            error_report("Failed to store dimension metadata in the database");
     }
     sqlite3_reset(res);
     sqlite3_finalize(res);
-
 found:
-    store_active_dimension(uuid);
-    // netdata_mutex_unlock(&sqlite_find_uuid);
     return uuid;
 
 bind_fail:
     error_report("Failed to bind input parameter to perform dimension UUID database lookup, rc = %d", rc);
     return NULL;
+}
+
+uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
+{
+    uuid_t *uuid = NULL;
+    int rc;
+
+    uuid = mallocz(sizeof(uuid_t));
+    uuid_generate(*uuid);
+    rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
+    if (unlikely(rc))
+       error_report("Failed to store dimension metadata in the database");
+
+    return uuid;
 }
 
 /*
@@ -468,7 +475,7 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const c
     }
 
     if (!res) {
-        rc = sqlite3_prepare_v2(db, SQL_FIND_CHART_UUID, -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
         if (rc != SQLITE_OK) {
             error_report("Failed to bind prepare statement to lookup chart UUID in the database");
             return NULL;
@@ -537,12 +544,12 @@ int sql_store_host(
     sqlite3_stmt *res;
     int rc;
 
-    if (unlikely(!db)) {
+    if (unlikely(!db_meta)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    rc = sqlite3_prepare_v2(db, SQL_STORE_HOST, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_STORE_HOST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store host, rc = %d", rc);
         return 1;
@@ -604,12 +611,12 @@ int sql_store_chart(
     sqlite3_stmt *res;
     int rc, param = 0;
 
-    if (unlikely(!db)) {
+    if (unlikely(!db_meta)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    rc = sqlite3_prepare_v2(db, SQL_STORE_CHART, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_STORE_CHART, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store chart, rc = %d", rc);
         return 1;
@@ -723,12 +730,12 @@ int sql_store_dimension(
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db)) {
+    if (unlikely(!db_meta)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    rc = sqlite3_prepare_v2(db, SQL_STORE_DIMENSION, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_STORE_DIMENSION, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store dimension, rc = %d", rc);
         return 1;
@@ -821,7 +828,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
     sqlite3_stmt *res_dim = NULL;
     time_t now = now_realtime_sec();
 
-    rc = sqlite3_prepare_v2(db, SELECT_CHART, -1, &res_chart, 0);
+    rc = sqlite3_prepare_v2(db_meta, SELECT_CHART, -1, &res_chart, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch host archived charts");
         return;
@@ -833,7 +840,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         return;
     }
 
-    rc = sqlite3_prepare_v2(db, SELECT_DIMENSION, -1, &res_dim, 0);
+    rc = sqlite3_prepare_v2(db_meta, SELECT_DIMENSION, -1, &res_dim, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart archived dimensions");
         goto failed;
@@ -989,7 +996,7 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     sqlite3_stmt *res = NULL;
 
-    rc = sqlite3_prepare_v2(db, SELECT_HOST, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch host");
         return NULL;
