@@ -156,7 +156,7 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [wolfssl],
-    [AS_HELP_STRING([--use-wolfssl], [Enable SSL support with WolfSSL @<:@default autodetect@:>@])],
+    [AS_HELP_STRING([--enable-wolfssl], [enable SSL support with WolfSSL @<:@default disabled@:>@])],
     ,
     [enable_wolfssl="no"]
 )
@@ -531,14 +531,14 @@ else
     enable_https="no"
 fi
 
-if test "${enable_https}" != "no" -a "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" == "yes"; then
+if test "${enable_https}" != "no" -a "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" = "yes"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
     AC_DEFINE([NETDATA_HTTPS_WITH_WOLFSSL], [1], [netdata is compiled against WolfSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
 else
-enable_https="no"
+    enable_https="no"
 fi
 
 AC_MSG_RESULT([${enable_https}])

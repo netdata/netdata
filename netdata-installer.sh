@@ -343,7 +343,7 @@ while [ -n "${1}" ]; do
       NETDATA_BUILD_JUDY=1
       ;;
     "--use-wolfssl")
-      NETDATA_USE_WOLFSSL=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-wolfssl/} --enable-wolfssl"
       ;;
     "--install")
       NETDATA_PREFIX="${2}/netdata"
