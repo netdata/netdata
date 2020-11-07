@@ -111,6 +111,6 @@ int ws_client_want_write(ws_client *client);
 
 int ws_client_process(ws_client *client);
 
-int ws_client_send(ws_client *client, const char *data, size_t size);
+int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size);
 
 #endif /* WS_CLIENT_H */

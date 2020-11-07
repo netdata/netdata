@@ -349,7 +349,7 @@ static inline size_t get_ws_hdr_size(size_t payload_size)
 }
 
 #define MAX_POSSIBLE_HDR_LEN 14
-int ws_client_send(ws_client *client, const char *data, size_t size)
+int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size)
 {
     // TODO maybe? implement fragmenting, it is not necessary though
     // as both tested MQTT brokers have no reuirement of one MQTT envelope
@@ -380,7 +380,7 @@ int ws_client_send(ws_client *client, const char *data, size_t size)
         // no bigus dealus
     }
 
-    *ptr++ = WS_OP_BINARY_FRAME | BYTE_MSB /*final frag*/;
+    *ptr++ = frame_type | BYTE_MSB /*final frag*/;
 
     //generate length
     *ptr = BYTE_MSB; //MASK
@@ -404,6 +404,9 @@ int ws_client_send(ws_client *client, const char *data, size_t size)
     }
 
     rbuf_push(client->buf_write, hdr, hdr_len);
+
+    if (!size)
+        return 0;
 
     // copy and mask data in the write ringbuffer
     while (size - size_written) {

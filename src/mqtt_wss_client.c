@@ -503,7 +503,7 @@ ssize_t mqtt_pal_sendall(mqtt_pal_socket_handle mqtt_wss_client, const void* buf
 #ifdef DEBUG_ULTRA_VERBOSE
     mws_debug(mqtt_wss_client->log, "mqtt_pal_sendall(len=%d)", len);
 #endif
-    int ret = ws_client_send(mqtt_wss_client->ws_client, buf, len);
+    int ret = ws_client_send(mqtt_wss_client->ws_client, WS_OP_BINARY_FRAME, buf, len);
     if (ret >= 0 && (size_t)ret != len) {
 #ifdef DEBUG_ULTRA_VERBOSE
         mws_debug(mqtt_wss_client->log, "Not complete message sent (Msg=%d,Sent=%d). Need to arm POLLOUT!", len, ret);
