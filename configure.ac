@@ -495,11 +495,8 @@ fi
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
-test "${enable_wolfssl}" = "yes" -a -z "${WOLFSSL_LIBS}" && \
-    AC_MSG_ERROR([WolfSSL required for HTTPS but not found. Try installing 'libwolfssl-dev' or 'wolfssl-devel'.])
-
-test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" -o -z  "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL or WolfSSL are required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel' or 'libwolfssl-dev'.])
 
 test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
@@ -531,7 +528,7 @@ else
     enable_https="no"
 fi
 
-if test "${enable_https}" != "no" -a "${WOLFSSL_LIBS}" -a "${enable_wolfssl}" = "yes"; then
+if test "${enable_wolfssl}" = "yes" -a "${WOLFSSL_LIBS}"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
     AC_DEFINE([NETDATA_HTTPS_WITH_WOLFSSL], [1], [netdata is compiled against WolfSSL])
