@@ -336,7 +336,9 @@ int ws_client_parse_handshake_resp(ws_client *client)
     return 0;
 }
 
-#define BYTE_MSB                     0x80
+#define BYTE_MSB          0x80
+#define WS_FINAL_FRAG     BYTE_MSB
+#define WS_PAYLOAD_MASKED BYTE_MSB
 
 static inline size_t get_ws_hdr_size(size_t payload_size)
 {
@@ -380,10 +382,10 @@ int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const ch
         // no bigus dealus
     }
 
-    *ptr++ = frame_type | BYTE_MSB /*final frag*/;
+    *ptr++ = frame_type | WS_FINAL_FRAG;
 
     //generate length
-    *ptr = BYTE_MSB; //MASK
+    *ptr = WS_PAYLOAD_MASKED;
     if (size > 65535) {
         *ptr++ |= 0x7f;
         uint64_t be = htobe64(size);
@@ -476,7 +478,7 @@ int ws_client_process_rx_ws(ws_client *client)
             rbuf_pop(client->buf_read, buf, 2);
             client->rx.opcode = buf[0] & (char)~BYTE_MSB;
 
-            if (!(buf[0] & (char)~BYTE_MSB)) {
+            if (!(buf[0] & (char)~WS_FINAL_FRAG)) {
                 ERROR("Not supporting fragmented messages yet!");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
@@ -484,7 +486,7 @@ int ws_client_process_rx_ws(ws_client *client)
             if (check_opcode(client, client->rx.opcode) == WS_CLIENT_PROTOCOL_ERROR)
                 return WS_CLIENT_PROTOCOL_ERROR;
 
-            if (buf[1] & (char)BYTE_MSB) {
+            if (buf[1] & (char)WS_PAYLOAD_MASKED) {
                 ERROR("Mask is not allowed in Server->Client Websocket direction.");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
