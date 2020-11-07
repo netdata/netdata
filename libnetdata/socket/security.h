@@ -49,7 +49,7 @@ extern const char *security_cert;
 extern const char *tls_version;
 extern const char *tls_ciphers;
 extern int netdata_validate_server;
-extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
+extern int security_location_for_context(SSL_CTX *ctx, char *file, char *path);
 
 #ifdef NETDATA_HTTPS_WITH_OPENSSL
 void security_openssl_library();
@@ -63,7 +63,7 @@ void security_wolfssl_library();
 
 void security_start_ssl(int selector);
 void security_clean_ssl();
-int security_process_accept(SSL *ssl,int msg);
+int security_process_accept(SSL *ssl, int msg);
 
 #endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

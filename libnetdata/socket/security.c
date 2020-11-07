@@ -82,7 +82,7 @@ void security_common_options(SSL_CTX *ctx, int side) {
 
 #if defined(OPENSSL_VERSION_NUMBER)
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+        SSL_CTX_set_options (ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #endif
 #endif
     }
@@ -129,7 +129,7 @@ SSL_CTX * security_initialize_openssl_client() {
 #endif
     if(ctx) {
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+        SSL_CTX_set_options (ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
 # if defined(TLS_MAX_VERSION)
@@ -176,22 +176,22 @@ static SSL_CTX * security_initialize_openssl_server() {
 #endif
     security_common_options(ctx, 0);
 
-    SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
 
     if (!SSL_CTX_check_private_key(ctx)) {
-        ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
-		error("SSL cannot check the private key: %s",lerror);
+        ERR_error_string_n(ERR_get_error(), lerror, sizeof(lerror));
+		error("SSL cannot check the private key: %s", lerror);
         SSL_CTX_free(ctx);
         return NULL;
     }
 
-	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
-    SSL_CTX_set_info_callback(ctx,security_info_callback);
+	SSL_CTX_set_session_id_context(ctx, (void*)&netdata_id_context, (unsigned int)sizeof(netdata_id_context));
+    SSL_CTX_set_info_callback(ctx, security_info_callback);
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
-	SSL_CTX_set_verify_depth(ctx,1);
+	SSL_CTX_set_verify_depth(ctx, 1);
 #endif
-    debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
+    debug(D_WEB_CLIENT, "SSL GLOBAL CONTEXT STARTED\n");
 
     return ctx;
 }
@@ -254,19 +254,19 @@ static SSL_CTX * security_initialize_wolfssl_server() {
     SSL_CTX_use_certificate_chain_file(ctx, security_cert);
     security_common_options(ctx, 0);
 
-    SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
 
     if (!SSL_CTX_check_private_key(ctx)) {
-        ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
-		error("SSL cannot check the private key: %s",lerror);
+        ERR_error_string_n(ERR_get_error(), lerror, sizeof(lerror));
+		error("SSL cannot check the private key: %s", lerror);
         SSL_CTX_free(ctx);
         return NULL;
     }
 
-	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
-    SSL_CTX_set_info_callback(ctx,security_info_callback);
+	SSL_CTX_set_session_id_context(ctx, (void*)&netdata_id_context, (unsigned int)sizeof(netdata_id_context));
+    SSL_CTX_set_info_callback(ctx, security_info_callback);
 
-    debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
+    debug(D_WEB_CLIENT, "SSL GLOBAL CONTEXT STARTED\n");
 
     return ctx;
 }
@@ -348,7 +348,6 @@ void security_clean_ssl()
 #endif
 }
 
-
 /**
  * Process accept
  *
@@ -360,7 +359,7 @@ void security_clean_ssl()
  * @return it returns 0 case it performs the handshake, 8 case it is clean connection
  *  and another integer power of 2 otherwise.
  */
-int security_process_accept(SSL *ssl,int msg) {
+int security_process_accept(SSL *ssl, int msg) {
     int sock = SSL_get_fd(ssl);
     int test;
     if (msg > 0x17)
@@ -392,7 +391,8 @@ int security_process_accept(SSL *ssl,int msg) {
                  int counter = 0;
                  while ((err = ERR_get_error()) != 0) {
                      ERR_error_string_n(err, buf, sizeof(buf));
-                     info("%d SSL Handshake error (%s) on socket %d ", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
+                     info("%d SSL Handshake error (%s) on socket %d ",
+                          counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
 			     }
                  return NETDATA_SSL_NO_HANDSHAKE;
 			 }
@@ -401,7 +401,9 @@ int security_process_accept(SSL *ssl,int msg) {
 
     if (SSL_is_init_finished(ssl))
     {
-        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
+        debug(D_WEB_CLIENT_ACCESS,
+              "SSL Handshake finished %s errno %d on socket fd %d",
+              ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
     }
 
     return NETDATA_SSL_HANDSHAKE_COMPLETE;
@@ -418,7 +420,6 @@ int security_process_accept(SSL *ssl,int msg) {
  */
 int security_test_certificate(SSL *ssl) {
     X509* cert = SSL_get_peer_certificate(ssl);
-    int ret;
     long status;
     if (!cert) {
         return -1;
@@ -429,13 +430,12 @@ int security_test_certificate(SSL *ssl) {
     {
         char error[512];
         ERR_error_string_n(ERR_get_error(), error, sizeof(error));
-        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s", status, error);
-        ret = -1;
-    } else {
-        ret = 0;
+        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s",
+              status, error);
+        return -1;
     }
 
-    return ret;
+    return 0;
 }
 
 /**
@@ -453,7 +453,8 @@ int security_test_certificate(SSL *ssl) {
 int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     struct stat statbuf;
     if (stat(file, &statbuf)) {
-        info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
+        info("Netdata does not have the parent's SSL certificate,"
+             "so it will use the default OpenSSL configuration to validate certificates!");
         return 0;
     }
 
@@ -473,9 +474,8 @@ int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
 slfc:
     while ((err = ERR_get_error()) != 0) {
         ERR_error_string_n(err, buf, sizeof(buf));
-        error("Cannot set the directory for the certificates and the parent SSL certificate: %s",buf);
+        error("Cannot set the directory for the certificates and the parent SSL certificate: %s", buf);
     }
     return -1;
 }
-
 #endif
