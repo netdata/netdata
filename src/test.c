@@ -17,6 +17,8 @@
 
 #include "mqtt_wss_client.h"
 
+int test_exit = 0;
+
 void mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 {
     (void)log_type;
@@ -33,14 +35,15 @@ void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
            len);
     cmsg[len] = 0;
 
+    if (!strcmp(cmsg, "shutdown"))
+        test_exit = 1;
+
     printf("Got Message From Broker Topic \"%s\" QOS %d MSG: \"%s\"\n", topic, qos, cmsg);
 }
 
 #define TESTMSG "Hello World!"
 int main()
 {
-    int exit = 0;
-
     mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
     struct mqtt_connect_params params = {
         .clientid = "test",
@@ -59,9 +62,12 @@ int main()
     mqtt_wss_subscribe(client, "test", 1);
     mqtt_wss_publish(client, "test", TESTMSG, strlen(TESTMSG), MQTT_WSS_PUB_QOS1);
 
-    while (!exit) {
+    while (!test_exit) {
         if(mqtt_wss_service(client, -1))
             break;
+    }
+    if (test_exit) {
+        mqtt_wss_disconnect(client, 2000);
     }
 
     return 0;

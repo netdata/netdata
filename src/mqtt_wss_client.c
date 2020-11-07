@@ -82,6 +82,7 @@ struct mqtt_wss_client {
     int mqtt_didnt_finish_write:1;
 
     int mqtt_connected:1;
+    int mqtt_disconnecting:1;
 
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
@@ -337,6 +338,97 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     return 0;
 }
 
+#define NSEC_PER_USEC   1000ULL
+#define USEC_PER_SEC    1000000ULL
+#define NSEC_PER_MSEC   1000000ULL
+#define NSEC_PER_SEC    1000000000ULL
+
+static inline uint64_t boottime_usec(mqtt_wss_client client) {
+    struct timespec ts;
+    if(clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
+        mws_error(client->log, "clock_gettimte failed");
+        return 0;
+    }
+    return (uint64_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
+}
+
+#define MWS_TIMED_OUT 1
+#define MWS_ERROR 2
+#define MWS_OK 0
+static inline const char *mqtt_wss_error_tos(int ec)
+{
+    switch(ec) {
+        case MWS_TIMED_OUT:
+            return "Error: Operation was not able to finish in time";
+        case MWS_ERROR:
+            return "Unspecified Error";
+        default:
+            return "Unknown Error Code!";
+    }
+
+}
+
+static inline int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
+{
+    uint64_t exit_by = boottime_usec(client) + (timeout_ms * NSEC_PER_MSEC);
+    uint64_t now;
+    client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
+    while (rbuf_bytes_available(client->ws_client->buf_write)) {
+        now = boottime_usec(client);
+        if (now >= exit_by)
+            return MWS_TIMED_OUT;
+        if (mqtt_wss_service(client, exit_by - now))
+            return MWS_ERROR;
+    }
+    return MWS_OK;
+}
+
+void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
+{
+    int ret;
+
+    // block application from sending more MQTT messages
+    client->mqtt_disconnecting = 1;
+
+    // send whatever was left at the time of calling this function
+    ret = mqtt_wss_service_all(client, timeout_ms / 4);
+    if(ret)
+        mws_error(client->log,
+                  "Error while trying to send all remaining data in an attempt "
+                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
+                  ret,
+                  mqtt_wss_error_tos(ret));
+
+    // schedule and send MQTT disconnect
+    mqtt_disconnect(client->mqtt_client);
+    mqtt_sync(client->mqtt_client);
+    ret = mqtt_wss_service_all(client, timeout_ms / 4);
+    if(ret)
+        mws_error(client->log,
+                  "Error while trying to send MQTT disconnect message in an attempt "
+                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
+                  ret,
+                  mqtt_wss_error_tos(ret));
+
+    // send WebSockets close message
+    // TODO(prio:low) send reason in the message
+    ws_client_send(client->ws_client, WS_OP_CONNECTION_CLOSE, NULL, 0);
+    ret = mqtt_wss_service_all(client, timeout_ms / 4);
+    if(ret) {
+        // Some MQTT/WSS servers will close socket on receipt of MQTT disconnect and
+        // do not wait for WebSocket to be closed properly
+        mws_warn(client->log,
+                 "Error while trying to send WebSocket disconnect message in an attempt "
+                 "to gracefully disconnect! EC=%d Desc:\"%s\".",
+                 ret,
+                 mqtt_wss_error_tos(ret));
+    }
+
+    // Service WSS connection until remote closes connection (usual)
+    // or timeout happens (unusual) in which case we close
+    while (!mqtt_wss_service(client, timeout_ms / 4));
+}
+
 static inline void mqtt_wss_wakeup(mqtt_wss_client client)
 {
 #ifdef DEBUG_ULTRA_VERBOSE
@@ -558,6 +650,12 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
 int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags)
 {
     uint16_t pid;
+
+    if (client->mqtt_disconnecting) {
+        mws_error(client->log, "mqtt_wss is disconnecting can't publish");
+        return 1;
+    }
+
     return mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, &pid);
 }
 
@@ -567,6 +665,11 @@ int mqtt_wss_subscribe(mqtt_wss_client client, const char *topic, int max_qos_le
 
     if (!client->mqtt_connected) {
         mws_error(client->log, "MQTT is offline. Can't subscribe.");
+        return 1;
+    }
+
+    if (client->mqtt_disconnecting) {
+        mws_error(client->log, "mqtt_wss is disconnecting can't subscribe");
         return 1;
     }
 

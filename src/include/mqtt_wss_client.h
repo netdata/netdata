@@ -47,6 +47,7 @@ struct mqtt_connect_params;
  */
 int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params);
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
+void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
 // we redefine this instead of using MQTT-C flags as in future
 // we want to support different MQTT implementations if needed
