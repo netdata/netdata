@@ -3,6 +3,10 @@
 #ifndef NETDATA_LIB_H
 #define NETDATA_LIB_H 1
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -327,5 +331,9 @@ extern char *netdata_configured_host_prefix;
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif // NETDATA_LIB_H

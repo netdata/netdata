@@ -3,6 +3,10 @@
 #ifndef NETDATA_LOG_H
 #define NETDATA_LOG_H 1
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 #include "../libnetdata.h"
 
 #define D_WEB_BUFFER        0x0000000000000001
@@ -97,5 +101,9 @@ extern void info_int( const char *file, const char *function, const unsigned lon
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
 extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif /* NETDATA_LOG_H */

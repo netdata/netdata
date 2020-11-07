@@ -322,7 +322,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->calculation) {
         rc->calculation->status = &rc->status;
-        rc->calculation->this = &rc->value;
+        rc->calculation->myself = &rc->value;
         rc->calculation->after = &rc->db_after;
         rc->calculation->before = &rc->db_before;
         rc->calculation->rrdcalc = rc;
@@ -330,7 +330,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->warning) {
         rc->warning->status = &rc->status;
-        rc->warning->this = &rc->value;
+        rc->warning->myself = &rc->value;
         rc->warning->after = &rc->db_after;
         rc->warning->before = &rc->db_before;
         rc->warning->rrdcalc = rc;
@@ -338,7 +338,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->critical) {
         rc->critical->status = &rc->status;
-        rc->critical->this = &rc->value;
+        rc->critical->myself = &rc->value;
         rc->critical->after = &rc->db_after;
         rc->critical->before = &rc->db_before;
         rc->critical->rrdcalc = rc;

@@ -80,7 +80,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(unlikely(v->hash == this_hash && !strcmp(v->name, "this"))) {
-        n = (exp->this)?*exp->this:NAN;
+        n = (exp->myself)?*exp->myself:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
