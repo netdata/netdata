@@ -378,6 +378,37 @@ done:
 #endif
 }
 
+#define FIND_UUID_TYPE  "select 1 from host where host_id = @uuid union select 2 from chart where chart_id = @uuid union select 3 from dimension where dim_id = @uuid;"
+
+int find_uuid_type(uuid_t *uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+    int uuid_type = 0;
+
+    rc = sqlite3_prepare_v2(db_meta, FIND_UUID_TYPE, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to bind prepare statement to find UUID type in the database");
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW))
+        uuid_type = sqlite3_column_int(res, 0);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement find dimension uuid, rc = %d", rc);
+
+    return uuid_type;
+
+bind_fail:
+    return 0;
+}
 
 uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 {
@@ -709,6 +740,9 @@ int sql_store_chart(
 
 bind_fail:
     error_report("Failed to bind parameter %d to store chart, rc = %d", param, rc);
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement in chart store function, rc = %d", rc);
     return 1;
 }
 

@@ -43,12 +43,12 @@ struct metalog_statistics {
 struct metalog_instance {
     struct rrdengine_instance *rrdeng_ctx;
     //struct metadata_record_commit_log records_log;
-    struct metadata_logfile_list metadata_logfiles;
+    //struct metadata_logfile_list metadata_logfiles;
     struct parser_user_object *metalog_parser_object;
     //struct logfile_compaction_state compaction_state;
-    unsigned long disk_space;
+    //unsigned long disk_space;
     uint8_t initialized; /* set to 1 to mark context initialized */
-    unsigned last_fileno; /* newest index of metadata log file */
+    //unsigned last_fileno; /* newest index of metadata log file */
 
 //    uint8_t quiesce; /*
 //                      * 0 initial state when all operations function normally

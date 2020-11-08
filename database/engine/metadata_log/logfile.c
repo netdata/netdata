@@ -2,16 +2,16 @@
 #include "metadatalog.h"
 #include "metalogpluginsd.h"
 
-void metadata_logfile_list_insert(struct metadata_logfile_list *metadata_logfiles, struct metadata_logfile *metalogfile)
-{
-    if (likely(NULL != metadata_logfiles->last)) {
-        metadata_logfiles->last->next = metalogfile;
-    }
-    if (unlikely(NULL == metadata_logfiles->first)) {
-        metadata_logfiles->first = metalogfile;
-    }
-    metadata_logfiles->last = metalogfile;
-}
+//void metadata_logfile_list_insert(struct metadata_logfile_list *metadata_logfiles, struct metadata_logfile *metalogfile)
+//{
+//    if (likely(NULL != metadata_logfiles->last)) {
+//        metadata_logfiles->last->next = metalogfile;
+//    }
+//    if (unlikely(NULL == metadata_logfiles->first)) {
+//        metadata_logfiles->first = metalogfile;
+//    }
+//    metadata_logfiles->last = metalogfile;
+//}
 
 void generate_metadata_logfile_path(struct metadata_logfile *metalogfile, char *str, size_t maxlen)
 {
@@ -421,7 +421,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         freez(metalogfiles);
         return UV_EINVAL;
     }
-    ctx->last_fileno = metalogfiles[matched_files - 1]->fileno;
+    //ctx->last_fileno = metalogfiles[matched_files - 1]->fileno;
 
     struct plugind cd = {
         .enabled = 1,
@@ -472,13 +472,19 @@ static int scan_metalog_files(struct metalog_instance *ctx)
         if (0 != ret) {
             error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
                       METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
-            unlink_metadata_logfile(metalogfile);
-            freez(metalogfile);
+            //unlink_metadata_logfile(metalogfile);
+            //freez(metalogfile);
             ++failed_to_load;
-            continue;
+            //continue;
         }
-        metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
-        rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
+        else
+            info("Deleting migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
+                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
+
+        unlink_metadata_logfile(metalogfile);
+        freez(metalogfile);
+        //metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
+        //rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }
     matched_files -= failed_to_load;
     debug(D_METADATALOG, "PARSER ended");
@@ -505,9 +511,9 @@ int init_metalog_files(struct metalog_instance *ctx)
     if (ret < 0) {
         error("Failed to scan path \"%s\".", dbfiles_path);
         return ret;
-    } else if (0 == ret) {
+    }/* else if (0 == ret) {
         ctx->last_fileno = 1;
-    }
+    }*/
 
     return 0;
 }

@@ -61,6 +61,7 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
         type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
         chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries);
+    ((PARSER_USER_OBJECT *)user)->st_exists = 1;
 
     return PARSER_RC_OK;
 }
