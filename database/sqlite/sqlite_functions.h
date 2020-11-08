@@ -46,13 +46,19 @@ extern int sql_store_chart(
 extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
                                collected_number divisor, int algorithm);
 
-// Lookup UUIDs in the database
 extern uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd);
 extern uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd);
 extern void store_active_dimension(uuid_t *dimension_uuid);
-extern uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const char *id, const char *name);
-extern int sql_cache_chart_dimensions(RRDSET *st);
-extern int sql_cache_host_charts(RRDHOST *host);
+
+extern uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name);
+extern uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name);
+extern int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const char *name);
+extern void store_active_chart(uuid_t *dimension_uuid);
+
+extern int find_uuid_type(uuid_t *uuid);
+
+extern int cache_chart_dimensions(RRDSET *st);
+extern int cache_host_charts(RRDHOST *host);
 
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 

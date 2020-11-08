@@ -20,10 +20,12 @@ PARSER_RC metalog_pluginsd_host_action(
                   rrd_memory_mode_name(RRD_MEMORY_MODE_DBENGINE));
             ((PARSER_USER_OBJECT *) user)->host = NULL; /* Ignore objects if memory mode is not dbengine */
         }
+        ((PARSER_USER_OBJECT *) user)->host = host;
         return PARSER_RC_OK;
     }
 
     if (strcmp(machine_guid, registry_get_this_machine_guid()) == 0) {
+        ((PARSER_USER_OBJECT *) user)->host = host;
         return PARSER_RC_OK;
     }
 
@@ -103,7 +105,28 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
     UNUSED(user);
-    UNUSED(uuid);
+    //UNUSED(uuid);
+    struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
+    uuid_copy(state->uuid, *uuid);
+
+    char uuid_str[37];
+
+    int rc = find_uuid_type(uuid);
+
+    if (rc == 1) {
+        uuid_copy(state->host_uuid, *uuid);
+        ((PARSER_USER_OBJECT *)user)->st_exists = 0;
+    }
+    if (rc == 2) {
+        uuid_copy(state->chart_uuid, *uuid);
+        ((PARSER_USER_OBJECT *)user)->st_exists = 1;
+    }
+    if (rc == 3)
+        uuid_copy(state->uuid, *uuid);
+
+    uuid_unparse_lower(*uuid, uuid_str);
+    info("CONTEXT %s  -- maps to type %d", uuid_str, rc);
+
     return PARSER_RC_OK;
 }
 

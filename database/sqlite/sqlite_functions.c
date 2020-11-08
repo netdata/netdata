@@ -86,7 +86,7 @@ static int store_active_uuid_object(sqlite3_stmt **res, char *statement, uuid_t 
  * Marks a chart with UUID as active
  * Input: UUID
  */
-static void store_active_chart(uuid_t *chart_uuid)
+void store_active_chart(uuid_t *chart_uuid)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -95,6 +95,9 @@ static void store_active_chart(uuid_t *chart_uuid)
         error_report("Database has not been initialized");
         return;
     }
+
+    if (unlikely(!chart_uuid))
+        return;
 
     rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_CHART, chart_uuid);
     if (rc != SQLITE_DONE)
@@ -120,9 +123,12 @@ void store_active_dimension(uuid_t *dimension_uuid)
         return;
     }
 
+    if (unlikely(!dimension_uuid))
+        return;
+
     rc = store_active_uuid_object(&res, SQL_STORE_ACTIVE_DIMENSION, dimension_uuid);
     if (rc != SQLITE_DONE)
-        error_report("Failed to store active chart, rc = %d", rc);
+        error_report("Failed to store active dimension, rc = %d", rc);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -295,14 +301,16 @@ uuid_t *find_in_uuid_cache(struct uuid_cache **uuid_cache, const char *type, con
     return uuid;
 }
 
-int sql_cache_host_charts(RRDHOST *host)
+int cache_host_charts(RRDHOST *host)
 {
 #ifdef ENABLE_CACHE_CHARTS
     int rc;
     sqlite3_stmt *res = NULL;
 
-    if (!db_meta)
+    if (!db_meta) {
+        error_report("Database has not been initialized");
         return 0;
+    }
 
     int count = 0;
 
@@ -313,7 +321,7 @@ int sql_cache_host_charts(RRDHOST *host)
             return 0;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         error_report("Failed to bind host_uuid to find host charts");
         goto done;
@@ -335,7 +343,7 @@ done:
 #endif
 }
 
-int sql_cache_chart_dimensions(RRDSET *st)
+int cache_chart_dimensions(RRDSET *st)
 {
 #ifdef ENABLE_CACHE_DIMENSIONS
     sqlite3_stmt *res = NULL;
@@ -356,7 +364,7 @@ int sql_cache_chart_dimensions(RRDSET *st)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         error_report("Failed to bind chart_uuid to find chart dimensions");
         goto done;
@@ -418,44 +426,47 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 
     uuid = find_in_uuid_cache(&st->state->uuid_cache, NULL, rd->id, rd->name);
 
-    if (uuid) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        char  uuid_str[37];
-        uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_SQLITE, "Found UUID %s for dimension %s", uuid_str, rd->name);
-#endif
+    if (uuid)
         goto found;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
+        return NULL;
     }
 
-    if (!res) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
-            return NULL;
-        }
-    }
-
-    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 2, rd->id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 2, rd->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 3, rd->name, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, rd->name, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     rc = sqlite3_step(res);
-
     if (likely(rc == SQLITE_ROW)) {
         uuid = mallocz(sizeof(uuid_t));
         uuid_copy(*uuid, sqlite3_column_blob(res, 0));
     }
-    sqlite3_reset(res);
-    sqlite3_finalize(res);
-found:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement find dimension uuid, rc = %d", rc);
+
+found:;
+#ifdef NETDATA_INTERNAL_CHECKS
+    char  uuid_str[37];
+    if (likely(uuid)) {
+        uuid_unparse_lower(*uuid, uuid_str);
+        debug(D_SQLITE, "Found UUID %s for dimension %s", uuid_str, rd->name);
+    }
+    else
+        debug(D_SQLITE, "UUID not found for dimension %s", rd->name);
+#endif
     return uuid;
 
 bind_fail:
@@ -470,6 +481,13 @@ uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
 
     uuid = mallocz(sizeof(uuid_t));
     uuid_generate(*uuid);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char uuid_str[37];
+    uuid_unparse_lower(*uuid, uuid_str);
+    debug(D_SQLITE,"Generating uuid [%s] for dimension %s under chart %s", uuid_str, rd->name, st->id);
+#endif
+
     rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
     if (unlikely(rc))
        error_report("Failed to store dimension metadata in the database");
@@ -481,7 +499,7 @@ uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
  * Do a database lookup to find the UUID of a chart
  *
  */
-uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const char *id, const char *name)
+uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name)
 {
     sqlite3_stmt *res = NULL;
     uuid_t *uuid = NULL;
@@ -489,74 +507,94 @@ uuid_t *sql_find_chart_uuid(RRDHOST *host, RRDSET *st, const char *type, const c
 
     uuid = find_in_uuid_cache(&host->uuid_cache, type, id, name);
 
-    if (uuid) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        char  uuid_str[37];
-        uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_SQLITE, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
-#endif
+    if (uuid)
         goto found;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to bind prepare statement to lookup chart UUID in the database");
+        return NULL;
     }
 
-    if (!res) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to bind prepare statement to lookup chart UUID in the database");
-            return NULL;
-        }
-    }
-
-//    int dim_id = sqlite3_bind_parameter_index(res, "@host");
-//    int id_id = sqlite3_bind_parameter_index(res, "@id");
-//    int name_id = sqlite3_bind_parameter_index(res, "@name");
-
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 2, type, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 2, type, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 4, name ? name : id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 4, name ? name : id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     rc = sqlite3_step(res);
-
-    uuid = mallocz(sizeof(uuid_t));
-    if (likely(rc == SQLITE_ROW))
+    if (likely(rc == SQLITE_ROW)) {
+        uuid = mallocz(sizeof(uuid_t));
         uuid_copy(*uuid, sqlite3_column_blob(res, 0));
-    else {
-        uuid_generate(*uuid);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        char uuid_str[37];
-        uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_SQLITE,"Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, host->hostname);
-#endif
-        rc = sql_store_chart(
-            uuid, &host->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units, st->plugin_name,
-            st->module_name, st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
-
-        if (unlikely(rc)) {
-            error_report("Failed to store chart metadata in the database");
-        }
     }
-    sqlite3_reset(res);
-    sqlite3_finalize(res);
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when searching for a chart UUID, rc = %d", rc);
 
-found:
-    store_active_chart(uuid);
+found:;
+#ifdef NETDATA_INTERNAL_CHECKS
+    char  uuid_str[37];
+    if (likely(uuid)) {
+        uuid_unparse_lower(*uuid, uuid_str);
+        debug(D_SQLITE, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
+    }
+    else
+        debug(D_SQLITE, "UUID not found for chart %s.%s", type, name ? name : id);
+#endif
     return uuid;
 
 bind_fail:
     error_report("Failed to bind input parameter to perform chart UUID database lookup, rc = %d", rc);
     return NULL;
+}
+
+int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const char *name)
+{
+    int rc;
+
+
+    char c_str[37], h_str[37];
+
+    uuid_unparse_lower(*chart_uuid, c_str);
+    uuid_unparse_lower(st->rrdhost->host_uuid, h_str);
+
+    rc = sql_store_chart(
+        chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units, st->plugin_name,
+        st->module_name, st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
+
+    return rc;
+}
+
+uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
+{
+    uuid_t *uuid = NULL;
+    int rc;
+
+    uuid = mallocz(sizeof(uuid_t));
+    uuid_generate(*uuid);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char uuid_str[37];
+    uuid_unparse_lower(*uuid, uuid_str);
+    debug(D_SQLITE,"Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, st->rrdhost->hostname);
+#endif
+
+    rc = update_chart_metadata(uuid, st, id, name);
+
+    if (unlikely(rc))
+        error_report("Failed to store chart metadata in the database");
+
+    return uuid;
 }
 
 // Functions to create host, chart, dimension in the database
@@ -565,7 +603,7 @@ int sql_store_host(
     uuid_t *host_uuid, const char *hostname, const char *registry_hostname, int update_every, const char *os,
     const char *tzone, const char *tags)
 {
-    sqlite3_stmt *res;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -579,15 +617,15 @@ int sql_store_host(
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 2, hostname, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 2, hostname, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 3, registry_hostname, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, registry_hostname, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -595,29 +633,29 @@ int sql_store_host(
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 5, os, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 5, os, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 6, tzone, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 6, tzone, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 7, tags, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_step(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    int store_rc = sqlite3_step(res);
+    if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host %s, rc = %d", hostname, rc);
-    }
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to finalize statement to store host %s, rc = %d", hostname, rc);
+        rc = 0; // This is not fatal worse case memory leak
     }
-    return 0;
 
+    return !(store_rc == SQLITE_DONE);
 bind_fail:
     error_report("Failed to bind parameter to store host %s, rc = %d", hostname, rc);
     return 1;
@@ -647,59 +685,59 @@ int sql_store_chart(
     }
 
     param++;
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_blob(res, 2, host_uuid, sizeof(*host_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res, 2, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 3, type, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 3, type, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 4, id, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 4, id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
     if (name) {
-        rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_TRANSIENT);
+        rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
     }
 
     param++;
-    rc = sqlite3_bind_text(res, 6, family, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 6, family, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 7, context, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 7, context, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 8, title, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 8, title, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 9, units, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 9, units, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 10, plugin, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 10, plugin, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_text(res, 11, module, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(res, 11, module, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -860,7 +898,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         return;
     }
 
-    rc = sqlite3_bind_blob(res_chart, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_TRANSIENT);
+    rc = sqlite3_bind_blob(res_chart, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
         return;

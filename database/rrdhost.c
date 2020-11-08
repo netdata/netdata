@@ -320,17 +320,14 @@ RRDHOST *rrdhost_create(const char *hostname,
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-            (void) sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
-            sql_cache_host_charts(host);
+            int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+            if (unlikely(!rc))
+                error_report("Failed to store machine GUID to the database");
+            else
+                cache_host_charts(host);
         }
-        else {
-            errno = 0;
-            error("Host machine GUID %s is not valid", host->machine_guid);
-        }
-        //if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
-        //    error("Failed to store machine GUID to global map");
-        //else
-        //    info("Added %s to global map for host %s", host->machine_guid, host->hostname);
+        else
+            error_report("Host machine GUID %s is not valid", host->machine_guid);
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;

@@ -658,13 +658,16 @@ RRDSET *rrdset_create_custom(
                 sched_yield();
             }
         }
-//#ifdef ENABLE_DBENGINE
-//        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-//            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
-//            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
-//            metalog_commit_update_chart(st);
-//        }
-//#endif
+#ifdef ENABLE_DBENGINE
+        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
+            debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
+            int rc = update_chart_metadata(st->chart_uuid, st, id, name);
+            if (unlikely(rc))
+                error_report("Failed to update chart metadata in the database");
+            //metalog_commit_update_chart(st);
+        }
+#endif
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active)
             return st;
@@ -929,28 +932,12 @@ RRDSET *rrdset_create_custom(
     rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        //        int replace_instead_of_generate = 0;
+        st->chart_uuid = find_chart_uuid(host, type, id, name);
+        if (unlikely(!st->chart_uuid))
+            st->chart_uuid = create_chart_uuid(st, id, name);
 
-        st->chart_uuid = sql_find_chart_uuid(host, st, type, id, name);
-        if (unlikely(!st->chart_uuid)) {
-            errno = 0;
-            error("FAILED to generate GUID for %s", st->id);
-            fatal_assert(0);
-        }
-//        st->chart_uuid = callocz(1, sizeof(uuid_t));
-//        if (NULL != chart_uuid) {
-//            replace_instead_of_generate = 1;
-//            uuid_copy(*st->chart_uuid, *chart_uuid);
-//        }
-//        if (unlikely(
-//                find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART, replace_instead_of_generate))) {
-//            errno = 0;
-//            error("FAILED to generate GUID for %s", st->id);
-//            freez(st->chart_uuid);
-//            st->chart_uuid = NULL;
-//            fatal_assert(0);
-//        }
-        sql_cache_chart_dimensions(st);
+        store_active_chart(st->chart_uuid);
+        cache_chart_dimensions(st);
         st->compaction_id = 0;
     }
 #endif
