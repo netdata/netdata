@@ -34,6 +34,7 @@
 #ifdef  NETDATA_HTTPS_WITH_WOLFSSL
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
+#include <wolfssl/openssl/ssl.h>
 #endif
 
 struct netdata_ssl{
@@ -53,7 +54,6 @@ extern int security_location_for_context(SSL_CTX *ctx, char *file, char *path);
 
 #ifdef NETDATA_HTTPS_WITH_OPENSSL
 void security_openssl_library();
-int security_test_certificate(SSL *ssl);
 SSL_CTX * security_initialize_openssl_client();
 #endif
 
@@ -64,6 +64,7 @@ void security_wolfssl_library();
 void security_start_ssl(int selector);
 void security_clean_ssl();
 int security_process_accept(SSL *ssl, int msg);
+int security_test_certificate(SSL *ssl);
 
 #endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

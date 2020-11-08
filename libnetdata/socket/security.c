@@ -23,9 +23,39 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     UNUSED(ssl);
     if (where & SSL_CB_ALERT) {
-        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
+        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s", SSL_alert_desc_string_long(ret));
     }
 }
+
+/**
+ * Test Certificate
+ *
+ * Check the certificate of Netdata parent
+ *
+ * @param ssl is the connection structure
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int security_test_certificate(SSL *ssl) {
+    X509* cert = SSL_get_peer_certificate(ssl);
+    long status;
+    if (!cert) {
+        return -1;
+    }
+
+    status = SSL_get_verify_result(ssl);
+    if((X509_V_OK != status))
+    {
+        char error[512];
+        ERR_error_string_n(ERR_get_error(), error, sizeof(error));
+        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s",
+              status, error);
+        return -1;
+    }
+
+    return 0;
+}
+
 
 #if defined(OPENSSL_VERSION_110) || defined(NETDATA_HTTPS_WITH_WOLFSSL)
 /**
@@ -312,7 +342,12 @@ void security_start_ssl(int selector) {
             break;
         }
         case NETDATA_SSL_CONTEXT_EXPORTING: {
+#ifdef NETDATA_HTTPS_WITH_OPENSSL
             netdata_exporting_ctx = security_initialize_openssl_client();
+#endif
+#ifdef NETDATA_HTTPS_WITH_WOLFSSL
+            netdata_client_ctx = security_initialize_wolfssl_client();
+#endif
             break;
         }
     }
@@ -407,35 +442,6 @@ int security_process_accept(SSL *ssl, int msg) {
     }
 
     return NETDATA_SSL_HANDSHAKE_COMPLETE;
-}
-
-/**
- * Test Certificate
- *
- * Check the certificate of Netdata parent
- *
- * @param ssl is the connection structure
- *
- * @return It returns 0 on success and -1 otherwise
- */
-int security_test_certificate(SSL *ssl) {
-    X509* cert = SSL_get_peer_certificate(ssl);
-    long status;
-    if (!cert) {
-        return -1;
-    }
-
-    status = SSL_get_verify_result(ssl);
-    if((X509_V_OK != status))
-    {
-        char error[512];
-        ERR_error_string_n(ERR_get_error(), error, sizeof(error));
-        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s",
-              status, error);
-        return -1;
-    }
-
-    return 0;
 }
 
 /**
