@@ -262,6 +262,9 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     if (client->ssl_ctx)
         SSL_CTX_free(client->ssl_ctx);
 
+    if (client->sockfd > 0)
+        close(client->sockfd);
+
     mqtt_wss_log_ctx_destroy(client->log);
     free(client);
 }
@@ -281,6 +284,10 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         return -1;
     }
 
+    // reset state in case this is reconnect
+    client->mqtt_didnt_finish_write = 0;
+    client->mqtt_connected = 0;
+    client->mqtt_disconnecting = 0;
     ws_client_reset(client->ws_client);
 
     if(client->host)
@@ -303,6 +310,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     mws_debug(client->log, "Resolved IP: %s", inet_ntoa(*addr_list[0]));
     addr.sin_addr = *addr_list[0];
 
+    if (client->sockfd > 0)
+        close(client->sockfd);
     client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (client->sockfd < 0) {
         mws_error(client->log, "Couldn't create socket()");
@@ -328,6 +337,12 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK);
 
     OPENSSL_init_ssl(0, 0);
+
+    // free SSL structs from possible previous connections
+    if (client->ssl)
+        SSL_free(client->ssl);
+    if (client->ssl_ctx)
+        SSL_CTX_free(client->ssl_ctx);
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
     client->ssl = SSL_new(client->ssl_ctx);
@@ -454,6 +469,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     // Service WSS connection until remote closes connection (usual)
     // or timeout happens (unusual) in which case we close
     while (!mqtt_wss_service(client, timeout_ms / 4));
+    close(client->sockfd);
+    client->sockfd = -1;
 }
 
 static inline void mqtt_wss_wakeup(mqtt_wss_client client)
