@@ -199,6 +199,7 @@ function k8s_get_kubepod_name() {
   jq_filter+='pod_name=\"\(.metadata.name)\",'
   jq_filter+='pod_uid=\"\(.metadata.uid)\",'
   jq_filter+='\(.metadata.labels | to_entries | map("pod_label_"+.key+"=\""+.value+"\"") | join(",") | if length > 0 then .+"," else . end)'
+  jq_filter+='\((.metadata.ownerReferences[]? | select(.controller==true) | "controller_kind=\""+.kind+"\",controller_name=\""+.name+"\",") // "")'
   jq_filter+='node_name=\"\(.spec.nodeName)\",'
   jq_filter+='" + '
   jq_filter+='(.status.containerStatuses[]? | "'
@@ -227,7 +228,7 @@ function k8s_get_kubepod_name() {
     fi
   elif [ -n "$pod_uid" ]; then
     if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
-      labels="${labels%%,cont*}"
+      labels="${labels%%,container_*}"
       labels+=',kind="pod"'
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
