@@ -98,9 +98,9 @@ void ws_client_destroy(ws_client *client)
     free(client->hs.nonce_reply);
     free(client->hs.http_reply_msg);
     close(client->entropy_fd);
-    rbuf_free(client->buf_write);
     rbuf_free(client->buf_read);
-    free(client->host);
+    rbuf_free(client->buf_write);
+    rbuf_free(client->buf_to_mqtt);
     free(client);
 }
 

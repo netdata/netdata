@@ -37,6 +37,8 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos),
                              void (*puback_callback)(uint16_t packet_id));
 
+void mqtt_wss_destroy(mqtt_wss_client client);
+
 struct mqtt_connect_params;
 
 /* Will block until the MQTT over WSS connection is established or return error

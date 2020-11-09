@@ -241,6 +241,18 @@ fail:
     return NULL;
 }
 
+void mqtt_wss_destroy(mqtt_wss_client client)
+{
+    free(client->mqtt_recv_buf);
+    free(client->mqtt_send_buf);
+    free(client->mqtt_client);
+    close(client->write_notif_pipe[PIPE_WRITE_END]);
+    close(client->write_notif_pipe[PIPE_READ_END]);
+    ws_client_destroy(client->ws_client);
+    mqtt_wss_log_ctx_destroy(client->log);
+    free(client);
+}
+
 int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params)
 {
     struct sockaddr_in addr;

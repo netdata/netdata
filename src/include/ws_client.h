@@ -98,6 +98,7 @@ typedef struct websocket_client {
 
     int entropy_fd;
 
+    // careful host is borrowed, don't free
     char **host;
     mqtt_wss_log_ctx_t log;
 } ws_client;

@@ -70,5 +70,6 @@ int main()
         mqtt_wss_disconnect(client, 2000);
     }
 
+    mqtt_wss_destroy(client);
     return 0;
 }
