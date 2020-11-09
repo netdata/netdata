@@ -17,63 +17,63 @@ export LC_ALL=C
 PROGRAM_NAME="$(basename "${0}")"
 
 logdate() {
-	date "+%Y-%m-%d %H:%M:%S"
+  date "+%Y-%m-%d %H:%M:%S"
 }
 
 log() {
-	local status="${1}"
-	shift
+  local status="${1}"
+  shift
 
-	echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+  echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
 
 }
 
 warning() {
-	log WARNING "${@}"
+  log WARNING "${@}"
 }
 
 error() {
-	log ERROR "${@}"
+  log ERROR "${@}"
 }
 
 info() {
-	log INFO "${@}"
+  log INFO "${@}"
 }
 
 fatal() {
-	log FATAL "${@}"
-	exit 1
+  log FATAL "${@}"
+  exit 1
 }
 
 function docker_like_get_name_command() {
-	local command="${1}"
-	local id="${2}"
-	info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
-	NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
-	return 0
+  local command="${1}"
+  local id="${2}"
+  info "Running command: ${command} ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
+  NAME="$(${command} ps --filter=id="${id}" --format="{{.Names}}")"
+  return 0
 }
 
 function docker_like_get_name_api() {
-	local host_var="${1}"
-	local host="${!host_var}"
-	local path="/containers/${2}/json"
-	if [ -z "${host}" ]; then
-		warning "No ${host_var} is set"
-		return 1
-	fi
-	if ! command -v jq >/dev/null 2>&1; then
-		warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
-		return 1
-	fi
-	if [ -S "${host}" ]; then
-		info "Running API command: curl --unix-socket \"${host}\" http://localhost${path}"
-		JSON=$(curl -sS --unix-socket "${host}" "http://localhost${path}")
-	else
-		info "Running API command: curl \"${host}${path}\""
-		JSON=$(curl -sS "${host}${path}")
-	fi
-	NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
-	return 0
+  local host_var="${1}"
+  local host="${!host_var}"
+  local path="/containers/${2}/json"
+  if [ -z "${host}" ]; then
+    warning "No ${host_var} is set"
+    return 1
+  fi
+  if ! command -v jq > /dev/null 2>&1; then
+    warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
+    return 1
+  fi
+  if [ -S "${host}" ]; then
+    info "Running API command: curl --unix-socket \"${host}\" http://localhost${path}"
+    JSON=$(curl -sS --unix-socket "${host}" "http://localhost${path}")
+  else
+    info "Running API command: curl \"${host}${path}\""
+    JSON=$(curl -sS "${host}${path}")
+  fi
+  NAME=$(echo "${JSON}" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
+  return 0
 }
 
 # get_lbl_val returns the value for the label with the given name.
@@ -272,53 +272,53 @@ function k8s_get_name() {
 }
 
 function docker_get_name() {
-	local id="${1}"
-	if hash docker 2>/dev/null; then
-		docker_like_get_name_command docker "${id}"
-	else
-		docker_like_get_name_api DOCKER_HOST "${id}" || docker_like_get_name_command podman "${id}"
-	fi
-	if [ -z "${NAME}" ]; then
-		warning "cannot find the name of docker container '${id}'"
-		NAME_NOT_FOUND=2
-		NAME="${id:0:12}"
-	else
-		info "docker container '${id}' is named '${NAME}'"
-	fi
+  local id="${1}"
+  if hash docker 2> /dev/null; then
+    docker_like_get_name_command docker "${id}"
+  else
+    docker_like_get_name_api DOCKER_HOST "${id}" || docker_like_get_name_command podman "${id}"
+  fi
+  if [ -z "${NAME}" ]; then
+    warning "cannot find the name of docker container '${id}'"
+    NAME_NOT_FOUND=2
+    NAME="${id:0:12}"
+  else
+    info "docker container '${id}' is named '${NAME}'"
+  fi
 }
 
 function docker_validate_id() {
-	local id="${1}"
-	if [ -n "${id}" ] && { [ ${#id} -eq 64 ] || [ ${#id} -eq 12 ]; }; then
-		docker_get_name "${id}"
-	else
-		error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
-	fi
+  local id="${1}"
+  if [ -n "${id}" ] && { [ ${#id} -eq 64 ] || [ ${#id} -eq 12 ]; }; then
+    docker_get_name "${id}"
+  else
+    error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
+  fi
 }
 
 function podman_get_name() {
-	local id="${1}"
+  local id="${1}"
 
-	# for Podman, prefer using the API if we can, as netdata will not normally have access
-	# to other users' containers, so they will not be visible when running `podman ps`
-	docker_like_get_name_api PODMAN_HOST "${id}" || docker_like_get_name_command podman "${id}"
+  # for Podman, prefer using the API if we can, as netdata will not normally have access
+  # to other users' containers, so they will not be visible when running `podman ps`
+  docker_like_get_name_api PODMAN_HOST "${id}" || docker_like_get_name_command podman "${id}"
 
-	if [ -z "${NAME}" ]; then
-		warning "cannot find the name of podman container '${id}'"
-		NAME_NOT_FOUND=2
-		NAME="${id:0:12}"
-	else
-		info "podman container '${id}' is named '${NAME}'"
-	fi
+  if [ -z "${NAME}" ]; then
+    warning "cannot find the name of podman container '${id}'"
+    NAME_NOT_FOUND=2
+    NAME="${id:0:12}"
+  else
+    info "podman container '${id}' is named '${NAME}'"
+  fi
 }
 
 function podman_validate_id() {
-	local id="${1}"
-	if [ -n "${id}" ] && [ ${#id} -eq 64 ]; then
-		podman_get_name "${id}"
-	else
-		error "a podman id cannot be extracted from docker cgroup '${CGROUP}'."
-	fi
+  local id="${1}"
+  if [ -n "${id}" ] && [ ${#id} -eq 64 ]; then
+    podman_get_name "${id}"
+  else
+    error "a podman id cannot be extracted from docker cgroup '${CGROUP}'."
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -335,86 +335,85 @@ NAME=
 # -----------------------------------------------------------------------------
 
 if [ -z "${CGROUP}" ]; then
-	fatal "called without a cgroup name. Nothing to do."
+  fatal "called without a cgroup name. Nothing to do."
 fi
 
 for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_CONFIG_DIR}/cgroups-names.conf"; do
-	if [ -f "${CONFIG}" ]; then
-		NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed 's/[[:space:]]\+/ /g' | cut -d ' ' -f 2)"
-		if [ -z "${NAME}" ]; then
-			info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
-		else
-			break
-		fi
-	#else
-	#   info "configuration file '${CONFIG}' is not available."
-	fi
+  if [ -f "${CONFIG}" ]; then
+    NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed 's/[[:space:]]\+/ /g' | cut -d ' ' -f 2)"
+    if [ -z "${NAME}" ]; then
+      info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
+    else
+      break
+    fi
+  #else
+  #   info "configuration file '${CONFIG}' is not available."
+  fi
 done
 
 if [ -z "${NAME}" ]; then
-	if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
-		k8s_get_name "${CGROUP}"
-	fi
+  if [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
+    k8s_get_name "${CGROUP}"
+  fi
 fi
 
 if [ -z "${NAME}" ]; then
-	if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
-		# docker containers
-		#shellcheck disable=SC1117
-		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
-		docker_validate_id "${DOCKERID}"
-	elif [[ ${CGROUP} =~ ^.*ecs[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
-		# ECS
-		#shellcheck disable=SC1117
-		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
-		docker_validate_id "${DOCKERID}"
-	elif [[ ${CGROUP} =~ ^.*libpod-[a-fA-F0-9]+.*$ ]]; then
-		# Podman
-		PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\([a-fA-F0-9]\+\).*$|\1|")"
-		podman_validate_id "${PODMANID}"
+  if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
+    # docker containers
+    #shellcheck disable=SC1117
+    DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
+    docker_validate_id "${DOCKERID}"
+  elif [[ ${CGROUP} =~ ^.*ecs[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
+    # ECS
+    #shellcheck disable=SC1117
+    DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
+    docker_validate_id "${DOCKERID}"
+  elif [[ ${CGROUP} =~ ^.*libpod-[a-fA-F0-9]+.*$ ]]; then
+    # Podman
+    PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\([a-fA-F0-9]\+\).*$|\1|")"
+    podman_validate_id "${PODMANID}"
 
-	elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
-		# systemd-nspawn
-		NAME="$(echo "${CGROUP}" | sed 's/.*machine.slice[_\/]\(.*\)\.service/\1/g')"
+  elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
+    # systemd-nspawn
+    NAME="$(echo "${CGROUP}" | sed 's/.*machine.slice[_\/]\(.*\)\.service/\1/g')"
 
-	elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
-		# libvirtd / qemu virtual machines
-		# NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
-		NAME="qemu_$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-qemu//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+  elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
+    # libvirtd / qemu virtual machines
+    # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+    NAME="qemu_$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-qemu//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
 
-	elif [[ ${CGROUP} =~ machine_.*\.libvirt-qemu ]]; then
-		# libvirtd / qemu virtual machines
-		NAME="qemu_$(echo "${CGROUP}" | sed 's/^machine_//; s/\.libvirt-qemu$//; s/-/_/;')"
+  elif [[ ${CGROUP} =~ machine_.*\.libvirt-qemu ]]; then
+    # libvirtd / qemu virtual machines
+    NAME="qemu_$(echo "${CGROUP}" | sed 's/^machine_//; s/\.libvirt-qemu$//; s/-/_/;')"
 
-	elif [[ ${CGROUP} =~ qemu.slice_([0-9]+).scope && -d /etc/pve ]]; then
-		# Proxmox VMs
+  elif [[ ${CGROUP} =~ qemu.slice_([0-9]+).scope && -d /etc/pve ]]; then
+    # Proxmox VMs
 
-		FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
-		if [[ -f $FILENAME && -r $FILENAME ]]; then
-			NAME="qemu_$(grep -e '^name: ' "/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
-		else
-			error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
-		fi
-	elif [[ ${CGROUP} =~ lxc_([0-9]+) && -d /etc/pve ]]; then
-		# Proxmox Containers (LXC)
+    FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
+    if [[ -f $FILENAME && -r $FILENAME ]]; then
+      NAME="qemu_$(grep -e '^name: ' "/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
+    else
+      error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+    fi
+  elif [[ ${CGROUP} =~ lxc_([0-9]+) && -d /etc/pve ]]; then
+    # Proxmox Containers (LXC)
 
-		FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
-		if [[ -f ${FILENAME} && -r ${FILENAME} ]]; then
-			NAME=$(grep -e '^hostname: ' "/etc/pve/lxc/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
-		else
-			error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
-		fi
-	elif [[ ${CGROUP} =~ lxc.payload.* ]]; then
-		# LXC 4.0
-		NAME="$(echo "${CGROUP}" | sed 's/lxc\.payload\.\(.*\)/\1/g')"
-	fi
+    FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
+    if [[ -f ${FILENAME} && -r ${FILENAME} ]]; then
+      NAME=$(grep -e '^hostname: ' "/etc/pve/lxc/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
+    else
+      error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+    fi
+  elif [[ ${CGROUP} =~ lxc.payload.* ]]; then
+    # LXC 4.0
+    NAME="$(echo "${CGROUP}" | sed 's/lxc\.payload\.\(.*\)/\1/g')"
+  fi
 
-	[ -z "${NAME}" ] && NAME="${CGROUP}"
-	[ ${#NAME} -gt 100 ] && NAME="${NAME:0:100}"
+  [ -z "${NAME}" ] && NAME="${CGROUP}"
+  [ ${#NAME} -gt 100 ] && NAME="${NAME:0:100}"
 fi
 
 info "cgroup '${CGROUP}' is called '${NAME}'"
 echo "${NAME}"
 
 exit ${NAME_NOT_FOUND}
-
