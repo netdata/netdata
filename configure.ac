@@ -537,7 +537,6 @@ fi
 if test "${enable_wolfssl}" = "yes" -a "${WOLFSSL_LIBS}"; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
-    AC_DEFINE([USE_WOLFSSL], [1], [compatibility with libwebsockets])
     AC_DEFINE([NETDATA_HTTPS_WITH_WOLFSSL], [1], [netdata is compiled against WolfSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"

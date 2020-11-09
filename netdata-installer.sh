@@ -343,6 +343,7 @@ while [ -n "${1}" ]; do
       NETDATA_BUILD_JUDY=1
       ;;
     "--use-wolfssl")
+      NETDATA_USE_WOLFSSL=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-wolfssl/} --enable-wolfssl"
       ;;
     "--install")
@@ -616,10 +617,14 @@ bundle_libmosquitto
 # -----------------------------------------------------------------------------
 
 build_libwebsockets() {
-  local env_cmd=''
+  local env_cmd='' wolfssl_opt=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+  fi
+
+  if [ ! -z ${NETDATA_USE_WOLFSSL} ]; then
+    wolfssl_opt='-DLWS_WITH_WOLFSSL=1 -DLWS_WOLFSSL_LIBRARIES=/usr/lib64/libwolfssl.a -DLWS_WOLFSSL_INCLUDE_DIRS=/usr/include/'
   fi
 
   pushd "${1}" > /dev/null || exit 1
@@ -627,11 +632,11 @@ build_libwebsockets() {
     run ${env_cmd} cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-      -D LWS_WITH_SOCKS5:bool=ON \
+      -D LWS_WITH_SOCKS5:bool=ON ${wolfssl_opt} \
       $CMAKE_FLAGS \
       .
   else
-    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON $CMAKE_FLAGS .
+    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON ${wolfssl_opt} $CMAKE_FLAGS .
   fi
   run ${env_cmd} make
   popd > /dev/null || exit 1
