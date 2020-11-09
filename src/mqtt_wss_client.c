@@ -246,9 +246,22 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     free(client->mqtt_recv_buf);
     free(client->mqtt_send_buf);
     free(client->mqtt_client);
+
     close(client->write_notif_pipe[PIPE_WRITE_END]);
     close(client->write_notif_pipe[PIPE_READ_END]);
+
     ws_client_destroy(client->ws_client);
+
+    // deleted after client->ws_client
+    // as it "borrows" this pointer and might use it
+    free(client->host);
+
+    if (client->ssl)
+        SSL_free(client->ssl);
+    
+    if (client->ssl_ctx)
+        SSL_CTX_free(client->ssl_ctx);
+
     mqtt_wss_log_ctx_destroy(client->log);
     free(client);
 }
