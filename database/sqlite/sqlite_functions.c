@@ -555,6 +555,9 @@ found:;
 
 bind_fail:
     error_report("Failed to bind input parameter to perform chart UUID database lookup, rc = %d", rc);
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when searching for a chart UUID, rc = %d", rc);
     return NULL;
 }
 
@@ -658,6 +661,9 @@ int sql_store_host(
     return !(store_rc == SQLITE_DONE);
 bind_fail:
     error_report("Failed to bind parameter to store host %s, rc = %d", hostname, rc);
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to store host %s, rc = %d", hostname, rc);
     return 1;
 }
 
@@ -844,6 +850,9 @@ int sql_store_dimension(
 
 bind_fail:
     error_report("Failed to bind parameter to store dimension, rc = %d", rc);
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement in store dimension, rc = %d", rc);
     return 1;
 }
 
