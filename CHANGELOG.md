@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix repeated frontmatter in exporting docs [\#10211](https://github.com/netdata/netdata/pull/10211) ([joelhans](https://github.com/joelhans))
 - Inform users about an issue with the newest gRPC versions [\#10194](https://github.com/netdata/netdata/pull/10194) ([vlvkobal](https://github.com/vlvkobal))
 - fix: make comma optional when parsing ipsec trafficstatus [\#10190](https://github.com/netdata/netdata/pull/10190) ([wash2](https://github.com/wash2))
 - Page duty V2 [\#10189](https://github.com/netdata/netdata/pull/10189) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -236,7 +237,6 @@
 - Stop mdstat collector from looking up archived charts. [\#9583](https://github.com/netdata/netdata/pull/9583) ([mfundul](https://github.com/mfundul))
 - Fixes mempcpy-\>memcpy [\#9575](https://github.com/netdata/netdata/pull/9575) ([underhood](https://github.com/underhood))
 - Sends netdata.public.unique.id \(machine GUID\) with claim [\#9574](https://github.com/netdata/netdata/pull/9574) ([underhood](https://github.com/underhood))
-- Added libbpf patch to make dist. [\#9571](https://github.com/netdata/netdata/pull/9571) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
