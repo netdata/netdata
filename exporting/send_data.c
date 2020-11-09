@@ -253,9 +253,6 @@ void simple_connector_worker(void *instance_p)
                                .tv_usec = (instance->config.timeoutms * 1000) % 1000000 };
     int failures = 0;
 
-    BUFFER *spare_header = buffer_create(0);
-    BUFFER *spare_buffer = buffer_create(0);
-
     while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
         int send_stats = 0;
@@ -279,32 +276,28 @@ void simple_connector_worker(void *instance_p)
         // ------------------------------------------------------------------------
         // detach buffer
 
-        BUFFER *header;
-        BUFFER *buffer;
         size_t buffered_metrics;
 
         if (!connector_specific_data->previous_buffer ||
             (connector_specific_data->previous_buffer == connector_specific_data->first_buffer &&
              connector_specific_data->first_buffer->used == 1)) {
-            connector_specific_data->header = connector_specific_data->first_buffer->header;
-            connector_specific_data->buffer = connector_specific_data->first_buffer->buffer;
+            BUFFER *header, *buffer;
+
+            header = connector_specific_data->first_buffer->header;
+            buffer = connector_specific_data->first_buffer->buffer;
             connector_specific_data->buffered_metrics = connector_specific_data->first_buffer->buffered_metrics;
             connector_specific_data->buffered_bytes = connector_specific_data->first_buffer->buffered_bytes;
 
-            header = connector_specific_data->header;
-            buffer = connector_specific_data->buffer;
             buffered_metrics = connector_specific_data->buffered_metrics;
 
-            buffer_flush(spare_header);
-            connector_specific_data->first_buffer->header = spare_header;
-            spare_header = header;
+            buffer_flush(connector_specific_data->header);
+            connector_specific_data->first_buffer->header = connector_specific_data->header;
+            connector_specific_data->header = header;
 
-            buffer_flush(spare_buffer);
-            connector_specific_data->first_buffer->buffer = spare_buffer;
-            spare_buffer = buffer;
+            buffer_flush(connector_specific_data->buffer);
+            connector_specific_data->first_buffer->buffer = connector_specific_data->buffer;
+            connector_specific_data->buffer = buffer;
         } else {
-            header = connector_specific_data->header;
-            buffer = connector_specific_data->buffer;
             buffered_metrics = connector_specific_data->buffered_metrics;
         }
 
@@ -385,7 +378,13 @@ void simple_connector_worker(void *instance_p)
         failures = 0;
 
         if (likely(sock != -1)) {
-            simple_connector_send_buffer(&sock, &failures, instance, header, buffer, buffered_metrics);
+            simple_connector_send_buffer(
+                &sock,
+                &failures,
+                instance,
+                connector_specific_data->header,
+                connector_specific_data->buffer,
+                buffered_metrics);
         } else {
             error("EXPORTING: failed to update '%s'", instance->config.destination);
             stats->transmission_failures++;
