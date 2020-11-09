@@ -42,9 +42,8 @@ void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 }
 
 #define TESTMSG "Hello World!"
-int main()
+int client_handle(mqtt_wss_client client)
 {
-    mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
     struct mqtt_connect_params params = {
         .clientid = "test",
         .username = "anon",
@@ -63,8 +62,17 @@ int main()
     mqtt_wss_publish(client, "test", TESTMSG, strlen(TESTMSG), MQTT_WSS_PUB_QOS1);
 
     while (!test_exit) {
-        if(mqtt_wss_service(client, -1))
-            break;
+        if(mqtt_wss_service(client, -1) < 0)
+            return 1;
+    }
+    return 0;
+}
+
+int main()
+{
+    mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
+    while (!test_exit) {
+        printf("client_handle = %d", client_handle(client));
     }
     if (test_exit) {
         mqtt_wss_disconnect(client, 2000);

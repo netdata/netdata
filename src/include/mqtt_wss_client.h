@@ -18,6 +18,19 @@
 #include <stdint.h>
 #include <stddef.h> //size_t
 
+// All OK call me at your earliest convinience
+#define MQTT_WSS_OK              0
+/* All OK, poll timeout you requested when calling mqtt_wss_service expired - you might want to know if timeout
+ * happened or we got some data or handle same as MQTT_WSS_OK
+ */
+#define MQTT_WSS_OK_TO           1
+// Connection was closed by remote
+#define MQTT_WSS_ERR_CONN_DROP  -1
+// Error in MQTT protocol (e.g. malformed packet)
+#define MQTT_WSS_ERR_PROTO_MQTT -2
+// Error in WebSocket protocol (e.g. malformed packet)
+#define MQTT_WSS_ERR_PROTO_WS   -3
+
 typedef struct mqtt_wss_client *mqtt_wss_client;
 
 /* Creates new instance of MQTT over WSS. Doesn't start connection.

@@ -561,14 +561,16 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             mws_debug(client->log, "Read Err: %s", util_openssl_ret_err(ret));
 #endif
             set_socket_pollfds(client, ret);
-            if (ret == SSL_ERROR_ZERO_RETURN)
-                return -1;
+            if (ret != SSL_ERROR_WANT_READ &&
+                ret != SSL_ERROR_WANT_WRITE) {
+                return MQTT_WSS_ERR_CONN_DROP;
+            }
         }
     }
 
     ret = ws_client_process(client->ws_client);
     if (ret == WS_CLIENT_PROTOCOL_ERROR)
-        return 1;
+        return MQTT_WSS_ERR_PROTO_WS;
     if (ret == WS_CLIENT_NEED_MORE_BYTES) {
 #ifdef DEBUG_ULTRA_VERBOSE
         mws_debug(client->log, "WSCLIENT WANT READ");
@@ -577,7 +579,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
     if (handle_mqtt(client))
-        return 1;
+        return MQTT_WSS_ERR_PROTO_MQTT;
 
     if ((ptr = rbuf_get_linear_read_range(client->ws_client->buf_write, &size))) {
 #ifdef DEBUG_ULTRA_VERBOSE
@@ -594,13 +596,17 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             mws_debug(client->log, "Write Err: %s", util_openssl_ret_err(ret));
 #endif
             set_socket_pollfds(client, ret);
+            if (ret != SSL_ERROR_WANT_READ &&
+                ret != SSL_ERROR_WANT_WRITE) {
+                return MQTT_WSS_ERR_CONN_DROP;
+            }
         }
     }
 
     if(client->poll_fds[POLLFD_PIPE].revents & POLLIN)
         util_clear_pipe(client->write_notif_pipe[PIPE_READ_END]);
 
-    return 0;
+    return MQTT_WSS_OK;
 }
 
 ssize_t mqtt_pal_sendall(mqtt_pal_socket_handle mqtt_wss_client, const void* buf, size_t len, int flags)
