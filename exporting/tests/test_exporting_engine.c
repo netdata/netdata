@@ -609,6 +609,8 @@ static void test_simple_connector_worker(void **state)
     instance->connector_specific_data = simple_connector_data;
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->first_buffer = simple_connector_data->last_buffer;
+    simple_connector_data->header = buffer_create(0);
+    simple_connector_data->buffer = buffer_create(0);
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
 
