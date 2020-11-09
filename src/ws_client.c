@@ -104,6 +104,20 @@ void ws_client_destroy(ws_client *client)
     free(client);
 }
 
+void ws_client_reset(ws_client *client)
+{
+    free(client->hs.nonce_reply);
+    client->hs.nonce_reply = NULL;
+    free(client->hs.http_reply_msg);
+    client->hs.http_reply_msg = NULL;
+    rbuf_flush(client->buf_read);
+    rbuf_flush(client->buf_write);
+    rbuf_flush(client->buf_to_mqtt);
+    client->state = WS_RAW;
+    client->hs.hdr_state = WS_HDR_HTTP;
+    client->rx.parse_state = WS_FIRST_2BYTES;
+}
+
 int ws_client_want_write(ws_client *client)
 {
     return rbuf_bytes_available(client->buf_write);

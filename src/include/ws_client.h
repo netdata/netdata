@@ -104,6 +104,7 @@ typedef struct websocket_client {
 
 ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log);
 void ws_client_destroy(ws_client *client);
+void ws_client_reset(ws_client *client);
 
 int ws_client_start_handshake(ws_client *client);
 

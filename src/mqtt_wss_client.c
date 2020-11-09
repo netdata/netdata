@@ -256,6 +256,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         return -1;
     }
 
+    ws_client_reset(client->ws_client);
+
     if(client->host)
         free(client->host);
     client->host = strdup(host);
