@@ -44,26 +44,31 @@ CHARTS = {
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
+
         self.order = ORDER
         self.definitions = CHARTS
         self.protocol = self.configuration.get('protocol', 'http')
         self.host = self.configuration.get('host', '127.0.0.1:19999')
+        
         self.charts_regex = re.compile(self.configuration.get('charts_regex','system\..*'))
         self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         if len(self.charts_to_exclude) > 0:
             self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
-        self.model = self.configuration.get('model', 'pca')
+        
         self.train_max_n = self.configuration.get('train_max_n', 100000)
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
-        self.offset_n_secs = self.configuration.get('offset_n_secs', 0)
         self.train_every_n = self.configuration.get('train_every_n', 900)
         self.initial_train_data_after = self.configuration.get('initial_train_data_after', 0)
         self.initial_train_data_before = self.configuration.get('initial_train_data_before', 0)
-        self.contamination = self.configuration.get('contamination', 0.001)
+        self.offset_n_secs = self.configuration.get('offset_n_secs', 0)
         self.lags_n = self.configuration.get('lags_n', 5)
         self.smooth_n = self.configuration.get('smooth_n', 3)
         self.diffs_n = self.configuration.get('diffs_n', 1)
+        
+        self.model = self.configuration.get('model', 'pca')
+        self.contamination = self.configuration.get('contamination', 0.001)
+        
         self.custom_models = self.configuration.get('custom_models', None)
         self.custom_models_normalize = bool(self.configuration.get('custom_models_normalize', False))
         if self.custom_models:
@@ -93,6 +98,7 @@ class Service(SimpleService):
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         else:
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
+        
         self.scaler = MinMaxScaler()
         self.fitted_at = {}
         self.df_predict = pd.DataFrame()
