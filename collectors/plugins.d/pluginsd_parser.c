@@ -378,7 +378,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    if (unlikely(!host)) {
+    if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
         debug(D_PLUGINSD, "Ignoring dimension belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }

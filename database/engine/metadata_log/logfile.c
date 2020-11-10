@@ -321,6 +321,8 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     char path[RRDENG_PATH_MAX];
 
     generate_metadata_logfile_path(metalogfile, path, sizeof(path));
+    if (file_is_migrated(path))
+        return 0;
     fd = open_file_buffered_io(path, O_RDWR, &file);
     if (fd < 0) {
 //        ++ctx->stats.fs_errors;
@@ -345,6 +347,7 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     iterate_records(metalogfile);
 
     info("Metadata log \"%s\" loaded (size:%"PRIu64").", path, file_size);
+    add_migrated_file(path);
     return 0;
 
 error:
@@ -468,21 +471,26 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         metalogfile = metalogfiles[i];
+        db_execute("BEGIN TRANSACTION;");
         ret = load_metadata_logfile(ctx, metalogfile);
         if (0 != ret) {
             error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
                       METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
-            //unlink_metadata_logfile(metalogfile);
-            //freez(metalogfile);
+            unlink_metadata_logfile(metalogfile);
+            freez(metalogfile);
             ++failed_to_load;
-            //continue;
+            db_execute("ROLLBACK TRANSACTION;");
+            continue;
         }
-        else
-            info("Deleting migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
+        else {
+            info("Migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
                       METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
+            db_execute("COMMIT TRANSACTION;");
+        }
 
-        unlink_metadata_logfile(metalogfile);
-        freez(metalogfile);
+        //unlink_metadata_logfile(metalogfile);
+        //freez(metalogfile);
+
         //metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
         //rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
     }

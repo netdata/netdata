@@ -151,8 +151,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
 #ifdef ENABLE_DBENGINE
-    //int is_legacy = is_archived ? 0 : (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
-    int is_legacy = 0;
+    int is_legacy = (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
 #else
     int is_legacy = 1;
 #endif

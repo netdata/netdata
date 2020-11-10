@@ -62,7 +62,7 @@ PARSER_RC metalog_pluginsd_chart_action(void *user, char *type, char *id, char *
     (void) sql_store_chart(&state->chart_uuid, &state->host_uuid,
         type, id, name, family, context, title, units,
         plugin, module, priority, update_every,
-        chart_type, RRD_MEMORY_MODE_DBENGINE, (host)->rrd_history_entries);
+        chart_type, RRD_MEMORY_MODE_DBENGINE, host ? host->rrd_history_entries : 1);
     ((PARSER_USER_OBJECT *)user)->st_exists = 1;
 
     return PARSER_RC_OK;
@@ -79,11 +79,13 @@ PARSER_RC metalog_pluginsd_dimension_action(void *user, RRDSET *st, char *id, ch
 
     if (unlikely(uuid_is_null(state->chart_uuid))) {
         debug(D_METADATALOG, "Ignoring dimension belonging to missing or ignored chart.");
+        info("Ignoring dimension belonging to missing or ignored chart.");
         return PARSER_RC_OK;
     }
 
     if (unlikely(uuid_is_null(state->uuid))) {
         debug(D_METADATALOG, "Ignoring dimension without unknown UUID");
+        info("Ignoring dimension without unknown UUID");
         return PARSER_RC_OK;
     }
 
@@ -104,18 +106,17 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
-    UNUSED(user);
+    //UNUSED(user);
     //UNUSED(uuid);
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
     uuid_copy(state->uuid, *uuid);
-
-    char uuid_str[37];
 
     int rc = find_uuid_type(uuid);
 
     if (rc == 1) {
         uuid_copy(state->host_uuid, *uuid);
         ((PARSER_USER_OBJECT *)user)->st_exists = 0;
+        ((PARSER_USER_OBJECT *)user)->host_exists = 1;
     }
     if (rc == 2) {
         uuid_copy(state->chart_uuid, *uuid);
@@ -123,9 +124,6 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
     }
     if (rc == 3)
         uuid_copy(state->uuid, *uuid);
-
-    uuid_unparse_lower(*uuid, uuid_str);
-    info("CONTEXT %s  -- maps to type %d", uuid_str, rc);
 
     return PARSER_RC_OK;
 }

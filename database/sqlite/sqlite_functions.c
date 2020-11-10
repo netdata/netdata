@@ -20,6 +20,7 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS label(uuid blob, key text, value text, source int, PRIMARY KEY(key, uuid)) without rowid;",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
+    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text);",
     "CREATE INDEX IF NOT EXISTS ind_host on chart(host_id);",
     "CREATE INDEX IF NOT EXISTS ind_chart on dimension(chart_id);",
     "CREATE INDEX IF NOT EXISTS ind_uuid on label(uuid);",
@@ -392,7 +393,7 @@ int find_uuid_type(uuid_t *uuid)
 {
     sqlite3_stmt *res = NULL;
     int rc;
-    int uuid_type = 0;
+    int uuid_type = 3;
 
     rc = sqlite3_prepare_v2(db_meta, FIND_UUID_TYPE, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -565,12 +566,6 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
 {
     int rc;
 
-
-    char c_str[37], h_str[37];
-
-    uuid_unparse_lower(*chart_uuid, c_str);
-    uuid_unparse_lower(st->rrdhost->host_uuid, h_str);
-
     rc = sql_store_chart(
         chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units, st->plugin_name,
         st->module_name, st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
@@ -653,10 +648,8 @@ int sql_store_host(
         error_report("Failed to store host %s, rc = %d", hostname, rc);
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to store host %s, rc = %d", hostname, rc);
-        rc = 0; // This is not fatal worse case memory leak
-    }
 
     return !(store_rc == SQLITE_DONE);
 bind_fail:
@@ -1107,4 +1100,73 @@ failed:
         error_report("Failed to finalize the prepared statement when reading host information");
 
     return host;
+}
+
+void db_execute(char *cmd)
+{
+    int rc;
+    char *err_msg;
+    rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to execute '%s', rc = %d (%s)", cmd, rc, err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    return;
+}
+
+#define SELECT_MIGRATED_FILE    "select 1 from metadata_migration where filename = @path;"
+
+int file_is_migrated(char *path)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_MIGRATED_FILE, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host");
+        return 0;
+    }
+
+    rc = sqlite3_bind_text(res, 1, path, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind filename parameter to check migration");
+        return 0;
+    }
+
+    rc = sqlite3_step(res);
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
+
+    return (rc == SQLITE_ROW);
+}
+
+#define STORE_MIGRATED_FILE    "insert into metadata_migration (filename) values (@file);"
+
+void add_migrated_file(char *path)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, STORE_MIGRATED_FILE, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 1, path, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind filename parameter to check migration");
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store migrated file, rc = %d", rc);
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
+
+    return;
 }
