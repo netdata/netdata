@@ -453,8 +453,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
                   mqtt_wss_error_tos(ret));
 
     // send WebSockets close message
-    // TODO(prio:low) send reason in the message
-    ws_client_send(client->ws_client, WS_OP_CONNECTION_CLOSE, NULL, 0);
+    uint16_t ws_rc = htobe16(1000);
+    ws_client_send(client->ws_client, WS_OP_CONNECTION_CLOSE, (const char*)&ws_rc, sizeof(ws_rc));
     ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret) {
         // Some MQTT/WSS servers will close socket on receipt of MQTT disconnect and
