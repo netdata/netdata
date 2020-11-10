@@ -624,7 +624,7 @@ build_libwebsockets() {
   fi
 
   if [ ! -z ${NETDATA_USE_WOLFSSL} ]; then
-    wolfssl_opt='-DLWS_WITH_WOLFSSL=1 -DLWS_WOLFSSL_LIBRARIES=/usr/lib64/libwolfssl.a -DLWS_WOLFSSL_INCLUDE_DIRS=/usr/include/'
+    wolfssl_opt='-DLWS_WITH_WOLFSSL=1 -DLWS_WOLFSSL_LIBRARIES=/usr/lib/libwolfssl.a -DLWS_WOLFSSL_INCLUDE_DIRS=/usr/include/'
   fi
 
   pushd "${1}" > /dev/null || exit 1
