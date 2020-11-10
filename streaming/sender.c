@@ -193,6 +193,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
         if (host->ssl.conn)
         {
+            // WolfSSL is not in the same level of OpenSSL, to understand some errors, it is necessary to read
+            // the link https://www.wolfssl.com/docs/wolfssl-manual/appendix-c/
             if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -288,7 +290,9 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         int err = SSL_connect(host->ssl.conn);
         if (err != 1){
             err = SSL_get_error(host->ssl.conn, err);
-            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            error("SSL cannot connect with the server %d:  %s ",
+                  err,
+                  ERR_error_string((unsigned long)err , NULL));
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 rrdpush_sender_thread_close_socket(host);
                 return 0;

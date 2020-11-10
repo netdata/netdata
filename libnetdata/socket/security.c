@@ -9,7 +9,7 @@ const char *security_key=NULL;
 const char *security_cert=NULL;
 const char *tls_version=NULL;
 const char *tls_ciphers=NULL;
-int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
+int netdata_validate_server = NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
  * Info Callback
@@ -250,6 +250,9 @@ SSL_CTX * security_initialize_wolfssl_client() {
     SSL_CTX *ctx;
     ctx = SSL_CTX_new(TLS_client_method());
     if(ctx) {
+        if (netdata_validate_server == NETDATA_SSL_INVALID_CERTIFICATE)
+            wolfSSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
+
         SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
 #if defined(TLS_MAX_VERSION)
         SSL_CTX_set_max_proto_version(ctx, TLS_MAX_VERSION);
