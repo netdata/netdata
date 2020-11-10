@@ -811,7 +811,7 @@ class Service(SimpleService):
                 name,
                 'absolute',
                 1,
-                1024 * 1000,
+                1000,
                 ])
         self.charts['allocated_usage'].add_dimension(
             [
