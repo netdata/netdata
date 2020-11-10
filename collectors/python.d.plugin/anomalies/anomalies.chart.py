@@ -49,7 +49,7 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.protocol = self.configuration.get('protocol', 'http')
         self.host = self.configuration.get('host', '127.0.0.1:19999')
-        
+
         self.charts_regex = re.compile(self.configuration.get('charts_regex','system\..*'))
         self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
@@ -308,8 +308,8 @@ class Service(SimpleService):
 
         if len(self.fitted_at) < len(self.models):
             self.train(
-                models_to_train=[m for m in self.models if m not in self.fitted_at], 
-                train_data_after=self.initial_train_data_after, 
+                models_to_train=[m for m in self.models if m not in self.fitted_at],
+                train_data_after=self.initial_train_data_after,
                 train_data_before=self.initial_train_data_before
                 )
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
