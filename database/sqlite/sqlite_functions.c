@@ -5,8 +5,6 @@
 #define ENABLE_CACHE_CHARTS 1
 #define ENABLE_CACHE_DIMENSIONS 1
 
-
-
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
     "PRAGMA journal_size_limit=17179869184;",
@@ -25,6 +23,9 @@ const char *database_config[] = {
 
     "delete from chart_active;",
     "delete from dimension_active;",
+
+    "delete from chart where chart_id not in (select chart_id from dimension);",
+    "delete from host where host_id not in (select host_id from chart);",
     NULL
 };
 
@@ -494,6 +495,40 @@ uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
     return uuid;
 }
 
+#define DELETE_DIMENSION_UUID   "delete from dimension where dim_id = @uuid;"
+
+void delete_dimension_uuid(uuid_t *dimension_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char uuid_str[37];
+    uuid_unparse_lower(*dimension_uuid, uuid_str);
+    debug(D_SQLITE,"Deleting dimension uuid %s", uuid_str);
+#endif
+
+    rc = sqlite3_prepare_v2(db_meta, DELETE_DIMENSION_UUID, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to delete a dimension uuid");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, dimension_uuid,  sizeof(*dimension_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_step(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete dimension uuid, rc = %d", rc);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when searching for a chart UUID, rc = %d", rc);
+    return;
+}
+
 /*
  * Do a database lookup to find the UUID of a chart
  *
@@ -511,7 +546,7 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
 
     rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to bind prepare statement to lookup chart UUID in the database");
+        error_report("Failed to prepare statement to lookup chart UUID in the database");
         return NULL;
     }
 

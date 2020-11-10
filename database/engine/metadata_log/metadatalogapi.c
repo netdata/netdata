@@ -18,6 +18,7 @@ void metalog_commit_delete_dimension(RRDDIM *rd)
 
     uuid_unparse_lower(*rd->state->metric_uuid, uuid_str);
     info("metalog_commit_delete_dimension %s", uuid_str);
+    delete_dimension_uuid(rd->state->metric_uuid);
     return;
 }
 
