@@ -44,7 +44,7 @@ CHARTS = {
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        
+
         self.order = ORDER
         self.definitions = CHARTS
         self.protocol = self.configuration.get('protocol', 'http')
@@ -211,7 +211,7 @@ class Service(SimpleService):
 
         # get training data
         df_train = get_data(
-            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before, 
+            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
             sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
             ).ffill()
         if self.custom_models:
@@ -233,7 +233,7 @@ class Service(SimpleService):
         self.n_fit_fail, self.n_fit_success = 0, 0
         for model in models_to_train:
             X_train = self.make_features(
-                df_train[df_train.columns[df_train.columns.str.startswith(model)]].values, 
+                df_train[df_train.columns[df_train.columns.str.startswith(model)]].values,
                 train=True, model=model)
             try:
                 self.models[model].fit(X_train)
@@ -253,7 +253,7 @@ class Service(SimpleService):
         """
         # get recent data to predict on
         df_allmetrics = get_allmetrics_async(
-            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', wide=True, sort_cols=True, 
+            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', wide=True, sort_cols=True,
             protocol=self.protocol, numeric_only=True, float_size='float32', user=self.username, pwd=self.password
             )
         if self.custom_models:
@@ -274,7 +274,7 @@ class Service(SimpleService):
         for model in self.fitted_at.keys():
             model_display_name = self.model_display_names[model]
             X_model = self.make_features(
-                self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(model)]].values, 
+                self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(model)]].values,
                 model=model)[-1,:].reshape(1, -1)
             try:
                 data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 100
@@ -296,8 +296,8 @@ class Service(SimpleService):
 
         if len(self.fitted_at) < len(self.models):
             self.train(
-                models_to_train=[m for m in self.models if m not in self.fitted_at], 
-                train_data_after=self.initial_train_data_after, 
+                models_to_train=[m for m in self.models if m not in self.fitted_at],
+                train_data_after=self.initial_train_data_after,
                 train_data_before=self.initial_train_data_before)
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
