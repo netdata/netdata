@@ -819,7 +819,7 @@ class Service(SimpleService):
                 name,
                 'absolute',
                 1,
-                1024 * 1000,
+                1000,
                 ])
         self.charts['allocated_usage_in_percent'].add_dimension(
             [
