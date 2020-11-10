@@ -655,7 +655,7 @@ static void print_domain_network_bytes_chart_definition(char *type, unsigned int
 }
 
 static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.packets_network%u '' 'Network%u Recieved/Sent Packets' 'packets/s' 'network' 'xendomain.packets_network' line %d %d %s %s\n"
+    printf("CHART %s.packets_network%u '' 'Network%u Received/Sent Packets' 'packets/s' 'network' 'xendomain.packets_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -683,7 +683,7 @@ static void print_domain_network_errors_chart_definition(char *type, unsigned in
 }
 
 static void print_domain_network_drops_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.drops_network%u '' 'Network%u Recieve/Transmit Drops' 'drops/s' 'network' 'xendomain.drops_network' line %d %d %s %s\n"
+    printf("CHART %s.drops_network%u '' 'Network%u Receive/Transmit Drops' 'drops/s' 'network' 'xendomain.drops_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -861,7 +861,7 @@ static void xenstat_send_domain_metrics() {
                     }
                     printf(
                             "BEGIN %s.bytes_network%u\n"
-                            "SET recieved = %lld\n"
+                            "SET received = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
                             , type
@@ -878,7 +878,7 @@ static void xenstat_send_domain_metrics() {
                     }
                     printf(
                             "BEGIN %s.packets_network%u\n"
-                            "SET recieved = %lld\n"
+                            "SET received = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
                             , type
@@ -895,7 +895,7 @@ static void xenstat_send_domain_metrics() {
                     }
                     printf(
                             "BEGIN %s.errors_network%u\n"
-                            "SET recieved = %lld\n"
+                            "SET received = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
                             , type
@@ -912,7 +912,7 @@ static void xenstat_send_domain_metrics() {
                     }
                     printf(
                             "BEGIN %s.drops_network%u\n"
-                            "SET recieved = %lld\n"
+                            "SET received = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
                             , type
