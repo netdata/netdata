@@ -240,7 +240,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
-                return 1;
+                return 0;
             }
 
             if (homogeneous) {
