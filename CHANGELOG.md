@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix coverity issues [\#10216](https://github.com/netdata/netdata/pull/10216) ([vlvkobal](https://github.com/vlvkobal))
+- installer: update go.d.plugin version to v0.25.0 [\#10215](https://github.com/netdata/netdata/pull/10215) ([ilyam8](https://github.com/ilyam8))
 - Fix repeated frontmatter in exporting docs [\#10211](https://github.com/netdata/netdata/pull/10211) ([joelhans](https://github.com/joelhans))
+- Fixed bug in auto-updater for FreeBSD \(\#10198\) [\#10204](https://github.com/netdata/netdata/pull/10204) ([abrbon](https://github.com/abrbon))
 - Inform users about an issue with the newest gRPC versions [\#10194](https://github.com/netdata/netdata/pull/10194) ([vlvkobal](https://github.com/vlvkobal))
 - fix: make comma optional when parsing ipsec trafficstatus [\#10190](https://github.com/netdata/netdata/pull/10190) ([wash2](https://github.com/wash2))
 - Page duty V2 [\#10189](https://github.com/netdata/netdata/pull/10189) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -235,8 +238,6 @@
 - Added proper handling for autogen on Ubuntu 18.04 [\#9586](https://github.com/netdata/netdata/pull/9586) ([Ferroin](https://github.com/Ferroin))
 - Added lock dir [\#9584](https://github.com/netdata/netdata/pull/9584) ([vlvkobal](https://github.com/vlvkobal))
 - Stop mdstat collector from looking up archived charts. [\#9583](https://github.com/netdata/netdata/pull/9583) ([mfundul](https://github.com/mfundul))
-- Fixes mempcpy-\>memcpy [\#9575](https://github.com/netdata/netdata/pull/9575) ([underhood](https://github.com/underhood))
-- Sends netdata.public.unique.id \(machine GUID\) with claim [\#9574](https://github.com/netdata/netdata/pull/9574) ([underhood](https://github.com/underhood))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
