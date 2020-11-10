@@ -1,16 +1,16 @@
 <!--
 ---
-title: "Contributor Covenant Code of Conduct"
+title: "Netdata Community Code of Conduct"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/CODE_OF_CONDUCT.md
 ---
 -->
 
-# Contributor Covenant Code of Conduct
+# Netdata Community Code of Conduct
 
 ## Our Pledge
 
 In the interest of fostering an open and welcoming environment, we as
-contributors and maintainers pledge to making participation in our project and
+contributors, maintainers and community members pledge to making participation in our project and
 our community a harassment-free experience for everyone, regardless of age, body
 size, disability, ethnicity, sex characteristics, gender identity and expression,
 level of experience, education, socio-economic status, nationality, personal
@@ -45,7 +45,7 @@ behavior and are expected to take appropriate and fair corrective action in
 response to any instances of unacceptable behavior.
 
 Project maintainers have the right and responsibility to remove, edit, or
-reject comments, commits, code, wiki edits, issues, and other contributions
+reject comments, commits, code, documentation edits, issues, community posts, and other contributions
 that are not aligned to this Code of Conduct, or to ban temporarily or
 permanently any contributor for other behaviors that they deem inappropriate,
 threatening, offensive, or harmful.
