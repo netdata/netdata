@@ -114,7 +114,7 @@ class Service(SimpleService):
         else:
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         self.custom_model_scalers = {model: MinMaxScaler() for model in self.models_in_scope}
-        
+
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
@@ -212,7 +212,7 @@ class Service(SimpleService):
 
         # get training data
         df_train = get_data(
-            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before, 
+            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
             sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
             ).ffill()
         self.expected_cols = list(df_train.columns)
@@ -297,7 +297,7 @@ class Service(SimpleService):
         if len(self.fitted_at) < len(self.models):
             self.train(
                 models_to_train=[m for m in self.models if m not in self.fitted_at],
-                train_data_after=self.initial_train_data_after, 
+                train_data_after=self.initial_train_data_after,
                 train_data_before=self.initial_train_data_before)
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
