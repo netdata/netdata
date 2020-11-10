@@ -54,6 +54,7 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
     uuid_t legacy_uuid;
+    uuid_t multihost_legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
     int is_multihost_child = 0;
@@ -108,17 +109,20 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     } else {
         /* There are legacy UUIDs in the database, implement backward compatibility */
 
+        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
+                                                &multihost_legacy_uuid);
+
         if (unlikely(!rd->state->metric_uuid))
             rd->state->metric_uuid = mallocz(sizeof(uuid_t));
 
-        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
-                                                rd->state->metric_uuid);
+        int need_to_store = (dim_uuid == NULL || uuid_compare(*rd->state->metric_uuid, multihost_legacy_uuid));
 
-        //if (dim_uuid && uuid_compare(*rd->state->metric_uuid, *dim_uuid)) {
-        //    error("Mismatch of metadata log DIMENSION GUID with dbengine metric GUID.");
-        //}
-        (void) sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name,
-                                     rd->multiplier, rd->divisor, rd->algorithm);
+        uuid_copy(*rd->state->metric_uuid, multihost_legacy_uuid);
+
+        if (unlikely(need_to_store))
+            (void)sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+                rd->algorithm);
+
     }
     rd->state->rrdeng_uuid = &page_index->id;
     rd->state->page_index = page_index;
