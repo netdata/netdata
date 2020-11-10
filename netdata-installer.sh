@@ -623,7 +623,7 @@ build_libwebsockets() {
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
-  if [ -n ${NETDATA_USE_WOLFSSL} ]; then
+  if [ "${NETDATA_USE_WOLFSSL}" = "1" ]; then
     wolfssl_opt='-DLWS_WITH_WOLFSSL=1 -DLWS_WOLFSSL_LIBRARIES=/usr/lib/libwolfssl.a -DLWS_WOLFSSL_INCLUDE_DIRS=/usr/include/'
   fi
 
