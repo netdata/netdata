@@ -38,7 +38,7 @@ Then, as the issue passes, the anomaly probabilities should settle back down int
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.28 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Configuration
@@ -67,8 +67,12 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
-# host to pull data from
+# Host to pull data from
 host: '127.0.0.1:19999'
+
+# Username and Password for Netdata if using basic auth.
+# username: 'username'
+# password: 'password'
 
 # Use http or https to pull data
 protocol: 'http'
