@@ -114,10 +114,11 @@ class Service(SimpleService):
         else:
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         self.custom_model_scalers = {model: MinMaxScaler() for model in self.models_in_scope}
-
+        
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
+        self.expected_cols = []
 
     @staticmethod
     def check():
@@ -211,16 +212,16 @@ class Service(SimpleService):
 
         # get training data
         df_train = get_data(
-            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
+            host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before, 
             sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
             ).ffill()
+        self.expected_cols = list(df_train.columns)
         if self.custom_models:
             df_train = self.add_custom_models_dims(df_train)
 
         # train model
         self.try_fit(df_train, models_to_train=models_to_train)
         self.info(f'training complete in {round(time.time() - now, 2)} seconds (runs_counter={self.runs_counter}, model={self.model}, train_n_secs={self.train_n_secs}, models={len(self.fitted_at)}, n_fit_success={self.n_fit_success}, n_fit_fails={self.n_fit_fail}, after={after}, before={before}).')
-        self.debug(f'self.fitted_at = {self.fitted_at}')
 
     def try_fit(self, df_train, models_to_train=None):
         """Try fit each model and try to fallback to a default model if fit fails for any reason.
@@ -233,7 +234,7 @@ class Service(SimpleService):
         self.n_fit_fail, self.n_fit_success = 0, 0
         for model in models_to_train:
             X_train = self.make_features(
-                df_train[df_train.columns[df_train.columns.str.startswith(model)]].values,
+                df_train[df_train.columns[df_train.columns.str.startswith(f'{model}|')]].values,
                 train=True, model=model)
             try:
                 self.models[model].fit(X_train)
@@ -255,7 +256,7 @@ class Service(SimpleService):
         df_allmetrics = get_allmetrics_async(
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', wide=True, sort_cols=True,
             protocol=self.protocol, numeric_only=True, float_size='float32', user=self.username, pwd=self.password
-            )
+            )[self.expected_cols]
         if self.custom_models:
             df_allmetrics = self.add_custom_models_dims(df_allmetrics)
         self.df_allmetrics = self.df_allmetrics.append(df_allmetrics).ffill().tail((max(self.lags_n.values()) + max(self.smooth_n.values()) + max(self.diffs_n.values())) * 2)
@@ -274,13 +275,12 @@ class Service(SimpleService):
         for model in self.fitted_at.keys():
             model_display_name = self.model_display_names[model]
             X_model = self.make_features(
-                self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(model)]].values,
+                self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(f'{model}|')]].values,
                 model=model)[-1,:].reshape(1, -1)
             try:
                 data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 100
                 data_anomaly[model_display_name + '_anomaly'] = self.models[model].predict(X_model)[-1]
             except Exception as e:
-                self.info(X_model)
                 self.info(e)
                 if model_display_name + '_prob' in self.data_latest:
                     self.info(f'prediction failed for {model} at run_counter {self.runs_counter}, using last prediction instead.')
@@ -297,7 +297,7 @@ class Service(SimpleService):
         if len(self.fitted_at) < len(self.models):
             self.train(
                 models_to_train=[m for m in self.models if m not in self.fitted_at],
-                train_data_after=self.initial_train_data_after,
+                train_data_after=self.initial_train_data_after, 
                 train_data_before=self.initial_train_data_before)
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
