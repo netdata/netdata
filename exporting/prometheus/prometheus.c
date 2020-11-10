@@ -8,7 +8,7 @@
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
 /**
- * Check if a chart can be sent to an external databese
+ * Check if a chart can be sent to Prometheus
  *
  * @param instance an instance data structure.
  * @param st a chart.
