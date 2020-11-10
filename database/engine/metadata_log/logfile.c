@@ -346,8 +346,8 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
 
     iterate_records(metalogfile);
 
-    info("Metadata log \"%s\" loaded (size:%"PRIu64").", path, file_size);
-    add_migrated_file(path);
+    info("Metadata log \"%s\" migrated to the database (size:%"PRIu64").", path, file_size);
+    add_migrated_file(path, file_size);
     return 0;
 
 error:
@@ -471,6 +471,7 @@ static int scan_metalog_files(struct metalog_instance *ctx)
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         metalogfile = metalogfiles[i];
+        db_lock();
         db_execute("BEGIN TRANSACTION;");
         ret = load_metadata_logfile(ctx, metalogfile);
         if (0 != ret) {
@@ -480,13 +481,15 @@ static int scan_metalog_files(struct metalog_instance *ctx)
             freez(metalogfile);
             ++failed_to_load;
             db_execute("ROLLBACK TRANSACTION;");
+            db_unlock();
             continue;
         }
         else {
-            info("Migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
-                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
+//            info("Migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
+//                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
             db_execute("COMMIT TRANSACTION;");
         }
+        db_unlock();
 
         //unlink_metadata_logfile(metalogfile);
         //freez(metalogfile);

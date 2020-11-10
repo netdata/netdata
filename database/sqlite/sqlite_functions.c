@@ -19,7 +19,7 @@ const char *database_config[] = {
     "multiplier int, divisor int , algorithm int, options text);",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
-    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, date_created int);",
+    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_host on chart(host_id);",
     "CREATE INDEX IF NOT EXISTS ind_chart on dimension(chart_id);",
 
@@ -30,7 +30,7 @@ const char *database_config[] = {
 
 sqlite3 *db_meta = NULL;
 
-//static uv_mutex_t sqlite_lookup;
+static uv_mutex_t sqlite_transaction_lock;
 //static uv_mutex_t sqlite_add_page;
 static uint32_t page_size;
 static uint32_t page_count;
@@ -146,7 +146,7 @@ int sql_init_database(void)
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-//    fatal_assert(0 == uv_mutex_init(&sqlite_lookup));
+    fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
 //    fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
@@ -879,7 +879,9 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_
     buffer_sprintf(wb, "\n\t\t\t}");
 }
 
-#define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, module, unit, chart_type, update_every from chart where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
+#define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, " \
+    "module, unit, chart_type, update_every from chart " \
+    "where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
 
 void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
 {
@@ -1113,6 +1115,19 @@ void db_execute(char *cmd)
     return;
 }
 
+void db_lock(void)
+{
+    uv_mutex_lock(&sqlite_transaction_lock);
+    return;
+}
+
+void db_unlock(void)
+{
+    uv_mutex_unlock(&sqlite_transaction_lock);
+    return;
+}
+
+
 #define SELECT_MIGRATED_FILE    "select 1 from metadata_migration where filename = @path;"
 
 int file_is_migrated(char *path)
@@ -1140,10 +1155,10 @@ int file_is_migrated(char *path)
     return (rc == SQLITE_ROW);
 }
 
-#define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, date_created) " \
-                                "values (@file, strftime('%s'));"
+#define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, file_size, date_created) " \
+                                "values (@file, @size, strftime('%s'));"
 
-void add_migrated_file(char *path)
+void add_migrated_file(char *path, uint64_t file_size)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -1156,7 +1171,13 @@ void add_migrated_file(char *path)
 
     rc = sqlite3_bind_text(res, 1, path, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind filename parameter to check migration");
+        error_report("Failed to bind filename parameter to store migration information");
+        return;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, file_size);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind size parameter to store migration information");
         return;
     }
 
