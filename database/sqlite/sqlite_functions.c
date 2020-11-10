@@ -20,7 +20,7 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS label(uuid blob, key text, value text, source int, PRIMARY KEY(key, uuid)) without rowid;",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
-    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text);",
+    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_host on chart(host_id);",
     "CREATE INDEX IF NOT EXISTS ind_chart on dimension(chart_id);",
     "CREATE INDEX IF NOT EXISTS ind_uuid on label(uuid);",
@@ -1142,7 +1142,8 @@ int file_is_migrated(char *path)
     return (rc == SQLITE_ROW);
 }
 
-#define STORE_MIGRATED_FILE    "insert into metadata_migration (filename) values (@file);"
+#define STORE_MIGRATED_FILE    "insert or replace into metadata_migration (filename, date_created) " \
+                                "values (@file, strftime('%s'));"
 
 void add_migrated_file(char *path)
 {
