@@ -392,9 +392,11 @@ AC_CHECK_LIB(
     [WOLFSSL_LIBS="-lwolfssl"]
 )
 
+# the wolfSSL_X509_VERIFY_PARAM_set1_host is not recognize by libwebsockets, this is the motive we are searching
+# for the wrong function here
 AC_CHECK_LIB(
     [wolfssl],
-    [wolfSSL_X509_VERIFY_PARAM_set1_host],
+    [X509_VERIFY_PARAM_set1_host],
     [wolfssl_host_validation="yes"],
     [wolfssl_host_validation="no"]
 )
@@ -682,17 +684,12 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$enable_cloud" != "no"; then
+if test "$enable_cloud" != "no" -a "${enable_wolfssl}" != "yes"; then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
     if test -n "${SSL_LIBS}"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-        if test "${enable_wolfssl}" = "yes"; then
-            OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
-        fi
-        if test "${enable_wolfssl}" != "yes"; then
-            OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-        fi
+        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
         AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev', 'libwolfssl-dev' or 'openssl-devel'.])
     fi
