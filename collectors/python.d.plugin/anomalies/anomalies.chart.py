@@ -57,7 +57,7 @@ class Service(SimpleService):
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         if len(self.charts_to_exclude) > 0:
             self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
-        
+
         self.custom_models = self.configuration.get('custom_models', None)
         self.custom_models_normalize = bool(self.configuration.get('custom_models_normalize', False))
         if self.custom_models:
@@ -114,7 +114,7 @@ class Service(SimpleService):
         else:
             self.models = {model: HBOS(contamination=self.contamination) for model in self.models_in_scope}
         self.custom_model_scalers = {model: MinMaxScaler() for model in self.models_in_scope}
-        
+
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
