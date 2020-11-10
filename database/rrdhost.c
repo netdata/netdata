@@ -320,7 +320,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 #ifdef ENABLE_DBENGINE
         if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
             int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
-            if (unlikely(!rc))
+            if (unlikely(rc))
                 error_report("Failed to store machine GUID to the database");
             else
                 cache_host_charts(host);

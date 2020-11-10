@@ -1380,8 +1380,10 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         int release_host = 0;
         if (!host) {
             host = sql_create_host_by_uuid(tok);
-            rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
-            release_host = 1;
+            if (likely(host)) {
+                rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+                release_host = 1;
+            }
         }
         if(host) {
             int rc = web_client_process_url(host, w, url);
