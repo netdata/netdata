@@ -21,9 +21,9 @@ code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations
 those operations over standard and secure SSH connections. There's no agent to install on the remote system, so all you
 have to worry about is your application and your monitoring software. 
 
-Ansible has some competition from the likes of [Puppet](https://puppet.com/), [Chef](https://www.chef.io/), or even
-[Terraform](https://www.hashicorp.com/products/terraform), but the most valuable feature about Ansible is that every is
-**idempotent**. From the [Ansible glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
+Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
+most valuable feature about Ansible is that every is **idempotent**. From the [Ansible
+glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
 > repeatedly without any intervening actions.
@@ -87,9 +87,9 @@ the `ansible_user` variable to set the login user. For example:
 
 #### Set your SSH key (optional)
 
-If you use an SSH key other than `~/.ssh/id_rsa` for logging into your nodes, you can set that on a per-node in the
-`hosts` file with the `ansible_ssh_private_key_file` variable. For example, to log into a Lightsail instance using two
-different SSH keys supplied by AWS.
+If you use an SSH key other than `~/.ssh/id_rsa` for logging into your nodes, you can set that on a per-node basis in
+the `hosts` file with the `ansible_ssh_private_key_file` variable. For example, to log into a Lightsail instance using
+two different SSH keys supplied by AWS.
 
 ```conf
 203.0.113.0  hostname=ansible-01  ansible_ssh_private_key_file=~/.ssh/LightsailDefaultKey-us-west-2.pem
@@ -105,7 +105,12 @@ and `claim_room` variables.
 
 To find your `claim_token` and `claim_room`, go to Netdata Cloud, then click on your Space's name in the top navigation,
 then click on **Manage your Space**. Click on the **Nodes** tab in the panel that appears, which displays a script with
-`token` and `room` strings. Copy those strings into the `claim_token` and `claim_rooms` variables.
+`token` and `room` strings. 
+
+![Animated GIF of finding the claiming script and the token and room
+strings](https://user-images.githubusercontent.com/1153921/98740235-f4c3ac00-2367-11eb-8ffd-e9ab0f04c463.gif)
+
+Copy those strings into the `claim_token` and `claim_rooms` variables.
 
 ```yml
 claim_token: XXXXX
@@ -115,8 +120,8 @@ claim_rooms: XXXXX
 Change the `dbengine_multihost_disk_space` if you want to change the metrics retention policy by allocating more or less
 disk space for storing metrics. The default is 2048 Mib, or 2 GiB. 
 
-Because we're claiming this node to Netdata Cloud, and will view its dashboards there instead of via
-`http://NODE:19999`, the playbook disables that local dashboard by setting `web_mode` to `none`. This gives a small
+Because we're claiming this node to Netdata Cloud, and will view its dashboards there instead of via the IP address or
+hostname of the node, the playbook disables that local dashboard by setting `web_mode` to `none`. This gives a small
 security boost by not allowing any unwanted access to the local dashboard.
 
 You can read more about this decision, or other ways you might lock down the local dashboard, in our [node security
