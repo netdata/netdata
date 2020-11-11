@@ -50,14 +50,47 @@ error_after_init_rrd_files:
 /* This function is called by dbengine rotation logic when the metric has no writers */
 void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid)
 {
-//    RRDDIM *rd;
-//    RRDSET *st;
-//    RRDHOST *host;
+    RRDDIM *rd = NULL;
+    RRDSET *st = NULL;
+    RRDHOST *host = NULL;
 //    uint8_t empty_chart;
+    char    *host_guid = NULL;
+    char    *rd_id = NULL;
+    char    *st_id = NULL;
 
     char uuid_str[37];
-    uuid_unparse_lower(metric_uuid, uuid_str);
-    info("Delete metric %s due to rotation", uuid_str);
+    uuid_unparse_lower(*metric_uuid, uuid_str);
+    info("WARNING: Delete metric %s due to rotation", uuid_str);
+
+    int rc = find_host_chart_dimension(metric_uuid, &host_guid, &st_id, &rd_id);
+
+    if (unlikely(rc))
+        return;
+
+    host = rrdhost_find_by_guid(host_guid, 0);
+
+    if (likely(host)) {
+        info("WARNING UUID %s maps to host %s, chart [%s], dimension [%s]", uuid_str, host->hostname, st_id, rd_id);
+
+        st = rrdset_find(host, st_id);
+        if (likely(st)) {
+            rd = rrddim_find(st, st_id);
+            if (likely(rd)) {
+                info(
+                    "WARNING UUID %s maps to host %s, chart [%s], dimension [%s] -- set, dimension found", uuid_str,
+                    host->hostname, st_id, rd_id);
+                char uuid_str1[37];
+                uuid_unparse_lower(*rd->state->metric_uuid, uuid_str1);
+                info("WARNING: delete metric %s due to rotation that matches metric_uuid %s", uuid_str, uuid_str1);
+            }
+        }
+
+        freez(host);
+        freez(st_id);
+        freez(rd_id);
+    }
+
+    UNUSED(ctx);
 
     // TODO: check the database and delete the UUID
 

@@ -1254,3 +1254,43 @@ void add_migrated_file(char *path, uint64_t file_size)
 
     return;
 }
+
+#define FIND_HOST_CHART_METRIC "select h.hostname, c.type||'.'||c.id, d.id from dimension d, chart c, host h where " \
+        "d.chart_id = c.chart_id and c.host_id = h.host_id and @uuid in " \
+        "(dim_id, multihost(h.host_id, legacy(d.id, c.type||'.'||c.id)), legacy(d.id, c.type||'.'||c.id));"
+
+int find_host_chart_dimension(uuid_t *uuid, char **host, char **chart, char **dimension)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, FIND_HOST_CHART_METRIC, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to find host, chart, dimension info for a uuid");
+        return 1;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW)) {
+        //uuid_copy(*host_uuid, sqlite3_column_blob(res, 0));
+        *host = (char *) strdupz((const char *) sqlite3_column_text(res, 0));
+        *chart = (char *) strdupz((const char *) sqlite3_column_text(res, 1));
+        *dimension = (char *) strdupz((const char *) sqlite3_column_text(res, 2));
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to find host, chart, dimension info for a uuid, rc = %d", rc);
+
+    return 0;
+bind_fail:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to find host, chart, dimension info for a uuid, rc = %d", rc);
+    return 0;
+}
