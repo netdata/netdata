@@ -3654,4 +3654,88 @@ netdataDashboard.context = {
             },
         ],
     },
+
+    // ------------------------------------------------------------------------
+    // Nvidia-smi
+
+    'nvidia_smi.fan_speed': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="speed"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Fan Speed"'
+                    + ' data-units="percentage"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.temperature': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="temp"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Temperature"'
+                    + ' data-units="celsius"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.memory_allocated': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Used Memory"'
+                    + ' data-units="MiB"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.power': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="power"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Power Utilization"'
+                    + ' data-units="watts"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
 };
