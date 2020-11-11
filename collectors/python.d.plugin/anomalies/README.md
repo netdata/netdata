@@ -67,76 +67,82 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
-# Host to pull data from
-host: '127.0.0.1:19999'
 
-# Username and Password for Netdata if using basic auth.
-# username: 'username'
-# password: 'password'
+# Job to pull system overview data from local Netdata node.
+system:
+    
+    # Job name.
+    name: 'System'
+    # Host to pull data from.
+    host: '127.0.0.1:19999'
 
-# Use http or https to pull data
-protocol: 'http'
+    # Username and Password for Netdata if using basic auth.
+    # username: 'username'
+    # password: 'password'
 
-# What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
-charts_in_scope: 'system\..*'
+    # Use http or https to pull data.
+    protocol: 'http'
 
-# Charts to exclude, useful if you would like to exclude some charts from charts_in_scope. 
-# Note: should be a ',' separated string like 'chart.name,chart.name'.
-charts_to_exclude: 'system.uptime,system.entropy'
+    # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
+    charts_in_scope: 'system\..*'
 
-# What model to use - can be one of 'pca', 'hbos', 'iforest', 'cblof', 'loda', 'copod' or 'feature_bagging'. 
-# More details here: https://pyod.readthedocs.io/en/latest/pyod.models.html.
-model: 'pca'
+    # Charts to exclude, useful if you would like to exclude some charts from charts_in_scope. 
+    # Note: should be a ',' separated string like 'chart.name,chart.name'.
+    charts_to_exclude: 'system.uptime,system.entropy'
 
-# Max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.
-train_max_n: 100000
+    # What model to use - can be one of 'pca', 'hbos', 'iforest', 'cblof', 'loda', 'copod' or 'feature_bagging'. 
+    # More details here: https://pyod.readthedocs.io/en/latest/pyod.models.html.
+    model: 'pca'
 
-# How often to re-train the model (assuming update_every=2 then train_every_n=900 represents (re)training every 30 minutes).
-# Note: If you want to turn off re-training set train_every_n=0 and after initial training the models will not be retrained.
-train_every_n: 900
+    # Max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.
+    train_max_n: 100000
 
-# The length of the window of data to train on (14400 = last 4 hours).
-train_n_secs: 14400
+    # How often to re-train the model (assuming update_every=2 then train_every_n=900 represents (re)training every 30 minutes).
+    # Note: If you want to turn off re-training set train_every_n=0 and after initial training the models will not be retrained.
+    train_every_n: 900
 
-# If you would like to train the model for the first time on a specific window then you can define it using the below two variables.
-# Start of training data for initial model.
-# initial_train_data_after: 1604578857
+    # The length of the window of data to train on (14400 = last 4 hours).
+    train_n_secs: 14400
 
-# End of training data for initial model.
-# initial_train_data_before: 1604593257
+    # If you would like to train the model for the first time on a specific window then you can define it using the below two variables.
+    # Start of training data for initial model.
+    # initial_train_data_after: 1604578857
 
-# If you would like to ignore recent data in training then you can offset it by offset_n_secs.
-offset_n_secs: 0
+    # End of training data for initial model.
+    # initial_train_data_before: 1604593257
 
-# How many lagged values of each dimension to include in the 'feature vector' each model is trained on.
-lags_n: 5
+    # If you would like to ignore recent data in training then you can offset it by offset_n_secs.
+    offset_n_secs: 0
 
-# How much smoothing to apply to each dimension in the 'feature vector' each model is trained on.
-smooth_n: 3
+    # How many lagged values of each dimension to include in the 'feature vector' each model is trained on.
+    lags_n: 5
 
-# How many differences to take in preprocessing your data. 
-# diffs_n=0 would mean training models on the raw values of each dimension.
-# diffs_n=1 means everything is done in terms of differences.
-diffs_n: 1
+    # How much smoothing to apply to each dimension in the 'feature vector' each model is trained on.
+    smooth_n: 3
 
-# What is the typical proportion of anomalies in your data on average? 
-# This paramater can control the sensitivity of your models to anomalies. 
-# Some discussion here: https://github.com/yzhao062/pyod/issues/144
-contamination: 0.001
+    # How many differences to take in preprocessing your data. 
+    # diffs_n=0 would mean training models on the raw values of each dimension.
+    # diffs_n=1 means everything is done in terms of differences.
+    diffs_n: 1
 
-# Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
-# For example below example creates two custom models, one to run anomaly detection on the netdata user 
-# and one on the apps metrics for python.d.plugin.
-# custom_models:
-#  - name: 'user_netdata'
-#    dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
-#  - name: 'apps_python_d_plugin'
-#    dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
+    # What is the typical proportion of anomalies in your data on average? 
+    # This paramater can control the sensitivity of your models to anomalies. 
+    # Some discussion here: https://github.com/yzhao062/pyod/issues/144
+    contamination: 0.001
 
-# Set to true to normalize, using min-max standardization, features used for the custom models. 
-# Useful if your custom models contain dimensions on very different scales. 
-# Usually best to leave as false.
-# custom_models_normalize: false
+    # Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
+    # For example below example creates two custom models, one to run anomaly detection on the netdata user 
+    # and one on the apps metrics for python.d.plugin.
+    # custom_models:
+    #  - name: 'user_netdata'
+    #    dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
+    #  - name: 'apps_python_d_plugin'
+    #    dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
+
+    # Set to true to normalize, using min-max standardization, features used for the custom models. 
+    # Useful if your custom models contain dimensions on very different scales. 
+    # Usually best to leave as false.
+    # custom_models_normalize: false
 ```
 
 ## Custom Models
