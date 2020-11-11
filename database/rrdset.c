@@ -951,7 +951,8 @@ RRDSET *rrdset_create_custom(
     }
 #endif
 
-    rrdhost_cleanup_obsolete_charts(host);
+    if (!is_archived)
+        rrdhost_cleanup_obsolete_charts(host);
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
