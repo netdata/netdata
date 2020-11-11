@@ -70,6 +70,6 @@ extern void db_unlock(void);
 extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
 extern void free_uuid_cache(struct uuid_cache **uuid_cache);
-extern int find_host_chart_dimension(uuid_t *uuid, char **host, char **chart, char **dimension);
+extern int find_host_chart_dimension(uuid_t *uuid, char **host, char **chart, char **dimension, uuid_t *stored_uuid);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H
