@@ -381,12 +381,16 @@ int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const ch
     size_t hdr_len = get_ws_hdr_size(size);
 
     if (w_buff_free < hdr_len * 2) {
+#ifdef DEBUG_ULTRA_VERBOSE
         DEBUG("Write buffer full. Can't write requested %d size.", size);
+#endif
         return 0;
     }
 
     if (w_buff_free < (hdr_len + size)) {
+#ifdef DEBUG_ULTRA_VERBOSE
         DEBUG("Can't write whole MQTT packet of %d bytes into the buffer. Will do partial send of %d.", size, w_buff_free - hdr_len);
+#endif
         size = w_buff_free - hdr_len;
         hdr_len = get_ws_hdr_size(size);
         // the actual needed header size might decrease if we cut number of bytes

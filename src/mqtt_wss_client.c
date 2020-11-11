@@ -372,7 +372,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
         if(mqtt_wss_service(client, -1)) {
-            mws_error(client->log, "Error connecting to MQTT WSS server \"%s\", port &d.", host, port);
+            mws_error(client->log, "Error connecting to MQTT WSS server \"%s\", port %d.", host, port);
             return 2;
         }
     }
