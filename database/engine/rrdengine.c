@@ -649,12 +649,7 @@ static void delete_old_data(void *arg)
                  * If the metric is empty, has no active writers and if the metadata log has been initialized then
                  * attempt to delete the corresponding netdata dimension.
                  */
-                //metalog_delete_dimension_by_uuid(ctx->metalog_ctx, metric_id);
-                {
-                    char uuid_str[37];
-                    uuid_unparse_lower(metric_id, uuid_str);
-                    info("Delete metric %s due to rotation", uuid_str);
-                }
+                metalog_delete_dimension_by_uuid(ctx->metalog_ctx, metric_id);
             }
         }
         next = extent->next;

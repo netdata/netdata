@@ -32,7 +32,6 @@ const char *database_config[] = {
 sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_transaction_lock;
-//static uv_mutex_t sqlite_add_page;
 static uint32_t page_size;
 static uint32_t page_count;
 static uint32_t free_page_count;
@@ -136,6 +135,35 @@ void store_active_dimension(uuid_t *dimension_uuid)
     return;
 }
 
+static void legacy_uuid(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    if (unlikely(argc != 2 || sqlite3_value_text(argv[0]) == NULL || sqlite3_value_text(argv[1]) == NULL)) {
+        sqlite3_result_null(context);
+        return ;
+    }
+    uuid_t  uuid;
+
+    rrdeng_generate_legacy_uuid((char *) sqlite3_value_text(argv[0]), (char *) sqlite3_value_text(argv[1]), &uuid);
+
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
+
+static void multihost_uuid(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    if (unlikely(argc != 2 || sqlite3_value_blob(argv[0]) == NULL || sqlite3_value_blob(argv[1]) == NULL)) {
+        sqlite3_result_null(context);
+        return ;
+    }
+    char host_guid[GUID_LEN + 1];
+    uuid_unparse_lower(*((uuid_t *) sqlite3_value_blob(argv[0])), host_guid);
+
+    uuid_t  uuid;
+
+    rrdeng_convert_legacy_uuid_to_multihost((char *) host_guid, (uuid_t *) sqlite3_value_blob(argv[1]), &uuid);
+
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
+
 
 /*
  * Initialize the SQLite database
@@ -148,7 +176,6 @@ int sql_init_database(void)
     int rc;
 
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
-//    fatal_assert(0 == uv_mutex_init(&sqlite_add_page));
 
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
     rc = sqlite3_open(sqlite_database, &db_meta);
@@ -169,6 +196,8 @@ int sql_init_database(void)
             return 1;
         }
     }
+    sqlite3_create_function(db_meta, "legacy", 2, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, legacy_uuid, 0, 0);
+    sqlite3_create_function(db_meta, "multihost", 2, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, multihost_uuid, 0, 0);
     info("SQLite database initialization completed");
     return 0;
 }
@@ -459,7 +488,7 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 
 found:;
 #ifdef NETDATA_INTERNAL_CHECKS
-    char  uuid_str[37];
+    char  uuid_str[GUID_LEN + 1];
     if (likely(uuid)) {
         uuid_unparse_lower(*uuid, uuid_str);
         debug(D_SQLITE, "Found UUID %s for dimension %s", uuid_str, rd->name);
@@ -483,7 +512,7 @@ uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
     uuid_generate(*uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    char uuid_str[37];
+    char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str);
     debug(D_SQLITE,"Generating uuid [%s] for dimension %s under chart %s", uuid_str, rd->name, st->id);
 #endif
@@ -503,7 +532,7 @@ void delete_dimension_uuid(uuid_t *dimension_uuid)
     int rc;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    char uuid_str[37];
+    char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*dimension_uuid, uuid_str);
     debug(D_SQLITE,"Deleting dimension uuid %s", uuid_str);
 #endif
@@ -577,7 +606,7 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
 
 found:;
 #ifdef NETDATA_INTERNAL_CHECKS
-    char  uuid_str[37];
+    char  uuid_str[GUID_LEN + 1];
     if (likely(uuid)) {
         uuid_unparse_lower(*uuid, uuid_str);
         debug(D_SQLITE, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
@@ -615,7 +644,7 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
     uuid_generate(*uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    char uuid_str[37];
+    char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str);
     debug(D_SQLITE,"Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, st->rrdhost->hostname);
 #endif
@@ -1115,7 +1144,7 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
         goto failed;
     }
 
-    char uuid_str[37];
+    char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 0)), uuid_str);
 
     host = callocz(1, sizeof(RRDHOST));
