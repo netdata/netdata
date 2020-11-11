@@ -276,9 +276,9 @@ class Service(SimpleService):
         data_probability, data_anomaly = {}, {}
         for model in self.fitted_at.keys():
             model_display_name = self.model_display_names[model]
-            X_model = self.make_features(
+            X_model = np.nan_to_num(self.make_features(
                 self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(f'{model}|')]].values,
-                model=model)[-1,:].reshape(1, -1)
+                model=model)[-1,:].reshape(1, -1))
             try:
                 data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 100
                 data_anomaly[model_display_name + '_anomaly'] = self.models[model].predict(X_model)[-1]
