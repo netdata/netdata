@@ -27,6 +27,8 @@ from bases.FrameworkServices.SimpleService import SimpleService
 warnings.filterwarnings('ignore', r'All-NaN slice encountered')
 warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
 
+disabled_by_default = True
+
 ORDER = ['probability', 'anomaly']
 
 CHARTS = {
