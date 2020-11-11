@@ -321,6 +321,8 @@ void rrdset_free(RRDSET *st) {
     rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
 
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        free_uuid_cache(&st->state->uuid_cache);
     // info("Removing chart '%s' ('%s')", st->id, st->name);
 
     // ------------------------------------------------------------------------

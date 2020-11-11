@@ -69,5 +69,6 @@ extern void add_migrated_file(char *path, uint64_t file_size);
 extern void db_unlock(void);
 extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
+extern void free_uuid_cache(struct uuid_cache **uuid_cache);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H
