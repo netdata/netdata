@@ -38,9 +38,10 @@ sudo ./edit-config python.d/alarms.conf
 
 The `alarms` specific part of the `alarms.conf` file should look like this:
 
-```
+```yaml
 # what url to pull data from
-url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+local:
+   url: 'http://127.0.0.1:19999/api/v1/alarms?all'
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`
