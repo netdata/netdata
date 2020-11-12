@@ -2,16 +2,6 @@
 #include "metadatalog.h"
 #include "metalogpluginsd.h"
 
-//void metadata_logfile_list_insert(struct metadata_logfile_list *metadata_logfiles, struct metadata_logfile *metalogfile)
-//{
-//    if (likely(NULL != metadata_logfiles->last)) {
-//        metadata_logfiles->last->next = metalogfile;
-//    }
-//    if (unlikely(NULL == metadata_logfiles->first)) {
-//        metadata_logfiles->first = metalogfile;
-//    }
-//    metadata_logfiles->last = metalogfile;
-//}
 
 void generate_metadata_logfile_path(struct metadata_logfile *metalogfile, char *str, size_t maxlen)
 {
@@ -60,26 +50,6 @@ int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_s
     return ret;
 }
 
-//int close_metadata_logfile(struct metadata_logfile *metalogfile)
-//{
-//    struct metalog_instance *ctx = metalogfile->ctx;
-//    uv_fs_t req;
-//    int ret;
-//    char path[RRDENG_PATH_MAX];
-//
-//    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
-//
-//    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
-//    if (ret < 0) {
-//        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-////        ++ctx->stats.fs_errors;
-//        rrd_stat_atomic_add(&global_fs_errors, 1);
-//    }
-//    uv_fs_req_cleanup(&req);
-//
-//    return ret;
-//}
-
 int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
 {
     //struct metalog_instance *ctx = metalogfile->ctx;
@@ -99,44 +69,6 @@ int unlink_metadata_logfile(struct metadata_logfile *metalogfile)
 
     return ret;
 }
-
-//int destroy_metadata_logfile(struct metadata_logfile *metalogfile)
-//{
-//    struct metalog_instance *ctx = metalogfile->ctx;
-//    uv_fs_t req;
-//    int ret;
-//    char path[RRDENG_PATH_MAX];
-//
-//    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
-//
-//    ret = uv_fs_ftruncate(NULL, &req, metalogfile->file, 0, NULL);
-//    if (ret < 0) {
-//        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-////        ++ctx->stats.fs_errors;
-//        rrd_stat_atomic_add(&global_fs_errors, 1);
-//    }
-//    uv_fs_req_cleanup(&req);
-//
-//    ret = uv_fs_close(NULL, &req, metalogfile->file, NULL);
-//    if (ret < 0) {
-//        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
-////        ++ctx->stats.fs_errors;
-//        rrd_stat_atomic_add(&global_fs_errors, 1);
-//    }
-//    uv_fs_req_cleanup(&req);
-//
-//    ret = uv_fs_unlink(NULL, &req, path, NULL);
-//    if (ret < 0) {
-//        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-////        ++ctx->stats.fs_errors;
-//        rrd_stat_atomic_add(&global_fs_errors, 1);
-//    }
-//    uv_fs_req_cleanup(&req);
-//
-////    ++ctx->stats.metadata_logfile_deletions;
-//
-//    return ret;
-//}
 
 static int check_metadata_logfile_superblock(uv_file file)
 {
@@ -485,8 +417,6 @@ static int scan_metalog_files(struct metalog_instance *ctx)
             continue;
         }
         else {
-//            info("Migrated metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
-//                      METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
             db_execute("COMMIT TRANSACTION;");
         }
         db_unlock();

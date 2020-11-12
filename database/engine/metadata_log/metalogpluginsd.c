@@ -106,8 +106,6 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
-    //UNUSED(user);
-    //UNUSED(uuid);
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
     uuid_copy(state->uuid, *uuid);
 

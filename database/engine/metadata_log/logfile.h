@@ -31,7 +31,6 @@ struct metadata_logfile_list {
 extern void generate_metadata_logfile_path(struct metadata_logfile *metadatalog, char *str, size_t maxlen);
 extern int rename_metadata_logfile(struct metadata_logfile *metalogfile, unsigned new_starting_fileno,
                                    unsigned new_fileno);
-//extern int close_metadata_logfile(struct metadata_logfile *metadatalog);
 extern int unlink_metadata_logfile(struct metadata_logfile *metalogfile);
 extern int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile *logfile);
 extern int init_metalog_files(struct metalog_instance *ctx);
