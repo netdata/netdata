@@ -1603,7 +1603,6 @@ restart_after_removal:
                     /* If the chart still has dimensions don't delete it from the metadata log */
                     continue;
                 }
-                metalog_commit_delete_chart(st);
             }
 #endif
             rrdset_rdlock(st);

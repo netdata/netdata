@@ -135,36 +135,6 @@ void store_active_dimension(uuid_t *dimension_uuid)
     return;
 }
 
-static void legacy_uuid(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    if (unlikely(argc != 2 || sqlite3_value_text(argv[0]) == NULL || sqlite3_value_text(argv[1]) == NULL)) {
-        sqlite3_result_null(context);
-        return ;
-    }
-    uuid_t  uuid;
-
-    rrdeng_generate_legacy_uuid((char *) sqlite3_value_text(argv[0]), (char *) sqlite3_value_text(argv[1]), &uuid);
-
-    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
-}
-
-static void multihost_uuid(sqlite3_context *context, int argc, sqlite3_value **argv)
-{
-    if (unlikely(argc != 2 || sqlite3_value_blob(argv[0]) == NULL || sqlite3_value_blob(argv[1]) == NULL)) {
-        sqlite3_result_null(context);
-        return ;
-    }
-    char host_guid[GUID_LEN + 1];
-    uuid_unparse_lower(*((uuid_t *) sqlite3_value_blob(argv[0])), host_guid);
-
-    uuid_t  uuid;
-
-    rrdeng_convert_legacy_uuid_to_multihost((char *) host_guid, (uuid_t *) sqlite3_value_blob(argv[1]), &uuid);
-
-    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
-}
-
-
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -196,8 +166,6 @@ int sql_init_database(void)
             return 1;
         }
     }
-    sqlite3_create_function(db_meta, "legacy", 2, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, legacy_uuid, 0, 0);
-    sqlite3_create_function(db_meta, "multihost", 2, SQLITE_ANY | SQLITE_DETERMINISTIC , 0, multihost_uuid, 0, 0);
     info("SQLite database initialization completed");
     return 0;
 }
@@ -1253,38 +1221,4 @@ void add_migrated_file(char *path, uint64_t file_size)
         error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
 
     return;
-}
-
-#define FIND_HOST_CHART_METRIC "select h.hostname, c.type||'.'||c.id, d.id, d.dim_id from dimension d, chart c, host h " \
-        "where d.chart_id = c.chart_id and c.host_id = h.host_id and @uuid in " \
-        "(dim_id, multihost(h.host_id, legacy(d.id, c.type||'.'||c.id)), legacy(d.id, c.type||'.'||c.id));"
-
-int find_host_chart_dimension(uuid_t *uuid, char **host, char **chart, char **dimension, uuid_t *stored_uuid)
-{
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    rc = sqlite3_prepare_v2(db_meta, FIND_HOST_CHART_METRIC, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to find host, chart, dimension info for a uuid");
-        return 1;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_step(res);
-    if (likely(rc == SQLITE_ROW)) {
-        *host = (char *) strdupz((const char *) sqlite3_column_text(res, 0));
-        *chart = (char *) strdupz((const char *) sqlite3_column_text(res, 1));
-        *dimension = (char *) strdupz((const char *) sqlite3_column_text(res, 2));
-        uuid_copy(*stored_uuid, sqlite3_column_blob(res, 3));
-    }
-
-bind_fail:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize statement to find host, chart, dimension info for a uuid");
-
-    return !(rc == SQLITE_ROW);
 }
