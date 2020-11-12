@@ -19,10 +19,12 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 #
-# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright: 2018-2020 Netdata Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author: Paweł Krupa <paulfantom@gmail.com>
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+# Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
 set -e
 
