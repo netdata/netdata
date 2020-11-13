@@ -113,6 +113,7 @@ Netdata features. For more details, take a look on the table:
 | memory mode = `dbengine`| Avaiable|Available|
 | HTTPS on exporter| When destination accepts|When destination accepts, but with a worse performance when compared with `OpenSSL`. <sup id="a1">[1](#f1)</sup>|
 | Netdata cloud| Available| `not Available` due problems with `libwebsockets`. <sup id="a2">[2](#f2)</sup> |
+
 <b id="f1">1</b> When testing with InnoDB, we observed error mesages like `"tls: oversized record received with length
 21536"`. [↩](#a1)
 <b id="f2">2</b> When `libwebsockets` is compiled against `WolfSSL` it says that the function
