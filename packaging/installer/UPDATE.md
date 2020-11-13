@@ -1,25 +1,22 @@
 <!--
----
 title: "Update Netdata"
 description: "We actively develop Netdata to add new features and remove bugs. Here's how to stay up-to-date with the 
 latest nightly or major releases."
-date: 2020-03-12
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
----
 -->
 
 # Update Netdata
 
-We actively develop Netdata to add new features and remove bugs, and encourage all users to ensure they're using the
-most up-to-date version, whether that's nightly or major releases.
+We actively develop the open-source Netdata Agent to add new features and remove bugs, and encourage all users to ensure
+they're using the most up-to-date version, whether that's nightly or major releases.
 
-Before you update Netdata using one of the methods below, check to see if your Netdata agent is already up-to-date by
+Before you update Netdata using one of the methods below, check to see if your Netdata Agent is already up-to-date by
 opening the update modal in the dashboard. Click the **Update** button in the top navigation to open it. The modal tells
-you whether your agent is up-to-date or not.
+you whether your Agent is up-to-date or not.
 
 ![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/80829493-1adbe880-8b9c-11ea-9770-cc3b23a89414.gif)
 
-If your agent can be updated, use one of the methods below. **The method you chose for updating Netdata depends on how
+If your Agent can be updated, use one of the methods below. **The method you chose for updating Netdata depends on how
 you installed it.** Choose from the following list to see the appropriate update instructions for your system.
 
 -   [One-line installer script (`kickstart.sh`)](#one-line-installer-script-kickstartsh)
@@ -29,16 +26,18 @@ you installed it.** Choose from the following list to see the appropriate update
 -   [macOS](#macos)
 -   [Manual installation from Git](#manual-installation-from-git)
 
-#### How to determine which install method you used
+## How to determine which install method you used
 
-First, see [here](https://learn.netdata.cloud/docs/configure/nodes#the-netdata-config-directory) to figure out
-where your user configuration files for Netdata are.
+First, see our [configuration doc](https://learn.netdata.cloud/docs/configure/nodes#the-netdata-config-directory) to
+figure out where your Netdata config directory is. In most installations, this is `/etc/netdata`.
 
-Once you have figured this out, look for a file called `.environment` in this directory (you will need to use
-`ls -a` to see it, as it will not be listed by default by a regular `ls` command). If it is not there, you used
-package manager to install netdata and need to update it through that package manager. If the `environment` file
-is present, check the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using
-`kickstart-static64.sh`.  Otherwise you installed using `kickstart.sh`.
+Look for a file called `.environment` in your Netdata config directory with `ls -a`.
+
+-   If the `.environment` file _does not_ exist, update with your [package manager](#deb-or-rpm-packages).
+-   If the `.environtment` file _does_ exist, check its contents.
+    -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
+        binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
+    -   Otherwise, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
 
 ## One-line installer script (`kickstart.sh`)
 

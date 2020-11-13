@@ -125,6 +125,14 @@ Cloud. If the script returns an error, try our [troubleshooting tips](/claim/REA
 For more information on the claiming process, why we implemented it, and how it works, see the [claim](/claim/README.md)
 and [Agent-Cloud link](/aclk/README.md) reference docs.
 
+## Troubleshooting
+
+If you experience issues with installing the Netdata Agent, see our
+[installation](/packaging/installer/README.md#troubleshooting-and-known-issues) reference. Our
+[reinstall](/packaging/installer/REINSTALL.md) doc can help clean up your installation and get you back to monitoring.
+
+For Netdata Cloud issues, see the [Netdata Cloud reference docs](https://learn.netdata.cloud/docs/cloud).
+
 ## What's next?
 
 At this point, you have set up your free Netdata Cloud account, installed the Netdata Agent on your node(s), and claimed
@@ -136,5 +144,13 @@ quickstart](/docs/quickstart/single-node.md).
 
 If you're looking to monitor an entire infrastructure with Netdata, see the [infrastructure monitoring
 quickstart](/docs/quickstart/infrastructure.md).
+
+### Related reference documentation
+
+-   [Packaging &amp; installer](/packaging/installer/README.md)
+-   [Reinstall Netdata](/packaging/installer/REINSTALL.md)
+-   [Update Netdata](/packaging/installer/UPDATE.md)
+-   [Agent-Cloud link](/aclk/README.md)
+-   [Agent claiming](/claim/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Foverview%2Fnetdata-monitoring-stacka&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
