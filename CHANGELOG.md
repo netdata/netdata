@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Disable chart obsoletion code for archived chart creation. [\#10231](https://github.com/netdata/netdata/pull/10231) ([mfundul](https://github.com/mfundul))
 - add `nvidia\_smi` collector data to the dashboard\_info.js [\#10230](https://github.com/netdata/netdata/pull/10230) ([ilyam8](https://github.com/ilyam8))
 - health: convert `elasticsearch\_last\_collected` alarm to template [\#10226](https://github.com/netdata/netdata/pull/10226) ([ilyam8](https://github.com/ilyam8))
 - streaming: fix a typo in the README.md [\#10225](https://github.com/netdata/netdata/pull/10225) ([ilyam8](https://github.com/ilyam8))
@@ -214,7 +215,6 @@
 - Add option for multiple storage backends in `python.d/varnish` [\#9668](https://github.com/netdata/netdata/pull/9668) ([florianmagnin](https://github.com/florianmagnin))
 - Fix for ignored LXC containers [\#9645](https://github.com/netdata/netdata/pull/9645) ([vlvkobal](https://github.com/vlvkobal))
 - Fix systemd journal logs to remove PrivateMounts [\#9619](https://github.com/netdata/netdata/pull/9619) ([Steve8291](https://github.com/Steve8291))
-- Add community link to readme [\#9602](https://github.com/netdata/netdata/pull/9602) ([zack-shoylev](https://github.com/zack-shoylev))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
