@@ -108,14 +108,14 @@ void security_common_options(SSL_CTX *ctx, int side) {
                 error("SSL error. cannot set the cipher list");
             }
         }
+    }
 #endif
 
 #if defined(OPENSSL_VERSION_NUMBER)
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-        SSL_CTX_set_options (ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+    SSL_CTX_set_options (ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #endif
 #endif
-    }
 
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 }
