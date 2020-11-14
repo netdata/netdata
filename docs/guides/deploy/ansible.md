@@ -52,7 +52,7 @@ current directory, and remove the rest of the cloned repository, as it's not req
 
 ```bash
 git clone https://github.com/netdata/community.git
-mv netdata-agent-deployment/ansible-quickstart .
+mv community/netdata-agent-deployment/ansible-quickstart .
 rm -rf community
 ```
 
