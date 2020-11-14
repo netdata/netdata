@@ -52,14 +52,14 @@ current directory, and remove the rest of the cloned repository, as it's not req
 
 ```bash
 git clone https://github.com/netdata/community.git
-mv community/configuration-management/ansible .
+mv community/netdata-agent-deployment/ansible-quickstart .
 rm -rf community
 ```
 
 Next, `cd` into the Ansible directory.
 
 ```bash
-cd ansible
+cd ansible-quickstart
 ```
 
 ### Edit the `hosts` file
