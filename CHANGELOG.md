@@ -18,6 +18,7 @@
 - installer: update go.d.plugin version to v0.25.0 [\#10215](https://github.com/netdata/netdata/pull/10215) ([ilyam8](https://github.com/ilyam8))
 - Fix repeated frontmatter in exporting docs [\#10211](https://github.com/netdata/netdata/pull/10211) ([joelhans](https://github.com/joelhans))
 - Fixed bug in auto-updater for FreeBSD \(\#10198\) [\#10204](https://github.com/netdata/netdata/pull/10204) ([abrbon](https://github.com/abrbon))
+- New ebpf release [\#10202](https://github.com/netdata/netdata/pull/10202) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add guide: Deploy Netdata with Ansible [\#10199](https://github.com/netdata/netdata/pull/10199) ([joelhans](https://github.com/joelhans))
 - Add allocated space metrics to oracledb charts [\#10197](https://github.com/netdata/netdata/pull/10197) ([jurgenhaas](https://github.com/jurgenhaas))
 - Inform users about an issue with the newest gRPC versions [\#10194](https://github.com/netdata/netdata/pull/10194) ([vlvkobal](https://github.com/vlvkobal))
