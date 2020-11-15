@@ -1528,8 +1528,11 @@ restart_after_removal:
                 while (st->alarms)     rrdsetcalc_unlink(st->alarms);
                 rrdset_wrlock(st);
                 for (rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
+                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+                        last = rd;
+                        rd = rd->next;
                         continue;
+                    }
 
                     rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
                     while (rd->variables)
