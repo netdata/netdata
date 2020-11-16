@@ -497,14 +497,14 @@ fi
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
-test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" -a -z  "${WOLFSSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL or WolfSSL are required for HTTPS but not found. Try installing 'libssl-dev', 'openssl-devel' or 'libwolfssl-dev'.])
+test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" -a -z "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL or WolfSSL are required for HTTPS but not found. Try installing 'libssl-dev', 'openssl-devel', or 'libwolfssl-dev'.])
 
-test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev', 'openssl-devel' or  'libwolfssl-dev'.])
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" -a -z "${WOLFSSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev', 'openssl-devel', or  'libwolfssl-dev'.])
 
 AC_MSG_CHECKING([if netdata dbengine should be used])
-if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}" -o "${WOLF_LIBS}"; then
+if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a \( "${SSL_LIBS}" -o "${WOLF_LIBS}" \) ; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
@@ -514,9 +514,7 @@ if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     if test "${enable_wolfssl}" = "yes"; then
         OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
-    fi
-
-    if test "${enable_wolfssl}" != "yes"; then
+    else
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     fi
 else
@@ -687,11 +685,11 @@ AC_MSG_RESULT([${enable_cloud}])
 if test "$enable_cloud" != "no" -a "${enable_wolfssl}" != "yes"; then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
-    if test -n "${SSL_LIBS}"; then
+    if test -n "${SSL_LIBS}" -a "${enable_wolfssl}" != "yes"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-else
-        AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev', 'libwolfssl-dev' or 'openssl-devel'.])
+    else
+        AC_MSG_WARN([OpenSSL required for agent-cloud-link but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
     fi
 
     AC_MSG_CHECKING([if libmosquitto static lib is present (and builds)])
