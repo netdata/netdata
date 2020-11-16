@@ -400,10 +400,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
-    //if (is_archived)
-    //    rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
-    //else
-        rd->state->collect_ops.init(rd); // only initialize if a collector created this dimension
+    rd->state->collect_ops.init(rd);
     // append this dimension
     if(!st->dimensions)
         st->dimensions = rd;
@@ -430,7 +427,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         td->next = rd;
     }
 
-    if(host->health_enabled) { //} && !is_archived) {
+    if(host->health_enabled) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
@@ -439,8 +436,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    //if (!is_archived)
-        calc_link_to_rrddim(rd);
+    calc_link_to_rrddim(rd);
 
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
