@@ -57,7 +57,7 @@ int security_test_certificate(SSL *ssl) {
 }
 
 
-#if defined(OPENSSL_VERSION_110) || defined(NETDATA_HTTPS_WITH_WOLFSSL)
+#if defined(OPENSSL_VERSION_NUMBER) || defined(NETDATA_HTTPS_WITH_WOLFSSL)
 /**
  * TLS version
  *
