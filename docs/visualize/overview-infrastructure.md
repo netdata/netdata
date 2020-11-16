@@ -61,9 +61,9 @@ affects a single node, a subset of nodes, or an entire infrastructure.
 ![Composite charts showing available and committed RAM across an
 infrastructure](https://user-images.githubusercontent.com/1153921/99314892-0bae4680-281f-11eb-823e-071a1da25dc7.png)
 
-Use [_group by node_](https://learn.netdata.cloud/docs/cloud/visualize/overview) to visualize a single metric across all
-contributing nodes. If the composite chart has 5 contributing nodes, there will be 5 lines/areas, one for the most
-relevant dimension from each node.
+Use [_group by node_](https://learn.netdata.cloud/docs/cloud/visualize/overview#group-by-dimension-or-node) to visualize
+a single metric across all contributing nodes. If the composite chart has 5 contributing nodes, there will be 5
+lines/areas, one for the most relevant dimension from each node.
 
 ![Finding a problematic node with group by
 node](https://user-images.githubusercontent.com/1153921/99315558-0e5d6b80-2820-11eb-91e9-9c46bc4c7298.gif)
