@@ -163,10 +163,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, hostname, registry_hostname, guid, os,
                         tags, timezone, program_name, program_version);
 
-    //host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
-    //host->rrd_memory_mode     = memory_mode;
-    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE) /*|| is_archived*/) ? 0 : health_enabled;
+    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
@@ -194,17 +192,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_mutex_init(&host->claimed_id_lock);
 
-    //rrdhost_init_hostname(host, hostname);
-    //rrdhost_init_machine_guid(host, guid);
-
-    //rrdhost_init_os(host, os);
-    //rrdhost_init_timezone(host, timezone);
-    //rrdhost_init_tags(host, tags);
-
-    //host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
-    //host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
-    //host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
-
     host->system_info = system_info;
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
@@ -212,10 +199,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
-    //if (is_archived) {
-    //    rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
-    //    info("Host %s is created in archived mode", hostname);
-    //}
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
@@ -352,7 +335,6 @@ RRDHOST *rrdhost_create(const char *hostname,
             return host;
         }
 
-        //metalog_upd_objcount(host, 1);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
@@ -414,10 +396,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_hosts_available++;
 
-//#ifdef ENABLE_DBENGINE
-//    if (likely(!is_localhost && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-//            metalog_commit_update_host(host);
-//#endif
     return host;
 }
 
@@ -519,10 +497,7 @@ void rrdhost_update(RRDHOST *host
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
     }
-//#ifdef ENABLE_DBENGINE
-//    if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-//        metalog_commit_update_host(host);
-//#endif
+
     return;
 }
 
@@ -925,9 +900,6 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
 
-//#ifdef ENABLE_DBENGINE
-//    free_uuid(&host->host_uuid);
-//#endif
     freez(host);
 
     rrd_hosts_available--;
