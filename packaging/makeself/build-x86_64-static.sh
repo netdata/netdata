@@ -7,7 +7,7 @@
 
 set -e
 
-DOCKER_CONTAINER_NAME="netdata-package-x86_64-static-alpine37"
+DOCKER_CONTAINER_NAME="netdata-package-x86_64-static-alpine312"
 
 if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # To run interactively:

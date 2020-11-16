@@ -30,6 +30,7 @@ apk add --no-cache -U \
   libmnl-dev \
   libnetfilter_acct-dev \
   libuv-dev \
+  libuv-static \
   lz4-dev \
   snappy-dev \
   protobuf-dev \
