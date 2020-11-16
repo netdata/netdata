@@ -393,23 +393,9 @@ AC_CHECK_LIB(
 )
 
 # the wolfSSL_X509_VERIFY_PARAM_set1_host is not recognize by libwebsockets, this is the motive we are searching
-# for the wrong function here
-AC_CHECK_LIB(
-    [wolfssl],
-    [X509_VERIFY_PARAM_set1_host],
-    [wolfssl_host_validation="yes"],
-    [wolfssl_host_validation="no"]
-)
 
 test -z "${WOLFSSL_LIBS}" || \
     AC_DEFINE([HAVE_CRYPTO], [1], [libwolfssl availability])
-
-if test "${wolfssl_host_validation}" = "no"; then
-    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [0], [ssl host validation])
-    AC_MSG_WARN([DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.])
-else
-    AC_DEFINE([HAVE_X509_VERIFY_PARAM_set1_host], [1], [ssl host validation])
-fi
 
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
