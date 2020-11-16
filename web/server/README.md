@@ -116,6 +116,7 @@ Netdata features. For more details, take a look on the table:
 
 <b id="f1">1</b> When testing with InnoDB, we observed error mesages like `"tls: oversized record received with length
 21536"`. [↩](#a1)
+
 <b id="f2">2</b> When `libwebsockets` is compiled against `WolfSSL` it says that the function
 `X509_VERIFY_PARAM_set1_host` is not present, but `WolfSSL` has the function `wolfSSL_X509_VERIFY_PARAM_set1_host` that
 is not used. [↩](#a2)
