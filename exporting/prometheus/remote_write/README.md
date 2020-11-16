@@ -15,8 +15,8 @@ than 20 external storage providers for long-term archiving and further analysis.
 To use the Prometheus remote write API with [storage
 providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage), install
 [protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy) libraries.
-Next, re-install Netdata from the source, which detects that the required libraries and
-utilities are now available.
+Next, [reinstall Netdata](/packaging/installer/REINSTALL.md), which detects that the required libraries and utilities
+are now available.
 
 ## Configuration
 
