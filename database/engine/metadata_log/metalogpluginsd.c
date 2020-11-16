@@ -107,7 +107,6 @@ PARSER_RC metalog_pluginsd_guid_action(void *user, uuid_t *uuid)
 PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
 {
     struct metalog_pluginsd_state *state = ((PARSER_USER_OBJECT *)user)->private;
-    uuid_copy(state->uuid, *uuid);
 
     int rc = find_uuid_type(uuid);
 
@@ -115,12 +114,10 @@ PARSER_RC metalog_pluginsd_context_action(void *user, uuid_t *uuid)
         uuid_copy(state->host_uuid, *uuid);
         ((PARSER_USER_OBJECT *)user)->st_exists = 0;
         ((PARSER_USER_OBJECT *)user)->host_exists = 1;
-    }
-    if (rc == 2) {
+    } else if (rc == 2) {
         uuid_copy(state->chart_uuid, *uuid);
         ((PARSER_USER_OBJECT *)user)->st_exists = 1;
-    }
-    if (rc == 3)
+    } else
         uuid_copy(state->uuid, *uuid);
 
     return PARSER_RC_OK;

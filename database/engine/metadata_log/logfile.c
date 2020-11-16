@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <database/sqlite/sqlite_functions.h>
 #include "metadatalog.h"
 #include "metalogpluginsd.h"
 
