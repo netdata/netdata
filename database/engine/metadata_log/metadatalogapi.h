@@ -3,8 +3,6 @@
 #ifndef NETDATA_METADATALOGAPI_H
 #define NETDATA_METADATALOGAPI_H
 
-#include "metadatalog.h"
-
 extern void metalog_commit_delete_chart(RRDSET *st);
 extern void metalog_commit_delete_dimension(RRDDIM *rd);
 extern void metalog_delete_dimension_by_uuid(struct metalog_instance *ctx, uuid_t *metric_uuid);

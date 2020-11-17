@@ -396,7 +396,6 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
-        database/engine/metadata_log/metadatalog.c \
         database/engine/metadata_log/metadatalog.h \
         database/engine/metadata_log/metadatalogapi.c \
         database/engine/metadata_log/metadatalogapi.h \

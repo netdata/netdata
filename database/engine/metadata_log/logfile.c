@@ -411,22 +411,13 @@ static int scan_metalog_files(struct metalog_instance *ctx)
             error("Deleting invalid metadata log file \"%s/"METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL
                       METALOG_EXTENSION"\"", dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
             unlink_metadata_logfile(metalogfile);
-            freez(metalogfile);
             ++failed_to_load;
             db_execute("ROLLBACK TRANSACTION;");
-            db_unlock();
-            continue;
         }
-        else {
+        else
             db_execute("COMMIT TRANSACTION;");
-        }
         db_unlock();
-
-        //unlink_metadata_logfile(metalogfile);
-        //freez(metalogfile);
-
-        //metadata_logfile_list_insert(&ctx->metadata_logfiles, metalogfile);
-        //rrd_atomic_fetch_add(&ctx->disk_space, metalogfile->pos);
+        freez(metalogfile);
     }
     matched_files -= failed_to_load;
     debug(D_METADATALOG, "PARSER ended");
