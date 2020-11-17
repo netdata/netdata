@@ -337,13 +337,54 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m->collected++;
 }
 
+static struct loop_thread
+{
+    uv_thread_t thread;
+    uv_loop_t loop;
+    uv_async_t async;
+} loop_thread;
+
 static void diskspace_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     info("cleaning up...");
 
+    /* stop event loop */
+    fatal_assert(0 == uv_async_send(&loop_thread.async));
+
+    int error = uv_thread_join(&loop_thread.thread);
+    if (error) {
+        error("uv_thread_join(): %s", uv_strerror(error));
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void close_async(uv_async_t *handle)
+{
+    uv_close((uv_handle_t *)handle, NULL);
+}
+
+void run_event_loop(void *ptr)
+{
+    UNUSED(ptr);
+    int error;
+
+    error = uv_loop_init(&loop_thread.loop);
+    if (error) {
+        error("uv_loop_init(): %s", uv_strerror(error));
+        return;
+    }
+
+    error = uv_async_init(&loop_thread.loop, &loop_thread.async, close_async);
+    if (error) {
+        error("uv_async_init(): %s", uv_strerror(error));
+    }
+    
+    uv_run(&loop_thread.loop, UV_RUN_DEFAULT);
+
+    fatal_assert(0 == uv_loop_close(&loop_thread.loop));
 }
 
 void *diskspace_main(void *ptr) {
@@ -362,6 +403,12 @@ void *diskspace_main(void *ptr) {
         check_for_new_mountpoints_every = update_every;
 
     struct rusage thread;
+
+    int error = uv_thread_create(&loop_thread.thread, run_event_loop, NULL);
+    if (error) {
+        error("uv_thread_create(): %s", uv_strerror(error));
+        return NULL;
+    }
 
     usec_t duration = 0;
     usec_t step = update_every * USEC_PER_SEC;
