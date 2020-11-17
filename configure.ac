@@ -510,7 +510,7 @@ AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 AC_MSG_CHECKING([if netdata https should be used])
-if test "${enable_https}" != "no" -a "${SSL_LIBS}" -a "${enable_wolfssl}" != "yes"; then
+if test "${enable_https}" != "no" -a "${SSL_LIBS}" -a \( -z "${WOLFSSL_LIBS}" -o "${enable_wolfssl}" != "yes" \) ; then
     enable_https="yes"
     AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
     AC_DEFINE([NETDATA_HTTPS_WITH_OPENSSL], [1], [netdata is compiled against OpenSSL])
@@ -671,7 +671,7 @@ AC_MSG_RESULT([${enable_cloud}])
 if test "$enable_cloud" != "no" -a "${enable_wolfssl}" != "yes"; then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
-    if test -n "${SSL_LIBS}" -a "${enable_wolfssl}" != "yes"; then
+    if test -n "${SSL_LIBS}" -a \( "${enable_wolfssl}" != "yes" -o -z "${WOLFSSL_LIBS}" \); then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
