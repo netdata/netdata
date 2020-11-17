@@ -32,6 +32,7 @@ apk add --no-cache -U \
   libuv-dev \
   libuv-static \
   lz4-dev \
+  lz4-static \
   snappy-dev \
   protobuf-dev \
   binutils \
