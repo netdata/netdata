@@ -4,7 +4,7 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-fetch "netdata-ioping-43d15a5" "https://github.com/netdata/ioping/tarball/master"
+fetch "ioping-1.2" "https://github.com/koct9i/ioping/archive/v1.2.tar.gz"
 
 export CFLAGS="-static"
 
