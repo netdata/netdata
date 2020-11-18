@@ -26,8 +26,7 @@ what that chart's current value is, the alarm that triggered it, and when the al
 
 Use the input field in the Alarms panel to filter active alarms. You can sort by the node's name, alarm, status, chart
 that triggered the alarm, or the operating system. Read more about the [filtering
-syntax](/docs/visualize/view-all-nodes.md#filter-and-group-your-infrastructure) to build valuable filters for your
-infrastructure.
+syntax](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) to build valuable filters for your infrastructure.
 
 Click on the 3-dot icon (`⋮`) to view active alarm information or navigate directly to the offending chart in that
 node's Cloud dashboard with the **Go to chart** button.
