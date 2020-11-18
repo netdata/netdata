@@ -336,7 +336,7 @@ This module will produce following charts (if data is available):
 
 ## Configuration
 
-Edit the `python.d/mysql.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/mysql.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

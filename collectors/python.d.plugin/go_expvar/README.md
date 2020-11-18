@@ -254,7 +254,7 @@ the first defined key wins and all subsequent keys with the same name are ignore
 
 ## Configuration
 
-Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

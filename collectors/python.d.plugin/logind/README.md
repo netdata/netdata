@@ -41,7 +41,7 @@ specify it using the `command` key like so:
 command: '/path/to/other/command'
 ```
 
-Edit the `python.d/logind.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/logind.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

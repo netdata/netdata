@@ -31,7 +31,7 @@ One chart for every sensor chip found and each of the above will be created.
 
 ## Configuration
 
-Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

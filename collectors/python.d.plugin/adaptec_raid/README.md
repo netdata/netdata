@@ -43,7 +43,7 @@ It produces:
 adaptec_raid: yes
 ```
 
-Edit the `python.d/adaptec_raid.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/adaptec_raid.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

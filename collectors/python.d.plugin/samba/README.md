@@ -81,7 +81,7 @@ netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
 samba: yes
 ```
 
-Edit the `python.d/samba.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/samba.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

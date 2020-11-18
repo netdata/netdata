@@ -100,7 +100,7 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
 
 ## Usage
 
-Edit the `python.d/springboot.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/springboot.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

@@ -27,7 +27,7 @@ Monit monitoring module. Data is grabbed from stats XML interface (exists for a 
 
 ## Configuration
 
-Edit the `python.d/monit.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/monit.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

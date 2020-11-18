@@ -16,7 +16,7 @@ It produces one aggregate chart or one chart per DNS server, showing the query t
 
 ## Configuration
 
-Edit the `python.d/dns_query_time.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/dns_query_time.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

@@ -8,7 +8,7 @@ sidebar_label: "OpenSIPS"
 
 ## Configuration
 
-Edit the `charts.d/opensips.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `charts.d/opensips.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

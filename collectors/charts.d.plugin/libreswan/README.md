@@ -21,7 +21,7 @@ The following charts are created, **per tunnel**:
 
 ## Configuration
 
-Edit the `charts.d/libreswan.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `charts.d/libreswan.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

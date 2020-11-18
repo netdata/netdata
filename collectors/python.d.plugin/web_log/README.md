@@ -35,7 +35,7 @@ If Netdata is installed on a system running a web server, it will detect it and 
 
 ## Configuration
 
-Edit the `python.d/web_log.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/web_log.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

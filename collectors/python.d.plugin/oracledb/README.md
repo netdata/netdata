@@ -70,7 +70,7 @@ GRANT SELECT_CATALOG_ROLE TO netdata;
 
 ## Configuration
 
-Edit the `python.d/oracledb.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/oracledb.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

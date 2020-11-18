@@ -12,7 +12,7 @@ Charts are created dynamically.
 
 ## Configuration
 
-Edit the `python.d/sensors.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/sensors.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

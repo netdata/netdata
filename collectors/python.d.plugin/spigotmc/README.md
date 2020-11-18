@@ -17,7 +17,7 @@ the data returned by the `tps` or `list` console commands.
 
 ## Configuration
 
-Edit the `python.d/spigotmc.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/spigotmc.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

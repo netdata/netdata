@@ -75,7 +75,7 @@ Collects memory-caching system performance metrics. It reads server response to 
 
 ## Configuration
 
-Edit the `python.d/memcached.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/memcached.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

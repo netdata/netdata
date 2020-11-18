@@ -42,7 +42,7 @@ For every disk (SMF):
 
 ## Configuration
 
-Edit the `python.d/varnish.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/varnish.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

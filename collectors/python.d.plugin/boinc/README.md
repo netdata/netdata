@@ -12,7 +12,7 @@ It provides charts tracking the total number of tasks and active tasks, as well 
 
 ## Configuration
 
-Edit the `python.d/boinc.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/boinc.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

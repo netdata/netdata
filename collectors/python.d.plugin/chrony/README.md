@@ -22,7 +22,7 @@ Verify that user Netdata can execute `chronyc tracking`. If necessary, update `/
 
 ## Configuration
 
-Edit the `python.d/chrony.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/chrony.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

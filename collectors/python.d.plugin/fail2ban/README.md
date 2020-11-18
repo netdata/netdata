@@ -16,7 +16,7 @@ It produces one chart with multiple lines (one line per jail)
 
 ## Configuration
 
-Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash

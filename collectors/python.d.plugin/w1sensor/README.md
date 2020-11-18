@@ -15,7 +15,7 @@ Charts are created dynamically based on the number of detected sensors.
 
 ## Configuration
 
-Edit the `python.d/w1sensor.conf` configuration file using `edit-config` from the `edit-config` from the Netdata [config
+Edit the `python.d/w1sensor.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
