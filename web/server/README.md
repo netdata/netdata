@@ -121,6 +121,10 @@ Netdata features. For more details, take a look on the table:
 `X509_VERIFY_PARAM_set1_host` is not present, but `WolfSSL` has the function `wolfSSL_X509_VERIFY_PARAM_set1_host` that
 is not used. [↩](#a2)
 
+#### Linking against WolfSSL
+
+If you compile Netdata against `WolfSS` and you have [errors](https://github.com/netdata/netdata/pull/10227#issuecomment-729626178), it is possible that your library were not compiled with all available options. 
+
 ### Select TLS version
 
 Beginning with version 1.21, you can also specify the TLS version and the ciphers that you want to use:
