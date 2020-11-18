@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Fix streaming buffer size [\#10240](https://github.com/netdata/netdata/pull/10240) ([vlvkobal](https://github.com/vlvkobal))
+- dashboard v2.9.2 [\#10239](https://github.com/netdata/netdata/pull/10239) ([jacekkolasa](https://github.com/jacekkolasa))
 - database: avoid endless loop when cleaning obsolete charts [\#10236](https://github.com/netdata/netdata/pull/10236) ([hexchain](https://github.com/hexchain))
 - Update ansible.md [\#10232](https://github.com/netdata/netdata/pull/10232) ([voriol](https://github.com/voriol))
 - Disable chart obsoletion code for archived chart creation. [\#10231](https://github.com/netdata/netdata/pull/10231) ([mfundul](https://github.com/mfundul))
