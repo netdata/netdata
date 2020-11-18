@@ -1,4 +1,0 @@
-numpy
-pandas
-requests
-pyod==0.7.8
