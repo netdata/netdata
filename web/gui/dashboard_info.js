@@ -11,7 +11,6 @@ var netdataDashboard = window.netdataDashboard || {};
 // Menus
 
 netdataDashboard.menu = {
-    
     'system': {
         title: 'System Overview',
         icon: '<i class="fas fa-bookmark"></i>',
@@ -195,6 +194,11 @@ netdataDashboard.menu = {
         title: 'Netdata Monitoring',
         icon: '<i class="fas fa-chart-bar"></i>',
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
+    },
+
+    'aclk_test': {
+        title: 'ACLK Test Generator',
+        info: 'For internal use to perform integration testing.'
     },
 
     'example': {
@@ -572,6 +576,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-exclamation"></i>',
         info: 'Charts showing alarm status over time (status maps to alarm state as 1:WARNING, 2:CRITICAL). More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
+
 };
 
 
@@ -762,7 +767,7 @@ netdataDashboard.context = {
     },
 
     'system.load': {
-        info: 'Current system load, i.e.. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
+        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>.',
         height: 0.7
     },
 
