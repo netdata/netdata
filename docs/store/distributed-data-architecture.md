@@ -34,7 +34,7 @@ Netdata's distributed data architecture has a number of benefits:
 Netdata Cloud does not store metric values. 
 
 To enable certain features, such as [viewing active alarms](/docs/monitor/view-active-alarms.md) or [filtering by
-service](/docs/visualize/view-all-nodes.md#filter-and-group-your-infrastructure), Netdata Cloud does store configured
+hostname/service](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter), Netdata Cloud does store configured
 alarms, their status, and a list of active collectors.
 
 Netdata does not and never will sell your personal data or data about your deployment.
