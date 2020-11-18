@@ -543,6 +543,11 @@ RRDSET *rrdset_create_custom(
         int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
+            changed_from_archived_to_active = 1;
+            mark_rebuild |= META_CHART_ACTIVATED;
+        }
         char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
              *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
         int rc;
