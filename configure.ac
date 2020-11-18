@@ -392,8 +392,6 @@ AC_CHECK_LIB(
     [WOLFSSL_LIBS="-lwolfssl"]
 )
 
-# the wolfSSL_X509_VERIFY_PARAM_set1_host is not recognize by libwebsockets, this is the motive we are searching
-
 test -z "${WOLFSSL_LIBS}" || \
     AC_DEFINE([HAVE_CRYPTO], [1], [libwolfssl availability])
 
@@ -668,10 +666,10 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$enable_cloud" != "no" -a "${enable_wolfssl}" != "yes"; then
+if test "$enable_cloud" != "no" -a  \( "${enable_wolfssl}" != "yes" -o -z "${WOLFSSL_LIBS}" \); then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
-    if test -n "${SSL_LIBS}" -a \( "${enable_wolfssl}" != "yes" -o -z "${WOLFSSL_LIBS}" \); then
+    if test -n "${SSL_LIBS}"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
