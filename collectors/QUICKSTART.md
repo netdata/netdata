@@ -83,9 +83,8 @@ auto-detect almost all local Nginx web servers.
 Despite Netdata's auto-detection capabilities, it's important to know how to edit collector configuration files.
 
 You should always edit configuration files with the `edit-config` script that comes with every installation of Netdata.
-To edit a collector configuration file, navigate to your [Netdata configuration
-directory](/docs/guides/step-by-step/step-04.md#find-your-netdataconf-file). Launch `edit-config` with the path to the
-collector's configuration file.
+To edit a collector configuration file, navigate to your [Netdata configuration directory](/docs/configure/nodes.md).
+Launch `edit-config` with the path to the collector's configuration file.
 
 How do you find that path to the collector's configuration file? Look under the **Configuration** heading in the
 collector's documentation. Each file contains a short code block with the relevant command.
