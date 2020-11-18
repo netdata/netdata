@@ -1,4 +1,9 @@
 {
+    "ignorePatterns": [
+		{
+			"pattern": "^https:\/\/pi-hole.net"
+		}
+	],
     "replacementPatterns": [
         {
             "pattern": "^/",

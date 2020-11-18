@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Run link check
-        uses: gaurav-nelson/github-action-markdown-link-check@1.0.2
+        uses: gaurav-nelson/github-action-markdown-link-check@1.0.7
         with:
           use-quiet-mode: 'no'
           use-verbose-mode: 'yes'
