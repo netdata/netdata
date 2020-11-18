@@ -157,7 +157,7 @@ int sql_init_database(void)
     info("SQLite database %s initialization", sqlite_database);
 
     for (int i = 0; database_config[i]; i++) {
-        debug(D_SQLITE, "Executing %s", database_config[i]);
+        debug(D_METADATALOG, "Executing %s", database_config[i]);
         rc = sqlite3_exec(db_meta, database_config[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
@@ -459,10 +459,10 @@ found:;
     char  uuid_str[GUID_LEN + 1];
     if (likely(uuid)) {
         uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_SQLITE, "Found UUID %s for dimension %s", uuid_str, rd->name);
+        debug(D_METADATALOG, "Found UUID %s for dimension %s", uuid_str, rd->name);
     }
     else
-        debug(D_SQLITE, "UUID not found for dimension %s", rd->name);
+        debug(D_METADATALOG, "UUID not found for dimension %s", rd->name);
 #endif
     return uuid;
 
@@ -482,7 +482,7 @@ uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
 #ifdef NETDATA_INTERNAL_CHECKS
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str);
-    debug(D_SQLITE,"Generating uuid [%s] for dimension %s under chart %s", uuid_str, rd->name, st->id);
+    debug(D_METADATALOG,"Generating uuid [%s] for dimension %s under chart %s", uuid_str, rd->name, st->id);
 #endif
 
     rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
@@ -502,7 +502,7 @@ void delete_dimension_uuid(uuid_t *dimension_uuid)
 #ifdef NETDATA_INTERNAL_CHECKS
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*dimension_uuid, uuid_str);
-    debug(D_SQLITE,"Deleting dimension uuid %s", uuid_str);
+    debug(D_METADATALOG,"Deleting dimension uuid %s", uuid_str);
 #endif
 
     rc = sqlite3_prepare_v2(db_meta, DELETE_DIMENSION_UUID, -1, &res, 0);
@@ -577,10 +577,10 @@ found:;
     char  uuid_str[GUID_LEN + 1];
     if (likely(uuid)) {
         uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_SQLITE, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
+        debug(D_METADATALOG, "Found UUID %s for chart %s.%s", uuid_str, type, name ? name : id);
     }
     else
-        debug(D_SQLITE, "UUID not found for chart %s.%s", type, name ? name : id);
+        debug(D_METADATALOG, "UUID not found for chart %s.%s", type, name ? name : id);
 #endif
     return uuid;
 
@@ -614,7 +614,7 @@ uuid_t *create_chart_uuid(RRDSET *st, const char *id, const char *name)
 #ifdef NETDATA_INTERNAL_CHECKS
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str);
-    debug(D_SQLITE,"Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, st->rrdhost->hostname);
+    debug(D_METADATALOG,"Generating uuid [%s] for chart %s under host %s", uuid_str, st->id, st->rrdhost->hostname);
 #endif
 
     rc = update_chart_metadata(uuid, st, id, name);
