@@ -392,7 +392,7 @@ AC_CHECK_LIB(
     [WOLFSSL_LIBS="-lwolfssl"]
 )
 
-test -z "${WOLFSSL_LIBS}" || \
+test -z "${WOLFSSL_LIBS}" -a  "${enable_wolfssl}" = "yes" || \
     AC_DEFINE([HAVE_CRYPTO], [1], [libwolfssl availability])
 
 # -----------------------------------------------------------------------------
