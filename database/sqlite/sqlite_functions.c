@@ -7,7 +7,7 @@
 
 const char *database_config[] = {
     "PRAGMA auto_vacuum=incremental; PRAGMA synchronous=1 ; PRAGMA journal_mode=WAL; PRAGMA temp_store=MEMORY;",
-    "PRAGMA journal_size_limit=17179869184;",
+    "PRAGMA journal_size_limit=16777216;",
     "CREATE TABLE IF NOT EXISTS host(host_id blob PRIMARY KEY, hostname text, "
     "registry_hostname text, update_every int, os text, timezone text, tags text);",
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
