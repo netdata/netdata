@@ -197,38 +197,9 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
-    'anomalies': {
-        title: 'Anomalies',
-        icon: '<i class="fas fa-flask"></i>',
-        info: 'Anomaly scores relating to key system metrics.'
-    },
-
-    'zscores': {
-        title: 'Z-Scores',
-        icon: '<i class="fas fa-exclamation"></i>',
-        info: 'Z scores scores relating to key system metrics.'
-    },
-    
-    'correlations': {
-        title: 'Correlations',
-        icon: '<i class="fas fa-random"></i>',
-        info: 'Cross correlations relating to key system metrics.'
-    },
-    
-    'smoothing': {
-        title: 'Smoothing',
-        icon: '<i class="fas fa-flask"></i>',
-        info: 'Smoothing'
-    },
-
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
-    },
-
-    'example2': {
-        title: 'Example Charts 2',
-        info: 'Example charts 2, demonstrating the external plugin architecture.'
     },
 
     'cgroup': {
