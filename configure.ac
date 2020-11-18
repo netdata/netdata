@@ -496,7 +496,7 @@ if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY
     OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
     OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-    if test "${enable_wolfssl}" = "yes"; then
+    if test "${WOLFSSL_LIBS}"; then
         OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
     else
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
