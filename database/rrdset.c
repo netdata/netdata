@@ -1871,7 +1871,7 @@ after_second_database_work:
                         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
-                            metalog_commit_delete_dimension(rd);
+                            delete_dimension_uuid(rd->state->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
                             last = rd;

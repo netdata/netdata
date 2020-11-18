@@ -461,7 +461,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
             /* This metric has no data and no references */
-            metalog_commit_delete_dimension(rd);
+            delete_dimension_uuid(rd->state->metric_uuid);
 #endif
         }
     }

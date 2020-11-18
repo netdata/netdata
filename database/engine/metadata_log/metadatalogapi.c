@@ -3,12 +3,6 @@
 
 #include "metadatalog.h"
 
-void metalog_commit_delete_dimension(RRDDIM *rd)
-{
-    delete_dimension_uuid(rd->state->metric_uuid);
-    return;
-}
-
 /*
  * Returns 0 on success, negative on error
  */
