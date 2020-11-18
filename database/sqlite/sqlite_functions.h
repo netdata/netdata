@@ -6,14 +6,6 @@
 #include "../../daemon/common.h"
 #include "sqlite3.h"
 
-
-/*
- * Initialize a database
- */
-
-#define SQLITE_SELECT_MAX   (10)        // Max select retries
-#define SQLITE_INSERT_MAX   (10)        // Max select retries
-#define SQLITE_SELECT_DELAY (50)        // select delay in MS between retries
 #define SQLITE_INSERT_DELAY (50)        // Insert delay in case of lock
 
 #define SQL_STORE_HOST "insert or replace into host (host_id,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
