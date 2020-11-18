@@ -524,8 +524,6 @@ if test "${enable_wolfssl}" = "yes" -a "${WOLFSSL_LIBS}"; then
     AC_DEFINE([NETDATA_HTTPS_WITH_WOLFSSL], [1], [netdata is compiled against WolfSSL])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${WOLFSSL_LIBS}"
-else
-    enable_https="no"
 fi
 
 AC_MSG_RESULT([${enable_https}])
