@@ -1,6 +1,6 @@
 ---
-name: Bug report
-about: Create a bug report to help us improve
+name: Bug Report - Netdata Agent
+about: Submit a report and help us improve our Open-Source free Netdata Agent
 labels: bug, needs triage
 ---
 
