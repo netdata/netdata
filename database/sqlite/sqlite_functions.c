@@ -313,7 +313,7 @@ int cache_host_charts(RRDHOST *host)
 
     if (!res) {
         rc = sqlite3_prepare_v2(
-            db_meta, "select chart_id, type, id, name from chart where host_id = @host;", -1, &res, 0);
+            db_meta, "select chart_id, type, id, name from chart where host_id = @host order by rowid desc;", -1, &res, 0);
         if (rc != SQLITE_OK)
             return 0;
     }
@@ -354,7 +354,7 @@ int cache_chart_dimensions(RRDSET *st)
     int count = 0;
 
     if (!res) {
-        rc = sqlite3_prepare_v2(db_meta, "select dim_id, id, name from dimension where chart_id = @chart;", -1, &res, 0);
+        rc = sqlite3_prepare_v2(db_meta, "select dim_id, id, name from dimension where chart_id = @chart order by rowid desc;", -1, &res, 0);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to find chart dimensions");
             return 0;
