@@ -126,8 +126,7 @@ docker pull netdata/netdata:latest
 ```
 
 Next, to stop and remove any containers using the `netdata/netdata` image. Replace `netdata` if you changed it from the
-default in our [Docker installation
-instructions](/packaging/docker/README.md#run-the-agent-with-the-docker-command).
+default.
 
 ```bash
 docker stop netdata
@@ -135,21 +134,7 @@ docker rm netdata
 ```
 
 You can now re-create your Netdata container using the `docker` command or a `docker-compose.yml` file. See our [Docker
-installation instructions](/packaging/docker/README.md#run-the-agent-with-the-docker-command) for details. For
-example, using the `docker` command:
-
-```bash
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata
-```
+installation instructions](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
 ## macOS
 
