@@ -233,7 +233,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+#ifdef ENABLE_DBENGINE
             store_active_dimension(rd->state->metric_uuid);
+#endif
             rd->state->collect_ops.init(rd);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
