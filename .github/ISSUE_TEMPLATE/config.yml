@@ -1,6 +1,6 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Bug Report - Netdata Cloud
+  - name: Bug report: Netdata Cloud
     url: https://github.com/netdata/netdata-cloud/issues/new/choose
     about: Create a report to help us improve our SaaS offering
   - name: Help
