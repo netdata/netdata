@@ -223,6 +223,12 @@ update() {
       env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
+    if [ ! -x ./netdata-installer.sh ]; then
+      if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
+        cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || exit 1
+      fi
+    fi
+
     info "Re-installing netdata..."
     eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 
