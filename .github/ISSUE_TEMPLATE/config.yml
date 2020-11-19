@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Bug report: Netdata Cloud
     url: https://github.com/netdata/netdata-cloud/issues/new/choose
-    about: Create a report to help us improve our SaaS offering
+    about: Create a report to help us improve our web application
   - name: Help
     url: https://community.netdata.cloud/c/support/13
     about: We offer community-driven support on our Community forums
