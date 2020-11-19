@@ -8,7 +8,7 @@ contact_links:
     about: We offer community-driven support on our community forums
   - name: Feature Request
     url: https://community.netdata.cloud/c/feature-requests/7
-    about: Make a feature request for Netdata Cloud or Netdata Agent
+    about: Make a feature request for Netdata Cloud or the Netdata Agent
   - name: Community
     url: https://netdata.cloud/community
     about: If you don't know where to start, visit our community page!
