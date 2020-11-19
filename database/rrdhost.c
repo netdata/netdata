@@ -633,10 +633,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         gap_when_lost_iterations_above = 1;
 
 #ifdef ENABLE_DBENGINE
-    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        if (unlikely(sql_init_database())) {
-            return 1;
-        }
+    if (unlikely(sql_init_database())) {
+        return 1;
     }
 #endif
 
