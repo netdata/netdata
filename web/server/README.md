@@ -123,7 +123,7 @@ is not used. [↩](#a2)
 
 #### Linking against WolfSSL
 
-If you compile Netdata against `WolfSS` and you have [errors](https://github.com/netdata/netdata/pull/10227#issuecomment-729626178), it is possible that your library were not compiled with all available options. 
+If you compile Netdata against `WolfSSL` and you have [errors](https://github.com/netdata/netdata/pull/10227#issuecomment-729626178), it is possible that your library were not compiled with all available options. 
 
 ### Select TLS version
 
