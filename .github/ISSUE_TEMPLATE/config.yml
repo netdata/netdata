@@ -5,7 +5,7 @@ contact_links:
     about: Create a report to help us improve our web application
   - name: Help
     url: https://community.netdata.cloud/c/support/13
-    about: We offer community-driven support on our Community forums
+    about: We offer community-driven support on our community forums
   - name: Feature Request
     url: https://community.netdata.cloud/c/feature-requests/7
     about: Make a feature request for Netdata Cloud or Netdata Agent
