@@ -218,7 +218,7 @@ You're a real sysadmin now!
 If you want to configure your Nginx proxy further, check out the following:
 
 -   [Running Netdata behind Nginx](/docs/Running-behind-nginx.md)
--   [High-performance Netdata](/docs/high-performance-netdata.md)
+-   [How to optimize Netdata's performance](/docs/guides/configure/performance.md)
 -   [Enabling TLS on Netdata's dashboard](/web/server/README.md#enabling-tls-support)
 
 And... you're _almost_ done with the Netdata guide.
