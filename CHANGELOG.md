@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add kernel to blacklist [\#10262](https://github.com/netdata/netdata/pull/10262) ([thiagoftsm](https://github.com/thiagoftsm))
+- Docs: Point users to proper configure doc [\#10254](https://github.com/netdata/netdata/pull/10254) ([joelhans](https://github.com/joelhans))
 - Docs: Cleanup and fix broken links [\#10253](https://github.com/netdata/netdata/pull/10253) ([joelhans](https://github.com/joelhans))
 - Update CONTRIBUTING.md [\#10252](https://github.com/netdata/netdata/pull/10252) ([joelhans](https://github.com/joelhans))
 - updated 3rd party static dependencies and use alpine 3.12 [\#10241](https://github.com/netdata/netdata/pull/10241) ([ktsaou](https://github.com/ktsaou))
@@ -56,6 +58,7 @@
 - Fixed compile error in CENTOS 6 [\#10110](https://github.com/netdata/netdata/pull/10110) ([stelfrag](https://github.com/stelfrag))
 - installer: update go.d.plugin version to v0.24.0 [\#10109](https://github.com/netdata/netdata/pull/10109) ([ilyam8](https://github.com/ilyam8))
 - Rewrite the repository's main README [\#10108](https://github.com/netdata/netdata/pull/10108) ([joelhans](https://github.com/joelhans))
+- Remove Docker example from update docs and add section to claim troubleshooting [\#10103](https://github.com/netdata/netdata/pull/10103) ([joelhans](https://github.com/joelhans))
 - Update supported collectors list with new collectors [\#10102](https://github.com/netdata/netdata/pull/10102) ([joelhans](https://github.com/joelhans))
 - Added more robust doucmentation around updates. [\#10100](https://github.com/netdata/netdata/pull/10100) ([Ferroin](https://github.com/Ferroin))
 - nvidia\_smi: Not count users with zero memory allocated [\#10098](https://github.com/netdata/netdata/pull/10098) ([scatenag](https://github.com/scatenag))
