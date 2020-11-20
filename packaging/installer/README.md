@@ -168,7 +168,7 @@ the community helps fix any bugs that might have been introduced in previous rel
     installation
 -   Retain more control over the Netdata version you use
 
-## Installation notes and known issues
+## Troubleshooting and known issues
 
 We are tracking a few issues related to installation and packaging.
 
