@@ -49,9 +49,6 @@ extern void store_active_chart(uuid_t *dimension_uuid);
 
 extern int find_uuid_type(uuid_t *uuid);
 
-extern int cache_chart_dimensions(RRDSET *st);
-extern int cache_host_charts(RRDHOST *host);
-
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
@@ -61,6 +58,5 @@ extern void add_migrated_file(char *path, uint64_t file_size);
 extern void db_unlock(void);
 extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
-extern void free_uuid_cache(struct uuid_cache **uuid_cache);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H
