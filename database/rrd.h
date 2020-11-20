@@ -369,24 +369,12 @@ struct rrddim_volatile {
     } query_ops;
 };
 
-// Temp uuid cache
-struct uuid_cache {
-    uuid_t   uuid;
-    char    *id;
-    char    *type;
-    char    *name;
-    uint32_t count;
-    struct uuid_cache *next;
-};
-
-
 // ----------------------------------------------------------------------------
 // volatile state per chart
 struct rrdset_volatile {
     char *old_title;
     char *old_family;
     char *old_context;
-    struct uuid_cache *uuid_cache;
 };
 
 // ----------------------------------------------------------------------------
@@ -830,7 +818,6 @@ struct rrdhost {
     uuid_t  host_uuid;                              // Global GUID for this host
     uint32_t compaction_id;                         // The last metadata log compaction procedure that has processed
                                                     // this object.
-    struct uuid_cache *uuid_cache;
 #endif
 
 #ifdef ENABLE_HTTPS
