@@ -420,6 +420,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         return 1;
     }
 
+    client->poll_fds[POLLFD_PIPE].events = POLLIN;
+    client->poll_fds[POLLFD_SOCKET].events = POLLIN;
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
         if(mqtt_wss_service(client, -1)) {
