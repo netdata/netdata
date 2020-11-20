@@ -277,15 +277,12 @@ def read_passwd_file_safe():
     try:
         if IS_INSIDE_DOCKER:
             return read_passwd_file()
-        else:
-            return dict((k[2], k) for k in pwd.getpwall())
+        return dict((k[2], k) for k in pwd.getpwall())
     except (OSError, IOError):
         return dict()
 
 
 def get_username_by_pid_safe(pid, passwd_file):
-    if not passwd_file:
-        return ''
     path = os.path.join(PROC_PATH, pid)
     try:
         uid = os.stat(path).st_uid
