@@ -528,6 +528,7 @@ static void aclk_start_host_popcorning(RRDHOST *host)
         errno = 0;
         error("Localhost is allowed to do popcorning only once after startup!");
         rrdhost_aclk_state_unlock(host);
+        ACLK_SHARED_STATE_UNLOCK;
         return;
     }
 
