@@ -1,6 +1,7 @@
 # mqtt_websockets
 
-Library to connect MQTT client over Websockets Secure (WSS). Working but currently WIP.
+Library to connect MQTT client over Websockets Secure (WSS).
+Documentation is pending. Best way to figure out how to use the library it to look at `src\test.c`.
 
 ## License
 
