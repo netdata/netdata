@@ -16,11 +16,10 @@ Netdata](https://github.com/netdata/netdata/issues/1323#issuecomment-266427841) 
 threads. Despite collecting 100,000 metrics every second, the Agent still only uses 9% CPU utilization on a
 single core.
 
-But not everyone has such powerful systems at their disposal. For example, you might run the Agent on a cloud VM
-with only 512 MiB of RAM, or on an IoT device like a [Raspberry Pi](/docs/guides/monitor/pi-hole-raspberry-pi.md). In
-these cases, reducing Netdata's footprint beyond its already diminuitive size can pay big dividends, giving your
-services more horsepower while still monitoring the health and the performance of the node, OS, hardware, and
-applications.
+But not everyone has such powerful systems at their disposal. For example, you might run the Agent on a cloud VM with
+only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](/docs/guides/monitor/pi-hole-raspberry-pi.md). In these
+cases, reducing Netdata's footprint beyond its already diminuitive size can pay big dividends, giving your services more
+horsepower while still monitoring the health and the performance of the node, OS, hardware, and applications.
 
 ## Prerequisites
 
@@ -47,7 +46,7 @@ the node has CPU resources to space. If the node reaches 100% CPU utilization, t
 applications get any available resources. In addition, under heavy load, collectors that require disk I/O may stop and
 show gaps in charts.
 
-Let's walk through the best ways to ipmrove the Netdata Agent's performance.
+Let's walk through the best ways to improve the Netdata Agent's performance.
 
 ## Reduce collection frequency
 
@@ -71,15 +70,15 @@ dedicated for metrics collection. Set this to `5` or `10` to collect metrics eve
 
 ## Specific plugin or collector
 
-If you did not [reduce the global collection frequency](#global), but find that a specific plugin/collector uses too
-many resources, you can reduce its frequency. [Internal
-collectors](/docs/collect/how-collectors-work.md#collector-architecture-and-terminolog) are configured in
-`netdata.conf`, while external collectors are configured in their individual files.
+If you did not [reduce the global collection frequency](#global) but find that a specific plugin/collector uses too many
+resources, you can reduce its frequency. You configure [internal
+collectors](/docs/collect/how-collectors-work.md#collector-architecture-and-terminolog) in `netdata.conf` and external
+collectors in their individual `.conf` files.
 
 To reduce the frequency of an [internal
 plugin/collector](/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and
 find the appropriate section. For example, to reduce the frequency of the `apps` plugin, which collects and visualizes
-metrics about the resource utilization of every application on your node:
+metrics on application resource utilization:
 
 ```conf
 [plugin:apps]
@@ -87,8 +86,8 @@ metrics about the resource utilization of every application on your node:
 ```
 
 To [configure an individual collector](/docs/collect/enable-configure.md), open its specific configuration file with
-`edit-config` and look for an `update_every` setting. For example, to reduce the frequency of the `nginx` collector, run
-`sudo ./edit-config go.d/nginx.conf`:
+`edit-config` and look for the `update_every` setting. For example, to reduce the frequency of the `nginx` collector,
+run `sudo ./edit-config go.d/nginx.conf`:
 
 ```conf
 # [ GLOBAL ]
@@ -186,9 +185,9 @@ Finally, edit `netdata.conf` with the following settings:
 
 ## Disable/lower gzip compression for the dashboard
 
-If you choose not to run the Agent behind Nginx, you can disable or lower the gzip compression used by the Agent's web
-server. While gzip compression does reduce the size of the HTML/CSS/JS payload, it does use additional CPU while a user
-is looking at the local Agent dashboard.
+If you choose not to run the Agent behind Nginx, you can disable or lower the Agent's web server's gzip compression.
+While gzip compression does reduce the size of the HTML/CSS/JS payload, it does use additional CPU while a user is
+looking at the local Agent dashboard.
 
 To disable gzip compression, open `netdata.conf` and find the `[web]` section:
 
