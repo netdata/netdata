@@ -19,7 +19,7 @@ Run the one-line installer script with the `--reinstall` parameter to reinstall 
 any [user configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 If you used any [optional
-parameters](/packaging/installer/methods/kickstart.sh#optional-parameters-to-alter-your-installation) during initial
+parameters](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) during initial
 installation, you need to pass them to the script again during reinstallation. If you cannot remember which options you
 used, read the contents of the `.environment` file and look for a `REINSTALL_OPTIONS` line. This line contains a list of
 optional parameters.
@@ -47,10 +47,10 @@ Run the one-line installer script with the `--reinstall` parameter to reinstall 
 any [user configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 If you used any [optional
-parameters](/packaging/installer/methods/kickstart.sh#optional-parameters-to-alter-your-installation) during initial
-installation, you need to pass them to the script again during reinstallation. If you cannot remember which options you
-used, read the contents of the `.environment` file and look for a `REINSTALL_OPTIONS` line. This line contains a list of
-optional parameters.
+parameters](/packaging/installer/methods/kickstart-64.md#optional-parameters-to-alter-your-installation) during
+initial installation, you need to pass them to the script again during reinstallation. If you cannot remember which
+options you used, read the contents of the `.environment` file and look for a `REINSTALL_OPTIONS` line. This line
+contains a list of optional parameters.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --reinstall
