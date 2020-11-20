@@ -304,8 +304,6 @@ RRDHOST *rrdhost_create(const char *hostname,
             int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
             if (unlikely(rc))
                 error_report("Failed to store machine GUID to the database");
-            else
-                cache_host_charts(host);
         }
         else
             error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -807,7 +805,6 @@ void rrdhost_free(RRDHOST *host) {
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         if (host->rrdeng_ctx != &multidb_ctx)
             rrdeng_prepare_exit(host->rrdeng_ctx);
-        free_uuid_cache(&host->uuid_cache);
     }
 #endif
     while(host->rrdset_root)

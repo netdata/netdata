@@ -320,11 +320,6 @@ void rrdset_free(RRDSET *st) {
 
     rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
-
-#ifdef ENABLE_DBENGINE
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        free_uuid_cache(&st->state->uuid_cache);
-#endif
     // info("Removing chart '%s' ('%s')", st->id, st->name);
 
     // ------------------------------------------------------------------------
@@ -841,7 +836,6 @@ RRDSET *rrdset_create_custom(
     st->type       = config_get(st->config_section, "type", type);
 
     st->state = mallocz(sizeof(*st->state));
-    st->state->uuid_cache = NULL;
     st->family     = config_get(st->config_section, "family", family?family:st->type);
     st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
@@ -930,7 +924,6 @@ RRDSET *rrdset_create_custom(
             st->chart_uuid = create_chart_uuid(st, id, name);
 
         store_active_chart(st->chart_uuid);
-        cache_chart_dimensions(st);
         st->compaction_id = 0;
     }
 #endif
