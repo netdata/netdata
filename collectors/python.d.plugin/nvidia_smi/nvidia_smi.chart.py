@@ -248,11 +248,12 @@ HOST_PREFIX = os.getenv('NETDATA_HOST_PREFIX')
 ETC_PASSWD_PATH = '/etc/passwd'
 PROC_PATH = '/proc'
 
-IS_INSIDE_DOCKER = HOST_PREFIX is not None
+IS_INSIDE_DOCKER = False
 
 if HOST_PREFIX:
     ETC_PASSWD_PATH = os.path.join(HOST_PREFIX, ETC_PASSWD_PATH[1:])
     PROC_PATH = os.path.join(HOST_PREFIX, PROC_PATH[1:])
+    IS_INSIDE_DOCKER = True
 
 
 def read_passwd_file():
@@ -294,7 +295,7 @@ def get_username_by_pid_safe(pid, passwd_file):
     try:
         return passwd_file[uid][0]
     except KeyError:
-        return uid
+        return str(uid)
 
 
 class GPU:
