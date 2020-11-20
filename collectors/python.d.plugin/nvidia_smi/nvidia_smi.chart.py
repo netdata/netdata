@@ -7,6 +7,7 @@
 import subprocess
 import threading
 import os
+import pwd
 
 import xml.etree.ElementTree as et
 
@@ -247,6 +248,8 @@ HOST_PREFIX = os.getenv('NETDATA_HOST_PREFIX')
 ETC_PASSWD_PATH = '/etc/passwd'
 PROC_PATH = '/proc'
 
+IS_INSIDE_DOCKER = HOST_PREFIX is not None
+
 if HOST_PREFIX:
     ETC_PASSWD_PATH = os.path.join(HOST_PREFIX, ETC_PASSWD_PATH[1:])
     PROC_PATH = os.path.join(HOST_PREFIX, PROC_PATH[1:])
@@ -271,7 +274,10 @@ def read_passwd_file():
 
 def read_passwd_file_safe():
     try:
-        return read_passwd_file()
+        if IS_INSIDE_DOCKER:
+            return read_passwd_file()
+        else:
+            return dict((k[2], k) for k in pwd.getpwall())
     except (OSError, IOError):
         return dict()
 
@@ -282,9 +288,13 @@ def get_username_by_pid_safe(pid, passwd_file):
     path = os.path.join(PROC_PATH, pid)
     try:
         uid = os.stat(path).st_uid
-        return passwd_file[uid][0]
-    except (OSError, IOError, KeyError):
+    except (OSError, IOError):
         return ''
+
+    try:
+        return passwd_file[uid][0]
+    except KeyError:
+        return uid
 
 
 class GPU:
