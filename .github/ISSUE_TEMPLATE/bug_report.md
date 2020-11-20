@@ -1,5 +1,5 @@
 ---
-name: Bug report: Netdata Agent
+name: "Bug report: Netdata Agent"
 about: Submit a report and help us improve our free and open-source Netdata Agent
 labels: bug, needs triage
 ---
