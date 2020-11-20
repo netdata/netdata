@@ -54,13 +54,17 @@ void mqtt_wss_destroy(mqtt_wss_client client);
 
 struct mqtt_connect_params;
 
+#define MQTT_WSS_SSL_CERT_CHECK_FULL   0x00
+#define MQTT_WSS_SSL_ALLOW_SELF_SIGNED 0x01
+#define MQTT_WSS_SSL_DONT_CHECK_CERTS  0x08
+
 /* Will block until the MQTT over WSS connection is established or return error
  * @param client mqtt_wss_client which should connect
  * @param host to connect to (where MQTT over WSS server is listening)
  * @param port to connect to (where MQTT over WSS server is listening)
  * @param mqtt_params pointer to mqtt_connect_params structure which contains MQTT credentials and settings
  */
-int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params);
+int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags);
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 

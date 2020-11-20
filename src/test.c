@@ -51,7 +51,7 @@ int client_handle(mqtt_wss_client client)
         .keep_alive = 10
     };
 
-    while (mqtt_wss_connect(client, "127.0.0.1", 9002, &params)) {
+    while (mqtt_wss_connect(client, "127.0.0.1", 9002, &params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
         printf("Connect failed\n");
         sleep(1);
         printf("Attempting Reconnect\n");

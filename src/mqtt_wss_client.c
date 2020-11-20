@@ -71,6 +71,7 @@ struct mqtt_wss_client {
 
     SSL_CTX *ssl_ctx;
     SSL *ssl;
+    int ssl_flags;
 
     struct mqtt_client *mqtt_client;
     uint8_t *mqtt_send_buf;
@@ -269,7 +270,43 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     free(client);
 }
 
-int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params)
+static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
+{
+    SSL *ssl;
+    X509 *err_cert;
+    mqtt_wss_client client;
+    int err, depth;
+    char *err_str;
+
+    ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+    client = SSL_get_ex_data(ssl, 0);
+
+    // TODO handle depth as per https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_set_verify.html
+
+    if (!preverify_ok) {
+        err = X509_STORE_CTX_get_error(ctx);
+        depth = X509_STORE_CTX_get_error_depth(ctx);
+        err_cert = X509_STORE_CTX_get_current_cert(ctx);
+        err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
+
+        mws_error(client->log, "verify error:num=%d:%s:depth=%d:%s", err,
+                 X509_verify_cert_error_string(err), depth, err_str);
+
+        free(err_str);
+    }
+
+    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT &&
+        client->ssl_flags & MQTT_WSS_SSL_ALLOW_SELF_SIGNED)
+    {
+        preverify_ok = 1;
+        mws_error(client->log, "Self Signed Certificate Accepted as the connection was "
+                               "requested with MQTT_WSS_SSL_ALLOW_SELF_SIGNED");
+    }
+
+    return preverify_ok;
+}
+
+int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags)
 {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -294,6 +331,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         free(client->host);
     client->host = strdup(host);
     client->port = port;
+
+    client->ssl_flags = ssl_flags;
 
     //TODO gethostbyname -> getaddinfo
     //     hstrerror -> gai_strerror
@@ -345,7 +384,19 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         SSL_CTX_free(client->ssl_ctx);
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
+    if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+        SSL_CTX_set_default_verify_paths(client->ssl_ctx);
+        SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
+    } else
+        mws_error(client->log, "SSL Certificate checking completely disabled!!!");
+
     client->ssl = SSL_new(client->ssl_ctx);
+    if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+        if (!SSL_set_ex_data(client->ssl, 0, client)) {
+            mws_error(client->log, "Could not SSL_set_ex_data");
+            return -4;
+        }
+    }
     SSL_set_fd(client->ssl, client->sockfd);
     SSL_set_connect_state(client->ssl);
     SSL_connect(client->ssl);
