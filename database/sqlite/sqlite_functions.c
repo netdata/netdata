@@ -40,7 +40,7 @@ static int execute_insert(sqlite3_stmt *res)
 {
     int rc;
 
-    while ((rc = sqlite3_step(res)) != SQLITE_DONE || unlikely(netdata_exit)) {
+    while ((rc = sqlite3_step(res)) != SQLITE_DONE && unlikely(netdata_exit)) {
         if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED))
             usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
         else {
