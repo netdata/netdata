@@ -65,7 +65,7 @@ long get_system_cpus(void) {
 #endif /* __APPLE__, __FreeBSD__ */
 }
 
-unsigned int fd_max = 1024;
+long double fd_max = 1024;
 
 int get_system_fd_max(void) {
 #ifdef __APPLE__
@@ -83,16 +83,16 @@ int get_system_fd_max(void) {
 
     unsigned long long max = 0;
     if(read_single_number_file(filename, &max) != 0) {
-        error("Cannot open file '%s'. Assuming system supports %d file descriptors.", filename, fd_max);
+        error("Cannot open file '%s'. Assuming system supports %LG file descriptors.", filename, fd_max);
         return fd_max;
     }
 
     if(!max) {
-        error("Cannot parse file '%s'. Assuming system supports %d file descriptors.", filename, fd_max);
+        error("Cannot parse file '%s'. Assuming system supports %LG file descriptors.", filename, fd_max);
         return fd_max;
     }
 
-    fd_max = max;
+    fd_max = (long double)max;
     return fd_max;
 
 #endif /* __APPLE__, __FreeBSD__ */

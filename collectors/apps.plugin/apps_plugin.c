@@ -7,7 +7,7 @@
  */
 
 #include "../../libnetdata/libnetdata.h"
-#include "../../database/rrd.h"
+
 // ----------------------------------------------------------------------------
 
 // callback required by fatal()
@@ -508,8 +508,8 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-        maxfdperc = 0;
-        usedfdperc = 0;
+        long double currentmaxfds = 0;
+        long double currentfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -2193,11 +2193,12 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds[fdid].cache_iterations_counter = p->fds[fdid].cache_iterations_reset;
         }
     }
-    usedfdperc = (p->fds_size * 100) / get_system_fd_max();
-    if (usedfdperc >= maxfdperc){
-        maxfdperc = usedfdperc;
+    
+    currentfds = p->fds_size;
+    if (currentfds >= currentmaxfds){
+        currentmaxfds = currentfds;
     }
-    //maxfdperc = p->fds_size;
+    
     closedir(fds);
 #endif
     cleanup_negative_pid_fds(p);
@@ -3200,17 +3201,12 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&last, &now, sizeof(struct timeval));
         memmove(&me_last, &me, sizeof(struct rusage));
     }
-
-
-    static RRDSETVAR *fdperc;//maxfdperc;
-    static RRDSET *mychart_chart = NULL;
-    //rrdset_next(mychart_chart);
-    fdperc = rrdsetvar_custom_chart_variable_create(mychart_chart, "usedfdperc");
-    //rrdsetvar_custom_chart_variable_set(fdperc, maxfdperc);
-//    rrdset_done(mychart_chart);
+    
+    long double usedfdpercentage = (long double) ((currentmaxfds * 100) / get_system_fd_max());
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
+        
         created_charts = 1;
 
         fprintf(stdout,
@@ -3227,6 +3223,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "DIMENSION fds '' absolute 1 1\n"
                 "DIMENSION targets '' absolute 1 1\n"
                 "DIMENSION new_pids 'new pids' incremental 1 1\n"
+                "VARIABLE fdperc = usedfdpercentage '' absolute 1 1\n"
                 , update_every
         );
 
@@ -3270,6 +3267,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         "SET fds = %d\n"
         "SET targets = %zu\n"
         "SET new_pids = %zu\n"
+        "VARIABLE fdperc = %LG\n"
         "END\n"
         , dt
         , cpuuser
@@ -3284,6 +3282,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , all_files_len
         , apps_groups_targets_count
         , targets_assignment_counter
+        , usedfdpercentage
         );
 
     fprintf(stdout,
