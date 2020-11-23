@@ -48,4 +48,5 @@ class Service(UrlService):
         alarms = raw_data.get('alarms', {})
         data = {a: self.status_map[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.status_map}
         self.validate_charts('alarms', data)
+
         return data
