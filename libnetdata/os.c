@@ -65,39 +65,6 @@ long get_system_cpus(void) {
 #endif /* __APPLE__, __FreeBSD__ */
 }
 
-long double fd_max = 1024;
-
-int get_system_fd_max(void) {
-#ifdef __APPLE__
-    return fd_max;
-#elif __FreeBSD__
-    return fd_max;
-#else
-
-    static char read = 0;
-    if(unlikely(read)) return fd_max;
-    read = 1;
-
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/fs/file-max", netdata_configured_host_prefix);
-
-    unsigned long long max = 0;
-    if(read_single_number_file(filename, &max) != 0) {
-        error("Cannot open file '%s'. Assuming system supports %LG file descriptors.", filename, fd_max);
-        return fd_max;
-    }
-
-    if(!max) {
-        error("Cannot parse file '%s'. Assuming system supports %LG file descriptors.", filename, fd_max);
-        return fd_max;
-    }
-
-    fd_max = (long double)max;
-    return fd_max;
-
-#endif /* __APPLE__, __FreeBSD__ */
-}
-
 pid_t pid_max = 32768;
 pid_t get_system_pid_max(void) {
 #ifdef __APPLE__

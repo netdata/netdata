@@ -3202,7 +3202,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&me_last, &me, sizeof(struct rusage));
     }
     
-    long double usedfdpercentage = (long double) ((currentmaxfds * 100) / get_system_fd_max());
+    long double usedfdpercentage = (long double) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
