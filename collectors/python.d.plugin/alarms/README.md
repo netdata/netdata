@@ -3,12 +3,16 @@ title: "Alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/alarms/README.md
 -->
 
-# Alarms - graphing active Netdata alarms over time
+# Alarms - graphing Netdata alarm states over time
 
-This collector creates an 'Alarms' section with one line plot showing alarms by status. Alarm states are mapped to integer values according to the below mapping.
+This collector creates an 'Alarms' menu with one line plot showing alarm states over time. Alarm states are mapped to integer values according to the below default mapping. Any alarm status types not in this mapping will be ignored (Note: This mapping can be changed by editing the `status_map` in the `alarms.conf` file).
 
 ```
-{'UNDEFINED': 0, 'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
+{
+    'CLEAR': 0, 
+    'WARNING': 1, 
+    'CRITICAL': 2
+}
 ```
 
 ## Charts
@@ -28,7 +32,7 @@ sudo ./edit-config python.d.conf
 sudo systemctl restart netdata
 ```
 
-If needed (typically not), edit the `python.d/alarms.conf` configuration file using `edit-config` from the your agent's [config
+If needed, edit the `python.d/alarms.conf` configuration file using `edit-config` from the your agent's [config
 directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
 
 ```bash
@@ -41,7 +45,12 @@ The `alarms` specific part of the `alarms.conf` file should look like this:
 ```yaml
 # what url to pull data from
 local:
-   url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+  # define how to map alarm status to numbers for the chart
+  status_map:
+    CLEAR: 0
+    WARNING: 1
+    CRITICAL: 2
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`
