@@ -172,16 +172,24 @@ function k8s_get_kubepod_name() {
     return 1
   fi
 
-  local kube_system_ns pods
+  local kube_system_ns
+  local tmp_kube_system_ns_file="${TMPDIR:-"/tmp/"}netdata-cgroups-kube-system-ns"
+  [ -f "$tmp_kube_system_ns_file" ] && kube_system_ns=$(cat "$tmp_kube_system_ns_file" 2> /dev/null)
+
+  local pods
   if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
     local token header host url
     token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
     header="Authorization: Bearer $token"
     host="$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT"
 
-    url="https://$host/api/v1/namespaces/kube-system"
-    if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
-      warning "${fn}: error on curl '${url}': ${kube_system_ns}."
+    if [ -z "$kube_system_ns" ]; then
+      url="https://$host/api/v1/namespaces/kube-system"
+      if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
+        warning "${fn}: error on curl '${url}': ${kube_system_ns}."
+      else
+        echo "$kube_system_ns" > "$tmp_kube_system_ns_file" 2> /dev/null
+      fi
     fi
 
     url="https://$host/api/v1/pods"
@@ -191,8 +199,12 @@ function k8s_get_kubepod_name() {
       return 1
     fi
   elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
-    if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
-      warning "${fn}: error on 'kubectl': ${kube_system_ns}."
+    if [ -z "$kube_system_ns" ]; then
+      if ! kube_system_ns=$(kubectl get namespaces kube-system -o json 2>&1); then
+        warning "${fn}: error on 'kubectl': ${kube_system_ns}."
+      else
+        echo "$kube_system_ns" > "$tmp_kube_system_ns_file" 2> /dev/null
+      fi
     fi
 
     [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
