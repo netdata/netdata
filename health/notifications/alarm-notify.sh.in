@@ -1887,7 +1887,7 @@ send_syslog() {
 
     message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
-    if [ ${server} ] && [ -z $temp1 ]; then
+    if [ ${server} ]; then
       logger_options="${logger_options} -n ${server}"
       if [ ${port} ]; then
         logger_options="${logger_options} -P ${port}"
