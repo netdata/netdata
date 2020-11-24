@@ -10,12 +10,6 @@ void generate_metadata_logfile_path(struct metadata_logfile *metalogfile, char *
                     metalogfile->ctx->rrdeng_ctx->dbfiles_path, metalogfile->starting_fileno, metalogfile->fileno);
 }
 
-void generate_relative_metadata_logfile_path(struct metadata_logfile *metalogfile, char *str, size_t maxlen)
-{
-    (void) snprintf(str, maxlen, METALOG_PREFIX METALOG_FILE_NUMBER_PRINT_TMPL METALOG_EXTENSION,
-                    metalogfile->starting_fileno, metalogfile->fileno);
-}
-
 void metadata_logfile_init(struct metadata_logfile *metalogfile, struct metalog_instance *ctx, unsigned starting_fileno,
                            unsigned fileno)
 {
@@ -259,11 +253,9 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     uint64_t file_size;
     char path[RRDENG_PATH_MAX];
 
-    generate_relative_metadata_logfile_path(metalogfile, path, sizeof(path));
+    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
     if (file_is_migrated(path))
         return 0;
-
-    generate_metadata_logfile_path(metalogfile, path, sizeof(path));
 
     fd = open_file_buffered_io(path, O_RDWR, &file);
     if (fd < 0) {
@@ -289,7 +281,6 @@ int load_metadata_logfile(struct metalog_instance *ctx, struct metadata_logfile 
     iterate_records(metalogfile);
 
     info("Metadata log \"%s\" migrated to the database (size:%"PRIu64").", path, file_size);
-    generate_relative_metadata_logfile_path(metalogfile, path, sizeof(path));
     add_migrated_file(path, file_size);
     return 0;
 
