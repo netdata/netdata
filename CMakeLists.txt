@@ -1294,6 +1294,7 @@ endif()
         -Wl,--wrap=web_client_api_request_v1
         -Wl,--wrap=rrdhost_find_by_guid
         -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=sql_create_host_by_uuid
         -Wl,--wrap=rrdset_find
         -Wl,--wrap=rrdpush_receiver_thread_spawn
         -Wl,--wrap=debug_int
@@ -1318,6 +1319,7 @@ endif()
         -Wl,--wrap=web_client_api_request_v1
         -Wl,--wrap=rrdhost_find_by_guid
         -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=sql_create_host_by_uuid
         -Wl,--wrap=rrdset_find
         -Wl,--wrap=rrdpush_receiver_thread_spawn
         -Wl,--wrap=debug_int

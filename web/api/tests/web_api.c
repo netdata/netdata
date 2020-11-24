@@ -8,6 +8,12 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
+RRDHOST *__wrap_sql_create_host_by_uuid(char *hostname)
+{
+    (void) hostname;
+    return NULL;
+}
+
 void repr(char *result, int result_size, char const *buf, int size)
 {
     int n;
