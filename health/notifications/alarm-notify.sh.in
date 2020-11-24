@@ -1885,10 +1885,6 @@ send_syslog() {
       fi
     fi
 
-    if [ -z ${server} ] ; then
-      server="${args_host}"
-    fi
-
     message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
     if [ ${server} ] && [ -z $temp1 ]; then
