@@ -22,6 +22,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         sq[0] = '"';
     }
 
+    rrdset_rdlock(r->st);
     buffer_sprintf(wb, "{\n"
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
@@ -38,11 +39,12 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, temp_rd?r->st->context:r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t)rrdset_first_entry_t(r->st)
-                   , kq, kq, (uint32_t)rrdset_last_entry_t(r->st)
+                   , kq, kq, (uint32_t)rrdset_first_entry_t_nolock(r->st)
+                   , kq, kq, (uint32_t)rrdset_last_entry_t_nolock(r->st)
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
+    rrdset_unlock(r->st);
 
     for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
