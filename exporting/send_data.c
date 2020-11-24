@@ -236,10 +236,10 @@ void simple_connector_send_buffer(
 void simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
+    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
 #ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
-    struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
