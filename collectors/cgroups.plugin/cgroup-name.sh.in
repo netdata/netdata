@@ -178,6 +178,9 @@ function k8s_get_kubepod_name() {
     token="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
     header="Authorization: Bearer $token"
     url="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods"
+    if [ -n "$MY_NODE_NAME" ]; then
+      url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
+    fi
     if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
       warning "${funcname}: error on curl '${url}': ${pods}."
       return 1
