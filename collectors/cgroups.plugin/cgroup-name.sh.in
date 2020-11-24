@@ -122,11 +122,11 @@ function k8s_get_kubepod_name() {
   #
   # NOTE: cgroups plugin uses '_' to join dir names, so it is <parent>_<child>_<child>_...
 
-  local funcname="${FUNCNAME[0]}"
+  local fn="${FUNCNAME[0]}"
   local id="${1}"
 
   if [[ ! $id =~ ^kubepods ]]; then
-    warning "${funcname}: '${id}' is not kubepod cgroup."
+    warning "${fn}: '${id}' is not kubepod cgroup."
     return 1
   fi
 
@@ -160,15 +160,15 @@ function k8s_get_kubepod_name() {
   fi
 
   if [ -z "$pod_uid" ] && [ -z "$cntr_id" ]; then
-    warning "${funcname}: can't extract pod_uid or container_id from the cgroup '$id'."
+    warning "${fn}: can't extract pod_uid or container_id from the cgroup '$id'."
     return 1
   fi
 
-  [ -n "$pod_uid" ] && info "${funcname}: cgroup '$id' is a pod(uid:$pod_uid)"
-  [ -n "$cntr_id" ] && info "${funcname}: cgroup '$id' is a container(id:$cntr_id)"
+  [ -n "$pod_uid" ] && info "${fn}: cgroup '$id' is a pod(uid:$pod_uid)"
+  [ -n "$cntr_id" ] && info "${fn}: cgroup '$id' is a container(id:$cntr_id)"
 
   if ! command -v jq > /dev/null 2>&1; then
-    warning "${funcname}: 'jq' command not available."
+    warning "${fn}: 'jq' command not available."
     return 1
   fi
 
@@ -182,17 +182,17 @@ function k8s_get_kubepod_name() {
       url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
     fi
     if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
-      warning "${funcname}: error on curl '${url}': ${pods}."
+      warning "${fn}: error on curl '${url}': ${pods}."
       return 1
     fi
   elif ps -C kubelet > /dev/null 2>&1 && command -v kubectl > /dev/null 2>&1; then
     [[ -z ${KUBE_CONFIG+x} ]] && KUBE_CONFIG="/etc/kubernetes/admin.conf"
     if ! pods=$(kubectl --kubeconfig="$KUBE_CONFIG" get pods --all-namespaces -o json 2>&1); then
-      warning "${funcname}: error on 'kubectl': ${pods}."
+      warning "${fn}: error on 'kubectl': ${pods}."
       return 1
     fi
   else
-    warning "${funcname}: not inside the k8s cluster and 'kubectl' command not available."
+    warning "${fn}: not inside the k8s cluster and 'kubectl' command not available."
     return 1
   fi
 
@@ -213,7 +213,7 @@ function k8s_get_kubepod_name() {
 
   local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
-    warning "${funcname}: error on 'jq' parse: ${containers}."
+    warning "${fn}: error on 'jq' parse: ${containers}."
     return 1
   fi
 
@@ -242,7 +242,7 @@ function k8s_get_kubepod_name() {
 
   # jq filter nonexistent field and nonexistent label value is 'null'
   if [[ $name =~ _null(_|$) ]]; then
-    warning "${funcname}: invalid name: $name (cgroup '$id')"
+    warning "${fn}: invalid name: $name (cgroup '$id')"
     name=""
   fi
 
@@ -252,13 +252,13 @@ function k8s_get_kubepod_name() {
 }
 
 function k8s_get_name() {
-  local funcname="${FUNCNAME[0]}"
+  local fn="${FUNCNAME[0]}"
   local id="${1}"
 
   NAME=$(k8s_get_kubepod_name "$id")
 
   if [ -z "${NAME}" ]; then
-    warning "${funcname}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
+    warning "${fn}: cannot find the name of cgroup with id '${id}'. Setting name to ${id} and disabling it."
     NAME="${id}"
     NAME_NOT_FOUND=3
   else
@@ -268,9 +268,9 @@ function k8s_get_name() {
     name=${NAME%% *}
     labels=${NAME#* }
     if [ "$name" != "$labels" ]; then
-      info "${funcname}: cgroup '${id}' has chart name '${name}', labels '${labels}"
+      info "${fn}: cgroup '${id}' has chart name '${name}', labels '${labels}"
     else
-      info "${funcname}: cgroup '${id}' has chart name '${NAME}'"
+      info "${fn}: cgroup '${id}' has chart name '${NAME}'"
     fi
   fi
 }
