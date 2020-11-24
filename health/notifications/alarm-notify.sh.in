@@ -1889,7 +1889,7 @@ send_syslog() {
       server="${args_host}"
     fi
 
-    message="${prefix} ${status} on ${server} at ${date}: ${chart} ${value_string}"
+    message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
     if [ ${server} ] && [ -z $temp1 ]; then
       logger_options="${logger_options} -n ${server}"
