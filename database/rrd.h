@@ -950,12 +950,10 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , int update_every
                              , RRDSET_TYPE chart_type
                              , RRD_MEMORY_MODE memory_mode
-                             , long history_entries
-                             , int is_archived
-                             , uuid_t *chart_uuid);
+                             , long history_entries);
 
 #define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0, NULL)
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
@@ -1161,10 +1159,10 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
 
 extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                                 int is_archived, uuid_t *dim_uuid);
+                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);//,
+                                 //int is_archived, uuid_t *dim_uuid);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, \
-                                                                                   algorithm, (st)->rrd_memory_mode, 0, NULL)
+                                                                                   algorithm, (st)->rrd_memory_mode)//, 0, NULL)
 
 extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
@@ -1237,15 +1235,21 @@ extern RRDHOST *rrdhost_create(
     const char *tags, const char *program_name, const char *program_version, int update_every, long entries,
     RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled, char *rrdpush_destination,
     char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
-    int is_localhost, int is_archived);
+    int is_localhost); //TODO: Remove , int is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
+
+extern void set_host_properties(
+    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
+    const char *guid, const char *os, const char *tags, const char *tzone, const char *program_name,
+    const char *program_version);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
+#include "sqlite/sqlite_functions.h"
 #endif
 
 #endif /* NETDATA_RRD_H */

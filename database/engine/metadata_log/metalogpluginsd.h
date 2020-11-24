@@ -10,6 +10,8 @@
 struct metalog_pluginsd_state {
     struct metalog_instance *ctx;
     uuid_t uuid;
+    uuid_t host_uuid;
+    uuid_t chart_uuid;
     uint8_t skip_record; /* skip this record due to errors in parsing */
     struct metadata_logfile *metalogfile; /* current metadata log file being replayed */
 };

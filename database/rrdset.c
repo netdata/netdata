@@ -320,7 +320,6 @@ void rrdset_free(RRDSET *st) {
 
     rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
-
     // info("Removing chart '%s' ('%s')", st->id, st->name);
 
     // ------------------------------------------------------------------------
@@ -389,17 +388,12 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_DBENGINE:
 #ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                free_uuid(st->chart_uuid);
+            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
                 freez(st->chart_uuid);
-            }
 #endif
             freez(st);
             break;
     }
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(host, -1);
-#endif
 
 }
 
@@ -503,8 +497,6 @@ RRDSET *rrdset_create_custom(
         , RRDSET_TYPE chart_type
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
-        , int is_archived
-        , uuid_t *chart_uuid
 ) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
@@ -546,7 +538,7 @@ RRDSET *rrdset_create_custom(
         int mark_rebuild = 0;
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
+        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
             rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
             changed_from_archived_to_active = 1;
             mark_rebuild |= META_CHART_ACTIVATED;
@@ -661,10 +653,12 @@ RRDSET *rrdset_create_custom(
             }
         }
 #ifdef ENABLE_DBENGINE
-        if (is_archived == 0 && st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
             (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
             debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
-            metalog_commit_update_chart(st);
+            int rc = update_chart_metadata(st->chart_uuid, st, id, name);
+            if (unlikely(rc))
+                error_report("Failed to update chart metadata in the database");
         }
 #endif
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
@@ -689,9 +683,6 @@ RRDSET *rrdset_create_custom(
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-        if (!is_archived && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-        }
         return st;
     }
 
@@ -821,8 +812,6 @@ RRDSET *rrdset_create_custom(
         else
             st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
-    if (is_archived)
-        rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
 
     st->plugin_name = plugin?strdupz(plugin):NULL;
     st->module_name = module?strdupz(module):NULL;
@@ -915,7 +904,7 @@ RRDSET *rrdset_create_custom(
     st->next = host->rrdset_root;
     host->rrdset_root = st;
 
-    if(host->health_enabled && !is_archived) {
+    if(host->health_enabled) {
         rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
         rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
@@ -926,33 +915,20 @@ RRDSET *rrdset_create_custom(
     if(unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
 
-    if (!is_archived) {
-        rrdsetcalc_link_matching(st);
-        rrdcalctemplate_link_matching(st);
-    }
+    rrdsetcalc_link_matching(st);
+    rrdcalctemplate_link_matching(st);
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        int replace_instead_of_generate = 0;
+        st->chart_uuid = find_chart_uuid(host, type, id, name);
+        if (unlikely(!st->chart_uuid))
+            st->chart_uuid = create_chart_uuid(st, id, name);
 
-        st->chart_uuid = callocz(1, sizeof(uuid_t));
-        if (NULL != chart_uuid) {
-            replace_instead_of_generate = 1;
-            uuid_copy(*st->chart_uuid, *chart_uuid);
-        }
-        if (unlikely(
-                find_or_generate_guid((void *) st, st->chart_uuid, GUID_TYPE_CHART, replace_instead_of_generate))) {
-            errno = 0;
-            error("FAILED to generate GUID for %s", st->id);
-            freez(st->chart_uuid);
-            st->chart_uuid = NULL;
-            fatal_assert(0);
-        }
+        store_active_chart(st->chart_uuid);
         st->compaction_id = 0;
     }
 #endif
 
-    if (!is_archived)
-        rrdhost_cleanup_obsolete_charts(host);
+    rrdhost_cleanup_obsolete_charts(host);
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
@@ -961,11 +937,6 @@ RRDSET *rrdset_create_custom(
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
     }
 #endif
-#ifdef ENABLE_DBENGINE
-    metalog_upd_objcount(host, 1);
-    metalog_commit_update_chart(st);
-#endif
-
     return(st);
 }
 
@@ -1898,7 +1869,7 @@ after_second_database_work:
                         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
-                            metalog_commit_delete_dimension(rd);
+                            delete_dimension_uuid(rd->state->metric_uuid);
                         } else {
                             /* Do not delete this dimension */
                             last = rd;

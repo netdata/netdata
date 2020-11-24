@@ -73,10 +73,6 @@
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
-#ifdef ENABLE_DBENGINE
-#include "database/engine/global_uuid_map/global_uuid_map.h"
-#endif
-
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"

@@ -354,12 +354,15 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 1);
+#ifdef ENABLE_DBENGINE
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        sql_rrdset2json(host, w->response.data);
+#endif
     return HTTP_RESP_OK;
 }
 

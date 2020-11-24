@@ -103,6 +103,28 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
     host->hash_machine_guid = simple_hash(host->machine_guid);
 }
 
+void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname,
+                         const char *registry_hostname, const char *guid, const char *os, const char *tags,
+                         const char *tzone, const char *program_name, const char *program_version)
+{
+
+    host->rrd_update_every = update_every;
+    host->rrd_memory_mode = memory_mode;
+
+    rrdhost_init_hostname(host, hostname);
+
+    rrdhost_init_machine_guid(host, guid);
+
+    rrdhost_init_os(host, os);
+    rrdhost_init_timezone(host, tzone);
+    rrdhost_init_tags(host, tags);
+
+    host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
+    host->program_version = strdupz((program_version && *program_version) ? program_version : "unknown");
+
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname) ? registry_hostname : host->hostname);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -123,13 +145,12 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
                         struct rrdhost_system_info *system_info,
-                        int is_localhost,
-                        int is_archived
+                        int is_localhost
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
 #ifdef ENABLE_DBENGINE
-    int is_legacy = is_archived ? 0 : (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
+    int is_legacy = (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
 #else
     int is_legacy = 1;
 #endif
@@ -138,10 +159,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every    = (update_every > 0)?update_every:1;
+    set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, hostname, registry_hostname, guid, os,
+                        tags, timezone, program_name, program_version);
+
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
-    host->rrd_memory_mode     = memory_mode;
-    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE) || is_archived) ? 0 : health_enabled;
+    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
     host->sender = mallocz(sizeof(*host->sender));
     sender_init(host->sender, host);
@@ -169,17 +191,6 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_mutex_init(&host->claimed_id_lock);
 
-    rrdhost_init_hostname(host, hostname);
-    rrdhost_init_machine_guid(host, guid);
-
-    rrdhost_init_os(host, os);
-    rrdhost_init_timezone(host, timezone);
-    rrdhost_init_tags(host, tags);
-
-    host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
-    host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
-    host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
-
     host->system_info = system_info;
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
@@ -187,10 +198,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
-    if (is_archived) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
-        info("Host %s is created in archived mode", hostname);
-    }
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
@@ -248,7 +255,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
         host->varlib_dir = strdupz(filename);
 
-        if(!is_archived && host->health_enabled) {
+        if(host->health_enabled) {
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
@@ -256,7 +263,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     }
 
-    if(!is_archived && host->health_enabled) {
+    if(host->health_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
         int r = mkdir(filename, 0775);
         if(r != 0 && errno != EEXIST)
@@ -274,7 +281,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // load health configuration
 
-    if(!is_archived && host->health_enabled) {
+    if(host->health_enabled) {
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
@@ -293,13 +300,13 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        if (unlikely(-1 == uuid_parse(host->machine_guid, host->host_uuid))) {
-            error("Host machine GUID is not valid.");
+        if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
+            int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+            if (unlikely(rc))
+                error_report("Failed to store machine GUID to the database");
         }
-        if (unlikely(find_or_generate_guid((void *) host, &host->host_uuid, GUID_TYPE_HOST, 1)))
-            error("Failed to store machine GUID to global map");
         else
-            info("Added %s to global map for host %s", host->machine_guid, host->hostname);
+            error_report("Host machine GUID %s is not valid", host->machine_guid);
         host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
@@ -325,7 +332,6 @@ RRDHOST *rrdhost_create(const char *hostname,
             return host;
         }
 
-        metalog_upd_objcount(host, 1);
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
@@ -385,13 +391,8 @@ RRDHOST *rrdhost_create(const char *hostname,
          , host->health_default_recipient
     );
 
-    if (!is_archived)
-        rrd_hosts_available++;
+    rrd_hosts_available++;
 
-#ifdef ENABLE_DBENGINE
-    if (likely(!is_localhost && !is_archived && host && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-            metalog_commit_update_host(host);
-#endif
     return host;
 }
 
@@ -493,10 +494,7 @@ void rrdhost_update(RRDHOST *host
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
     }
-#ifdef ENABLE_DBENGINE
-    if (likely(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
-        metalog_commit_update_host(host);
-#endif
+
     return;
 }
 
@@ -549,7 +547,6 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
                 , system_info
-                , 0
                 , 0
         );
     }
@@ -633,6 +630,12 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
+#ifdef ENABLE_DBENGINE
+    if (unlikely(sql_init_database())) {
+        return 1;
+    }
+#endif
+
     health_init();
 
     rrdpush_init();
@@ -658,7 +661,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , default_rrdpush_send_charts_matching
             , system_info
             , 1
-            , 0
     );
     if (unlikely(!localhost)) {
         rrd_unlock();
@@ -800,8 +802,10 @@ void rrdhost_free(RRDHOST *host) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && host->rrdeng_ctx != &multidb_ctx)
-        rrdeng_prepare_exit(host->rrdeng_ctx);
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if (host->rrdeng_ctx != &multidb_ctx)
+            rrdeng_prepare_exit(host->rrdeng_ctx);
+    }
 #endif
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
@@ -890,9 +894,6 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
 
-#ifdef ENABLE_DBENGINE
-    free_uuid(&host->host_uuid);
-#endif
     freez(host);
 
     rrd_hosts_available--;
@@ -1544,7 +1545,7 @@ restart_after_removal:
                         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
-                            metalog_commit_delete_dimension(rd);
+                            delete_dimension_uuid(rd->state->metric_uuid);
                             rrddim_free(st, rd);
                             if (unlikely(!last)) {
                                 rd = st->dimensions;
@@ -1568,7 +1569,6 @@ restart_after_removal:
                     /* If the chart still has dimensions don't delete it from the metadata log */
                     continue;
                 }
-                metalog_commit_delete_chart(st);
             }
 #endif
             rrdset_rdlock(st);

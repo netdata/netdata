@@ -377,6 +377,10 @@ RRD_PLUGIN_FILES = \
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
+        database/sqlite/sqlite_functions.c \
+        database/sqlite/sqlite_functions.h \
+        database/sqlite/sqlite3.c \
+        database/sqlite/sqlite3.h \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
         database/engine/rrddiskprotocol.h \
@@ -392,7 +396,6 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
-        database/engine/metadata_log/metadatalog.c \
         database/engine/metadata_log/metadatalog.h \
         database/engine/metadata_log/metadatalogapi.c \
         database/engine/metadata_log/metadatalogapi.h \
@@ -403,8 +406,6 @@ if ENABLE_DBENGINE
         database/engine/metadata_log/metalogpluginsd.h \
         database/engine/metadata_log/compaction.c \
         database/engine/metadata_log/compaction.h \
-        database/engine/global_uuid_map/global_uuid_map.c \
-        database/engine/global_uuid_map/global_uuid_map.h \
         $(NULL)
 endif
 
