@@ -681,11 +681,16 @@ bind_fail:
 //
 // Support for archived charts
 //
-#define SELECT_DIMENSION "select d.id, d.name from dimension d where d.chart_id = @chart_uuid;"
+#define SELECT_DIMENSION "select d.id, d.name, d.dim_id from dimension d where d.chart_id = @chart_uuid;"
 
-void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_t *dimensions_count)
+void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, char *machine_guid,
+                    BUFFER *wb, size_t *dimensions_count,
+                    time_t *first_entry_t, time_t *last_entry_t)
 {
     int rc;
+//    time_t first_entry_t, last_entry_t;
+    uuid_t  legacy_uuid;
+    uuid_t  multihost_legacy_uuid;
 
     rc = sqlite3_bind_blob(res_dim, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (rc != SQLITE_OK)
@@ -695,6 +700,39 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_
     buffer_sprintf(wb, "\t\t\t\"dimensions\": {\n");
 
     while (sqlite3_step(res_dim) == SQLITE_ROW) {
+        time_t dim_first_entry_t, dim_last_entry_t;
+
+        rrdeng_generate_legacy_uuid((const char *) sqlite3_column_text(res_dim, 0), chart_id, &legacy_uuid);
+        rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid,
+                                                &multihost_legacy_uuid);
+
+        char uuid_str[37];
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_text(res_dim, 2), uuid_str);
+        info("LOOKING UUID %s", uuid_str);
+        uuid_unparse_lower(legacy_uuid, uuid_str);
+        info("  LEGACY UUID %s", uuid_str);
+        uuid_unparse_lower(multihost_legacy_uuid, uuid_str);
+        info("  MULTIHOST LEGACY UUID %s", uuid_str);
+
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_text(res_dim, 2), uuid_str);
+
+        rc = rrdeng_metric_latest_time_by_uuid((uuid_t *) sqlite3_column_text(res_dim, 2),
+                                               &dim_first_entry_t, &dim_last_entry_t);
+        if (rc) {
+            uuid_unparse_lower(legacy_uuid, uuid_str);
+            rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+            if (rc) {
+                uuid_unparse_lower(multihost_legacy_uuid, uuid_str);
+                rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+            }
+            info("LEGACY UUID %s --  First =%ld, Last = %ld", uuid_str, dim_first_entry_t, dim_last_entry_t);
+        }
+
+        info("FINAL UUID %s -- First =%ld, Last = %ld", uuid_str, dim_first_entry_t, dim_last_entry_t);
+
+        *first_entry_t = MIN(*first_entry_t, dim_first_entry_t);
+        *last_entry_t = MAX(*last_entry_t, dim_last_entry_t);
+
         if (dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
@@ -703,6 +741,7 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_
         buffer_strcat(wb, "\": { \"name\": \"");
         buffer_strcat_jsonescape(wb, (const char *) sqlite3_column_text(res_dim, 1));
         buffer_strcat(wb, "\" }");
+
         dimensions++;
     }
     *dimensions_count += dimensions;
@@ -715,8 +754,8 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, BUFFER *wb, size_
 
 void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
 {
-    //    time_t first_entry_t = 0; //= rrdset_first_entry_t(st);
-    //   time_t last_entry_t = 0; //rrdset_last_entry_t(st);
+    time_t first_entry_t = LONG_MAX; //= rrdset_first_entry_t(st);
+    time_t last_entry_t = 0; //rrdset_last_entry_t(st);
     static char *custom_dashboard_info_js_filename = NULL;
     int rc;
 
@@ -770,6 +809,8 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
     size_t c = 0;
     size_t dimensions = 0;
 
+    BUFFER *dimension_buffer = buffer_create(16384);
+
     while (sqlite3_step(res_chart) == SQLITE_ROW) {
         char id[512];
         sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
@@ -786,6 +827,13 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         buffer_strcat(wb, id);
         buffer_strcat(wb, "\": ");
 
+        buffer_reset(dimension_buffer);
+
+        sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), id,
+                       host->machine_guid,
+                       dimension_buffer,
+                       &dimensions, &first_entry_t, &last_entry_t);
+
         buffer_sprintf(
             wb,
             "\t\t{\n"
@@ -801,28 +849,44 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             "\t\t\t\"enabled\": %s,\n"
             "\t\t\t\"units\": \"%s\",\n"
             "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-            "\t\t\t\"chart_type\": \"%s\",\n",
-            id //sqlite3_column_text(res_chart, 1)
-            ,
-            id // sqlite3_column_text(res_chart, 2)
-            ,
-            sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 4), sqlite3_column_text(res_chart, 5),
-            sqlite3_column_text(res_chart, 6), id //sqlite3_column_text(res_chart, 2)
-            ,
-            (long ) sqlite3_column_int(res_chart, 7),
-            (const char *) sqlite3_column_text(res_chart, 8) ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",
-            (const char *) sqlite3_column_text(res_chart, 9) ? (const char *) sqlite3_column_text(res_chart, 9) : (char *) "", (char *) "false",
-            (const char *) sqlite3_column_text(res_chart, 10), id //sqlite3_column_text(res_chart, 2)
-            ,
-            rrdset_type_name(sqlite3_column_int(res_chart, 11)));
+            "\t\t\t\"chart_type\": \"%s\",\n"
+            "\t\t\t\"duration\": %ld,\n"
+            "\t\t\t\"first_entry\": %ld,\n"
+            "\t\t\t\"last_entry\": %ld,\n"
+            "\t\t\t\"update_every\": %d,\n",
+            id, //sqlite3_column_text(res_chart, 1)
+            id, // sqlite3_column_text(res_chart, 2)
+            sqlite3_column_text(res_chart, 3),
+            sqlite3_column_text(res_chart, 4),
+            sqlite3_column_text(res_chart, 5),
+            sqlite3_column_text(res_chart, 6), id, // title
+            (long ) sqlite3_column_int(res_chart, 7), // priority
+            (const char *) sqlite3_column_text(res_chart, 8) ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",   // plugin
+            (const char *) sqlite3_column_text(res_chart, 9) ? (const char *) sqlite3_column_text(res_chart, 9) : (char *) "",   // module
+            (char *) "false",  // enabled
+            (const char *) sqlite3_column_text(res_chart, 10),  // units
+            id, //data url
+            rrdset_type_name(sqlite3_column_int(res_chart, 11)),
+            last_entry_t - first_entry_t, // duration
+            first_entry_t, // first_entry
+            last_entry_t, // last_entry
+            1  // update every
+            );
 
-        sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), wb, &dimensions);
+//        buffer_reset(dimension_buffer);
+//
+//        sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), dimension_buffer,
+//                       &dimensions, &first_entry_t, &last_entry_t);
+
+        buffer_strcat(wb, buffer_tostring(dimension_buffer));
 
         rc = sqlite3_reset(res_dim);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset the prepared statement when reading archived chart dimensions");
         buffer_strcat(wb, "\n\t\t}");
     }
+
+    buffer_free(dimension_buffer);
 
     buffer_sprintf(wb
         , "\n\t}"
