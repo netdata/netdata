@@ -812,8 +812,9 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
     BUFFER *dimension_buffer = buffer_create(16384);
 
     while (sqlite3_step(res_chart) == SQLITE_ROW) {
-        char id[512];
-        sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
         RRDSET *st = rrdset_find(host, id);
         if (st && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
@@ -870,13 +871,8 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             last_entry_t - first_entry_t, // duration
             first_entry_t, // first_entry
             last_entry_t, // last_entry
-            1  // update every
+            sqlite3_column_int(res_chart, 12)  // update every
             );
-
-//        buffer_reset(dimension_buffer);
-//
-//        sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), dimension_buffer,
-//                       &dimensions, &first_entry_t, &last_entry_t);
 
         buffer_strcat(wb, buffer_tostring(dimension_buffer));
 
