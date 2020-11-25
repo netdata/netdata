@@ -47,7 +47,7 @@ class Service(UrlService):
         raw_data = loads(raw_data)
         alarms = raw_data.get('alarms', {})
         data = {a: self.status_map[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.status_map}
-        data['alarms_sum'] = sum(data.values())
+        data['alarms_num'] = len([v for v in data.values() if v > 0])
         self.validate_charts('alarms', data)
 
         return data
