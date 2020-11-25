@@ -68,17 +68,6 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    {
-        uuid_t multihost_legacy_uuid1;
-        char uuid_str[37];
-        char uuid_str1[37];
-        uuid_unparse_lower(legacy_uuid, uuid_str);
-        info("Computing legacy id on %s [%s] [%s]  --> %s",rd->rrdset->rrdhost->machine_guid, rd->id, rd->rrdset->id, uuid_str);
-        rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
-                                                &multihost_legacy_uuid1);
-        uuid_unparse_lower(multihost_legacy_uuid1, uuid_str1);
-        info("Computing multihost legacy id on %s [%s] [%s]  --> %s    multi = [%s]",rd->rrdset->rrdhost->machine_guid, rd->id, rd->rrdset->id, uuid_str, uuid_str1);
-    }
     rd->state->metric_uuid = dim_uuid;
     if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
         is_multihost_child = 1;
@@ -706,24 +695,15 @@ int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, t
 {
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
-//    uuid_t legacy_uuid;
-//    uuid_t multihost_legacy_uuid;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index = NULL;
-    int is_multihost_child = 0;
-    //RRDHOST *host = rd->rrdset->rrdhost;
 
     ctx = get_rrdeng_ctx_from_host(localhost);
     if (unlikely(!ctx)) {
         error("Failed to fetch multidb context");
-        return;
+        return 1;
     }
     pg_cache = &ctx->pg_cache;
-
-//    rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-//    rd->state->metric_uuid = dim_uuid;
-//    if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
-//        is_multihost_child = 1;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, dim_uuid, sizeof(uuid_t));

@@ -947,24 +947,40 @@ failed:
 }
 
 #define SELECT_HOST "select host_id, registry_hostname, update_every, os, timezone, tags from host where hostname = @hostname order by rowid desc;"
+#define SELECT_HOST_BY_UUID "select host_id, registry_hostname, update_every, os, timezone, tags from host where host_id = @host_id ;"
 
 RRDHOST *sql_create_host_by_uuid(char *hostname)
 {
     int rc;
     RRDHOST *host = NULL;
+    uuid_t host_uuid;
 
     sqlite3_stmt *res = NULL;
 
-    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch host");
-        return NULL;
+    rc = uuid_parse(hostname, host_uuid);
+    if (!rc) {
+        rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_BY_UUID, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to fetch host");
+            return NULL;
+        }
+        rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind host_id parameter to fetch host information");
+            return NULL;
+        }
     }
-
-    rc = sqlite3_bind_text(res, 1, hostname, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind hostname parameter to fetch host information");
-        return NULL;
+    else {
+        rc = sqlite3_prepare_v2(db_meta, SELECT_HOST, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to fetch host");
+            return NULL;
+        }
+        rc = sqlite3_bind_text(res, 1, hostname, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind hostname parameter to fetch host information");
+            return NULL;
+        }
     }
 
     rc = sqlite3_step(res);
