@@ -29,12 +29,6 @@ const char *database_config[] = {
 sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_transaction_lock;
-static uint32_t page_size;
-static uint32_t page_count;
-static uint32_t free_page_count;
-
-uint32_t sqlite_disk_quota_mb;
-uint32_t desired_pages = 0;
 
 static int execute_insert(sqlite3_stmt *res)
 {
@@ -182,50 +176,6 @@ void sql_close_database(void)
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database", rc);
     return;
-}
-
-/*
- * Return the database size in MiB
- */
-int sql_database_size(void)
-{
-    sqlite3_stmt *chk_size;
-    int rc;
-
-    rc = sqlite3_prepare_v2(db_meta, "pragma page_count;", -1, &chk_size, 0);
-    if (rc != SQLITE_OK)
-        return 0;
-
-    if (sqlite3_step(chk_size) == SQLITE_ROW)
-        page_count = sqlite3_column_int(chk_size, 0);
-
-    sqlite3_finalize(chk_size);
-
-    rc = sqlite3_prepare_v2(db_meta, "pragma freelist_count;", -1, &chk_size, 0);
-    if (rc != SQLITE_OK)
-        return 0;
-
-    if (sqlite3_step(chk_size) == SQLITE_ROW)
-        free_page_count = sqlite3_column_int(chk_size, 0);
-
-    sqlite3_finalize(chk_size);
-
-    if (unlikely(!page_size)) {
-        rc = sqlite3_prepare_v2(db_meta, "pragma page_size;", -1, &chk_size, 0);
-        if (rc != SQLITE_OK)
-            return 0;
-
-        if (sqlite3_step(chk_size) == SQLITE_ROW)
-            page_size = (uint32_t)sqlite3_column_int(chk_size, 0);
-
-        sqlite3_finalize(chk_size);
-        desired_pages = (sqlite_disk_quota_mb * 0.95) * (1024 * 1024 / page_size);
-        info(
-            "Database desired size is %u pages (page size is %u bytes). Current size is %u pages (includes %u free pages)",
-            desired_pages, page_size, page_count, free_page_count);
-    }
-
-    return ((page_count - free_page_count) / 1024) * (page_size / 1024);
 }
 
 #define FIND_UUID_TYPE  "select 1 from host where host_id = @uuid union select 2 from chart where chart_id = @uuid union select 3 from dimension where dim_id = @uuid;"
