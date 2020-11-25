@@ -2202,6 +2202,18 @@ NETDATA.dygraphChartCreate = function (state, data) {
         // Expects a string in the format "<series name>: <style>" where each series is separated by a |
         perSeriesStyle: NETDATA.dataAttribute(state.element, 'dygraph-per-series-style', ''),
 
+        // Applies shading to the graph based on the value of this (reference) dimension
+        dyShadeReferenceDimension: NETDATA.dataAttribute(state.element, 'dygraph-shaderefdimension', undefined),
+
+        // The threshold value of the reference dimension to apply shading
+        dyShadeReferenceThreshold: NETDATA.dataAttribute(state.element, 'dygraph-shaderefthreshold', undefined),
+
+        // Tells the algorithm how to compare against the reference dimension. Accepts '<', '<=', '>', '>=', '=', '!='
+        dyShadeCompareWith: NETDATA.dataAttribute(state.element, 'dygraph-shaderefcomparewith', '<'),
+
+        // The color of the shaded area
+        dyShadeColor: NETDATA.dataAttribute(state.element, 'dygraph-shadecolor', NETDATA.themes.current.highlight),
+
         axes: {
             x: {
                 pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
@@ -2372,6 +2384,78 @@ NETDATA.dygraphChartCreate = function (state, data) {
         },
         underlayCallback: function (canvas, area, g) {
             // the chart is about to be drawn
+
+            if (g.attributes_.user_.dyShadeReferenceDimension && g.attributes_.user_.dyShadeReferenceThreshold) {
+                // Compares a left hand value to a right hand value using an operator.
+                // Treats '===', '==' and '=' as ===, '!==', '!=' and '!' as '!==' to make the input syntax more lenient.
+                // Defaults to '<'.
+                const compareValues = function(operator, lhValue, rhValue) {
+                    switch (operator) {
+                        case '=':
+                        case '==':
+                        case '===':
+                            return lhValue === rhValue;
+                        case '!==':
+                        case '!=':
+                        case '!':
+                            return lhValue !== rhValue;
+                        case '>':
+                            return lhValue > rhValue;
+                        case '>=':
+                            return lhValue >= rhValue;
+                        case '<=':
+                            return lhValue <= rhValue;
+                        default:
+                            return lhValue < rhValue;
+                    }
+                };
+
+                const findSectionsToShade = function (dygraph, dimension, threshold, operator) {
+                    const shadeSections = [];
+                    // Stores the current processed section in the format of { 'start': <timestamp>, 'stop': <timestamp> }
+                    let currentSection;
+
+                    const dimensionIndex = dygraph.attributes_.labels_.indexOf(dimension) + 1;
+                    if (!dimensionIndex) {
+                        return shadeSections;
+                    }
+
+                    dygraph.rawData_.forEach(function (dataPoint, i, series) {
+                        if (compareValues(operator, dataPoint[dimensionIndex], threshold)) {
+                            currentSection = currentSection || { 'start': dataPoint[0] };
+                            currentSection.stop = dataPoint[0];
+                            // Keep processing unless we are at the last data point
+                            if (i < (series.length - 1)) {
+                                return;
+                            }
+                        }
+                        if (currentSection) {
+                            shadeSections.push(currentSection);
+                            currentSection = undefined;
+                        }
+                    });
+
+                    return shadeSections;
+                };
+
+                const dygraphShading = function (dygraph, canvas, area, start, stop, color) {
+                    const fillStart = dygraph.toDomXCoord(start);
+                    const fillStop = dygraph.toDomXCoord(stop);
+                    canvas.fillStyle = color;
+
+                    const width = fillStop - fillStart || 1; // Always shade at least one pixel
+                    canvas.fillRect(fillStart, area.y, width, area.h);
+                };
+
+                const refDimension = g.attributes_.user_.dyShadeReferenceDimension;
+                const threshold = g.attributes_.user_.dyShadeReferenceThreshold;
+                const operator = g.attributes_.user_.dyShadeCompareWith;
+
+                const sections = findSectionsToShade(g, refDimension, threshold, operator);
+                sections.forEach(function (section) {
+                    dygraphShading(g, canvas, area, section.start, section.stop, g.attributes_.user_.dyShadeColor);
+                });
+            }
 
             // update history_tip_element
             if (state.tmp.dygraph_history_tip_element) {
@@ -3512,7 +3596,7 @@ NETDATA.gaugeChartCreate = function (state, data) {
         colorStart: startColor,     // Colors
         colorStop: stopColor,       // just experiment with them
         strokeColor: strokeColor,   // to see which ones work best for you
-        generateGradient: (generateGradient === true), // gmosx: 
+        generateGradient: (generateGradient === true), // gmosx:
         gradientType: 0,
         highDpiSupport: true        // High resolution support
     };
@@ -10020,7 +10104,7 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
-                });    
+                });
             }
         });
     },
@@ -10071,7 +10155,7 @@ NETDATA.registry = {
             // data.
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
-        } 
+        }
 
         console.log("ACCESS", name, url);
 
