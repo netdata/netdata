@@ -7,8 +7,7 @@ from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
 
-priority = 200200
-update_every = 5
+update_every = 10
 disabled_by_default = True
 
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
@@ -47,7 +46,7 @@ class Service(UrlService):
         raw_data = loads(raw_data)
         alarms = raw_data.get('alarms', {})
         data = {a: self.status_map[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.status_map}
-        data['alarms_num'] = len([v for v in data.values() if v > 0])
         self.validate_charts('alarms', data)
+        data['alarms_num'] = len(data)
 
         return data
