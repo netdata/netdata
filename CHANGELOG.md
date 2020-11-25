@@ -54,6 +54,7 @@
 - Fixed builds using particular versions of Clang. [\#10155](https://github.com/netdata/netdata/pull/10155) ([Ferroin](https://github.com/Ferroin))
 - Update README.md [\#10146](https://github.com/netdata/netdata/pull/10146) ([WBTMagnum](https://github.com/WBTMagnum))
 - fix configuration category in docs/prometheus\_remote\_write [\#10145](https://github.com/netdata/netdata/pull/10145) ([OdysLam](https://github.com/OdysLam))
+- Migrate metadata log to SQLite [\#10139](https://github.com/netdata/netdata/pull/10139) ([stelfrag](https://github.com/stelfrag))
 - dashboard@2.7.4 [\#10122](https://github.com/netdata/netdata/pull/10122) ([jacekkolasa](https://github.com/jacekkolasa))
 - Disregard host tags configuration pointer [\#10121](https://github.com/netdata/netdata/pull/10121) ([mfundul](https://github.com/mfundul))
 - Fix platform dependent printf format [\#10120](https://github.com/netdata/netdata/pull/10120) ([Saruspete](https://github.com/Saruspete))
@@ -246,9 +247,6 @@
 - installer: fix `govercomp` [\#9646](https://github.com/netdata/netdata/pull/9646) ([ilyam8](https://github.com/ilyam8))
 - installer: update `go.d.plugin` version to v0.20.0 [\#9644](https://github.com/netdata/netdata/pull/9644) ([ilyam8](https://github.com/ilyam8))
 - python.d: fix `find\_binary` [\#9641](https://github.com/netdata/netdata/pull/9641) ([ilyam8](https://github.com/ilyam8))
-- dashboard v1.0.26 [\#9639](https://github.com/netdata/netdata/pull/9639) ([jacekkolasa](https://github.com/jacekkolasa))
-- Fetch libbpf from netdata fork [\#9637](https://github.com/netdata/netdata/pull/9637) ([vlvkobal](https://github.com/vlvkobal))
-- charts.d: fix `current\_time\_ms\_from\_date` on macOS [\#9636](https://github.com/netdata/netdata/pull/9636) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.23.2](https://github.com/netdata/netdata/tree/v1.23.2) (2020-07-16)
 
