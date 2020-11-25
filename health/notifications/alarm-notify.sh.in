@@ -1833,7 +1833,7 @@ EOF
 
 send_syslog() {
   local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
-  local priority='' message='' host='' port='' prefix=''
+  local priority='' message='' server='' port='' prefix=''
   local temp1='' temp2=''
 
   [ "${SEND_SYSLOG}" = "YES" ] || return 1
@@ -1847,7 +1847,7 @@ send_syslog() {
   for target in ${targets}; do
     priority="${facility}.${level}"
     message=''
-    host=''
+    server=''
     port=''
     prefix=''
     temp1=''
@@ -1859,25 +1859,25 @@ send_syslog() {
     if [ ${prefix} != ${temp1} ]; then
       if (echo ${temp1} | grep -q '@'); then
         temp2=$(echo ${temp1} | cut -d '@' -f 1)
-        host=$(echo ${temp1} | cut -d '@' -f 2)
+        server=$(echo ${temp1} | cut -d '@' -f 2)
 
-        if [ ${temp2} != ${host} ]; then
+        if [ ${temp2} != ${server} ]; then
           priority=${temp2}
         fi
 
-        port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+        port=$(echo ${server} | rev | cut -d ':' -f 1 | rev)
 
-        if (echo ${host} | grep -E -q '\[.*\]'); then
+        if (echo ${server} | grep -E -q '\[.*\]'); then
           if (echo ${port} | grep -q ']'); then
             port=''
           else
-            host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+            server=$(echo ${server} | rev | cut -d ':' -f 2- | rev)
           fi
         else
-          if [ ${port} = ${host} ]; then
+          if [ ${port} = ${server} ]; then
             port=''
           else
-            host=$(echo ${host} | cut -d ':' -f 1)
+            server=$(echo ${server} | cut -d ':' -f 1)
           fi
         fi
       else
@@ -1887,8 +1887,8 @@ send_syslog() {
 
     message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
-    if [ ${host} ]; then
-      logger_options="${logger_options} -n ${host}"
+    if [ ${server} ]; then
+      logger_options="${logger_options} -n ${server}"
       if [ ${port} ]; then
         logger_options="${logger_options} -P ${port}"
       fi
