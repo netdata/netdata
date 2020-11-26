@@ -688,7 +688,6 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
                     time_t *first_entry_t, time_t *last_entry_t)
 {
     int rc;
-//    time_t first_entry_t, last_entry_t;
     uuid_t  legacy_uuid;
     uuid_t  multihost_legacy_uuid;
 
@@ -702,35 +701,20 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
     while (sqlite3_step(res_dim) == SQLITE_ROW) {
         time_t dim_first_entry_t, dim_last_entry_t;
 
-        rrdeng_generate_legacy_uuid((const char *) sqlite3_column_text(res_dim, 0), chart_id, &legacy_uuid);
-        rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid, &multihost_legacy_uuid);
-
-        char uuid_str[37];
-        uuid_unparse_lower(*(uuid_t *) sqlite3_column_text(res_dim, 2), uuid_str);
-        info("LOOKING UUID %s", uuid_str);
-        uuid_unparse_lower(legacy_uuid, uuid_str);
-        info("  LEGACY UUID on %s [%s] [%s] --> %s", machine_guid, (char *) sqlite3_column_text(res_dim, 0), chart_id, uuid_str);
-        uuid_unparse_lower(multihost_legacy_uuid, uuid_str);
-        info("  MULTIHOST LEGACY UUID %s", uuid_str);
-
-        uuid_unparse_lower(*(uuid_t *) sqlite3_column_text(res_dim, 2), uuid_str);
-
-        rc = rrdeng_metric_latest_time_by_uuid((uuid_t *) sqlite3_column_text(res_dim, 2),
-                                               &dim_first_entry_t, &dim_last_entry_t);
-        if (rc) {
-            uuid_unparse_lower(legacy_uuid, uuid_str);
+        rc = rrdeng_metric_latest_time_by_uuid((uuid_t *) sqlite3_column_text(res_dim, 2), &dim_first_entry_t, &dim_last_entry_t);
+        if (unlikely(rc)) {
+            rrdeng_generate_legacy_uuid((const char *) sqlite3_column_text(res_dim, 0), chart_id, &legacy_uuid);
             rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
-            if (rc) {
-                uuid_unparse_lower(multihost_legacy_uuid, uuid_str);
+            if (likely(rc)) {
+                rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid, &multihost_legacy_uuid);
                 rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
             }
-            info("LEGACY UUID %s --  First =%ld, Last = %ld", uuid_str, dim_first_entry_t, dim_last_entry_t);
         }
 
-        info("FINAL UUID %s -- First =%ld, Last = %ld", uuid_str, dim_first_entry_t, dim_last_entry_t);
-
-        *first_entry_t = MIN(*first_entry_t, dim_first_entry_t);
-        *last_entry_t = MAX(*last_entry_t, dim_last_entry_t);
+        if (likely(!rc)) {
+            *first_entry_t = MIN(*first_entry_t, dim_first_entry_t);
+            *last_entry_t = MAX(*last_entry_t, dim_last_entry_t);
+        }
 
         if (dimensions)
             buffer_strcat(wb, ",\n\t\t\t\t\"");
@@ -753,8 +737,8 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
 
 void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
 {
-    time_t first_entry_t = LONG_MAX; //= rrdset_first_entry_t(st);
-    time_t last_entry_t = 0; //rrdset_last_entry_t(st);
+    time_t first_entry_t = LONG_MAX;
+    time_t last_entry_t = 0;
     static char *custom_dashboard_info_js_filename = NULL;
     int rc;
 
@@ -808,7 +792,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
     size_t c = 0;
     size_t dimensions = 0;
 
-    BUFFER *dimension_buffer = buffer_create(16384);
+    BUFFER *dimension_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
     while (sqlite3_step(res_chart) == SQLITE_ROW) {
         char id[RRD_ID_LENGTH_MAX + 1];
