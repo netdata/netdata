@@ -747,6 +747,39 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
     buffer_sprintf(wb, "\n\t\t\t}");
 }
 
+#define SELECT_ARCHIVED_HOSTS "select host_id, hostname from host where host_id not in (select host_id from chart where chart_id in (select chart_id from chart_active));"
+
+void sql_archived_database_hosts(BUFFER *wb, int count)
+{
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_ARCHIVED_HOSTS, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch archived hosts");
+        return;
+    }
+
+    char machine_guid[GUID_LEN + 1];
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 0), machine_guid);
+        if (count > 0)
+            buffer_strcat(wb, ",\n");
+        buffer_sprintf(
+            wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\" }", machine_guid, sqlite3_column_text(res, 1));
+
+        count++;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived hosts");
+
+    return;
+}
+
 #define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, " \
     "module, unit, chart_type, update_every from chart " \
     "where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
