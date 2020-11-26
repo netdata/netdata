@@ -132,7 +132,7 @@ Restart your Agent and [claim your node](/claim/README.md#how-to-claim-a-node).
 
 # ACLK and privacy
 
-Privacy is very important to us and we firmly believe that the data of our users belong to themselves. This is why w**e actually don't store any metric data in the Netdata Cloud**. 
+Privacy is very important to us and we firmly believe that the data of our users belong to themselves. This is why **we actually don't store any metric data in the Netdata Cloud**. 
 
 All the data that the user sees in the web browser when using Netdata Cloud, are actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. They pass through our systems, but they are not stored.
 
