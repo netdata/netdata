@@ -442,7 +442,7 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
     recursively_delete_dir(st->cache_dir, "left-over chart");
 #ifdef ENABLE_ACLK
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
-        aclk_del_collector(st->rrdhost->hostname, st->plugin_name, st->module_name);
+        aclk_del_collector(st->rrdhost, st->plugin_name, st->module_name);
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
     }
 #endif
@@ -626,14 +626,14 @@ RRDSET *rrdset_create_custom(
 #ifdef ENABLE_ACLK
             if (netdata_cloud_setting) {
                 if (mark_rebuild & META_CHART_ACTIVATED) {
-                    aclk_add_collector(host->hostname, st->plugin_name, st->module_name);
+                    aclk_add_collector(host, st->plugin_name, st->module_name);
                 }
                 else {
                     if (mark_rebuild & (META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
                         aclk_del_collector(
-                            host->hostname, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
+                            host, mark_rebuild & META_PLUGIN_UPDATED ? old_plugin : st->plugin_name,
                             mark_rebuild & META_MODULE_UPDATED ? old_module : st->module_name);
-                        aclk_add_collector(host->hostname, st->plugin_name, st->module_name);
+                        aclk_add_collector(host, st->plugin_name, st->module_name);
                     }
                 }
                 aclk_update_chart(host, st->id, ACLK_CMD_CHART);
@@ -933,7 +933,7 @@ RRDSET *rrdset_create_custom(
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
-        aclk_add_collector(host->hostname, plugin, module);
+        aclk_add_collector(host, plugin, module);
         aclk_update_chart(host, st->id, ACLK_CMD_CHART);
     }
 #endif

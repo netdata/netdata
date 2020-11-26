@@ -66,24 +66,28 @@ int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
 
-int aclk_send_metadata(ACLK_METADATA_STATE state);
-int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted);
+int aclk_send_metadata(ACLK_METADATA_STATE state, RRDHOST *host);
+int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *host);
 void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
 
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 
-int aclk_send_single_chart(char *host, char *chart);
+int aclk_send_single_chart(RRDHOST *host, char *chart);
 int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us, int version);
 int aclk_handle_cloud_message(char *payload);
-void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
-void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
+void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
+void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 void aclk_alarm_reload();
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 void aclk_single_update_enable();
 void aclk_single_update_disable();
+
+void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd);
+int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);
+void aclk_update_next_child_to_popcorn(void);
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H

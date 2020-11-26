@@ -126,11 +126,11 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
         return PARSER_RC_OK; //the message is OK problem must be somewehere else
     }
 
-    netdata_mutex_lock(&host->claimed_id_lock);
-    if (host->claimed_id)
-        freez(host->claimed_id);
-    host->claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
-    netdata_mutex_unlock(&host->claimed_id_lock);
+    rrdhost_aclk_state_lock(host);
+    if (host->aclk_state.claimed_id)
+        freez(host->aclk_state.claimed_id);
+    host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+    rrdhost_aclk_state_unlock(host);
 
     rrdpush_claimed_id(host);
 
@@ -440,6 +440,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
+#ifdef ENABLE_ACLK
+    // in case we have cloud connection we inform cloud
+    // new slave connected
+    if (netdata_cloud_setting)
+        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_CONNECT);
+#endif
 
     size_t count = streaming_parser(rpt, &cd, fp);
 
@@ -447,6 +453,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
                           "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
+
+#ifdef ENABLE_ACLK
+    // in case we have cloud connection we inform cloud
+    // new slave connected
+    if (netdata_cloud_setting)
+        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_DISCONNECT);
+#endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {

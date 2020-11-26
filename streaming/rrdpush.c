@@ -374,11 +374,11 @@ void rrdpush_claimed_id(RRDHOST *host)
         return;
 
     sender_start(host->sender);
-    netdata_mutex_lock(&host->claimed_id_lock);
+    rrdhost_aclk_state_lock(host);
 
-    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->claimed_id ? host->claimed_id : "NULL") );
+    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
 
-    netdata_mutex_unlock(&host->claimed_id_lock);
+    rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender);
 
     // signal the sender there are more data

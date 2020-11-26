@@ -189,7 +189,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     netdata_rwlock_init(&host->rrdhost_rwlock);
     netdata_rwlock_init(&host->labels_rwlock);
 
-    netdata_mutex_init(&host->claimed_id_lock);
+    netdata_mutex_init(&host->aclk_state_lock);
 
     host->system_info = system_info;
 
@@ -870,8 +870,8 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    pthread_mutex_destroy(&host->claimed_id_lock);
-    freez(host->claimed_id);
+    pthread_mutex_destroy(&host->aclk_state_lock);
+    freez(host->aclk_state.claimed_id);
     freez((void *)host->tags);
     free_host_labels(host->labels);
     freez((void *)host->os);
