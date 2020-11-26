@@ -129,3 +129,28 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 Restart your Agent and [claim your node](/claim/README.md#how-to-claim-a-node).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Faclk%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+
+# ACLK and privacy
+
+Privacy is very important to us and we firmly believe that the data of our users belong to themselves. This is why w**e actually don't store any metric data in the Netdata Cloud**. 
+
+All the data that the user sees in the web browser when using Netdata Cloud, are actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. They pass through our systems, but they are not stored.
+
+We do however store a limited number of *metadata* to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud.
+
+## Metadata
+
+The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example) :
+- User data:
+  - user email
+- For each Netdata Agent node that is connected to Netdata Cloud:
+ - Node Name
+ - The node information shown in `/api/v1/info`. E.g. `https://frankfurt.my-netdata.io/api/v1/info`
+ - The chart metadata shown in `/api/v1/charts`. E.g. `https://frankfurt.my-netdata.io/api/v1/charts`
+ - The alarm configurations shown in `/api/v1/alarms?all`. E.g. `https://frankfurt.my-netdata.io/api/v1/alarms?all`
+ - Active alarms shown in `/api/v1/alarms`. E.g `https://frankfurt.my-netdata.io/api/v1/alarms`
+
+How we use them:
+- The data are stored in our production database on Google Cloud and some of it is also used in BigQuery, our data lake, for analytics purposes. These analytics are crucial for our product development process.
+- Email is used to identify users in regards to product use and to enrich our tools with product use, such as our CRM.
+- This data is only be available to Netdata and never to a 3rd party.
