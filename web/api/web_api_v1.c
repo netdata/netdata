@@ -499,12 +499,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (context && !chart) {
         RRDSET *st1;
         uint32_t context_hash = simple_hash(context);
-        rrdhost_rdlock(localhost);
-        rrdset_foreach_read(st1, localhost) {
+        rrdhost_rdlock(host);
+        rrdset_foreach_read(st1, host) {
             if (st1->hash_context == context_hash && !strcmp(st1->context, context))
                 build_context_param_list(&context_param_list, st1);
         }
-        rrdhost_unlock(localhost);
+        rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
     }
