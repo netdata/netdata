@@ -104,7 +104,8 @@ struct extent_cache_element {
     struct extent_info *extent;
     struct extent_cache_element *prev; /* LRU */
     struct extent_cache_element *next; /* LRU */
-    uint8_t pages[MAX_PAGES_PER_EXTENT][RRDENG_BLOCK_SIZE];
+    struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
+    uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
 };
 
 #define MAX_CACHED_EXTENTS 16 /* cannot be over 32 to fit in 32-bit architectures */
@@ -112,8 +113,8 @@ struct extent_cache_element {
 /* Initialize by setting the structure to zero */
 struct extent_cache {
     struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
-    unsigned long allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
-    unsigned long inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
+    unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
+    unsigned inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
 
     struct extent_cache_element *replaceQ_head; /* LRU */
     struct extent_cache_element *replaceQ_tail; /* MRU */

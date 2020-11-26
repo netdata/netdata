@@ -36,10 +36,10 @@ typedef uintptr_t rrdeng_stats_t;
 
 #define rrd_stat_atomic_add(p, n) rrd_atomic_fetch_add(p, n)
 
-/* returns -1 if it didn't find the first set bit, the position otherwise. Starts from LSB. */
-static inline int find_first_bit(unsigned x)
+/* returns -1 if it didn't find the first cleared bit, the position otherwise. Starts from LSB. */
+static inline int find_first_zero(unsigned x)
 {
-    return ffs((int)x) - 1;
+    return ffs((int)(~x)) - 1;
 }
 
 /* Starts from LSB. */
@@ -49,14 +49,14 @@ static inline int check_bit(unsigned x, size_t pos)
 }
 
 /* Starts from LSB. val is 0 or 1 */
-static inline void modify_bit(unsigned x, unsigned pos, uint8_t val)
+static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
 {
     switch(val) {
     case 0:
-        x &= ~(1U << pos);
+        *x &= ~(1U << pos);
         break;
     case 1:
-        x |= 1U << pos;
+        *x |= 1U << pos;
         break;
     default:
         error("modify_bit() called with invalid argument.");
