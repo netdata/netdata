@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/conf
 # How to optimize the Netdata Agent's performance
 
 We designed the Netdata Agent to be incredibly lightweight, even when it's collecting a few thousand dimensions every
-second and storing that data into hundreds of charts. The Agent itself should never use more than 1% of a single CPU
+second and visualizing that data into hundreds of charts. The Agent itself should never use more than 1% of a single CPU
 core, roughly 100 MiB of RAM, and minimal disk I/O to collect, store, and visualize all this data.
   
 We take this scalability seriously. We have one user [running
@@ -40,11 +40,11 @@ example, you can't control how many users might be viewing a local Agent dashboa
 infrastructure](/docs/visualize/overview-infrastructure.md) in real-time with Netdata Cloud, or running [Metric
 Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations).
 
-The Netdata Agent runs with the lowest possible [/daemon/README.md#netdata-process-scheduling-policy), which is `nice
-19`, and uses the `idle` process scheduler. Together, these settings ensure that the Agent only gets CPU resources when
-the node has CPU resources to space. If the node reaches 100% CPU utilization, the Agent is stopped first to ensure your
-applications get any available resources. In addition, under heavy load, collectors that require disk I/O may stop and
-show gaps in charts.
+The Netdata Agent runs with the lowest possible [process scheduling
+policy](/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
+Together, these settings ensure that the Agent only gets CPU resources when the node has CPU resources to space. If the
+node reaches 100% CPU utilization, the Agent is stopped first to ensure your applications get any available resources.
+In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.
 
 Let's walk through the best ways to improve the Netdata Agent's performance.
 
