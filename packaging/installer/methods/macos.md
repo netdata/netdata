@@ -50,10 +50,10 @@ xcode-select --install
 ```
 
 Click **Install** on the Software Update popup window that appears. Then, use the same terminal session to use Homebrew
-to install some of Netdata's prerequisites.
+to install some of Netdata's prerequisites. `cmake` is necessary only if you need to claim the node to Netdata Cloud.
 
 ```bash
-brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1
+brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1 cmake
 ```
 
 If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download
