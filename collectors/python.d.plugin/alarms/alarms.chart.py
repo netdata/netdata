@@ -18,7 +18,7 @@ ORDER = [
 
 CHARTS = {
     'alarms': {
-        'options': ['alarms', 'Alarms', 'status', 'alarms', 'alarms.status', 'line'],
+        'options': [],
         'lines': []
     }
 }
@@ -31,11 +31,12 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.url = self.configuration.get('url', 'http://127.0.0.1:19999/api/v1/alarms?all')
         self.status_map = self.configuration.get('status_map', DEFAULT_STATUS_MAP)
+        self.chart_title = f"Alarms ({', '.join([f'{k}={self.status_map[k]}' for k in self.status_map])})"
 
     def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):
         for dim in data:
             if name not in self.charts:
-                chart_params = [name] + CHARTS[name]['options']
+                chart_params = [name] + ['alarms', self.chart_title, 'status', 'alarms', 'alarms.status', 'line']
                 self.charts.add_chart(params=chart_params)
             if dim not in self.charts[name]:
                 self.charts[name].add_dimension([dim, dim, algorithm, multiplier, divisor])
