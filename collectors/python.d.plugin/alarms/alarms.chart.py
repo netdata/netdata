@@ -17,10 +17,6 @@ ORDER = [
 ]
 
 CHARTS = {
-    'alarms': {
-        'options': [],
-        'lines': []
-    }
 }
 
 
