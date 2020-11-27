@@ -47,18 +47,8 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
 
-        self.order = ORDER
-        self.definitions = CHARTS
-        self.protocol = self.configuration.get('protocol', 'http')
-        self.host = self.configuration.get('host', '127.0.0.1:19999')
-        self.username = self.configuration.get('username', None)
-        self.password = self.configuration.get('password', None)
-
-        self.charts_regex = re.compile(self.configuration.get('charts_regex','None'))
-        self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
-        self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
-        if len(self.charts_to_exclude) > 0:
-            self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
+        self.basic_init()
+        self.charts_init()
 
         self.custom_models = self.configuration.get('custom_models', None)
         self.custom_models_normalize = bool(self.configuration.get('custom_models_normalize', False))
@@ -125,6 +115,25 @@ class Service(SimpleService):
     @staticmethod
     def check():
         return True
+
+    def basic_init(self):
+        """Perform some basic initialization.
+        """
+        self.order = ORDER
+        self.definitions = CHARTS
+        self.protocol = self.configuration.get('protocol', 'http')
+        self.host = self.configuration.get('host', '127.0.0.1:19999')
+        self.username = self.configuration.get('username', None)
+        self.password = self.configuration.get('password', None)
+
+    def charts_init(self):
+        """
+        """
+        self.charts_regex = re.compile(self.configuration.get('charts_regex','None'))
+        self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
+        self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
+        if len(self.charts_to_exclude) > 0:
+            self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
 
     def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):
         """If dimension not in chart then add it.
