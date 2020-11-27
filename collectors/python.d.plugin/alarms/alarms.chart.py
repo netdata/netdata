@@ -29,6 +29,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+        self.url = self.configuration.get('url', 'http://127.0.0.1:19999/api/v1/alarms?all')
         self.status_map = self.configuration.get('status_map', DEFAULT_STATUS_MAP)
 
     def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):

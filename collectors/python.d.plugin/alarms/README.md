@@ -5,7 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/pytho
 
 # Alarms - graphing Netdata alarm states over time
 
-This collector creates an 'Alarms' menu with one line plot showing alarm states over time. Alarm states are mapped to integer values according to the below default mapping. Any alarm status types not in this mapping will be ignored (Note: This mapping can be changed by editing the `status_map` in the `alarms.conf` file).
+This collector creates an 'Alarms' menu with one line plot showing alarm states over time. Alarm states are mapped to integer values according to the below default mapping. Any alarm status types not in this mapping will be ignored (Note: This mapping can be changed by editing the `status_map` in the `alarms.conf` file). If you would like to learn more about the different alarm statuses check out the docs [here](https://learn.netdata.cloud/docs/agent/health/reference#alarm-statuses).
 
 ```
 {
@@ -33,7 +33,7 @@ sudo systemctl restart netdata
 ```
 
 If needed, edit the `python.d/alarms.conf` configuration file using `edit-config` from the your agent's [config
-directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
+directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
