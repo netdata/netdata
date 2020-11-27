@@ -573,7 +573,7 @@ netdataDashboard.menu = {
 
     'alarms': {
         title: 'Alarms',
-        icon: '<i class="fas fa-exclamation"></i>',
+        icon: '<i class="fas fa-bell"></i>',
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
 
