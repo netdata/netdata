@@ -725,8 +725,8 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
 
     struct context_param  *context_param_list = NULL;
     if (context && !chart) {
-        RRDSET *st1;
-        uint32_t context_hash = simple_hash(context);
+//        RRDSET *st1;
+//        uint32_t context_hash = simple_hash(context);
         sql_build_context_param_list(&context_param_list, &host->host_uuid, context);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;

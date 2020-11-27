@@ -2,7 +2,7 @@
 
 #include "web/api/web_api_v1.h"
 
-static inline void free_temp_rrddim(RRDDIM *temp_rd)
+static inline void free_temp_rrddim(RRDDIM *temp_rd, int archive_mode)
 {
     if (unlikely(!temp_rd))
         return;
@@ -12,6 +12,11 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd)
         t = temp_rd->next;
         freez((char *)temp_rd->id);
         freez((char *)temp_rd->name);
+        if (unlikely(archive_mode)) {
+            freez((char *) temp_rd->rrdset->name);
+            freez(temp_rd->rrdset->context);
+            freez(temp_rd->rrdset);
+        }
 #ifdef ENABLE_DBENGINE
         if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             freez(temp_rd->state->metric_uuid);
@@ -27,7 +32,7 @@ void free_context_param_list(struct context_param **param_list)
     if (unlikely(!param_list || !*param_list))
         return;
 
-    free_temp_rrddim(((*param_list)->rd));
+    free_temp_rrddim(((*param_list)->rd), (*param_list)->archive_mode);
     freez((*param_list));
     *param_list = NULL;
 }
@@ -42,6 +47,7 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
         (*param_list)->rd = NULL;
+        (*param_list)->archive_mode = 0;
     }
 
     RRDDIM *rd1;

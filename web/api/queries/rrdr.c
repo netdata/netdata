@@ -108,7 +108,8 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
     RRDR *r = callocz(1, sizeof(RRDR));
     r->st = st;
 
-    rrdr_lock_rrdset(r);
+    if (context_param_list && !context_param_list->archive_mode)
+        rrdr_lock_rrdset(r);
 
     RRDDIM *temp_rd =  context_param_list ? context_param_list->rd : NULL;
     RRDDIM *rd;
