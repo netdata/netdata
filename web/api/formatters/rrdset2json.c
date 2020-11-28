@@ -7,8 +7,8 @@
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
     rrdset_rdlock(st);
 
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
 
     buffer_sprintf(wb,
             "\t\t{\n"

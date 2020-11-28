@@ -679,6 +679,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         //, size_t before_slot
         , const char *msg
         ) {
+    netdata_rwlock_rdlock(&r->st->rrdset_rwlock);
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %zu, db: %zu), "
          "before (got: %zu, want: %zu, req: %zu, db: %zu), "
@@ -700,19 +701,19 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t(r->st)
+         , (size_t)rrdset_first_entry_t_nolock(r->st)
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t(r->st)
+         , (size_t)rrdset_last_entry_t_nolock(r->st)
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
+         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
 
          // slot
          /*
@@ -730,6 +731,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          // message
          , msg
     );
+    netdata_rwlock_unlock(&r->st->rrdset_rwlock);
 }
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -1575,8 +1577,10 @@ RRDR *rrd2rrdr(
         first_entry_t = context_param_list->first_entry_t;
         last_entry_t = context_param_list->last_entry_t;
     } else {
-        first_entry_t = rrdset_first_entry_t(st);
-        last_entry_t = rrdset_last_entry_t(st);
+        rrdset_rdlock(st);
+        first_entry_t = rrdset_first_entry_t_nolock(st);
+        last_entry_t = rrdset_last_entry_t_nolock(st);
+        rrdset_unlock(st);
     }
 
     rrd_update_every = st->update_every;

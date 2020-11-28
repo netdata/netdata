@@ -171,11 +171,11 @@ static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
 }
 
 static time_t rrddim_query_latest_time(RRDDIM *rd) {
-    return rrdset_last_entry_t(rd->rrdset);
+    return rrdset_last_entry_t_nolock(rd->rrdset);
 }
 
 static time_t rrddim_query_oldest_time(RRDDIM *rd) {
-    return rrdset_first_entry_t(rd->rrdset);
+    return rrdset_first_entry_t_nolock(rd->rrdset);
 }
 
 
