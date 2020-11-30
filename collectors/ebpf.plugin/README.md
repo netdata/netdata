@@ -175,12 +175,12 @@ When the integration is enabled, your dashboard will also show the following cha
 -   eBPF net
     -   Number of bytes transmited per seconds.   
 
-If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `disable
-apps` to `yes`.
+If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
+`no`.
 
 ```conf
 [global]
-   disable apps = yes
+   apps = yes
 ```
 
 ### `[ebpf programs]`
