@@ -189,7 +189,7 @@ sudo su -s /bin/bash netdata
 - Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relativley high `update_every` maybe 10,15 or 30 in `anomalies.conf`.
 - Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisey model if you set `train_n_secs` to be too small for how your node tends to behave.
 
-## Useful Links & Further Reading
+## Useful links and further reading
 
 - [PyOD documentation](https://pyod.readthedocs.io/en/latest/), [PyOD Github](https://github.com/yzhao062/pyod).
 - [Anomaly Detection](https://en.wikipedia.org/wiki/Anomaly_detection) wikipedia page.
