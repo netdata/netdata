@@ -659,7 +659,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_FILE_GROUP,
                                20061,
                                root);
 
@@ -667,7 +667,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
                                    "Fails to open files",
                                    EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   NETDATA_APPS_FILE_GROUP,
                                    20062,
                                    root);
     }
@@ -675,7 +675,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
                                "Files closed",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_FILE_GROUP,
                                20063,
                                root);
 
@@ -683,7 +683,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
                                    "Fails to close files",
                                    EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   NETDATA_APPS_FILE_GROUP,
                                    20064,
                                    root);
     }
@@ -691,14 +691,14 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                "Files deleted",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_VFS_GROUP,
                                20065,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
                                "Write to disk",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_VFS_GROUP,
                                20066,
                                apps_groups_root_target);
 
@@ -706,7 +706,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
                                    "Fails to write",
                                    EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   NETDATA_APPS_VFS_GROUP,
                                    20067,
                                    root);
     }
@@ -714,7 +714,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
                                "Read from disk",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_VFS_GROUP,
                                20068,
                                root);
 
@@ -722,7 +722,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
                                    "Fails to read",
                                    EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_SYSCALL_GROUP,
+                                   NETDATA_APPS_VFS_GROUP,
                                    20069,
                                    root);
     }
@@ -730,35 +730,35 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
                                "Bytes written on disk",
                                EBPF_COMMON_DIMENSION_BYTESS,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_VFS_GROUP,
                                20070,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                "Bytes read from disk",
                                EBPF_COMMON_DIMENSION_BYTESS,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_VFS_GROUP,
                                20071,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
                                "Process started",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_PROCESS_GROUP,
                                20072,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
                                "Threads started",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_PROCESS_GROUP,
                                20073,
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
                                "Tasks closed",
                                EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_SYSCALL_GROUP,
+                               NETDATA_APPS_PROCESS_GROUP,
                                20074,
                                root);
 }
