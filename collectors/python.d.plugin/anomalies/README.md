@@ -143,7 +143,7 @@ system:
     # custom_models_normalize: false
 ```
 
-## Custom Models
+## Custom models
 
 In the `anomalies.conf` file you can also define some "custom models" which you can use to group one or more metrics into a single model much like is done by default for the charts you specify. This is useful if you have a handful of metrics that exist in different charts but perhaps are related to the same underlying thing you would like to perform anomaly detection on, for example a specific app or user. 
 
