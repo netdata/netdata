@@ -72,6 +72,7 @@ class Service(SimpleService):
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
         self.expected_cols = []
+        self.last_train_at = 0
 
     def charts_init(self):
         """Do some initialisation of charts in scope related variables.
@@ -119,6 +120,7 @@ class Service(SimpleService):
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
         self.offset_n_secs = self.configuration.get('offset_n_secs', 0)
         self.train_every_n = self.configuration.get('train_every_n', 900)
+        self.train_no_prediction_n = self.configuration.get('train_no_prediction_n', 10)
         self.initial_train_data_after = self.configuration.get('initial_train_data_after', 0)
         self.initial_train_data_before = self.configuration.get('initial_train_data_before', 0)
         self.contamination = self.configuration.get('contamination', 0.001)
@@ -246,6 +248,7 @@ class Service(SimpleService):
         # train model
         self.try_fit(df_train, models_to_train=models_to_train)
         self.info(f'training complete in {round(time.time() - now, 2)} seconds (runs_counter={self.runs_counter}, model={self.model}, train_n_secs={self.train_n_secs}, models={len(self.fitted_at)}, n_fit_success={self.n_fit_success}, n_fit_fails={self.n_fit_fail}, after={after}, before={before}).')
+        self.last_train_at = self.runs_counter
 
     def try_fit(self, df_train, models_to_train=None):
         """Try fit each model and try to fallback to a default model if fit fails for any reason.
@@ -318,19 +321,25 @@ class Service(SimpleService):
 
     def get_data(self):
 
+        # if not all models have been trained then train those we need to
         if len(self.fitted_at) < len(self.models):
             self.train(
                 models_to_train=[m for m in self.models if m not in self.fitted_at],
                 train_data_after=self.initial_train_data_after,
                 train_data_before=self.initial_train_data_before)
+        # retrain all models as per schedule from config
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
+        
+        # roll forward previous predictions around a training step to avoid the possibility of having the training itself trigger an anomaly
+        if (self.runs_counter - self.last_train_at) <= self.train_no_prediction_n:
+            data = self.data_latest
+        else:
+            data_probability, data_anomaly = self.predict()
+            data = {**data_probability, **data_anomaly}
+            self.validate_charts('probability', data_probability, divisor=100)
+            self.validate_charts('anomaly', data_anomaly)
 
-        data_probability, data_anomaly = self.predict()
-        data = {**data_probability, **data_anomaly}
         self.data_latest = data
-
-        self.validate_charts('probability', data_probability, divisor=100)
-        self.validate_charts('anomaly', data_anomaly)
 
         return data
