@@ -50,7 +50,8 @@ xcode-select --install
 ```
 
 Click **Install** on the Software Update popup window that appears. Then, use the same terminal session to use Homebrew
-to install some of Netdata's prerequisites. `cmake` is necessary only if you need to claim the node to Netdata Cloud.
+to install some of Netdata's prerequisites. You can omit `cmake` in case you do not want to use 
+[Netdata Cloud](https://learn.netdata.cloud/docs/cloud/).
 
 ```bash
 brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1 cmake
