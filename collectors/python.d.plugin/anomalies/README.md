@@ -3,7 +3,7 @@ title: "Anomalies"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/anomalies/README.md
 -->
 
-# Anomalies - ML driven anomaly detection for your Netdata!
+# Anomalies: ML-driven anomaly detection for the Netdata Agent
 
 This collector uses the Python [PyOD](https://pyod.readthedocs.io/en/latest/index.html) library to perform unsupervised [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) on your Netdata charts and/or dimensions.
 
