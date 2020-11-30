@@ -152,13 +152,12 @@ void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsig
 {
     struct extent_cache *xt_cache = &wc->xt_cache;
     struct extent_cache_element *xt_cache_elem;
-    struct extent_io_descriptor *curr;
+    struct extent_io_descriptor *old_next;
 
     xt_cache_elem = &xt_cache->extent_array[idx];
-    for (curr = xt_cache_elem->inflight_io_descr ; curr->next != NULL ; curr = curr->next) {
-        ;
-    }
-    curr->next = xt_io_descr;
+    old_next = xt_cache_elem->inflight_io_descr->next;
+    xt_cache_elem->inflight_io_descr->next = xt_io_descr;
+    xt_io_descr->next = old_next;
 }
 
 void read_cached_extent_cb(struct rrdengine_worker_config* wc, unsigned idx, struct extent_io_descriptor *xt_io_descr)
@@ -287,15 +286,11 @@ after_crc_check:
             struct extent_io_descriptor *curr;
 
             if (have_read_error) {
-                memset(xt_cache_elem->pages, 0, payload_length);
-            }
-            else {
-                for (j = 0 ; j < count ; ++j) {
-                    if (RRD_NO_COMPRESSION == header->compression_algorithm)
-                        (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
-                    else
-                        (void)memcpy(xt_cache_elem->pages, uncompressed_buf, payload_length);
-                }
+                memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
+            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+                (void)memcpy(xt_cache_elem->pages, xt_io_descr->buf + payload_offset, payload_length);
+            } else {
+                (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
             }
             /* complete all connected in-flight read requests */
             for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = curr->next) {
