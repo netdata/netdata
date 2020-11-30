@@ -26,7 +26,7 @@ If we then go onto the system and run a command like `stress-ng --all 2` to crea
 
 Then, as the issue passes, the anomaly probabilities should settle back down into their 'normal' range again. 
 
-![netdata-anomalies-collector-normal-again](https://user-images.githubusercontent.com/2178292/100663718-9ed29a80-334e-11eb-852c-28af8a3eda49.jpg)
+![netdata-anomalies-collector-normal-again](https://user-images.githubusercontent.com/2178292/100666681-481a9000-3351-11eb-9979-64728ee2dfb6.jpg)
 
 ## Requirements
 
