@@ -35,6 +35,7 @@ static struct {
         , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
+        , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
         , {                  NULL, 0, 0}
 };
 
@@ -353,12 +354,15 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 1);
+#ifdef ENABLE_DBENGINE
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        sql_rrdset2json(host, w->response.data);
+#endif
     return HTTP_RESP_OK;
 }
 
@@ -495,12 +499,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (context && !chart) {
         RRDSET *st1;
         uint32_t context_hash = simple_hash(context);
-        rrdhost_rdlock(localhost);
-        rrdset_foreach_read(st1, localhost) {
+        rrdhost_rdlock(host);
+        rrdset_foreach_read(st1, host) {
             if (st1->hash_context == context_hash && !strcmp(st1->context, context))
                 build_context_param_list(&context_param_list, st1);
         }
-        rrdhost_unlock(localhost);
+        rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
     }
@@ -650,6 +654,9 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 /*
     int redirects = 0;
 */
+
+	// Don't cache registry responses
+    buffer_no_cacheable(w->response.data);
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -834,12 +841,12 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
             (host->receiver || host == localhost) ? "true" : "false");
         netdata_mutex_unlock(&host->receiver_lock);
 
-        netdata_mutex_lock(&host->claimed_id_lock);
-        if (host->claimed_id)
-            buffer_sprintf(wb, "\"%s\" }", host->claimed_id);
+        rrdhost_aclk_state_lock(host);
+        if (host->aclk_state.claimed_id)
+            buffer_sprintf(wb, "\"%s\" }", host->aclk_state.claimed_id);
         else
             buffer_strcat(wb, "null }");
-        netdata_mutex_unlock(&host->claimed_id_lock);
+        rrdhost_aclk_state_unlock(host);
 
         count++;
     }

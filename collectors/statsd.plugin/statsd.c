@@ -22,7 +22,7 @@
 #define STATSD_FIRST_PTR_MUTEX_UNLOCK(index) netdata_mutex_unlock(&((index)->first_mutex))
 #define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_DEFAULT
 #else
-#define STATSD_AVL_TREE avl_tree
+#define STATSD_AVL_TREE avl_tree_type
 #define STATSD_AVL_INSERT avl_insert
 #define STATSD_AVL_SEARCH avl_search
 #define STATSD_AVL_INDEX_INIT { .root = NULL, .compar = statsd_metric_compare }
@@ -698,7 +698,10 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 
         s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
         if(name == name_end) {
-            s = statsd_parse_skip_spaces(s);
+            if (*s) {
+                s++;
+                s = statsd_parse_skip_spaces(s);
+            }
             continue;
         }
 
@@ -1461,8 +1464,6 @@ static inline RRDSET *statsd_private_rrdset_create(
             , chart_type      // chart type
             , memory_mode     // memory mode
             , history         // history
-            , 0               // not archived
-            , NULL            // no known UUID
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -2001,8 +2002,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->chart_type         // chart type
                 , app->rrd_memory_mode      // memory mode
                 , app->rrd_history_entries  // history
-                , 0                         // not archived
-                , NULL                      // no known UUID
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);

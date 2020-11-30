@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Bug report: Netdata Cloud"
+    url: https://github.com/netdata/netdata-cloud/issues/new/choose
+    about: Create a report to help us improve our web application
+  - name: Help
+    url: https://community.netdata.cloud/c/support/13
+    about: We offer community-driven support on our community forums
+  - name: Feature request
+    url: https://community.netdata.cloud/c/feature-requests/7
+    about: Make a feature request for Netdata Cloud or the Netdata Agent
+  - name: Community
+    url: https://netdata.cloud/community
+    about: If you don't know where to start, visit our community page!

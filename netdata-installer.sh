@@ -234,6 +234,7 @@ USAGE: ${PROGRAM} [options]
   --enable-lto               Enable Link-Time-Optimization. Default: enabled
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
+  --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
@@ -275,6 +276,7 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
+    "--use-system-lws") USE_SYSTEM_LWS=1 ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
@@ -533,7 +535,7 @@ build_libmosquitto() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   if [ "$(uname -s)" = Linux ]; then
@@ -613,7 +615,7 @@ build_libwebsockets() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
@@ -641,7 +643,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ]; then
     return 0
   fi
 
@@ -668,6 +670,7 @@ bundle_libwebsockets() {
       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libwebsockets built and prepared."
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws=externaldeps/libwebsockets"
     else
       run_failed "Failed to build libwebsockets."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
@@ -694,7 +697,7 @@ build_judy() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || return 1
@@ -777,7 +780,7 @@ build_jsonc() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
@@ -848,7 +851,7 @@ bundle_jsonc
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
   popd > /dev/null || exit 1
 }
 
@@ -914,6 +917,18 @@ bundle_libbpf
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
   "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
+fi
+
+# -----------------------------------------------------------------------------
+# By default, `git` does not update local tags based on remotes. Because
+# we use the most recent tag as part of our version determination in
+# our build, this can lead to strange versions that look ancient but are
+# actually really recent. To avoid this, try and fetch tags if we're
+# working in a git checkout.
+if [ -d ./.git ] ; then
+  echo >&2
+  progress "Updating tags in git to ensure a consistent version number"
+  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
 fi
 
 # -----------------------------------------------------------------------------

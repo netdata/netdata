@@ -18,6 +18,7 @@ typedef struct context_param CONTEXT_PARAM;
 // forward declarations
 struct rrddim_volatile;
 struct rrdset_volatile;
+struct context_param;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -32,6 +33,13 @@ struct pg_cache_page_index;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
+#include "../aclk/aclk_common.h"
+
+struct context_param {
+    RRDDIM *rd;
+    time_t first_entry_t;
+    time_t last_entry_t;
+};
 
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2
@@ -818,8 +826,8 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
-    netdata_mutex_t claimed_id_lock;
-    char *claimed_id;                               // Claimed ID if host has one otherwise NULL
+    netdata_mutex_t aclk_state_lock;
+    aclk_rrdhost_state aclk_state;
 
     struct rrdhost *next;
 };
@@ -828,6 +836,9 @@ extern RRDHOST *localhost;
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
 #define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
 #define rrdhost_unlock(host) netdata_rwlock_unlock(&((host)->rrdhost_rwlock))
+
+#define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
+#define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -943,12 +954,10 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , int update_every
                              , RRDSET_TYPE chart_type
                              , RRD_MEMORY_MODE memory_mode
-                             , long history_entries
-                             , int is_archived
-                             , uuid_t *chart_uuid);
+                             , long history_entries);
 
 #define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries, 0, NULL)
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
@@ -1018,16 +1027,15 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrdset_last_entry_t(RRDSET *st) {
+static inline time_t rrdset_last_entry_t_nolock(RRDSET *st)
+{
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
 
-        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
         }
-        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         return last_entry_t;
     } else {
@@ -1035,23 +1043,44 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
     }
 }
 
+static inline time_t rrdset_last_entry_t(RRDSET *st)
+{
+    time_t last_entry_t;
+
+    netdata_rwlock_rdlock(&st->rrdset_rwlock);
+    last_entry_t = rrdset_last_entry_t_nolock(st);
+    netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+    return last_entry_t;
+}
+
 // get the timestamp of first entry in the round robin database
-static inline time_t rrdset_first_entry_t(RRDSET *st) {
+static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
+{
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t first_entry_t = LONG_MAX;
 
-        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
         }
-        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
     } else {
-        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
+        return (time_t)(rrdset_last_entry_t_nolock(st) - rrdset_duration(st));
     }
+}
+
+static inline time_t rrdset_first_entry_t(RRDSET *st)
+{
+    time_t first_entry_t;
+
+    netdata_rwlock_rdlock(&st->rrdset_rwlock);
+    first_entry_t = rrdset_first_entry_t_nolock(st);
+    netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+    return first_entry_t;
 }
 
 // get the timestamp of the last entry in the round robin database
@@ -1092,23 +1121,26 @@ static inline size_t rrdset_first_slot(RRDSET *st) {
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
+// only valid when not using dbengine
 static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
     size_t ret = 0;
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
 
-    if(t >= rrdset_last_entry_t(st)) {
+    if(t >= last_entry_t) {
         // the requested time is after the last entry we have
         ret = rrdset_last_slot(st);
     }
     else {
-        if(t <= rrdset_first_entry_t(st)) {
+        if(t <= first_entry_t) {
             // the requested time is before the first entry we have
             ret = rrdset_first_slot(st);
         }
         else {
-            if(rrdset_last_slot(st) >= ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)))
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every));
+            if(rrdset_last_slot(st) >= ((last_entry_t - t) / (size_t)(st->update_every)))
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every));
             else
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
         }
     }
 
@@ -1121,8 +1153,11 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
 }
 
 // get the timestamp of a specific slot in the round robin database
+// only valid when not using dbengine
 static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     time_t ret;
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
 
     if(slot >= (size_t)st->entries) {
         error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
@@ -1130,20 +1165,20 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     }
 
     if(slot > rrdset_last_slot(st)) {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
+        ret = last_entry_t - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
     }
     else {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every;
+        ret = last_entry_t - (size_t)st->update_every;
     }
 
-    if(unlikely(ret < rrdset_first_entry_t(st))) {
+    if(unlikely(ret < first_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
-        ret = rrdset_first_entry_t(st);
+        ret = first_entry_t;
     }
 
-    if(unlikely(ret > rrdset_last_entry_t(st))) {
+    if(unlikely(ret > last_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
-        ret = rrdset_last_entry_t(st);
+        ret = last_entry_t;
     }
 
     return ret;
@@ -1154,10 +1189,10 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
 
 extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier,
-                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode,
-                                 int is_archived, uuid_t *dim_uuid);
+                                 collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);//,
+                                 //int is_archived, uuid_t *dim_uuid);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, \
-                                                                                   algorithm, (st)->rrd_memory_mode, 0, NULL)
+                                                                                   algorithm, (st)->rrd_memory_mode)//, 0, NULL)
 
 extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
@@ -1230,15 +1265,21 @@ extern RRDHOST *rrdhost_create(
     const char *tags, const char *program_name, const char *program_version, int update_every, long entries,
     RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled, char *rrdpush_destination,
     char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
-    int is_localhost, int is_archived);
+    int is_localhost); //TODO: Remove , int is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
+
+extern void set_host_properties(
+    RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
+    const char *guid, const char *os, const char *tags, const char *tzone, const char *program_name,
+    const char *program_version);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
+#include "sqlite/sqlite_functions.h"
 #endif
 
 #endif /* NETDATA_RRD_H */

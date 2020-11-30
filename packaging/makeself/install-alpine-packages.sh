@@ -26,10 +26,13 @@ apk add --no-cache -U \
   util-linux-dev \
   gnutls-dev \
   zlib-dev \
+  zlib-static \
   libmnl-dev \
   libnetfilter_acct-dev \
   libuv-dev \
+  libuv-static \
   lz4-dev \
+  lz4-static \
   snappy-dev \
   protobuf-dev \
   binutils \

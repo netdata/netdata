@@ -10,7 +10,7 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 // minimum and maximum supported version of ACLK
 // in this version of agent
 #define ACLK_VERSION_MIN 2
-#define ACLK_VERSION_MAX 2
+#define ACLK_VERSION_MAX 3
 
 // Version negotiation messages have they own versioning
 // this is also used for LWT message as we set that up
@@ -26,7 +26,8 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #endif
 
 // Define ACLK Feature Version Boundaries Here
-#define ACLK_V_COMPRESSION 2
+#define ACLK_V_COMPRESSION   2
+#define ACLK_V_CHILDRENSTATE 3
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
@@ -35,7 +36,9 @@ typedef enum aclk_cmd {
     ACLK_CMD_CHART,
     ACLK_CMD_CHARTDEL,
     ACLK_CMD_ALARM,
-    ACLK_CMD_CLOUD_QUERY_2
+    ACLK_CMD_CLOUD_QUERY_2,
+    ACLK_CMD_CHILD_CONNECT,
+    ACLK_CMD_CHILD_DISCONNECT
 } ACLK_CMD;
 
 typedef enum aclk_metadata_state {
@@ -45,13 +48,32 @@ typedef enum aclk_metadata_state {
 } ACLK_METADATA_STATE;
 
 typedef enum aclk_agent_state {
-    AGENT_INITIALIZING,
-    AGENT_STABLE
-} ACLK_AGENT_STATE;
+    ACLK_HOST_INITIALIZING,
+    ACLK_HOST_STABLE
+} ACLK_POPCORNING_STATE;
+
+typedef struct aclk_rrdhost_state {
+    char *claimed_id; // Claimed ID if host has one otherwise NULL
+
+#ifdef ENABLE_ACLK
+    // per child popcorning
+    ACLK_POPCORNING_STATE state;
+    ACLK_METADATA_STATE metadata;
+
+    time_t timestamp_created;
+    time_t t_last_popcorn_update;
+#endif
+} aclk_rrdhost_state;
+
+#define ACLK_IS_HOST_INITIALIZING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
+#define ACLK_IS_HOST_POPCORNING(host) (ACLK_IS_HOST_INITIALIZING(host) && host->aclk_state.t_last_popcorn_update)
+
+typedef struct rrdhost RRDHOST;
+
 extern struct aclk_shared_state {
-    ACLK_METADATA_STATE metadata_submitted;
-    ACLK_AGENT_STATE agent_state;
-    time_t last_popcorn_interrupt;
+    // optimization to avoid looping trough hosts
+    // every time Query Thread wakes up
+    RRDHOST *next_popcorn_host;
 
     // read only while ACLK connected
     // protect by lock otherwise

@@ -53,12 +53,6 @@
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 
-typedef struct context_param {
-    RRDDIM *rd;
-    time_t first_entry_t;
-    time_t last_entry_t;
-} CONTEXT_PARAM;
-
 extern int rrdset2anything_api_v1(
           RRDSET *st
         , BUFFER *wb

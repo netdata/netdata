@@ -68,7 +68,14 @@
 #ifdef ACLK_NO_LWS
 #define FEAT_LWS "NO"
 #else
-#define FEAT_LWS "YES"
+#ifdef ENABLE_ACLK
+#include <libwebsockets.h>
+#endif
+#ifdef BUNDLED_LWS
+#define FEAT_LWS "YES static"
+#else
+#define FEAT_LWS "YES shared-lib"
+#endif
 #endif
 
 #ifdef NETDATA_WITH_ZLIB
@@ -193,7 +200,11 @@ void print_build_info(void) {
     printf("    libcap:                  %s\n", FEAT_LIBCAP);
     printf("    libcrypto:               %s\n", FEAT_CRYPTO);
     printf("    libm:                    %s\n", FEAT_LIBM);
+#if defined(ENABLE_ACLK)
+    printf("    LWS:                     %s v%d.%d.%d\n", FEAT_LWS, LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
+#else
     printf("    LWS:                     %s\n", FEAT_LWS);
+#endif
     printf("    mosquitto:               %s\n", FEAT_MOSQUITTO);
     printf("    tcalloc:                 %s\n", FEAT_TCMALLOC);
     printf("    zlib:                    %s\n", FEAT_ZLIB);

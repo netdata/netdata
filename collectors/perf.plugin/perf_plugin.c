@@ -422,7 +422,7 @@ static int perf_collect() {
             }
         }
 
-        if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
+        if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %"PRIu64"\n", current_event->id, current_event->value);
     }
 
     if(unlikely(perf_events[EV_ID_CPU_CYCLES].value == prev_cpu_cycles_value))

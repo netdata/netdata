@@ -122,7 +122,6 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
-    assert_ptr_equal(instance->end_batch_formatting, simple_connector_update_buffered_bytes);
 
     BUFFER *buffer = instance->buffer;
     assert_ptr_not_equal(buffer, NULL);
@@ -500,14 +499,10 @@ static void test_format_dimension_collected_opentsdb_http(void **state)
     assert_int_equal(format_dimension_collected_opentsdb_http(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
-        "POST /api/put HTTP/1.1\r\n"
-        "Host: test-host\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: 153\r\n\r\n"
-        "{  \"metric\": \"netdata.chart_name.dimension_name\",  "
-        "\"timestamp\": 15051,  "
-        "\"value\": 123000321,  "
-        "\"tags\": {    \"host\": \"test-host TAG1=VALUE1 TAG2=VALUE2\"  }}");
+        "{\"metric\":\"netdata.chart_name.dimension_name\","
+        "\"timestamp\":15051,"
+        "\"value\":123000321,"
+        "\"tags\":{\"host\":\"test-host TAG1=VALUE1 TAG2=VALUE2\"}}");
 }
 
 static void test_format_dimension_stored_opentsdb_http(void **state)
@@ -521,14 +516,10 @@ static void test_format_dimension_stored_opentsdb_http(void **state)
     assert_int_equal(format_dimension_stored_opentsdb_http(engine->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->instance_root->buffer),
-        "POST /api/put HTTP/1.1\r\n"
-        "Host: test-host\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: 161\r\n\r\n"
-        "{  \"metric\": \"netdata.chart_name.dimension_name\",  "
-        "\"timestamp\": 15052,  "
-        "\"value\": 690565856.0000000,  "
-        "\"tags\": {    \"host\": \"test-host TAG1=VALUE1 TAG2=VALUE2\"  }}");
+        "{\"metric\":\"netdata.chart_name.dimension_name\","
+        "\"timestamp\":15052,"
+        "\"value\":690565856.0000000,"
+        "\"tags\":{\"host\":\"test-host TAG1=VALUE1 TAG2=VALUE2\"}}");
 }
 
 static void test_exporting_discard_response(void **state)
@@ -538,14 +529,7 @@ static void test_exporting_discard_response(void **state)
     BUFFER *response = buffer_create(0);
     buffer_sprintf(response, "Test response");
 
-    expect_function_call(__wrap_info_int);
-
     assert_int_equal(exporting_discard_response(response, engine->instance_root), 0);
-
-    assert_string_equal(
-        log_line,
-        "EXPORTING: received 13 bytes from instance_name connector instance. Ignoring them. Sample: 'Test response'");
-
     assert_int_equal(buffer_strlen(response), 0);
 
     buffer_free(response);
@@ -565,13 +549,7 @@ static void test_simple_connector_receive_response(void **state)
     expect_value(__wrap_recv, len, 4096);
     expect_value(__wrap_recv, flags, MSG_DONTWAIT);
 
-    expect_function_call(__wrap_info_int);
-
     simple_connector_receive_response(&sock, instance);
-
-    assert_string_equal(
-        log_line,
-        "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
 
     assert_int_equal(stats->received_bytes, 9);
     assert_int_equal(stats->receptions, 1);
@@ -583,39 +561,34 @@ static void test_simple_connector_send_buffer(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
     struct stats *stats = &instance->stats;
-    BUFFER *buffer = instance->buffer;
 
     int sock = 1;
     int failures = 3;
+    size_t buffered_metrics = 1;
+    BUFFER *header = buffer_create(0);
+    BUFFER *buffer = buffer_create(0);
+    buffer_strcat(header, "test header\n");
+    buffer_strcat(buffer, "test buffer\n");
 
-    __real_mark_scheduled_instances(engine);
-
-    expect_function_call(__wrap_rrdhost_is_exportable);
-    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
-    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
-    will_return(__wrap_rrdhost_is_exportable, 1);
-
-    RRDSET *st = localhost->rrdset_root;
-    expect_function_call(__wrap_rrdset_is_exportable);
-    expect_value(__wrap_rrdset_is_exportable, instance, instance);
-    expect_value(__wrap_rrdset_is_exportable, st, st);
-    will_return(__wrap_rrdset_is_exportable, 1);
-
-    __real_prepare_buffers(engine);
+    expect_function_call(__wrap_send);
+    expect_value(__wrap_send, sockfd, 1);
+    expect_value(__wrap_send, buf, buffer_tostring(header));
+    expect_string(__wrap_send, buf, "test header\n");
+    expect_value(__wrap_send, len, 12);
+    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 1);
     expect_value(__wrap_send, buf, buffer_tostring(buffer));
-    expect_string(
-        __wrap_send, buf, "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
-    expect_value(__wrap_send, len, 84);
+    expect_string(__wrap_send, buf, "test buffer\n");
+    expect_value(__wrap_send, len, 12);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
-    simple_connector_send_buffer(&sock, &failures, instance);
+    simple_connector_send_buffer(&sock, &failures, instance, header, buffer, buffered_metrics);
 
     assert_int_equal(failures, 0);
     assert_int_equal(stats->transmission_successes, 1);
-    assert_int_equal(stats->sent_bytes, 84);
+    assert_int_equal(stats->sent_bytes, 12);
     assert_int_equal(stats->sent_metrics, 1);
     assert_int_equal(stats->transmission_failures, 0);
 
@@ -629,22 +602,20 @@ static void test_simple_connector_worker(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
     struct stats *stats = &instance->stats;
-    BUFFER *buffer = instance->buffer;
 
     __real_mark_scheduled_instances(engine);
 
-    expect_function_call(__wrap_rrdhost_is_exportable);
-    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
-    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
-    will_return(__wrap_rrdhost_is_exportable, 1);
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = simple_connector_data;
+    simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
+    simple_connector_data->first_buffer = simple_connector_data->last_buffer;
+    simple_connector_data->header = buffer_create(0);
+    simple_connector_data->buffer = buffer_create(0);
+    simple_connector_data->last_buffer->header = buffer_create(0);
+    simple_connector_data->last_buffer->buffer = buffer_create(0);
 
-    RRDSET *st = localhost->rrdset_root;
-    expect_function_call(__wrap_rrdset_is_exportable);
-    expect_value(__wrap_rrdset_is_exportable, instance, instance);
-    expect_value(__wrap_rrdset_is_exportable, st, st);
-    will_return(__wrap_rrdset_is_exportable, 1);
-
-    __real_prepare_buffers(engine);
+    buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
+    buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
 
     expect_function_call(__wrap_connect_to_one_of);
     expect_string(__wrap_connect_to_one_of, destination, "localhost");
@@ -656,10 +627,16 @@ static void test_simple_connector_worker(void **state)
 
     expect_function_call(__wrap_send);
     expect_value(__wrap_send, sockfd, 2);
-    expect_value(__wrap_send, buf, buffer_tostring(buffer));
-    expect_string(
-        __wrap_send, buf, "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
-    expect_value(__wrap_send, len, 84);
+    expect_not_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
+    expect_string(__wrap_send, buf, "test header");
+    expect_value(__wrap_send, len, 11);
+    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+
+    expect_function_call(__wrap_send);
+    expect_value(__wrap_send, sockfd, 2);
+    expect_value(__wrap_send, buf, buffer_tostring(simple_connector_data->last_buffer->buffer));
+    expect_string(__wrap_send, buf, "test buffer");
+    expect_value(__wrap_send, len, 11);
     expect_value(__wrap_send, flags, MSG_NOSIGNAL);
 
     expect_function_call(__wrap_send_internal_metrics);
@@ -669,13 +646,13 @@ static void test_simple_connector_worker(void **state)
     simple_connector_worker(instance);
 
     assert_int_equal(stats->buffered_metrics, 0);
-    assert_int_equal(stats->buffered_bytes, 84);
+    assert_int_equal(stats->buffered_bytes, 0);
     assert_int_equal(stats->received_bytes, 0);
-    assert_int_equal(stats->sent_bytes, 84);
-    assert_int_equal(stats->sent_metrics, 1);
+    assert_int_equal(stats->sent_bytes, 0);
+    assert_int_equal(stats->sent_metrics, 0);
     assert_int_equal(stats->lost_metrics, 0);
     assert_int_equal(stats->receptions, 0);
-    assert_int_equal(stats->transmission_successes, 1);
+    assert_int_equal(stats->transmission_successes, 0);
     assert_int_equal(stats->transmission_failures, 0);
     assert_int_equal(stats->data_lost_events, 0);
     assert_int_equal(stats->lost_bytes, 0);
@@ -1159,7 +1136,7 @@ static void test_init_prometheus_remote_write_instance(void **state)
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, NULL);
     assert_ptr_equal(instance->end_batch_formatting, format_batch_prometheus_remote_write);
-    assert_ptr_equal(instance->send_header, prometheus_remote_write_send_header);
+    assert_ptr_equal(instance->prepare_header, prometheus_remote_write_prepare_header);
     assert_ptr_equal(instance->check_response, process_prometheus_remote_write_response);
 
     assert_ptr_not_equal(instance->buffer, NULL);
@@ -1169,40 +1146,43 @@ static void test_init_prometheus_remote_write_instance(void **state)
         (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
 
     assert_ptr_not_equal(instance->connector_specific_data, NULL);
-    assert_ptr_equal(connector_specific_data->write_request, 0xff);
+    assert_ptr_not_equal(connector_specific_data->write_request, NULL);
     freez(instance->connector_specific_data);
 }
 
-static void test_prometheus_remote_write_send_header(void **state)
+static void test_prometheus_remote_write_prepare_header(void **state)
 {
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
-    int sock = 1;
 
     struct prometheus_remote_write_specific_config *connector_specific_config =
         callocz(1, sizeof(struct prometheus_remote_write_specific_config));
     instance->config.connector_specific_config = connector_specific_config;
     connector_specific_config->remote_write_path = strdupz("/receive");
 
-    buffer_sprintf(instance->buffer, "test buffer");
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = simple_connector_data;
+    simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
+    simple_connector_data->last_buffer->header = buffer_create(0);
+    simple_connector_data->last_buffer->buffer = buffer_create(0);
 
-    expect_function_call(__wrap_send);
-    expect_value(__wrap_send, sockfd, 1);
-    expect_not_value(__wrap_send, buf, NULL);
-    expect_string(
-        __wrap_send, buf,
+    buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
+
+    prometheus_remote_write_prepare_header(instance);
+
+    assert_string_equal(
+        buffer_tostring(simple_connector_data->last_buffer->header),
         "POST /receive HTTP/1.1\r\n"
         "Host: localhost\r\n"
         "Accept: */*\r\n"
         "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: 11\r\n"
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
-    expect_value(__wrap_send, len, 167);
-    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
-
-    assert_int_equal(prometheus_remote_write_send_header(&sock, instance),0);
 
     free(connector_specific_config->remote_write_path);
+
+    buffer_free(simple_connector_data->last_buffer->header);
+    buffer_free(simple_connector_data->last_buffer->buffer);
 }
 
 static void test_process_prometheus_remote_write_response(void **state)
@@ -1224,9 +1204,11 @@ static void test_format_host_prometheus_remote_write(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
+    instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));
-    instance->connector_specific_data = (void *)connector_specific_data;
+    simple_connector_data->connector_specific_data = (void *)connector_specific_data;
     connector_specific_data->write_request = (void *)0xff;
 
     localhost->program_name = strdupz("test_program");
@@ -1254,6 +1236,7 @@ static void test_format_host_prometheus_remote_write(void **state)
     assert_int_equal(format_host_prometheus_remote_write(instance, localhost), 0);
 
     freez(connector_specific_data);
+    freez(simple_connector_data);
     free(localhost->program_name);
     free(localhost->program_version);
 }
@@ -1263,9 +1246,11 @@ static void test_format_dimension_prometheus_remote_write(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
+    instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));
-    instance->connector_specific_data = (void *)connector_specific_data;
+    simple_connector_data->connector_specific_data = (void *)connector_specific_data;
     connector_specific_data->write_request = (void *)0xff;
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
@@ -1291,11 +1276,16 @@ static void test_format_batch_prometheus_remote_write(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
+    struct simple_connector_data *simple_connector_data = mallocz(sizeof(struct simple_connector_data *));
+    instance->connector_specific_data = simple_connector_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
         mallocz(sizeof(struct prometheus_remote_write_specific_data *));
-    instance->connector_specific_data = (void *)connector_specific_data;
+    simple_connector_data->connector_specific_data = (void *)connector_specific_data;
     connector_specific_data->write_request = __real_init_write_request();
 
+    expect_function_call(__wrap_simple_connector_end_batch);
+    expect_value(__wrap_simple_connector_end_batch, instance, instance);
+    will_return(__wrap_simple_connector_end_batch, 0);
     __real_add_host_info(
         connector_specific_data->write_request,
         "test_name", "test_instance", "test_application", "test_version", 15051);
@@ -1410,6 +1400,9 @@ static void test_aws_kinesis_connector_worker(void **state)
     expect_value(__wrap_rrdset_is_exportable, st, st);
     will_return(__wrap_rrdset_is_exportable, 1);
 
+    expect_function_call(__wrap_simple_connector_end_batch);
+    expect_value(__wrap_simple_connector_end_batch, instance, instance);
+    will_return(__wrap_simple_connector_end_batch, 0);
     __real_prepare_buffers(engine);
 
     struct aws_kinesis_specific_config *connector_specific_config =
@@ -1542,6 +1535,9 @@ static void test_pubsub_connector_worker(void **state)
     expect_value(__wrap_rrdset_is_exportable, st, st);
     will_return(__wrap_rrdset_is_exportable, 1);
 
+    expect_function_call(__wrap_simple_connector_end_batch);
+    expect_value(__wrap_simple_connector_end_batch, instance, instance);
+    will_return(__wrap_simple_connector_end_batch, 0);
     __real_prepare_buffers(engine);
 
     struct pubsub_specific_config *connector_specific_config =
@@ -1663,7 +1659,7 @@ static void test_init_mongodb_instance(void **state)
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, flush_host_labels);
     assert_ptr_equal(instance->end_batch_formatting, format_batch_mongodb);
-    assert_ptr_equal(instance->send_header, NULL);
+    assert_ptr_equal(instance->prepare_header, NULL);
     assert_ptr_equal(instance->check_response, NULL);
 
     assert_ptr_not_equal(instance->buffer, NULL);
@@ -1884,7 +1880,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_init_prometheus_remote_write_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
-            test_prometheus_remote_write_send_header, setup_initialized_engine, teardown_initialized_engine),
+            test_prometheus_remote_write_prepare_header, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_process_prometheus_remote_write_response),
         cmocka_unit_test_setup_teardown(
             test_format_host_prometheus_remote_write, setup_initialized_engine, teardown_initialized_engine),

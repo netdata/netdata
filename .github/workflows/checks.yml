@@ -53,6 +53,15 @@ jobs:
           autoreconf -ivf;
           ./configure;
           make;'
+  clang-checks:
+    name: Clang
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          docker build -f .github/dockerfiles/Dockerfile.clang .
   dist-checks:
     name: Dist
     runs-on: ubuntu-latest
@@ -79,7 +88,7 @@ jobs:
       - name: Verify & Set distfile
         run: |
           ls -lah netdata-*.tar.gz
-          echo "::set-env name=DISTFILE::$(ls netdata-*.tar.gz)"
+          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
       - name: Run run_install_with_dist_file.sh
         run: |
           ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"

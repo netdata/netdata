@@ -13,10 +13,10 @@ To learn about more advanced health configurations, visit the [health reference 
 
 ## Edit health configuration files
 
-You should use `edit-config` to edit Netdata's health configuration files. `edit-config` will open your system's default
-terminal editor for you to make your changes. Once you've saved and closed the editor, `edit-config` will copy your
-edited file into `/etc/netdata/health.d/`, which will override the stock file in `/usr/lib/netdata/conf.d/health.d/` and
-ensure your customizations are persistent between updates.
+You should [use `edit-config`](/docs/configure/nodes.md) to edit Netdata's health configuration files. `edit-config`
+will open your system's default terminal editor for you to make your changes. Once you've saved and closed the editor,
+`edit-config` will copy your edited file into `/etc/netdata/health.d/`, which will override the stock file in
+`/usr/lib/netdata/conf.d/health.d/` and ensure your customizations are persistent between updates.
 
 For example, to edit the `cpu.conf` health configuration file, you would run:
 
@@ -24,11 +24,6 @@ For example, to edit the `cpu.conf` health configuration file, you would run:
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
 ./edit-config health.d/cpu.conf
 ```
-
-> You may need to use `sudo` or another method of elevating your privileges: `sudo ./edit-config health.d/cpu.conf`.
->
-> You can also use the `$EDITOR` environment variable to use your preferred terminal editor with `edit-config`. See 
-> [this page](/docs/guides/step-by-step/step-04.md#use-edit-config-to-open-netdataconf) for details.
 
 Each health configuration file contains one or more health entities, which always begin with an `alarm:` or `template:`
 line. You can edit these entities based on your needs. To make any changes live, be sure to [reload your health

@@ -22,13 +22,14 @@ static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 
 static ebpf_data_t socket_data;
 
-static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
-static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
+ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
+int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -37,6 +38,8 @@ netdata_socket_t *socket_values;
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
 static int *map_fd = NULL;
+static struct bpf_object *objects = NULL;
+static struct bpf_link **probe_links = NULL;
 
 /*****************************************************************
  *
@@ -1341,6 +1344,7 @@ void *ebpf_socket_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
@@ -1359,6 +1363,7 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
+    read_thread_closed = 1;
     return NULL;
 }
 
@@ -1467,9 +1472,6 @@ static void ebpf_socket_update_apps_data()
 
         ebpf_socket_fill_publish_apps(key, eb);
 
-        if (eb[0].removed)
-            bpf_map_delete_elem(fd, &key);
-
         pids = pids->next;
     }
 }
@@ -1479,6 +1481,10 @@ static void ebpf_socket_update_apps_data()
  *  FUNCTIONS WITH THE MAIN LOOP
  *
  *****************************************************************/
+
+struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                               NULL, NULL, 1, NULL,
+                                               NULL, ebpf_socket_read_hash };
 
 /**
  * Main loop for this collector.
@@ -1493,10 +1499,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, ebpf_socket_read_hash };
-    socket_threads.thread = mallocz(sizeof(netdata_thread_t));;
+    socket_threads.thread = mallocz(sizeof(netdata_thread_t));
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
                           NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
@@ -1650,6 +1653,15 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
+void clean_thread_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(socket_bandwidth_curr[pids->pid]);
+
+        pids = pids->next;
+    }
+}
+
 /**
  * Clean up the main thread.
  *
@@ -1657,12 +1669,23 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
  */
 static void ebpf_socket_cleanup(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 200*USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
+
     freez(socket_aggregated_data);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    freez(socket_data.map_fd);
+    clean_thread_structures();
     freez(socket_bandwidth_curr);
     freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
@@ -1683,6 +1706,18 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_hostnames(network_viewer_opt.excluded_hostnames);
 
     pthread_mutex_destroy(&nv_mutex);
+    freez(socket_data.map_fd);
+
+    freez(socket_threads.thread);
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
+    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -1789,8 +1824,8 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     set_local_pointers(em);
-    if (ebpf_load_program(
-            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, socket_data.map_fd)) {
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
+    if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
@@ -1801,6 +1836,7 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_create_global_charts(em);
 
+    finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_time * USEC_PER_SEC), em);

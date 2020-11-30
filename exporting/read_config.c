@@ -135,13 +135,20 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
 {
     if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_GRAPHITE;
-    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET;
-    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP;
+    } else if (!strcmp(type, "graphite:http") || !strcmp(type, "graphite:https")) {
+        return EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP;
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_JSON;
-    } else if (!strcmp(type, "prometheus_remote_write")) {
+    } else if (!strcmp(type, "json:http") || !strcmp(type, "json:https")) {
+        return EXPORTING_CONNECTOR_TYPE_JSON_HTTP;
+    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB;
+    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP;
+    } else if (
+        !strcmp(type, "prometheus_remote_write") ||
+        !strcmp(type, "prometheus_remote_write:http") ||
+        !strcmp(type, "prometheus_remote_write:https")) {
         return EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_KINESIS;
@@ -432,7 +439,22 @@ struct engine *read_exporting_config()
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
 
 #ifdef ENABLE_HTTPS
-        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
+
+#define STR_GRAPHITE_HTTPS "graphite:https"
+#define STR_JSON_HTTPS "json:https"
+#define STR_OPENTSDB_HTTPS "opentsdb:https"
+#define STR_PROMETHEUS_REMOTE_WRITE_HTTPS "prometheus_remote_write:https"
+
+        if ((tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_GRAPHITE_HTTPS, strlen(STR_GRAPHITE_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_JSON_HTTPS, strlen(STR_JSON_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_OPENTSDB_HTTPS, strlen(STR_OPENTSDB_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE &&
+             !strncmp(
+                 tmp_ci_list->local_ci.connector_name, STR_PROMETHEUS_REMOTE_WRITE_HTTPS,
+                 strlen(STR_PROMETHEUS_REMOTE_WRITE_HTTPS)))) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
         }
 #endif

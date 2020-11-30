@@ -274,7 +274,7 @@ PARSER_RC pluginsd_end(char **words, void *user, PLUGINSD_ACTION  *plugins_actio
 PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
 {
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    if (unlikely(!host)) {
+    if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
         debug(D_PLUGINSD, "Ignoring chart belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }
@@ -303,7 +303,10 @@ PARSER_RC pluginsd_chart(char **words, void *user, PLUGINSD_ACTION  *plugins_act
 
     // make sure we have the required variables
     if (unlikely((!type || !*type || !id || !*id))) {
-        error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
+        if (likely(host))
+            error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
+        else
+            error("requested a CHART, without a type.id. Disabling it.");
         ((PARSER_USER_OBJECT *) user)->enabled = 0;
         return PARSER_RC_ERROR;
     }
@@ -375,7 +378,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
 
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    if (unlikely(!host)) {
+    if (unlikely(!host && !((PARSER_USER_OBJECT *) user)->host_exists)) {
         debug(D_PLUGINSD, "Ignoring dimension belonging to missing or ignored host.");
         return PARSER_RC_OK;
     }
@@ -387,7 +390,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
         goto disable;
     }
 
-    if (unlikely(!st)) {
+    if (unlikely(!st && !((PARSER_USER_OBJECT *) user)->st_exists)) {
         error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
         goto disable;
     }
@@ -409,7 +412,7 @@ PARSER_RC pluginsd_dimension(char **words, void *user, PLUGINSD_ACTION  *plugins
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(
             D_PLUGINSD,
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",

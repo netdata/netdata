@@ -43,7 +43,6 @@ struct sender_state {
     pid_t task_id;
     unsigned int overflow:1;
     int timeout, default_port;
-    size_t max_size;
     usec_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;

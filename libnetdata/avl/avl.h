@@ -34,13 +34,13 @@ typedef struct avl {
 } avl;
 
 /* An AVL tree */
-typedef struct avl_tree {
+typedef struct avl_tree_type {
     avl *root;
     int (*compar)(void *a, void *b);
-} avl_tree;
+} avl_tree_type;
 
 typedef struct avl_tree_lock {
-    avl_tree avl_tree;
+    avl_tree_type avl_tree;
 
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
@@ -60,7 +60,7 @@ typedef struct avl_tree_lock {
  * be properly allocated by the caller.
  */
 avl *avl_insert_lock(avl_tree_lock *tree, avl *item) NEVERNULL WARNUNUSED;
-avl *avl_insert(avl_tree *tree, avl *item) NEVERNULL WARNUNUSED;
+avl *avl_insert(avl_tree_type *tree, avl *item) NEVERNULL WARNUNUSED;
 
 /* Remove an element a from the AVL tree t
  * returns a pointer to the removed element
@@ -68,22 +68,22 @@ avl *avl_insert(avl_tree *tree, avl *item) NEVERNULL WARNUNUSED;
  * (equal as returned by t->compar())
  */
 avl *avl_remove_lock(avl_tree_lock *tree, avl *item) WARNUNUSED;
-avl *avl_remove(avl_tree *tree, avl *item) WARNUNUSED;
+avl *avl_remove(avl_tree_type *tree, avl *item) WARNUNUSED;
 
 /* Find the element into the tree that equal to a
  * (equal as returned by t->compar())
  * returns NULL is no element is equal to a
  */
 avl *avl_search_lock(avl_tree_lock *tree, avl *item);
-avl *avl_search(avl_tree *tree, avl *item);
+avl *avl_search(avl_tree_type *tree, avl *item);
 
 /* Initialize the avl_tree_lock
  */
 void avl_init_lock(avl_tree_lock *tree, int (*compar)(void *a, void *b));
-void avl_init(avl_tree *tree, int (*compar)(void *a, void *b));
+void avl_init(avl_tree_type *tree, int (*compar)(void *a, void *b));
 
 
 int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void *entry, void *data), void *data);
-int avl_traverse(avl_tree *tree, int (*callback)(void *entry, void *data), void *data);
+int avl_traverse(avl_tree_type *tree, int (*callback)(void *entry, void *data), void *data);
 
 #endif /* avl.h */

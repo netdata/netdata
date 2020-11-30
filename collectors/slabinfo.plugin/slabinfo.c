@@ -163,12 +163,12 @@ struct slabinfo *read_file_slabinfo() {
     slabdebug("-> Reading procfile %s", PLUGIN_SLABINFO_PROCFILE);
 
     static procfile *ff = NULL;
-	static long slab_pagesize = 0;
+    static long slab_pagesize = 0;
 
-	if (unlikely(!slab_pagesize)) {
-		slab_pagesize = sysconf(_SC_PAGESIZE);
-		slabdebug("   Discovered pagesize: %ld", slab_pagesize);
-	}
+    if (unlikely(!slab_pagesize)) {
+        slab_pagesize = sysconf(_SC_PAGESIZE);
+        slabdebug("   Discovered pagesize: %ld", slab_pagesize);
+    }
 
     if(unlikely(!ff)) {
         ff = procfile_reopen(ff, PLUGIN_SLABINFO_PROCFILE, " ,:" , PROCFILE_FLAG_DEFAULT);
@@ -191,7 +191,7 @@ struct slabinfo *read_file_slabinfo() {
     slabdebug("   Read %lu lines from procfile", (unsigned long)lines);
     for(l = 2; l < lines; l++) {
         if (unlikely(procfile_linewords(ff, l) < 14)) {
-            slabdebug("    Line %lu has only %lu words, skipping", (unsigned long)l, procfile_linewords(ff,l));
+            slabdebug("    Line %zu has only %zu words, skipping", l, procfile_linewords(ff,l));
             continue;
         }
 
@@ -231,7 +231,7 @@ struct slabinfo *read_file_slabinfo() {
         else
             s->obj_filling = 0;
 
-        slabdebug("    Updated slab %s: %lu %lu %lu %lu %lu / %lu %lu %lu / %lu %lu %lu / %lu %lu %hhu",
+        slabdebug("    Updated slab %s: %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" / %"PRIu64" %"PRIu64" %"PRIu64" / %"PRIu64" %"PRIu64" %"PRIu64" / %"PRIu64" %"PRIu64" %hhu",
             name, s->active_objs, s->num_objs, s->obj_size, s->obj_per_slab, s->pages_per_slab,
             s->tune_limit, s->tune_batchcnt, s->tune_shared_factor,
             s->data_active_slabs, s->data_num_slabs, s->data_shared_avail,
@@ -304,7 +304,7 @@ unsigned int do_slab_stats(int update_every) {
             , "slabmemory"
         );
         for (s = sactive; s; s = s->next) {
-            printf("SET %s = %lu\n"
+            printf("SET %s = %"PRIu64"\n"
                 , s->name
                 , s->mem_usage
             );
@@ -334,7 +334,7 @@ unsigned int do_slab_stats(int update_every) {
             , "slabwaste"
         );
         for (s = sactive; s; s = s->next) {
-            printf("SET %s = %lu\n"
+            printf("SET %s = %"PRIu64"\n"
                 , s->name
                 , s->mem_waste
             );

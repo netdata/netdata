@@ -8,6 +8,7 @@
 
 #include "../libnetdata.h"
 
+/*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
     int fd = open(filename, O_WRONLY | O_APPEND, 0);
@@ -56,6 +57,7 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 
     return 0;
 }
+*/
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -280,40 +282,40 @@ static int select_file(char *name, const char *program, size_t length, int mode,
     return ret;
 }
 
-int ebpf_load_program(char *plugins_dir, int event_id, int mode, char *kernel_string, const char *name, int *map_fd)
+struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string, struct bpf_object **obj, int *map_fd)
 {
-    UNUSED(event_id);
-
     char lpath[4096];
     char lname[128];
-    struct bpf_object *obj;
     int prog_fd;
 
-    int test = select_file(lname, name, (size_t)127, mode, kernel_string);
+    int test = select_file(lname, em->thread_name, (size_t)127, em->mode, kernel_string);
     if (test < 0 || test > 127)
-        return -1;
+        return NULL;
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir, lname);
-    if (bpf_prog_load(lpath, BPF_PROG_TYPE_KPROBE, &obj, &prog_fd)) {
+    if (bpf_prog_load(lpath, BPF_PROG_TYPE_KPROBE, obj, &prog_fd)) {
         info("Cannot load program: %s", lpath);
-        return -1;
+        return NULL;
     } else {
-        info("The eBPF program %s was loaded with success.", name);
+        info("The eBPF program %s was loaded with success.", em->thread_name);
     }
 
     struct bpf_map *map;
     size_t i = 0;
-    bpf_map__for_each(map, obj)
+    bpf_map__for_each(map, *obj)
     {
         map_fd[i] = bpf_map__fd(map);
         i++;
     }
 
     struct bpf_program *prog;
-    bpf_object__for_each_program(prog, obj)
+    struct bpf_link **links = callocz(NETDATA_MAX_PROBES , sizeof(struct bpf_link *));
+    i = 0;
+    bpf_object__for_each_program(prog, *obj)
     {
-        bpf_program__attach(prog);
+        links[i] = bpf_program__attach(prog);
+        i++;
     }
 
-    return 0;
+    return links;
 }

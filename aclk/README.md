@@ -111,11 +111,12 @@ Restart your Agent to disable the ACLK.
 ### Re-enable the ACLK
 
 If you first disable the ACLK and any Cloud functionality and then decide you would like to use Cloud, you must either
-reinstall Netdata with Cloud enabled or change the runtime setting in your `cloud.conf` file.
+[reinstall Netdata](/packaging/installer/REINSTALL.md) with Cloud enabled or change the runtime setting in your
+`cloud.conf` file.
 
-If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must reinstall your Agent. Use the
-same method as before, but pass `--require-cloud` to the installer. When installation finishes you can [claim your
-node](/claim/README.md#how-to-claim-a-node).
+If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must
+[reinstall](/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
+the installer. When installation finishes you can [claim your node](/claim/README.md#how-to-claim-a-node).
 
 If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` file, edit the file again and change
 `enabled` to `yes`:

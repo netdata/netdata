@@ -133,7 +133,7 @@ parse_version() {
   fi
 
   read -r -a pp <<< "$(echo "${v}" | tr '.' ' ')"
-  printf "%03d%03d%03d%03d" "${pp[0]}" "${pp[1]}" "${pp[2]}" "${b}"
+  printf "%03d%03d%03d%05d" "${pp[0]}" "${pp[1]}" "${pp[2]}" "${b}"
 }
 
 get_latest_version() {
@@ -256,7 +256,7 @@ done
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
 if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
-  sleep $(((RANDOM % 3600) + 1))s
+    sleep $(((RANDOM % 3600) + 1))
 fi
 
 # Usually stored in /etc/netdata/.environment

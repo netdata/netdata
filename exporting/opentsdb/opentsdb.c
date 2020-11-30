@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "opentsdb.h"
+#include "../json/json.h"
 
 /**
  * Initialize OpenTSDB telnet connector instance
@@ -16,6 +17,17 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
+    struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = connector_specific_data;
+
+#ifdef ENABLE_HTTPS
+    connector_specific_data->flags = NETDATA_SSL_START;
+    connector_specific_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+    }
+#endif
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_telnet;
     instance->start_chart_formatting = NULL;
@@ -27,9 +39,9 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+    instance->end_batch_formatting = simple_connector_end_batch;
 
-    instance->send_header = NULL;
+    instance->prepare_header = NULL;
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -37,6 +49,9 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
     }
+
+    simple_connector_init(instance);
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
@@ -59,17 +74,17 @@ int init_opentsdb_http_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 4242;
 
+    struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
 #ifdef ENABLE_HTTPS
-    struct opentsdb_specific_data *connector_specific_data = callocz(1, sizeof(struct opentsdb_specific_data));
     connector_specific_data->flags = NETDATA_SSL_START;
     connector_specific_data->conn = NULL;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
+        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
     }
-    instance->connector_specific_data = connector_specific_data;
 #endif
+    instance->connector_specific_data = connector_specific_data;
 
-    instance->start_batch_formatting = NULL;
+    instance->start_batch_formatting = open_batch_json_http;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
     instance->start_chart_formatting = NULL;
 
@@ -80,9 +95,9 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+    instance->end_batch_formatting = close_batch_json_http;
 
-    instance->send_header = NULL;
+    instance->prepare_header = opentsdb_http_prepare_header;
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -90,6 +105,9 @@ int init_opentsdb_http_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
+
+    simple_connector_init(instance);
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
@@ -240,26 +258,26 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 }
 
 /**
- * Prepare an HTTP message for OpenTSDB HTTP connector
+ * Ppepare HTTP header
  *
- * @param buffer a buffer to write the message to.
- * @param message the body of the message.
- * @param hostname the name of the host that sends the message.
- * @param length the length of the message body.
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
  */
-static inline void opentsdb_build_message(BUFFER *buffer, char *message, const char *hostname, int length)
+void opentsdb_http_prepare_header(struct instance *instance)
 {
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
+
     buffer_sprintf(
-        buffer,
+        simple_connector_data->last_buffer->header,
         "POST /api/put HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Content-Type: application/json\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n"
-        "%s",
-        hostname,
-        length,
-        message);
+        "Content-Length: %lu\r\n"
+        "\r\n",
+        instance->config.destination,
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
+
+    return;
 }
 
 /**
@@ -324,17 +342,18 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
         RRD_ID_LENGTH_MAX);
 
-    char message[1024];
-    int length = snprintfz(
-        message,
-        sizeof(message),
+    if (buffer_strlen((BUFFER *)instance->buffer) > 2)
+        buffer_strcat(instance->buffer, ",\n");
+
+    buffer_sprintf(
+        instance->buffer,
         "{"
-        "  \"metric\": \"%s.%s.%s\","
-        "  \"timestamp\": %llu,"
-        "  \"value\": " COLLECTED_NUMBER_FORMAT ","
-        "  \"tags\": {"
-        "    \"host\": \"%s%s%s\"%s"
-        "  }"
+        "\"metric\":\"%s.%s.%s\","
+        "\"timestamp\":%llu,"
+        "\"value\":"COLLECTED_NUMBER_FORMAT","
+        "\"tags\":{"
+        "\"host\":\"%s%s%s\"%s"
+        "}"
         "}",
         instance->config.prefix,
         chart_name,
@@ -345,10 +364,6 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
-
-    if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
-    }
 
     return 0;
 }
@@ -384,17 +399,18 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     if(isnan(value))
         return 0;
 
-    char message[1024];
-    int length = snprintfz(
-        message,
-        sizeof(message),
+    if (buffer_strlen((BUFFER *)instance->buffer) > 2)
+        buffer_strcat(instance->buffer, ",\n");
+
+    buffer_sprintf(
+        instance->buffer,
         "{"
-        "  \"metric\": \"%s.%s.%s\","
-        "  \"timestamp\": %llu,"
-        "  \"value\": " CALCULATED_NUMBER_FORMAT ","
-        "  \"tags\": {"
-        "    \"host\": \"%s%s%s\"%s"
-        "  }"
+        "\"metric\":\"%s.%s.%s\","
+        "\"timestamp\":%llu,"
+        "\"value\":"CALCULATED_NUMBER_FORMAT","
+        "\"tags\":{"
+        "\"host\":\"%s%s%s\"%s"
+        "}"
         "}",
         instance->config.prefix,
         chart_name,
@@ -405,10 +421,6 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
-
-    if (length > 0) {
-        opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
-    }
 
     return 0;
 }

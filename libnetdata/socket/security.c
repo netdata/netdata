@@ -2,7 +2,7 @@
 
 #ifdef ENABLE_HTTPS
 
-SSL_CTX *netdata_opentsdb_ctx=NULL;
+SSL_CTX *netdata_exporting_ctx=NULL;
 SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
@@ -201,7 +201,7 @@ static SSL_CTX * security_initialize_openssl_server() {
  * @param selector informs the context that must be initialized, the following list has the valid values:
  *      NETDATA_SSL_CONTEXT_SERVER - the server context
  *      NETDATA_SSL_CONTEXT_STREAMING - Starts the streaming context.
- *      NETDATA_SSL_CONTEXT_OPENTSDB - Starts the OpenTSDB contextv
+ *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB contextv
  */
 void security_start_ssl(int selector) {
     switch (selector) {
@@ -222,8 +222,8 @@ void security_start_ssl(int selector) {
             SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
-        case NETDATA_SSL_CONTEXT_OPENTSDB: {
-            netdata_opentsdb_ctx = security_initialize_openssl_client();
+        case NETDATA_SSL_CONTEXT_EXPORTING: {
+            netdata_exporting_ctx = security_initialize_openssl_client();
             break;
         }
     }
@@ -234,20 +234,18 @@ void security_start_ssl(int selector) {
  *
  * Clean all the allocated contexts from netdata.
  */
-void security_clean_openssl() {
-	if (netdata_srv_ctx)
-	{
-		SSL_CTX_free(netdata_srv_ctx);
-	}
+void security_clean_openssl()
+{
+    if (netdata_srv_ctx) {
+        SSL_CTX_free(netdata_srv_ctx);
+    }
 
-    if (netdata_client_ctx)
-    {
+    if (netdata_client_ctx) {
         SSL_CTX_free(netdata_client_ctx);
     }
 
-    if ( netdata_opentsdb_ctx )
-    {
-        SSL_CTX_free(netdata_opentsdb_ctx);
+    if (netdata_exporting_ctx) {
+        SSL_CTX_free(netdata_exporting_ctx);
     }
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110

@@ -69,6 +69,7 @@ int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
 static int isrh;
+uint32_t finalized_threads = 1;
 
 pthread_mutex_t lock;
 pthread_mutex_t collect_data_mutex;
@@ -115,7 +116,6 @@ ebpf_module_t ebpf_modules[] = {
 };
 
 // Link with apps.plugin
-pid_t *pid_index;
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
@@ -142,6 +142,7 @@ void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
     ebpf_network_viewer_port_list_t *move = *clean;
     while (move) {
         ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
         freez(move);
 
         move = next;
@@ -181,13 +182,13 @@ static void change_events()
  * Clean Loaded Events
  *
  * This function cleans the events previous loaded on Linux.
- */
 void clean_loaded_events()
 {
     int event_pid;
     for (event_pid = 0; ebpf_modules[event_pid].probes; event_pid++)
         clean_kprobe_events(NULL, (int)ebpf_modules[event_pid].thread_id, ebpf_modules[event_pid].probes);
 }
+ */
 
 /**
  * Close the collector gracefully
@@ -203,11 +204,9 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    clean_apps_groups_target(apps_groups_root_target);
-
-    freez(pid_index);
     freez(global_process_stat);
 
+    /*
     int ret = fork();
     if (ret < 0) // error
         error("Cannot fork(), so I won't be able to clean %skprobe_events", NETDATA_DEBUGFS);
@@ -237,6 +236,7 @@ static void ebpf_exit(int sig)
     } else { // parent
         exit(0);
     }
+     */
 
     exit(sig);
 }
@@ -830,7 +830,6 @@ int ebpf_start_pthread_variables()
 static void ebpf_allocate_common_vectors()
 {
     all_pids = callocz((size_t)pid_max, sizeof(struct pid_stat *));
-    pid_index = callocz((size_t)pid_max, sizeof(pid_t));
     global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
 
@@ -1969,7 +1968,7 @@ int main(int argc, char **argv)
     };
 
     change_events();
-    clean_loaded_events();
+    //clean_loaded_events();
 
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {

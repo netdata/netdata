@@ -1,46 +1,71 @@
 <!--
----
 title: "Install Netdata on pfSense"
+description: "Install Netdata on pfSense to monitor the health and performance of firewalls with thousands of real-time, per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
----
 -->
 
 # Install Netdata on pfSense
 
-To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt
-within the pfSense web interface).
+> 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
+> details of the installation process, such as version numbers for downloadable packages, before proceeding.
+>
+> You can help improve this document by [submitting a
+> PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md) with your recommended
+> improvements or changes. Thank you!
 
-Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense,
-Netdata, Judy and Python are downloaded from the FreeBSD repository.
+## Install prerequisites/dependencies
 
-```sh
+To install Netdata on pfSense, first run the following command (within a shell or under the **Diagnostics/Command**
+prompt within the pfSense web interface).
+
+```bash
 pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.4.5.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.19.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cffi-1.14.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-six-1.14.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cryptography-2.6.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.8.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.7,1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.20.0_3.txz
 ```
 
-**Note:** If you receive a `Not Found` error during the last two commands above, you will either need to manually look
-in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its
-URL instead, or you can try manually changing the Netdata version in the URL to the latest version.
+Then run the following commands to download various dependencies from the FreeBSD repository.
 
-**Note:** On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install Python from the FreeBSD repository as instructed above.
+```sh
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/json-c-0.15_1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.6.20.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.20.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cffi-1.14.3.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-six-1.15.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cryptography-2.6.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.10.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.11,1.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
+```
+
+> ⚠️ If any of the above commands return a `Not Found` error, you need to manually search for the latest package in the
+> [FreeBSD repository](https://www.freebsd.org/ports/). Search for the package's name, such as `py37-cffi`, find the
+> latest version number, and update the command accordingly.
+
+> ⚠️ On pfSense 2.4.5, Python version 3.7 may be installed by the system, in which case you should should not install
+> Python from the FreeBSD repository as instructed above.
+
+> ⚠️ If you are using the `apcupsd` collector, you need to make sure that apcupsd is up before starting Netdata.
+> Otherwise a infinitely running `cat` process triggered by the default activated apcuspd charts plugin will eat up CPU
+> and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies to `OPNsense`.
+
+## Install Netdata
+
+You can now install Netdata from the FreeBSD repository.
+
+```bash
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.26.0.txz
+```
+
+> ⚠️ If the above command returns a `Not Found` error, you need to manually search for the latest version of Netdata in
+> the [FreeBSD repository](https://www.freebsd.org/ports/). Search for `netdata`, find the latest version number, and
+> update the command accordingly.
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
 To start Netdata manually, run `service netdata onestart`.
-
-**Warning:** If you are using the `apcupsd` collector, you need to make sure that apcupsd is up before starting Netdata. Otherwise a infinitely running `cat` process triggered by the default activated apcuspd charts plugin will eat up CPU and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies to `OPNsense`.
 
 Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
 

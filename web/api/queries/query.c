@@ -679,6 +679,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         //, size_t before_slot
         , const char *msg
         ) {
+    netdata_rwlock_rdlock(&r->st->rrdset_rwlock);
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %zu, db: %zu), "
          "before (got: %zu, want: %zu, req: %zu, db: %zu), "
@@ -700,19 +701,19 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t(r->st)
+         , (size_t)rrdset_first_entry_t_nolock(r->st)
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t(r->st)
+         , (size_t)rrdset_last_entry_t_nolock(r->st)
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
+         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
 
          // slot
          /*
@@ -730,6 +731,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          // message
          , msg
     );
+    netdata_rwlock_unlock(&r->st->rrdset_rwlock);
 }
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -740,6 +742,7 @@ static int rrdr_convert_before_after_to_absolute(
         , int update_every
         , time_t first_entry_t
         , time_t last_entry_t
+        , RRDR_OPTIONS options
 ) {
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -785,10 +788,12 @@ static int rrdr_convert_before_after_to_absolute(
 
     // make sure they are within our timeframe
     if(before_requested > last_entry_t)  before_requested = last_entry_t;
-    if(before_requested < first_entry_t) before_requested = first_entry_t;
+    if(before_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
+        before_requested = first_entry_t;
 
     if(after_requested > last_entry_t)  after_requested = last_entry_t;
-    if(after_requested < first_entry_t) after_requested = first_entry_t;
+    if(after_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
+        after_requested = first_entry_t;
 
     // check if they are reversed
     if(after_requested > before_requested) {
@@ -1566,22 +1571,26 @@ RRDR *rrd2rrdr(
     int rrd_update_every;
     int absolute_period_requested;
 
-//    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-
     time_t first_entry_t;
     time_t last_entry_t;
     if (context_param_list) {
         first_entry_t = context_param_list->first_entry_t;
         last_entry_t = context_param_list->last_entry_t;
     } else {
-        first_entry_t = rrdset_first_entry_t(st);
-        last_entry_t = rrdset_last_entry_t(st);
+        rrdset_rdlock(st);
+        first_entry_t = rrdset_first_entry_t_nolock(st);
+        last_entry_t = rrdset_last_entry_t_nolock(st);
+        rrdset_unlock(st);
     }
 
     rrd_update_every = st->update_every;
     absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
                                                                       rrd_update_every, first_entry_t,
-                                                                      last_entry_t);
+                                                                      last_entry_t, options);
+    if (options & RRDR_OPTION_ALLOW_PAST)
+        if (first_entry_t > after_requested)
+            first_entry_t = after_requested;
+
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         struct rrdeng_region_info *region_info_array;
@@ -1597,7 +1606,7 @@ RRDR *rrd2rrdr(
                     /* recalculate query alignment */
                     absolute_period_requested =
                             rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
-                                                                  first_entry_t, last_entry_t);
+                                                                  first_entry_t, last_entry_t, options);
                 }
                 freez(region_info_array);
             }
@@ -1610,7 +1619,7 @@ RRDR *rrd2rrdr(
                 /* recalculate query alignment */
                 absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
                                                                                   rrd_update_every, first_entry_t,
-                                                                                  last_entry_t);
+                                                                                  last_entry_t, options);
             }
             return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,

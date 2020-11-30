@@ -1,26 +1,37 @@
 <!--
----
-title: "Update Netdata"
-description: "We actively develop Netdata to add new features and remove bugs. Here's how to stay up-to-date with the 
-latest nightly or major releases."
-date: 2020-03-12
+title: "Update the Netdata Agen"
+description: "If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly or stable version."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
----
 -->
 
-# Update Netdata
+# Update the Netdata Agent
 
-We actively develop Netdata to add new features and remove bugs, and encourage all users to ensure they're using the
-most up-to-date version, whether that's nightly or major releases.
+By default, the Netdata Agent automatically updates with the latest nightly version. If you opted out of automatic
+updates, you need to update your Netdata Agent to the latest nightly or stable version.
 
-Before you update Netdata using one of the methods below, check to see if your Netdata agent is already up-to-date by
-opening the update modal in the dashboard. Click the **Update** button in the top navigation to open it. The modal tells
-you whether your agent is up-to-date or not.
+> 💡 Looking to reinstall the Netdata Agent to enable a feature, update an Agent that cannot update automatically, or
+> troubleshoot an error during the installation process? See our [reinstallation doc](/packaging/installer/REINSTALL.md)
+> for reinstallation steps.
 
-![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/80829493-1adbe880-8b9c-11ea-9770-cc3b23a89414.gif)
+Before you update the Netdata Agent, check to see if your Netdata Agent is already up-to-date by clicking on the update
+icon in the local Agent dashboard's top navigation. This modal informs you whether your Agent needs an update or not.
 
-If your agent can be updated, use one of the methods below. **The method you chose for updating Netdata depends on how
-you installed it.** Choose from the following list to see the appropriate update instructions for your system.
+![Opening the Agent's Update modal](https://user-images.githubusercontent.com/1153921/99738428-add06780-2a87-11eb-8268-0e17b689eb3f.gif)
+
+## Determine which installation method you used
+
+If you are not sure where your Netdata config directory is, see the [configuration doc](/docs/configure/nodes.md). In
+most installations, this is `/etc/netdata`.
+
+Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.environment`.
+
+-   If the `.environment` file _does not_ exist, reinstall with your [package manager](#deb-or-rpm-packages).
+-   If the `.environtment` file _does_ exist, check its contents with `less .environment`.
+    -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
+        binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
+    -   In all other cases, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
+
+Next, use the appropriate method to update the Netdata Agent:
 
 -   [One-line installer script (`kickstart.sh`)](#one-line-installer-script-kickstartsh)
 -   [`.deb` or `.rpm` packages](#deb-or-rpm-packages)
@@ -28,17 +39,6 @@ you installed it.** Choose from the following list to see the appropriate update
 -   [Docker](#docker)
 -   [macOS](#macos)
 -   [Manual installation from Git](#manual-installation-from-git)
-
-#### How to determine which install method you used
-
-First, see [here](https://learn.netdata.cloud/docs/configure/nodes#the-netdata-config-directory) to figure out
-where your user configuration files for Netdata are.
-
-Once you have figured this out, look for a file called `.environment` in this directory (you will need to use
-`ls -a` to see it, as it will not be listed by default by a regular `ls` command). If it is not there, you used
-package manager to install netdata and need to update it through that package manager. If the `environment` file
-is present, check the contents of the file. If `IS_NETDATA_STATIC_BINARY` is `"yes"`, then you installed using
-`kickstart-static64.sh`.  Otherwise you installed using `kickstart.sh`.
 
 ## One-line installer script (`kickstart.sh`)
 
@@ -55,27 +55,17 @@ that prefix to this command to make sure it finds Netdata.
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-In the event that this command fails, there may be an issue with the installed update script. In such cases, you
-can instead use the following command to run an update as if it were a clean install (this will still preserve
-any user configuration).
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --reinstall
-```
-
-If using this method, you will need to pass any options you passed during the original installation process. To
-determine what options you passed, start by finding the `.environment` file for your install as described above in
-[How to determine which install method you used](#how-to-determine-which-install-method-you-used). Once you have
-found this file, look at the value of the `REINSTALL_OPTIONS` line. This is the list of additional options you
-need to pass to the above command.
+> ❗ If the above command fails, you can [reinstall
+> Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This also
+> preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 ## `.deb` or `.rpm` packages
 
-If you installed Netdata with `.deb` or `.rpm` packages, use your distribution's package manager update Netdata. Any
-custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists during this
-process.
+If you installed Netdata with [`.deb` or `.rpm` packages](/packaging/installer/methods/packages.md), use your
+distribution's package manager to update Netdata. Any custom settings present in your Netdata configuration directory
+(typically at `/etc/netdata`) persists during this process.
 
-Your package manager grabs a new package from our hosted repository, updates Netdata, and restarts it.
+Your package manager grabs a new package from our hosted repository, updates the Netdata Agent, and restarts it.
 
 ```bash
 apt-get install netdata     # Ubuntu/Debian
@@ -99,25 +89,15 @@ you disabled automatic updates) and preserve the existing install options you sp
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
-In the event that this command fails, there may be an issue with the installed update script. In such cases, you
-can instead use the following command to run an update as if it were a clean install (this will still preserve
-any user configuration).
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --reinstall
-```
-
-If using this method, you will need to pass any options you passed during the original installation process. To
-determine what options you passed, start by finding the `.environment` file for your install as described above in
-[How to determine which install method you used](#how-to-determine-which-install-method-you-used). Once you have
-found this file, look at the value of the `REINSTALL_OPTIONS` line. This is the list of additional options you
-need to pass to the above command.
+> ❗ If the above command fails, you can [reinstall
+> Netdata](/packaging/installer/REINSTALL.md#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh) to get the
+> latest version. This also preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 ## Docker
 
-Docker-based installations do not update automatically. To update an agent running in a Docker container, you must pull
-the [latest image from Docker hub](https://hub.docker.com/r/netdata/netdata), stop and remove the container, and
-re-create it using the latest image.
+Docker-based installations do not update automatically. To update an Netdata Agent running in a Docker container, you
+must pull the [latest image from Docker Hub](https://hub.docker.com/r/netdata/netdata), stop and remove the container,
+and re-create it using the latest image.
 
 First, pull the latest version of the image.
 
@@ -126,8 +106,7 @@ docker pull netdata/netdata:latest
 ```
 
 Next, to stop and remove any containers using the `netdata/netdata` image. Replace `netdata` if you changed it from the
-default in our [Docker installation
-instructions](/packaging/docker/README.md#run-the-agent-with-the-docker-command).
+default.
 
 ```bash
 docker stop netdata
@@ -135,21 +114,7 @@ docker rm netdata
 ```
 
 You can now re-create your Netdata container using the `docker` command or a `docker-compose.yml` file. See our [Docker
-installation instructions](/packaging/docker/README.md#run-the-agent-with-the-docker-command) for details. For
-example, using the `docker` command:
-
-```bash
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata
-```
+installation instructions](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
 ## macOS
 
@@ -165,16 +130,16 @@ and updates Netdata via reinstallation.
 
 ## Manual installation from Git
 
-If you installed Netdata manually from Git using `netdata-installer.sh`, you can run that installer again to update your
-agent. First, run our automatic requirements installer, which works on many Linux distributions, to ensure your system
-has the dependencies necessary for new features.
+If you installed [Netdata manually from Git](/packaging/installer/methods/manual.md), you can run that installer again
+to update your agent. First, run our automatic requirements installer, which works on many Linux distributions, to
+ensure your system has the dependencies necessary for new features.
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)
 ```
 
-Then, navigate to the directory where you first cloned the Netdata repository, pull the latest source code, and run
-`netdata-install.sh` again. This process compiles Netdata with the latest source code and updates it via reinstallation. 
+Navigate to the directory where you first cloned the Netdata repository, pull the latest source code, and run
+`netdata-install.sh` again. This process compiles Netdata with the latest source code and updates it via reinstallation.
 
 ```bash
 cd /path/to/netdata/git

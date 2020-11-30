@@ -16,6 +16,17 @@ int init_graphite_instance(struct instance *instance)
     instance->config.connector_specific_config = (void *)connector_specific_config;
     connector_specific_config->default_port = 2003;
 
+    struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = connector_specific_data;
+
+#ifdef ENABLE_HTTPS
+    connector_specific_data->flags = NETDATA_SSL_START;
+    connector_specific_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+    }
+#endif
+
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_graphite_plaintext;
     instance->start_chart_formatting = NULL;
@@ -27,9 +38,13 @@ int init_graphite_instance(struct instance *instance)
 
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = flush_host_labels;
-    instance->end_batch_formatting = simple_connector_update_buffered_bytes;
+    instance->end_batch_formatting = simple_connector_end_batch;
 
-    instance->send_header = NULL;
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP)
+        instance->prepare_header = graphite_http_prepare_header;
+    else
+        instance->prepare_header = NULL;
+
     instance->check_response = exporting_discard_response;
 
     instance->buffer = (void *)buffer_create(0);
@@ -37,6 +52,9 @@ int init_graphite_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
         return 1;
     }
+
+    simple_connector_init(instance);
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
@@ -186,4 +204,27 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         (unsigned long long)last_t);
 
     return 0;
+}
+
+/**
+ * Ppepare HTTP header
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+void graphite_http_prepare_header(struct instance *instance)
+{
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
+
+    buffer_sprintf(
+        simple_connector_data->last_buffer->header,
+        "POST /api/put HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Content-Type: application/graphite\r\n"
+        "Content-Length: %lu\r\n"
+        "\r\n",
+        instance->config.destination,
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
+
+    return;
 }
