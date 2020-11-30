@@ -18,15 +18,15 @@ Two charts are produced:
 
 Below is an example of the charts produced by this collector and how they might look when things are 'normal' on the node. The anomaly probabilities tend to bounce randomly around a typically low probability range, one or two might randomly jump or drift outside of this range every now and then and show up as anomalies on the anomaly chart. 
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-anomalies-collector-normal.jpg)
+![netdata-anomalies-collector-normal](https://user-images.githubusercontent.com/2178292/100630492-85b3f480-3322-11eb-842a-cd3e5a5917ec.jpg)
 
 If we then go onto the system and run a command like `stress-ng --all 2` to create some [stress](https://wiki.ubuntu.com/Kernel/Reference/stress-ng), we see some charts begin to have anomaly probabilities that jump outside the typical range. When the anomaly probabilities change enough, we will start seeing anomalies being flagged on the `anomalies.anomaly` chart. The idea is that these charts are the most anomalous right now so could be a good place to start your troubleshooting. 
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-anomalies-collector-abnormal.jpg)
+![netdata-anomalies-collector-abnormal](https://user-images.githubusercontent.com/2178292/100630489-851b5e00-3322-11eb-87e5-509ca63e7afd.jpg)
 
 Then, as the issue passes, the anomaly probabilities should settle back down into their 'normal' range again. 
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-anomalies-collector-normal-again.jpg)
+![netdata-anomalies-collector-normal-again](https://user-images.githubusercontent.com/2178292/100630494-85b3f480-3322-11eb-94cc-9f94ced3acb1.jpg)
 
 ## Requirements
 
