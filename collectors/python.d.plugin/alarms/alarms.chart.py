@@ -8,7 +8,7 @@ from json import loads
 from bases.FrameworkServices.UrlService import UrlService
 
 update_every = 10
-disabled_by_default = True
+disabled_by_default = False
 
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
 
