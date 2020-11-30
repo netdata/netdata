@@ -67,10 +67,10 @@ The default configuration should look something like this. Here you can see each
 ```yaml
 
 # Job to pull system overview data from local Netdata node.
-system:
+local:
     
     # Job name.
-    name: 'System'
+    name: 'local'
     # Host to pull data from.
     host: '127.0.0.1:19999'
 
