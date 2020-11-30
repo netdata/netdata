@@ -177,6 +177,10 @@ sudo su -s /bin/bash netdata
 /usr/libexec/netdata/plugins.d/python.d.plugin anomalies debug trace nolock
 ```
 
+## Deepdive turorial
+
+If you would like to go deeper on what exactly the anomalies collector is doing under the hood then check out this [deepdive tutorial](https://github.com/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where you can play around with some data from our demo servers (or your own if its accessible to you) and work through the calculations step by step. 
+
 ## Notes
 
 - Python 3 is required as the [`netdata-pandas`](https://github.com/netdata/netdata-pandas) package uses Python async libraries ([asks](https://pypi.org/project/asks/) and [trio](https://pypi.org/project/trio/)) to make asynchronous calls to the [Netdata REST API](https://learn.netdata.cloud/docs/agent/web/api) to get the required data for each chart.
