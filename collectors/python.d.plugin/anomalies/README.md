@@ -55,7 +55,7 @@ The configuration for the anomalies collector defines how it will behave on your
 _**Note**: If you are unsure about any of the below configuration options then it's best to just ignore all this and leave the `anomalies.conf` file alone to begin with. Then you can return to it later if you would like to tune things a bit more once the collector is running for a while and you have a feeling for its performance on your node._
 
 Edit the `python.d/anomalies.conf` configuration file using `edit-config` from the your agent's [config
-directory](https://learn.netdata.cloud/guides/step-by-step/step-04#find-your-netdataconf-file), which is usually at `/etc/netdata`.
+directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
