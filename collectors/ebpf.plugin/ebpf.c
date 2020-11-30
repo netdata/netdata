@@ -1699,9 +1699,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
-                                    0);
-    ebpf_modules[1].optional = enabled;
+    // This is kept to keep compatibility
+    value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
+                                    NULL);
+    if (!value)
+        value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connection",
+                              "no");
+    ebpf_modules[1].optional = (!value || !strcasecmp(value, "no"))?0:1;
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
