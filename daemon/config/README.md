@@ -56,7 +56,7 @@ Please note that your data history will be lost if you have modified `history` p
 | glibc malloc arena max for Netdata|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
 | hostname|auto-detected|The hostname of the computer running Netdata.|||
 | history|`3996`| Used with `memory mode = save/map/ram/alloc`, not the default `memory mode = dbengine`. This number reflects the number of entries the `netdata` daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](/database/README.md) for more information. |||
-| update every|`1`|The frequency in seconds, for data collection. For more information see [Performance](/docs/Performance.md).|||
+| update every|`1`|The frequency in seconds, for data collection. For more information see the [performance guide](/docs/guides/configure/performance.md).|||
 | config directory|`/etc/netdata`|The directory configuration files are kept.|||
 | stock config directory|`/usr/lib/netdata/conf.d`||||
 | log directory|`/var/log/netdata`|The directory in which the [log files](/daemon/README.md#log-files) are kept.|||
@@ -150,7 +150,7 @@ External plugins will have only 2 options at `netdata.conf`:
 
 | setting | default | info |
 | :-----:|:-----:|:---|
-| update every | the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](/docs/Performance.md#performance).|
+| update every | the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check the [performance guide](/docs/guides/configure/performance.md).|
 | command options | _empty_ | Additional command line options to pass to the plugin.|
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
