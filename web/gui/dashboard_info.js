@@ -1102,7 +1102,7 @@ netdataDashboard.context = {
         height: 2.0
         info: 'Calls for internal function <code>do_sys_open</code>, which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
     },
 
     'apps.file_open_error': {
