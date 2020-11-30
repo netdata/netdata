@@ -283,7 +283,7 @@ after_crc_check:
         if (xt_is_cached && xt_is_inflight) {
             struct extent_cache *xt_cache = &wc->xt_cache;
             struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
-            struct extent_io_descriptor *curr;
+            struct extent_io_descriptor *curr, *next;
 
             if (have_read_error) {
                 memset(xt_cache_elem->pages, 0, sizeof(xt_cache_elem->pages));
@@ -293,7 +293,8 @@ after_crc_check:
                 (void)memcpy(xt_cache_elem->pages, uncompressed_buf, uncompressed_payload_length);
             }
             /* complete all connected in-flight read requests */
-            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = curr->next) {
+            for (curr = xt_cache_elem->inflight_io_descr->next ; curr ; curr = next) {
+                next = curr->next;
                 read_cached_extent_cb(wc, xt_idx, curr);
             }
             xt_cache_elem->inflight_io_descr = NULL;
