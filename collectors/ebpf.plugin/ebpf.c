@@ -875,7 +875,7 @@ static inline int parse_disable_apps(char *ptr)
         ebpf_disable_apps();
         return 1;
     } else if (strcasecmp(ptr, "no") != 0) {
-        error("The option %s for \"disable apps\" is not a valid option.", ptr);
+        error("The option %s for \"apps\" is not a valid option.", ptr);
     }
 
     return 0;
@@ -1674,7 +1674,11 @@ static void read_collector_values(int *disable_apps)
 
     how_to_load(value);
 
-    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", "no");
+    // This is kept to keep compatibility
+    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", NULL);
+    if (!value)
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "apps", "no");
+
     *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
