@@ -42,10 +42,12 @@ def create_runtime_chart(func):
 
     def wrapper(*args, **kwargs):
         self = args[0]
+        chart = RUNTIME_CHART_CREATE.format(
+            job_name=self.name,
+            update_every=self._runtime_counters.update_every,
+        )
+        safe_print(chart)
         ok = func(*args, **kwargs)
-        if ok:
-            safe_print(RUNTIME_CHART_CREATE.format(job_name=self.name,
-                                                   update_every=self._runtime_counters.update_every))
         return ok
 
     return wrapper
