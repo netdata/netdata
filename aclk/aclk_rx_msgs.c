@@ -42,6 +42,9 @@ static inline int aclk_v2_payload_get_query(struct aclk_cloud_req_v2 *cloud_req,
 
         strncpyz(uuid_str, ptr, UUID_STR_LEN - 1);
 
+        for(int i = 0; i < UUID_STR_LEN && uuid_str[i]; i++)
+            uuid_str[i] = tolower(uuid_str[i]);
+
         if(ptr[0] && uuid_parse(uuid_str, uuid)) {
             error("Got Child query (/host/XXX/...) host id \"%s\" doesn't look like valid GUID", uuid_str);
             return 1;
