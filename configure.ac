@@ -197,6 +197,16 @@ AC_ARG_ENABLE(
     [ enable_cloud="detect" ]
 )
 
+AC_ARG_WITH(
+    [aclk-ng],
+    [AS_HELP_STRING([--with-aclk-ng],
+                    [Requires ACLK-NG to be used even in case ACLK Legacy can run on this system])],
+    [aclk_ng="$withval"],
+    [aclk_ng="fallback"]
+)
+
+AM_CONDITIONAL([ACLK_NG], [true])
+
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
@@ -632,7 +642,7 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$enable_cloud" != "no"; then
+if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
     # just to have all messages that can fail ACLK build in one place
     # so it is easier to see why it can't be built
     if test -n "${SSL_LIBS}"; then
@@ -706,6 +716,7 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${can_enable_aclk}])
 
+# TODO fix this (you need to try fallback)
     test "${enable_cloud}" = "yes" -a "${can_enable_aclk}" = "no" && \
         AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
 
@@ -723,8 +734,24 @@ if test "$enable_cloud" != "no"; then
 
     AC_MSG_RESULT([${enable_aclk}])
 fi
-AC_SUBST([enable_cloud])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
+
+if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
+    if test "$aclk_ng" != "yes" -a "$enable_aclk" == "no"; then #default "fallback"
+        AC_MSG_NOTICE([ACLK Legacy could not be built. Trying ACLK-NG as fallback.])
+        aclk_ng="yes"
+    fi
+    if test "$aclk_ng" = "yes"; then
+#TODO Check OpenSSL and JSON-C
+        AC_MSG_CHECKING([if ACLK Next Generation can be built])
+        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+        enable_aclk="yes"
+        AC_MSG_RESULT([yes])
+        OPTIONAL_MQTT_WSS_CFLAGS="-Imqtt_websockets/src/include -Iexternaldeps/libwebsockets/include"
+    fi
+fi
+AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -1420,7 +1447,8 @@ AC_SUBST([webdir])
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
-    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS}"
+    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
+    ${OPTIONAL_MQTT_WSS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1470,6 +1498,7 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 AC_SUBST([OPTIONAL_LWS_LIBS])
+AC_SUBST([OPTIONAL_MQTT_WSS_CFLAGS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1611,10 +1640,16 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
-    aclk/legacy/Makefile
     spawn/Makefile
     parser/Makefile
 ])
+
+if test "$enable_aclk" = "yes" -a "$aclk_ng" != "yes"; then
+AC_CONFIG_FILES([
+    aclk/legacy/Makefile
+])
+fi
+
 AC_OUTPUT
 
 test "${with_math}" != "yes" && AC_MSG_WARN([You are building without math. math allows accurate calculations. It should be enabled.]) || :
