@@ -1676,9 +1676,13 @@ static void read_collector_values(int *disable_apps)
 
     // This is kept to keep compatibility
     value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", NULL);
-    if (!value)
+    if (!value) {
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "apps", "no");
-
+        if (!strcasecmp(value, "yes") )
+            value = "no";
+        else
+            value = "yes";
+    }
     *disable_apps = parse_disable_apps(value);
 
     // Read ebpf programs section
