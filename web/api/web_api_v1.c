@@ -961,6 +961,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+#ifdef ACLK_NG
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
+#else
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"legacy\",\n");
+#endif
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif

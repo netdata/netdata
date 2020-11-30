@@ -8,7 +8,13 @@
 #ifdef ENABLE_ACLK
 #define FEAT_CLOUD 1
 #define FEAT_CLOUD_MSG ""
+#ifdef ACLK_NG
+#define ACLK_IMPL "Next Generation"
 #else
+#define ACLK_IMPL "Legacy"
+#endif
+#else
+#define ACLK_IMPL ""
 #ifdef DISABLE_CLOUD
 #define FEAT_CLOUD 0
 #define FEAT_CLOUD_MSG "(by user request)"
@@ -199,6 +205,9 @@ void print_build_info(void) {
     printf("    dbengine:                %s\n", FEAT_YES_NO(FEAT_DBENGINE));
     printf("    Native HTTPS:            %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
     printf("    Netdata Cloud:           %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
+#if FEAT_CLOUD == 1
+    printf("    Cloud Implementation:    %s\n", ACLK_IMPL);
+#endif
     printf("    TLS Host Verification:   %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
 
     printf("Libraries:\n");
@@ -251,6 +260,9 @@ void print_build_info_json(void) {
     printf("    \"cloud-disabled\": true,\n");
 #else
     printf("    \"cloud-disabled\": false,\n");
+#endif
+#if FEAT_CLOUD == 1
+    printf("    \"cloud-implementation\": \"%s\",", ACLK_IMPL);
 #endif
     printf("    \"tls-host-verify\": %s\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("  },\n");
