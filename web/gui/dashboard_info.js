@@ -1099,85 +1099,85 @@ netdataDashboard.context = {
     },
 
     'apps.file_open': {
-        height: 2.0
-        info: 'Calls for internal function <code>do_sys_open</code>, which is the common function called from'+
+        height: 2.0,
+        info: 'Calls for internal function <code>do_sys_open</code>, which is the common function called from' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
     },
 
     'apps.file_open_error': {
-        height: 2.0
+        height: 2.0,
         info: 'Number of calls for  internal function <code>do_sys_open</code>, which returned error.'
     },
 
     'apps.file_closed': {
-        height: 2.0
+        height: 2.0,
         info: 'Calls for internal function <code>__close_fd</code>, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'apps.file_close_error': {
-        height: 2.0
+        height: 2.0,
         info: 'Calls for internal function <code>__close_fd</code>, which returned error.'
     },
 
     'apps.file_deleted': {
-        height: 2.0
+        height: 2.0,
         info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
     },
 
     'apps.vfs_write_call': {
-        height: 2.0
+        height: 2.0,
         info: 'Successful calls to function <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_error': {
-        height: 2.0
+        height: 2.0,
         info: 'Failed calls to function <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_call': {
-        height: 2.0
+        height: 2.0,
         info: 'Successful calls to functions <code>vfs_read</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_error': {
-        height: 2.0
+        height: 2.0,
         info: 'Failed calls to functions <code>vfs_read</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_bytes': {
-        height: 2.0
+        height: 2.0,
         info: 'Total of bytes written with success using the function <code>vfs_write</code>.'
     },
 
     'apps.vfs_read_bytes': {
-        height: 2.0
+        height: 2.0,
         info: 'Total of bytes read with success using the functions <code>vfs_read</code>.'
     },
 
     'apps.process_create': {
-        height: 2.0
+        height: 2.0,
         info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by couting the number of calls for <code>sys_clone</code> that has not the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.thread_create': {
-        height: 2.0
+        height: 2.0,
         info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.task_close': {
-        height: 2.0
+        height: 2.0,
         info: 'Calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'apps.bandwidth_sent': {
-        height: 2.0
+        height: 2.0,
         info: 'Bytes sent for functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
     },
 
     'apps.bandwidth_recv': {
-        height: 2.0
+        height: 2.0,
         info: 'Bytes received for functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
     },
 
