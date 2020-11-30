@@ -43,9 +43,9 @@ static inline int find_first_zero(unsigned x)
 }
 
 /* Starts from LSB. */
-static inline int check_bit(unsigned x, size_t pos)
+static inline uint8_t check_bit(unsigned x, size_t pos)
 {
-    return x & (1 << pos);
+    return !!(x & (1 << pos));
 }
 
 /* Starts from LSB. val is 0 or 1 */

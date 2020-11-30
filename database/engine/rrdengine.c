@@ -92,11 +92,11 @@ static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct e
     unsigned idx;
     int ret;
 
-    ret = find_first_zero(wc->xt_cache.allocation_bitmap);
+    ret = find_first_zero(xt_cache->allocation_bitmap);
     if (-1 == ret || ret >= MAX_CACHED_EXTENTS) {
         for (xt_cache_elem = xt_cache->replaceQ_head ; NULL != xt_cache_elem ; xt_cache_elem = xt_cache_elem->next) {
             idx = xt_cache_elem - xt_cache->extent_array;
-            if (!check_bit(wc->xt_cache.inflight_bitmap, idx)) {
+            if (!check_bit(xt_cache->inflight_bitmap, idx)) {
                 xt_cache_replaceQ_delete(wc, xt_cache_elem);
                 break;
             }
@@ -110,7 +110,7 @@ static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct e
     xt_cache_elem->extent = extent;
     xt_cache_elem->inflight_io_descr = NULL;
     xt_cache_replaceQ_insert(wc, xt_cache_elem);
-    modify_bit(&wc->xt_cache.allocation_bitmap, idx, 1);
+    modify_bit(&xt_cache->allocation_bitmap, idx, 1);
 
     return (int)idx;
 }
@@ -127,7 +127,7 @@ static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct ext
 
     for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
         xt_cache_elem = &xt_cache->extent_array[i];
-        if (xt_cache_elem->extent == extent) {
+        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent) {
             *idx = i;
             return 0;
         }
