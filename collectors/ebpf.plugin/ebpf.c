@@ -863,25 +863,6 @@ static inline void how_to_load(char *ptr)
 }
 
 /**
- * Parse disable apps option
- *
- * @param ptr the option given by users
- *
- * @return It returns 1 to disable the charts or 0 otherwise.
- */
-static inline int parse_disable_apps(char *ptr)
-{
-    if (!strcasecmp(ptr, "yes")) {
-        ebpf_disable_apps();
-        return 1;
-    } else if (strcasecmp(ptr, "no") != 0) {
-        error("The option %s for \"apps\" is not a valid option.", ptr);
-    }
-
-    return 0;
-}
-
-/**
  * Fill Port list
  *
  * @param out a pointer to the link list.
@@ -1675,18 +1656,16 @@ static void read_collector_values(int *disable_apps)
     how_to_load(value);
 
     // This is kept to keep compatibility
-    value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", NULL);
-    if (!value) {
-        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "apps", "no");
-        if (!strcasecmp(value, "yes") )
-            value = "no";
-        else
-            value = "yes";
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", 0);
+    if (!enabled) {
+        // Apps is a positive sentence, so we need to invert the values to disable apps.
+        enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "apps", 1);
+        enabled =  (!enabled)?1:0;
     }
-    *disable_apps = parse_disable_apps(value);
+    *disable_apps = (int)enabled;
 
     // Read ebpf programs section
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name,
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name,
                                              1);
     int started = 0;
     if (enabled) {
@@ -1708,12 +1687,12 @@ static void read_collector_values(int *disable_apps)
     }
 
     // This is kept to keep compatibility
-    value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
-                                    NULL);
-    if (!value)
-        value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
-                              "no");
-    ebpf_modules[1].optional = (!value || !strcasecmp(value, "no"))?0:1;
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
+                                    0);
+    if (!enabled)
+        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
+                              0);
+    ebpf_modules[1].optional = enabled;
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
