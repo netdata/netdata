@@ -1,6 +1,6 @@
 <p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
-<h3 align="center">The best monitoring and troubleshooting for systems, containers, applications, and infrastructure. <br />Preconfigured, opinionated, and always real-time.</h3>
+<h3 align="center">Netdata is high fidelity infrastructure monitoring and troubleshooting.<br />Open-source, free, preconfigured, opinionated, and always real-time.<br/>It is perfectly safe to install and use netdata mid-crisis, without any preparation.</h3>
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
