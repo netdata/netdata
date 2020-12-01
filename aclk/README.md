@@ -146,7 +146,7 @@ The information we store in Netdata Cloud is the following (using the publicly a
  - Node Name
  - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
  - The chart metadata shown in `/api/v1/charts`. E.g. `https://frankfurt.my-netdata.io/api/v1/charts`
- - The alarm configurations shown in `/api/v1/alarms?all`. E.g. `https://frankfurt.my-netdata.io/api/v1/alarms?all`
+ - Alarm configurations shown in `/api/v1/alarms?all`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms?all](https://frankfurt.my-netdata.io/api/v1/alarms?all).
  - Active alarms shown in `/api/v1/alarms`. E.g `https://frankfurt.my-netdata.io/api/v1/alarms`
 
 How we use them:
