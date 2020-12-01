@@ -185,6 +185,7 @@ function k8s_get_kubepod_name() {
 
     if [ -z "$kube_system_ns" ]; then
       url="https://$host/api/v1/namespaces/kube-system"
+      # FIX: check HTTP response code
       if ! kube_system_ns=$(curl -sSk -H "$header" "$url" 2>&1); then
         warning "${fn}: error on curl '${url}': ${kube_system_ns}."
       else
@@ -194,6 +195,7 @@ function k8s_get_kubepod_name() {
 
     url="https://$host/api/v1/pods"
     [ -n "$MY_NODE_NAME" ] && url+="?fieldSelector=spec.nodeName==$MY_NODE_NAME"
+    # FIX: check HTTP response code
     if ! pods=$(curl -sSk -H "$header" "$url" 2>&1); then
       warning "${fn}: error on curl '${url}': ${pods}."
       return 1
@@ -249,7 +251,7 @@ function k8s_get_kubepod_name() {
   if [ -n "$cntr_id" ]; then
     if labels=$(grep "$cntr_id" <<< "$containers" 2> /dev/null); then
       labels+=',kind="container"'
-      [ -n "$kube_system_uid" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
       name="cntr"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
@@ -260,7 +262,7 @@ function k8s_get_kubepod_name() {
     if labels=$(grep "$pod_uid" -m 1 <<< "$containers" 2> /dev/null); then
       labels="${labels%%,container_*}"
       labels+=',kind="pod"'
-      [ -n "$kube_system_uid" ] && labels+=",cluster_id=\"$kube_system_uid\""
+      [ -n "$kube_system_uid" ] && [ "$kube_system_uid" != "null" ] && labels+=",cluster_id=\"$kube_system_uid\""
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
