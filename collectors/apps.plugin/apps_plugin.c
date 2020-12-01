@@ -2193,7 +2193,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds[fdid].cache_iterations_counter = p->fds[fdid].cache_iterations_reset;
         }
     }
-    
+
     closedir(fds);
 #endif
     cleanup_negative_pid_fds(p);
@@ -3203,7 +3203,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&me_last, &me, sizeof(struct rusage));
     }
     
-    long double usedfdpercentage = (long double) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
+    unsigned long long usedfdpercentage = (unsigned long long) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
@@ -3272,7 +3272,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         "SET fds = %d\n"
         "SET targets = %zu\n"
         "SET new_pids = %zu\n"
-        "VARIABLE fdperc = %LG\n"
         "END\n"
         , dt
         , cpuuser
@@ -3324,8 +3323,9 @@ void send_resource_usage_to_netdata(usec_t dt) {
     
     fprintf(stdout,
         "BEGIN apps.files %llu\n"
-        "VARIABLE fdperc = %LG\n"
+        "VARIABLE fdperc = %llu\n"
         "END\n"
+        , dt
         , usedfdpercentage
         );
 }
