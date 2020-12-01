@@ -305,7 +305,7 @@ class Service(SimpleService):
                 self.df_allmetrics[self.df_allmetrics.columns[self.df_allmetrics.columns.str.startswith(f'{model}|')]].values,
                 model=model)[-1,:].reshape(1, -1))
             try:
-                data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 100
+                data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 10000
                 data_anomaly[model_display_name + '_anomaly'] = self.models[model].predict(X_model)[-1]
             except Exception as e:
                 #self.info(e)
