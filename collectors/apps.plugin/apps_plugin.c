@@ -2194,11 +2194,6 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         }
     }
     
-    currentfds = p->fds_size;
-    if (currentfds >= currentmaxfds){
-        currentmaxfds = currentfds;
-    }
-    
     closedir(fds);
 #endif
     cleanup_negative_pid_fds(p);
@@ -3013,6 +3008,12 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
+
+        currentfds = p->fds_size;
+        if (currentfds >= currentmaxfds){
+        currentmaxfds = currentfds;
+        }
+
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
@@ -3223,7 +3224,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "DIMENSION fds '' absolute 1 1\n"
                 "DIMENSION targets '' absolute 1 1\n"
                 "DIMENSION new_pids 'new pids' incremental 1 1\n"
-                "VARIABLE fdperc = usedfdpercentage '' absolute 1 1\n"
                 , update_every
         );
 
@@ -3249,6 +3249,11 @@ void send_resource_usage_to_netdata(usec_t dt) {
                     , update_every
                     , RATES_DETAIL
             );
+        fprintf(stdout,
+                "CHART apps.files '' 'Apps Open Files' 'open files' disk apps.files stacked 140004 %1$d\n"
+                "VARIABLE fdperc = usedfdpercentage '' absolute 1 1\n"
+                , update_every
+        );
 
     }
 
@@ -3282,7 +3287,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , all_files_len
         , apps_groups_targets_count
         , targets_assignment_counter
-        , usedfdpercentage
         );
 
     fprintf(stdout,
@@ -3317,6 +3321,13 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
+    
+    fprintf(stdout,
+        "BEGIN apps.files %llu\n"
+        "VARIABLE fdperc = %LG\n"
+        "END\n"
+        , usedfdpercentage
+        );
 }
 
 static void normalize_utilization(struct target *root) {
