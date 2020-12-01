@@ -2,8 +2,14 @@
 
 #include "json_wrapper.h"
 
-void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value, RRDDIM *temp_rd, char *chart_label_key) {
-    rrdset_check_rdlock(r->st);
+void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
+                             struct context_param *context_param_list, char *chart_label_key) {
+{
+
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+
+    if (context_param_list && !context_param_list->archive_mode)
+        rrdset_check_rdlock(r->st);
 
     long rows = rrdr_rows(r);
     long c, i;
@@ -39,8 +45,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, temp_rd?r->st->context:r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t)rrdset_first_entry_t_nolock(r->st)
-                   , kq, kq, (uint32_t)rrdset_last_entry_t_nolock(r->st)
+                   , kq, kq, context_param_list ? (uint32_t) context_param_list->first_entry_t : (uint32_t)rrdset_first_entry_t(r->st)
+                   , kq, kq, context_param_list ? (uint32_t) context_param_list->last_entry_t : (uint32_t)rrdset_last_entry_t(r->st)
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
