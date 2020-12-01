@@ -41,7 +41,7 @@ typedef enum ebpf_socket_idx {
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
-#define NETDATA_SOCKET_GROUP "Network Viewer"
+#define NETDATA_SOCKET_GROUP "Socket"
 #define NETDATA_NETWORK_CONNECTIONS_GROUP "Network connections"
 
 // Global chart name
