@@ -1060,7 +1060,8 @@ static RRDR *rrd2rrdr_fixedstep(
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
 
-    rrdset_check_rdlock(st);
+    if (context_param_list && !context_param_list->archive_mode)
+        rrdset_check_rdlock(st);
 
     if(dimensions)
         rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
@@ -1436,7 +1437,8 @@ static RRDR *rrd2rrdr_variablestep(
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
 
-    rrdset_check_rdlock(st);
+    if (context_param_list && !context_param_list->archive_mode)
+        rrdset_check_rdlock(st);
 
     if(dimensions)
         rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
