@@ -1073,7 +1073,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         count++;
     }
-    rrd_unlock();
 
     buffer_strcat(wb, "\n\t],\n\t\"archived_hosts\": [\n");
     count = 0;
@@ -1089,6 +1088,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         count++;
     }
+    rrd_unlock();
 
     sql_archived_database_hosts(wb, count);
 
