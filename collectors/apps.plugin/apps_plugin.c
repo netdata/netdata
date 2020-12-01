@@ -2193,7 +2193,6 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds[fdid].cache_iterations_counter = p->fds[fdid].cache_iterations_reset;
         }
     }
-    
     closedir(fds);
 #endif
     cleanup_negative_pid_fds(p);
