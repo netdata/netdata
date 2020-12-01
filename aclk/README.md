@@ -31,9 +31,9 @@ We do however store a limited number of *metadata* to be able to offer the stunn
 The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example):
 - The email address you used to sign up/or sign in
 - For each node claimed to your Spaces in Netdata Cloud:
- - Node Name
+ - Hostname (as it appears in Netdata Cloud)
  - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
- - The chart metadata shown in `/api/v1/charts`. E.g. `https://frankfurt.my-netdata.io/api/v1/charts`
+ - The chart metadata shown in `/api/v1/charts`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
  - Alarm configurations shown in `/api/v1/alarms?all`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms?all](https://frankfurt.my-netdata.io/api/v1/alarms?all).
  - Active alarms shown in `/api/v1/alarms`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms](https://frankfurt.my-netdata.io/api/v1/alarms).
 
