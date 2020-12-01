@@ -108,6 +108,7 @@ static int try_insert_into_xt_cache(struct rrdengine_worker_config* wc, struct e
         xt_cache_elem = &xt_cache->extent_array[idx];
     }
     xt_cache_elem->extent = extent;
+    xt_cache_elem->fileno = extent->datafile->fileno;
     xt_cache_elem->inflight_io_descr = NULL;
     xt_cache_replaceQ_insert(wc, xt_cache_elem);
     modify_bit(&xt_cache->allocation_bitmap, idx, 1);
@@ -127,7 +128,8 @@ static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct ext
 
     for (i = 0 ; i < MAX_CACHED_EXTENTS ; ++i) {
         xt_cache_elem = &xt_cache->extent_array[i];
-        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent) {
+        if (check_bit(xt_cache->allocation_bitmap, i) && xt_cache_elem->extent == extent &&
+            xt_cache_elem->fileno == extent->datafile->fileno) {
             *idx = i;
             return 0;
         }
@@ -135,6 +137,7 @@ static uint8_t lookup_in_xt_cache(struct rrdengine_worker_config* wc, struct ext
     return 1;
 }
 
+#if 0 /* disabled code */
 static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned idx)
 {
     struct extent_cache *xt_cache = &wc->xt_cache;
@@ -146,6 +149,7 @@ static void delete_from_xt_cache(struct rrdengine_worker_config* wc, unsigned id
     modify_bit(&wc->xt_cache.allocation_bitmap, idx, 0); /* invalidate it */
     modify_bit(&wc->xt_cache.inflight_bitmap, idx, 0); /* not in-flight anymore */
 }
+#endif
 
 void enqueue_inflight_read_to_xt_cache(struct rrdengine_worker_config* wc, unsigned idx,
                                        struct extent_io_descriptor *xt_io_descr)
@@ -274,13 +278,12 @@ after_crc_check:
         /* care, we don't hold the descriptor mutex */
     }
     {
-        uint8_t xt_is_cached = 0, xt_is_inflight = 0;
+        uint8_t xt_is_cached = 0;
         unsigned xt_idx;
         struct extent_info *extent = xt_io_descr->descr_array[0]->extent;
 
         xt_is_cached = !lookup_in_xt_cache(wc, extent, &xt_idx);
-        xt_is_inflight = check_bit(wc->xt_cache.inflight_bitmap, xt_idx);
-        if (xt_is_cached && xt_is_inflight) {
+        if (xt_is_cached && check_bit(wc->xt_cache.inflight_bitmap, xt_idx)) {
             struct extent_cache *xt_cache = &wc->xt_cache;
             struct extent_cache_element *xt_cache_elem = &xt_cache->extent_array[xt_idx];
             struct extent_io_descriptor *curr, *next;

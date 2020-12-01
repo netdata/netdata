@@ -101,7 +101,8 @@ struct generic_io_descriptor {
 };
 
 struct extent_cache_element {
-    struct extent_info *extent;
+    struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
+    unsigned fileno;
     struct extent_cache_element *prev; /* LRU */
     struct extent_cache_element *next; /* LRU */
     struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
