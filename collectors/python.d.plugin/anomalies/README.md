@@ -65,26 +65,27 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```yaml
+# ----------------------------------------------------------------------
+# JOBS (data collection sources)
 
-# Job to pull system overview data from local Netdata node.
+# Pull data from local Netdata node.
 local:
-    
-    # Job name.
     name: 'local'
+
     # Host to pull data from.
     host: '127.0.0.1:19999'
 
     # Username and Password for Netdata if using basic auth.
-    # username: 'username'
-    # password: 'password'
+    # username: '???'
+    # password: '???'
 
-    # Use http or https to pull data.
+    # Use http or https to pull data
     protocol: 'http'
 
     # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
-    charts_in_scope: 'system\..*'
+    charts_regex: 'system\..*'
 
-    # Charts to exclude, useful if you would like to exclude some charts from charts_in_scope. 
+    # Charts to exclude, useful if you would like to exclude some specific charts. 
     # Note: should be a ',' separated string like 'chart.name,chart.name'.
     charts_to_exclude: 'system.uptime,system.entropy'
 
@@ -95,16 +96,16 @@ local:
     # Max number of observations to train on, to help cap compute cost of training model if you set a very large train_n_secs.
     train_max_n: 100000
 
-    # How often to re-train the model (assuming update_every=2 then train_every_n=900 represents (re)training every 30 minutes).
+    # How often to re-train the model (assuming update_every=1 then train_every_n=1800 represents (re)training every 30 minutes).
     # Note: If you want to turn off re-training set train_every_n=0 and after initial training the models will not be retrained.
-    train_every_n: 900
+    train_every_n: 1800
 
     # The length of the window of data to train on (14400 = last 4 hours).
     train_n_secs: 14400
 
     # How many prediction steps after a train event to just use previous prediction value for. 
     # Used to reduce possibility of the training step itself appearing as an anomaly on the charts.
-    train_no_prediction_n: 10    
+    train_no_prediction_n: 10
 
     # If you would like to train the model for the first time on a specific window then you can define it using the below two variables.
     # Start of training data for initial model.
@@ -123,8 +124,9 @@ local:
     smooth_n: 3
 
     # How many differences to take in preprocessing your data. 
+    # More info on differencing here: https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing
     # diffs_n=0 would mean training models on the raw values of each dimension.
-    # diffs_n=1 means everything is done in terms of differences.
+    # diffs_n=1 means everything is done in terms of differences. 
     diffs_n: 1
 
     # What is the typical proportion of anomalies in your data on average? 
@@ -134,20 +136,20 @@ local:
 
     # Set to true to include an "average_prob" dimension on anomalies probability chart which is 
     # just the average of all anomaly probabilities at each time step
-    include_average_prob: true    
+    include_average_prob: true
 
     # Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
-    # For example below example creates two custom models, one to run anomaly detection on the netdata user 
-    # and one on the apps metrics for python.d.plugin.
+    # For example below example creates two custom models, one to run anomaly detection user and system cpu for our demo servers
+    # and one on the cpu and mem apps metrics for the python.d.plugin.
     # custom_models:
-    #  - name: 'user_netdata'
-    #    dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
-    #  - name: 'apps_python_d_plugin'
-    #    dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
+    #   - name: 'demos_cpu'
+    #     dimensions: 'london.my-netdata.io::system.cpu|user,london.my-netdata.io::system.cpu|system,newyork.my-netdata.io::system.cpu|user,newyork.my-netdata.io::system.cpu|system'
+    #   - name: 'apps_python_d_plugin'
+    #     dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin'
 
     # Set to true to normalize, using min-max standardization, features used for the custom models. 
-    # Useful if your custom models contain dimensions on very different scales. 
-    # Usually best to leave as false.
+    # Useful if your custom models contain dimensions on very different scales an model you use does 
+    # not internally do its own normalization. Usually best to leave as false.
     # custom_models_normalize: false
 ```
 
@@ -161,16 +163,23 @@ To define a custom model you would include configuation like below in `anomalies
 
 ```yaml
 custom_models:
+   # a model for anomaly detection on the netdata user in terms of cpu, mem, threads, processes and sockets.
  - name: 'user_netdata'
    dimensions: 'users.cpu|netdata,users.mem|netdata,users.threads|netdata,users.processes|netdata,users.sockets|netdata'
+   # a model for anomaly detection on the netdata python.d.plugin app in terms of cpu, mem, threads, processes and sockets.
  - name: 'apps_python_d_plugin'
    dimensions: 'apps.cpu|python.d.plugin,apps.mem|python.d.plugin,apps.threads|python.d.plugin,apps.processes|python.d.plugin,apps.sockets|python.d.plugin'
+
 custom_models_normalize: false
 ```
 
 ## Troubleshooting
 
-To see any relevant log messages you can use a command like `grep 'anomalies' /var/log/netdata/error.log`.
+To see any relevant log messages you can use a command like below.
+
+```bash
+`grep 'anomalies' /var/log/netdata/error.log`
+```
 
 If you would like to log in as `netdata` user and run the collector in debug mode to see more detail.
 
@@ -183,7 +192,9 @@ sudo su -s /bin/bash netdata
 
 ## Deepdive turorial
 
-If you would like to go deeper on what exactly the anomalies collector is doing under the hood then check out this [deepdive tutorial](https://github.com/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where you can play around with some data from our demo servers (or your own if its accessible to you) and work through the calculations step by step. 
+If you would like to go deeper on what exactly the anomalies collector is doing under the hood then check out this [deepdive tutorial](https://github.com/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) in our community repo where you can play around with some data from our demo servers (or your own if its accessible to you) and work through the calculations step by step.
+
+(Note: as its a Jupyter Notebook it might render a little prettier on [nbviewer](https://nbviewer.jupyter.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb))
 
 ## Notes
 
@@ -191,15 +202,16 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - Python 3 is also required for the underlying ML libraries of [numba](https://pypi.org/project/numba/), [scikit-learn](https://pypi.org/project/scikit-learn/), and [PyOD](https://pypi.org/project/pyod/).
 - It may take a few hours or so (depending on your choice of `train_secs_n`) for the collector to 'settle' into it's typical behaviour in terms of the trained models and probabilities you will see in the normal running of your node.
 - As this collector does most of the work in Python itself, with [PyOD](https://pyod.readthedocs.io/en/latest/) leveraging [numba](https://numba.pydata.org/) under the hood, you may want to try it out first on a test or development system to get a sense of its performance characteristics on a node similar to where you would like to use it.
-- `lags_n`, `smooth_n`, and `diffs_n` together define the preprocessing done to the raw data before models are trained and before each prediction. This essentially creates a [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)#:~:text=In%20pattern%20recognition%20and%20machine,features%20that%20represent%20some%20object.&text=Feature%20vectors%20are%20often%20combined,score%20for%20making%20a%20prediction.) for each chart model (or each custom model). The default settings for these parameters aim to create a rolling matrix of recent smoothed [differenced](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) values for each chart. The aim of the model then is to score how unusual this 'matrix' of features is for each chart based on what it has learned as 'normal' from the training data. So as opposed to just looking at the single most recent value of a dimension and considering how strange it is, this approach looks at a recent smoothed window of all dimensions for a chart (or dimensions in a custom model) and asks how unusual the data as a whole looks. This should be more flexibile in capturing a wider range of [anomaly types](https://andrewm4894.com/2020/10/19/different-types-of-time-series-anomalies/) and be somewhat more robust to temporary 'spikes' in the data that tend to always be happening somewhere in your metrics but often are not the most important type of anomaly.
-- You can see how long model training is taking by looking in the logs for the collector `grep 'anomalies' /var/log/netdata/error.log` and you should see a line like `2020-10-19 12:03:34: python.d INFO: anomalies[anomalies] : training complete in 9.17 seconds (runs_counter=900, model=pca, train_n_secs=14400, models=30, n_fit_success=30, n_fit_fails=0).`. 
-  -   This also gives counts of the number of models, if any, that failed to fit and so had to default back to the DefaultModel (which is currently [HBOS](https://pyod.readthedocs.io/en/latest/_modules/pyod/models/hbos.html)).
+- `lags_n`, `smooth_n`, and `diffs_n` together define the preprocessing done to the raw data before models are trained and before each prediction. This essentially creates a [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)#:~:text=In%20pattern%20recognition%20and%20machine,features%20that%20represent%20some%20object.&text=Feature%20vectors%20are%20often%20combined,score%20for%20making%20a%20prediction.) for each chart model (or each custom model). The default settings for these parameters aim to create a rolling matrix of recent smoothed [differenced](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) values for each chart. The aim of the model then is to score how unusual this 'matrix' of features is for each chart based on what it has learned as 'normal' from the training data. So as opposed to just looking at the single most recent value of a dimension and considering how strange it is, this approach looks at a recent smoothed window of all dimensions for a chart (or dimensions in a custom model) and asks how unusual the data as a whole looks. This should be more flexibile in capturing a wider range of [anomaly types](https://andrewm4894.com/2020/10/19/different-types-of-time-series-anomalies/) and be somewhat more robust to temporary 'spikes' in the data that tend to always be happening somewhere in your metrics but often are not the most important type of anomaly (this is all covered in a lot more detail in the [deepdive tutorial](https://nbviewer.jupyter.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb)).
+- You can see how long model training is taking by looking in the logs for the collector `grep 'anomalies' /var/log/netdata/error.log | grep 'training'` and you should see lines like `2020-12-01 22:02:14: python.d INFO: anomalies[local] : training complete in 2.81 seconds (runs_counter=2700, model=pca, train_n_secs=14400, models=26, n_fit_success=26, n_fit_fails=0, after=1606845731, before=1606860131).`. 
+  - This also gives counts of the number of models, if any, that failed to fit and so had to default back to the DefaultModel (which is currently [HBOS](https://pyod.readthedocs.io/en/latest/_modules/pyod/models/hbos.html)).
+  - `after` and `before` here refer to the start and end of the training data used to train the models.
 - On a development n1-standard-2 (2 vCPUs, 7.5 GB memory) vm running Ubuntu 18.04 LTS and not doing any work some of the typical performance characteristics we saw from running this collector (with defaults) were:
-  - A runtime (`netdata.runtime_anomalies`) of ~60-70ms when doing scoring and ~10 seconds when training or retraining the models. This will lead to a gap of a couple of seconds in the `anomalies` charts during a training step.
-  - Typically ~3%-3.5% cpu usage from scoring, jumping to ~50% for a couple of seconds during model training.
-  - About ~150mb of ram (`apps.mem`) being continually used by the `python.d.plugin`, peaking around ~270mb for a few seconds during training using default settings.
+  - A runtime (`netdata.runtime_anomalies`) of ~80ms when doing scoring and ~3 seconds when training or retraining the models.
+  - Typically ~3%-3.5% additional cpu usage from scoring, jumping to ~60% for a couple of seconds during model training.
+  - About ~150mb of ram (`apps.mem`) being continually used by the `python.d.plugin`.
 - If you activate this collector on a fresh node, it might take a little while to build up enough data to calculate a realistic and useful model.
-- Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relativley high `update_every` maybe 10,15 or 30 in `anomalies.conf`.
+- Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relativley high `update_every` maybe 10, 15 or 30 in `anomalies.conf`.
 - Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisey model if you set `train_n_secs` to be too small for how your node tends to behave.
 
 ## Useful links and further reading

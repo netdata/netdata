@@ -120,7 +120,7 @@ class Service(SimpleService):
         self.train_max_n = self.configuration.get('train_max_n', 100000)
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)
         self.offset_n_secs = self.configuration.get('offset_n_secs', 0)
-        self.train_every_n = self.configuration.get('train_every_n', 900)
+        self.train_every_n = self.configuration.get('train_every_n', 1800)
         self.train_no_prediction_n = self.configuration.get('train_no_prediction_n', 10)
         self.initial_train_data_after = self.configuration.get('initial_train_data_after', 0)
         self.initial_train_data_before = self.configuration.get('initial_train_data_before', 0)
