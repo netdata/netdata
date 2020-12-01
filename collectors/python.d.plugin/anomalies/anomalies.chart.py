@@ -73,6 +73,7 @@ class Service(SimpleService):
         self.data_latest = {}
         self.expected_cols = []
         self.last_train_at = 0
+        self.include_average_prob = bool(self.configuration.get('include_average_prob', True))
 
     def charts_init(self):
         """Do some initialisation of charts in scope related variables.
@@ -336,6 +337,8 @@ class Service(SimpleService):
             data = self.data_latest
         else:
             data_probability, data_anomaly = self.predict()
+            if self.include_average_prob:
+                data_probability['average_prob'] = np.mean(list(data_probability.values()))
             data = {**data_probability, **data_anomaly}
             self.validate_charts('probability', data_probability, divisor=100)
             self.validate_charts('anomaly', data_anomaly)
