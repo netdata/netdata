@@ -140,7 +140,7 @@ We do however store a limited number of *metadata* to be able to offer the stunn
 
 ## Metadata
 
-The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example) :
+The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example):
 - User data:
   - user email
 - For each Netdata Agent node that is connected to Netdata Cloud:
