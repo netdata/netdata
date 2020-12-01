@@ -308,7 +308,7 @@ class Service(SimpleService):
             try:
                 data_probability[model_display_name + '_prob'] = np.nan_to_num(self.models[model].predict_proba(X_model)[-1][1]) * 10000
                 data_anomaly[model_display_name + '_anomaly'] = self.models[model].predict(X_model)[-1]
-            except Exception as e:
+            except Exception:
                 #self.info(e)
                 if model_display_name + '_prob' in self.data_latest:
                     #self.info(f'prediction failed for {model} at run_counter {self.runs_counter}, using last prediction instead.')
@@ -331,7 +331,7 @@ class Service(SimpleService):
         # retrain all models as per schedule from config
         elif self.train_every_n > 0 and self.runs_counter % self.train_every_n == 0:
             self.train()
-        
+
         # roll forward previous predictions around a training step to avoid the possibility of having the training itself trigger an anomaly
         if (self.runs_counter - self.last_train_at) <= self.train_no_prediction_n:
             data = self.data_latest
