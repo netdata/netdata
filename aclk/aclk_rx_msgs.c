@@ -15,18 +15,55 @@ static inline int aclk_extract_v2_data(char *payload, char **data)
     return 0;
 }
 
-static inline int aclk_v2_payload_get_query(const char *payload, struct aclk_request *req)
+#define ACLK_GET_REQ "GET "
+#define ACLK_CHILD_REQ "/host/"
+#define ACLK_CLOUD_REQ_V2_PREFIX "/api/v1/"
+#define STRNCMP_CONSTANT_PREFIX(str, const_pref) strncmp(str, const_pref, strlen(const_pref))
+static inline int aclk_v2_payload_get_query(struct aclk_cloud_req_v2 *cloud_req, struct aclk_request *req)
 {
-    const char *start, *end;
+    const char *start, *end, *ptr;
+    char uuid_str[UUID_STR_LEN];
+    uuid_t uuid;
 
-    if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
-        errno = 0;
+    errno = 0;
+
+    if(STRNCMP_CONSTANT_PREFIX(cloud_req->data, ACLK_GET_REQ)) {
+        error("Only accepting GET HTTP requests from CLOUD");
+        return 1;
+    }
+    start = ptr = cloud_req->data + strlen(ACLK_GET_REQ);
+
+    if(!STRNCMP_CONSTANT_PREFIX(ptr, ACLK_CHILD_REQ)) {
+        ptr += strlen(ACLK_CHILD_REQ);
+        if(strlen(ptr) < UUID_STR_LEN) {
+            error("the child id in URL too short \"%s\"", start);
+            return 1;
+        }
+
+        strncpyz(uuid_str, ptr, UUID_STR_LEN - 1);
+
+        for(int i = 0; i < UUID_STR_LEN && uuid_str[i]; i++)
+            uuid_str[i] = tolower(uuid_str[i]);
+
+        if(ptr[0] && uuid_parse(uuid_str, uuid)) {
+            error("Got Child query (/host/XXX/...) host id \"%s\" doesn't look like valid GUID", uuid_str);
+            return 1;
+        }
+        ptr += UUID_STR_LEN - 1;
+
+        cloud_req->host = rrdhost_find_by_guid(uuid_str, 0);
+        if(!cloud_req->host) {
+            error("Cannot find host with GUID \"%s\"", uuid_str);
+            return 1;
+        }
+    }
+
+    if(STRNCMP_CONSTANT_PREFIX(ptr, ACLK_CLOUD_REQ_V2_PREFIX)) {
         error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
         return 1;
     }
-    start = payload + 4;
 
-    if(!(end = strstr(payload, " HTTP/1.1\x0D\x0A"))) {
+    if(!(end = strstr(ptr, " HTTP/1.1\x0D\x0A"))) {
         errno = 0;
         error("Doesn't look like HTTP GET request.");
         return 1;
@@ -88,6 +125,7 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
 {
     HTTP_CHECK_AGENT_INITIALIZED();
 
+    struct aclk_cloud_req_v2 *cloud_req;
     char *data;
 
     errno = 0;
@@ -104,32 +142,38 @@ static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, cha
         return 1;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(data, cloud_to_agent))) {
+    cloud_req = mallocz(sizeof(struct aclk_cloud_req_v2));
+    cloud_req->data = data;
+    cloud_req->host = localhost;
+
+    if (unlikely(aclk_v2_payload_get_query(cloud_req, cloud_to_agent))) {
         error("Could not extract payload from query");
-        freez(data);
-        return 1;
+        goto cleanup;
     }
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
         error("Missing callback_topic");
-        freez(data);
-        return 1;
+        goto cleanup;
     }
 
     if (unlikely(!cloud_to_agent->msg_id)) {
         error("Missing msg_id");
-        freez(data);
-        return 1;
+        goto cleanup;
     }
 
     // aclk_queue_query takes ownership of data pointer
     if (unlikely(aclk_queue_query(
-            cloud_to_agent->callback_topic, data, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0,
-            ACLK_CMD_CLOUD_QUERY_2)))
-        debug(D_ACLK, "ACLK failed to queue incoming \"http\" message");
+            cloud_to_agent->callback_topic, cloud_req, cloud_to_agent->msg_id, cloud_to_agent->payload, 0, 0,
+            ACLK_CMD_CLOUD_QUERY_2))) {
+        error("ACLK failed to queue incoming \"http\" v2 message");
+        goto cleanup;
+    }
 
-    UNUSED(cloud_to_agent);
     return 0;
+cleanup:
+    freez(cloud_req->data);
+    freez(cloud_req);
+    return 1;
 }
 
 // This handles `version` message from cloud used to negotiate
