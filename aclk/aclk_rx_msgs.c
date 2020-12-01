@@ -18,7 +18,7 @@ static inline int aclk_extract_v2_data(char *payload, char **data)
 #define ACLK_GET_REQ "GET "
 #define ACLK_CHILD_REQ "/host/"
 #define ACLK_CLOUD_REQ_V2_PREFIX "/api/v1/"
-#define STRNCMP_CONST(str, const) strncmp(str, const, strlen(const))
+#define STRNCMP_CONSTANT_PREFIX(str, const_pref) strncmp(str, const_pref, strlen(const_pref))
 static inline int aclk_v2_payload_get_query(struct aclk_cloud_req_v2 *cloud_req, struct aclk_request *req)
 {
     const char *start, *end, *ptr;
@@ -27,13 +27,13 @@ static inline int aclk_v2_payload_get_query(struct aclk_cloud_req_v2 *cloud_req,
 
     errno = 0;
 
-    if(STRNCMP_CONST(cloud_req->data, ACLK_GET_REQ)) {
+    if(STRNCMP_CONSTANT_PREFIX(cloud_req->data, ACLK_GET_REQ)) {
         error("Only accepting GET HTTP requests from CLOUD");
         return 1;
     }
     start = ptr = cloud_req->data + strlen(ACLK_GET_REQ);
 
-    if(!STRNCMP_CONST(ptr, ACLK_CHILD_REQ)) {
+    if(!STRNCMP_CONSTANT_PREFIX(ptr, ACLK_CHILD_REQ)) {
         ptr += strlen(ACLK_CHILD_REQ);
         if(strlen(ptr) < UUID_STR_LEN) {
             error("the child id in URL too short \"%s\"", start);
@@ -58,7 +58,7 @@ static inline int aclk_v2_payload_get_query(struct aclk_cloud_req_v2 *cloud_req,
         }
     }
 
-    if(strncmp(ptr, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
+    if(STRNCMP_CONSTANT_PREFIX(ptr, ACLK_CLOUD_REQ_V2_PREFIX)) {
         error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
         return 1;
     }
