@@ -147,7 +147,7 @@ The information we store in Netdata Cloud is the following (using the publicly a
  - Information shown in `/api/v1/info`. For example: [https://frankfurt.my-netdata.io/api/v1/info](https://frankfurt.my-netdata.io/api/v1/info).
  - The chart metadata shown in `/api/v1/charts`. E.g. `https://frankfurt.my-netdata.io/api/v1/charts`
  - Alarm configurations shown in `/api/v1/alarms?all`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms?all](https://frankfurt.my-netdata.io/api/v1/alarms?all).
- - Active alarms shown in `/api/v1/alarms`. E.g `https://frankfurt.my-netdata.io/api/v1/alarms`
+ - Active alarms shown in `/api/v1/alarms`. For example: [https://frankfurt.my-netdata.io/api/v1/alarms](https://frankfurt.my-netdata.io/api/v1/alarms).
 
 How we use them:
 - The data are stored in our production database on Google Cloud and some of it is also used in BigQuery, our data lake, for analytics purposes. These analytics are crucial for our product development process.
