@@ -1707,7 +1707,7 @@ static void read_collector_values(int *disable_apps)
     value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
                                     NULL);
     if (!value)
-        value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connection",
+        value = appconfig_get(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                               "no");
     ebpf_modules[1].optional = (!value || !strcasecmp(value, "no"))?0:1;
 
