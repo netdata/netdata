@@ -1146,7 +1146,8 @@ void add_migrated_file(char *path, uint64_t file_size)
 }
 
 
-#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name from chart c, dimension d, host h " \
+#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every from chart c, " \
+    "dimension d, host h " \
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.context = @context " \
     "order by c.type||c.id desc;"
 
@@ -1201,7 +1202,7 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
             snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", (char *) sqlite3_column_text(res, 4), (char *) sqlite3_column_text(res, 3));
             st->name = strdupz(n);
 //            st->context = strdupz(context);
-            st->update_every = 1;
+            st->update_every = sqlite3_column_int(res, 6);
 //            if((char *) sqlite3_column_text(res, 5) && *(char *) sqlite3_column_text(res, 5) && rrdset_set_name(st, (char *) sqlite3_column_text(res, 5)))
 //                ;
 //            else
