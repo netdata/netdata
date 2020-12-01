@@ -141,8 +141,7 @@ We do however store a limited number of *metadata* to be able to offer the stunn
 ## Metadata
 
 The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example):
-- User data:
-  - user email
+- The email address you used to sign up/or sign in
 - For each node claimed to your Spaces in Netdata Cloud:
  - Node Name
  - The node information shown in `/api/v1/info`. E.g. `https://frankfurt.my-netdata.io/api/v1/info`
