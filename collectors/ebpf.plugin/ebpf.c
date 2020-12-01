@@ -1660,7 +1660,7 @@ static void read_collector_values(int *disable_apps)
     if (!enabled) {
         // Apps is a positive sentence, so we need to invert the values to disable apps.
         enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "apps", 1);
-        enabled =  (!enabled)?1:0;
+        enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
     }
     *disable_apps = (int)enabled;
 
