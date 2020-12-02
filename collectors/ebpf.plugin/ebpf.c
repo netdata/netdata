@@ -1537,12 +1537,12 @@ static void parse_network_viewer_section()
     network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
                                                                        "resolve hostnames",
-                                                                       0);
+                                                                       CONFIG_BOOLEAN_NO);
 
     network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(&collector_config,
                                                                            EBPF_NETWORK_VIEWER_SECTION,
                                                                            "resolve service names",
-                                                                           0);
+                                                                           CONFIG_BOOLEAN_NO);
 
     char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
                                 "ports", NULL);
@@ -1656,17 +1656,19 @@ static void read_collector_values(int *disable_apps)
     how_to_load(value);
 
     // This is kept to keep compatibility
-    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", 0);
+    uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
+                                             CONFIG_BOOLEAN_NO);
     if (!enabled) {
         // Apps is a positive sentence, so we need to invert the values to disable apps.
-        enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "apps", 1);
+        enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "apps",
+                                        CONFIG_BOOLEAN_YES);
         enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
     }
     *disable_apps = (int)enabled;
 
     // Read ebpf programs section
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[0].config_name,
-                                             1);
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                    ebpf_modules[0].config_name, CONFIG_BOOLEAN_YES);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
@@ -1674,9 +1676,11 @@ static void read_collector_values(int *disable_apps)
     }
 
     // This is kept to keep compatibility
-    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", 0);
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer",
+                                    CONFIG_BOOLEAN_NO);
     if (!enabled)
-        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name, 0);
+        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name,
+                                        CONFIG_BOOLEAN_NO);
 
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
@@ -1688,10 +1692,10 @@ static void read_collector_values(int *disable_apps)
 
     // This is kept to keep compatibility
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring",
-                                    0);
+                                    CONFIG_BOOLEAN_NO);
     if (!enabled)
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
-                              0);
+                                        CONFIG_BOOLEAN_NO);
     ebpf_modules[1].optional = enabled;
 
     if (!started){
