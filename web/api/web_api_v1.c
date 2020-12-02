@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v1.h"
+#include "../../database/sqlite/sqlite_functions.h"
 
 char *api_secret;
 
@@ -725,9 +726,10 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
 
     struct context_param  *context_param_list = NULL;
     if (context && !chart) {
-//        RRDSET *st1;
-//        uint32_t context_hash = simple_hash(context);
-        sql_build_context_param_list(&context_param_list, &host->host_uuid, context);
+#ifdef ENABLE_DBENGINE
+        if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            sql_build_context_param_list(&context_param_list, &host->host_uuid, context);
+#endif
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
     }
@@ -1090,8 +1092,10 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     }
     rrd_unlock();
 
-    sql_archived_database_hosts(wb, count);
-
+#ifdef ENABLE_DBENGINE
+    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        sql_archived_database_hosts(wb, count);
+#endif
     buffer_strcat(wb, "\n\t],\n");
 }
 
