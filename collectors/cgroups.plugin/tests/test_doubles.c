@@ -63,7 +63,7 @@ void rrdset_update_labels(RRDSET *st, struct label *labels)
 RRDSET *rrdset_create_custom(
     RRDHOST *host, const char *type, const char *id, const char *name, const char *family, const char *context,
     const char *title, const char *units, const char *plugin, const char *module, long priority, int update_every,
-    RRDSET_TYPE chart_type, RRD_MEMORY_MODE memory_mode, long history_entries, int is_archived, uuid_t *chart_uuid)
+    RRDSET_TYPE chart_type, RRD_MEMORY_MODE memory_mode, long history_entries)
 {
     UNUSED(host);
     UNUSED(type);
@@ -80,15 +80,13 @@ RRDSET *rrdset_create_custom(
     UNUSED(chart_type);
     UNUSED(memory_mode);
     UNUSED(history_entries);
-    UNUSED(is_archived);
-    UNUSED(chart_uuid);
 
     return NULL;
 }
 
 RRDDIM *rrddim_add_custom(
     RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor,
-    RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode, int is_archived, uuid_t *dim_uuid)
+    RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode)
 {
     UNUSED(st);
     UNUSED(id);
@@ -97,8 +95,6 @@ RRDDIM *rrddim_add_custom(
     UNUSED(divisor);
     UNUSED(algorithm);
     UNUSED(memory_mode);
-    UNUSED(is_archived);
-    UNUSED(dim_uuid);
 
     return NULL;
 }
