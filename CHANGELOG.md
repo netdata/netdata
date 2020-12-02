@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Add optional info on how to also add some default alarms as part of s… [\#10302](https://github.com/netdata/netdata/pull/10302) ([andrewm4894](https://github.com/andrewm4894))
+- Update UPDATE.md [\#10301](https://github.com/netdata/netdata/pull/10301) ([ysamouhos](https://github.com/ysamouhos))
+- HAProxy spelling correction [\#10300](https://github.com/netdata/netdata/pull/10300) ([autoalan](https://github.com/autoalan))
 - python.d: always create a runtime chart on `create` call [\#10296](https://github.com/netdata/netdata/pull/10296) ([ilyam8](https://github.com/ilyam8))
 - Fixed the data endpoint so that the context param is correctly applied to children [\#10290](https://github.com/netdata/netdata/pull/10290) ([stelfrag](https://github.com/stelfrag))
 - installer: update go.d.plugin version to v0.26.0 [\#10284](https://github.com/netdata/netdata/pull/10284) ([ilyam8](https://github.com/ilyam8))
@@ -70,15 +73,12 @@
 - Fix platform dependent printf format [\#10120](https://github.com/netdata/netdata/pull/10120) ([Saruspete](https://github.com/Saruspete))
 - Fix broken links in docs [\#10115](https://github.com/netdata/netdata/pull/10115) ([joelhans](https://github.com/joelhans))
 - Added new data query option "allow\_past" [\#10112](https://github.com/netdata/netdata/pull/10112) ([stelfrag](https://github.com/stelfrag))
-- Fixed compile error in CENTOS 6 [\#10110](https://github.com/netdata/netdata/pull/10110) ([stelfrag](https://github.com/stelfrag))
-- installer: update go.d.plugin version to v0.24.0 [\#10109](https://github.com/netdata/netdata/pull/10109) ([ilyam8](https://github.com/ilyam8))
-- Rewrite the repository's main README [\#10108](https://github.com/netdata/netdata/pull/10108) ([joelhans](https://github.com/joelhans))
 - Remove Docker example from update docs and add section to claim troubleshooting [\#10103](https://github.com/netdata/netdata/pull/10103) ([joelhans](https://github.com/joelhans))
 - ebpf memory cleanup [\#10096](https://github.com/netdata/netdata/pull/10096) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add documentation for configuring/editing hostnames of Docker-run Agents [\#10087](https://github.com/netdata/netdata/pull/10087) ([joelhans](https://github.com/joelhans))
 - Add documentation for Cloud Overview [\#10082](https://github.com/netdata/netdata/pull/10082) ([joelhans](https://github.com/joelhans))
 - Alarms collector [\#10042](https://github.com/netdata/netdata/pull/10042) ([andrewm4894](https://github.com/andrewm4894))
-- Don't check for ebpf dependencies if ebpf is disabled. [\#10034](https://github.com/netdata/netdata/pull/10034) ([KickerTom](https://github.com/KickerTom))
+- ACLK allow child query [\#10030](https://github.com/netdata/netdata/pull/10030) ([underhood](https://github.com/underhood))
 - Completely hide SSO iframe [\#10027](https://github.com/netdata/netdata/pull/10027) ([Jiab77](https://github.com/Jiab77))
 - Adds metric showing how long Query spent in Queue [\#10016](https://github.com/netdata/netdata/pull/10016) ([underhood](https://github.com/underhood))
 - allows use of system libwebsockets instead of bundled one [\#9984](https://github.com/netdata/netdata/pull/9984) ([underhood](https://github.com/underhood))
