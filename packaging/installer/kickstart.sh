@@ -413,7 +413,7 @@ if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
   fi
 fi
 
-# shellcheck disable=SC2235
+# shellcheck disable=SC2235,SC2030
 if ( [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_URL}" ] ) || ( [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ -z "${NETDATA_CLAIM_URL}" ] ); then
   run_failed "Invalid claiming options, both a claiming token and URL must be specified."
   exit 1
