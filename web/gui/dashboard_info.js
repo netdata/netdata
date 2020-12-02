@@ -571,6 +571,12 @@ netdataDashboard.menu = {
         info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
     },
 
+    'anomalies': {
+        title: 'Anomalies',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Anomaly scores relating to key system metrics. A high anomaly probability indicates strange behaviour and may trigger an anomaly prediction from the trained models. Read the <a href="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/anomalies" target="_blank">anomalies collector docs</a> for more details.'
+    },
+
     'alarms': {
         title: 'Alarms',
         icon: '<i class="fas fa-bell"></i>',
