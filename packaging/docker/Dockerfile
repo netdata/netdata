@@ -28,7 +28,7 @@ WORKDIR /opt/netdata.git
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    ./netdata-installer.sh --dont-wait --dont-start-it ${EXTRA_INSTALL_OPTS} \
-   $([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)
+   "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -105,7 +105,8 @@ RUN \
     ln -sf /dev/stderr /var/log/netdata/error.log
 
 # Install any Python wheels
-RUN pip install /wheels/*
+# hadolint ignore=DL3013
+RUN pip --no-cache-dir install /wheels/*
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
