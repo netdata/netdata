@@ -5,6 +5,7 @@ on:
   pull_request:
 env:
   run_eslint: 0
+  run_hadolint: 0
   run_shellcheck: 0
   run_yamllint: 0
 jobs:
@@ -28,6 +29,26 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           eslint_flags: '.'
+
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Check files
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*Dockerfile*' ; then
+            echo 'run_hadolint=1' >> $GITHUB_ENV
+          fi
+      - name: Run hadolint
+        if: env.run_hadolint == 1
+        uses: reviewdog/action-hadolint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
 
   shellcheck:
     name: shellcheck
