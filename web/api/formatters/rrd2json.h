@@ -66,6 +66,7 @@ extern int rrdset2anything_api_v1(
         , uint32_t options
         , time_t *latest_timestamp
         , struct context_param *context_param_list
+        , char *chart_label_key
 );
 
 extern int rrdset2value_api_v1(

@@ -1917,11 +1917,12 @@ void rrdset_finalize_labels(RRDSET *st)
     struct label *new_labels = st->state->new_labels;
     struct label_index *labels = &st->state->labels;
 
-    if (labels->head) {
+    if (!labels->head) {
         labels->head = new_labels;
     } else {
         replace_label_list(labels, new_labels);
     }
+    st->state->new_labels = NULL;
 }
 
 void rrdset_update_labels(RRDSET *st, struct label *labels)
@@ -1931,4 +1932,32 @@ void rrdset_update_labels(RRDSET *st, struct label *labels)
 
     update_label_list(&st->state->new_labels, labels);
     rrdset_finalize_labels(st);
+}
+
+int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash)
+{
+    struct label_index *labels = &st->state->labels;
+    int ret;
+
+    if (!labels->head)
+        return 0;
+
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
+    ret = label_list_contains_key(labels->head, key, key_hash);
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+
+    return ret;
+}
+
+struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash)
+{
+    struct label_index *labels = &st->state->labels;
+    struct label *ret = NULL;
+
+    if (labels->head) {
+        netdata_rwlock_rdlock(&labels->labels_rwlock);
+        ret = label_list_lookup_key(labels->head, key, key_hash);
+        netdata_rwlock_unlock(&labels->labels_rwlock);
+    }
+    return ret;
 }

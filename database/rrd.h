@@ -210,6 +210,9 @@ extern void replace_label_list(struct label_index *labels, struct label *new_lab
 extern int is_valid_label_value(char *value);
 extern int is_valid_label_key(char *key);
 extern void free_label_list(struct label *labels);
+extern struct label *label_list_lookup_key(struct label *head, char *key, uint32_t key_hash);
+extern int label_list_contains_key(struct label *head, char *key, uint32_t key_hash);
+extern int label_list_contains(struct label *head, struct label *check);
 extern struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri);
 extern void strip_last_symbol(
     char *str,
@@ -220,6 +223,8 @@ void reload_host_labels(void);
 extern void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source);
 extern void rrdset_finalize_labels(RRDSET *st);
 extern void rrdset_update_labels(RRDSET *st, struct label *labels);
+extern int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash);
+extern struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric

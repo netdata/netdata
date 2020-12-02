@@ -402,7 +402,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     , *after_str = NULL
     , *group_time_str = NULL
     , *points_str = NULL
-    , *context = NULL;
+    , *context = NULL
+    , *chart_label_key = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
@@ -422,6 +423,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         // they are not null and not empty
 
         if(!strcmp(name, "context")) context = value;
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
         else if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
             if(!dimensions) dimensions = buffer_create(100);
@@ -499,9 +501,15 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if (context && !chart) {
         RRDSET *st1;
         uint32_t context_hash = simple_hash(context);
+        uint32_t key_hash;
+
+        if (chart_label_key)
+            key_hash = simple_hash(chart_label_key);
+
         rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
-            if (st1->hash_context == context_hash && !strcmp(st1->context, context))
+            if (st1->hash_context == context_hash && !strcmp(st1->context, context) &&
+                (!chart_label_key || rrdset_contains_label_key(st1, chart_label_key, key_hash)))
                 build_context_param_list(&context_param_list, st1);
         }
         rrdhost_unlock(host);
@@ -518,8 +526,16 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     if (!st && !context_param_list) {
         if (context && !chart) {
-            buffer_strcat(w->response.data, "Context is not found: ");
-            buffer_strcat_htmlescape(w->response.data, context);
+            if (!chart_label_key) {
+                buffer_strcat(w->response.data, "Context is not found: ");
+                buffer_strcat_htmlescape(w->response.data, context);
+            } else {
+                buffer_strcat(w->response.data, "Context: ");
+                buffer_strcat_htmlescape(w->response.data, context);
+                buffer_strcat(w->response.data, " or chart label key: ");
+                buffer_strcat_htmlescape(w->response.data, chart_label_key);
+                buffer_strcat(w->response.data, " not found");
+            }
         }
         else {
             buffer_strcat(w->response.data, "Chart is not found: ");
@@ -572,7 +588,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data, context_param_list);
+                                 , options, &last_timestamp_in_data, context_param_list, chart_label_key);
 
     free_context_param_list(&context_param_list);
 

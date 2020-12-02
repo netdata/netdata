@@ -137,15 +137,25 @@ void update_label_list(struct label **labels, struct label *new_labels)
     }
 }
 
-int label_list_contains(struct label *head, struct label *check)
+struct label *label_list_lookup_key(struct label *head, char *key, uint32_t key_hash)
 {
     while (head != NULL)
     {
-        if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
-            return 1;
+        if (head->key_hash == key_hash && !strcmp(head->key, key))
+            return head;
         head = head->next;
     }
-    return 0;
+    return NULL;
+}
+
+int label_list_contains_key(struct label *head, char *key, uint32_t key_hash)
+{
+    return (label_list_lookup_key(head, key, key_hash) != NULL);
+}
+
+int label_list_contains(struct label *head, struct label *check)
+{
+    return label_list_contains_key(head, check->key, check->key_hash);
 }
 
 /* Create a list with entries from both lists.
@@ -167,3 +177,4 @@ struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
     }
     return result;
 }
+
