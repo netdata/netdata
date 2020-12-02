@@ -26,7 +26,7 @@ All the data that the user sees in the web browser when using Netdata Cloud, are
 
 We do however store a limited number of *metadata* to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud.
 
-## Metadata
+### Metadata
 
 The information we store in Netdata Cloud is the following (using the publicly available demo server `frankfurt.my-netdata.io` as an example):
 - The email address you used to sign up/or sign in
@@ -148,5 +148,4 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 Restart your Agent and [claim your node](/claim/README.md#how-to-claim-a-node).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Faclk%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
-
 
