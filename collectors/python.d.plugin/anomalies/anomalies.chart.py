@@ -79,7 +79,8 @@ class Service(SimpleService):
         """Do some initialisation of charts in scope related variables.
         """
         self.charts_regex = re.compile(self.configuration.get('charts_regex','None'))
-        self.charts_in_scope = list(filter(self.charts_regex.match, [c for c in requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json()['charts'].keys()]))
+        self.charts_available = [c for c in list(requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json().get('charts', {}).keys())]
+        self.charts_in_scope = list(filter(self.charts_regex.match, self.charts_available))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         if len(self.charts_to_exclude) > 0:
             self.charts_in_scope = [c for c in self.charts_in_scope if c not in self.charts_to_exclude]
