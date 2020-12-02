@@ -5,8 +5,13 @@
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable, RRDDIM *temp_rd) {
-    rrdset_check_rdlock(r->st);
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable, struct context_param *context_param_list)
+{
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+    int should_lock = (!context_param_list || (context_param_list && !context_param_list->archive_mode));
+
+    if (should_lock)
+        rrdset_check_rdlock(r->st);
 
     //info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
@@ -100,8 +105,6 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable, RRDDIM 
 
         buffer_strcat(wb, pre_label);
         buffer_strcat(wb, rd->name);
-//        buffer_strcat(wb, ".");
-//        buffer_strcat(wb, rd->rrdset->name);
         buffer_strcat(wb, post_label);
         i++;
     }
