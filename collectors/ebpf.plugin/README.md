@@ -221,7 +221,7 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 500 dimensions on network connections charts. If there are more possible dimensions, 
+By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
 they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
