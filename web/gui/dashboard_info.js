@@ -1142,7 +1142,7 @@ netdataDashboard.context = {
     },
 
     'apps.vfs_read_bytes': {
-        info: 'Total of bytes read with success using the functions <code>vfs_read</code>.'
+        info: 'Total of bytes successfully read using the function <code>vfs_read</code>.'
     },
 
     'apps.process_create': {
