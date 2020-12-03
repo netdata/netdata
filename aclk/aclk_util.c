@@ -54,19 +54,19 @@ static inline void generate_topic_cache(void)
     struct aclk_topic *tc = aclk_topic_cache;
     char *ptr;
     if (unlikely(!tc->topic)) {
-        netdata_mutex_lock(&localhost->claimed_id_lock);
+        rrdhost_aclk_state_lock(localhost);
         while(tc->topic_suffix) {
             tc->topic = mallocz(strlen(ACLK_TOPIC_PREFIX) + (UUID_STR_LEN - 1) + 2 /* '/' and \0 */ + strlen(tc->topic_suffix));
             ptr = tc->topic;
             strcpy(ptr, ACLK_TOPIC_PREFIX);
             ptr += strlen(ACLK_TOPIC_PREFIX);
-            strcpy(ptr, localhost->claimed_id);
+            strcpy(ptr, localhost->aclk_state.claimed_id);
             ptr += (UUID_STR_LEN - 1);
             *ptr++ = '/';
             strcpy(ptr, tc->topic_suffix);
             tc++;
         }
-        netdata_mutex_unlock(&localhost->claimed_id_lock);
+        rrdhost_aclk_state_unlock(localhost);
     }
 }
 

@@ -2,6 +2,10 @@
 #ifndef ACLK_H
 #define ACLK_H
 
+typedef struct aclk_rrdhost_state {
+    char *claimed_id; // Claimed ID if host has one otherwise NULL
+} aclk_rrdhost_state;
+
 #include "../daemon/common.h"
 
 // minimum and maximum supported version of ACLK
