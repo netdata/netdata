@@ -18,7 +18,7 @@ disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
 
-BAD_VALUE = 'N/A'
+BAD_VALUE = ('N/A', 'Unknown')
 
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
@@ -423,9 +423,7 @@ class GPU:
                     data[key] = p['used_memory']
         data['user_num'] = len(users)
 
-        return dict(
-            ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
-        )
+        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
 
 
 class Service(SimpleService):
@@ -467,7 +465,10 @@ class Service(SimpleService):
         data = dict()
         for idx, root in enumerate(parsed.findall('gpu')):
             gpu = GPU(idx, root, self.exclude_zero_memory_users)
-            data.update(gpu.data())
+            gpu_data = gpu.data()
+            # self.debug(gpu_data)
+            gpu_data = dict((k, v) for k, v in gpu_data.items() if v is not None and v not in BAD_VALUE)
+            data.update(gpu_data)
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
 
