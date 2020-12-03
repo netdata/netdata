@@ -3608,7 +3608,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
-    kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
     if(enable_file_charts) {
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
@@ -3616,6 +3615,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
                 send_SET(w->name, w->openfiles);
         }
         if (!strcmp("apps", type))
+            kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
             fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
         send_END();
 
