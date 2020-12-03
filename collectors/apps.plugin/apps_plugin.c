@@ -2999,8 +2999,9 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(w);
     reallocate_target_fds(u);
     reallocate_target_fds(g);
-
-    long double currentfds = 0;
+    
+    
+    currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
