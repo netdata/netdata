@@ -1154,7 +1154,7 @@ netdataDashboard.context = {
     },
 
     'apps.task_close': {
-        info: 'Calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
+        info: 'Calls to the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'apps.bandwidth_sent': {
