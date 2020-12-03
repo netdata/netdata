@@ -99,6 +99,21 @@ function get_lbl_val() {
   return 1
 }
 
+function add_lbl_prefix() {
+  local orig_labels prefix
+  orig_labels="${1}"
+  prefix="${2}"
+
+  IFS=, read -ra labels <<< "$orig_labels"
+
+  local new_labels
+  for l in "${labels[@]}"; do
+    new_labels+="${prefix}${l},"
+  done
+
+  echo "${new_labels:0:-1}" # trim last ','
+}
+
 # k8s_get_kubepod_name resolves */kubepods/* cgroup name.
 # pod level cgroup name format: 'pod_<namespace>_<pod_name>'
 # container level cgroup name format: 'cntr_<namespace>_<pod_name>_<container_name>'
@@ -256,6 +271,7 @@ function k8s_get_kubepod_name() {
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
       name+="_$(get_lbl_val "$labels" container_name)"
+      labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
     fi
   elif [ -n "$pod_uid" ]; then
@@ -266,6 +282,7 @@ function k8s_get_kubepod_name() {
       name="pod"
       name+="_$(get_lbl_val "$labels" namespace)"
       name+="_$(get_lbl_val "$labels" pod_name)"
+      labels=$(add_lbl_prefix "$labels" "k8s_")
       name+=" $labels"
     fi
   fi
