@@ -246,7 +246,7 @@ Click **Save** to add the chart for all your claimed nodes. Now you can see how 
 Linux kernels on multiple Linux systems. 
 
 Now that you can see these metrics in Netdata Cloud, you can [invite your
-team](https://learn.netdata.cloud/docs/cloud/collaborate/invite-your-team) and share your findings with others.
+team](https://learn.netdata.cloud/docs/cloud/manage/invite-your-team) and share your findings with others.
 
 ## What's next?
 
