@@ -1114,7 +1114,7 @@ netdataDashboard.context = {
     },
 
     'apps.file_close_error': {
-        info: 'Calls for internal function <code>__close_fd</code>, which returned error.'
+        info: 'Failed calls to the internal function <code>__close_fd</code>.'
     },
 
     'apps.file_deleted': {
