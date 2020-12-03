@@ -5,6 +5,10 @@
 #include "aclk_stats.h"
 #include "aclk_query.h"
 
+#ifndef UUID_STR_LEN
+#define UUID_STR_LEN 37
+#endif
+
 static inline int aclk_extract_v2_data(char *payload, char **data)
 {
     char* ptr = strstr(payload, ACLK_V2_PAYLOAD_SEPARATOR);
