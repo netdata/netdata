@@ -3609,7 +3609,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
     kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
-    const char *fdname = "fdperc";
     if(enable_file_charts) {
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
