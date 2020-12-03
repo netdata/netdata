@@ -3000,6 +3000,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
+    long double currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3008,16 +3009,15 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
-
-        currentfds = p->fds_size;
-        if (currentfds >= currentmaxfds){
-        currentmaxfds = currentfds;
-        }
+        currentfds++;
 
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
     }
+
+    if (currentfds >= currentmaxfds)
+        currentmaxfds = currentfds;
 }
 
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
@@ -3107,7 +3107,7 @@ static void calculate_netdata_statistics(void) {
 
     // concentrate everything on the targets
     for(p = root_of_pids; p ; p = p->next) {
-
+        
         // --------------------------------------------------------------------
         // apps_groups target
 
@@ -3203,7 +3203,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&me_last, &me, sizeof(struct rusage));
     }
     
-    unsigned long long usedfdpercentage = (unsigned long long) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
@@ -3249,12 +3248,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                     , update_every
                     , RATES_DETAIL
             );
-        fprintf(stdout,
-                "CHART apps.files '' 'Apps Open Files' 'open files' disk apps.files stacked 140004 %1$d\n"
-                "VARIABLE fdperc = usedfdpercentage '' absolute 1 1\n"
-                , update_every
-        );
-
     }
 
     fprintf(stdout,
@@ -3320,14 +3313,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
-    
-    fprintf(stdout,
-        "BEGIN apps.files %llu\n"
-        "VARIABLE fdperc = %llu\n"
-        "END\n"
-        , dt
-        , usedfdpercentage
-        );
 }
 
 static void normalize_utilization(struct target *root) {
@@ -3625,12 +3610,18 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
+
+    //unsigned long long usedfdpercentage = (unsigned long long) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
+    kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
+    const char *fdname = "fdperc";
     if(enable_file_charts) {
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
+        if (!strcmp("apps", type))
+            fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
         send_END();
 
         send_BEGIN(type, "sockets", dt);
@@ -3819,14 +3810,16 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 #endif
-
+    
     if(enable_file_charts) {
-        fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
+           fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
+        if (!strcmp("apps", type))
+            fprintf(stdout, "VARIABLE fdperc '' absolute 1 1\n");
 
         fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
                        type, title, type, update_every);
@@ -4207,7 +4200,7 @@ int main(int argc, char **argv) {
             printf("DISABLE\n");
             exit(1);
         }
-
+        currentmaxfds = 0;
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 
