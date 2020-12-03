@@ -6,8 +6,9 @@ sidebar_label: "Varnish Cache"
 
 # Varnish Cache monitoring with Netdata
 
-Provides HTTP accelerator global, backends (VBE) and disks (SMF) statistics using `varnishstat` tool.
+Provides HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics using `varnishstat` tool.
 
+Note that both, Varnish-Cache (free and open source) and Varnish-Plus (Commercial/Enterprise version), are supported.
 
 ## Requirements
 
@@ -29,16 +30,15 @@ This module produces the following charts:
 -   Backend Connections Statistics in `connections/s`
 -   Requests To The Backend in `requests/s`
 -   ESI Statistics in `problems/s`
--   Memory Usage in `MiB`
 -   Uptime in `seconds`
 
 For every backend (VBE):
 
 -   Backend Response Statistics in `kilobits/s`
 
-For every disk (SMF):
+For every storage (SMF, SMA, or MSE):
 
--   Disk Usage in `KiB` 
+-   Storage Usage in `KiB` 
 
 ## Configuration
 

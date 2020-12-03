@@ -321,6 +321,12 @@ class Service(ExecutableService):
             self.add_backend_charts(name)
 
     def get_storages(self, server_stats):
+        # Storage types:
+        #  - SMF: File Storage
+        #  - SMA: Malloc Storage
+        #  - MSE: Massive Storage Engine (Varnish-Plus only)
+        #
+        # Stats example:
         #  [('SMF.', 'ssdStorage.c_req', '47686'),
         #  ('SMF.', 'ssdStorage.c_fail', '0'),
         #  ('SMF.', 'ssdStorage.c_bytes', '668102656'),
