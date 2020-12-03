@@ -29,6 +29,7 @@ dist_healthconfig_DATA = \
     health.d/anomalies.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
+    health.d/apps_plugin.conf \
     health.d/backend.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
