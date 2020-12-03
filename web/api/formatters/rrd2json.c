@@ -13,9 +13,12 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd, int archive_mode)
         freez((char *)temp_rd->id);
         freez((char *)temp_rd->name);
         if (unlikely(archive_mode)) {
-            freez((char *) temp_rd->rrdset->name);
-            freez(temp_rd->rrdset->context);
-            freez(temp_rd->rrdset);
+            temp_rd->rrdset->counter--;
+            if (!temp_rd->rrdset->counter) {
+                freez((char *)temp_rd->rrdset->name);
+                freez(temp_rd->rrdset->context);
+                freez(temp_rd->rrdset);
+            }
         }
 #ifdef ENABLE_DBENGINE
         if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
