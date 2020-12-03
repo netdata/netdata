@@ -105,7 +105,15 @@ For this mapping Netdata provides 2 configuration options:
 
 The whole point for the additional pattern list, is to limit the number of times the script will be called. Without this pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
 
-The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the script [cgroup-name.sh](https://raw.githubusercontent.com/netdata/netdata/master/collectors/cgroups.plugin/cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
+The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the script [cgroup-name.sh](https://raw.githubusercontent.com/netdata/netdata/master/collectors/cgroups.plugin/cgroup-name.sh.in) to get its name. This script queries `docker`, `kubectl`, `podman`, or applies heuristics to find give a name for the cgroup.
+
+#### Note on Podman container names
+
+Podman's security model is a lot more restrictive than Docker's, so Netdata will not be able to detect container names out of the box unless they were started by the same user as Netdata itself.
+
+If Podman is used in "rootful" mode, it's also possible to use `podman system service` to grant Netdata access to container names. To do this, ensure `podman system service` is running and Netdata has access to `/run/podman/podman.sock` (the default permissions as specified by upstream are `0600`, with owner `root`, so you will have to adjust the configuration).
+
+[docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment should be set to the proxy's URL in this case.
 
 ### charts with zero metrics
 

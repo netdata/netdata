@@ -160,6 +160,31 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     }
 }
 
+void buffer_strcat_jsonescape(BUFFER *wb, const char *txt)
+{
+    while(*txt) {
+        switch(*txt) {
+            case '\\':
+                buffer_need_bytes(wb, 2);
+                wb->buffer[wb->len++] = '\\';
+                wb->buffer[wb->len++] = '\\';
+                break;
+            case '"':
+                buffer_need_bytes(wb, 2);
+                wb->buffer[wb->len++] = '\\';
+                wb->buffer[wb->len++] = '"';
+                break;
+            default: {
+                buffer_need_bytes(wb, 1);
+                wb->buffer[wb->len++] = *txt;
+            }
+        }
+        txt++;
+    }
+
+    buffer_overflow_check(wb);
+}
+
 void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
 {
     while(*txt) {

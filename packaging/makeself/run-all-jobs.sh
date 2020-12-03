@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+set -e
+
 LC_ALL=C
 umask 002
-
-# be nice
-renice 19 $$ >/dev/null 2>/dev/null
 
 # -----------------------------------------------------------------------------
 # prepare the environment for the jobs
@@ -14,10 +13,11 @@ renice 19 $$ >/dev/null 2>/dev/null
 export NETDATA_INSTALL_PATH="${1-/opt/netdata}"
 
 # our source directory
-export NETDATA_MAKESELF_PATH="$(dirname "${0}")"
-if [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ]
-	then
-	export NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
+NETDATA_MAKESELF_PATH="$(dirname "${0}")"
+export NETDATA_MAKESELF_PATH
+if [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ]; then
+  NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
+  export NETDATA_MAKESELF_PATH
 fi
 
 # netdata source directory
@@ -30,12 +30,12 @@ export NULL=
 
 cd "${NETDATA_MAKESELF_PATH}" || exit 1
 
+# shellcheck source=packaging/makeself/functions.sh
 . ./functions.sh "${@}" || exit 1
 
-for x in jobs/*.install.sh
-do
-	progress "running ${x}"
-	"${x}" "${NETDATA_INSTALL_PATH}"
+for x in jobs/*.install.sh; do
+  progress "running ${x}"
+  "${x}" "${NETDATA_INSTALL_PATH}"
 done
 
 echo >&2 "All jobs for static packaging done successfully."

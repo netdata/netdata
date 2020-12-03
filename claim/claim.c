@@ -12,24 +12,32 @@ static char *claiming_errors[] = {
         "Problems with claiming working directory",     // 2
         "Missing dependencies",                         // 3
         "Failure to connect to endpoint",               // 4
-        "Unknown HTTP error message",                   // 5
-        "invalid node id",                              // 6
-        "invalid node name",                            // 7
-        "invalid room id",                              // 8
-        "invalid public key",                           // 9
-        "token expired/token not found/invalid token",  // 10
-        "already claimed",                              // 11
-        "processing claiming",                          // 12
-        "Internal Server Error",                        // 13
-        "Gateway Timeout",                              // 14
-        "Service Unavailable"                           // 15
+        "The CLI didn't work",                          // 5
+        "Wrong user",                                   // 6
+        "Unknown HTTP error message",                   // 7
+        "invalid node id",                              // 8
+        "invalid node name",                            // 9
+        "invalid room id",                              // 10
+        "invalid public key",                           // 11
+        "token expired/token not found/invalid token",  // 12
+        "already claimed",                              // 13
+        "processing claiming",                          // 14
+        "Internal Server Error",                        // 15
+        "Gateway Timeout",                              // 16
+        "Service Unavailable",                          // 17
+        "Agent Unique Id Not Readable"                  // 18
 };
 
-static char *claimed_id = NULL;
-
-char *is_agent_claimed(void)
+/* Retrieve the claim id for the agent.
+ * Caller owns the string.
+*/
+char *is_agent_claimed()
 {
-    return claimed_id;
+    char *result;
+    rrdhost_aclk_state_lock(localhost);
+    result = (localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(localhost->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(localhost);
+    return result;
 }
 
 #define CLAIMING_COMMAND_LENGTH 16384
@@ -37,7 +45,7 @@ char *is_agent_claimed(void)
 
 extern struct registry registry;
 
-/* rrd_init() must have been called before this function */
+/* rrd_init() and post_conf_load() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
     if (!netdata_cloud_setting) {
@@ -51,7 +59,10 @@ void claim_agent(char *claiming_arguments)
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
 
-    char *cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    // This is guaranteed to be set early in main via post_conf_load()
+    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    if (cloud_base_url == NULL)
+        fatal("Do not move the cloud base url out of post_conf_load!!");
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
@@ -104,22 +115,80 @@ void claim_agent(char *claiming_arguments)
 #endif
 }
 
+#ifdef ENABLE_ACLK
+extern int aclk_connected, aclk_kill_link, aclk_disable_runtime;
+#endif
+
+/* Change the claimed state of the agent.
+ *
+ * This only happens when the user has explicitly requested it:
+ *   - via the cli tool by reloading the claiming state
+ *   - after spawning the claim because of a command-line argument
+ * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
+ */
 void load_claiming_state(void)
 {
-    if (claimed_id != NULL) {
+    // --------------------------------------------------------------------
+    // Check if the cloud is enabled
+#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
+    netdata_cloud_setting = 0;
+#else
+    uuid_t uuid;
+    rrdhost_aclk_state_lock(localhost);
+    if (localhost->aclk_state.claimed_id) {
+        freez(localhost->aclk_state.claimed_id);
+        localhost->aclk_state.claimed_id = NULL;
+    }
+    if (aclk_connected)
+    {
+        info("Agent was already connected to Cloud - forcing reconnection under new credentials");
+        aclk_kill_link = 1;
+    }
+    aclk_disable_runtime = 0;
+
+    // Propagate into aclk and registry. Be kind of atomic...
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/claimed_id", netdata_configured_varlib_dir);
+
+    long bytes_read;
+    char *claimed_id = read_by_filename(filename, &bytes_read);
+    if(claimed_id && uuid_parse(claimed_id, uuid)) {
+        error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
         freez(claimed_id);
         claimed_id = NULL;
     }
-
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claim.d/claimed_id", netdata_configured_user_config_dir);
-
-    long bytes_read;
-    claimed_id = read_by_filename(filename, &bytes_read);
+    localhost->aclk_state.claimed_id = claimed_id;
+    rrdhost_aclk_state_unlock(localhost);
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
 
     info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+    netdata_cloud_setting = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+#endif
+}
+
+struct config cloud_config = { .first_section = NULL,
+                               .last_section = NULL,
+                               .mutex = NETDATA_MUTEX_INITIALIZER,
+                               .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                          .rwlock = AVL_LOCK_INITIALIZER } };
+
+void load_cloud_conf(int silent)
+{
+    char *filename;
+    errno = 0;
+
+    int ret = 0;
+
+    filename = strdupz_path_subpath(netdata_configured_varlib_dir, "cloud.d/cloud.conf");
+
+    ret = appconfig_load(&cloud_config, filename, 1, NULL);
+    if(!ret && !silent) {
+        info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
+    }
+    freez(filename);
 }

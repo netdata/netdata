@@ -281,7 +281,7 @@ RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPI
 
 // ----------------------------------------------------------------------------
 
-static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims) {
+static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims, RRDDIM *temp_rd) {
     rrdset_check_rdlock(r->st);
 
     if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
@@ -300,7 +300,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
 
     RRDDIM *d;
     long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
-    for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+    for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next) {
         if(    (match_ids   && simple_pattern_matches(pattern, d->id))
                || (match_names && simple_pattern_matches(pattern, d->name))
                 ) {
@@ -332,7 +332,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
         // but they are all zero
         // enable the selected ones
         // to avoid returning an empty chart
-        for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
+        for(c = 0, d = temp_rd?temp_rd:r->st->dimensions; d ;c++, d = d->next)
             if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED))
                 r->od[c] |= RRDR_DIMENSION_NONZERO;
     }
@@ -573,6 +573,12 @@ static inline void do_dimension_fixedstep(
 #endif
         db_now = now; // this is needed to set db_now in case the next_metric implementation does not set it
         storage_number n = rd->state->query_ops.next_metric(&handle, &db_now);
+        if(unlikely(db_now > before_wanted)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+            r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
+#endif
+            break;
+        }
         for ( ; now <= db_now ; now += dt) {
             calculated_number value = NAN;
             if(likely(now >= db_now && does_storage_number_exist(n))) {
@@ -673,6 +679,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         //, size_t before_slot
         , const char *msg
         ) {
+    netdata_rwlock_rdlock(&r->st->rrdset_rwlock);
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %zu, db: %zu), "
          "before (got: %zu, want: %zu, req: %zu, db: %zu), "
@@ -694,19 +701,19 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t(r->st)
+         , (size_t)rrdset_first_entry_t_nolock(r->st)
 
          // before
          , (size_t)r->before
          , (size_t)before_wanted
          , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t(r->st)
+         , (size_t)rrdset_last_entry_t_nolock(r->st)
 
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
          , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
+         , (size_t)((rrdset_last_entry_t_nolock(r->st) - rrdset_first_entry_t_nolock(r->st)) + r->st->update_every)
 
          // slot
          /*
@@ -724,6 +731,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          // message
          , msg
     );
+    netdata_rwlock_unlock(&r->st->rrdset_rwlock);
 }
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -734,6 +742,7 @@ static int rrdr_convert_before_after_to_absolute(
         , int update_every
         , time_t first_entry_t
         , time_t last_entry_t
+        , RRDR_OPTIONS options
 ) {
     int absolute_period_requested = -1;
     long long after_requested, before_requested;
@@ -779,10 +788,12 @@ static int rrdr_convert_before_after_to_absolute(
 
     // make sure they are within our timeframe
     if(before_requested > last_entry_t)  before_requested = last_entry_t;
-    if(before_requested < first_entry_t) before_requested = first_entry_t;
+    if(before_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
+        before_requested = first_entry_t;
 
     if(after_requested > last_entry_t)  after_requested = last_entry_t;
-    if(after_requested < first_entry_t) after_requested = first_entry_t;
+    if(after_requested < first_entry_t && !(options & RRDR_OPTION_ALLOW_PAST))
+        after_requested = first_entry_t;
 
     // check if they are reversed
     if(after_requested > before_requested) {
@@ -810,6 +821,7 @@ static RRDR *rrd2rrdr_fixedstep(
         , time_t first_entry_t
         , time_t last_entry_t
         , int absolute_period_requested
+        , struct context_param *context_param_list
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
@@ -817,8 +829,10 @@ static RRDR *rrd2rrdr_fixedstep(
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
 
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+
     if(duration <= 0 || available_points <= 0)
-        return rrdr_create(st, 1);
+        return rrdr_create(st, 1, context_param_list);
 
     // check the number of wanted points in the result
     if(unlikely(points_requested < 0)) points_requested = -points_requested;
@@ -976,7 +990,7 @@ static RRDR *rrd2rrdr_fixedstep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted);
+    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1049,7 +1063,7 @@ static RRDR *rrd2rrdr_fixedstep(
     rrdset_check_rdlock(st);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions);
+        rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
 
 
     // -------------------------------------------------------------------------
@@ -1060,7 +1074,7 @@ static RRDR *rrd2rrdr_fixedstep(
 
     RRDDIM *rd;
     long c, dimensions_used = 0, dimensions_nonzero = 0;
-    for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+    for(rd = temp_rd?temp_rd:st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
 
         // if we need a percentage, we need to calculate all dimensions
         if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN))) {
@@ -1153,7 +1167,7 @@ static RRDR *rrd2rrdr_fixedstep(
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
         // all the dimensions are zero
         // mark them as NONZERO to send them all
-        for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+        for(rd = temp_rd?temp_rd:st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             r->od[c] |= RRDR_DIMENSION_NONZERO;
         }
@@ -1178,6 +1192,7 @@ static RRDR *rrd2rrdr_variablestep(
         , time_t last_entry_t
         , int absolute_period_requested
         , struct rrdeng_region_info *region_info_array
+        , struct context_param *context_param_list
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
 
@@ -1185,9 +1200,11 @@ static RRDR *rrd2rrdr_variablestep(
     time_t duration = before_requested - after_requested;
     long available_points = duration / update_every;
 
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+
     if(duration <= 0 || available_points <= 0) {
         freez(region_info_array);
-        return rrdr_create(st, 1);
+        return rrdr_create(st, 1, context_param_list);
     }
 
     // check the number of wanted points in the result
@@ -1346,7 +1363,7 @@ static RRDR *rrd2rrdr_variablestep(
     // initialize our result set
     // this also locks the chart for us
 
-    RRDR *r = rrdr_create(st, points_wanted);
+    RRDR *r = rrdr_create(st, points_wanted, context_param_list);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
@@ -1422,7 +1439,7 @@ static RRDR *rrd2rrdr_variablestep(
     rrdset_check_rdlock(st);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions);
+        rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
 
 
     // -------------------------------------------------------------------------
@@ -1433,7 +1450,7 @@ static RRDR *rrd2rrdr_variablestep(
 
     RRDDIM *rd;
     long c, dimensions_used = 0, dimensions_nonzero = 0;
-    for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+    for(rd = temp_rd?temp_rd:st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
 
         // if we need a percentage, we need to calculate all dimensions
         if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN))) {
@@ -1527,7 +1544,7 @@ static RRDR *rrd2rrdr_variablestep(
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
         // all the dimensions are zero
         // mark them as NONZERO to send them all
-        for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+        for(rd = temp_rd?temp_rd:st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
             r->od[c] |= RRDR_DIMENSION_NONZERO;
         }
@@ -1548,16 +1565,32 @@ RRDR *rrd2rrdr(
         , long resampling_time_requested
         , RRDR_OPTIONS options
         , const char *dimensions
-) {
+        , struct context_param *context_param_list
+)
+{
     int rrd_update_every;
     int absolute_period_requested;
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
+
+    time_t first_entry_t;
+    time_t last_entry_t;
+    if (context_param_list) {
+        first_entry_t = context_param_list->first_entry_t;
+        last_entry_t = context_param_list->last_entry_t;
+    } else {
+        rrdset_rdlock(st);
+        first_entry_t = rrdset_first_entry_t_nolock(st);
+        last_entry_t = rrdset_last_entry_t_nolock(st);
+        rrdset_unlock(st);
+    }
 
     rrd_update_every = st->update_every;
     absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
                                                                       rrd_update_every, first_entry_t,
-                                                                      last_entry_t);
+                                                                      last_entry_t, options);
+    if (options & RRDR_OPTION_ALLOW_PAST)
+        if (first_entry_t > after_requested)
+            first_entry_t = after_requested;
+
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         struct rrdeng_region_info *region_info_array;
@@ -1565,7 +1598,7 @@ RRDR *rrd2rrdr(
 
         /* This call takes the chart read-lock */
         regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
-                                                  &region_info_array, &max_interval);
+                                                  &region_info_array, &max_interval, context_param_list);
         if (1 == regions) {
             if (region_info_array) {
                 if (rrd_update_every != region_info_array[0].update_every) {
@@ -1573,28 +1606,28 @@ RRDR *rrd2rrdr(
                     /* recalculate query alignment */
                     absolute_period_requested =
                             rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
-                                                                  first_entry_t, last_entry_t);
+                                                                  first_entry_t, last_entry_t, options);
                 }
                 freez(region_info_array);
             }
             return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
-                                      first_entry_t, last_entry_t, absolute_period_requested);
+                                      first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
         } else {
             if (rrd_update_every != (uint16_t)max_interval) {
                 rrd_update_every = (uint16_t) max_interval;
                 /* recalculate query alignment */
                 absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
                                                                                   rrd_update_every, first_entry_t,
-                                                                                  last_entry_t);
+                                                                                  last_entry_t, options);
             }
             return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
-                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array);
+                                         first_entry_t, last_entry_t, absolute_period_requested, region_info_array, context_param_list);
         }
     }
 #endif
     return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
-                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested);
+                              rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested, context_param_list);
 }

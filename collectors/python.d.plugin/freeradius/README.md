@@ -1,8 +1,7 @@
 <!--
----
 title: "FreeRADIUS monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/freeradius/README.md
----
+sidebar_label: "FreeRADIUS"
 -->
 
 # FreeRADIUS monitoring with Netdata
@@ -53,8 +52,8 @@ It produces:
 
 ## Configuration
 
-Edit the `python.d/freeradius.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/freeradius.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

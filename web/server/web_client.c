@@ -199,6 +199,7 @@ void web_client_request_done(struct web_client *w) {
         w->response.zstream.total_in = 0;
         w->response.zstream.total_out = 0;
         w->response.zinitialized = 0;
+        w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
     }
 #endif // NETDATA_WITH_ZLIB
 }
@@ -501,6 +502,7 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
     w->response.zsent = 0;
     w->response.zoutput = 1;
     w->response.zinitialized = 1;
+    w->flags |= WEB_CLIENT_CHUNKED_TRANSFER;
 
     debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
@@ -733,7 +735,8 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_proto = 0, hash_forwarded_host = 0;
 #ifdef NETDATA_WITH_ZLIB
     static uint32_t hash_accept_encoding = 0;
 #endif
@@ -748,6 +751,8 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
+        hash_forwarded_proto = simple_uhash("X-Forwarded-Proto");
+        hash_forwarded_host = simple_uhash("X-Forwarded-Host");
     }
 
     char *e = s;
@@ -809,6 +814,15 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         }
     }
 #endif /* NETDATA_WITH_ZLIB */
+#ifdef ENABLE_HTTPS
+    else if(hash == hash_forwarded_proto && !strcasecmp(s, "X-Forwarded-Proto")) {
+        if(strcasestr(v, "https"))
+            w->ssl.flags |= NETDATA_SSL_PROXY_HTTPS;
+    }
+#endif
+    else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")){
+        strncpyz(w->forwarded_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
+    }
 
     *e = ':';
     *ve = '\r';
@@ -863,7 +877,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 memcpy(hostname,"not available",13);
                 hostname[13] = 0x00;
             }
-            error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
+            error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
             s = NULL;
         }
 #endif
@@ -1074,6 +1088,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
+                        // The client will be redirected for Netdata and we are preserving the original request.
+                        *ue = '\0';
+                        strncpyz(w->last_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                        *ue = ' ';
                         web_client_disable_wait_receive(w);
                         return HTTP_VALIDATION_REDIRECT;
                     }
@@ -1118,7 +1136,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     return bytes;
 }
 
-static inline void web_client_send_http_header(struct web_client *w) {
+void web_client_build_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
@@ -1148,39 +1166,30 @@ static inline void web_client_send_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
-    char headerbegin[8328];
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
-        memcpy(headerbegin,"\r\nLocation: https://",20);
-        size_t headerlength = strlen(w->server_host);
-        memcpy(&headerbegin[20],w->server_host,headerlength);
-        headerlength += 20;
-        size_t tmp = strlen(w->last_url);
-        memcpy(&headerbegin[headerlength],w->last_url,tmp);
-        headerlength += tmp;
-        memcpy(&headerbegin[headerlength],"\r\n",2);
-        headerlength += 2;
-        headerbegin[headerlength] = 0x00;
+        buffer_sprintf(w->response.header_output,
+                       "HTTP/1.1 %d %s\r\n"
+                       "Location: https://%s%s\r\n",
+                       w->response.code, code_msg,
+                       w->server_host,
+                       w->last_url);
     }else {
-        memcpy(headerbegin,"\r\n",2);
-        headerbegin[2]=0x00;
+        buffer_sprintf(w->response.header_output,
+                       "HTTP/1.1 %d %s\r\n"
+                       "Connection: %s\r\n"
+                       "Server: NetData Embedded HTTP Server %s\r\n"
+                       "Access-Control-Allow-Origin: %s\r\n"
+                       "Access-Control-Allow-Credentials: true\r\n"
+                       "Content-Type: %s\r\n"
+                       "Date: %s\r\n",
+                       w->response.code,
+                       code_msg,
+                       web_client_has_keepalive(w)?"keep-alive":"close",
+                       VERSION,
+                       w->origin,
+                       content_type_string,
+                       date);
     }
-
-    buffer_sprintf(w->response.header_output,
-            "HTTP/1.1 %d %s\r\n"
-                    "Connection: %s\r\n"
-                    "Server: NetData Embedded HTTP Server %s\r\n"
-                    "Access-Control-Allow-Origin: %s\r\n"
-                    "Access-Control-Allow-Credentials: true\r\n"
-                    "Content-Type: %s\r\n"
-                    "Date: %s%s"
-                   , w->response.code, code_msg
-                   , web_client_has_keepalive(w)?"keep-alive":"close"
-                   , VERSION
-                   , w->origin
-                   , content_type_string
-                   , date
-                   , headerbegin
-    );
 
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
@@ -1233,12 +1242,11 @@ static inline void web_client_send_http_header(struct web_client *w) {
         buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
 
     // headers related to the transfer method
-    if(likely(w->response.zoutput)) {
-        buffer_strcat(w->response.header_output,
-                "Content-Encoding: gzip\r\n"
-                        "Transfer-Encoding: chunked\r\n"
-        );
-    }
+    if(likely(w->response.zoutput))
+        buffer_strcat(w->response.header_output, "Content-Encoding: gzip\r\n");
+
+    if(likely(w->flags & WEB_CLIENT_CHUNKED_TRANSFER))
+        buffer_strcat(w->response.header_output, "Transfer-Encoding: chunked\r\n");
     else {
         if(likely((w->response.data->len || w->response.rlen))) {
             // we know the content length, put it
@@ -1252,6 +1260,10 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     // end of HTTP header
     buffer_strcat(w->response.header_output, "\r\n");
+}
+
+static inline void web_client_send_http_header(struct web_client *w) {
+    web_client_build_http_header(w);
 
     // sent the HTTP header
     debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
@@ -1341,7 +1353,14 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
         if(!url) { //no delim found
             debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
-            buffer_sprintf(w->response.header, "Location: http://%s%s/\r\n", w->server_host, w->last_url);
+            char *protocol, *url_host;
+#ifdef ENABLE_HTTPS
+            protocol = ((w->ssl.conn && !w->ssl.flags) || w->ssl.flags & NETDATA_SSL_PROXY_HTTPS) ? "https" : "http";
+#else
+            protocol = "http";
+#endif
+            url_host = (!w->forwarded_host[0])?w->server_host:w->forwarded_host;
+            buffer_sprintf(w->response.header, "Location: %s://%s%s/\r\n", protocol, url_host, w->last_url);
             buffer_strcat(w->response.data, "Permanent redirect");
             return HTTP_RESP_REDIR_PERM;
         }
@@ -1357,7 +1376,32 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         host = rrdhost_find_by_hostname(tok, hash);
         if(!host) host = rrdhost_find_by_guid(tok, hash);
 
-        if(host) return web_client_process_url(host, w, url);
+#ifdef ENABLE_DBENGINE
+        int release_host = 0;
+        if (!host) {
+            host = sql_create_host_by_uuid(tok);
+            if (likely(host)) {
+                rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+                release_host = 1;
+            }
+        }
+        if(host) {
+            int rc = web_client_process_url(host, w, url);
+            if (release_host) {
+                freez(host->hostname);
+                freez((char *) host->os);
+                freez((char *) host->tags);
+                freez((char *) host->timezone);
+                freez(host->program_name);
+                freez(host->program_version);
+                freez(host->registry_hostname);
+                freez(host);
+            }
+            return rc;
+        }
+#else
+        if (host) return web_client_process_url(host, w, url);
+#endif
     }
 
     buffer_flush(w->response.data);
@@ -1507,7 +1551,7 @@ void web_client_process_request(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(localhost, w, w->decoded_url);
+                    w->response.code = rrdpush_receiver_thread_spawn(w, w->decoded_url);
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:
@@ -1566,7 +1610,14 @@ void web_client_process_request(struct web_client *w) {
         {
             buffer_flush(w->response.data);
             w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
+            buffer_strcat(w->response.data,
+                          "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html>"
+                          "<body onload=\"window.location.href ='https://'+ window.location.hostname +"
+                          " ':' + window.location.port + window.location.pathname + window.location.search\">"
+                          "Redirecting to safety connection, case your browser does not support redirection, please"
+                          " click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' "
+                          " + window.location.port + window.location.pathname + window.location.search\">here</a>."
+                          "</body></html>");
             w->response.code = HTTP_RESP_MOVED_PERM;
             break;
         }

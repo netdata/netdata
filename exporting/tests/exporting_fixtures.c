@@ -5,6 +5,7 @@
 int setup_configured_engine(void **state)
 {
     struct engine *engine = __mock_read_exporting_config();
+    engine->instance_root->data_is_ready = 1;
 
     *state = engine;
 
@@ -18,11 +19,11 @@ int teardown_configured_engine(void **state)
     struct instance *instance = engine->instance_root;
     free((void *)instance->config.destination);
     free((void *)instance->config.name);
+    free((void *)instance->config.prefix);
     simple_pattern_free(instance->config.charts_pattern);
     simple_pattern_free(instance->config.hosts_pattern);
     free(instance);
 
-    free((void *)engine->config.prefix);
     free((void *)engine->config.hostname);
     free(engine);
 

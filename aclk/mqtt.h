@@ -14,12 +14,12 @@ int mqtt_attempt_connection(char *aclk_hostname, int aclk_port, char *username, 
 //int _link_lib_init();
 int _mqtt_lib_init();
 int _link_subscribe(char *topic, int qos);
-int _link_send_message(char *topic, unsigned char *message, int *mid);
+int _link_send_message(char *topic, const void *message, size_t len, int *mid);
 const char *_link_strerror(int rc);
 int _link_set_lwt(char *topic, int qos);
 
 
-int aclk_handle_cloud_request(char *);
+int aclk_handle_cloud_message(char *);
 extern char *get_topic(char *sub_topic, char *final_topic, int max_size);
 
 #endif //NETDATA_MQTT_H

@@ -1,9 +1,6 @@
 <!--
----
 title: "Health configuration reference"
-date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
----
 -->
 
 # Health configuration reference
@@ -13,27 +10,25 @@ Welcome to the health configuration reference.
 This guide contains information about editing health configuration files to tweak existing alarms or create new health
 entities that are customized to the needs of your infrastructure.
 
-To learn the basics of locating and editing health configuration files, see the [health quickstart](QUICKSTART.md).
+To learn the basics of locating and editing health configuration files, see the [health
+quickstart](/health/QUICKSTART.md).
 
-## What's in this reference guide
+## Health configuration files
 
--   [Health entity reference](#health-entity-reference)
-    -   [Entity types](#entity-types)
-    -   [Entity format](#entity-format)
--   [Expressions](#expressions)
-    -   [Special use of the conditional operator](#special-use-of-the-conditional-operator)
--   [Variables](#variables)
--   [Alarm statuses](#alarm-statuses)
--   [Example alarms](#example-alarms)
--   [Troubleshooting](#troubleshooting)
--   [Disabling health checks or silencing notifications at runtime](#disabling-health-checks-or-silencing-notifications-at-runtime)
+You can configure the Agent's health watchdog service by editing files in two locations:
+
+-   The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
+    altogether, run health checks more or less often, and more. See [daemon
+    configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
+    default values, and what they control.
+-   The individual `.conf` files in `health.d/`. These health entitiy files are organized by the type of metric they are
+    performing calculations on or their associated collector. You should edit these files using the `edit-config`
+    script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
 ## Health entity reference
 
 The following reference contains information about the syntax and options of _health entities_, which Netdata attaches
 to charts in order to trigger alarms.
-
-Entities are written into `.conf` files, inside of the `health.d/` directory, using YAML formatting.
 
 ### Entity types
 
@@ -65,6 +60,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
+| [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
+| [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
@@ -155,6 +152,31 @@ begin with `redis`.
 hosts: server1 server2 database* !redis3 redis*
 ```
 
+#### Alarm line `plugin`
+
+The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
+you can create a filter for an alarm that applies specifically to `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+```
+
+The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
+inclusive filter that is unlikely to be of much use in production. See [`module`](#alarm-line-module) for a
+comprehensive example using both.
+
+#### Alarm line `module`
+
+The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+module: isc_dhcpd
+```
+
 #### Alarm line `families`
 
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
@@ -200,8 +222,9 @@ Everything is the same with [badges](../web/api/badges/). In short:
 
 -   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
-     have spaces in their names). This accepts Netdata simple patterns and the `match-ids` and
-     `match-names` options affect the searches for dimensions.
+     have spaces in their names). This accepts Netdata simple patterns _(with `words` separated by
+     `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches
+     for dimensions.
 
 -   `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
      rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule
@@ -382,7 +405,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `host labels`
 
-Defines the list of labels present on a host. See our [host labels tutorial](../docs/tutorials/using-host-labels.md) for
+Defines the list of labels present on a host. See our [host labels guide](/docs/guides/using-host-labels.md) for
 an explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:
@@ -482,8 +505,9 @@ Which in turn, results in the following behavior:
 ## Variables
 
 You can find all the variables that can be used for a given chart, using
-`http://your.netdata.ip:19999/api/v1/alarm_variables?chart=CHART_NAME` Example: [variables for the `system.cpu` chart of
-the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
+`http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`, replacing `NODE` with the IP address or hostname for your
+Agent dashboard. For example, [variables for the `system.cpu` chart of the
+registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
 > If you don't know how to find the CHART_NAME, you can read about it [here](../web/README.md#charts).
 
@@ -745,21 +769,21 @@ Netdata will create alarms for all dimensions of the chart.
 
 ## Troubleshooting
 
-You can compile Netdata with [debugging](../daemon/README.md#debugging) and then set in `netdata.conf`:
+You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
 
 ```yaml
 [global]
    debug flags = 0x0000000000800000
 ```
 
-Then check your `/var/log/netdata/debug.log`. It will show you how it works.
-Important: this will generate a lot of output in debug.log.
+Then check your `/var/log/netdata/debug.log`. It will show you how it works. Important: this will generate a lot of
+output in debug.log.
 
-You can find the context of charts by looking up the chart in either
-`http://your.netdata:19999/netdata.conf` or `http://your.netdata:19999/api/v1/charts`.
+You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
+`http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
 You can find how Netdata interpreted the expressions by examining the alarm at
-`http://your.netdata:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
+`http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
 config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
 expression.
 
@@ -768,6 +792,6 @@ expression.
 It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need
 to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence
 notifications are runtime. The health checks can be controlled at runtime via the [health management
-api](../web/api/health/).
+api](/web/api/health/README.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Freference%2F&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

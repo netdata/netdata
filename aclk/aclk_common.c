@@ -2,6 +2,20 @@
 
 #include "../daemon/common.h"
 
+#ifdef ENABLE_ACLK
+#include <libwebsockets.h>
+#endif
+
+netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
+
+int aclk_disable_runtime = 0;
+int aclk_kill_link = 0;
+
+struct aclk_shared_state aclk_shared_state = {
+    .version_neg = 0,
+    .version_neg_wait_till = 0
+};
+
 struct {
     ACLK_PROXY_TYPE type;
     const char *url_str;
@@ -131,14 +145,31 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
         return proxy;
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {
-        if (check_socks_enviroment(&proxy) == 0)
+        if (check_socks_enviroment(&proxy) == 0) {
+#ifdef LWS_WITH_SOCKS5
             *type = PROXY_TYPE_SOCKS5;
-        else if (check_http_enviroment(&proxy) == 0)
+            return proxy;
+#else
+            safe_log_proxy_error("socks_proxy environment variable set to use SOCKS5 proxy "
+                "but Libwebsockets used doesn't have SOCKS5 support built in. "
+                "Ignoring and checking for other options.",
+                proxy);
+#endif
+        }
+        if (check_http_enviroment(&proxy) == 0)
             *type = PROXY_TYPE_HTTP;
         return proxy;
     }
 
     *type = aclk_verify_proxy(proxy);
+#ifndef LWS_WITH_SOCKS5
+    if (*type == PROXY_TYPE_SOCKS5) {
+        safe_log_proxy_error(
+            "Config var \"" ACLK_PROXY_CONFIG_VAR
+            "\" set to use SOCKS5 proxy but Libwebsockets used is built without support for SOCKS proxy. ACLK will be disabled.",
+            proxy);
+    }
+#endif
     if (*type == PROXY_TYPE_UNKNOWN) {
         *type = PROXY_DISABLED;
         safe_log_proxy_error(
@@ -165,7 +196,7 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
     return proxy;
 }
 
-int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
+int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
 {
     int pos = 0;
     if (!strncmp("https://", url, 8)) {
@@ -179,8 +210,8 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
         host_end++;
     if (url[host_end] == 0) {
         *aclk_hostname = strdupz(url + pos);
-        *aclk_port = strdupz("443");
-        info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+        *aclk_port = 443;
+        info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
         return 0;
     }
     if (url[host_end] == ':') {
@@ -193,15 +224,13 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, char **aclk_port)
             error("Port specified in %s is invalid", url);
             return 0;
         }
-        *aclk_port = callocz(port_end - host_end + 1, 1);
-        for (int i = host_end + 1; i < port_end; i++)
-            (*aclk_port)[i - host_end - 1] = url[i];
+        *aclk_port = atoi(&url[host_end+1]);
     }
     if (url[host_end] == '/') {
-        *aclk_port = strdupz("443");
+        *aclk_port = 443;
         *aclk_hostname = callocz(1, host_end - pos + 1);
         strncpy(*aclk_hostname, url+pos, host_end - pos);
     }
-    info("Setting ACLK target host=%s port=%s from %s", *aclk_hostname, *aclk_port, url);
+    info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
     return 0;
 }

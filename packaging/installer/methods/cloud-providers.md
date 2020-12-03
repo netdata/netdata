@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 Netdata is fully compatible with popular cloud providers like Google Cloud Platform (GCP), Amazon Web Services (AWS),
 Azure, and others. You can install Netdata on cloud instances to monitor the apps/services running there, or use
-multiple instances in a [master/slave streaming](../../../streaming/README.md) configuration.
+multiple instances in a [parent-child streaming](/streaming/README.md) configuration.
 
 In some cases, using Netdata on these cloud providers requires unique installation or configuration steps. This page
 aims to document some of those steps for popular cloud providers.
@@ -58,11 +58,11 @@ command from a remote system, and it fails, it's likely that a firewall is block
 Another option is to put Netdata behind web server, which will proxy requests through standard HTTP/HTTPS ports
 (80/443), which are likely already open on your instance. We have a number of guides available:
 
--   [Apache](../../../docs/Running-behind-apache.md)
--   [Nginx](../../../docs/Running-behind-nginx.md)
--   [Caddy](../../../docs/Running-behind-caddy.md)
--   [HAProxy](../../../docs/Running-behind-haproxy.md)
--   [lighttpd](../../../docs/Running-behind-lighttpd.md)
+-   [Apache](/docs/Running-behind-apache.md)
+-   [Nginx](/docs/Running-behind-nginx.md)
+-   [Caddy](/docs/Running-behind-caddy.md)
+-   [HAProxy](/docs/Running-behind-haproxy.md)
+-   [lighttpd](/docs/Running-behind-lighttpd.md)
 
 The next few sections outline how to add firewall rules to GCP, AWS, and Azure instances.
 

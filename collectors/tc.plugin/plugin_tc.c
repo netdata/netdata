@@ -81,7 +81,7 @@ struct tc_device {
     RRDSET *st_tokens;
     RRDSET *st_ctokens;
 
-    avl_tree classes_index;
+    avl_tree_type classes_index;
 
     struct tc_class *classes;
     struct tc_class *last_class;
@@ -102,7 +102,7 @@ static int tc_device_compare(void* a, void* b) {
     else return strcmp(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
 }
 
-avl_tree tc_device_root_index = {
+avl_tree_type tc_device_root_index = {
         NULL,
         tc_device_compare
 };

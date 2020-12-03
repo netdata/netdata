@@ -44,6 +44,19 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
     return ret;
 }
 
+static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
+    if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
+        return 0;
+
+    if (rt->module_pattern && !simple_pattern_matches(rt->module_pattern, st->module_name))
+        return 0;
+
+    if (rt->plugin_pattern && !simple_pattern_matches(rt->plugin_pattern, st->plugin_name))
+        return 0;
+
+    return 1;
+}
+
 // RRDCALCTEMPLATE management
 /**
  * RRDCALC TEMPLATE LINK MATCHING
@@ -51,9 +64,9 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
  * @param rt is the template used to create the chart.
  * @param st is the chart where the alarm will be attached.
  */
-void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host ) {
-    if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
-       && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
+void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
+    if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context) &&
+        rrdcalctemplate_test_additional_restriction(rt, st) ) {
         if (!rrdcalctemplate_is_there_label_restriction(rt, host)) {
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if (unlikely(!rc))
@@ -91,6 +104,12 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
 
     freez(rt->family_match);
     simple_pattern_free(rt->family_pattern);
+
+    freez(rt->plugin_match);
+    simple_pattern_free(rt->plugin_pattern);
+
+    freez(rt->module_match);
+    simple_pattern_free(rt->module_pattern);
 
     freez(rt->name);
     freez(rt->exec);

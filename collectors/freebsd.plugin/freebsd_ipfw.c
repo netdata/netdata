@@ -235,12 +235,12 @@ int do_ipfw(int update_every, usec_t dt) {
                 if (likely(do_static)) {
                     sprintf(rule_num_str, "%d_%d", rule->rulenum, rule->id);
 
-                    rd_packets = rrddim_find(st_packets, rule_num_str);
+                    rd_packets = rrddim_find_active(st_packets, rule_num_str);
                     if (unlikely(!rd_packets))
                         rd_packets = rrddim_add(st_packets, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_set_by_pointer(st_packets, rd_packets, cntr->pcnt);
 
-                    rd_bytes = rrddim_find(st_bytes, rule_num_str);
+                    rd_bytes = rrddim_find_active(st_bytes, rule_num_str);
                     if (unlikely(!rd_bytes))
                         rd_bytes = rrddim_add(st_bytes, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_set_by_pointer(st_bytes, rd_bytes, cntr->bcnt);
@@ -347,12 +347,12 @@ int do_ipfw(int update_every, usec_t dt) {
             for (srn = 0; (srn < (static_rules_num - 1)) && (dyn_rules_num[srn].rule_num != IPFW_DEFAULT_RULE); srn++) {
                 sprintf(rule_num_str, "%d", dyn_rules_num[srn].rule_num);
 
-                rd_active = rrddim_find(st_active, rule_num_str);
+                rd_active = rrddim_find_active(st_active, rule_num_str);
                 if (unlikely(!rd_active))
                     rd_active = rrddim_add(st_active, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(st_active, rd_active, dyn_rules_num[srn].active_rules);
 
-                rd_expired = rrddim_find(st_expired, rule_num_str);
+                rd_expired = rrddim_find_active(st_expired, rule_num_str);
                 if (unlikely(!rd_expired))
                     rd_expired = rrddim_add(st_expired, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(st_expired, rd_expired, dyn_rules_num[srn].expired_rules);

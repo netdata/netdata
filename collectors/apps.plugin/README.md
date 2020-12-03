@@ -64,7 +64,10 @@ Each of these sections provides the same number of charts:
     -   Major Page Faults (i.e. swap activity)
 -   Network
     -   Sockets Open
-
+    
+In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also show
+an additional [list](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) of charts using low-level Linux metrics.    
+    
 The above are reported:
 
 -   For **Applications** per target configured.
@@ -154,6 +157,15 @@ There are a few command line options you can pass to `apps.plugin`. The list of 
 [plugin:apps]
   command options = without-users without-groups
 ```
+
+### Integration with eBPF
+
+If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
+[`ebpf.conf`](/collectors/ebpf.plugin/README.md#ebpf-programs) file to ensure the eBPF program is enabled.
+
+Also see our [guide on troubleshooting apps with eBPF
+metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a
+few scenarios.
 
 ## Permissions
 

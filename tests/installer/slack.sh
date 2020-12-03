@@ -1,6 +1,6 @@
 # #No shebang necessary
 # BASH Lib: Simple incoming webhook for slack integration.
-# 
+#
 # The script expects the following parameters to be defined by the upper layer:
 # SLACK_NOTIFY_WEBHOOK_URL
 # SLACK_BOT_NAME
@@ -17,12 +17,12 @@ post_message() {
 
 	case "$TYPE" in
 		"PLAIN_MESSAGE")
-			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_NOTIFY_WEBHOOK_URL}
+			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" "${SLACK_NOTIFY_WEBHOOK_URL}"
 			;;
 		"TRAVIS_MESSAGE")
-			EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
-			if [ "$TRAVIS_EVENT_TYPE}" == "pull_request" ]; then
-				EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}' #${TRAVIS_PULL_REQUEST}, on '${TRAVIS_OS_NAME}' "
+			if [ "${TRAVIS_EVENT_TYPE}" == "pull_request" ] || [ "${TRAVIS_BRANCH}" != "master" ] ; then
+				echo "Skipping notification due to build type."
+				return 0
 			fi
 
 			if [ -n "${CUSTOM_CHANNEL}" ]; then

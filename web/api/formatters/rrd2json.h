@@ -65,6 +65,7 @@ extern int rrdset2anything_api_v1(
         , long group_time
         , uint32_t options
         , time_t *latest_timestamp
+        , struct context_param *context_param_list
 );
 
 extern int rrdset2value_api_v1(
@@ -82,5 +83,8 @@ extern int rrdset2value_api_v1(
         , time_t *db_before
         , int *value_is_null
 );
+
+extern void build_context_param_list(struct context_param **param_list, RRDSET *st);
+extern void free_context_param_list(struct context_param **param_list);
 
 #endif /* NETDATA_RRD2JSON_H */

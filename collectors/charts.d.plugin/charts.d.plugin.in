@@ -294,15 +294,7 @@ run() {
 	if [ "z${1}" = "z-t" -a "${2}" != "0" ]; then
 		t="${2}"
 		shift 2
-
-		case "$(getosid)" in
-		"alpine")
-			timeout -t ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
-			;;
-		*)
-			timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
-			;;
-		esac
+		timeout "${t}" "${@}" 2>"${TMP_DIR}/run.${pid}"
 		ret=$?
 	else
 		"${@}" 2>"${TMP_DIR}/run.${pid}"

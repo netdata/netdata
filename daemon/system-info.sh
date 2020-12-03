@@ -23,14 +23,16 @@ if [ -z "${VIRTUALIZATION}" ]; then
             if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
                     VIRTUALIZATION="hypervisor"
                     VIRT_DETECTION="/proc/cpuinfo"
-            elif [ -n "$(command -v dmidecode)" ]; then
-                    # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
-                    # This only works as root
-                    if dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
-                            VIRTUALIZATION="$(dmidecode -s system-product-name)"
-                            VIRT_DETECTION="dmidecode"
-                    fi
+            elif [ -n "$(command -v dmidecode)" ] && dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
+                    VIRTUALIZATION="$(dmidecode -s system-product-name)"
+                    VIRT_DETECTION="dmidecode"
+            else
+                    VIRTUALIZATION="none"
             fi
+    fi
+    if [ -z "${VIRTUALIZATION}" ]; then
+      # Output from the command is outside of spec
+      VIRTUALIZATION="unknown"
     fi
 else
     # Passed from outside - probably in docker run
@@ -105,6 +107,7 @@ else
                 CONTAINER_OS_DETECTION="/etc/os-release"
         fi
 
+        # shellcheck disable=SC2153
         if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
                 if [ -f "/etc/lsb-release" ]; then
                         if [ "${OS_DETECTION}" = "unknown" ]; then
@@ -121,9 +124,9 @@ else
                         if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
                 fi
                 if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-                        if [ "${OS_DETECTION}" = "unknown" ]; then 
+                        if [ "${OS_DETECTION}" = "unknown" ]; then
                                 CONTAINER_OS_DETECTION="lsb_release"
-                        else 
+                        else
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
                         if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
@@ -192,6 +195,9 @@ if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1 ; then
         CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*') MHz"
+        if [ "${possible_cpu_freq}" = " MHz" ] ; then
+            possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*') MHz"
+        fi
 elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1 ; then
         dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
         CPU_INFO_SOURCE="dmidecode"
@@ -280,6 +286,9 @@ RAM_DETECTION="none"
 if [ "${KERNEL_NAME}" = FreeBSD ] ; then
         RAM_DETECTION="sysctl"
         TOTAL_RAM="$(sysctl -n hw.physmem)"
+elif [ "${KERNEL_NAME}" = Darwin ] ; then
+        RAM_DETECTION="sysctl"
+        TOTAL_RAM="$(sysctl -n hw.physmem)"
 elif [ -r /proc/meminfo ] ; then
         RAM_DETECTION="procfs"
         TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
@@ -304,8 +313,7 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         fi
 
         DISK_DETECTION="df"
-        total="$(/bin/df -k -t ${types} | tail -n +1 | awk '{s+=$2} END {print s}')"
-        DISK_SIZE="$((total * 1024))"
+        DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
 elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         types='ufs'
 
@@ -317,16 +325,20 @@ elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
         DISK_SIZE="$((total * 1024))"
 else
-        if [ -d /sys/block ] ; then
-                # List of device majors we actually count towards total disk space.
-                # The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
-                # The ':' surrounding each number are important for matching.
-                dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
+        if [ -d /sys/block ] && [ -r /proc/devices ] ; then
+                dev_major_whitelist=''
 
-                if [ "${VIRTUALIZATION}" != "unknown" ] ; then
-                    # We're running virtualized, add the local range of device major numbers so that we catch paravirtualized block devices.
-                    dev_major_whitelist="${dev_major_whitelist}240:241:242:243:244:245:246:247:248:249:250:251:252:253:254:"
-                fi
+                # This is a list of device names used for block storage devices.
+                # These translate to the prefixs of files in `/dev` indicating the device type.
+                # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
+                # We use this to look up device major numbers in `/proc/devices`
+                device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme'
+
+                for name in ${device_names} ; do
+                        if grep -qE " ${name}\$" /proc/devices ; then
+                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' ' | tr '\n' ':'):"
+                        fi
+                done
 
                 DISK_DETECTION="sysfs"
                 DISK_SIZE="0"
@@ -335,18 +347,17 @@ else
                            (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") && \
                            grep -qv 1 "${disk}/removable"
                         then
-                            size="$(cat "${disk}/size")"
+                            size="$(($(cat "${disk}/size") * 512))"
                             DISK_SIZE="$((DISK_SIZE + size))"
                         fi
                 done
         elif df --version 2>/dev/null | grep -qF "GNU coreutils" ; then
                 DISK_DETECTION="df"
-                DISK_SIZE="$(df -x tmpfs -x devtmpfs -x squashfs -l --total -B1 --output=size | tail -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+                DISK_SIZE=$(($(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size | tail -n +2 | sort -u -k 1 | awk '{print $2}' | tr '\n' '+' | head -c -1)))
         else
                 DISK_DETECTION="df"
                 include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
-                total="$(df -T -P | grep "${include_fs_types}" | awk '{s+=$3} END {print s}')"
-                DISK_SIZE="$((total * 1024))"
+                DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
         fi
 fi
 

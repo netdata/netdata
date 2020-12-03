@@ -1,11 +1,10 @@
 <!--
----
-title: "Access Point monitoring with Netdata"
+title: "Access point monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md
----
+sidebar_label: "Access points"
 -->
 
-# Access Point monitoring with Netdata
+# Access point monitoring with Netdata
 
 The `ap` collector visualizes data related to access points.
 
@@ -83,8 +82,8 @@ Station 40:b8:37:5a:ed:5e (on wlan0)
 
 ## Configuration
 
-Edit the `charts.d/ap.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `charts.d/ap.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

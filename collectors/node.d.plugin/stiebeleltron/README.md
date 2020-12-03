@@ -1,8 +1,7 @@
 <!--
----
 title: "Stiebel Eltron ISG monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/stiebeleltron/README.md
----
+sidebar_label: "Stiebel Eltron ISG"
 -->
 
 # Stiebel Eltron ISG monitoring with Netdata

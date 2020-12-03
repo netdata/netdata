@@ -51,8 +51,9 @@ CHARTS = {
         ]
     },
     'memory': {
-        'options': [None, 'Memory utilization', 'KiB', 'memory', 'redis.memory', 'line'],
+        'options': [None, 'Memory utilization', 'KiB', 'memory', 'redis.memory', 'area'],
         'lines': [
+            ['maxmemory', 'max', 'absolute', 1, 1024],
             ['used_memory', 'total', 'absolute', 1, 1024],
             ['used_memory_lua', 'lua', 'absolute', 1, 1024]
         ]

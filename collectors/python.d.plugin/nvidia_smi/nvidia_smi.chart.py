@@ -2,9 +2,13 @@
 # Description: nvidia-smi netdata python.d module
 # Original Author: Steven Noonan (tycho)
 # Author: Ilya Mashchenko (ilyam8)
+# User Memory Stat Author: Guido Scatena (scatenag)
 
 import subprocess
 import threading
+import os
+import pwd
+
 import xml.etree.ElementTree as et
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -13,8 +17,6 @@ from bases.collection import find_binary
 disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
-
-BAD_VALUE = 'N/A'
 
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
@@ -30,6 +32,8 @@ TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
 PROCESSES_MEM = 'processes_mem'
+USER_MEM = 'user_mem'
+USER_NUM = 'user_num'
 
 ORDER = [
     PCI_BANDWIDTH,
@@ -42,6 +46,8 @@ ORDER = [
     CLOCKS,
     POWER,
     PROCESSES_MEM,
+    USER_MEM,
+    USER_NUM,
 ]
 
 
@@ -113,6 +119,16 @@ def gpu_charts(gpu):
         PROCESSES_MEM: {
             'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
             'lines': []
+        },
+        USER_MEM: {
+            'options': [None, 'Memory Used by Each User', 'MiB', fam, 'nvidia_smi.user_mem', 'stacked'],
+            'lines': []
+        },
+        USER_NUM: {
+            'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'line'],
+            'lines': [
+                ['user_num', 'users'],
+            ]
         },
     }
 
@@ -226,10 +242,62 @@ def handle_value_error(method):
     return on_call
 
 
+HOST_PREFIX = os.getenv('NETDATA_HOST_PREFIX')
+ETC_PASSWD_PATH = '/etc/passwd'
+PROC_PATH = '/proc'
+
+IS_INSIDE_DOCKER = False
+
+if HOST_PREFIX:
+    ETC_PASSWD_PATH = os.path.join(HOST_PREFIX, ETC_PASSWD_PATH[1:])
+    PROC_PATH = os.path.join(HOST_PREFIX, PROC_PATH[1:])
+    IS_INSIDE_DOCKER = True
+
+
+def read_passwd_file():
+    data = dict()
+    with open(ETC_PASSWD_PATH, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("#"):
+                continue
+            fields = line.split(":")
+            # name, passwd, uid, gid, comment, home_dir, shell
+            if len(fields) != 7:
+                continue
+            # uid, guid
+            fields[2], fields[3] = int(fields[2]), int(fields[3])
+            data[fields[2]] = fields
+    return data
+
+
+def read_passwd_file_safe():
+    try:
+        if IS_INSIDE_DOCKER:
+            return read_passwd_file()
+        return dict((k[2], k) for k in pwd.getpwall())
+    except (OSError, IOError):
+        return dict()
+
+
+def get_username_by_pid_safe(pid, passwd_file):
+    path = os.path.join(PROC_PATH, pid)
+    try:
+        uid = os.stat(path).st_uid
+    except (OSError, IOError):
+        return ''
+
+    try:
+        return passwd_file[uid][0]
+    except KeyError:
+        return str(uid)
+
+
 class GPU:
-    def __init__(self, num, root):
+    def __init__(self, num, root, exclude_zero_memory_users=False):
         self.num = num
         self.root = root
+        self.exclude_zero_memory_users = exclude_zero_memory_users
 
     def id(self):
         return self.root.get('id')
@@ -303,15 +371,22 @@ class GPU:
 
     @handle_attr_error
     def processes(self):
-        p_nodes = self.root.find('processes').findall('process_info')
-        ps = []
-        for p in p_nodes:
-            ps.append({
-                'pid': p.find('pid').text,
-                'process_name': p.find('process_name').text,
-                'used_memory': int(p.find('used_memory').text.split()[0]),
+        processes_info = self.root.find('processes').findall('process_info')
+        if not processes_info:
+            return list()
+
+        passwd_file = read_passwd_file_safe()
+        processes = list()
+
+        for info in processes_info:
+            pid = info.find('pid').text
+            processes.append({
+                'pid': int(pid),
+                'process_name': info.find('process_name').text,
+                'used_memory': int(info.find('used_memory').text.split()[0]),
+                'username': get_username_by_pid_safe(pid, passwd_file),
             })
-        return ps
+        return processes
 
     def data(self):
         data = {
@@ -332,11 +407,21 @@ class GPU:
             'power_draw': self.power_draw(),
         }
         processes = self.processes() or []
-        data.update({'process_mem_{0}'.format(p['pid']): p['used_memory'] for p in processes})
+        users = set()
+        for p in processes:
+            data['process_mem_{0}'.format(p['pid'])] = p['used_memory']
+            if p['username']:
+                if self.exclude_zero_memory_users and p['used_memory'] == 0:
+                    continue
+                users.add(p['username'])
+                key = 'user_mem_{0}'.format(p['username'])
+                if key in data:
+                    data[key] += p['used_memory']
+                else:
+                    data[key] = p['used_memory']
+        data['user_num'] = len(users)
 
-        return dict(
-            ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
-        )
+        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
 
 
 class Service(SimpleService):
@@ -346,6 +431,7 @@ class Service(SimpleService):
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
         poll = int(configuration.get('poll_seconds', 1))
+        self.exclude_zero_memory_users = configuration.get('exclude_zero_memory_users', False)
         self.poller = NvidiaSMIPoller(poll)
 
     def get_data_loop_mode(self):
@@ -376,9 +462,13 @@ class Service(SimpleService):
 
         data = dict()
         for idx, root in enumerate(parsed.findall('gpu')):
-            gpu = GPU(idx, root)
-            data.update(gpu.data())
+            gpu = GPU(idx, root, self.exclude_zero_memory_users)
+            gpu_data = gpu.data()
+            # self.debug(gpu_data)
+            gpu_data = dict((k, v) for k, v in gpu_data.items() if is_gpu_data_value_valid(v))
+            data.update(gpu_data)
             self.update_processes_mem_chart(gpu)
+            self.update_processes_user_mem_chart(gpu)
 
         return data or None
 
@@ -393,6 +483,24 @@ class Service(SimpleService):
             active_dim_ids.append(dim_id)
             if dim_id not in chart:
                 chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
+        for dim in chart:
+            if dim.id not in active_dim_ids:
+                chart.del_dimension(dim.id, hide=False)
+
+    def update_processes_user_mem_chart(self, gpu):
+        ps = gpu.processes()
+        if not ps:
+            return
+        chart = self.charts['gpu{0}_{1}'.format(gpu.num, USER_MEM)]
+        active_dim_ids = []
+        for p in ps:
+            if not p.get('username'):
+                continue
+            dim_id = 'gpu{0}_user_mem_{1}'.format(gpu.num, p['username'])
+            active_dim_ids.append(dim_id)
+            if dim_id not in chart:
+                chart.add_dimension([dim_id, '{0}'.format(p['username'])])
+
         for dim in chart:
             if dim.id not in active_dim_ids:
                 chart.del_dimension(dim.id, hide=False)
@@ -432,3 +540,11 @@ class Service(SimpleService):
             order, charts = gpu_charts(GPU(idx, root))
             self.order.extend(order)
             self.definitions.update(charts)
+
+
+def is_gpu_data_value_valid(value):
+    try:
+        int(value)
+    except (TypeError, ValueError):
+        return False
+    return True

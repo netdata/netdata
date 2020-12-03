@@ -3,6 +3,10 @@
 #ifndef NETDATA_LIB_H
 #define NETDATA_LIB_H 1
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -291,6 +295,7 @@ extern char *read_by_filename(char *filename, long *file_size);
 
 /* misc. */
 #define UNUSED(x) (void)(x)
+#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
@@ -300,6 +305,7 @@ extern char *netdata_configured_host_prefix;
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
+#include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
@@ -313,7 +319,9 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
+#ifdef HAVE_LIBBPF
 #include "ebpf/ebpf.h"
+#endif
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
@@ -323,6 +331,10 @@ extern char *netdata_configured_host_prefix;
 #include "string/utf8.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://netdata.cloud"
+#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif // NETDATA_LIB_H

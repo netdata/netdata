@@ -105,7 +105,7 @@ CHARTS = {
         ]
     },
     'query_latency_avg': {
-        'options': [None, 'Average latency for the last N queries', 'ms/query', 'latency',
+        'options': [None, 'Average latency for the last N queries', 'microseconds', 'latency',
                     'dnsdist.query_latency_avg', 'line'],
         'lines': [
             ['latency-avg100', '100', 'absolute'],

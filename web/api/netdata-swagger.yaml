@@ -101,13 +101,21 @@ paths:
       parameters:
         - name: chart
           in: query
-          description: The id of the chart as returned by the /charts call.
-          required: true
+          description: The id of the chart as returned by the /charts call. Note chart or context must be specified
+          required: false
           allowEmptyValue: false
           schema:
             type: string
             format: as returned by /charts
             default: system.cpu
+        - name: context
+          in: query
+          description: The context of the chart as returned by the /charts call. Note chart or context must be specified
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: string
+            format: as returned by /charts
         - name: dimension
           in: query
           description: Zero, one or more dimension ids or names, as returned by the /chart
@@ -125,11 +133,10 @@ paths:
           description: "This parameter can either be an absolute timestamp specifying the
             starting point of the data to be returned, or a relative number of
             seconds (negative, relative to parameter: before). Netdata will
-            assume it is a relative number if it is less that 3 years (in
-            seconds). Netdata will adapt this parameter to the boundaries of the
-            round robin database. The default is the beginning of the round
-            robin database (i.e. by default netdata will attempt to return data
-            for the entire database)."
+            assume it is a relative number if it is less that 3 years (in seconds).
+            If not specified the default is -600 seconds. Netdata will adapt this
+            parameter to the boundaries of the round robin database unless the allow_past
+            option is specified."
           required: true
           allowEmptyValue: false
           schema:
@@ -243,6 +250,7 @@ paths:
                 - match-ids
                 - match-names
                 - showcustomvars
+                - allow_past
             default:
               - seconds
               - jsonwrap
@@ -285,7 +293,7 @@ paths:
         "400":
           description: Bad request - the body will include a message stating what is wrong.
         "404":
-          description: No chart with the given id is found.
+          description: Chart or context is not found. The supplied chart or context will be reported.
         "500":
           description: Internal server error. This usually means the server is out of
             memory.
@@ -881,6 +889,33 @@ components:
           example:
             - host1.example.com
             - host2.example.com
+        mirrored_hosts_status:
+          type: array
+          description: >-
+            List of details of hosts mirrored to this served (including self).
+            Indexes correspond to indexes in "mirrored_hosts".
+          items:
+            type: object
+            description: Host data
+            properties:
+              guid:
+                type: string
+                format: uuid
+                nullable: false
+                description: Host unique GUID from `netdata.public.unique.id`.
+                example: 245e4bff-3b34-47c1-a6e5-5c535a9abfb2
+              reachable:
+                type: boolean
+                nullable: false
+                description: Current state of streaming. Always true for localhost/self.
+              claim_id:
+                type: string
+                format: uuid
+                nullable: true
+                description: >-
+                  Cloud GUID/identifier in case the host is claimed.
+                  If child status unknown or unclaimed this field is set to `null`
+                example: c3b2a66a-3052-498c-ac52-7fe9e8cccb0c
         os_name:
           type: string
           description: Operating System Name.
@@ -1544,3 +1579,29 @@ components:
         old_value:
           type: number
           nullable: true
+    alarms_values:
+      type: object
+      properties:
+        hostname:
+          type: string
+        alarms:
+          type: object
+          description: HashMap with keys being alarm names
+          additionalProperties:
+            type: object
+            properties:
+              id:
+                type: integer
+              value:
+                type: integer
+              status:
+                type: string
+                enum:
+                  - REMOVED
+                  - UNDEFINED
+                  - UNINITIALIZED
+                  - CLEAR
+                  - RAISED
+                  - WARNING
+                  - CRITICAL
+                  - UNKNOWN

@@ -1,8 +1,7 @@
 <!--
----
 title: "SNMP device monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/snmp/README.md
----
+sidebar_label: "SNMP"
 -->
 
 # SNMP device monitoring with Netdata

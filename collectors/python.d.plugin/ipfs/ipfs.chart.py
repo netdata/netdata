@@ -63,7 +63,9 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
         self.baseurl = self.configuration.get('url', 'http://localhost:5001')
+        self.method = "POST"
         self.do_pinapi = self.configuration.get('pinapi')
+        self.do_repoapi = self.configuration.get('repoapi')
         self.__storage_max = None
 
     def _get_json(self, sub_url):
@@ -109,16 +111,32 @@ class Service(UrlService):
         # suburl : List of (result-key, original-key, transform-func)
         cfg = {
             '/api/v0/stats/bw':
-                [('in', 'RateIn', int), ('out', 'RateOut', int)],
+                [
+                    ('in', 'RateIn', int),
+                    ('out', 'RateOut', int),
+                ],
             '/api/v0/swarm/peers':
-                [('peers', 'Peers', len)],
-            '/api/v0/stats/repo':
-                [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
+                [
+                    ('peers', 'Peers', len),
+                ],
         }
+        if self.do_repoapi:
+            cfg.update({
+                '/api/v0/stats/repo':
+                    [
+                        ('size', 'RepoSize', int),
+                        ('objects', 'NumObjects', int),
+                        ('avail', 'StorageMax', self._storagemax),
+                    ],
+            })
+
         if self.do_pinapi:
             cfg.update({
                 '/api/v0/pin/ls':
-                    [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
+                    [
+                        ('pinned', 'Keys', len),
+                        ('recursive_pins', 'Keys', self._recursive_pins),
+                    ]
             })
         r = dict()
         for suburl in cfg:

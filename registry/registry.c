@@ -130,6 +130,20 @@ static inline int registry_person_url_callback_verify_machine_exists(void *entry
 }
 
 // ----------------------------------------------------------------------------
+// dynamic update of the configuration
+// The registry does not seem to be designed to support this and I cannot see any concurrency protection
+// that could make this safe, so try to be as atomic as possible.
+
+void registry_update_cloud_base_url()
+{
+    // This is guaranteed to be set early in main via post_conf_load()
+    registry.cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    if (registry.cloud_base_url == NULL)
+        fatal("Do not move the cloud base url out of post_conf_load!!");
+
+    setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+}
+// ----------------------------------------------------------------------------
 // public HELLO request
 
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {

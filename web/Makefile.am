@@ -9,19 +9,7 @@ SUBDIRS = \
     server \
     $(NULL)
 
-CLEANFILES = \
-    netdata-switch-dashboard.sh \
-    $(NULL)
-
 usersslconfigdir=$(configdir)/ssl
-
-include $(top_srcdir)/build/subst.inc
-SUFFIXES = .in
-
-scriptsdir=${prefix}/libexec/netdata
-scripts_SCRIPTS = \
-    netdata-switch-dashboard.sh \
-    $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
@@ -31,5 +19,4 @@ dist_noinst_DATA = \
     README.md \
     gui/confluence/README.md \
     gui/custom/README.md \
-    netdata-switch-dashboard.sh.in \
     $(NULL)

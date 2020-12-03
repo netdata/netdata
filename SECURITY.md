@@ -15,9 +15,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/SECURITY.md
 
 ## Reporting a Vulnerability
 
-We’re extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
+We're extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
 
-To make a report, please create a post [here](https://groups.google.com/a/netdata.cloud/forum/#!newtopic/security) with
+To make a report, please send an email to **security@netdata.cloud** with
 the vulnerability details and the details expected for [all Netdata bug
 reports](https://github.com/netdata/netdata/blob/c1f4c6cf503995cd4d896c5821b00d55afcbde87/.github/ISSUE_TEMPLATE/bug_report.md).
 
@@ -37,7 +37,7 @@ reports](https://github.com/netdata/netdata/blob/c1f4c6cf503995cd4d896c5821b00d5
 
 Each report is acknowledged and analyzed by Netdata Team members within 3 working days. This will set off a Security Release Process.
 
-Any vulnerability information shared with Netdata Team stays within Netdata project and will not be disseminated to other projects unless it is necessary to get the issue fixed.
+Any vulnerability information shared with the Netdata Team stays within the Netdata project and will not be disseminated to other projects unless it is necessary to get the issue fixed.
 
 As the security issue moves from triage, to identified fix, to release planning we will keep the reporter updated.
 

@@ -2,61 +2,65 @@
 # This way we prevent modifications which will be overwriten by automation.
 
 # Global (default) code owner
-* @ktsaou @cosmix
+* @ktsaou @Ferroin
 
 # Ownership by directory structure
-.travis/ @cosmix @Ferroin @knatsakis @ncmans @prologic
-.github/ @cosmix @Ferroin @knatsakis @ncmans @prologic
+.travis/ @Ferroin @knatsakis @kaskavel
+.github/ @Ferroin @knatsakis @kaskavel
+aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @cosmix
-contrib/debian @cosmix @Ferroin @knatsakis @ncmans @prologic
-collectors/ @vlvkobal @mfundul @cosmix
-collectors/charts.d.plugin/ @ilyam8 @Ferroin @prologic @cosmix
-collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cosmix
-collectors/macos.plugin/ @vlvkobal @thiagoftsm @cosmix
-collectors/node.d.plugin/ @jacekkolasa @cosmix
-collectors/node.d.plugin/fronius/ @ccremer @cosmix
-collectors/node.d.plugin/snmp/ @jacekkolasa @cosmix
-collectors/node.d.plugin/stiebeleltron/ @ccremer @cosmix
+build/ @Ferroin @knatsakis
+contrib/debian @Ferroin @knatsakis
+collectors/ @vlvkobal @mfundul
+collectors/charts.d.plugin/ @ilyam8 @Ferroin
+collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
+collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
+collectors/macos.plugin/ @vlvkobal @thiagoftsm
+collectors/node.d.plugin/ @jacekkolasa
+collectors/node.d.plugin/fronius/ @ccremer
+collectors/node.d.plugin/snmp/ @jacekkolasa
+collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cosmix
-daemon/ @thiagoftsm @mfundul @cosmix
-database/ @mfundul @thiagoftsm @cosmix
-docs/ @cosmix @joelhans @shortpatti
-health/ @thiagoftsm @vlvkobal @cosmix
-health/health.d/ @thiagoftsm @vlvkobal @cosmix
-health/notifications/ @Ferroin @thiagoftsm @cosmix
-libnetdata/ @thiagofsm @mfundul @cosmix
-packaging/ @cosmix @Ferroin @knatsakis @ncmans @prologic
-registry/ @jacekkolasa @cosmix
-streaming/ @thiagoftsm @vlvkobal @cosmix
-web/ @thiagoftsm @mfundul @vlvkobal @cosmix
-web/gui/ @jacekkolasa @cosmix
+collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
+exporting/  @vlvkobal @thiagoftsm
+daemon/ @thiagoftsm @mfundul
+database/ @mfundul @thiagoftsm
+docs/ @joelhans
+health/ @thiagoftsm @vlvkobal
+health/health.d/ @thiagoftsm @vlvkobal
+health/notifications/ @Ferroin @thiagoftsm
+libnetdata/ @thiagofsm @mfundul
+packaging/ @Ferroin @knatsakis
+registry/ @jacekkolasa
+streaming/ @thiagoftsm @vlvkobal
+system/ @Ferroin @knatsakis
+tests/ @Ferroin @knatsakis @kaskavel
+web/ @thiagoftsm @mfundul @vlvkobal
+web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @cosmix
-*.md @cosmix @joelhans @shortpatti
-Dockerfile* @Ferroin @knatsakis @ncmans @prologic @cosmix
+*.am @Ferroin
+*.md @joelhans
+Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
-.gitignore @cosmix @Ferroin @knatsakis @ncmans @prologic
-.travis.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-.lgtm.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-.eslintrc @cosmix @Ferroin @knatsakis @ncmans @prologic
-.eslintignore @cosmix @Ferroin @knatsakis @ncmans @prologic
-.csslintrc @cosmix @Ferroin @knatsakis @ncmans @prologic
-.codeclimate.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-.codacy.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-.yamllint.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
-netdata.spec.in @cosmix @Ferroin @knatsakis @ncmans @prologic
-netdata-installer.sh @cosmix @Ferroin @knatsakis @ncmans @prologic
-netlify.toml @cosmix
-package.json @jacekkolasa
-packaging/version @netdatabot
+.gitignore @Ferroin @knatsakis
+.travis.yml @Ferroin @knatsakis @kaskavel
+.lgtm.yml @Ferroin @knatsakis
+.eslintrc @Ferroin @knatsakis
+.eslintignore @Ferroin @knatsakis
+.csslintrc @Ferroin @knatsakis
+.codeclimate.yml @Ferroin @knatsakis
+.codacy.yml @Ferroin @knatsakis
+.yamllint.yml @Ferroin @knatsakis
+netdata.spec.in @Ferroin @knatsakis
+netdata-installer.sh @Ferroin @knatsakis
+package.json @jacekkolasa @Ferroin @knatsakis
+packaging/version @netdatabot @Ferroin @knatsakis
 
-LICENSE.md @cosmix @joelhans
-CHANGELOG.md @netdatabot
+LICENSE.md @joelhans @Ferroin
+CHANGELOG.md @netdatabot @Ferroin

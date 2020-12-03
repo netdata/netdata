@@ -24,8 +24,8 @@ function detect_arch_from_commit {
 			;;
 
 		*)
-			echo "Unknown build architecture in '${TRAVIS_COMMIT_MESSAGE}'. No BUILD_ARCH can be provided"
-			exit 1
+			echo "Unknown build architecture in '${TRAVIS_COMMIT_MESSAGE}'. Assuming amd64"
+			export BUILD_ARCH="amd64"
 			;;
 	esac
 

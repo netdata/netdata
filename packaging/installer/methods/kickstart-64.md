@@ -14,7 +14,8 @@ This page covers detailed instructions on using and configuring the installation
 This method uses a pre-compiled static binary to install Netdata on any Intel/AMD 64bit Linux system and on any Linux
 distribution, even those with a broken or unsupported package manager.
 
-To install Netdata from a binary package and get _automatic nightly updates_, run the following as your normal user:
+To install Netdata from a static binary package, including all dependencies required to connect to Netdata Cloud, and
+get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
@@ -30,8 +31,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 
 The `kickstart.sh` script does the following after being downloaded and run:
 
--   Detects the Linux distribution and **installs the required system packages** for building Netdata. Unless you added
-    the `--dont-wait` option, it will ask for your permission first.
+-   Checks to see if there is an existing installation, and if there is updates that in preference to reinstalling.
 -   Downloads the latest Netdata binary from the [binary-packages](https://github.com/netdata/binary-packages)
     repository. You can also run any of these `.run` files with [makeself](https://github.com/megastep/makeself).
 -   Installs Netdata by running `./netdata-installer.sh` from the source tree, including any options you might have
@@ -65,6 +65,8 @@ your installation. Here are a few important parameters:
 -   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--reinstall`: If an existing installation is detected, reinstall instead of attempting to update it. Note
+    that this cannot be used to switch betwen installation types.
 -   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths:
     the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force
     kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
@@ -76,15 +78,15 @@ To use `md5sum` to verify the intregity of the `kickstart-static64.sh` script yo
 command above, run the following:
 
 ```bash
-[ "33ecd20452f569c1d9972bcefdf04692" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "efddf41d3c19c4988601aecf5b483e3a" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step tutorial](/docs/step-by-step/step-00.md) for a
-fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
+a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
 Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
 guide](/docs/getting-started.md) for a quick overview.

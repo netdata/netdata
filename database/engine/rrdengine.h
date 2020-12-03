@@ -17,6 +17,7 @@
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
+#include "metadata_log/metadatalog.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
 #include "rrdenglocking.h"
@@ -50,6 +51,7 @@ enum rrdeng_opcode {
     RRDENG_FLUSH_PAGES,
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
+    RRDENG_QUIESCE,
 
     RRDENG_MAX_OPCODE
 };
@@ -86,6 +88,7 @@ struct extent_io_descriptor {
     int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
+    struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
 
 struct generic_io_descriptor {
@@ -95,6 +98,27 @@ struct generic_io_descriptor {
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
+};
+
+struct extent_cache_element {
+    struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
+    unsigned fileno;
+    struct extent_cache_element *prev; /* LRU */
+    struct extent_cache_element *next; /* LRU */
+    struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
+    uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
+};
+
+#define MAX_CACHED_EXTENTS 16 /* cannot be over 32 to fit in 32-bit architectures */
+
+/* Initialize by setting the structure to zero */
+struct extent_cache {
+    struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
+    unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
+    unsigned inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
+
+    struct extent_cache_element *replaceQ_head; /* LRU */
+    struct extent_cache_element *replaceQ_tail; /* MRU */
 };
 
 struct rrdengine_worker_config {
@@ -119,6 +143,8 @@ struct rrdengine_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct rrdeng_cmdqueue cmd_queue;
+
+    struct extent_cache xt_cache;
 
     int error;
 };
@@ -169,7 +195,12 @@ extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
 extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
 extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
+#define NO_QUIESCE  (0) /* initial state when all operations function normally */
+#define SET_QUIESCE (1) /* set it before shutting down the instance, quiesce long running operations */
+#define QUIESCED    (2) /* is set after all threads have finished running */
+
 struct rrdengine_instance {
+    struct metalog_instance *metalog_ctx;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
@@ -177,13 +208,17 @@ struct rrdengine_instance {
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
     struct rrdengine_datafile_list datafiles;
-    char dbfiles_path[FILENAME_MAX+1];
+    RRDHOST *host; /* the legacy host, or NULL for multi-host DB */
+    char dbfiles_path[FILENAME_MAX + 1];
+    char machine_guid[GUID_LEN + 1]; /* the unique ID of the corresponding host, or localhost for multihost DB */
     uint64_t disk_space;
     uint64_t max_disk_space;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
+
+    uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
 
     struct rrdengine_statistics stats;
 };

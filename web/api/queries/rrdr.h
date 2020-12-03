@@ -23,6 +23,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_MATCH_IDS    = 0x00004000, // when filtering dimensions, match only IDs
     RRDR_OPTION_MATCH_NAMES  = 0x00008000, // when filtering dimensions, match only names
     RRDR_OPTION_CUSTOM_VARS  = 0x00010000, // when wraping response in a JSON, return custom variables in response
+    RRDR_OPTION_ALLOW_PAST   = 0x00020000, // The after parameter can extend in the past before the first entry
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
@@ -97,13 +98,17 @@ typedef struct rrdresult {
 
 #define rrdr_rows(r) ((r)->rows)
 
+#include "../../../database/rrd.h"
 extern void rrdr_free(RRDR *r);
-extern RRDR *rrdr_create(struct rrdset *st, long n);
+extern RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(
+    RRDSET *st, long points_requested, long long after_requested, long long before_requested,
+    RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions,
+    struct context_param *context_param_list);
 
 #include "query.h"
 

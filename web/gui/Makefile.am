@@ -71,6 +71,11 @@ dist_web_DATA = \
     version.txt \
     $(NULL)
 
+webolddir=$(webdir)/old
+dist_webold_DATA = \
+    old/index.html \
+    $(NULL)
+
 webstaticdir=$(webdir)/static/img
 dist_webstatic_DATA = \
     static/img/netdata-logomark.svg \

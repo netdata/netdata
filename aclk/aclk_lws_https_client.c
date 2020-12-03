@@ -12,6 +12,8 @@
 struct simple_hcc_data {
     char *data;
     size_t data_size;
+    size_t written;
+    char lws_work_buffer[1024 + LWS_PRE];
     char *payload;
     int response_code;
     int done;
@@ -28,6 +30,10 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
     switch (reason) {
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ");
+        if (perconn_data->data_size - 1 - perconn_data->written < len)
+            return 1;
+        memcpy(&perconn_data->data[perconn_data->written], in, len);
+        perconn_data->written += len;
         return 0;
     case LWS_CALLBACK_RECEIVE_CLIENT_HTTP:
         debug(D_ACLK, "LWS_CALLBACK_RECEIVE_CLIENT_HTTP");
@@ -35,11 +41,11 @@ static int simple_https_client_callback(struct lws *wsi, enum lws_callback_reaso
             error("Missing Per Connect Data");
             return -1;
         }
-        ptr = perconn_data->data;
-        n = perconn_data->data_size - 1;
+        n = sizeof(perconn_data->lws_work_buffer) - LWS_PRE;
+        ptr = perconn_data->lws_work_buffer + LWS_PRE;
         if (lws_http_client_read(wsi, &ptr, &n) < 0)
             return -1;
-        ptr[n] = '\0';
+        perconn_data->data[perconn_data->written] = '\0';
         return 0;
     case LWS_CALLBACK_WSI_DESTROY:
         debug(D_ACLK, "LWS_CALLBACK_WSI_DESTROY");
@@ -147,7 +153,7 @@ static void simple_hcc_log_divert(int level, const char *line)
     error("Libwebsockets: %s", line);
 }
 
-int aclk_send_https_request(char *method, char *host, char *port, char *url, char *b, size_t b_size, char *payload)
+int aclk_send_https_request(char *method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
 {
     info("%s %s", __func__, method);
 
@@ -193,8 +199,12 @@ int aclk_send_https_request(char *method, char *host, char *port, char *url, cha
 #else
     i.ssl_connection = LCCSCF_USE_SSL;
 #endif
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 0
+#warning DISABLING SSL HOSTNAME VALIDATION BECAUSE IT IS NOT AVAILABLE ON THIS SYSTEM.
+    i.ssl_connection |= LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+#endif
 
-    i.port = atoi(port);
+    i.port = port;
     i.address = host;
     i.path = url;
 

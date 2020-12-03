@@ -61,6 +61,10 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
             m++;
         }
 
+        if (unlikely(n > (calculated_number) (0x00ffffff))) {
+            n /= 10;
+            m--;
+        }
         // the value was small enough and we multiplied it
         // so we add a divider to unpack it
         r += (0 << 30) + (m << 27); // the divider m

@@ -50,6 +50,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for network interfaces.'
     },
 
+    'wireless': {
+        title: 'Wireless Interfaces',
+        icon: '<i class="fas fa-wifi"></i>',
+        info: 'Performance metrics for wireless interfaces.'
+    },
+
     'ip': {
         title: 'Networking Stack',
         icon: '<i class="fas fa-cloud"></i>',
@@ -564,6 +570,19 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-comments"></i>',
         info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
     },
+
+    'anomalies': {
+        title: 'Anomalies',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Anomaly scores relating to key system metrics. A high anomaly probability indicates strange behaviour and may trigger an anomaly prediction from the trained models. Read the <a href="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/anomalies" target="_blank">anomalies collector docs</a> for more details.'
+    },
+
+    'alarms': {
+        title: 'Alarms',
+        icon: '<i class="fas fa-bell"></i>',
+        info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
+    },
+
 };
 
 
@@ -754,7 +773,7 @@ netdataDashboard.context = {
     },
 
     'system.load': {
-        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
+        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>.',
         height: 0.7
     },
 
@@ -972,7 +991,7 @@ netdataDashboard.context = {
     },
 
     'mem.kernel': {
-        info: 'The total amount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory decicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
+        info: 'The total amount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
     },
 
     'mem.slab': {
@@ -1083,6 +1102,70 @@ netdataDashboard.context = {
 
     'apps.uptime': {
         info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
+    },
+
+    'apps.file_open': {
+        height: 2.0
+    },
+
+    'apps.file_open_error': {
+        height: 2.0
+    },
+
+    'apps.file_closed': {
+        height: 2.0
+    },
+
+    'apps.file_close_error': {
+        height: 2.0
+    },
+
+    'apps.file_deleted': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_call': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_error': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_call': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_error': {
+        height: 2.0
+    },
+
+    'apps.vfs_write_bytes': {
+        height: 2.0
+    },
+
+    'apps.vfs_read_bytes': {
+        height: 2.0
+    },
+
+    'apps.process_create': {
+        height: 2.0
+    },
+
+    'apps.thread_create': {
+        height: 2.0
+    },
+
+    'apps.task_close': {
+        height: 2.0
+    },
+
+    'apps.bandwidth_sent': {
+        height: 2.0
+    },
+
+    'apps.bandwidth_recv': {
+        height: 2.0
     },
 
     // ------------------------------------------------------------------------
@@ -1877,6 +1960,10 @@ netdataDashboard.context = {
         info: 'The usage space in each OSD.'
     },
 
+    'ceph.osd_size': {
+        info: "Each OSD's size"
+    },
+
     'ceph.apply_latency': {
         info: 'Time taken to flush an update in each OSD.'
     },
@@ -2197,6 +2284,106 @@ netdataDashboard.context = {
             '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
 
+     // ------------------------------------------------------------------------
+    // go web_log
+
+    'web_log.type_requests': {
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="success"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Successful"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redirect"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Redirects"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="bad"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Bad Requests"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="error"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Server Errors"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.request_processing_time': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="avg"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Average Response Time"'
+                    + ' data-units="milliseconds"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
     // ------------------------------------------------------------------------
     // Fronius Solar Power
 
@@ -2368,6 +2555,16 @@ netdataDashboard.context = {
 
     'rabbitmq.disk_space': {
         info: 'Total amount of disk space consumed by the message store(s).  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-disk-space" target=_"blank">Disk Space Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.queue_messages': {
+        info: 'Total amount of messages and their states in this queue.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.queue_messages_stats': {
+        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
@@ -3045,44 +3242,107 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // eBPF
 
+    'ebpf.tcp_functions': {
+        title : 'TCP calls',
+        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+    },
+
+    'ebpf.tcp_bandwidth': {
+        title : 'TCP bandwidth',
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>.'
+    },
+
+    'ebpf.tcp_retransmit': {
+        title : 'TCP retransmit',
+        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+    },
+
+    'ebpf.tcp_error': {
+        title : 'TCP errors',
+        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+    },
+
+    'ebpf.udp_functions': {
+        title : 'UDP calls',
+        info: 'Successful or failed calls to  functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+    },
+
+    'ebpf.udp_bandwidth': {
+        title : 'UDP bandwidth',
+        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+    },
+
     'ebpf.file_descriptor': {
-        info: 'File descriptor shows the number of calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function \'do_sys_open\', that is the common function called from open(2) and openat(2). The close dimension is attached to the function \'__close_fd\', that is called from system call close(2).'
+        title : 'File access',
+        info: 'Calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code>, which is the common function called from'+
+            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
+            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'ebpf.file_error': {
-        info: 'File error shows the number of calls that returned an error when called per period.'
+        title : 'File access error',
+        info: 'Failed calls to the kernel internal function <code>do_sys_open</code>, which is the common function called from'+
+            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
+            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'ebpf.deleted_objects': {
-        info: 'Deleted objects monitors calls to the function \'vfs_unlink\'. This chart does not show all events to remove files from the file system, because file systems can create their own functions to remove files.'
+        title : 'VFS remove',
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
     },
 
     'ebpf.io': {
-        info: 'IO shows the number of calls for functions \'vfs_read\' and \'vfs_write\' independent of the return to be success or fail. Like the chart \'deleted_objects\', case the file system uses other function to store data on disks, this chart will not show events for it.'
+        title : 'VFS IO',
+        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
-        info: 'IO bytes shows the total of bytes read or written with success using the functions  \'vfs_read\' and \'vfs_write\'.'
+        title : 'VFS bytes written',
+        info: 'Total of bytes read or written with success using the functions  <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.io_error': {
-        info: 'IO error shows the number of calls for \'vfs_read\' and \'vfs_write\' that did not have success.'
+        title : 'VFS IO error',
+        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.process_thread': {
-        info: 'Process thread counts the number of times that the function \'do_fork\' was called to create a new task. Task is the common name used to define process and tasks inside the kernel, to identify the threads, Netdata also counts the number of calls for \'sys_clone\' that has the flag \'CLONE_THREAD\' set.'
+        title : 'Task creation',
+        info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
-        info: 'Exit count the number of calls for the functions responsible to close (\'do_exit\') and release(\'release_task\') tasks.'
+        title : 'Exit monitoring',
+        info: 'Calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'ebpf.task_error': {
-        info: 'Task error count the number of errors to create a new process or thread.'
+        title : 'Task error',
+        info: 'Number of errors to create a new process or thread.'
     },
 
     'ebpf.process_status': {
-        info: 'This chart demonstrate the difference between the number of process created and the number of threads created per period(\'process\' dimension), it also shows the number of possible zombie process running on system.'
+        title : 'Task status',
+        info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ACLK Internal Stats
+    'netdata.aclk_status': {
+        valueRange: "[0, 1]",
+        info: 'This chart shows if ACLK was online during entirety of the sample duration.'
+    },
+
+    'netdata.aclk_query_per_second': {
+        info: 'This chart shows how many queries were added for ACLK_query thread to process and how many it was actually able to process.'
+    },
+
+    'netdata.aclk_latency_mqtt': {
+        info: 'Measures latency between MQTT publish of the message and it\'s PUB_ACK being received'
     },
 
     // ------------------------------------------------------------------------
@@ -3155,7 +3415,7 @@ netdataDashboard.context = {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="queue_message_in"'
                     + ' data-chart-library="easypiechart"'
-                    + ' data-title="MQTT Recieve Rate"'
+                    + ' data-title="MQTT Receive Rate"'
                     + ' data-units="messages/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="14%"'
@@ -3406,5 +3666,89 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
         ],
+    },
+
+    // ------------------------------------------------------------------------
+    // Nvidia-smi
+
+    'nvidia_smi.fan_speed': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="speed"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Fan Speed"'
+                    + ' data-units="percentage"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.temperature': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="temp"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Temperature"'
+                    + ' data-units="celsius"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.memory_allocated': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Used Memory"'
+                    + ' data-units="MiB"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.power': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="power"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Power Utilization"'
+                    + ' data-units="watts"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
     },
 };

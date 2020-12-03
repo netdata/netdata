@@ -31,7 +31,7 @@ test -f $DAEMON || exit 0
 
 case "$1" in
 start)	log_daemon_msg "Starting real-time system monitoring" "netdata"
-        start_daemon -p $PIDFILE $DAEMON $EXTRA_OPTS
+        start_daemon -p $PIDFILE $DAEMON -P $PIDFILE $EXTRA_OPTS
         log_end_msg $?
 	;;
 stop)	log_daemon_msg "Stopping real-time system monitoring" "netdata"

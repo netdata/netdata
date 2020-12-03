@@ -121,6 +121,7 @@ class Service(SocketService):
 
         Example output returned from
         _get_raw_data():
+        prefix generic_worker4 78      78      500
         generic_worker2 78      78      500
         generic_worker3 0       0       760
         generic_worker1 0       0       500
@@ -137,13 +138,24 @@ class Service(SocketService):
             self.debug("Gearman returned no data")
             raise GearmanReadException()
 
-        job_lines = raw.splitlines()[:-1]
-        job_lines = [job.split() for job in sorted(job_lines)]
+        workers = list()
 
-        for line in job_lines:
-            line[1:] = map(int, line[1:])
+        for line in raw.splitlines()[:-1]:
+            parts = line.split()
+            if not parts:
+                continue
 
-        return job_lines
+            name = '_'.join(parts[:-3])
+            try:
+                values = [int(w) for w in parts[-3:]]
+            except ValueError:
+                continue
+
+            w = [name]
+            w.extend(values)
+            workers.append(w)
+
+        return workers
 
     def process_jobs(self, active_jobs):
 

@@ -30,7 +30,7 @@ void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_dataf
     struct rrdengine_datafile *next;
 
     next = datafile->next;
-    assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
+    fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
     ctx->datafiles.first = next;
 }
 
@@ -38,7 +38,7 @@ void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_dataf
 static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_instance *ctx,
                           unsigned tier, unsigned fileno)
 {
-    assert(tier == 1);
+    fatal_assert(tier == 1);
     datafile->tier = tier;
     datafile->fileno = fileno;
     datafile->file = (uv_file)0;
@@ -75,6 +75,27 @@ int close_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
+int unlink_data_file(struct rrdengine_datafile *datafile)
+{
+    struct rrdengine_instance *ctx = datafile->ctx;
+    uv_fs_t req;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    generate_datafilepath(datafile, path, sizeof(path));
+
+    ret = uv_fs_unlink(NULL, &req, path, NULL);
+    if (ret < 0) {
+        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        ++ctx->stats.fs_errors;
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+    }
+    uv_fs_req_cleanup(&req);
+
+    ++ctx->stats.datafile_deletions;
+
+    return ret;
+}
 
 int destroy_data_file(struct rrdengine_datafile *datafile)
 {
@@ -146,7 +167,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         error("uv_fs_write: %s", uv_strerror(ret));
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
@@ -184,7 +205,7 @@ static int check_data_file_superblock(uv_file file)
         uv_fs_req_cleanup(&req);
         goto error;
     }
-    assert(req.result >= 0);
+    fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
     if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
@@ -271,7 +292,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     ret = uv_fs_scandir(NULL, &req, ctx->dbfiles_path, 0, NULL);
     if (ret < 0) {
-        assert(req.result < 0);
+        fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
         error("uv_fs_scandir(%s): %s", ctx->dbfiles_path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
@@ -305,33 +326,47 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     ctx->last_fileno = datafiles[matched_files - 1]->fileno;
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
+        uint8_t must_delete_pair = 0;
+
         datafile = datafiles[i];
         ret = load_data_file(datafile);
         if (0 != ret) {
-            freez(datafile);
-            ++failed_to_load;
-            break;
+            must_delete_pair = 1;
         }
         journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
-            close_data_file(datafile);
-            freez(datafile);
-            freez(journalfile);
-            ++failed_to_load;
-            break;
+            if (!must_delete_pair) /* If datafile is still open close it */
+                close_data_file(datafile);
+            must_delete_pair = 1;
         }
+        if (must_delete_pair) {
+            char path[RRDENG_PATH_MAX];
+
+            error("Deleting invalid data and journal file pair.");
+            ret = unlink_journal_file(journalfile);
+            if (!ret) {
+                generate_journalfilepath(datafile, path, sizeof(path));
+                info("Deleted journal file \"%s\".", path);
+            }
+            ret = unlink_data_file(datafile);
+            if (!ret) {
+                generate_datafilepath(datafile, path, sizeof(path));
+                info("Deleted data file \"%s\".", path);
+            }
+            freez(journalfile);
+            freez(datafile);
+            ++failed_to_load;
+            continue;
+        }
+
         datafile_list_insert(ctx, datafile);
         ctx->disk_space += datafile->pos + journalfile->pos;
     }
+    matched_files -= failed_to_load;
     freez(datafiles);
-    if (failed_to_load) {
-        error("%u datafiles failed to load.", failed_to_load);
-        finalize_data_files(ctx);
-        return UV_EIO;
-    }
 
     return matched_files;
 }

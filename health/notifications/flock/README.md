@@ -1,11 +1,9 @@
 <!--
----
-title: "flock.com"
+title: "Flock"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/flock/README.md
----
 -->
 
-# flock.com
+# Flock
 
 This is what you will get:
 

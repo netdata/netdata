@@ -689,8 +689,10 @@ int main(int argc, char **argv) {
     }
     else if(!strcmp(argv[1], "--cgroup")) {
         char *cgroup = argv[2];
-        if(verify_path(cgroup) == -1)
-            fatal("cgroup '%s' does not exist or is not valid.", cgroup);
+        if(verify_path(cgroup) == -1) {
+            error("cgroup '%s' does not exist or is not valid.", cgroup);
+            return 1;
+        }
 
         pid = read_pid_from_cgroup(cgroup);
         call_the_helper(pid, cgroup);

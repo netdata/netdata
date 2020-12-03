@@ -499,10 +499,26 @@ function toggleAgentItem(e, guid) {
 // When you stream metrics from netdata to netdata, the recieving netdata now
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
+const OLD_DASHBOARD_SUFFIX = "old"
+let isOldSuffix = true
+try {
+    const currentScriptMainJs = document.currentScript;
+    const mainJsSrc = currentScriptMainJs.getAttribute("src")
+    isOldSuffix = mainJsSrc.startsWith("../main.js")
+} catch {
+    console.warn("current script not detecting, assuming the dashboard is running with /old suffix")
+}
+
+function transformWithOldSuffix(url) {
+    return isOldSuffix ? `../${url}` : url
+}
+
 function renderStreamedHosts(options) {
     let html = `<div class="info-item">Databases streamed to this agent</div>`;
 
-    var base = document.location.origin.toString() + document.location.pathname.toString();
+    var base = document.location.origin.toString() +
+      document.location.pathname.toString()
+        .replace(isOldSuffix ? `/${OLD_DASHBOARD_SUFFIX}` : "", "");
     if (base.endsWith("/host/" + options.hostname + "/")) {
         base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
     }
@@ -536,10 +552,10 @@ function renderStreamedHosts(options) {
         displayedDatabases = true;
 
         if (hostname === master) {
-            url = `${base}/`;
+            url = isOldSuffix ? `${base}/${OLD_DASHBOARD_SUFFIX}/` : `${base}/`;
             icon = 'home';
         } else {
-            url = `${base}/host/${hostname}/`;
+            url = isOldSuffix ? `${base}/host/${hostname}/${OLD_DASHBOARD_SUFFIX}/` : `${base}/host/${hostname}/`;
             icon = 'window-restore';
         }
 
@@ -790,11 +806,6 @@ function renderMyNetdataMenu(machinesArray) {
     if (!isSignedIn()) {
         html += (
             `<div class="agent-item">
-                <i class="fas fa-tv"></i>
-                <a onClick="openAuthenticatedUrl('console.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
-                <div></div>
-            </div>
-            <div class="agent-item">
                 <i class="fas fa-cog""></i>
                 <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
                 <div></div>
@@ -1932,7 +1943,7 @@ function renderChartsAndMenu(data) {
 
 function loadJs(url, callback) {
     $.ajax({
-        url: url,
+        url: url.startsWith("http") ? url : transformWithOldSuffix(url),
         cache: true,
         dataType: "script",
         xhrFields: { withCredentials: true } // required for the cookie
@@ -1979,7 +1990,7 @@ function loadBootstrapSlider(callback) {
     if (bootstrapSliderLoaded === false) {
         bootstrapSliderLoaded = true;
         loadJs('lib/bootstrap-slider-10.0.0.min.js', function () {
-            NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
+            NETDATA._loadCSS(transformWithOldSuffix("css/bootstrap-slider-10.0.0.min.css"));
             callback();
         });
     } else {
@@ -4805,11 +4816,7 @@ function signInDidClick(e) {
 }
 
 function shouldShowSignInBanner() {
-    if (isSignedIn()) {
-        return false;
-    }
-
-    return localStorage.getItem("signInBannerClosed") != "true";
+    return false;
 }
 
 function closeSignInBanner() {
@@ -4893,43 +4900,6 @@ function signOut() {
     cloudSSOSignOut();
 }
 
-function renderAccountUI() {
-    if (!NETDATA.registry.isCloudEnabled) {
-        return
-    }
-
-    const container = document.getElementById("account-menu-container");
-    if (isSignedIn()) {
-        container.removeAttribute("title");
-        container.removeAttribute("data-original-title");
-        container.removeAttribute("data-placement");
-        container.innerHTML = (
-            `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
-            <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
-                <li>
-                    <a onclick="openAuthenticatedUrl('console.html');" target="_blank" class="btn">
-                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="btn" onclick="signOutDidClick(event); return false">
-                    <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
-                    </a>
-                </li>
-            </ul>`
-        )
-        document.getElementById("amc-account-name").textContent = cloudAccountName; // Anti-XSS
-    } else {
-        container.setAttribute("data-original-title", "sign in");
-        container.setAttribute("data-placement", "bottom");
-        container.innerHTML = (
-            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
-                <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
-            </a>`
-        )
-    }
-}
-
 function handleMessage(e) {
     switch (e.data.type) {
         case "sign-in":
@@ -4962,7 +4932,6 @@ function handleSignInMessage(e) {
 
 function handleSignOutMessage(e) {
     clearCloudVariables();
-    renderAccountUI();
     renderMyNetdataMenu(registryAgents);
 }
 
@@ -5116,7 +5085,6 @@ function initCloud() {
     }
 
     touchAgent();
-    renderAccountUI();
 }
 
 // This callback is called after NETDATA.registry is initialized.

@@ -10,6 +10,8 @@
 #define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
 #define HEALTH_FAMILIES_KEY "families"
+#define HEALTH_PLUGIN_KEY "plugin"
+#define HEALTH_MODULE_KEY "module"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
@@ -485,6 +487,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_on = 0,
             hash_host = 0,
             hash_families = 0,
+            hash_plugin = 0,
+            hash_module = 0,
             hash_calc = 0,
             hash_green = 0,
             hash_red = 0,
@@ -510,6 +514,8 @@ static int health_readfile(const char *filename, void *data) {
         hash_os = simple_uhash(HEALTH_OS_KEY);
         hash_host = simple_uhash(HEALTH_HOST_KEY);
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
+        hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
+        hash_module = simple_uhash(HEALTH_MODULE_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
@@ -811,6 +817,20 @@ static int health_readfile(const char *filename, void *data) {
                 rc->labels = simple_pattern_trim_around_equal(value);
                 rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
+            else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
+                freez(rc->plugin_match);
+                simple_pattern_free(rc->plugin_pattern);
+
+                rc->plugin_match = strdupz(value);
+                rc->plugin_pattern = simple_pattern_create(rc->plugin_match, NULL, SIMPLE_PATTERN_EXACT);
+            }
+            else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
+                freez(rc->module_match);
+                simple_pattern_free(rc->module_pattern);
+
+                rc->module_match = strdupz(value);
+                rc->module_pattern = simple_pattern_create(rc->module_match, NULL, SIMPLE_PATTERN_EXACT);
+            }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rc->name, key);
@@ -834,6 +854,20 @@ static int health_readfile(const char *filename, void *data) {
 
                 rt->family_match = strdupz(value);
                 rt->family_pattern = simple_pattern_create(rt->family_match, NULL, SIMPLE_PATTERN_EXACT);
+            }
+            else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
+                freez(rt->plugin_match);
+                simple_pattern_free(rt->plugin_pattern);
+
+                rt->plugin_match = strdupz(value);
+                rt->plugin_pattern = simple_pattern_create(rt->plugin_match, NULL, SIMPLE_PATTERN_EXACT);
+            }
+            else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
+                freez(rt->module_match);
+                simple_pattern_free(rt->module_pattern);
+
+                rt->module_match = strdupz(value);
+                rt->module_pattern = simple_pattern_create(rt->module_match, NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,

@@ -1,8 +1,6 @@
 <!--
----
 title: "node.d.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/node.d.plugin/README.md
----
 -->
 
 # node.d.plugin

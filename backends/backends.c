@@ -551,7 +551,7 @@ void *backends_main(void *ptr) {
         case BACKEND_TYPE_OPENTSDB_USING_HTTP: {
 #ifdef ENABLE_HTTPS
             if (!strcmp(type, "opentsdb:https")) {
-                security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
+                security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
             }
 #endif
             backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
@@ -697,6 +697,7 @@ void *backends_main(void *ptr) {
     // prepare the backend main loop
 
     info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
+    send_statistics("BACKEND_START", "OK", type);
 
     usec_t step_ut = global_backend_update_every * USEC_PER_SEC;
     time_t after = now_realtime_sec();
@@ -1000,9 +1001,9 @@ void *backends_main(void *ptr) {
                 sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
 #ifdef ENABLE_HTTPS
                 if(sock != -1) {
-                    if(netdata_opentsdb_ctx) {
+                    if(netdata_exporting_ctx) {
                         if(!opentsdb_ssl.conn) {
-                            opentsdb_ssl.conn = SSL_new(netdata_opentsdb_ctx);
+                            opentsdb_ssl.conn = SSL_new(netdata_exporting_ctx);
                             if(!opentsdb_ssl.conn) {
                                 error("Failed to allocate SSL structure %d.", sock);
                                 opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -1072,7 +1073,7 @@ void *backends_main(void *ptr) {
                                     "Content-Length: %zu\r\n"
                                     "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
                                     remote_write_path,
-                                    hostname,
+                                    destination,
                                     data_size
                     );
 
@@ -1228,7 +1229,7 @@ cleanup:
     buffer_free(response);
 
 #ifdef ENABLE_HTTPS
-    if(netdata_opentsdb_ctx) {
+    if(netdata_exporting_ctx) {
         if(opentsdb_ssl.conn) {
             SSL_free(opentsdb_ssl.conn);
         }

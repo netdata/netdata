@@ -34,6 +34,9 @@ ORDER = [
     'tablespace_size',
     'tablespace_usage',
     'tablespace_usage_in_percent',
+    'allocated_size',
+    'allocated_usage',
+    'allocated_usage_in_percent',
 ]
 
 CHARTS = {
@@ -170,6 +173,18 @@ CHARTS = {
         'options': [None, 'Usage', '%', 'tablespace', 'oracledb.tablespace_usage_in_percent', 'line'],
         'lines': [],
     },
+    'allocated_size': {
+        'options': [None, 'Size', 'B', 'tablespace', 'oracledb.allocated_size', 'line'],
+        'lines': [],
+    },
+    'allocated_usage': {
+        'options': [None, 'Usage', 'B', 'tablespace', 'oracledb.allocated_usage', 'line'],
+        'lines': [],
+    },
+    'allocated_usage_in_percent': {
+        'options': [None, 'Usage', '%', 'tablespace', 'oracledb.allocated_usage_in_percent', 'line'],
+        'lines': [],
+    },
 }
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
@@ -192,6 +207,27 @@ SELECT
 FROM
   dba_tablespace_usage_metrics m
   JOIN dba_tablespaces t ON m.tablespace_name = t.tablespace_name
+'''
+QUERY_ALLOCATED = '''
+SELECT
+  nvl(b.tablespace_name,nvl(a.tablespace_name,'UNKNOWN')) tablespace_name,
+  bytes_alloc used_bytes,
+  bytes_alloc-nvl(bytes_free,0) max_bytes,
+  ((bytes_alloc-nvl(bytes_free,0))/ bytes_alloc)*100 used_percent
+FROM
+  (SELECT
+    sum(bytes) bytes_free,
+    tablespace_name
+    FROM sys.dba_free_space
+    GROUP BY tablespace_name
+  ) a,
+  (SELECT
+    sum(bytes) bytes_alloc,
+    tablespace_name
+    FROM sys.dba_data_files
+    GROUP BY tablespace_name
+  ) b
+WHERE a.tablespace_name (+) = b.tablespace_name
 '''
 QUERY_ACTIVITIES_COUNT = '''
 SELECT
@@ -396,6 +432,26 @@ class Service(SimpleService):
                 data['{0}_tablespace_size'.format(name)] = int(size * 1000)
                 data['{0}_tablespace_used'.format(name)] = int(used * 1000)
                 data['{0}_tablespace_used_in_percent'.format(name)] = int(used_in_percent * 1000)
+
+        # ALLOCATED SPACE
+        try:
+            rv = self.gather_allocated_metrics()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            for name, offline, size, used, used_in_percent in rv:
+                # TODO: skip offline?
+                if not (not offline and self.charts):
+                    continue
+                # TODO: remove inactive?
+                if name not in self.active_tablespaces:
+                    self.active_tablespaces.add(name)
+                    self.add_tablespace_to_charts(name)
+                data['{0}_allocated_size'.format(name)] = int(size * 1000)
+                data['{0}_allocated_used'.format(name)] = int(used * 1000)
+                data['{0}_allocated_used_in_percent'.format(name)] = int(used_in_percent * 1000)
 
         return data or None
 
@@ -612,6 +668,44 @@ class Service(SimpleService):
                 )
         return metrics
 
+    def gather_allocated_metrics(self):
+        """
+        :return:
+
+        [['SYSTEM', 874250240.0, 3233169408.0, 27.040038107400033, 0],
+         ['SYSAUX', 498860032.0, 3233169408.0, 15.429443033997678, 0],
+         ['TEMP', 0.0, 3233177600.0, 0.0, 0],
+         ['USERS', 1048576.0, 3233169408.0, 0.03243182981397305, 0]]
+        """
+        metrics = list()
+        with self.conn.cursor() as cursor:
+            cursor.execute(QUERY_ALLOCATED)
+            for tablespace_name, used_bytes, max_bytes, used_percent in cursor.fetchall():
+                if used_bytes is None:
+                    offline = True
+                    used = 0
+                else:
+                    offline = False
+                    used = float(used_bytes)
+                if max_bytes is None:
+                    size = 0
+                else:
+                    size = float(max_bytes)
+                if used_percent is None:
+                    used_percent = 0
+                else:
+                    used_percent = float(used_percent)
+                metrics.append(
+                    [
+                        tablespace_name,
+                        offline,
+                        size,
+                        used,
+                        used_percent,
+                    ]
+                )
+        return metrics
+
     def gather_wait_time_metrics(self):
         """
         :return:
@@ -706,6 +800,30 @@ class Service(SimpleService):
         self.charts['tablespace_usage_in_percent'].add_dimension(
             [
                 '{0}_tablespace_used_in_percent'.format(name),
+                name,
+                'absolute',
+                1,
+                1000,
+            ])
+        self.charts['allocated_size'].add_dimension(
+            [
+                '{0}_allocated_size'.format(name),
+                name,
+                'absolute',
+                1,
+                1000,
+                ])
+        self.charts['allocated_usage'].add_dimension(
+            [
+                '{0}_allocated_used'.format(name),
+                name,
+                'absolute',
+                1,
+                1000,
+                ])
+        self.charts['allocated_usage_in_percent'].add_dimension(
+            [
+                '{0}_allocated_used_in_percent'.format(name),
                 name,
                 'absolute',
                 1,

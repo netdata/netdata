@@ -45,6 +45,19 @@ CHARTS = {
     }
 }
 
+POOL_CIDR = "CIDR"
+POOL_IP_RANGE = "IP_RANGE"
+POOL_UNKNOWN = "UNKNOWN"
+
+def detect_ip_type(ip):
+    ip_type = ip.split("-")
+    if len(ip_type) == 1:
+        return POOL_CIDR
+    elif len(ip_type) == 2:
+        return POOL_IP_RANGE
+    else:
+        return POOL_UNKNOWN
+
 
 class DhcpdLeasesFile:
     def __init__(self, path):
@@ -86,6 +99,32 @@ class Pool:
     def __init__(self, name, network):
         self.id = re.sub(r'[:/.-]+', '_', name)
         self.name = name
+
+        self.networks = list()
+        for network in network.split(" "):
+            if not network:
+                continue
+
+            ip_type = detect_ip_type(ip=network)
+            if ip_type == POOL_CIDR:
+                self.networks.append(PoolCIDR(network=network))
+            elif ip_type == POOL_IP_RANGE:
+                self.networks.append(PoolIPRange(ip_range=network))
+            else:
+                raise ValueError('Network ({0}) incorrect syntax, expect CIDR or IPRange format.'.format(network))
+
+    def num_hosts(self):
+        return sum([network.num_hosts() for network in self.networks])
+
+    def __contains__(self, item):
+        for network in self.networks:
+            if item in network:
+                return True
+        return False
+
+
+class PoolCIDR:
+    def __init__(self, network):
         self.network = ipaddress.ip_network(address=u'%s' % network)
 
     def num_hosts(self):
@@ -93,6 +132,30 @@ class Pool:
 
     def __contains__(self, item):
         return item.address in self.network
+
+
+class PoolIPRange:
+    def __init__(self, ip_range):
+        ip_range = ip_range.split("-")
+        self.networks = list(self._summarize_address_range(ip_range[0], ip_range[1]))
+
+    @staticmethod
+    def ip_address(ip):
+        return ipaddress.ip_address(u'%s' % ip)
+
+    def _summarize_address_range(self, first, last):
+        address_first = self.ip_address(first)
+        address_last = self.ip_address(last)
+        return ipaddress.summarize_address_range(address_first, address_last)
+
+    def num_hosts(self):
+        return sum([network.num_addresses for network in self.networks])
+
+    def __contains__(self, item):
+        for network in self.networks:
+            if item.address in network:
+                return True
+        return False
 
 
 class Lease:

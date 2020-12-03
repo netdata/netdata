@@ -68,6 +68,9 @@ extern int registry_request_search_json(RRDHOST *host, struct web_client *w, cha
 extern int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when);
 extern int registry_request_hello_json(RRDHOST *host, struct web_client *w);
 
+// update the registry config
+extern void registry_update_cloud_base_url();
+
 // update the registry monitoring charts
 extern void registry_statistics(void);
 

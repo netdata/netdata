@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Kavenegar
 
-[Kavenegar](https://www.kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
+[Kavenegar](https://kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
 
 Will look like this on your Android device:
 
@@ -16,7 +16,7 @@ Will look like this on your Android device:
 You will need:
 
 1.  Signup and Login to kavenegar.com
-2.  Get your APIKEY and Sender from <http://panel.kavenegar.com/client/setting/account>
+2.  Get your APIKEY and Sender from `http://panel.kavenegar.com/client/setting/account`
 3.  Fill in KAVENEGAR_API_KEY="" KAVENEGAR_SENDER=""
 4.  Add the recipient phone numbers to DEFAULT_RECIPIENT_KAVENEGAR=""
 

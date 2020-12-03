@@ -68,6 +68,11 @@
 // netdata agent cloud link
 #include "aclk/agent_cloud_link.h"
 
+// global GUID map functions
+
+// netdata agent spawn server
+#include "spawn/spawn.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
@@ -83,6 +88,7 @@ extern char *netdata_configured_primary_plugins_dir;
 extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
+extern char *netdata_configured_lock_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;

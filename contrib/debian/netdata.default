@@ -1,5 +1,7 @@
 # Extra arguments to pass to netdata
 #
 #EXTRA_OPTS=""
-#uncomment following line if you are building a wheezy-package
-#EXTRA_OPTS="-P /var/run/netdata.pid"
+#
+# Location of pidfile. Only used on SysV init based systems.
+#
+#PIDFILE="/var/run/netdata/netdata.pid"

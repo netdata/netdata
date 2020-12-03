@@ -137,10 +137,12 @@ int json_callback_print(JSON_ENTRY *e)
  * @param e the output structure
  */
 static inline void json_jsonc_set_string(JSON_ENTRY *e,char *key,const char *value) {
-    size_t length = strlen(key);
+    size_t len = strlen(key);
+    if(len > JSON_NAME_LEN)
+        len = JSON_NAME_LEN;
     e->type = JSON_STRING;
-    memcpy(e->name,key,length);
-    e->name[length] = 0x00;
+    memcpy(e->name,key,len);
+    e->name[len] = 0x00;
     e->data.string = (char *) value;
 }
 
@@ -157,6 +159,16 @@ static inline void json_jsonc_set_string(JSON_ENTRY *e,char *key,const char *val
 static inline void json_jsonc_set_boolean(JSON_ENTRY *e,int value) {
     e->type = JSON_BOOLEAN;
     e->data.boolean = value;
+}
+
+static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t value) {
+    size_t len = strlen(key);
+    if(len > JSON_NAME_LEN)
+        len = JSON_NAME_LEN;
+    e->type = JSON_NUMBER;
+    memcpy(e->name, key, len);
+    e->name[len] = 0;
+    e->data.number = value;
 }
 
 /**
@@ -446,6 +458,9 @@ size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(s
             callback_function(&e);
         } else if (type == json_type_boolean) {
             json_jsonc_set_boolean(&e,json_object_get_boolean(val));
+            callback_function(&e);
+        } else if (type == json_type_int) {
+            json_jsonc_set_integer(&e,key,json_object_get_int64(val));
             callback_function(&e);
         }
     }

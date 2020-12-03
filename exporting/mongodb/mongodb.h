@@ -21,7 +21,6 @@ struct mongodb_specific_data {
 
     size_t total_documents_inserted;
 
-    bson_t **current_insert;
     struct bson_buffer *first_buffer;
     struct bson_buffer *last_buffer;
 };

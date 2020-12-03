@@ -4,6 +4,8 @@
 #include "../daemon/common.h"
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
+#include "aclk_stats.h"
+#include "aclk_rx_msgs.h"
 
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
@@ -13,6 +15,10 @@ inline const char *_link_strerror(int rc)
     return mosquitto_strerror(rc);
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+static struct timeval sendTimes[1024];
+#endif
+
 static struct mosquitto *mosq = NULL;
 
 
@@ -21,7 +27,7 @@ void mqtt_message_callback(struct mosquitto *mosq, void *obj, const struct mosqu
     UNUSED(mosq);
     UNUSED(obj);
 
-    aclk_handle_cloud_request(msg->payload);
+    aclk_handle_cloud_message(msg->payload);
 }
 
 void publish_callback(struct mosquitto *mosq, void *obj, int rc)
@@ -29,8 +35,17 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(mosq);
     UNUSED(obj);
     UNUSED(rc);
+#ifdef NETDATA_INTERNAL_CHECKS
+    struct timeval now, *orig;
+    now_realtime_timeval(&now);
+    orig = &sendTimes[ rc & 0x3ff ];
+    int64_t diff = (now.tv_sec - orig->tv_sec) * USEC_PER_SEC + (now.tv_usec - orig->tv_usec);
+    diff /= 1000;
 
-    // TODO: link this with a msg_id so it can be traced
+    info("Publish_callback: mid=%d latency=%" PRId64 "ms", rc, diff);
+
+    aclk_metric_mat_update(&aclk_metrics_per_sample.latency, diff);
+#endif
     return;
 }
 
@@ -219,7 +234,8 @@ void aclk_lws_connection_data_received()
 
 void aclk_lws_connection_closed()
 {
-    aclk_disconnect(NULL);
+    aclk_disconnect();
+
 }
 
 
@@ -283,7 +299,7 @@ int _link_set_lwt(char *sub_topic, int qos)
 
     usec_t lwt_time = aclk_session_sec * USEC_PER_SEC + aclk_session_us + 1;
     BUFFER *b = buffer_create(512);
-    aclk_create_header(b, "disconnect", NULL, lwt_time / USEC_PER_SEC, lwt_time % USEC_PER_SEC);
+    aclk_create_header(b, "disconnect", NULL, lwt_time / USEC_PER_SEC, lwt_time % USEC_PER_SEC, ACLK_VERSION_NEG_VERSION);
     buffer_strcat(b, ", \"payload\": \"unexpected\" }");
     rc = mosquitto_will_set(mosq, topic, buffer_strlen(b), buffer_tostring(b), qos, 0);
     buffer_free(b);
@@ -316,18 +332,29 @@ int _link_subscribe(char *topic, int qos)
  *
  */
 
-int _link_send_message(char *topic, unsigned char *message, int *mid)
+int _link_send_message(char *topic, const void *message, size_t len, int *mid)
 {
     int rc;
+    size_t write_q, write_q_bytes, read_q;
 
     rc = mosquitto_pub_topic_check(topic);
 
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         return rc;
 
-    int msg_len = strlen((char*)message);
-    info("Sending MQTT len=%d starts %02x %02x %02x", msg_len, message[0], message[1], message[2]);
-    rc = mosquitto_publish(mosq, mid, topic, msg_len, message, ACLK_QOS, 0);
+    lws_wss_check_queues(&write_q, &write_q_bytes, &read_q);
+    rc = mosquitto_publish(mosq, mid, topic, len, message, ACLK_QOS, 0);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char msg_head[64];
+    memset(msg_head, 0, sizeof(msg_head));
+    strncpy(msg_head, (char*)message, 60);
+    for (size_t i = 0; i < sizeof(msg_head); i++)
+        if(msg_head[i] == '\n') msg_head[i] = ' ';
+    info("Sending MQTT len=%d mid=%d wq=%zu (%zu-bytes) readq=%zu: %s", (int)len,
+         *mid, write_q, write_q_bytes, read_q, msg_head);
+    now_realtime_timeval(&sendTimes[ *mid & 0x3ff ]);
+#endif
 
     // TODO: Add better handling -- error will flood the logfile here
     if (unlikely(rc != MOSQ_ERR_SUCCESS)) {

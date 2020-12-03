@@ -50,8 +50,7 @@ forward or backward in time, or selecting a specific timeframe for more in-depth
 analysis.
 
 Whenever you use a chart in this way, Netdata synchronizes all the other charts
-to match it. Chart synchronization even works between separate Netdata agents if you connect
-them using the [**My nodes** menu](/registry/README.md)!
+to match it.
 
 You can change how charts show their metrics in a few different ways, each of
 which have a few methods:
@@ -66,13 +65,18 @@ which have a few methods:
 
 Here's how chart synchronization looks while zooming and panning:
 
-![Animated GIF of the standard Netdata dashboard being manipulated and
-synchronizing
-charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
 
 You can also perform all these actions using the small
 rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the
 bottom-right corner of each chart.
+
+Additionally, resize charts by clicking-and-dragging the icon on the bottom-right corner of any chart. To restore the
+chart to its original height, double-click the same icon.
+
+![Animated GIF of resizing a chart and resetting it to the default
+height](https://user-images.githubusercontent.com/1153921/80842459-7d41e280-8bb6-11ea-9488-1bc29f94d7f2.gif)
 
 ## Charts, contexts, families
 
@@ -191,7 +195,8 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 metrics representing `read`, `input`, `inbound`, `received` and **negative**
 values for metrics representing `write`, `output`, `outbound`, `sent`.
 
-![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
+![Screenshot showing positive and negative
+values](https://user-images.githubusercontent.com/1153921/81870401-9d649080-952a-11ea-80e3-4a7b480252ee.gif)
 
 _Netdata charts showing the bandwidth and packets of a network interface.
 `received` is positive and `sent` is negative._
@@ -201,7 +206,8 @@ _Netdata charts showing the bandwidth and packets of a network interface.
 Netdata charts automatically zoom vertically, to visualize the variation of each
 metric within the visible timeframe.
 
-![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+![Animated GIF showing the auso-scaling Y
+axis](https://user-images.githubusercontent.com/1153921/80838276-8084a080-8bad-11ea-8167-8d5ab2fb1be1.gif)
 
 _A zero-based `stacked` chart, automatically switches to an auto-scaled `area`
 chart when a single dimension is selected._

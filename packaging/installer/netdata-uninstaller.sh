@@ -187,7 +187,7 @@ portable_del_group() {
       run groupdel "${groupname}" && return 0
     else
       echo >&2 "Group ${groupname} already removed in a previous step."
-      run_ok
+      return 0
     fi
   fi
 
@@ -197,6 +197,7 @@ portable_del_group() {
       run dseditgroup -o delete "${groupname}" && return 0
     else
       echo >&2 "Could not find group ${groupname}, nothing to do"
+      return 0
     fi
   fi
 
@@ -440,34 +441,6 @@ stop_all_netdata() {
 
 trap quit_msg EXIT
 
-uninstall_ebpf() {
-  # Removing NetData's libexec directory is taken care of which is where we
-  # installed the rest of the shared libraires for the eBPF Collector.
-
-  echo >&2 " Finding lib directory ..."
-  libdir=
-  libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | grep 'usr' | head -n 1)"
-  if [ -z "${libdir}" ]; then
-    libdir="$(ldconfig -v 2> /dev/null | grep ':$' | sed -e 's/://' | sort -r | head -n 1)"
-  fi
-
-  if [ -z "${libdir}" ]; then
-    echo >&2 "Unable to find the system lib directory we installed eBPF ebpf_kernel.so to ..."
-    user_input "Press ENTER to search your system (which may take some time) ..."
-    find / -type f -name 'libbpf_kernel.so' -o -name 'libbpf_kernel.so.0'
-    echo >&2 "Please manually delete these files"
-    return 1
-  fi
-
-  rm_file "${libdir}/libbpf_kernel.so.0"
-  rm_file "${libdir}/libbpf_kernel.so"
-  run ldconfig
-
-  echo >&2 "ePBF uninstall all done!"
-
-  return 0
-}
-
 #shellcheck source=/dev/null
 source "${ENVIRONMENT_FILE}" || exit 1
 
@@ -480,9 +453,17 @@ rm_file /etc/logrotate.d/netdata
 rm_file /etc/systemd/system/netdata.service
 rm_file /lib/systemd/system/netdata.service
 rm_file /usr/lib/systemd/system/netdata.service
+rm_file /etc/systemd/system/netdata-updater.service
+rm_file /lib/systemd/system/netdata-updater.service
+rm_file /usr/lib/systemd/system/netdata-updater.service
+rm_file /etc/systemd/system/netdata-updater.timer
+rm_file /lib/systemd/system/netdata-updater.timer
+rm_file /usr/lib/systemd/system/netdata-updater.timer
 rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
+rm_file /etc/cron.d/netdata-updater
+
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
   rm_dir "${NETDATA_PREFIX}"
@@ -498,8 +479,6 @@ else
   rm_dir "/var/log/netdata"
   rm_dir "/etc/netdata"
 fi
-
-uninstall_ebpf || echo >&2 "Unable to remove eBPF files automatically"
 
 FILE_REMOVAL_STATUS=1
 

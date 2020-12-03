@@ -7,8 +7,8 @@
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
     rrdset_rdlock(st);
 
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
 
     buffer_sprintf(wb,
             "\t\t{\n"
@@ -72,14 +72,14 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         memory += rd->memsize;
 
-        buffer_sprintf(
-                wb
-                , "%s"
-                  "\t\t\t\t\"%s\": { \"name\": \"%s\" }"
-                , dimensions ? ",\n" : ""
-                , rd->id
-                , rd->name
-        );
+        if (dimensions)
+            buffer_strcat(wb, ",\n\t\t\t\t\"");
+        else
+            buffer_strcat(wb, "\t\t\t\t\"");
+        buffer_strcat_jsonescape(wb, rd->id);
+        buffer_strcat(wb, "\": { \"name\": \"");
+        buffer_strcat_jsonescape(wb, rd->name);
+        buffer_strcat(wb, "\" }");
 
         dimensions++;
     }

@@ -18,8 +18,12 @@ typedef struct {
 
 static __thread NETDATA_THREAD *netdata_thread = NULL;
 
+inline int netdata_thread_tag_exists(void) {
+    return (netdata_thread && netdata_thread->tag && *netdata_thread->tag);
+}
+
 const char *netdata_thread_tag(void) {
-    return ((netdata_thread && netdata_thread->tag && *netdata_thread->tag)?netdata_thread->tag:"MAIN");
+    return (netdata_thread_tag_exists() ? netdata_thread->tag : "MAIN");
 }
 
 // ----------------------------------------------------------------------------
@@ -149,6 +153,16 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
 
     if (ret)
         info("cannot set libuv thread name to %s. Err: %d", threadname, ret);
+}
+
+void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
+{
+    threadname[0] = '\0';
+#if defined(__FreeBSD__)
+    pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
+#elif defined(HAVE_PTHREAD_GETNAME_NP) /* Linux & macOS */
+    (void)pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
+#endif
 }
 
 static void *thread_start(void *ptr) {

@@ -1,8 +1,6 @@
 <!--
----
 title: "Dynatrace"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/dynatrace/README.md
----
 -->
 
 # Dynatrace
@@ -22,10 +20,10 @@ This is a required parameter.
 Generate a Dynatrace API authentication token. On your Dynatrace server, go to **Settings** --> **Integration** --> **Dynatrace API** --> **Generate token**.
 See [Dynatrace API - Authentication](https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/basics/dynatrace-api-authentication/) for more details.
 This is a required parameter.
-3.  API Space. This is the URL part of the page you have access in order to generate the API Token. For example, for my generated API Token the URL is:
-https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all
-In that case, my space is _2a93fe0e-4cd5-469a-9d0d-1a064235cfce_
-This is a required parameter.
+3.  API Space. This is the URL part of the page you have access in order to generate the API Token. For example, the URL
+    for a generated API token might look like:
+    `https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all` In that
+    case, my space is _2a93fe0e-4cd5-469a-9d0d-1a064235cfce_ This is a required parameter.
 4. Generate a Server Tag. On your Dynatrace Server, go to **Settings** --> **Tags** --> **Manually applied tags** and create the Tag.
 The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
 This is a required parameter.

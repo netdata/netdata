@@ -18,7 +18,6 @@ This is a list of the donations we have received for Netdata (sorted alphabetica
 | Cloud VMs|[london.my-netdata.io](https://london.my-netdata.io) (Several VMs)|**[DigitalOcean.com](https://www.digitalocean.com/)**|**DigitalOcean.com** donated 1000 USD to be used in their excellent Cloud Computing services. Many thanks to [Justin Paine](https://github.com/xxdesmus) for making this happen.|
 | Development IDE|-|**[JetBrains.com](https://www.jetbrains.com/)**|**JetBrains.com** donated an open source license for 4 developers  for 1 year, to their excellent IDEs.|
 | Cloud VM|[octopuscs.my-netdata.io](https://octopuscs.my-netdata.io)|**[OctopusCS.com](https://octopuscs.com/)**|**OctopusCS.com** donated a VM with 4 CPU cores, 16GB RAM and 50GB HD in their excellent Cloud Computing services.|
-| Cloud VM|[ventureer.my-netdata.io](https://ventureer.my-netdata.io)|**[Ventureer.com](https://ventureer.com/)**|**Ventureer.com** donated a VM with 4 CPU cores, 8GB RAM and 50GB HD in their excellent Cloud Computing services.|
 | Cloud VM|[stackscale.my-netdata.io](https://stackscale.my-netdata.io)|**[stackscale.com](https://www.stackscale.com/)**|**StackScale.com** donated a VM with 4 CPU cores, 16GB RAM and 100GB HD in their excellent Cloud Computing services.|
 
 Thank you!

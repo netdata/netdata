@@ -1,11 +1,10 @@
 <!--
----
-title: "Go application monitoring with Netdata"
+title: "Go applications monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/go_expvar/README.md
----
+sidebar_label: "Go applications"
 -->
 
-# Go application monitoring with Netdata
+# Go applications monitoring with Netdata
 
 Monitors Go application that exposes its metrics with the use of `expvar` package from the Go standard library.  The package produces charts for Go runtime memory statistics and optionally any number of custom charts.
 
@@ -255,8 +254,8 @@ the first defined key wins and all subsequent keys with the same name are ignore
 
 ## Configuration
 
-Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

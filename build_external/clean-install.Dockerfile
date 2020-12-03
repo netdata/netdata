@@ -33,4 +33,7 @@ RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
 
+RUN rm /var/lib/netdata/registry/netdata.public.unique.id
+
 CMD ["/usr/sbin/netdata","-D"]
+ENTRYPOINT []

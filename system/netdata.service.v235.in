@@ -21,7 +21,7 @@ EnvironmentFile=-/etc/default/netdata
 ExecStart=/usr/sbin/netdata -D $EXTRA_OPTS
 
 # saving a big db on slow disks may need some time
-TimeoutStopSec=60
+TimeoutStopSec=150
 
 # restart netdata if it crashes
 Restart=on-failure

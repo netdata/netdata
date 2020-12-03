@@ -10,10 +10,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/R
 
 This wraps the build-system in Docker so that the host system and the target system are
 decoupled. This allows:
-* Cross-compilation (e.g. linux development from macOS)
-* Cross-distro (e.g. using CentOS user-land while developing on Debian)
-* Multi-host scenarios (e.g. master/slave configurations)
-* Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
+
+-   Cross-compilation (e.g. linux development from macOS)
+-   Cross-distro (e.g. using CentOS user-land while developing on Debian)
+-   Multi-host scenarios (e.g. parent-child configurations)
+-   Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
 for developers. This is the first iteration of the build-system to allow the team to use
@@ -97,19 +98,19 @@ Note: it is possible to run multiple copies of the agent using the `--scale` opt
 Distro=debian Version=10 docker-compose -f projects/only-agent/docker-compose.yml up --scale agent=3
 ```
 
-3. A simple master-slave scenario
+3. A simple parent-child scenario
 
 ```bash
-# Need to call clean-install on the configs used in the master/slave containers
-docker-compose -f master-slaves/docker-compose.yml up --scale agent_slave1=2
+# Need to call clean-install on the configs used in the parent-child containers
+docker-compose -f parent-child/docker-compose.yml up --scale agent_child1=2
 ```
 
 Note: this is not production ready yet, but it is left in so that we can see how it behaves
 and improve it. Currently it produces the following problems:
   * Only the base-configuration in the compose without scaling works.
   * The containers are hard-coded in the compose.
-  * There is no way to separate the agent configurations, so running multiple agent slaves
-    wth the same GUID kills the master which exits with a fatal condition.
+  * There is no way to separate the agent configurations, so running multiple agent child nodes with the same GUID kills
+    the parent which exits with a fatal condition.
 
 4. The ACLK
 

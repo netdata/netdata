@@ -51,7 +51,7 @@ case "${running_os}" in
 	update-ca-certificates
 	;;
 "arch")
-	pacman -Sy
+	pacman --noconfirm -Syu
 	pacman --noconfirm --needed -S bash-bats curl libffi
 	;;
 "alpine")

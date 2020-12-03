@@ -17,6 +17,7 @@ DEFAULT_PORT = '389'
 DEFAULT_TLS = False
 DEFAULT_CERT_CHECK = True
 DEFAULT_TIMEOUT = 1
+DEFAULT_START_TLS = False
 
 ORDER = [
     'total_connections',
@@ -143,6 +144,7 @@ class Service(SimpleService):
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
         self.use_tls = configuration.get('use_tls', DEFAULT_TLS)
         self.cert_check = configuration.get('cert_check', DEFAULT_CERT_CHECK)
+        self.use_start_tls = configuration.get('use_start_tls', DEFAULT_START_TLS)
         self.alive = False
         self.conn = None
 
@@ -159,8 +161,13 @@ class Service(SimpleService):
             else:
                 self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
-            if self.use_tls and not self.cert_check:
+            if (self.use_tls or self.use_start_tls) and not self.cert_check:
                 self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+            if self.use_start_tls or self.use_tls:
+                self.conn.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
+            if self.use_start_tls:
+                self.conn.protocol_version = ldap.VERSION3
+                self.conn.start_tls_s()
             if self.username and self.password:
                 self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:
@@ -197,13 +204,13 @@ class Service(SimpleService):
                 self.alive = False
                 return None
 
+            if result_type != 101:
+                continue
+
             try:
-                if result_type == 101:
-                    val = int(list(result_data[0][1].values())[0][0])
+                data[key] = int(list(result_data[0][1].values())[0][0])
             except (ValueError, IndexError) as error:
                 self.debug(error)
                 continue
-
-            data[key] = val
 
         return data

@@ -1,11 +1,10 @@
 <!--
----
-title: "Spring Boot2 monitoring with Netdata"
+title: "Java Spring Boot 2 application monitoring with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/springboot/README.md
----
+sidebar_label: "Java Spring Boot 2 applications"
 -->
 
-# Spring Boot2 monitoring with Netdata
+# Java Spring Boot 2 application monitoring with Netdata
 
 Monitors one or more Java Spring-boot applications depending on configuration.
 Netdata can be used to monitor running Java [Spring Boot](https://spring.io/) applications that expose their metrics with the use of the **Spring Boot Actuator** included in Spring Boot library.
@@ -101,8 +100,8 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
 
 ## Usage
 
-Edit the `python.d/springboot.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/springboot.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
