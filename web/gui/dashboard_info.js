@@ -1105,7 +1105,7 @@ netdataDashboard.context = {
     },
 
     'apps.file_open_error': {
-        info: 'Number of calls for  internal function <code>do_sys_open</code>, which returned error.'
+        info: 'Failed calls to the internal function <code>do_sys_open</code>.'
     },
 
     'apps.file_closed': {
