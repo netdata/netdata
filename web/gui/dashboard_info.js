@@ -1126,7 +1126,7 @@ netdataDashboard.context = {
     },
 
     'apps.vfs_write_error': {
-        info: 'Failed calls to function <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+        info: 'Failed calls to the function <code>vfs_write</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_call': {
