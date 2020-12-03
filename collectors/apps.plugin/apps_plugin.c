@@ -3813,8 +3813,6 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
-        if (!strcmp("apps", type))
-            fprintf(stdout, "VARIABLE fdperc '' absolute 1 1\n");
 
         fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
                        type, title, type, update_every);
