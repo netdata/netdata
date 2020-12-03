@@ -3614,9 +3614,10 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
-        if (!strcmp("apps", type))
+        if (!strcmp("apps", type)){
             kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
             fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
+        }
         send_END();
 
         send_BEGIN(type, "sockets", dt);
