@@ -18,8 +18,6 @@ disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
 
-BAD_VALUE = ('N/A', 'Unknown')
-
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
@@ -467,7 +465,7 @@ class Service(SimpleService):
             gpu = GPU(idx, root, self.exclude_zero_memory_users)
             gpu_data = gpu.data()
             # self.debug(gpu_data)
-            gpu_data = dict((k, v) for k, v in gpu_data.items() if v is not None and v not in BAD_VALUE)
+            gpu_data = dict((k, v) for k, v in gpu_data.items() if is_gpu_data_value_valid(v))
             data.update(gpu_data)
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)
@@ -542,3 +540,11 @@ class Service(SimpleService):
             order, charts = gpu_charts(GPU(idx, root))
             self.order.extend(order)
             self.definitions.update(charts)
+
+
+def is_gpu_data_value_valid(value):
+    try:
+        int(value)
+    except (TypeError, ValueError):
+        return False
+    return True
