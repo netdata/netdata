@@ -1109,7 +1109,7 @@ netdataDashboard.context = {
     },
 
     'apps.file_closed': {
-        info: 'Calls for internal function <code>__close_fd</code>, which is called from system call' +
+        info: 'Calls to the internal function <code>__close_fd</code>, which is called from' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
