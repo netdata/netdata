@@ -227,7 +227,7 @@ class Service(ExecutableService):
         self.parser = Parser()
         self.command = None
         self.collected_vbe = set()
-        self.collected_smf_sma = set()
+        self.collected_storages = set()
 
     def create_command(self):
         varnishstat = find_binary(VARNISHSTAT)
@@ -298,7 +298,7 @@ class Service(ExecutableService):
         data.update(stats)
 
         self.get_vbe_backends(data, raw)
-        self.get_smf_sma_storages(server_stats)
+        self.get_storages(server_stats)
 
         # varnish 5 uses default.g_bytes and default.g_space
         data['memory_allocated'] = data.get('s0.g_bytes') or data.get('default.g_bytes')
@@ -320,7 +320,13 @@ class Service(ExecutableService):
             self.collected_vbe.add(name)
             self.add_backend_charts(name)
 
-    def get_smf_sma_storages(self, server_stats):
+    def get_storages(self, server_stats):
+        # Storage types:
+        #  - SMF: File Storage
+        #  - SMA: Malloc Storage
+        #  - MSE: Massive Storage Engine (Varnish-Plus only)
+        #
+        # Stats example:
         #  [('SMF.', 'ssdStorage.c_req', '47686'),
         #  ('SMF.', 'ssdStorage.c_fail', '0'),
         #  ('SMF.', 'ssdStorage.c_bytes', '668102656'),
@@ -331,14 +337,14 @@ class Service(ExecutableService):
         #  ('SMF.', 'ssdStorage.g_smf', '40130'),
         #  ('SMF.', 'ssdStorage.g_smf_frag', '311'),
         #  ('SMF.', 'ssdStorage.g_smf_large', '66')]
-        storages = [name for typ, name, _ in server_stats if typ.startswith(('SMF', 'SMA')) and name.endswith('g_space')]
+        storages = [name for typ, name, _ in server_stats if typ.startswith(('SMF', 'SMA', 'MSE')) and name.endswith('g_space')]
         if not storages:
             return
         for storage in storages:
             storage = storage.split('.')[0]
-            if storage in self.collected_smf_sma:
+            if storage in self.collected_storages:
                 continue
-            self.collected_smf_sma.add(storage)
+            self.collected_storages.add(storage)
             self.add_storage_charts(storage)
 
     def add_backend_charts(self, backend_name):
