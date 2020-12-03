@@ -1118,7 +1118,7 @@ netdataDashboard.context = {
     },
 
     'apps.file_deleted': {
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
+        info: 'Calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
     },
 
     'apps.vfs_write_call': {
