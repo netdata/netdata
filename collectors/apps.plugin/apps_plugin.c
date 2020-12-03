@@ -4198,7 +4198,7 @@ int main(int argc, char **argv) {
             printf("DISABLE\n");
             exit(1);
         }
-        
+
         currentmaxfds = 0;
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
