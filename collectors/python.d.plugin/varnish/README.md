@@ -30,6 +30,7 @@ This module produces the following charts:
 -   Backend Connections Statistics in `connections/s`
 -   Requests To The Backend in `requests/s`
 -   ESI Statistics in `problems/s`
+-   Memory Usage in `MiB`
 -   Uptime in `seconds`
 
 For every backend (VBE):
