@@ -231,11 +231,11 @@ the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 ### `[service name]`
 
-Netdata uses the list of services in `/etc/services` to plot network connections charts. If this file does not contain the
+Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
 
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network connections charts, and thus see the name of the service instead of its port, define it:
+service in network connection charts, and thus see the name of the service instead of its port, define it:
 
 ```conf
 [service name]
