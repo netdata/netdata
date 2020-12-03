@@ -3204,7 +3204,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
-        
         created_charts = 1;
 
         fprintf(stdout,
@@ -3608,7 +3607,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             send_SET(w->name, w->io_storage_bytes_written);
     }
     send_END();
-
 
     kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
     const char *fdname = "fdperc";
