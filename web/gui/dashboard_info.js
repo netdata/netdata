@@ -1158,7 +1158,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_sent': {
-        info: 'Bytes sent for functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
     },
 
     'apps.bandwidth_recv': {
