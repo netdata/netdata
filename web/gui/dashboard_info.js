@@ -1162,7 +1162,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_recv': {
-        info: 'Bytes received for functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
     },
 
     // ------------------------------------------------------------------------
