@@ -1130,7 +1130,7 @@ netdataDashboard.context = {
     },
 
     'apps.vfs_read_call': {
-        info: 'Successful calls to functions <code>vfs_read</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+        info: 'Successful calls to the function <code>vfs_read</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_error': {
