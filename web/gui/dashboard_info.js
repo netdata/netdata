@@ -1146,7 +1146,7 @@ netdataDashboard.context = {
     },
 
     'apps.process_create': {
-        info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by couting the number of calls for <code>sys_clone</code> that has not the flag <code>CLONE_THREAD</code> set.'
+        info: 'Calls to the function <code>do_fork</code> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <code>sys_clone</code> that do not have the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.thread_create': {
