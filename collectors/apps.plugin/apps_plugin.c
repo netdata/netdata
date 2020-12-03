@@ -509,7 +509,6 @@ static int
         all_files_len = 0,
         all_files_size = 0;
         long double currentmaxfds = 0;
-        long double currentfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -2999,9 +2998,8 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(w);
     reallocate_target_fds(u);
     reallocate_target_fds(g);
-    
-    
-    currentfds = 0;
+
+    long double currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3108,7 +3106,7 @@ static void calculate_netdata_statistics(void) {
 
     // concentrate everything on the targets
     for(p = root_of_pids; p ; p = p->next) {
-        
+
         // --------------------------------------------------------------------
         // apps_groups target
 
@@ -3203,7 +3201,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         memmove(&last, &now, sizeof(struct timeval));
         memmove(&me_last, &me, sizeof(struct rusage));
     }
-    
 
     static char created_charts = 0;
     if(unlikely(!created_charts)) {
@@ -3249,6 +3246,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
                     , update_every
                     , RATES_DETAIL
             );
+
     }
 
     fprintf(stdout,
@@ -3612,7 +3610,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
 
-    //unsigned long long usedfdpercentage = (unsigned long long) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
     kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
     const char *fdname = "fdperc";
     if(enable_file_charts) {
@@ -3811,9 +3808,9 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 #endif
-    
+
     if(enable_file_charts) {
-           fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
+        fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
