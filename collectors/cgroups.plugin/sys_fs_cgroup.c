@@ -1547,7 +1547,6 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->chart_title);
 
     free_label_list(cg->chart_labels);
-    freez(cg->chart_labels);
 
     freez(cg);
 
