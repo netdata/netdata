@@ -219,7 +219,7 @@ void read_extent_cb(uv_fs_t* req)
     int ret;
     unsigned i, j, count;
     void *page, *uncompressed_buf = NULL;
-    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length;
+    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length = 0;
     uint8_t have_read_error = 0;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
