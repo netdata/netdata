@@ -175,12 +175,12 @@ When the integration is enabled, your dashboard will also show the following cha
 -   eBPF net
     -   Number of bytes transmited per seconds.   
 
-If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `disable
-apps` to `yes`.
+If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
+`no`.
 
 ```conf
 [global]
-   disable apps = yes
+   apps = yes
 ```
 
 ### `[ebpf programs]`
@@ -192,12 +192,12 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
 
-### `[network viewer]`
+### `[network connections]`
 
 You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
 ```conf
-[network viewer]
+[network connections]
     maximum dimensions = 500
     resolve hostname ips = no
     ports = 1-1024 !145 !domain
@@ -221,8 +221,8 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
-will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
+they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
@@ -231,11 +231,11 @@ the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 ### `[service name]`
 
-Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
+Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
 
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network viewer charts, and thus see the name of the service instead of its port, define it:
+service in network connection charts, and thus see the name of the service instead of its port, define it:
 
 ```conf
 [service name]

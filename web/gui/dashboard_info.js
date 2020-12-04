@@ -1105,67 +1105,70 @@ netdataDashboard.context = {
     },
 
     'apps.file_open': {
-        height: 2.0
+        info: 'Calls to the internal function <code>do_sys_open</code>, which is the common function called from' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
     },
 
     'apps.file_open_error': {
-        height: 2.0
+        info: 'Failed calls to the internal function <code>do_sys_open</code>.'
     },
 
     'apps.file_closed': {
-        height: 2.0
+        info: 'Calls to the internal function <code>__close_fd</code>, which is called from' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'apps.file_close_error': {
-        height: 2.0
+        info: 'Failed calls to the internal function <code>__close_fd</code>.'
     },
 
     'apps.file_deleted': {
-        height: 2.0
+        info: 'Calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
     },
 
     'apps.vfs_write_call': {
-        height: 2.0
+        info: 'Successful calls to the function <code>vfs_write</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_error': {
-        height: 2.0
+        info: 'Failed calls to the function <code>vfs_write</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_call': {
-        height: 2.0
+        info: 'Successful calls to the function <code>vfs_read</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_error': {
-        height: 2.0
+        info: 'Failed calls to the function <code>vfs_read</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_bytes': {
-        height: 2.0
+        info: 'Total of bytes successfully written using the function <code>vfs_write</code>.'
     },
 
     'apps.vfs_read_bytes': {
-        height: 2.0
+        info: 'Total of bytes successfully read using the function <code>vfs_read</code>.'
     },
 
     'apps.process_create': {
-        height: 2.0
+        info: 'Calls to the function <code>do_fork</code> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <code>sys_clone</code> that do not have the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.thread_create': {
-        height: 2.0
+        info: 'Calls to the function <code>do_fork</code> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <code>sys_clone</code> that have the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.task_close': {
-        height: 2.0
+        info: 'Calls to the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
     },
 
     'apps.bandwidth_sent': {
-        height: 2.0
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
     },
 
     'apps.bandwidth_recv': {
-        height: 2.0
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
     },
 
     // ------------------------------------------------------------------------
@@ -3302,7 +3305,7 @@ netdataDashboard.context = {
 
     'ebpf.io_bytes': {
         title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions  <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
     'ebpf.io_error': {
