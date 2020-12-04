@@ -31,4 +31,4 @@ jobs:
           COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
           COVERITY_SCAN_SUBMIT_MAIL: ${{ secrets.COVERITY_SCAN_SUBMIT_MAIL }}
         run: |
-          ./coverity-scan.sh --with-install
+          ./coverity-scan.sh  --with-install
