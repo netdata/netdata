@@ -20,7 +20,7 @@ nodes' metrics, not the data. By streaming metrics values to your browser, with 
 between them, you can monitor your infrastructure using customizable, interactive, and real-time visualizations from any
 numbe of distributed nodes.
 
-In this quickstart guide, you'll learn the basics using Netdata Cloud to monitor an infrastructure with dashboards,
+In this quickstart guide, you'll learn the basics of using Netdata Cloud to monitor an infrastructure with dashboards,
 composite charts, and alarm viewing. You'll then learn about the most critical ways to configure the Agent on each of
 your nodes to maximize the value you get from Netdata.
 
@@ -108,8 +108,8 @@ additional tips on best leveraging the feature to help you troubleshoot complex 
 ## Set up your nodes
 
 Netdata Cloud's dashboards and visualizations are enriched by the metrics streamed on-demand from your individual nodes.
-You should ensure each node is configured based its function and the applications it runs so that you have full health
-and performance visibility.
+You should ensure each node is configured based on its function, and the applications it runs, so that you have full
+health and performance visibility.
 
 ### Configure the Netdata Agent on your nodes
 
