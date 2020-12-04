@@ -12,7 +12,8 @@ And health metrics such as backend servers status (server check should be used).
 Plugin can obtain data from url **OR** unix socket.
 
 **Requirement:**
-Socket MUST be readable AND writable by the `netdata` user.
+Socket: MUST be readable AND writable by the `netdata` user.
+URL: MUST have `stats uri <path>` present in the haproxy config, otherwise you will 503 in the haprooxy logs, more info [here](https://github.com/netdata/netdata/issues/10321)
 
 It produces:
 
