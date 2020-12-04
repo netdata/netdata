@@ -1644,7 +1644,7 @@ AC_CONFIG_FILES([
     parser/Makefile
 ])
 
-if test "$enable_aclk" = "yes" -a "$aclk_ng" != "yes"; then
+if test "$aclk_ng" != "yes"; then
 AC_CONFIG_FILES([
     aclk/legacy/Makefile
 ])
