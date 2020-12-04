@@ -20,11 +20,22 @@ struct prometheus_output_options {
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
     const char *prometheus_server = w->client_ip;
-    uint32_t prometheus_backend_options = global_backend_options;
+
+    uint32_t prometheus_backend_options;
+    if (prometheus_exporter_instance)
+        prometheus_backend_options = prometheus_exporter_instance->config.options;
+    else
+        prometheus_backend_options = global_backend_options;
+
     PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options =
         PROMETHEUS_OUTPUT_TIMESTAMPS |
-        ((global_backend_options & BACKEND_OPTION_SEND_NAMES) ? PROMETHEUS_OUTPUT_NAMES : 0);
-    const char *prometheus_prefix = global_backend_prefix;
+        ((prometheus_backend_options & BACKEND_OPTION_SEND_NAMES) ? PROMETHEUS_OUTPUT_NAMES : 0);
+
+    const char *prometheus_prefix;
+    if (prometheus_exporter_instance)
+        prometheus_prefix = prometheus_exporter_instance->config.prefix;
+    else
+        prometheus_prefix = global_backend_prefix;
 
     while(url) {
         char *value = mystrsep(&url, "&");
