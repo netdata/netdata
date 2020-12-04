@@ -7,7 +7,7 @@ labels: bug, needs triage
 <!--
 When creating a bug report please:
 - Verify first that your issue is not already reported on GitHub.
-- Verify that you are using the latest version of the Netdata Agent and if not update. You can read more about it in our documentation at https://learn.netdata.cloud/docs/agent/packaging/installer/update
+- Verify that you are using the latest version of the Netdata Agent, and if not, update: https://learn.netdata.cloud/docs/agent/packaging/installer/update
 - If you are unsure if it's a bug, post a question on our support forums at https://community.netdata.cloud/c/support/agent-support/14
 -->
 
