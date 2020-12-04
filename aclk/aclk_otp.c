@@ -7,6 +7,8 @@
 
 #include "legacy/aclk_lws_https_client.h"
 
+#include "../daemon/common.h"
+
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -165,6 +167,102 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
+#ifndef ACLK_NG_USE_LIBWEBSOCKETS_OTP
+// send_https_request is original code from @amoss copied from before comit
+// 10090b556b07463a0ca2412fc4be8b470d115e31 which changed this to use Libwebsockets in ACLK Legacy
+// TODO this has to be rewritten as it doesn't care about HTTP return code or anything (very naive implementation)!!!
+#define PORT_STR_MAX_BYTES 7
+#define HTTP_HDR_END "\x0D\x0A\x0D\x0A"
+int aclk_send_https_request(char *method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
+{
+    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+    int rc=1;
+    char sport[PORT_STR_MAX_BYTES];
+    char *pl;
+
+    snprintf(sport, PORT_STR_MAX_BYTES, "%d", port);
+
+    size_t payload_len = 0, hdr_len;
+    if (payload != NULL)
+        payload_len = strlen(payload);
+
+    snprintf(
+        b,
+        b_size,
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
+        "User-Agent: Netdata/rocks\r\n\r\n",
+        method, url, host, payload_len);
+
+    hdr_len = strlen(b);
+
+    if (payload != NULL)
+        strncat(&b[hdr_len], payload, b_size - hdr_len);
+    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", payload_len + hdr_len, b);
+    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, sport, &timeout);
+
+    if (unlikely(sock == -1)) {
+        error("Handshake failed");
+        return 1;
+    }
+
+    SSL_CTX *ctx = security_initialize_openssl_client();
+    if (ctx==NULL) {
+        error("Cannot allocate SSL context");
+        goto exit_sock;
+    }
+    // Certificate chain: not updating the stores - do we need private CA roots?
+    // Calls to SSL_CTX_load_verify_locations would go here.
+    SSL *ssl = SSL_new(ctx);
+    if (ssl==NULL) {
+        error("Cannot allocate SSL");
+        goto exit_CTX;
+    }
+    SSL_set_fd(ssl, sock);
+    int err = SSL_connect(ssl);
+    if (err!=1) {
+        error("SSL_connect() failed with err=%d", err);
+        goto exit_SSL;
+    }
+    err = SSL_write(ssl, b, hdr_len + payload_len);
+    if (err <= 0)
+    {
+        error("SSL_write() failed with err=%d", err);
+        goto exit_SSL;
+    }
+
+    int bytes_read = SSL_read(ssl, b, b_size - 1);
+    if (bytes_read < 0)
+    {
+        error("No response available - SSL_read()=%d", bytes_read);
+        goto exit_FULL;
+    }
+    b[bytes_read] = 0;
+
+    debug(D_ACLK, "Received %d bytes in response", bytes_read);
+
+    pl = strstr(b, HTTP_HDR_END);
+    if(!pl) {
+        error("Empty Payload of HTTP response");
+        b[0] = 0;
+        goto exit_FULL;
+    }
+
+    strncpy(b, pl + strlen(HTTP_HDR_END), b_size);
+
+    rc = 0;
+exit_FULL:
+    SSL_shutdown(ssl);
+exit_SSL:
+    SSL_free(ssl);
+exit_CTX:
+    SSL_CTX_free(ctx);
+exit_sock:
+    close(sock);
+    return rc;
+}
+#endif
+
+// aclk_get_mqtt_otp is slightly modified original code from @amoss
 void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass)
 {
     char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -231,7 +329,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     debug(D_ACLK, "Password response from cloud: %s", data_buffer);
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    if ( json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
+    if (json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
     {
         freez(password.result);
         error("Could not parse the json response with the password: %s", data_buffer);

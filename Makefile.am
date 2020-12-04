@@ -549,8 +549,6 @@ ACLK_FILES = \
     aclk/aclk_collector_list.h \
     aclk/aclk_otp.c \
     aclk/aclk_otp.h \
-    aclk/legacy/aclk_lws_https_client.c \
-    aclk/legacy/aclk_lws_https_client.h \
     aclk/aclk_tx_msgs.c \
     aclk/aclk_tx_msgs.h \
     aclk/aclk_rx_msgs.c \
@@ -747,7 +745,6 @@ netdata_SOURCES = $(NETDATA_FILES)
 
 if ACLK_NG
 netdata_LDADD = \
-    externaldeps/libwebsockets/libwebsockets.a \
     mqtt_websockets/libmqttwebsockets.a \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
