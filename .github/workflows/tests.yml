@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
@@ -39,6 +41,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all

@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - run: |
           git fetch --prune --unshallow --tags
       - name: Build
@@ -98,6 +100,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: install-required-packages.sh on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}
@@ -183,6 +187,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: install-required-packages.sh on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}

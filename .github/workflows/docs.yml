@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Run link check
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
