@@ -129,6 +129,7 @@ struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_S
 void update_label_list(struct label **labels, struct label *new_labels)
 {
     free_label_list(*labels);
+    *labels = NULL;
 
     while (new_labels != NULL)
     {
