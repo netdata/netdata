@@ -155,9 +155,10 @@ def backend_charts_template(name):
     return order, charts
 
 
-def storage_usage_charts_template(name):
+def storage_charts_template(name):
     order = [
         'storage_{0}_usage'.format(name),
+        'storage_{0}_alloc_objs'.format(name)
     ]
 
     charts = {
@@ -168,22 +169,12 @@ def storage_usage_charts_template(name):
                 ['{0}.g_bytes'.format(name), 'allocated', 'absolute', 1, 1 << 10]
             ]
         },
-    }
-
-    return order, charts
-
-def storage_alloc_objs_charts_template(name):
-    order = [
-        'storage_{0}_alloc_objs'.format(name),
-    ]
-
-    charts = {
-        order[0]: {
+        order[1]: {
             'options': [None, 'Storage "{0}" Allocated Objects'.format(name), 'objects', 'storage usage', 'varnish.storage_usage', 'line'],
             'lines': [
                 ['{0}.g_alloc'.format(name), 'allocated', 'absolute']
             ]
-        },
+        }
     }
 
     return order, charts
@@ -366,8 +357,7 @@ class Service(ExecutableService):
         self.add_charts(backend_name, backend_charts_template)
 
     def add_storage_charts(self, storage_name):
-        self.add_charts(storage_name, storage_usage_charts_template)
-        self.add_charts(storage_name, storage_alloc_objs_charts_template)
+        self.add_charts(storage_name, storage_charts_template)
 
     def add_charts(self, name, charts_template):
         order, charts = charts_template(name)
