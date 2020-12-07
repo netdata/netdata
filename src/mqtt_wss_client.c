@@ -15,6 +15,7 @@
 #include "mqtt_wss_client.h"
 #include "mqtt.h"
 #include "ws_client.h"
+#include "common_internal.h"
 
 #include <stdlib.h>
 #include <fcntl.h>
@@ -36,6 +37,10 @@
 #define PIPE_WRITE_END 1
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
+
+#if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
+#include <openssl/conf.h>
+#endif
 
 char *util_openssl_ret_err(int err)
 {
@@ -375,7 +380,18 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
     fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK);
 
-    OPENSSL_init_ssl(0, 0);
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
+    OPENSSL_config(NULL);
+#endif
+    SSL_load_error_strings();
+    SSL_library_init();
+#else
+    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
+        mws_error(client->log, "Failed to initialize SSL");
+        return -1;
+    };
+#endif
 
     // free SSL structs from possible previous connections
     if (client->ssl)

@@ -23,6 +23,7 @@
 #include <base64.h>
 
 #include "ws_client.h"
+#include "common_internal.h"
 
 #ifdef MQTT_WEBSOCKETS_DEBUG
 #include "../c-rbuf/src/ringbuffer_internal.h"
@@ -170,7 +171,11 @@ int ws_client_start_handshake(ws_client *client)
     //Calculating expected Sec-WebSocket-Accept reply
     snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);
 
+#if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
+    md_ctx = EVP_MD_CTX_create();
+#else
     md_ctx = EVP_MD_CTX_new();
+#endif
     if (md_ctx == NULL) {
         ERROR("Cant create EVP_MD Context");
         return 1;
@@ -197,7 +202,12 @@ int ws_client_start_handshake(ws_client *client)
     client->hs.nonce_reply = strdup(nonce_b64);
 
     OPENSSL_free(digest);
+
+#if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
+    EVP_MD_CTX_destroy(md_ctx);
+#else
     EVP_MD_CTX_free(md_ctx);
+#endif
 
     return 0;
 }
