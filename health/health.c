@@ -403,7 +403,8 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         return;
 
     spawn_wait_cmd(ae->exec_spawn_serial, &ae->exec_code, &ae->exec_run_timestamp);
-    debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+    health_alarm_log_dispatch((ae->exec_code == 0) ? HEALTH_ENTRY_FLAG_EXEC_RUN : HEALTH_ENTRY_FLAG_EXEC_FAILED,
+        "done executing command '%"PRIu64"' - returned with code %d at %"PRId64, ae->exec_spawn_serial, ae->exec_code, ae->exec_run_timestamp);
     ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
 
     if(ae->exec_code != 0)

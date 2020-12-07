@@ -886,3 +886,24 @@ void log_access( const char *fmt, ... ) {
             netdata_mutex_unlock(&access_mutex);
     }
 }
+
+void log_health( const char *fmt, ... ) {
+    va_list args;
+
+    if(health_log_syslog) {
+        va_start( args, fmt );
+        vsyslog(LOG_INFO,  fmt, args );
+        va_end( args );
+    }
+
+    if(healthlog) {
+        char date[LOG_DATE_LENGTH];
+        log_date(date, LOG_DATE_LENGTH);
+        fprintf(healthlog, "%s: ", date);
+
+        va_start( args, fmt );
+        vfprintf( healthlog, fmt, args );
+        va_end( args );
+        fputc('\n', healthlog);
+    }
+}
