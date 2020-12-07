@@ -170,7 +170,7 @@ def storage_charts_template(name):
             ]
         },
         order[1]: {
-            'options': [None, 'Storage "{0}" Allocated Objects'.format(name), 'objects', 'storage usage', 'varnish.storage_usage', 'line'],
+            'options': [None, 'Storage "{0}" Allocated Objects'.format(name), 'objects', 'storage usage', 'varnish.storage_alloc_objs', 'line'],
             'lines': [
                 ['{0}.g_alloc'.format(name), 'allocated', 'absolute']
             ]
@@ -178,6 +178,7 @@ def storage_charts_template(name):
     }
 
     return order, charts
+
 
 VARNISHSTAT = 'varnishstat'
 
