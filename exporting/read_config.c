@@ -238,7 +238,8 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        if (prometheus_config_get_boolean("send names instead of ids", CONFIG_BOOLEAN_YES))
+        if (prometheus_config_get_boolean(
+                "send names instead of ids", global_backend_options & EXPORTING_OPTION_SEND_NAMES))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
@@ -257,6 +258,8 @@ struct engine *read_exporting_config()
             simple_pattern_create(prometheus_config_get("send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
             prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+
+        prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_backend_prefix);
     }
 
     // TODO: change BACKEND to EXPORTING
