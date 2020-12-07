@@ -11,7 +11,9 @@ TK
 
 ## Prerequisites
 
--   One or more Linux nodes running the [Netdata Agent](/docs/get/README.md).
+-   One or more Linux nodes running the [Netdata Agent](/docs/get/README.md). If you need more time to understand
+    Netdata before following this guide, see the [infrastructure](/docs/quickstart/infrastructure.md) or
+    [single-node](/docs/quickstart/single-node.md) monitoring quickstarts.
 -   A general understanding of how to [configure the Netdata Agent](/docs/configure/nodes.md) using `edit-config`.
 -   A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
 
@@ -25,18 +27,18 @@ process-specific charts.
 
 The process and groups settings are used by two unique and powerful collectors.
 
-[**apps.plugin**](/collectors/apps.plugin/README.md) looks at the Linux process tree every second, much like `top` or
+[**`apps.plugin`**](/collectors/apps.plugin/README.md) looks at the Linux process tree every second, much like `top` or
 `ps fax`, and collects resource utilization information on every running process. It then automatically adds a layer of
-meaningful visualization on top of these metrics, and creates per-application charts under the **Applications** section
-of a Netdata dashboard.
+meaningful visualization on top of these metrics, and creates per-process/application charts.
 
-[**ebpf.plugin**](/collectors/ebpf.plugin/README.md): Netdata's extended Berkeley Packet Filter (eBPF) collector
+[**`ebpf.plugin`**](/collectors/ebpf.plugin/README.md): Netdata's extended Berkeley Packet Filter (eBPF) collector
 monitors Linux kernel-level metrics for file descriptors, virtual filesystem IO, and process management, and then hands
 process-specific metrics over to `apps.plugin` for visualization. The eBPF collector also collects and visualizes
-metrics on an _event frequency_, which is even more precise than Netdata's standard per-second granularity. You can find
-these metrics in the **ebpf syscall** and **ebpf net** sub-sections under **Applications**.
+metrics on an _event frequency_, which is even more precise than Netdata's standard per-second granularity.
 
-With these collectors working in parallel, you can visualize the following per-second metrics for _any_ process on your
+### Per-process metrics and charts in Netdata
+
+With these collectors working in parallel, Netdata visualizes the following per-second metrics for _any_ process on your
 Linux systems:
 
 -   CPU utilization (`apps.cpu`)
@@ -98,39 +100,57 @@ cd /etc/netdata   # Replace this with your Netdata config directory if not at /e
 sudo ./edit-config apps_groups.conf
 ```
 
+Inside the file are lists of process names, oftentimes using wildcards (`*`), that the Netdata Agent looks for and
+groups together. For example, the Netdata Agent looks for processes starting with `mysqld`, `mariad`, `postgres`, and
+others, and groups them into `sql`. That makes sense, since all these procesess are for SQL databases.
+
+```conf
+sql: mysqld* mariad* postgres* postmaster* oracle_* ora_* sqlservr
+```
+
+These groups are then reflected as [dimensions](/web/README.md#dimensions) within Netdata's charts.
+
+![An example per-process CPU utilization chart in Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/101369156-352e2100-3865-11eb-9f0d-b8fac162e034.png)
+
 See the following two sections for details based on your needs. If you don't need to configure `apps_groups.conf`, jump
 down to [visualizing process metrics](#visualize-process-metrics).
 
 ### Standard applications (web servers, databases, containers, and more)
 
+As explained above, the Netdata Agent is already aware of most standard applications you run on Linux nodes, and you
+shouldn't need to configure it to discover them.
 
+However, if you're using multiple applications that the Netdata Agent groups together you may want to separate them for
+more precise monitoring. If you're not running any other types of SQL databases on that node, you don't need to change
+the grouping, since you know that any MySQL is the only process contributing to the `sql` group. 
 
-If you're not running any other types of SQL databases on that node, you don't need to change the grouping, since you
-know that any MySQL is the only process contributing to the `sql` group. But, if you are running multiple database
-types, you can separate them into more specific groups.
+Let's say you're using both MySQL and PostgreSQL databases on a single node, and want to monitor their processes
+independently. Open the `apps_groups.conf` file as explained in the [section
+above](#configure-the-netdata-agent-to-recognize-a-specific-process) and scroll down until you find the `database
+servers` section. Create new groups for MySQL and PostgreSQL, and move their process queries into the unique groups.
+
+```conf
+# -----------------------------------------------------------------------------
+# database servers
+
+mysql: mysqld* 
+postgres: postgres*
+sql: mariad* postmaster* oracle_* ora_* sqlservr
+```
+
+Restart Netdata with `service netdata restart`, or the appropriate method for your system, to start collecting
+utilization metrics from your application. Time to [visualize your process metrics](#visualize-process-metrics).
 
 ### Custom applications
-
-To start troubleshooting an application with eBPF metrics, you need to ensure your Netdata dashboard collects and
-displays those metrics independent from any other process.
-
-You can use the `apps_groups.conf` file to configure which applications appear in charts generated by
-[`apps.plugin`](/collectors/apps.plugin/README.md). Once you edit this file and create a new group for the application
-you want to monitor, you can see how it's interacting with the Linux kernel via real-time eBPF metrics.
 
 Let's assume you have an application that runs on the process `custom-app`. To monitor eBPF metrics for that application
 separate from any others, you need to create a new group in `apps_groups.conf` and associate that process name with it.
 
-Open the `apps_groups.conf` file in your Netdata config directory.
-
-```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory
-sudo ./edit-config apps_groups.conf
-```
-
-Scroll down past the explanatory comments and stop when you see `# NETDATA processes accounting`. Above that, paste in
-the following text, which creates a new `custom-app` group with the `custom-app` process. Replace `custom-app` with the
-name of your application's process. `apps_groups.conf` should now look like this:
+Open the `apps_groups.conf` file as explained in the [section
+above](#configure-the-netdata-agent-to-recognize-a-specific-process). Scroll down to `# NETDATA processes accounting`.
+Above that, paste in the following text, which creates a new `custom-app` group with the `custom-app` process. Replace
+`custom-app` with the name of your application's Linux process. `apps_groups.conf` should now look like this:
 
 ```conf
 ...
@@ -144,23 +164,68 @@ custom-app: custom-app
 ...
 ```
 
+Restart Netdata with `service netdata restart`, or the appropriate method for your system, to start collecting
+utilization metrics from your application.
+
 ## Visualize process metrics
 
-### Using Netdata's application collector
+Now that you're colleting metrics for your process, you'll want to visualize them using Netdata's real-time, interactive
+charts. Find these visualizations in the same section regardless of whether you use [Netdata
+Cloud](https://app.netdata.cloud) for infrastructure monitoring, or single-node monitoring with the local Agent's
+dashboard at `http://localhost:19999`.
 
-### Using Netdata's eBPF collector
+If you need a refresher on all the available per-process charts, see the [above
+list](#per-process-metrics-and-charts-in-netdata).
+
+### Using Netdata's application collector (`apps.plugin`)
+
+`apps.plugin` puts all of its charts under the **Applications** section of any Netdata dashboard.
+
+![Screenshot of the Applications section on a Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/101401172-2ceadb80-388f-11eb-9e9a-88443894c272.png)
+
+
+
+### Using Netdata's eBPF collector (`ebpf.plugin`)
+
+Netdata's eBPF collector puts its charts in two places. Of most imporance to process monitoring are the **ebpf syscall**
+and **ebpf net** sub-sections under **Applications**, shown in the above screenshot. However, you can also find
+additional eBPF metrics, which are system-wide and not per-process, under the **eBPF** section.
+
+For example, 
+
+### Key metrics for monitoring processes
+
+
+-   CPU utilization
+-   
 
 ## What's next?
 
-TK
+Now that you have `apps_groups.conf` configured correctly, and know where to find per-process visualizations throughout
+Netdata's ecosystem.
+
+If the process you're monitoring also has a [supported collector](/collectors/COLLECTORS.md), now is a great time to set
+that up if it wasn't autodetected. With both process utilization and application-specific metrics, you should have every
+piece of data needed to discover the root cause of an incident. See our [collector
+setup](/docs/collect/enable-configure.md) doc for details.
+
+Try running [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) on a node that's
+running the process(es) you're monitoring. Even if nothing is going wrong at the moment, Netdata Cloud's embedded
+intelligence helps you better understand how a MySQL database, for example, might influence a system's volume of memory
+page faults. And when an incident is afoot, use Metric Correlations to reduce mean time to resolution (MTTR) and
+cognitive load.
 
 If you want more specific metrics from your custom application, check out Netdata's [statd
 support](/collectors/statsd.plugin/README.md). With statd, you can send detailed metrics from your application to
-Netdata and visualize them with per-second granularity.
+Netdata and visualize them with per-second granularity. Netdata's statsd collector works with dozens of [statsd server
+implementations](https://github.com/etsy/statsd/wiki#client-implementations), which work with most application
+frameworks.
 
 ### Related reference documentation
 
 -   [Netdata Agent · `apps.plugin`](/collectors/apps.plugin/README.md)
 -   [Netdata Agent · `ebpf.plugin`](/collectors/ebpf.plugin/README.md)
+-   [Netdata Agent · Dashboards](/web/README.md#dimensions)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fprocess&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
