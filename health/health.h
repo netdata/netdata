@@ -6,6 +6,14 @@
 #include "daemon/common.h"
 
 extern unsigned int default_health_enabled;
+extern unsigned int health_alarm_log_flags;
+
+#define health_alarm_log_dispatch(flag, args...) do { \
+    if ((flag & health_alarm_log_flags) > 0) { \
+        log_health(args); \
+    } else { \
+        debug(D_HEALTH, args); \
+    } } while(0)
 
 #define HEALTH_ENTRY_FLAG_PROCESSED             0x00000001
 #define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
@@ -17,6 +25,7 @@ extern unsigned int default_health_enabled;
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_ACLK_QUEUED           0x20000000
+#define HEALTH_ENTRY_FLAG_SKIPPED               0x40000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 #ifndef HEALTH_LISTEN_PORT

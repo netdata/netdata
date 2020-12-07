@@ -399,6 +399,9 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    healthlog_filename = config_get(CONFIG_SECTION_GLOBAL, "health log", filename);
+
     char deffacility[8];
     snprintfz(deffacility,7,"%s","daemon");
     facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);

@@ -3,6 +3,7 @@
 #include "health.h"
 
 unsigned int default_health_enabled = 1;
+unsigned int health_alarm_log_flags = 0;
 char *silencers_filename;
 
 // the queue of executed alarm notifications that haven't been waited for yet
@@ -125,6 +126,19 @@ void health_init(void) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
+
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm update", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_UPDATED;
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm exec", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_EXEC_RUN | HEALTH_ENTRY_FLAG_EXEC_FAILED;
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm exec errors", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_EXEC_FAILED;
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm clear", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION;
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm silenced", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_SILENCED;
+    if (config_get_boolean(CONFIG_SECTION_HEALTH, "log alarm skipped", 0))
+        health_alarm_log_flags |= HEALTH_ENTRY_FLAG_SKIPPED;
 
     health_silencers_init();
 }
@@ -257,7 +271,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         // do not send notifications for disabled statuses
-        debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        health_alarm_log_dispatch(HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION,"Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)"
+            , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         // mark it as run, so that we will send the same alarm if it happens again
         goto done;
     }
@@ -277,8 +292,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             // we have executed this alarm notification in the past
             if(t && t->new_status == ae->new_status) {
                 // don't send the notification for the same status again
-                debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae->chart, ae->name
-                      , rrdcalc_status2string(ae->new_status));
+                health_alarm_log_dispatch(HEALTH_ENTRY_FLAG_SKIPPED, "Health not sending again notification for alarm '%s.%s' status %s"
+                    , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
                 goto done;
             }
         }
@@ -287,8 +302,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             // so, don't send CLEAR notifications
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
                 if((!(ae->flags & HEALTH_ENTRY_RUN_ONCE)) || (ae->flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
-                    debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
-                    , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+                    health_alarm_log_dispatch(HEALTH_ENTRY_FLAG_SKIPPED, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
+                        , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
                     goto done;
                 }
             }
@@ -297,7 +312,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // Check if alarm notifications are silenced
     if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
-        info("Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        health_alarm_log_dispatch(HEALTH_ENTRY_FLAG_SILENCED, "Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)"
+            , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
@@ -384,7 +400,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
-    debug(D_HEALTH, "executing command '%s'", command_to_run);
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     health_alarm_log_dispatch(HEALTH_ENTRY_FLAG_EXEC_RUN, "Queued command '%s' as id '%"PRIu64"'",

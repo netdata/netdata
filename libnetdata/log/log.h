@@ -55,8 +55,11 @@ extern const char *program_name;
 
 extern int stdaccess_fd;
 extern FILE *stdaccess;
+extern int healthlog_fd;
+extern FILE *healthlog;
 
 extern const char *stdaccess_filename;
+extern const char *healthlog_filename;
 extern const char *stderr_filename;
 extern const char *stdout_filename;
 extern const char *facility_log;
@@ -100,6 +103,7 @@ extern void info_int( const char *file, const char *function, const unsigned lon
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
 extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+extern void log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 # ifdef __cplusplus
 }
