@@ -163,38 +163,6 @@ biofailed:
     return 1;
 }
 
-/*
- * After a connection failure -- delay in milliseconds
- * When a connection is established, the delay function
- * should be called with
- *
- * mode 0 to reset the delay
- * mode 1 to calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
- *
- */
-unsigned long int aclk_reconnect_delay(int mode)
-{
-    static int fail = -1;
-    unsigned long int delay;
-
-    if (!mode || fail == -1) {
-        srandom(time(NULL));
-        fail = mode - 1;
-        return 0;
-    }
-
-    delay = (1 << fail);
-
-    if (delay >= ACLK_MAX_BACKOFF_DELAY) {
-        delay = ACLK_MAX_BACKOFF_DELAY * 1000;
-    } else {
-        fail++;
-        delay = (delay * 1000) + (random() % 1000);
-    }
-
-    return delay;
-}
-
 // This will give the base topic that the agent will publish messages.
 // subtopics will be sent under the base topic e.g.  base_topic/subtopic
 // This is called during the connection, we delete any previous topic
@@ -935,6 +903,7 @@ CLEANUP:
 static void aclk_try_to_connect(char *hostname, int port)
 {
     int rc;
+    aclk_pubacks = 0;
 
 // this is usefull for developers working on ACLK
 // allows connecting agent to any MQTT broker
@@ -1308,7 +1277,6 @@ void aclk_connect()
     aclk_stats_upd_online(1);
 
     aclk_connected = 1;
-    aclk_reconnect_delay(0);
 
     QUERY_THREAD_WAKEUP;
     return;

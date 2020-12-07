@@ -10,6 +10,7 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 
 int aclk_disable_runtime = 0;
 int aclk_kill_link = 0;
+int aclk_pubacks = 0;
 
 struct aclk_shared_state aclk_shared_state = {
     .version_neg = 0,
@@ -233,4 +234,36 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
     }
     info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
     return 0;
+}
+
+/*
+ * After a connection failure -- delay in milliseconds
+ * When a connection is established, the delay function
+ * should be called with
+ *
+ * mode 0 to reset the delay
+ * mode 1 to calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ *
+ */
+unsigned long int aclk_reconnect_delay(int mode)
+{
+    static int fail = -1;
+    unsigned long int delay;
+
+    if (!mode || fail == -1) {
+        srandom(time(NULL));
+        fail = mode - 1;
+        return 0;
+    }
+
+    delay = (1 << fail);
+
+    if (delay >= ACLK_MAX_BACKOFF_DELAY) {
+        delay = ACLK_MAX_BACKOFF_DELAY * 1000;
+    } else {
+        fail++;
+        delay = (delay * 1000) + (random() % 1000);
+    }
+
+    return delay;
 }

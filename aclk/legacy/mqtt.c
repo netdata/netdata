@@ -6,6 +6,7 @@
 #include "aclk_lws_wss_client.h"
 #include "aclk_stats.h"
 #include "aclk_rx_msgs.h"
+#include "aclk_common.h"
 
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
@@ -30,11 +31,16 @@ void mqtt_message_callback(struct mosquitto *mosq, void *obj, const struct mosqu
     aclk_handle_cloud_message(msg->payload);
 }
 
+#define PUBACKS_TILL_STABLE 5
 void publish_callback(struct mosquitto *mosq, void *obj, int rc)
 {
     UNUSED(mosq);
     UNUSED(obj);
     UNUSED(rc);
+    if(++aclk_pubacks == PUBACKS_TILL_STABLE) {
+        debug(D_ACLK, "Received %d PUBACKS. Connection considered stable (Restarting exponential backoff for reconnect).", PUBACKS_TILL_STABLE);
+        aclk_reconnect_delay(0);
+    }
 #ifdef NETDATA_INTERNAL_CHECKS
     struct timeval now, *orig;
     now_realtime_timeval(&now);

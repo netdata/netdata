@@ -30,6 +30,8 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_V_COMPRESSION   2
 #define ACLK_V_CHILDRENSTATE 3
 
+extern int aclk_pubacks;
+
 #define ACLK_IS_HOST_INITIALIZING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
 #define ACLK_IS_HOST_POPCORNING(host) (ACLK_IS_HOST_INITIALIZING(host) && host->aclk_state.t_last_popcorn_update)
 
@@ -66,5 +68,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
 int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
+
+unsigned long int aclk_reconnect_delay(int mode);
 
 #endif //ACLK_COMMON_H
