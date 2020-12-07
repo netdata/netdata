@@ -1,13 +1,36 @@
 <!--
 title: Monitor any process in real-time with Netdata
-description: TK
+description: "Tap into Netdata's powerful collectors, with per-second utilization metrics for every process, to troubleshoot faster and make data-informed decisions."
 image: /img/seo/guides/monitor/process.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/process.md
 -->
 
 # Monitor any process in real-time with Netdata
 
-TK
+Netdata is more than a heaping of generic system-level metrics and visualizations. Instead of providing only a bird's
+eye view of your system, leaving you to wonder exactly _what_ is taking up 99% CPU, Netdata also gives you visibility
+into _every layer_ of your node. These additional layers give you context, and meaningful insights, into the true health
+and performance of your infrastructure.
+
+One of these layers is the _process_. Every time a Linux system runs a program, it creates an independent process that
+executes the program's instructions in parallel with anything else happening on the system. Linux systems track the
+state and resource utilization of processes using the [`/proc` filesystem](https://en.wikipedia.org/wiki/Procfs), and
+Netdata is designed to hook into those metrics to create meaningul visualizations out of the box.
+
+While there are a lot of existing command-line tools for tracking processes on Linux systems, such as `ps` or `top`,
+only Netdata provides dozens of real-time charts, at both per-second and event frequency, without you having to write
+SQL queries or know a bunch of arbitrary command-line flags.
+
+With Netdata's process monitoring, you can:
+
+-   Benchmark/optimize performance of standard applications, like web servers or databases
+-   Benchmark/optimize performance of custom applications
+-   Troubleshoot CPU/memory/disk utilization issues (why is my system's CPU spiking right now?)
+-   Perform granular capacity planning based on the specific needs of your infrastructure
+-   Search for leaking file descriptors
+-   Investigate zombie processes
+
+... and much more. Let's get started.
 
 ## Prerequisites
 
@@ -34,7 +57,8 @@ meaningful visualization on top of these metrics, and creates per-process/applic
 [**`ebpf.plugin`**](/collectors/ebpf.plugin/README.md): Netdata's extended Berkeley Packet Filter (eBPF) collector
 monitors Linux kernel-level metrics for file descriptors, virtual filesystem IO, and process management, and then hands
 process-specific metrics over to `apps.plugin` for visualization. The eBPF collector also collects and visualizes
-metrics on an _event frequency_, which is even more precise than Netdata's standard per-second granularity.
+metrics on an _event frequency_, which means it captures every kernel interaction, and not just the volume of
+interaction at every second in time. That's even more precise than Netdata's standard per-second granularity.
 
 ### Per-process metrics and charts in Netdata
 
@@ -65,19 +89,25 @@ Linux systems:
     -   Major page faults (i.e. swap activiy, `apps.major_faults`)
 -   Network
     -   Sockets open (`apps.sockets`)
--   eBPF syscall
+-   eBPF file
     -   Number of calls to open files. (`apps.file_open`)
     -   Number of files closed. (`apps.file_closed`)
+    -   Number of calls to open files that returned errors.
+    -   Number of calls to close files that returned errors.
+-   eBPF syscall
     -   Number of calls to delete files. (`apps.file_deleted`)
     -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
     -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
     -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
     -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
+    -   Number of calls to write a file that returned errors.
+    -   Number of calls to read a file that returned errors.
+-   eBPF process
     -   Number of process created with `do_fork`. (`apps.process_create`)
     -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
     -   Number of times that a process called `do_exit`. (`apps.task_close`)
 -   eBPF net
-    -   Number of bytes sent per seconds. (`apps.bandwidth_sent`)
+    -   Number of bytes sent. (`apps.bandwidth_sent`)
     -   Number of bytes received. (`apps.bandwidth_recv`)
 
 As an example, here's the per-process CPU utilization chart, including a `sql` group/dimension.
@@ -184,31 +214,65 @@ list](#per-process-metrics-and-charts-in-netdata).
 ![Screenshot of the Applications section on a Netdata
 dashboard](https://user-images.githubusercontent.com/1153921/101401172-2ceadb80-388f-11eb-9e9a-88443894c272.png)
 
+Let's continue with the MySQL example. We can create a [test
+database](https://www.digitalocean.com/community/tutorials/how-to-measure-mysql-query-performance-with-mysqlslap) into
+MySQL to generate load on the `mysql` process.
 
+`apps.plugin` immediately collects and visualizes this activity `apps.cpu` chart, which shows an increase in CPU
+utilization from the `sql` group. There is a parallel increase in `apps.pwrites`, which visualizes writes to disk.
+
+![Per-application CPU utilization
+metrics](https://user-images.githubusercontent.com/1153921/101409725-8527da80-389b-11eb-96e9-9f401535aafc.png)
+
+![Per-application disk writing
+metrics](https://user-images.githubusercontent.com/1153921/101409728-85c07100-389b-11eb-83fd-d79dd1545b5a.png)
+
+Next, the `mysqlslap` utility queries the database to provide some real world-esque MySQL load.
+
+```bash
+sudo mysqlslap --user=sysadmin --password --host=localhost  --concurrency=50 --iterations=10 --create-schema=employees --query="SELECT * FROM dept_emp;" --verbose
+```
+
+The following per-process disk utilization charts show spikes under the `sql` group as well.
+
+![Per-application disk
+metrics](https://user-images.githubusercontent.com/1153921/101411810-d08fb800-389e-11eb-85b3-f3fa41f1f887.png)
+
+> 💡 Click on any dimension below a chart in Netdata Cloud (or to the right of a chart on a local Agent dashboard), to
+> visualize only that dimension. This can be particularly useful in process monitoring to separate one process'
+> utilization from the rest of the system.
 
 ### Using Netdata's eBPF collector (`ebpf.plugin`)
 
 Netdata's eBPF collector puts its charts in two places. Of most imporance to process monitoring are the **ebpf syscall**
 and **ebpf net** sub-sections under **Applications**, shown in the above screenshot. However, you can also find
-additional eBPF metrics, which are system-wide and not per-process, under the **eBPF** section.
 
-For example, 
+For example, running the above workload shows the entire "story" how MySQL interacts with the Linux kernel to open
+processes/threads to handle a large nubmer of SQL queries, then subsequently close the tasks as each query returns the
+relevant data.
 
-### Key metrics for monitoring processes
+![Per-process eBPF
+charts](https://user-images.githubusercontent.com/1153921/101412395-c8844800-389f-11eb-86d2-20c8a0f7b3c0.png)
 
-
--   CPU utilization
--   
+`ebpf.plugin` visualizes additional eBPF metrics, which are system-wide and not per-process, under the **eBPF** section.
 
 ## What's next?
 
 Now that you have `apps_groups.conf` configured correctly, and know where to find per-process visualizations throughout
-Netdata's ecosystem.
+Netdata's ecosystem, you can precisely monitor the health and performance of any process on your node using per-second
+metrics.
+
+For even more in-depth troubleshooting, see our guide on [monitoring and debugging applications with
+eBPF](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
 
 If the process you're monitoring also has a [supported collector](/collectors/COLLECTORS.md), now is a great time to set
 that up if it wasn't autodetected. With both process utilization and application-specific metrics, you should have every
 piece of data needed to discover the root cause of an incident. See our [collector
 setup](/docs/collect/enable-configure.md) doc for details.
+
+[Create new dashboards](/docs/visualize/create-dashboards.md) in Netdata Cloud using charts from `apps.plugin`,
+`ebpf.plugin`, and application-specific collectors to build targeted dashboards for monitoring key procesess across your
+infrastructure.
 
 Try running [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) on a node that's
 running the process(es) you're monitoring. Even if nothing is going wrong at the moment, Netdata Cloud's embedded
@@ -227,5 +291,6 @@ frameworks.
 -   [Netdata Agent · `apps.plugin`](/collectors/apps.plugin/README.md)
 -   [Netdata Agent · `ebpf.plugin`](/collectors/ebpf.plugin/README.md)
 -   [Netdata Agent · Dashboards](/web/README.md#dimensions)
+-   [Netdata Agent · MySQL collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fprocess&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

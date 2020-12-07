@@ -65,8 +65,8 @@ Each of these sections provides the same number of charts:
     
 In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also show an
 additional [list of charts](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) using low-level Linux
-metrics.    
-    
+metrics.
+
 The above are reported:
 
 -   For **Applications** per target configured.
