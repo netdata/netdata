@@ -471,12 +471,20 @@ cd netdata-* || fatal "Cannot cd to netdata source tree"
 # ---------------------------------------------------------------------------------------------------------------------
 # install netdata from source
 
-if [ -x netdata-installer.sh ]; then
+install() {
   progress "Installing netdata..."
   run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
   if [ -d "${ndtmpdir}" ] && [ ! "${ndtmpdir}" = "/" ]; then
     run ${sudo} rm -rf "${ndtmpdir}" > /dev/null 2>&1
   fi
+}
+
+if [ -x netdata-installer.sh ]; then
+  install "$@"
 else
-  fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${ndtmpdir}"
+  if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
+    cd "$(find . -mindepth 1 -maxdepth 1 -type d)" && install "$@"
+  else
+    fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${ndtmpdir}"
+  fi
 fi
