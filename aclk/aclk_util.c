@@ -4,6 +4,12 @@
 
 #include "../daemon/common.h"
 
+// CentOS 7 has older version that doesn't define this
+// same goes for MacOS
+#ifndef UUID_STR_LEN
+#define UUID_STR_LEN 37
+#endif
+
 #ifdef ACLK_LOG_CONVERSATION_DIR
 volatile int aclk_conversation_log_counter = 0;
 #if !defined(HAVE_C___ATOMIC) || defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
