@@ -7,7 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/n
 # Configure the Netdata Agent
 
 Netdata's zero-configuration collection, storage, and visualization features work for many users, infrastructures, and
-use cases, but there are some situations where you might want to configure the Netdata Agent running on your node(s).
+use cases, but there are some situations where you might want to configure the Netdata Agent running on your node(s),
+which can be a physical or virtual machine (VM), container, cloud deployment, or edge/IoT device.
 
 For example, you might want to increase metrics retention, configure a collector based on your infrastructure's unique
 setup, or secure the local dashboard by restricting it to only connections from `localhost`.

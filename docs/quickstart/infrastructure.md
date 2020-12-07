@@ -8,7 +8,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/
 # Infrastructure monitoring with Netdata
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
-nodes running the Netdata Agent.
+nodes running the Netdata Agent. A node is any system in your infrastructure that you want to monitor, whether it's a
+physical or virtual machine (VM), container, cloud deployment, or edge/IoT device.
 
 The Netdata Agent uses zero-configuration collectors to gather metrics from every application and container instantly,
 and uses Netdata's [distributed data architecture](/docs/store/distributed-data-architecture.md) to store metrics
@@ -107,9 +108,13 @@ additional tips on best leveraging the feature to help you troubleshoot complex 
 
 ## Set up your nodes
 
-Netdata Cloud's dashboards and visualizations are enriched by the metrics streamed on-demand from your individual nodes.
-You should ensure each node is configured based on its function, and the applications it runs, so that you have full
-health and performance visibility.
+You get the most value out of Netdata Cloud's infrastructure monitoring capabilities if each node collects every
+possible metric. For example, if a node in your infrastructure is responsible for serving a MySQL database, you should
+ensure that the Netdata Agent on that node is properly collecting and streaming all MySQL-related metrics.
+
+In most cases, collectors autodetect their data source and require no configuration, but you may need to configure
+certain behaviors based on your infrastructure. Or, you may want to enable/configure advanced functionality, such as
+longer metrics retention or streaming.
 
 ### Configure the Netdata Agent on your nodes
 
