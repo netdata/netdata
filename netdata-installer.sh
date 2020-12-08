@@ -716,13 +716,18 @@ bundle_libwebsockets
 
 build_judy() {
   local env_cmd=''
+  local libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
+  if [ "$(uname)" = "Darwin" ]; then
+    libtoolize="glibtoolize"
+  fi
+
   pushd "${1}" > /dev/null || return 1
-  if run ${env_cmd} libtoolize --force --copy &&
+  if run ${env_cmd} ${libtoolize} --force --copy &&
     run ${env_cmd} aclocal &&
     run ${env_cmd} autoheader &&
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
