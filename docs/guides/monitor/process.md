@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 
 # Monitor any process in real-time with Netdata
 
-Netdata is more than a heaping of generic system-level metrics and visualizations. Instead of providing only a bird's
+Netdata is more than a multitude of generic system-level metrics and visualizations. Instead of providing only a bird's
 eye view of your system, leaving you to wonder exactly _what_ is taking up 99% CPU, Netdata also gives you visibility
 into _every layer_ of your node. These additional layers give you context, and meaningful insights, into the true health
 and performance of your infrastructure.
@@ -199,8 +199,8 @@ utilization metrics from your application.
 
 ## Visualize process metrics
 
-Now that you're colleting metrics for your process, you'll want to visualize them using Netdata's real-time, interactive
-charts. Find these visualizations in the same section regardless of whether you use [Netdata
+Now that you're collecting metrics for your process, you'll want to visualize them using Netdata's real-time,
+interactive charts. Find these visualizations in the same section regardless of whether you use [Netdata
 Cloud](https://app.netdata.cloud) for infrastructure monitoring, or single-node monitoring with the local Agent's
 dashboard at `http://localhost:19999`.
 
@@ -215,7 +215,7 @@ list](#per-process-metrics-and-charts-in-netdata).
 dashboard](https://user-images.githubusercontent.com/1153921/101401172-2ceadb80-388f-11eb-9e9a-88443894c272.png)
 
 Let's continue with the MySQL example. We can create a [test
-database](https://www.digitalocean.com/community/tutorials/how-to-measure-mysql-query-performance-with-mysqlslap) into
+database](https://www.digitalocean.com/community/tutorials/how-to-measure-mysql-query-performance-with-mysqlslap) in
 MySQL to generate load on the `mysql` process.
 
 `apps.plugin` immediately collects and visualizes this activity `apps.cpu` chart, which shows an increase in CPU
@@ -227,13 +227,16 @@ metrics](https://user-images.githubusercontent.com/1153921/101409725-8527da80-38
 ![Per-application disk writing
 metrics](https://user-images.githubusercontent.com/1153921/101409728-85c07100-389b-11eb-83fd-d79dd1545b5a.png)
 
-Next, the `mysqlslap` utility queries the database to provide some real world-esque MySQL load.
+Next, the `mysqlslap` utility queries the database to provide some benchmarking load on the MySQL database. It won't
+look exactly like a production database executing lots of user queries, but it gives you an idea into the possibility of
+these visualizations.
 
 ```bash
 sudo mysqlslap --user=sysadmin --password --host=localhost  --concurrency=50 --iterations=10 --create-schema=employees --query="SELECT * FROM dept_emp;" --verbose
 ```
 
-The following per-process disk utilization charts show spikes under the `sql` group as well.
+The following per-process disk utilization charts show spikes under the `sql` group at the same time `mysqlslap` was run
+numerous times, with slightly different concurrency and query options.
 
 ![Per-application disk
 metrics](https://user-images.githubusercontent.com/1153921/101411810-d08fb800-389e-11eb-85b3-f3fa41f1f887.png)
@@ -246,10 +249,9 @@ metrics](https://user-images.githubusercontent.com/1153921/101411810-d08fb800-38
 
 Netdata's eBPF collector puts its charts in two places. Of most imporance to process monitoring are the **ebpf file**,
 **ebpf syscall**, **ebpf process**, and **ebpf net** sub-sections under **Applications**, shown in the above screenshot.
-However, you can also find
 
 For example, running the above workload shows the entire "story" how MySQL interacts with the Linux kernel to open
-processes/threads to handle a large nubmer of SQL queries, then subsequently close the tasks as each query returns the
+processes/threads to handle a large number of SQL queries, then subsequently close the tasks as each query returns the
 relevant data.
 
 ![Per-process eBPF
@@ -281,7 +283,7 @@ intelligence helps you better understand how a MySQL database, for example, migh
 page faults. And when an incident is afoot, use Metric Correlations to reduce mean time to resolution (MTTR) and
 cognitive load.
 
-If you want more specific metrics from your custom application, check out Netdata's [statd
+If you want more specific metrics from your custom application, check out Netdata's [statsd
 support](/collectors/statsd.plugin/README.md). With statd, you can send detailed metrics from your application to
 Netdata and visualize them with per-second granularity. Netdata's statsd collector works with dozens of [statsd server
 implementations](https://github.com/etsy/statsd/wiki#client-implementations), which work with most application
