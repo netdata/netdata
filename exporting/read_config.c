@@ -238,6 +238,10 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
+        prometheus_exporter_instance->config.options |=
+            global_backend_options &
+            (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM);
+
         if (prometheus_config_get_boolean(
                 "send names instead of ids", global_backend_options & EXPORTING_OPTION_SEND_NAMES))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
