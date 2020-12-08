@@ -13,9 +13,6 @@ metrics, and you interact with both of them the same way.
 > If you're not sure which option is best for you, see our [single-node](/docs/quickstart/single-node.md) and
 > [infrastructure](/docs/quickstart/infrastructure.md) quickstart guides.
 
-![A single-node dashboard in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/93500082-b01c1700-f8c8-11ea-920a-c490f05b50f5.gif)
-
 Netdata dashboards are single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
 
@@ -23,6 +20,31 @@ The dashboard is broken up into multiple **sections**, such as **System Overview
 automatically generated based on which [collectors](/docs/collect/how-collectors-work.md) begin collecting metrics when
 Netdata starts up. Sections also appear in the right-hand **menu**, along with submenus based on the contexts and
 families Netdata creates for your node.
+
+## Choose timeframes to visualize
+
+Both the local Agent dashboard and Netdata Cloud feature time & date pickers to help you visualize specific points in
+time. In Netdata Cloud, the picker appears in the [Overview](/docs/visualize/overview-infrastructure.md), [Nodes
+view](https://learn.netdata.cloud/docs/cloud/visualize/nodes), [new
+dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards), and any single-node dashboards you visit.
+
+Local Agent dashboard:
+
+![Time & date picker on the local Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/101512538-5875d080-3938-11eb-8daf-0fbd0948a04b.png)
+
+Netdata Cloud:
+
+![Time & date picker on Netdata
+Cloud](https://user-images.githubusercontent.com/1153921/101512689-86f3ab80-3938-11eb-8abc-12171a9b8a5e.png)
+
+Their behavior is identical. Use the Quick Selector to visualize generic timeframes, or use the calendar or inputs to
+select days, hours, minutes or seconds. Click **Apply** to re-render all visualizations with new metrics data, or
+**Clear** to restore the default timeframe.
+
+See reference documentation for the [local Agent dashboard](/web/gui/README.md#time--date-picker) and [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud/war-rooms#time--date-picker) for additional context about how the time &
+date picker behaves in each environment.
 
 ## Charts, dimensions, families, and contexts
 
@@ -99,5 +121,7 @@ to get informed when something goes wrong in your infrastructure.
 -   [Netdata Agent · Web dashboards overview](/web/README.md)
 -   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
 -   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
+-   [Netdata Cloud · Nodes](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
+-   [Netdata Cloud · Build new dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Finteract-dashboards-charts&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
