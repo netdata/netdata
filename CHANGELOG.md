@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- health: disable 'used\_file\_descriptors' alarm [\#10328](https://github.com/netdata/netdata/pull/10328) ([ilyam8](https://github.com/ilyam8))
+- Fix exporting config [\#10323](https://github.com/netdata/netdata/pull/10323) ([vlvkobal](https://github.com/vlvkobal))
 - Fix a compilation warning [\#10320](https://github.com/netdata/netdata/pull/10320) ([vlvkobal](https://github.com/vlvkobal))
 - installer: update go.d.plugin version to v0.26.1 [\#10319](https://github.com/netdata/netdata/pull/10319) ([ilyam8](https://github.com/ilyam8))
+- Improve core documentation to align with recent Netdata Cloud releases [\#10318](https://github.com/netdata/netdata/pull/10318) ([joelhans](https://github.com/joelhans))
 - Added support for MSE \(Massive Storage Engine\) in Varnish-Plus [\#10317](https://github.com/netdata/netdata/pull/10317) ([ernestojpg](https://github.com/ernestojpg))
 - dashboard v2.10.1 [\#10314](https://github.com/netdata/netdata/pull/10314) ([jacekkolasa](https://github.com/jacekkolasa))
 - fix UUID\_STR\_LEN undefined on MacOS [\#10313](https://github.com/netdata/netdata/pull/10313) ([underhood](https://github.com/underhood))
@@ -33,6 +36,7 @@
 - fix bug\_report.md syntax error [\#10269](https://github.com/netdata/netdata/pull/10269) ([OdysLam](https://github.com/OdysLam))
 - python.d/nvidia\_smi: use `pwd` lib to get username if not inside a container [\#10268](https://github.com/netdata/netdata/pull/10268) ([ilyam8](https://github.com/ilyam8))
 - Add kernel to blacklist [\#10262](https://github.com/netdata/netdata/pull/10262) ([thiagoftsm](https://github.com/thiagoftsm))
+- Made the update script significantly more robust and user friendly. [\#10261](https://github.com/netdata/netdata/pull/10261) ([Ferroin](https://github.com/Ferroin))
 - new issue templates [\#10259](https://github.com/netdata/netdata/pull/10259) ([OdysLam](https://github.com/OdysLam))
 - Docs: Point users to proper configure doc [\#10254](https://github.com/netdata/netdata/pull/10254) ([joelhans](https://github.com/joelhans))
 - Docs: Cleanup and fix broken links [\#10253](https://github.com/netdata/netdata/pull/10253) ([joelhans](https://github.com/joelhans))
@@ -76,10 +80,7 @@
 - Hangout thread [\#10160](https://github.com/netdata/netdata/pull/10160) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update the version of libJudy that we bundle to 1.0.5-netdata2 [\#10158](https://github.com/netdata/netdata/pull/10158) ([Ferroin](https://github.com/Ferroin))
 - Fixed builds using particular versions of Clang. [\#10155](https://github.com/netdata/netdata/pull/10155) ([Ferroin](https://github.com/Ferroin))
-- fix configuration category in docs/prometheus\_remote\_write [\#10145](https://github.com/netdata/netdata/pull/10145) ([OdysLam](https://github.com/OdysLam))
 - Migrate metadata log to SQLite [\#10139](https://github.com/netdata/netdata/pull/10139) ([stelfrag](https://github.com/stelfrag))
-- dashboard@2.7.4 [\#10122](https://github.com/netdata/netdata/pull/10122) ([jacekkolasa](https://github.com/jacekkolasa))
-- Fix broken links in docs [\#10115](https://github.com/netdata/netdata/pull/10115) ([joelhans](https://github.com/joelhans))
 - Remove Docker example from update docs and add section to claim troubleshooting [\#10103](https://github.com/netdata/netdata/pull/10103) ([joelhans](https://github.com/joelhans))
 - ebpf memory cleanup [\#10096](https://github.com/netdata/netdata/pull/10096) ([thiagoftsm](https://github.com/thiagoftsm))
 - Anomalies collector [\#10060](https://github.com/netdata/netdata/pull/10060) ([andrewm4894](https://github.com/andrewm4894))
@@ -226,9 +227,6 @@
 - Fix setting the default value of the home directory to the environment's HOME [\#9711](https://github.com/netdata/netdata/pull/9711) ([cakrit](https://github.com/cakrit))
 - Fix child memory corruption by removing broken optimization in the sender thread [\#9703](https://github.com/netdata/netdata/pull/9703) ([amoss](https://github.com/amoss))
 - Send follow up alarms when the initial status matches the notification [\#9698](https://github.com/netdata/netdata/pull/9698) ([cakrit](https://github.com/cakrit))
-- Improve and correct vulnerability reporting instructions [\#9696](https://github.com/netdata/netdata/pull/9696) ([cakrit](https://github.com/cakrit))
-- Fix collectors on MacOS and FreeBSD to ignore archived charts. [\#9695](https://github.com/netdata/netdata/pull/9695) ([mfundul](https://github.com/mfundul))
-- Fix print message when building for Ubuntu Focal [\#9694](https://github.com/netdata/netdata/pull/9694) ([devinrsmith](https://github.com/devinrsmith))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
