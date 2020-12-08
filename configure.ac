@@ -734,24 +734,30 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
 
     AC_MSG_RESULT([${enable_aclk}])
 fi
-AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
-    if test "$aclk_ng" != "yes" -a "$enable_aclk" == "no"; then #default "fallback"
-        AC_MSG_NOTICE([ACLK Legacy could not be built. Trying ACLK-NG as fallback.])
-        aclk_ng="yes"
-    fi
-    if test "$aclk_ng" = "yes"; then
-#TODO Check OpenSSL and JSON-C
-        AC_MSG_CHECKING([if ACLK Next Generation can be built])
-        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        enable_aclk="yes"
+    AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
+    if test "$enable_jsonc" != "yes"; then
+        AC_MSG_RESULT([no])
+    else
         AC_MSG_RESULT([yes])
-        OPTIONAL_MQTT_WSS_CFLAGS="-Imqtt_websockets/src/include -Iexternaldeps/libwebsockets/include"
+        if test "$aclk_ng" != "yes" -a "$enable_aclk" == "no"; then #default "fallback"
+            AC_MSG_NOTICE([ACLK Legacy could not be built. Trying ACLK-NG as fallback.])
+            aclk_ng="yes"
+        fi
+        if test "$aclk_ng" = "yes"; then
+    #TODO Check OpenSSL and JSON-C
+            AC_MSG_CHECKING([if ACLK Next Generation can be built])
+            AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
+            AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+            enable_aclk="yes"
+            AC_MSG_RESULT([yes])
+            OPTIONAL_MQTT_WSS_CFLAGS="-Imqtt_websockets/src/include -Iexternaldeps/libwebsockets/include"
+        fi
     fi
 fi
 AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
+AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
