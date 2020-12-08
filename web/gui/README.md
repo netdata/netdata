@@ -10,7 +10,7 @@ The local Netdata Agent dashboard is the heart of Netdata's performance troubles
 before:
 
 ![The Netdata dashboard in
-action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
+action](https://user-images.githubusercontent.com/1153921/101513938-fae28380-3939-11eb-9434-8ad86a39be62.gif)
 
 Learn more about how dashboards work and how they're populated using the `dashboards.js` file in our [web dashboards
 overview](/web/README.md).
