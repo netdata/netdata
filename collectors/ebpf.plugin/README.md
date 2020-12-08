@@ -156,24 +156,27 @@ The eBPF collector also creates charts for each running application through an i
 interact with the Linux kernel.
 
 When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
-    
--   eBPF syscall    
-    -   Number of calls to open files.
-    -   Number of files closed.
-    -   Number of calls to delete files.
-    -   Number of calls to `vfs_write`.
-    -   Number of calls to `vfs_read`.
-    -   Number of bytes written trough `vfs_write`
-    -   Number of bytes read trough `vfs_read`
-    -   Number of process created trough `do_fork`
-    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
-    -   Number of times that a process called `do_exit`. 
+
+-   eBPF file
+    -   Number of calls to open files. (`apps.file_open`)
+    -   Number of files closed. (`apps.file_closed`)
     -   Number of calls to open files that returned errors.
     -   Number of calls to close files that returned errors.
+-   eBPF syscall
+    -   Number of calls to delete files. (`apps.file_deleted`)
+    -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
+    -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
+    -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
+    -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
+    -   Number of calls to write a file that returned errors.
     -   Number of calls to read a file that returned errors.
-    -   Number of calls to read a file that returned errors.
+-   eBPF process
+    -   Number of process created with `do_fork`. (`apps.process_create`)
+    -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
+    -   Number of times that a process called `do_exit`. (`apps.task_close`)
 -   eBPF net
-    -   Number of bytes transmited per seconds.   
+    -   Number of bytes sent. (`apps.bandwidth_sent`)
+    -   Number of bytes received. (`apps.bandwidth_recv`)
 
 If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
 `no`.
