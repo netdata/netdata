@@ -152,7 +152,15 @@ BuildRequires: json-c-devel
 
 # Runtime dependencies
 #
-Requires:      python
+%if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
+Requires: python
+%else
+%if 0%{?centos_ver} == 8
+Requires: python38
+%else
+Requires: python3
+%endif
+%endif
 
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
