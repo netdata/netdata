@@ -619,6 +619,27 @@ build_libwebsockets() {
   fi
 
   pushd "${1}" > /dev/null || exit 1
+
+  if [ "$(uname)" = "Darwin" ]; then
+    run patch -p1 << "EOF"
+--- a/lib/plat/unix/private.h
++++ b/lib/plat/unix/private.h
+@@ -164,6 +164,8 @@ delete_from_fd(const struct lws_context *context, int fd);
+  * but happily have something equivalent in the SO_NOSIGPIPE flag.
+  */
+ #ifdef __APPLE__
++/* iOS SDK 12+ seems to define it, undef it for compatibility both ways */
++#undef MSG_NOSIGNAL
+ #define MSG_NOSIGNAL SO_NOSIGPIPE
+ #endif
+EOF
+
+    # shellcheck disable=SC2181
+    if [ $? -ne 0 ]; then
+      return 1
+    fi
+  fi
+
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
     run ${env_cmd} cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
