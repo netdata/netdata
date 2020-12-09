@@ -28,7 +28,7 @@
 
 set -e
 
-script_source="$("$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/netdata-updater.sh")"
+script_source="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/netdata-updater.sh"
 
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
