@@ -28,7 +28,13 @@
 
 set -e
 
-script_source="$("$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/netdata-updater.sh")"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+if [ -x "${script_dir}/netdata-updater" ]; then
+  script_source="${script_dir}/netdata-updater"
+else
+  script_source="${script_dir}/netdata-updater.sh"
+fi
 
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
@@ -153,7 +159,13 @@ newer_commit_date() {
     commit_date="1970-01-01T00:00:00Z"
   fi
 
-  [ "$(date -d "${commit_date}" +%s)" -ge "$(date -r "${script_source}" +%s)" ]
+  if [ -e "${script_source}" ]; then
+    script_date="$(date -r "${script_source}" +%s)"
+  else
+    script_date="$(date +%s)"
+  fi
+
+  [ "$(date -d "${commit_date}" +%s)" -ge "${script_date}" ]
 }
 
 self_update() {
@@ -312,7 +324,7 @@ while [ -n "${1}" ]; do
   elif [ "${1}" = "--no-updater-self-update" ]; then
     NETDATA_NO_UPDATER_SELF_UPDATE=1
     shift 1
-  elif [ "${1}" = "--tempdir-path" ]; then
+  elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
     shift 2
   else
