@@ -508,6 +508,7 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
+        long double currentmaxfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -2998,6 +2999,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
+    long double currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3006,10 +3008,15 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
+        currentfds++;
+
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
     }
+
+    if (currentfds >= currentmaxfds)
+        currentmaxfds = currentfds;
 }
 
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
@@ -3607,6 +3614,10 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
+        if (!strcmp("apps", type)){
+            kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
+            fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
+        }
         send_END();
 
         send_BEGIN(type, "sockets", dt);
@@ -4184,6 +4195,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
+        currentmaxfds = 0;
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 

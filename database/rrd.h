@@ -1027,16 +1027,15 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
 // get the timestamp of the last entry in the round robin database
-static inline time_t rrdset_last_entry_t(RRDSET *st) {
+static inline time_t rrdset_last_entry_t_nolock(RRDSET *st)
+{
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
 
-        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
         }
-        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         return last_entry_t;
     } else {
@@ -1044,23 +1043,44 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
     }
 }
 
+static inline time_t rrdset_last_entry_t(RRDSET *st)
+{
+    time_t last_entry_t;
+
+    netdata_rwlock_rdlock(&st->rrdset_rwlock);
+    last_entry_t = rrdset_last_entry_t_nolock(st);
+    netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+    return last_entry_t;
+}
+
 // get the timestamp of first entry in the round robin database
-static inline time_t rrdset_first_entry_t(RRDSET *st) {
+static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
+{
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t first_entry_t = LONG_MAX;
 
-        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
         }
-        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
     } else {
-        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
+        return (time_t)(rrdset_last_entry_t_nolock(st) - rrdset_duration(st));
     }
+}
+
+static inline time_t rrdset_first_entry_t(RRDSET *st)
+{
+    time_t first_entry_t;
+
+    netdata_rwlock_rdlock(&st->rrdset_rwlock);
+    first_entry_t = rrdset_first_entry_t_nolock(st);
+    netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+    return first_entry_t;
 }
 
 // get the timestamp of the last entry in the round robin database
@@ -1101,23 +1121,26 @@ static inline size_t rrdset_first_slot(RRDSET *st) {
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
+// only valid when not using dbengine
 static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
     size_t ret = 0;
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
 
-    if(t >= rrdset_last_entry_t(st)) {
+    if(t >= last_entry_t) {
         // the requested time is after the last entry we have
         ret = rrdset_last_slot(st);
     }
     else {
-        if(t <= rrdset_first_entry_t(st)) {
+        if(t <= first_entry_t) {
             // the requested time is before the first entry we have
             ret = rrdset_first_slot(st);
         }
         else {
-            if(rrdset_last_slot(st) >= ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)))
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every));
+            if(rrdset_last_slot(st) >= ((last_entry_t - t) / (size_t)(st->update_every)))
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every));
             else
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+                ret = rrdset_last_slot(st) - ((last_entry_t - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
         }
     }
 
@@ -1130,8 +1153,11 @@ static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
 }
 
 // get the timestamp of a specific slot in the round robin database
+// only valid when not using dbengine
 static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     time_t ret;
+    time_t last_entry_t = rrdset_last_entry_t_nolock(st);
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
 
     if(slot >= (size_t)st->entries) {
         error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
@@ -1139,20 +1165,20 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     }
 
     if(slot > rrdset_last_slot(st)) {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
+        ret = last_entry_t - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
     }
     else {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every;
+        ret = last_entry_t - (size_t)st->update_every;
     }
 
-    if(unlikely(ret < rrdset_first_entry_t(st))) {
+    if(unlikely(ret < first_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
-        ret = rrdset_first_entry_t(st);
+        ret = first_entry_t;
     }
 
-    if(unlikely(ret > rrdset_last_entry_t(st))) {
+    if(unlikely(ret > last_entry_t)) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
-        ret = rrdset_last_entry_t(st);
+        ret = last_entry_t;
     }
 
     return ret;

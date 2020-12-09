@@ -1,12 +1,10 @@
 <!--
----
-title: "Web dashboards overview"
-date: 2020-03-11
+title: "Dashboards"
+description: "Netdata comes bundled with hundreds of real-time, context-aware charts that help your monitor health and performance without configuration."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/README.md
----
 -->
 
-# Web dashboards overview
+# Dashboards
 
 Because Netdata is a health monitoring and _performance troubleshooting_ system,
 we put a lot of emphasis on real-time, meaningful, and context-aware charts.

@@ -88,6 +88,7 @@ struct extent_io_descriptor {
     int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
+    struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
 
 struct generic_io_descriptor {
@@ -97,6 +98,27 @@ struct generic_io_descriptor {
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
+};
+
+struct extent_cache_element {
+    struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
+    unsigned fileno;
+    struct extent_cache_element *prev; /* LRU */
+    struct extent_cache_element *next; /* LRU */
+    struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
+    uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
+};
+
+#define MAX_CACHED_EXTENTS 16 /* cannot be over 32 to fit in 32-bit architectures */
+
+/* Initialize by setting the structure to zero */
+struct extent_cache {
+    struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
+    unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
+    unsigned inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
+
+    struct extent_cache_element *replaceQ_head; /* LRU */
+    struct extent_cache_element *replaceQ_tail; /* MRU */
 };
 
 struct rrdengine_worker_config {
@@ -121,6 +143,8 @@ struct rrdengine_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct rrdeng_cmdqueue cmd_queue;
+
+    struct extent_cache xt_cache;
 
     int error;
 };

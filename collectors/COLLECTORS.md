@@ -10,9 +10,8 @@ Netdata uses collectors to help you gather metrics from your favorite applicatio
 real-time, interactive charts. The following list includes collectors for both external services/applications and
 internal system metrics.
 
-Read more about collectors and how to enable them in our [collectors documentation](/collectors/README.md), or use the
-[collector quickstart](/collectors/QUICKSTART.md) to figure out how to collect metrics from your favorite app/service
-with auto-detection and minimal configuration.
+Learn more about [how collectors work](/docs/collect/how-collectors-work.md), and then learn how to [enable or
+configure](/docs/collect/enable-configure.md) any of the below collectors using the same process.
 
 Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these
 cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best
@@ -22,9 +21,10 @@ If you want to use a Python version of a collector, you need to explicitly [disa
 version](/docs/collect/enable-configure.md), and enable the Python version. Netdata then skips the Go version and
 attempts to load the Python version and its accompanying configuration file.
 
-If you don't see the app/service you'd like to monitor here, check out our [GitHub
+If you don't see the app/service you'd like to monitor in this list, check out our [GitHub
 issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous discussions about that
-collector—we may be looking for contributions from users such as yourself!
+collector—we may be looking for contributions from users such as yourself! If you don't see the collector there, make a
+[feature request](https://community.netdata.cloud/c/feature-requests/7/none) on our community forums.
 
 -   [Service and application collectors](#service-and-application-collectors)
     -   [APM (application performance monitoring)](#apm-application-performance-monitoring)
@@ -51,6 +51,7 @@ collector—we may be looking for contributions from users such as yourself!
     -   [Processes](#processes)
     -   [Resources](#resources)
     -   [Users](#users)
+-   [Netdata collectors](#netdata-collectors)
 -   [Orchestrators](#orchestrators)
 -   [Third-party collectors](#third-party-collectors)
 -   [Etc](#etc)
@@ -194,7 +195,12 @@ configure any of these collectors according to your setup and infrastructure.
     trip time.
 -   [Dnsmasq](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq_dhcp/): Automatically
     detects all configured `Dnsmasq` DHCP ranges and Monitor their utilization.
--   [dnsdist](/collectors/python.d.plugin/dnsdist/README.md): Collect load-balancer performance and health metrics.
+-   [DNSdist (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsdist/): Collect
+    load-balancer performance and health metrics.
+-   [DNSdist (Python)](/collectors/python.d.plugin/dnsdist/README.md): Collect load-balancer performance and health
+    metrics.
+-   [Dnsmasq DNS Forwarder](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq/): Gather
+    queries, entries, operations, and events for the lightweight DNS forwarder.
 -   [dns_query](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsquery/): Monitor the round
     trip time for DNS queries in milliseconds.
 -   [DNS Query Time](/collectors/python.d.plugin/dns_query_time/README.md): Measure DNS query round trip time.
@@ -225,7 +231,13 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Pi-hole](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole/): Monitor basic (DNS
     queries, clients, blocklist) and extended (top clients, top permitted, and blocked domains) statistics using the PHP
     API.
--   [PowerDNS](/collectors/python.d.plugin/powerdns/README.md): Monitor authoritative server and recursor statistics.
+-   [PowerDNS Authoritative Server
+    (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns): Monitor one or more instances
+    of the nameserver software to collect questions, events, and latency metrics.
+-   [PowerDNS Recursor (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns_recursor):
+    Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
+-   [PowerDNS (Python)](/collectors/python.d.plugin/powerdns/README.md): Monitor authoritative server and recursor
+    statistics.
 -   [RetroShare](/collectors/python.d.plugin/retroshare/README.md): Monitor application bandwidth, peers, and DHT
     metrics.
 -   [Tor](/collectors/python.d.plugin/tor/README.md): Capture traffic usage statistics using the Tor control port.
@@ -461,6 +473,24 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
     by `systemd-logind` or `elogind`.
 -   [User/group usage](/collectors/apps.plugin/README.md): Gather CPU, disk, memory, network, and other metrics per user
     and user group using the `apps.plugin` collector.
+
+## Netdata collectors
+
+These collectors are recursive in nature, in that they monitor some function of the Netdata Agent itself. Some
+collectors are described only in code and associated charts in Netdata dashboards.
+
+-   [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/aclk_stats.c): View whether a Netdata Agent
+    is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
+-   [Alarms](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/alarms): This collector creates an
+    <strong>Alarms</strong> menu with one line plot showing the alarm states of a Netdata Agent over time.
+-   [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the
+    Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
+-   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
+    metrics on CPU utilization for the [exporting engine](/exporting/README.md), and specific metrics for each enabled
+    exporting connector.
+-   [Global statistics (code only)](https://github.com/netdata/netdata/blob/master/daemon/global_statistics.c): See
+    metrics on the CPU utilization, network traffic, volume of web clients, API responses, database engine usage, and
+    more.
 
 ## Orchestrators
 

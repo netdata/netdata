@@ -167,7 +167,7 @@ extern void write_end_chart();
 
 #define EBPF_GLOBAL_SECTION "global"
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
-#define EBPF_NETWORK_VIEWER_SECTION "network viewer"
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
 #define EBPF_COMMON_DIMENSION_CALL "calls"

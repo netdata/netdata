@@ -156,31 +156,34 @@ The eBPF collector also creates charts for each running application through an i
 interact with the Linux kernel.
 
 When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
-    
--   eBPF syscall    
-    -   Number of calls to open files.
-    -   Number of files closed.
-    -   Number of calls to delete files.
-    -   Number of calls to `vfs_write`.
-    -   Number of calls to `vfs_read`.
-    -   Number of bytes written trough `vfs_write`
-    -   Number of bytes read trough `vfs_read`
-    -   Number of process created trough `do_fork`
-    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
-    -   Number of times that a process called `do_exit`. 
+
+-   eBPF file
+    -   Number of calls to open files. (`apps.file_open`)
+    -   Number of files closed. (`apps.file_closed`)
     -   Number of calls to open files that returned errors.
     -   Number of calls to close files that returned errors.
+-   eBPF syscall
+    -   Number of calls to delete files. (`apps.file_deleted`)
+    -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
+    -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
+    -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
+    -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
+    -   Number of calls to write a file that returned errors.
     -   Number of calls to read a file that returned errors.
-    -   Number of calls to read a file that returned errors.
+-   eBPF process
+    -   Number of process created with `do_fork`. (`apps.process_create`)
+    -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
+    -   Number of times that a process called `do_exit`. (`apps.task_close`)
 -   eBPF net
-    -   Number of bytes transmited per seconds.   
+    -   Number of bytes sent. (`apps.bandwidth_sent`)
+    -   Number of bytes received. (`apps.bandwidth_recv`)
 
-If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `disable
-apps` to `yes`.
+If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
+`no`.
 
 ```conf
 [global]
-   disable apps = yes
+   apps = yes
 ```
 
 ### `[ebpf programs]`
@@ -192,12 +195,12 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
 
-### `[network viewer]`
+### `[network connections]`
 
 You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
 ```conf
-[network viewer]
+[network connections]
     maximum dimensions = 500
     resolve hostname ips = no
     ports = 1-1024 !145 !domain
@@ -221,8 +224,8 @@ The following options are available:
     range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
-will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
+they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
@@ -231,11 +234,11 @@ the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 ### `[service name]`
 
-Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
+Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
 
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network viewer charts, and thus see the name of the service instead of its port, define it:
+service in network connection charts, and thus see the name of the service instead of its port, define it:
 
 ```conf
 [service name]

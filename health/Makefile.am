@@ -26,8 +26,10 @@ healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
     health.d/am2320.conf \
+    health.d/anomalies.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
+    health.d/apps_plugin.conf \
     health.d/backend.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \

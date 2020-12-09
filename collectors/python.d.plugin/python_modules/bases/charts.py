@@ -16,8 +16,7 @@ CHART_BEGIN = 'BEGIN {type}.{id} {since_last}\n'
 CHART_CREATE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
                "{chart_type} {priority} {update_every} '{hidden}' 'python.d.plugin' '{module_name}'\n"
 CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
-               "{chart_type} {priority} {update_every} '{hidden} obsolete'\n"
-
+                 "{chart_type} {priority} {update_every} '{hidden} obsolete'\n"
 
 DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden} {obsolete}'\n"
 DIMENSION_SET = "SET '{id}' = {value}\n"
@@ -40,13 +39,17 @@ def create_runtime_chart(func):
     :param func: class method
     :return:
     """
+
     def wrapper(*args, **kwargs):
         self = args[0]
+        chart = RUNTIME_CHART_CREATE.format(
+            job_name=self.name,
+            update_every=self._runtime_counters.update_every,
+        )
+        safe_print(chart)
         ok = func(*args, **kwargs)
-        if ok:
-            safe_print(RUNTIME_CHART_CREATE.format(job_name=self.name,
-                                                   update_every=self._runtime_counters.update_every))
         return ok
+
     return wrapper
 
 
@@ -72,6 +75,7 @@ class Charts:
     All charts stored in a dict.
     Chart is a instance of Chart class.
     Charts adding must be done using Charts.add_chart() method only"""
+
     def __init__(self, job_name, priority, cleanup, get_update_every, module_name):
         """
         :param job_name: <bound method>
@@ -138,6 +142,7 @@ class Charts:
 
 class Chart:
     """Represent a chart"""
+
     def __init__(self, params):
         """
         :param params: <list>
@@ -281,6 +286,7 @@ class Chart:
 
 class Dimension:
     """Represent a dimension"""
+
     def __init__(self, params):
         """
         :param params: <list>
@@ -346,6 +352,7 @@ class Dimension:
 
 class ChartVariable:
     """Represent a chart variable"""
+
     def __init__(self, params):
         """
         :param params: <list>

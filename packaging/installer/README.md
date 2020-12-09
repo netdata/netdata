@@ -140,6 +140,17 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
 With automatic updates disabled, you can choose exactly when and how you [update
 Netdata](/packaging/installer/UPDATE.md).
 
+### Network usage of Netdata’s automatic updater
+
+The auto-update functionality set up by the installation scripts requires working internet access to function
+correctly. In particular, it currently requires access to GitHub (to check if a newer version of the updater script
+is available or not, as well as potentially fetching build-time dependencies that are bundled as part of the install),
+and Google Cloud Storage (to check for newer versions of Netdata and download the sources if there is a newer version).
+
+Note that the auto-update functionality will check for updates to itself independently of updates to Netdata,
+and will try to use the latest version of the updater script whenever possible. This is intended to reduce the
+amount of effort required by users to get updates working again in the event of a bug in the updater code.
+
 ## Nightly vs. stable releases
 
 The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's

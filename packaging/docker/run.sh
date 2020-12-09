@@ -2,16 +2,17 @@
 #
 # Entry point script for netdata
 #
-# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright: 2018 and later Netdata Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+# Author  : Austin S. Hemmelgarn <austin@netdata.cloud>
 set -e
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
-echo "Netdata entrypoint script starting"
 if [ -n "${PGID}" ]; then
   echo "Creating docker group ${PGID}"
   addgroup -g "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
@@ -19,6 +20,11 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" -W set web "web files group" root -W set web "web files owner" root "$@"
+if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/claim.d/claimed_id ]; then
+  /usr/sbin/netdata-claim.sh -token "${NETDATA_CLAIM_TOKEN}" \
+                             -url "${NETDATA_CLAIM_URL}" \
+                             ${NETDATA_CLAIM_ROOMS:+-rooms "${NETDATA_CLAIM_ROOMS}"} \
+                             ${NETDATA_CLAIM_PROXY:+-proxy "${NETDATA_CLAIM_PROXY}"}
+fi
 
-echo "Netdata entrypoint script, completed!"
+exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" -W set web "web files group" root -W set web "web files owner" root "$@"

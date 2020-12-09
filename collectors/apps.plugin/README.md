@@ -1,8 +1,7 @@
 <!--
----
 title: "apps.plugin"
+sidebar_label: "Application monitoring (apps.plugin)"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/apps.plugin/README.md
----
 -->
 
 # apps.plugin
@@ -39,35 +38,35 @@ that fork/spawn other short lived processes hundreds of times per second.
 
 Each of these sections provides the same number of charts:
 
--   CPU Utilization
+-   CPU utilization (`apps.cpu`)
     -   Total CPU usage
-    -   User / System CPU usage
+    -   User/system CPU usage (`apps.cpu_user`/`apps.cpu_system`)
 -   Disk I/O
-    -   Physical Reads / Writes
-    -   Logical Reads / Writes
-    -   Open Unique Files (if a file is found open multiple times, it is counted just once)
+    -   Physical reads/writes (`apps.preads`/`apps.pwrites`)
+    -   Logical reads/writes (`apps.lreads`/`apps.lwrites`)
+    -   Open unique files (if a file is found open multiple times, it is counted just once, `apps.files`)
 -   Memory
-    -   Real Memory Used (non shared)
-    -   Virtual Memory Allocated
-    -   Minor Page Faults (i.e. memory activity)
+    -   Real Memory Used (non-shared, `apps.mem`)
+    -   Virtual Memory Allocated (`apps.vmem`)
+    -   Minor page faults (i.e. memory activity, `apps.minor_faults`)
 -   Processes
-    -   Threads Running
-    -   Processes Running
-    -   Pipes Open
-    -   Carried Over Uptime (since the Netdata restart)
-    -   Minimum Uptime
-    -   Average Uptime
-    -   Maximum Uptime
-
--   Swap Memory
-    -   Swap Memory Used
-    -   Major Page Faults (i.e. swap activity)
+    -   Threads running (`apps.threads`)
+    -   Processes running (`apps.processes`)
+    -   Carried over uptime (since the last Netdata Agent restart, `apps.uptime`)
+    -   Minimum uptime (`apps.uptime_min`)
+    -   Average uptime (`apps.uptime_average`)
+    -   Maximum uptime (`apps.uptime_max`)
+    -   Pipes open (`apps.pipes`)
+-   Swap memory
+    -   Swap memory used (`apps.swap`)
+    -   Major page faults (i.e. swap activiy, `apps.major_faults`)
 -   Network
-    -   Sockets Open
+    -   Sockets open (`apps.sockets`)
     
-In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also show
-an additional [list](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) of charts using low-level Linux metrics.    
-    
+In addition, if the [eBPF collector](/collectors/ebpf.plugin/README.md) is running, your dashboard will also show an
+additional [list of charts](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) using low-level Linux
+metrics.
+
 The above are reported:
 
 -   For **Applications** per target configured.
