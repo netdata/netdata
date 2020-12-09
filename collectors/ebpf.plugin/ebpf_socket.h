@@ -73,8 +73,13 @@ typedef enum ebpf_socket_idx {
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
-    uint64_t sent;
-    uint64_t received;
+    uint64_t bytes_sent;         // Bytes sent
+    uint64_t bytes_received;     // Bytes received
+    uint32_t call_tcp_sent;      // Number of times tcp_sendmsg was called
+    uint32_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
+    uint32_t retransmit;         // Number of times tcp_retransmit was called
+    uint32_t call_udp_sent;      // Number of times udp_sendmsg was called
+    uint32_t call_udp_received;  // Number of times udp_recvmsg was called
 
     // Publish information.
     uint64_t publish_sent;

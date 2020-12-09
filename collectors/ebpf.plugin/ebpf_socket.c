@@ -266,8 +266,8 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
  */
 static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr, ebpf_socket_publish_apps_t *prev)
 {
-    curr->publish_recv = curr->received - prev->received;
-    curr->publish_sent = curr->sent - prev->sent;
+    curr->publish_recv = curr->bytes_received - prev->bytes_received;
+    curr->publish_sent = curr->bytes_sent - prev->bytes_sent;
 }
 
 /**
@@ -1429,8 +1429,13 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
         memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
     }
 
-    curr->sent = eb->sent;
-    curr->received = eb->received;
+    curr->bytes_sent = eb->bytes_sent;
+    curr->bytes_received = eb->bytes_received;
+    curr->call_tcp_sent = eb->call_tcp_sent;
+    curr->call_tcp_received = eb->call_tcp_received;
+    curr->retransmit = eb->retransmit;
+    curr->call_udp_sent = eb->call_udp_sent;
+    curr->call_udp_received = eb->call_udp_received;
 
     ebpf_socket_update_apps_publish(curr, prev);
 }
@@ -1446,8 +1451,13 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
     ebpf_bandwidth_t *total = &out[0];
     for (i = 1; i < end; i++) {
         ebpf_bandwidth_t *move = &out[i];
-        total->sent += move->sent;
-        total->received += move->received;
+        total->bytes_sent += move->bytes_sent;
+        total->bytes_received += move->bytes_received;
+        total->call_tcp_sent += move->call_tcp_sent;
+        total->call_tcp_received += move->call_tcp_received;
+        total->retransmit += move->retransmit;
+        total->call_udp_sent += move->call_udp_sent;
+        total->call_udp_received += move->call_udp_received;
     }
 }
 
