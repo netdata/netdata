@@ -52,3 +52,8 @@ clean:
 	cd c-rbuf && $(MAKE) clean
 	rm -f test libmqttwebsockets.a
 
+install:
+
+dist:
+
+distdir:
