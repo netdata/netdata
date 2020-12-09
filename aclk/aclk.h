@@ -73,7 +73,7 @@ extern struct aclk_shared_state {
     // at the same time if > 0 we know link is
     // shutting down
     int mqtt_shutdown_msg_id;
-    int mqtt_shutdown_msg_rcvd:1;
+    int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
 typedef enum aclk_proxy_type {
