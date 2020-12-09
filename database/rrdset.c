@@ -336,7 +336,11 @@ void rrdset_free(RRDSET *st) {
     freez(st->exporting_flags);
 
     while(st->variables)  rrdsetvar_free(st->variables);
-    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+//  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+    /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
+     * created by a template. This leads to an effective memory leak, which cannot be detected since the
+     * alarms will still be connected to the host, and freed during shutdown. */
+    while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
     rrdfamily_free(host, st->rrdfamily);
