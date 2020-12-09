@@ -23,6 +23,15 @@ jobs:
           - i386
           - armhf
           - aarch64
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: i386
+            platform: linux/i386
+          - arch: armhf
+            platform: linux/arm/v7
+          - arch: aarch64
+            platform: linux/arm64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,4 +41,4 @@ jobs:
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Test Docker Build
         run:
-          docker build --build-arg ARCH=${{ matrix.arch }} -f packaging/docker/Dockerfile .
+          docker build --build-arg ARCH=${{ matrix.arch }} --platform ${{ matrix.platform }} -f packaging/docker/Dockerfile .
