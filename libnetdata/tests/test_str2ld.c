@@ -32,7 +32,7 @@ static void test_str2ld(void **state)
         else if (isinf(mine))
             assert_true(isinf(sys));
         else if (mine != sys)
-            assert_false(abs(mine - sys) > 0.000001);
+            assert_false(ABS(mine - sys) > 0.000001);
 
         assert_ptr_equal(e_mine, e_sys);
     }

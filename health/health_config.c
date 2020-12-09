@@ -384,7 +384,7 @@ static inline int health_parse_db_lookup(
     }
 
     // sane defaults
-    *every = abs(*after);
+    *every = ABS(*after);
 
     // now we may have optional parameters
     while(*s) {
