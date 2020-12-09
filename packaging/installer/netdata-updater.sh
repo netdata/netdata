@@ -176,6 +176,7 @@ self_update() {
     cd "$ndtmpdir" || exit 1
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
+      chmod +x ./netdata-updater.sh || exit 1
       exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)"
     else
       echo >&3 "Failed to download newest version of updater script, continuing with current version."
