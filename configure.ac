@@ -1646,15 +1646,10 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile
+    aclk/legacy/Makefile
     spawn/Makefile
     parser/Makefile
 ])
-
-if test "$aclk_ng" != "yes"; then
-AC_CONFIG_FILES([
-    aclk/legacy/Makefile
-])
-fi
 
 AC_OUTPUT
 
