@@ -53,5 +53,5 @@ If you'd like to attach larger files, use gist.github.com and paste in links.
 1. ...
 2. ...
 
-##### Expected behavior
+##### Expected behaviour
 <!-- Provide a clear and concise description of what you expected to happen. -->
