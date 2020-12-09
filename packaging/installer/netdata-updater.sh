@@ -150,7 +150,7 @@ newer_commit_date() {
   echo >&3 "Checking if a newer version of the updater script is available."
 
   if command -v jq > /dev/null 2>&1; then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date')"
+    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date' | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
     commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)["commit"]["committer"]["date"])')"
   fi
