@@ -1550,7 +1550,7 @@ validate_tree_centos() {
     echo >&2 " > Checking for PowerTools ..."
     if ! run yum ${sudo} repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
-        run ${sudo} yum ${opts} config-manager --set-enabled PowerTools
+        run ${sudo} yum ${opts} config-manager --set-enabled powertools
       fi
     fi
 
