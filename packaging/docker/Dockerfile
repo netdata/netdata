@@ -28,7 +28,7 @@ WORKDIR /opt/netdata.git
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    ./netdata-installer.sh --dont-wait --dont-start-it ${EXTRA_INSTALL_OPTS} \
-   $([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)
+   "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -49,6 +49,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
+    mv packaging/docker/health.sh     /app/usr/sbin/ && \
     cp -rp /deps/* /app/usr/local/ && \
     chmod +x /app/usr/sbin/run.sh
 
@@ -57,12 +58,6 @@ ARG ARCH
 # This image contains preinstalled dependecies
 FROM netdata/base:${ARCH}
 
-# Copy files over
-RUN mkdir -p /opt/src
-COPY --from=builder /app /
-COPY --from=builder /wheels /wheels
-COPY packaging/docker/health.sh /health.sh
-
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
@@ -70,17 +65,28 @@ ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
 #ENV DO_NOT_TRACK=1
-RUN \
+
+# Copy files over
+RUN mkdir -p /opt/src /var/log/netdata && \
+    # Link log files to stdout
+    ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log && \
     # fping from alpine apk is on a different location. Moving it.
-    mv /usr/sbin/fping /usr/local/bin/fping && \
+    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
     chmod 4755 /usr/local/bin/fping && \
-    mkdir -p /var/log/netdata && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}" && \
-    # Apply the permissions as described in
-    # https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
-    chown -R root:root \
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
+
+# Long-term this should leverage BuildKit’s mount option.
+COPY --from=builder /wheels /wheels
+COPY --from=builder /app /
+
+# Apply the permissions as described in
+# https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
+# hadolint ignore=DL3013
+RUN chown -R root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
@@ -99,17 +105,12 @@ RUN \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
-    # Link log files to stdout
-    ln -sf /dev/stdout /var/log/netdata/access.log && \
-    ln -sf /dev/stdout /var/log/netdata/debug.log && \
-    ln -sf /dev/stderr /var/log/netdata/error.log
-
-# Install any Python wheels
-RUN pip install /wheels/*
+    pip --no-cache-dir install /wheels/* && \
+    rm -rf /wheels
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
-HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /health.sh
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
