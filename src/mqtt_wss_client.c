@@ -85,10 +85,10 @@ struct mqtt_wss_client {
 // signifies that we didn't write all MQTT wanted
 // us to write during last cycle (e.g. due to buffer
 // size) and thus we should arm POLLOUT
-    int mqtt_didnt_finish_write:1;
+    unsigned int mqtt_didnt_finish_write:1;
 
-    int mqtt_connected:1;
-    int mqtt_disconnecting:1;
+    unsigned int mqtt_connected:1;
+    unsigned int mqtt_disconnecting:1;
 
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
