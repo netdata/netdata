@@ -28,7 +28,13 @@
 
 set -e
 
-script_source="$("$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)/netdata-updater.sh")"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+if [ -x "${script_dir}/netdata-updater" ]; then
+  script_source="${script_dir}/netdata-updater"
+else
+  script_source="${script_dir}/netdata-updater.sh"
+fi
 
 info() {
   echo >&3 "$(date) : INFO: " "${@}"
@@ -144,16 +150,22 @@ newer_commit_date() {
   echo >&3 "Checking if a newer version of the updater script is available."
 
   if command -v jq > /dev/null 2>&1; then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date')"
+    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date' | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
-    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)["commit"]["committer"]["date"])')"
+    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
   fi
 
   if [ -z "${commit_date}" ] ; then
-    commit_date="1970-01-01T00:00:00Z"
+    commit_date="9999-12-31T23:59:59Z"
   fi
 
-  [ "$(date -d "${commit_date}" +%s)" -ge "$(date -r "${script_source}" +%s)" ]
+  if [ -e "${script_source}" ]; then
+    script_date="$(date -r "${script_source}" +%s)"
+  else
+    script_date="$(date +%s)"
+  fi
+
+  [ "$(date -d "${commit_date}" +%s)" -ge "${script_date}" ]
 }
 
 self_update() {
@@ -164,6 +176,7 @@ self_update() {
     cd "$ndtmpdir" || exit 1
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
+      chmod +x ./netdata-updater.sh || exit 1
       exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)"
     else
       echo >&3 "Failed to download newest version of updater script, continuing with current version."
@@ -312,7 +325,7 @@ while [ -n "${1}" ]; do
   elif [ "${1}" = "--no-updater-self-update" ]; then
     NETDATA_NO_UPDATER_SELF_UPDATE=1
     shift 1
-  elif [ "${1}" = "--tempdir-path" ]; then
+  elif [ "${1}" = "--tmpdir-path" ]; then
     NETDATA_TMPDIR_PATH="${2}"
     shift 2
   else
