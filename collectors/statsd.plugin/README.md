@@ -1,8 +1,7 @@
 <!--
----
 title: "statsd.plugin"
+description: "The Netdata Agent is a fully-featured statsd server that collects metrics from any custom application and visualizes them in real-time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
----
 -->
 
 # statsd.plugin
@@ -219,7 +218,8 @@ The same chart with the `sum` unselected:
 
 ### synthetic statsd charts
 
-Using synthetic charts, you can create dedicated sections on the dashboard to render the charts. You can control everything: the main menu, the submenus, the charts, the dimensions on each chart, etc.
+Use synthetic charts to create dedicated sections on the dashboard to render the charts, with control over the main
+menu, the submenus, the charts, the dimensions on each chart, and more.
 
 Synthetic charts are organized in
 
@@ -229,7 +229,7 @@ Synthetic charts are organized in
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
-So, to create the statsd application `myapp`, you can create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
+So, to create the statsd application `myapp`, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
 
 ```
 [app]
@@ -271,9 +271,9 @@ Using the above configuration `myapp` should get its own section on the dashboar
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
 
-Then, you can add any number of charts. Each chart should start with `[id]`.  The chart will be called `app_name.id`.  `family` controls the submenu on the dashboard. `context` controls the alarm templates. `priority` controls the ordering of the charts on the dashboard. The rest of the settings are informational.
+Then, add any number of charts. Each chart should start with `[id]`. The chart will be called `app_name.id`.  `family` controls the submenu on the dashboard. `context` controls the alarm templates. `priority` controls the ordering of the charts on the dashboard. The rest of the settings are informational.
 
-You can add any number of metrics to a chart, using `dimension` lines. These lines accept 5 space separated parameters:
+Add any number of metrics to a chart, using `dimension` lines. These lines accept 5 space separated parameters:
 
 1.  the metric name, as it is collected (it has to be matched by the `metrics =` pattern of the app)
 2.  the dimension name, as it should be shown on the chart
@@ -351,12 +351,12 @@ Netdata uses this dictionary as follows:
 
 3.  If any of the above succeeds, Netdata uses the `value` of the dictionary, to set the name of the dimension. The dimensions will have as ID the original statsd metric name, and as name, the dictionary value.
 
-So, you can use the dictionary in 2 ways:
+Use the dictionary in 2 ways:
 
 1.  set `dimension = myapp.metric1 ''` and have at the dictionary `myapp.metric1 = metric1 name`
 2.  set `dimension = myapp.metric1 'm1'` and have at the dictionary `m1 = metric1 name`
 
-In both cases, the dimension will be added with ID `myapp.metric1` and will be named `metric1 name`. So, in alarms you can use either of the 2 as `${myapp.metric1}` or `${metric1 name}`.
+In both cases, the dimension will be added with ID `myapp.metric1` and will be named `metric1 name`. So, in alarms use either of the 2 as `${myapp.metric1}` or `${metric1 name}`.
 
 > keep in mind that if you add multiple times the same statsd metric to a chart, Netdata will append `TYPE` to the dimension ID, so `myapp.metric1` will be added as `myapp.metric1_last` or `myapp.metric1_events`, etc. If you add multiple times the same metric with the same `TYPE` to a chart, Netdata will also append an incremental counter to the dimension ID, i.e. `myapp.metric1_last1`, `myapp.metric1_last2`, etc.
 
@@ -389,7 +389,7 @@ To add all response codes of `myapp.api.get` to a chart use this:
    dimension = pattern 'myapp.api.get.* '' last 1 1
 ```
 
-The above will add dimension named `200`, `400` and `500` (yes, Netdata extracts the wildcarded part of the metric name - so the dimensions will be named with whatever the `*` matched). You can rename the dimensions with this:
+The above will add dimension named `200`, `400` and `500` (yes, Netdata extracts the wildcarded part of the metric name - so the dimensions will be named with whatever the `*` matched). Rename the dimensions with this:
 
 ```
 [dictionary]
@@ -451,7 +451,8 @@ Using the above, the dimensions will be added as `GET`, `ADD` and `DELETE`.
 
 ## sending statsd metrics from shell scripts
 
-You can send/update statsd metrics from shell scripts. You can use this feature, to visualize in Netdata automated jobs you run on your servers.
+Send/update statsd metrics from shell scripts to visualize automated jobs you run on your servers using the Netdata
+Agent.
 
 The command you need to run is:
 

@@ -1,8 +1,7 @@
 <!--
----
 title: "Web server"
+description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
----
 -->
 
 # Web server
@@ -12,14 +11,14 @@ It uses non-blocking I/O and respects the `keep-alive` HTTP header to serve mult
 
 ## Configuration
 
-You can disable the web server by editing `netdata.conf` and setting:
+Disable the web server by editing `netdata.conf` and setting:
 
 ```
 [web]
     mode = none
 ```
 
-With the web server enabled, you can control the number of threads and sockets with the following settings:
+With the web server enabled, control the number of threads and sockets with the following settings:
 
 ```
 [web]
@@ -33,7 +32,7 @@ The `web server max sockets` setting is automatically adjusted to 50% of the max
 
 ### Binding Netdata to multiple ports
 
-Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (you can increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
+Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
 
 The ports to bind are controlled via `[web].bind to`, like this:
 
@@ -87,14 +86,14 @@ To enable TLS, provide the path to your certificate and private key in the `[web
 
 Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a parent-child connection, only the parent needs these settings.
 
-For test purposes, you can generate self-signed certificates with the following command:
+For test purposes, generate self-signed certificates with the following command:
 
 ```bash
 openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 ```
 
 > If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication.
-> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference
+> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. Verify the difference
 > by running:
 >
 > ```sh
@@ -103,7 +102,7 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 
 ### Select TLS version
 
-Beginning with version 1.21, you can also specify the TLS version and the ciphers that you want to use:
+Beginning with version 1.21, specify the TLS version and the ciphers that you want to use:
 
 ```conf
 [web]
@@ -122,7 +121,7 @@ When the certificates are defined and unless any other options are provided, a N
 -   Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, `netdata.conf` and badges.
 -   Allow incoming child connections to use both unencrypted and encrypted communications for streaming.
 
-To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
 
 | SSL setting | HTTP requests|HTTPS requests|Unencrypted Streams|Encrypted Streams|
 |:---------:|:-----------:|:------------:|:-----------------:|:----------------|
@@ -159,7 +158,7 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`. 
 
-In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols, which you can find above.
+In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
 
 ### Access lists
 
