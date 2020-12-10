@@ -367,6 +367,22 @@ void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/
 #endif /* AVL_WITHOUT_PTHREADS */
 }
 
+void avl_destroy_lock(avl_tree_lock *tree) {
+#ifndef AVL_WITHOUT_PTHREADS
+    int lock;
+
+#ifdef AVL_LOCK_WITH_MUTEX
+    lock = pthread_mutex_destroy(&tree->mutex);
+#else
+    lock = pthread_rwlock_destroy(&tree->rwlock);
+#endif
+
+    if(lock != 0)
+        fatal("Failed to destroy AVL mutex/rwlock, error: %d", lock);
+
+#endif /* AVL_WITHOUT_PTHREADS */
+}
+
 avl *avl_search_lock(avl_tree_lock *tree, avl *item) {
     avl_read_lock(tree);
     avl *ret = avl_search(&tree->avl_tree, item);

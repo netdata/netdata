@@ -331,6 +331,11 @@ void rrdset_free(RRDSET *st) {
     rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
+    // remove it from the configuration
+
+    appconfig_section_destroy_non_loaded(&netdata_config, st->config_section);
+
+    // ------------------------------------------------------------------------
     // free its children structures
 
     freez(st->exporting_flags);

@@ -82,6 +82,9 @@ avl *avl_search(avl_tree_type *tree, avl *item);
 void avl_init_lock(avl_tree_lock *tree, int (*compar)(void *a, void *b));
 void avl_init(avl_tree_type *tree, int (*compar)(void *a, void *b));
 
+/* Destroy the avl_tree_lock locks
+ */
+void avl_destroy_lock(avl_tree_lock *tree);
 
 int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void *entry, void *data), void *data);
 int avl_traverse(avl_tree_type *tree, int (*callback)(void *entry, void *data), void *data);
