@@ -20,6 +20,7 @@ int teardown_configured_engine(void **state)
     free((void *)instance->config.destination);
     free((void *)instance->config.name);
     free((void *)instance->config.prefix);
+    free((void *)instance->config.hostname);
     simple_pattern_free(instance->config.charts_pattern);
     simple_pattern_free(instance->config.hosts_pattern);
     free(instance);

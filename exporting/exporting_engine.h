@@ -67,6 +67,7 @@ struct instance_config {
     const char *name;
     const char *destination;
     const char *prefix;
+    const char *hostname;
 
     int update_every;
     int buffer_on_failures;

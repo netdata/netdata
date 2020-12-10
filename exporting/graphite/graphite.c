@@ -127,7 +127,6 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
  */
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -147,7 +146,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
@@ -168,7 +167,6 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
  */
 int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -194,7 +192,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         instance->buffer,
         "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
         instance->config.prefix,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",

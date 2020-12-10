@@ -16,6 +16,7 @@ static void clean_instance_config(struct instance_config *config)
     freez((void *)config->name);
     freez((void *)config->destination);
     freez((void *)config->prefix);
+    freez((void *)config->hostname);
 
     simple_pattern_free(config->charts_pattern);
 

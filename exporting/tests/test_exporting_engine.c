@@ -10,7 +10,7 @@ netdata_rwlock_t rrd_rwlock;
 struct config netdata_config;
 char *netdata_configured_user_config_dir = ".";
 char *netdata_configured_stock_config_dir = ".";
-char *netdata_configured_hostname = "test_host";
+char *netdata_configured_hostname = "test_global_host";
 
 char log_line[MAX_LOG_LINE + 1];
 
@@ -80,7 +80,7 @@ static void test_read_exporting_config(void **state)
     *state = engine;
 
     assert_ptr_not_equal(engine, NULL);
-    assert_string_equal(engine->config.hostname, "test-host");
+    assert_string_equal(engine->config.hostname, "test_engine_host");
     assert_int_equal(engine->config.update_every, 3);
     assert_int_equal(engine->instance_num, 0);
 
