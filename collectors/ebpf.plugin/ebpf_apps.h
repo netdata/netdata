@@ -371,11 +371,11 @@ typedef struct ebpf_bandwidth {
     uint64_t ct;                 // Last timestamp
     uint64_t bytes_sent;         // Bytes sent
     uint64_t bytes_received;     // Bytes received
-    uint32_t call_tcp_sent;      // Number of times tcp_sendmsg was called
-    uint32_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
-    uint32_t retransmit;         // Number of times tcp_retransmit was called
-    uint32_t call_udp_sent;      // Number of times udp_sendmsg was called
-    uint32_t call_udp_received;  // Number of times udp_recvmsg was called
+    uint64_t call_tcp_sent;      // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;         // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;  // Number of times udp_recvmsg was called
 } ebpf_bandwidth_t;
 
 /**
