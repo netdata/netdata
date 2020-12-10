@@ -64,7 +64,7 @@ echo "Version     : ${VERSION}"
 echo "Repository  : ${REPOSITORY}"
 echo "Architecture: ${ARCH}"
 
-docker run --rm --privileged multiarch/qemu-user-static:register --reset
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
 # Build images using multi-arch Dockerfile.
 TAG="${REPOSITORY,,}:${VERSION}-${ARCH}"
