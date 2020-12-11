@@ -8,7 +8,7 @@ from json import loads
 from bases.FrameworkServices.UrlService import UrlService
 
 update_every = 10
-disabled_by_default = False
+disabled_by_default = True
 
 
 def charts_template(sm):
