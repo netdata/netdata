@@ -51,8 +51,8 @@ class Service(UrlService):
         alarms = raw_data.get('alarms', {})
 
         data = {a: self.sm[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.sm}
-        data['alarms_num'] = len(data)
         self.update_charts(alarms, data)
+        data['alarms_num'] = len(data)
 
         return data
 
