@@ -9,19 +9,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/ena
 Netdata offers two ways to receive alarm notifications on external platforms. These methods work independently _or_ in
 parallel, which means you can enable both at the same time to send alarm notifications to any number of endpoints.
 
-Both methods use a node's health alarms to generate the content of alarm notifications, so if you're interested in
-changing thresholds or adding tailor alarms for your applications or infrastructure, be sure to [configure your
-alarms](/docs/monitor/configure-alarms.md) to ensure the notifications you receive are accurate and relevant.
+Both methods use a node's health alarms to generate the content of alarm notifications. Read the doc on [configuring
+alarms](/docs/monitor/configure-alarms.md) to change the preconfigured thresholds or to create tailored alarms for your
+infrastructure.
 
 Netdata Cloud offers [centralized alarm notifications](#netdata-cloud) via email, which leverages the health status
 information already streamed to Netdata Cloud from claimed nodes to send notifications to those who have enabled them.
 
-The Netdata Agent has [notification system](#netdata-agent) that supports more than a dozen services, such as email,
+The Netdata Agent has a [notification system](#netdata-agent) that supports more than a dozen services, such as email,
 Slack, PagerDuty, Twilio, Amazon SNS, Discord, and much more.
 
 For example, use centralized alarm notifications in Netdata Cloud for immediate, zero-configuration alarm notifications
-for your team, then configure individual nodes to also send notifications to a PagerDuty endpoint to automatically kick
-off an incident resolution process.
+for your team, then configure individual nodes send notifications to a PagerDuty endpoint for an automated incident
+response process.
 
 ## Netdata Cloud
 
@@ -30,8 +30,8 @@ zero-configuration way to get notified when an anomaly or incident strikes any n
 infrastructure. The advantage of using centralized alarm notifications from Netdata Cloud is that you don't have to
 worry about configuring each node in your infrastructure.
 
-To enable centalized alarm notifications for a Space, click on **Manage Space** in the left-hand menu, then click on the
-**Notifications** tab. Click the toggle switch next to **E-mail** to enable this notification method.
+To enable centralized alarm notifications for a Space, click on **Manage Space** in the left-hand menu, then click on
+the **Notifications** tab. Click the toggle switch next to **E-mail** to enable this notification method.
 
 Next, enable notifications on a user level by clicking on your profile icon, then **Profile** in the dropdown. The
 **Notifications** tab reveals rich management settings, including the ability to enable/disable methods entirely or
@@ -85,8 +85,8 @@ notification platform.
 
 ### Enable Slack notifications
 
-First, [Add an incoming webhook](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks) in Slack for channel where you want
-to see alarm notifications from Netdata. Click the green **Add to Slack** button, choose the channel, and click the
+First, [Add an incoming webhook](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks) in Slack for the channel where you
+want to see alarm notifications from Netdata. Click the green **Add to Slack** button, choose the channel, and click the
 **Add Incoming WebHooks Integration** button.
 
 On the following page, you'll receive a **Webhook URL**. That's what you'll need to configure Netdata, so keep it handy.
@@ -130,9 +130,10 @@ See the [Agent Slack notifications](/health/notifications/slack/README.md) doc f
 
 ## What's next?
 
-Now that you have health entities configured to your infrastructure's needs, and notifications to inform you of
-anomalies or incidents, you have everything your health monitoring setup is complete. To make your dashboards most
-useful during root cause analysis, use Netdata's [distributed data
+Now that you have health entities configured to your infrastructure's needs and notifications to inform you of anomalies
+or incidents, your health monitoring setup is complete.
+
+To make your dashboards most useful during root cause analysis, use Netdata's [distributed data
 architecture](/docs/store/distributed-data-architecture.md) for the best-in-class performance and scalability.
 
 ### Related reference documentation
