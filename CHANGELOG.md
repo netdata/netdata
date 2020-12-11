@@ -81,7 +81,6 @@
 - Move shared memory accounting from "cached" to "used" dimension [\#10183](https://github.com/netdata/netdata/pull/10183) ([mfundul](https://github.com/mfundul))
 - Don't cache registry responses [\#10181](https://github.com/netdata/netdata/pull/10181) ([cakrit](https://github.com/cakrit))
 - Fix an infinite loop in the statsd plugin [\#10180](https://github.com/netdata/netdata/pull/10180) ([vlvkobal](https://github.com/vlvkobal))
-- dashboard v2.7.5 [\#10179](https://github.com/netdata/netdata/pull/10179) ([jacekkolasa](https://github.com/jacekkolasa))
 - Update k8s docs with new Helm repo [\#10172](https://github.com/netdata/netdata/pull/10172) ([joelhans](https://github.com/joelhans))
 - Add notices to FreeBSD/pfSense docs that they are community-supported [\#10171](https://github.com/netdata/netdata/pull/10171) ([joelhans](https://github.com/joelhans))
 - Add supported notification platforms to docs [\#10170](https://github.com/netdata/netdata/pull/10170) ([joelhans](https://github.com/joelhans))
@@ -225,7 +224,6 @@
 - Add CAP\_SYS\_CHROOT for netdata service to read LXD network interfaces [\#9726](https://github.com/netdata/netdata/pull/9726) ([vlvkobal](https://github.com/vlvkobal))
 - Fix global GUID map memory leak [\#9725](https://github.com/netdata/netdata/pull/9725) ([stelfrag](https://github.com/stelfrag))
 - Fix proxy redirect [\#9722](https://github.com/netdata/netdata/pull/9722) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add v1.24 news to main README [\#9721](https://github.com/netdata/netdata/pull/9721) ([aabatangle](https://github.com/aabatangle))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
