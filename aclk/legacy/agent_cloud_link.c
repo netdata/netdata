@@ -190,7 +190,7 @@ unsigned long int aclk_reconnect_delay(int mode)
     } else {
         fail++;
         delay *= 1000;
-        delay += (random() % (delay / 2));
+        delay += (random() % (MAX(1000, delay/2)));
     }
 
     return delay;
