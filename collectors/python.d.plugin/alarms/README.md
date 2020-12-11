@@ -19,7 +19,7 @@ This collector creates an 'Alarms' menu with one line plot showing alarm states 
 
 Below is an example of the chart produced when running `stress-ng --all 2` for a few minutes. You can see the various warning and critical alarms raised. 
 
-![alarms collector](https://user-images.githubusercontent.com/2178292/101505477-4f9ef200-396c-11eb-864c-a44d9eaf2ee5.png)
+![alarms collector](https://user-images.githubusercontent.com/1153921/101641493-0b086a80-39ef-11eb-9f55-0713e5dfb19f.png)
 
 ## Configuration
 
