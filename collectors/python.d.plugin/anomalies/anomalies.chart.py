@@ -26,6 +26,8 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # ignore some sklearn/numpy warnings that are ok
 warnings.filterwarnings('ignore', r'All-NaN slice encountered')
 warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
+warnings.filterwarnings('ignore', r'divide by zero encountered in true_divide')
+warnings.filterwarnings('ignore', r'invalid value encountered in subtract')
 
 disabled_by_default = True
 
