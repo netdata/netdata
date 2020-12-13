@@ -23,7 +23,7 @@ package**](#install-netdata-with-the-homebrew-package).
 If you don't have [Homebrew](https://brew.sh/) installed already, begin with their installation script:
 
 ```bash
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
 Next, you can use Homebrew's package, which installs Netdata all its dependencies in a single step:
