@@ -636,7 +636,7 @@ RRDSET *rrdset_create_custom(
                         aclk_add_collector(host, st->plugin_name, st->module_name);
                     }
                 }
-                aclk_update_chart(host, st->id, ACLK_CMD_CHART);
+                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
             }
 #endif
             freez(old_plugin);
@@ -934,7 +934,7 @@ RRDSET *rrdset_create_custom(
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
         aclk_add_collector(host, plugin, module);
-        aclk_update_chart(host, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
     }
 #endif
     return(st);
@@ -1370,6 +1370,11 @@ void rrdset_done(RRDSET *st) {
 
     // a read lock is OK here
     rrdset_rdlock(st);
+
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+    }
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", st->id);

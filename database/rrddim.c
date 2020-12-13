@@ -211,7 +211,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     }
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -460,7 +460,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(host, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
     return(rd);
 }
@@ -535,7 +535,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
     }
 #ifdef ENABLE_ACLK
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != rrd_memory_mode))
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -557,7 +557,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
     rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
     return 0;
 }
@@ -575,7 +575,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
     return 0;
 }
@@ -591,7 +591,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
@@ -601,7 +601,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
 }
 
