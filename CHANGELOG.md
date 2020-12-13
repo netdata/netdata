@@ -82,7 +82,6 @@
 - Make libnetdata headers compilable by C++. [\#10185](https://github.com/netdata/netdata/pull/10185) ([KickerTom](https://github.com/KickerTom))
 - Move shared memory accounting from "cached" to "used" dimension [\#10183](https://github.com/netdata/netdata/pull/10183) ([mfundul](https://github.com/mfundul))
 - Update k8s docs with new Helm repo [\#10172](https://github.com/netdata/netdata/pull/10172) ([joelhans](https://github.com/joelhans))
-- Add notices to FreeBSD/pfSense docs that they are community-supported [\#10171](https://github.com/netdata/netdata/pull/10171) ([joelhans](https://github.com/joelhans))
 - Add supported notification platforms to docs [\#10170](https://github.com/netdata/netdata/pull/10170) ([joelhans](https://github.com/joelhans))
 - Fixed two bugs related to version handling in install and update code. [\#10162](https://github.com/netdata/netdata/pull/10162) ([Ferroin](https://github.com/Ferroin))
 - Fixed builds using particular versions of Clang. [\#10155](https://github.com/netdata/netdata/pull/10155) ([Ferroin](https://github.com/Ferroin))
@@ -220,7 +219,6 @@
 - Fix health notifications configuration to clarify which notifications are received when the "|critical" limit is set [\#9740](https://github.com/netdata/netdata/pull/9740) ([cakrit](https://github.com/cakrit))
 - Fix flushing errors [\#9738](https://github.com/netdata/netdata/pull/9738) ([mfundul](https://github.com/mfundul))
 - Added proper certificate handling cURL in our static build. [\#9733](https://github.com/netdata/netdata/pull/9733) ([Ferroin](https://github.com/Ferroin))
-- Add code to release memory used by the global GUID map [\#9729](https://github.com/netdata/netdata/pull/9729) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
