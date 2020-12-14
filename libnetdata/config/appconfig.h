@@ -182,6 +182,8 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 
 extern int appconfig_section_compare(void *a, void *b);
 
+extern void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
+
 extern int config_parse_duration(const char* string, int* result);
 
 extern struct section *appconfig_get_section(struct config *root, const char *name);

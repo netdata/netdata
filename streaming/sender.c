@@ -116,8 +116,8 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 }
 
 static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -354,8 +354,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
             answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
             if(!answer) {
                 version = 0;
-                host->labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
             }
         }
     }

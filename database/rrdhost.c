@@ -187,7 +187,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 #endif
 
     netdata_rwlock_init(&host->rrdhost_rwlock);
-    netdata_rwlock_init(&host->labels_rwlock);
+    netdata_rwlock_init(&host->labels.labels_rwlock);
 
     netdata_mutex_init(&host->aclk_state_lock);
 
@@ -873,7 +873,7 @@ void rrdhost_free(RRDHOST *host) {
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez((void *)host->tags);
-    free_host_labels(host->labels);
+    free_label_list(host->labels.head);
     freez((void *)host->os);
     freez((void *)host->timezone);
     freez(host->program_version);
@@ -890,7 +890,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
-    netdata_rwlock_destroy(&host->labels_rwlock);
+    netdata_rwlock_destroy(&host->labels.labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
 
@@ -930,55 +930,7 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
-static int is_valid_label_value(char *value) {
-    while(*value) {
-        if(*value == '"' || *value == '\'' || *value == '*' || *value == '!') {
-            return 0;
-        }
-
-        value++;
-    }
-
-    return 1;
-}
-
-static int is_valid_label_key(char *key) {
-    //Prometheus exporter
-    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
-        return 0;
-
-    //Netdata and Prometheus  internal
-    if (*key == '_')
-        return 0;
-
-    while(*key) {
-        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
-            return 0;
-
-        key++;
-    }
-
-    return 1;
-}
-
-char *translate_label_source(LABEL_SOURCE l) {
-    switch (l) {
-        case LABEL_SOURCE_AUTO:
-            return "AUTO";
-        case LABEL_SOURCE_NETDATA_CONF:
-            return "NETDATA.CONF";
-        case LABEL_SOURCE_DOCKER :
-            return "DOCKER";
-        case LABEL_SOURCE_ENVIRONMENT  :
-            return "ENVIRONMENT";
-        case LABEL_SOURCE_KUBERNETES :
-            return "KUBERNETES";
-        default:
-            return "Invalid label source";
-    }
-}
-
-struct label *load_auto_labels()
+static struct label *rrdhost_load_auto_labels(void)
 {
     struct label *label_list = NULL;
 
@@ -1040,11 +992,13 @@ struct label *load_auto_labels()
     return label_list;
 }
 
-static inline int is_valid_label_config_option(char *name, char *value) {
-    return (is_valid_label_key(name) && is_valid_label_value(value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") );
- }
+static inline int rrdhost_is_valid_label_config_option(char *name, char *value)
+{
+    return (is_valid_label_key(name) && is_valid_label_value(value) && strcmp(name, "from environment") &&
+            strcmp(name, "from kubernetes pods"));
+}
 
-struct label *load_config_labels()
+static struct label *rrdhost_load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
@@ -1058,7 +1012,7 @@ struct label *load_config_labels()
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            if( is_valid_label_config_option(cv->name, cv->value)) {
+            if(rrdhost_is_valid_label_config_option(cv->name, cv->value)) {
                 l = add_label_to_list(l, cv->name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {
@@ -1070,45 +1024,6 @@ struct label *load_config_labels()
     }
 
     return l;
-}
-
-typedef enum strip_quotes {
-    DO_NOT_STRIP_QUOTES,
-    STRIP_QUOTES
-} STRIP_QUOTES_OPTION;
-
-typedef enum skip_escaped_characters {
-    DO_NOT_SKIP_ESCAPED_CHARACTERS,
-    SKIP_ESCAPED_CHARACTERS
-} SKIP_ESCAPED_CHARACTERS_OPTION;
-
-static inline void strip_last_symbol(
-    char *str,
-    char symbol,
-    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
-{
-    char *end = str;
-
-    while (*end && *end != symbol) {
-        if (unlikely(skip_escaped_characters && *end == '\\')) {
-            end++;
-            if (unlikely(!*end))
-                break;
-        }
-        end++;
-    }
-    if (likely(*end == symbol))
-        *end = '\0';
-}
-
-static inline char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
-{
-    if (*str == '"') {
-        str++;
-        strip_last_symbol(str, '"', skip_escaped_characters);
-    }
-
-    return str;
 }
 
 struct label *parse_simple_tags(
@@ -1200,7 +1115,7 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     return label_list;
 }
 
-struct label *load_labels_from_tags()
+static struct label *rrdhost_load_labels_from_tags(void)
 {
     if (!localhost->tags)
         return NULL;
@@ -1244,7 +1159,7 @@ struct label *load_labels_from_tags()
     return label_list;
 }
 
-struct label *load_kubernetes_labels()
+static struct label *rrdhost_load_kubernetes_labels(void)
 {
     struct label *l=NULL;
     char *label_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2));
@@ -1302,104 +1217,26 @@ struct label *load_kubernetes_labels()
     return l;
 }
 
-struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
+void reload_host_labels(void)
 {
-    size_t key_len = strlen(key), value_len = strlen(value);
-    size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
-    struct label *result = callocz(1,n);
-    if (result != NULL) {
-        char *c = (char *)result;
-        c += sizeof(struct label);
-        strcpy(c, key);
-        result->key = c;
-        c += key_len + 1;
-        strcpy(c, value);
-        result->value = c;
-        result->label_source = label_source;
-        result->key_hash = simple_hash(result->key);
-    }
-    return result;
-}
-
-void free_host_labels(struct label *labels)
-{
-    while (labels != NULL)
-    {
-        struct label *current = labels;
-        labels = labels->next;
-        freez(current);
-    }
-}
-
-void replace_label_list(RRDHOST *host, struct label *new_labels)
-{
-    rrdhost_check_rdlock(host);
-    netdata_rwlock_wrlock(&host->labels_rwlock);
-    struct label *old_labels = host->labels;
-    host->labels = new_labels;
-    netdata_rwlock_unlock(&host->labels_rwlock);
-
-    free_host_labels(old_labels);
-}
-
-struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
-{
-    struct label *lab = create_label(key, value, label_source);
-    lab->next = l;
-    return lab;
-}
-
-int label_list_contains(struct label *head, struct label *check)
-{
-    while (head != NULL)
-    {
-        if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
-            return 1;
-        head = head->next;
-    }
-    return 0;
-}
-
-/* Create a list with entries from both lists.
-   If any entry in the low priority list is masked by an entry in the high priorty list then delete it.
-*/
-struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
-{
-    struct label *result = hi_pri;
-    while (lo_pri != NULL)
-    {
-        struct label *current = lo_pri;
-        lo_pri = lo_pri->next;
-        if (!label_list_contains(result, current)) {
-            current->next = result;
-            result = current;
-        }
-        else
-            freez(current);
-    }
-    return result;
-}
-
-void reload_host_labels()
-{
-    struct label *from_auto = load_auto_labels();
-    struct label *from_k8s = load_kubernetes_labels();
-    struct label *from_config = load_config_labels();
-    struct label *from_tags = load_labels_from_tags();
+    struct label *from_auto = rrdhost_load_auto_labels();
+    struct label *from_k8s = rrdhost_load_kubernetes_labels();
+    struct label *from_config = rrdhost_load_config_labels();
+    struct label *from_tags = rrdhost_load_labels_from_tags();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_tags);
     new_labels = merge_label_lists(new_labels, from_config);
 
     rrdhost_rdlock(localhost);
-    replace_label_list(localhost, new_labels);
+    replace_label_list(&localhost->labels, new_labels);
 
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 
 /*  TODO-GAPS - fix this so that it looks properly at the state and version of the sender
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
-        localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+        localhost->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
 */

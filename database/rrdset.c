@@ -331,12 +331,21 @@ void rrdset_free(RRDSET *st) {
     rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
+    // remove it from the configuration
+
+    appconfig_section_destroy_non_loaded(&netdata_config, st->config_section);
+
+    // ------------------------------------------------------------------------
     // free its children structures
 
     freez(st->exporting_flags);
 
     while(st->variables)  rrdsetvar_free(st->variables);
-    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+//  while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+    /* We must free all connected alarms here in case this has been an ephemeral chart whose alarm was
+     * created by a template. This leads to an effective memory leak, which cannot be detected since the
+     * alarms will still be connected to the host, and freed during shutdown. */
+    while(st->alarms)     rrdcalc_unlink_and_free(st->rrdhost, st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
     rrdfamily_free(host, st->rrdfamily);
@@ -366,6 +375,7 @@ void rrdset_free(RRDSET *st) {
     // free it
 
     netdata_rwlock_destroy(&st->rrdset_rwlock);
+    netdata_rwlock_destroy(&st->state->labels.labels_rwlock);
 
     // free directly allocated members
     freez(st->config_section);
@@ -374,6 +384,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_title);
     freez(st->state->old_family);
     freez(st->state->old_context);
+    free_label_list(st->state->labels.head);
     freez(st->state);
 
     switch(st->rrd_memory_mode) {
@@ -835,7 +846,7 @@ RRDSET *rrdset_create_custom(
     st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
     st->type       = config_get(st->config_section, "type", type);
 
-    st->state = mallocz(sizeof(*st->state));
+    st->state = callocz(1, sizeof(*st->state));
     st->family     = config_get(st->config_section, "family", family?family:st->type);
     st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
@@ -887,6 +898,7 @@ RRDSET *rrdset_create_custom(
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
+    netdata_rwlock_init(&st->state->labels.labels_rwlock);
 
     if(name && *name && rrdset_set_name(st, name))
         // we did set the name
@@ -1902,4 +1914,59 @@ after_second_database_work:
     rrdset_unlock(st);
 
     netdata_thread_enable_cancelability();
+}
+
+void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source)
+{
+    st->state->new_labels = add_label_to_list(st->state->new_labels, key, value, source);
+}
+
+void rrdset_finalize_labels(RRDSET *st)
+{
+    struct label *new_labels = st->state->new_labels;
+    struct label_index *labels = &st->state->labels;
+
+    if (!labels->head) {
+        labels->head = new_labels;
+    } else {
+        replace_label_list(labels, new_labels);
+    }
+    st->state->new_labels = NULL;
+}
+
+void rrdset_update_labels(RRDSET *st, struct label *labels)
+{
+    if (!labels)
+        return;
+
+    update_label_list(&st->state->new_labels, labels);
+    rrdset_finalize_labels(st);
+}
+
+int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash)
+{
+    struct label_index *labels = &st->state->labels;
+    int ret;
+
+    if (!labels->head)
+        return 0;
+
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
+    ret = label_list_contains_key(labels->head, key, key_hash);
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+
+    return ret;
+}
+
+struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash)
+{
+    struct label_index *labels = &st->state->labels;
+    struct label *ret = NULL;
+
+    if (labels->head) {
+        netdata_rwlock_rdlock(&labels->labels_rwlock);
+        ret = label_list_lookup_key(labels->head, key, key_hash);
+        netdata_rwlock_unlock(&labels->labels_rwlock);
+    }
+    return ret;
 }

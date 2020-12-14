@@ -19,6 +19,7 @@ typedef struct context_param CONTEXT_PARAM;
 struct rrddim_volatile;
 struct rrdset_volatile;
 struct context_param;
+struct label;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -185,12 +186,45 @@ struct label {
     struct label *next;
 };
 
+struct label_index {
+    struct label *head;                     // Label list
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
+    uint32_t labels_flag;                   // Flags for labels
+};
+
+typedef enum strip_quotes {
+    DO_NOT_STRIP_QUOTES,
+    STRIP_QUOTES
+} STRIP_QUOTES_OPTION;
+
+typedef enum skip_escaped_characters {
+    DO_NOT_SKIP_ESCAPED_CHARACTERS,
+    SKIP_ESCAPED_CHARACTERS
+} SKIP_ESCAPED_CHARACTERS_OPTION;
+
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
-struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
-extern void replace_label_list(RRDHOST *host, struct label *new_labels);
-extern void free_host_labels(struct label *labels);
-void reload_host_labels();
+extern struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern void update_label_list(struct label **labels, struct label *new_labels);
+extern void replace_label_list(struct label_index *labels, struct label *new_labels);
+extern int is_valid_label_value(char *value);
+extern int is_valid_label_key(char *key);
+extern void free_label_list(struct label *labels);
+extern struct label *label_list_lookup_key(struct label *head, char *key, uint32_t key_hash);
+extern int label_list_contains_key(struct label *head, char *key, uint32_t key_hash);
+extern int label_list_contains(struct label *head, struct label *check);
+extern struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri);
+extern void strip_last_symbol(
+    char *str,
+    char symbol,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
+extern char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters);
+void reload_host_labels(void);
+extern void rrdset_add_label_to_new_list(RRDSET *st, char *key, char *value, LABEL_SOURCE source);
+extern void rrdset_finalize_labels(RRDSET *st);
+extern void rrdset_update_labels(RRDSET *st, struct label *labels);
+extern int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash);
+extern struct label *rrdset_lookup_label_key(RRDSET *st, char *key, uint32_t key_hash);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -376,6 +410,8 @@ struct rrdset_volatile {
     char *old_title;
     char *old_family;
     char *old_context;
+    struct label *new_labels;
+    struct label_index labels;
 };
 
 // ----------------------------------------------------------------------------
@@ -801,9 +837,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    struct label *labels;
-    netdata_rwlock_t labels_rwlock;         // lock for the label list
-    uint32_t labels_flag;                   //Flags for labels
+    struct label_index labels;
 
     // ------------------------------------------------------------------------
     // indexes

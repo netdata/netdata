@@ -125,8 +125,8 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
 
     int count = 0;
     rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+    for (struct label *label = host->labels.head; label; label = label->next) {
         if (!should_send_label(instance, label))
             continue;
 
@@ -138,7 +138,7 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
 
         count++;
     }
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
 
     buffer_strcat(instance->labels, "},");
 

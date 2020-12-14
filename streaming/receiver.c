@@ -421,7 +421,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 */
 
 //    rpt->host->connected_senders++;
-    rpt->host->labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
+    rpt->host->labels.labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {

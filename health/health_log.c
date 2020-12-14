@@ -73,13 +73,13 @@ inline void health_label_log_save(RRDHOST *host) {
     if(likely(host->health_log_fp)) {
         BUFFER *wb = buffer_create(1024);
         rrdhost_check_rdlock(host);
-        netdata_rwlock_rdlock(&host->labels_rwlock);
-        struct label *l=localhost->labels;
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+        struct label *l=localhost->labels.head;
         while (l != NULL) {
             buffer_sprintf(wb,"%s=%s\t ", l->key, l->value);
             l = l->next;
         }
-        netdata_rwlock_unlock(&host->labels_rwlock);
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
 
         char *write = (char *) buffer_tostring(wb) ;
 
