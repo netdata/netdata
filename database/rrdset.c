@@ -1371,10 +1371,12 @@ void rrdset_done(RRDSET *st) {
     // a read lock is OK here
     rrdset_rdlock(st);
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+#ifdef ENABLE_ACLK
+    if (netdata_cloud_setting && unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
     }
+#endif
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", st->id);
