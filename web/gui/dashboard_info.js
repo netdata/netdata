@@ -1168,7 +1168,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.
     },
 
     'apps.bandwidth_tcp_send': {
@@ -1176,7 +1176,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>.'
+        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
     },
 
     'apps.bandwidth_tcp_retransmit': {
@@ -3265,7 +3265,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>.'
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
     },
 
     'ebpf.tcp_retransmit': {
