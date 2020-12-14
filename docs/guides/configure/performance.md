@@ -18,7 +18,7 @@ single core.
 
 But not everyone has such powerful systems at their disposal. For example, you might run the Agent on a cloud VM with
 only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](/docs/guides/monitor/pi-hole-raspberry-pi.md). In these
-cases, reducing Netdata's footprint beyond its already diminuitive size can pay big dividends, giving your services more
+cases, reducing Netdata's footprint beyond its already diminutive size can pay big dividends, giving your services more
 horsepower while still monitoring the health and the performance of the node, OS, hardware, and applications.
 
 ## Prerequisites
