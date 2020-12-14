@@ -23,7 +23,7 @@ package**](#install-netdata-with-the-homebrew-package).
 If you don't have [Homebrew](https://brew.sh/) installed already, begin with their installation script:
 
 ```bash
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
 Next, you can use Homebrew's package, which installs Netdata all its dependencies in a single step:
@@ -50,10 +50,11 @@ xcode-select --install
 ```
 
 Click **Install** on the Software Update popup window that appears. Then, use the same terminal session to use Homebrew
-to install some of Netdata's prerequisites.
+to install some of Netdata's prerequisites. You can omit `cmake` in case you do not want to use 
+[Netdata Cloud](https://learn.netdata.cloud/docs/cloud/).
 
 ```bash
-brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1
+brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1 libtool cmake
 ```
 
 If you want to use the [database engine](/database/engine/README.md) to store your metrics, you need to download

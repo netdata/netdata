@@ -19,17 +19,31 @@ jobs:
     strategy:
       matrix:
         arch:
-          - amd64
-          - i386
-          - armhf
-          - aarch64
+          - linux/amd64
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+        include:
+          - arch: linux/amd64
+            base: amd64
+          - arch: linux/i386
+            base: i386
+          - arch: linux/arm/v7
+            base: armhf
+          - arch: linux/arm64
+            base: aarch64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Prepare Docker Environment
-        run:
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-      - name: Test Docker Build
-        run:
-          docker build --build-arg ARCH=${{ matrix.arch }} -f packaging/docker/Dockerfile .
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Docker Build
+        uses: docker/build-push-action@v2
+        with:
+          platforms: ${{ matrix.arch }}
+          push: false
+          build-args: |
+            ARCH=${{ matrix.base }}

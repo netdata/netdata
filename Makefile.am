@@ -366,6 +366,7 @@ RRD_PLUGIN_FILES = \
     database/rrddimvar.h \
     database/rrdfamily.c \
     database/rrdhost.c \
+    database/rrdlabels.c \
     database/rrd.c \
     database/rrd.h \
     database/rrdset.c \
@@ -854,6 +855,7 @@ if ENABLE_UNITTESTS
         exporting/tests/exporting_engine_testdriver \
         web/api/tests/web_api_testdriver \
         web/api/tests/valid_urls_testdriver \
+        collectors/cgroups_plugin/tests/cgroups_testdriver \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
@@ -1006,4 +1008,19 @@ if ENABLE_BACKEND_MONGODB
         -Wl,--wrap=mongoc_collection_insert_many \
         $(NULL)
 endif
+
+    collectors_cgroups_plugin_tests_cgroups_testdriver_SOURCES = \
+        collectors/cgroups.plugin/tests/test_cgroups_plugin.c \
+        collectors/cgroups.plugin/tests/test_cgroups_plugin.h \
+        collectors/cgroups.plugin/tests/test_doubles.c \
+        $(CGROUPS_PLUGIN_FILES) \
+        database/rrdlabels.c \
+        database/rrd.h \
+        $(LIBNETDATA_FILES) \
+        $(NULL)
+    collectors_cgroups_plugin_tests_cgroups_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    collectors_cgroups_plugin_tests_cgroups_testdriver_LDFLAGS = \
+        -Wl,--wrap=add_label_to_list \
+        $(NULL)
+
 endif

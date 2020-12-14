@@ -164,7 +164,7 @@ And install the minimum required dependencies:
 yum install -y 'dnf-command(config-manager)'
 
 # Enable PowerTools
-yum config-manager --set-enabled PowerTools
+yum config-manager --set-enabled powertools
 
 # Enable EPEL
 yum install -y epel-release

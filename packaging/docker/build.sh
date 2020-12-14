@@ -52,12 +52,19 @@ if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     exit 1
 fi
 
+case "${ARCH}" in
+  amd64) DOCKER_PLATFORM="linux/amd64" ;;
+  i386) DOCKER_PLATFORM="linux/i386" ;;
+  armhf) DOCKER_PLATFORM="linux/arm/v7" ;;
+  aarch64) DOCKER_PLATFORM="linux/arm64" ;;
+esac
+
 echo "Docker image build in progress.."
 echo "Version     : ${VERSION}"
 echo "Repository  : ${REPOSITORY}"
 echo "Architecture: ${ARCH}"
 
-docker run --rm --privileged multiarch/qemu-user-static:register --reset
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
 # Build images using multi-arch Dockerfile.
 TAG="${REPOSITORY,,}:${VERSION}-${ARCH}"
@@ -65,6 +72,7 @@ echo "Building tag ${TAG}.."
 docker build --no-cache                                  \
 	--build-arg ARCH="${ARCH}"                       \
 	--build-arg RELEASE_CHANNEL="${RELEASE_CHANNEL}" \
+	--platform "${DOCKER_PLATFORM}"                  \
 	--tag "${TAG}"                                   \
 	--file packaging/docker/Dockerfile .
 echo "..Done!"

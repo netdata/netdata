@@ -1,6 +1,6 @@
 <p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
-<h3 align="center">The best monitoring and troubleshooting for systems, containers, applications, and infrastructure. <br />Preconfigured, opinionated, and always real-time.</h3>
+<h3 align="center">Netdata is high-fidelity infrastructure monitoring and troubleshooting.<br />Open-source, free, preconfigured, opinionated, and always real-time.</h3>
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
@@ -20,7 +20,8 @@
 
 Netdata's **distributed, real-time monitoring Agent** collects thousands of metrics from systems, hardware, containers,
 and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud
-deployments, and edge/IoT devices.
+deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any
+preparation.
 
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
 clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.

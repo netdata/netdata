@@ -40,6 +40,7 @@ For every backend (VBE):
 For every storage (SMF, SMA, or MSE):
 
 -   Storage Usage in `KiB` 
+-   Storage Allocated Objects
 
 ## Configuration
 

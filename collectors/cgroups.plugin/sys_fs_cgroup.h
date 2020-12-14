@@ -28,4 +28,6 @@ extern void *cgroups_main(void *ptr);
 
 #endif // (TARGET_OS == OS_LINUX)
 
+extern char *parse_k8s_data(struct label **labels, char *data);
+
 #endif //NETDATA_SYS_FS_CGROUP_H

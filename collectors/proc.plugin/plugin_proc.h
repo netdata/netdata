@@ -65,7 +65,8 @@ extern int get_numa_node_count(void);
 extern unsigned long long tcpext_TCPSynRetrans;
 
 // netdev renames
-extern void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name);
+extern void netdev_rename_device_add(
+    const char *host_device, const char *container_device, const char *container_name, struct label *labels);
 extern void netdev_rename_device_del(const char *host_device);
 
 #include "proc_self_mountinfo.h"

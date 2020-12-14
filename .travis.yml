@@ -1,5 +1,5 @@
 ---
-dist: bionic
+dist: focal
 language: c
 
 addons:
@@ -17,7 +17,7 @@ before_install:
 # Install dependencies for all, once
 #
 install:
-  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python3-pip
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
@@ -104,12 +104,14 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
     - name: Docker container build process (alpine installation)
-      script: packaging/docker/build.sh
+      script:
+        - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
+        - packaging/docker/build.sh
       env:
         - ARCH=amd64
       after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
-    - name: Build/Install for ubuntu 18.04 (not containerized)
+    - name: Build/Install for ubuntu 20.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
 
@@ -121,7 +123,7 @@ jobs:
       git:
         depth: false
       before_install:
-        - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+        - sudo apt-get install -y wget lxc python3-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
       before_script:
         - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
       script:
@@ -143,7 +145,7 @@ jobs:
       git:
         depth: false
       before_install:
-        - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
+        - sudo apt-get install -y wget lxc lxc-templates python3-lxc
       before_script:
         - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
       script:
@@ -186,7 +188,7 @@ jobs:
         git:
           depth: false
         before_install:
-          - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+          - sudo apt-get install -y wget lxc python3-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
           - source tests/installer/slack.sh
         before_script:
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
@@ -273,7 +275,7 @@ jobs:
         git:
           depth: false
         before_install:
-          - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
+          - sudo apt-get install -y wget lxc lxc-templates python3-lxc
           - source tests/installer/slack.sh
         before_script:
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
@@ -361,6 +363,7 @@ jobs:
           - echo "Last commit:" && git log -1
           - echo "GIT Describe:" && git describe
           - echo "packaging/version:" && cat packaging/version
+          - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
           - packaging/docker/check_login.sh
             && echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
             && tick packaging/docker/build.sh
@@ -443,6 +446,7 @@ jobs:
           - echo "Last commit:" && git log -1
           - echo "GIT Describe:" && git describe
           - echo "packaging/version:" && cat packaging/version
+          - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
           - packaging/docker/check_login.sh
             && tick packaging/docker/build.sh
             && packaging/docker/publish.sh

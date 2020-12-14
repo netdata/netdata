@@ -1115,52 +1115,52 @@ netdataDashboard.context = {
     },
 
     'apps.file_closed': {
-        info: 'Calls to the internal function <code>__close_fd</code>, which is called from' +
+        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>, which is called from' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'apps.file_close_error': {
-        info: 'Failed calls to the internal function <code>__close_fd</code>.'
+        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>.'
     },
 
     'apps.file_deleted': {
-        info: 'Calls to the function <code>vfs_unlink</code>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
+        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
     },
 
     'apps.vfs_write_call': {
-        info: 'Successful calls to the function <code>vfs_write</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_error': {
-        info: 'Failed calls to the function <code>vfs_write</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_call': {
-        info: 'Successful calls to the function <code>vfs_read</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_read_error': {
-        info: 'Failed calls to the function <code>vfs_read</code>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
     },
 
     'apps.vfs_write_bytes': {
-        info: 'Total of bytes successfully written using the function <code>vfs_write</code>.'
+        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
     },
 
     'apps.vfs_read_bytes': {
-        info: 'Total of bytes successfully read using the function <code>vfs_read</code>.'
+        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
     },
 
     'apps.process_create': {
-        info: 'Calls to the function <code>do_fork</code> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <code>sys_clone</code> that do not have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Calls to the function <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that do not have the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.thread_create': {
-        info: 'Calls to the function <code>do_fork</code> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <code>sys_clone</code> that have the flag <code>CLONE_THREAD</code> set.'
+        info: 'Calls to the function <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a> to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
     },
 
     'apps.task_close': {
-        info: 'Calls to the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
+        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
     'apps.bandwidth_sent': {
@@ -1168,7 +1168,27 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>.'
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'apps.bandwidth_tcp_send': {
+        info: 'Calls for function <code>tcp_sendmsg</code>.'
+    },
+
+    'apps.bandwidth_tcp_recv': {
+        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'apps.bandwidth_tcp_retransmit': {
+        info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
+    },
+
+    'apps.bandwidth_udp_send': {
+        info: 'Calls for function <code>udp_sendmsg</code>.'
+    },
+
+    'apps.bandwidth_udp_recv': {
+        info: 'Calls for function <code>udp_recvmsg</code>.'
     },
 
     // ------------------------------------------------------------------------
@@ -3252,7 +3272,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>.'
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
     },
 
     'ebpf.tcp_retransmit': {
@@ -3295,32 +3315,32 @@ netdataDashboard.context = {
 
     'ebpf.deleted_objects': {
         title : 'VFS remove',
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. '
     },
 
     'ebpf.io': {
         title : 'VFS IO',
-        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+        info: 'Successful or failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
     'ebpf.io_bytes': {
         title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Total of bytes read or written with success using the functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
     },
 
     'ebpf.io_error': {
         title : 'VFS IO error',
-        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
+        info: 'Failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
     },
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that the function <code>do_fork</code> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <code>sys_clone</code> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that the function <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a> is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
         title : 'Exit monitoring',
-        info: 'Calls for the functions responsible for closing (<code>do_exit</code>) and releasing (<code>release_task</code>) tasks.'
+        info: 'Calls for the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
     'ebpf.task_error': {

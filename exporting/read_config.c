@@ -238,6 +238,10 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
+        prometheus_exporter_instance->config.options |=
+            global_backend_options &
+            (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM);
+
         if (prometheus_config_get_boolean(
                 "send names instead of ids", global_backend_options & EXPORTING_OPTION_SEND_NAMES))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
@@ -440,6 +444,8 @@ struct engine *read_exporting_config()
         tmp_instance->config.destination = strdupz(exporter_get(instance_name, "destination", default_destination));
 
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
+
+        tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));
 
 #ifdef ENABLE_HTTPS
 
