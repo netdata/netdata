@@ -56,6 +56,11 @@ typedef enum ebpf_socket_idx {
 // Charts created on Apps submenu
 #define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
 #define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
+#define NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
+#define NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
 
 // Network viewer charts
 #define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
@@ -73,12 +78,22 @@ typedef enum ebpf_socket_idx {
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
-    uint64_t sent;
-    uint64_t received;
+    uint64_t bytes_sent;         // Bytes sent
+    uint64_t bytes_received;     // Bytes received
+    uint64_t call_tcp_sent;      // Number of times tcp_sendmsg was called
+    uint64_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
+    uint64_t retransmit;         // Number of times tcp_retransmit was called
+    uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
+    uint64_t call_udp_received;  // Number of times udp_recvmsg was called
 
     // Publish information.
-    uint64_t publish_sent;
-    uint64_t publish_recv;
+    uint64_t publish_sent_bytes;
+    uint64_t publish_received_bytes;
+    uint64_t publish_tcp_sent;
+    uint64_t publish_tcp_received;
+    uint64_t publish_retransmit;
+    uint64_t publish_udp_sent;
+    uint64_t publish_udp_received;
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {
