@@ -450,7 +450,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
     // No new values have been collected for this chart since agent start or it was marked RRDSET_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED            = 1 << 15
+    RRDSET_FLAG_ARCHIVED            = 1 << 15,
+    RRDSET_FLAG_ACLK                = 1 << 16
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
