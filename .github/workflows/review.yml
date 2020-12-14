@@ -66,7 +66,7 @@ jobs:
           fi
       - name: Run remarklint
         if: env.run_remarklint == 1
-        uses: reviewdog/action-remark-lint@v1
+        uses: reviewdog/action-remark-lint@v0.0.5
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
