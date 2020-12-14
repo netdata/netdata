@@ -22,7 +22,7 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
 Netdata uses an [internal, static-threaded web server](/web/server/README.md) to host the HTML, CSS, and JavaScript
 files that make up the local Agent dashboard. You don't have to configure anything to access it, although you can adjust
 [your settings](/web/server/README.md#other-netdataconf-web-section-options) in the `netdata.conf` file, or run Netdata
-behind an Nginx proxy, and so on.
+behind an [Nginx proxy](https://learn.netdata.cloud/docs/agent/running-behind-nginx), and so on.
 
 ## Navigating the local dashboard
 
@@ -92,9 +92,9 @@ submenus](https://user-images.githubusercontent.com/1153921/80834697-11577e00-8b
 ### Cloud menus (Spaces, War Rooms, and Visited nodes)
 
 The dashboard also features a menu related to Netdata Cloud functionality. You can view your existing Spaces or create
-new ones via the vertical column of boxes. This menu also displays the name of your current Space, shows a list of any
-War Rooms you've added you your Space, and lists your Visited nodes. If you click on a War Room's name, the dashboard
-redirects you to the Netdata Cloud web interface.
+new ones via the left vertical column of boxes. This menu also displays the name of your current Space, shows a list of
+any War Rooms you've added you your Space, and lists any notes you recently visited via their Agent dashboards. Click on
+a War Room's name to jump to the Netdata Cloud web interface.
 
 ![A screenshot of the Cloud
 menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)
