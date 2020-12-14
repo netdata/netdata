@@ -932,10 +932,9 @@ RRDSET *rrdset_create_custom(
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting) {
+    if (netdata_cloud_setting)
         aclk_add_collector(host, plugin, module);
-        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-    }
+    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
 #endif
     return(st);
 }
@@ -1372,7 +1371,7 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting && unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
     }
