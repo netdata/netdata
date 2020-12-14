@@ -1,9 +1,7 @@
 <!--
----
 title: "Daemon configuration"
-date: 2020-03-31
+description: "The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/config/README.md
----
 -->
 
 # Daemon configuration

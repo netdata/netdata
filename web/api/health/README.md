@@ -1,9 +1,7 @@
 <!--
----
 title: "Health API Calls"
 date: 2020-04-27
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/health/README.md
----
 -->
 
 # Health API Calls

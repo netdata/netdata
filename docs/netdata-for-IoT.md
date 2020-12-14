@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata for IoT"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md
----
 -->
 
 # Netdata for IoT

@@ -1,9 +1,7 @@
 <!--
----
 title: "Netdata daemon"
 date: 2020-04-29
 custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
----
 -->
 
 # Netdata daemon

@@ -1,8 +1,6 @@
 <!--
----
 title: "CSV formatter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/csv/README.md
----
 -->
 
 # CSV formatter

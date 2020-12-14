@@ -1,8 +1,7 @@
 <!--
----
 title: "Install Netdata on cloud providers"
+description: "The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/cloud-providers.md
----
 -->
 
 # Install Netdata on cloud providers
@@ -16,7 +15,7 @@ aims to document some of those steps for popular cloud providers.
 
 > This document is a work-in-progress! If you find new issues specific to a cloud provider, or would like to help
 > clarify the correct workaround, please [create an
-> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request%2C+needs+triage&template=feature_request.md)
+> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request.md)
 > with your process and instructions on using the provider's interface to complete the workaround.
 
 -   [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
@@ -127,3 +126,5 @@ Name: Netdata
 ```
 
 Click **Add** to apply your new inbound security rule.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fcloud-providers&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -1,8 +1,6 @@
 <!--
----
 title: "proc.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.plugin/README.md
----
 -->
 
 # proc.plugin
