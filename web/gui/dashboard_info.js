@@ -1183,6 +1183,13 @@ netdataDashboard.context = {
         info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
     },
 
+    'apps.bandwidth_udp_send': {
+        info: 'Calls for function <code>udp_sendmsg</code>.'
+    },
+
+    'apps.bandwidth_udp_recv': {
+        info: 'Calls for function <code>udp_recvmsg</code>.'
+    },
 
     // ------------------------------------------------------------------------
     // USERS
