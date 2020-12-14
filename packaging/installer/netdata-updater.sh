@@ -98,18 +98,22 @@ create_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
     echo "${NETDATA_TMPDIR_PATH}"
   else
-    if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-      if _cannot_use_tmpdir /tmp ; then
-        if _cannot_use_tmpdir "${PWD}" ; then
-          echo >&2
-          echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
-          exit 1
+    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_find_tmpdir "${NETDATA_TMPDIR}" ; then
+      if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
+        if _cannot_use_tmpdir /tmp ; then
+          if _cannot_use_tmpdir "${PWD}" ; then
+            echo >&2
+            echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+            exit 1
+          else
+            TMPDIR="${PWD}"
+          fi
         else
-          TMPDIR="${PWD}"
+          TMPDIR="/tmp"
         fi
-      else
-        TMPDIR="/tmp"
       fi
+    else
+      TMPDIR="${NETDATA_TMPDIR}"
     fi
 
     mktemp -d -t netdata-updater-XXXXXXXXXX
