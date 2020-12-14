@@ -26,7 +26,9 @@ This config file **is not needed by default**. Netdata works fine out of the box
 8.  `[plugin:NAME]` sections for each collector plugin, under the comment [Per plugin configuration](#per-plugin-configuration).
 9.  `[CHART_NAME]` sections for each chart defined, under the comment [Per chart configuration](#per-chart-configuration).
 
-The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a comment on settings it does not currently use.
+The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When
+you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a
+comment on settings it does not currently use.
 
 ## Applying changes
 
