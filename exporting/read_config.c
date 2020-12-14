@@ -445,6 +445,8 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
 
+        tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));
+
 #ifdef ENABLE_HTTPS
 
 #define STR_GRAPHITE_HTTPS "graphite:https"

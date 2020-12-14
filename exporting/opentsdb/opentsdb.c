@@ -178,7 +178,6 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -202,7 +201,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         (instance->labels) ? buffer_tostring(instance->labels) : "");
@@ -219,7 +218,6 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
  */
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -249,7 +247,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         (instance->labels) ? buffer_tostring(instance->labels) : "");
@@ -326,7 +324,6 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -360,7 +357,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         dimension_name,
         (unsigned long long)rd->last_collected_time.tv_sec,
         rd->last_collected_value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");
@@ -377,7 +374,6 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
  */
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -417,7 +413,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         dimension_name,
         (unsigned long long)last_t,
         value,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         (host->tags) ? " " : "",
         (host->tags) ? host->tags : "",
         instance->labels ? buffer_tostring(instance->labels) : "");

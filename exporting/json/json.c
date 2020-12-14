@@ -154,7 +154,6 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -200,7 +199,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}",
 
         instance->config.prefix,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
@@ -235,7 +234,6 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
  */
 int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    struct engine *engine = instance->engine;
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
@@ -286,7 +284,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}",
 
         instance->config.prefix,
-        (host == localhost) ? engine->config.hostname : host->hostname,
+        (host == localhost) ? instance->config.hostname : host->hostname,
         tags_pre,
         tags,
         tags_post,
