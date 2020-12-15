@@ -24,7 +24,8 @@ static inline int _aclk_queue_query(aclk_query_t query)
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
-        error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
+        if(!netdata_exit)
+            error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         aclk_query_free(query);
         return 1;
     }
@@ -63,7 +64,8 @@ aclk_query_t aclk_queue_pop(void)
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
-        error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
+        if(!netdata_exit)
+            error("POP Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         return NULL;
     }
 
