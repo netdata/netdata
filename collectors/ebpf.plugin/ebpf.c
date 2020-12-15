@@ -121,7 +121,9 @@ ebpf_process_stat_t *global_process_stat = NULL;
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = NETDATA_NV_CAP_VALUE, .hostname_resolution_enabled = 0,
                                                      .service_resolution_enabled = 0, .excluded_port = NULL,
-                                                     .included_port = NULL, .names = NULL, .ipv4_local_ip = NULL,
+                                                     .included_port = NULL, .names = NULL, .excluded_ips = NULL,
+                                                     .included_ips = NULL, .excluded_hostnames = NULL,
+                                                     .included_hostnames = NULL, .ipv4_local_ip = NULL,
                                                      .ipv6_local_ip = NULL };
 
 /*****************************************************************
