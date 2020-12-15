@@ -615,7 +615,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
  * Add a new collector to the list
  * If it exists, update the chart count
  */
-void aclk_add_collector(const char *hostname, const char *plugin_name, const char *module_name)
+void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -625,7 +625,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _add_collector(hostname, plugin_name, module_name);
+    tmp_collector = _add_collector(host->machine_guid, plugin_name, module_name);
 
     if (unlikely(tmp_collector->count != 1)) {
         COLLECTOR_UNLOCK;
@@ -634,7 +634,10 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_UNLOCK;
 
-    if(aclk_popcorn_check_bump())
+    if (aclk_popcorn_check_bump())
+        return;
+
+    if (host != localhost)
         return;
 
     query = aclk_query_new(METADATA_INFO);
@@ -655,7 +658,7 @@ void aclk_add_collector(const char *hostname, const char *plugin_name, const cha
  * This function will release the memory used and schedule
  * a cloud update
  */
-void aclk_del_collector(const char *hostname, const char *plugin_name, const char *module_name)
+void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -665,7 +668,7 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _del_collector(hostname, plugin_name, module_name);
+    tmp_collector = _del_collector(host->machine_guid, plugin_name, module_name);
 
     if (unlikely(!tmp_collector || tmp_collector->count)) {
         COLLECTOR_UNLOCK;
@@ -681,6 +684,9 @@ void aclk_del_collector(const char *hostname, const char *plugin_name, const cha
     _free_collector(tmp_collector);
 
     if (aclk_popcorn_check_bump())
+        return;
+    
+    if (host != localhost)
         return;
 
     query = aclk_query_new(METADATA_INFO);
