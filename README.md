@@ -55,7 +55,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 ## Features
 
 ![Netdata in
-action](https://user-images.githubusercontent.com/1153921/95625372-40afc800-0a2d-11eb-8425-3355c8c4a3f3.gif)
+action](https://user-images.githubusercontent.com/1153921/101513938-fae28380-3939-11eb-9434-8ad86a39be62.gif)
 
 Here's what you can expect from Netdata:
 
