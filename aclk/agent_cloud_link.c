@@ -576,7 +576,7 @@ void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *modu
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _add_collector(host->hostname, plugin_name, module_name);
+    tmp_collector = _add_collector(host->machine_guid, plugin_name, module_name);
 
     if (unlikely(tmp_collector->count != 1)) {
         COLLECTOR_UNLOCK;
@@ -609,7 +609,7 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
 
     COLLECTOR_LOCK;
 
-    tmp_collector = _del_collector(host->hostname, plugin_name, module_name);
+    tmp_collector = _del_collector(host->machine_guid, plugin_name, module_name);
 
     if (unlikely(!tmp_collector || tmp_collector->count)) {
         COLLECTOR_UNLOCK;
