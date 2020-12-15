@@ -864,7 +864,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 copyme += 9;
                 char *end = strchr(copyme,'&');
                 if(end){
-                    size_t length = end - copyme;
+                    size_t length = MIN(255, end - copyme);
                     memcpy(hostname,copyme,length);
                     hostname[length] = 0X00;
                 }
