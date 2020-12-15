@@ -16,6 +16,7 @@ Makefile.in
 *.old
 *.log
 *.pyc
+package-lock.json
 
 Makefile
 aclocal.m4
