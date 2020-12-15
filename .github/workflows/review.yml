@@ -86,6 +86,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
+          filter_mode: file
 
   shellcheck:
     name: shellcheck
