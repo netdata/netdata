@@ -68,8 +68,18 @@ jobs:
             echo 'run_remarklint=1' >> $GITHUB_ENV
           fi
       - name: Install remark dependencies
-        if: env.run_eslint == 1
-        run: npm install --no-save remark-preset-lint-markdown-style-guide remark-preset-lint-consistent remark-preset-lint-recommended remark-lint-no-dead-urls remark-lint-heading-whitespace remark-lint-maximum-line-length remark-lint-maximum-heading-length remark-lint-list-item-indent remark-lint-list-item-spacing remark-lint-strong-marker remark-lint-emphasis-marker remark-lint-unordered-list-marker-style remark-lint-ordered-list-marker-style remark-lint-ordered-list-marker-value remark-validate-links remark-frontmatter
+        if: env.run_remarklint == 1
+        run: >
+          npm install --no-save remark-preset-lint-markdown-style-guide
+          remark-preset-lint-consistent remark-preset-lint-recommended
+          remark-lint-no-dead-urls remark-lint-heading-whitespace
+          remark-lint-maximum-line-length remark-lint-maximum-heading-length
+          remark-lint-list-item-indent remark-lint-list-item-spacing
+          remark-lint-strong-marker remark-lint-emphasis-marker
+          remark-lint-unordered-list-marker-style
+          remark-lint-ordered-list-marker-style
+          remark-lint-ordered-list-marker-value remark-validate-links
+          remark-frontmatter
       - name: Run remarklint
         if: env.run_remarklint == 1
         uses: reviewdog/action-remark-lint@v0.0.5
