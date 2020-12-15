@@ -23,6 +23,9 @@ jobs:
           if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.js|node\.d\.plugin\.in' ; then
             echo 'run_eslint=1' >> $GITHUB_ENV
           fi
+      - name: Install eslint
+        if: env.run_eslint == 1
+        run: npm install --no-save eslint
       - name: Run eslint
         if: env.run_eslint == 1
         uses: reviewdog/action-eslint@v1

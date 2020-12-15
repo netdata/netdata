@@ -57,7 +57,6 @@ dist_noinst_DATA = \
     contrib \
     netdata.cppcheck \
     netdata.spec \
-    package.json \
     docs \
     packaging/version \
     packaging/dashboard.version \
