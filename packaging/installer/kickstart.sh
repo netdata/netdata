@@ -374,7 +374,8 @@ while [ -n "${1}" ]; do
     export NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT="${1}"
     shift 1
   else
-    break
+    NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS ${1}"
+    shift 1
   fi
 done
 
@@ -473,7 +474,7 @@ cd netdata-* || fatal "Cannot cd to netdata source tree"
 
 install() {
   progress "Installing netdata..."
-  run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
+  run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} || fatal "netdata-installer.sh exited with error"
   if [ -d "${ndtmpdir}" ] && [ ! "${ndtmpdir}" = "/" ]; then
     run ${sudo} rm -rf "${ndtmpdir}" > /dev/null 2>&1
   fi
