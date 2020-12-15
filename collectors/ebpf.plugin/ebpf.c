@@ -119,10 +119,7 @@ ebpf_module_t ebpf_modules[] = {
 ebpf_process_stat_t *global_process_stat = NULL;
 
 //Network viewer
-ebpf_network_viewer_options_t network_viewer_opt = { .max_dim = NETDATA_NV_CAP_VALUE, .hostname_resolution_enabled = 0,
-                                                     .service_resolution_enabled = 0, .excluded_port = NULL,
-                                                     .included_port = NULL, .names = NULL, .ipv4_local_ip = NULL,
-                                                     .ipv6_local_ip = NULL };
+ebpf_network_viewer_options_t network_viewer_opt;
 
 /*****************************************************************
  *
@@ -1781,6 +1778,9 @@ static void parse_args(int argc, char **argv)
         {"return",   no_argument,    0,  'r' },
         {0, 0, 0, 0}
     };
+
+    memset(&network_viewer_opt, 0, sizeof(network_viewer_opt));
+    network_viewer_opt.max_dim = NETDATA_NV_CAP_VALUE;
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
