@@ -239,7 +239,7 @@ struct engine *read_exporting_config()
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
         for (int retries = 0; !global_backend_source && retries < 1000; retries++)
-            usleep(10000);
+            sleep_usec(10000);
 
         if (!global_backend_source)
             global_backend_source = "average";
