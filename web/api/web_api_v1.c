@@ -509,7 +509,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_rdlock(host);
         rrdset_foreach_read(st1, host) {
             if (st1->hash_context == context_hash && !strcmp(st1->context, context) &&
-                (!chart_label_key || rrdset_contains_label_key(st1, chart_label_key, key_hash)))
+                (!chart_label_key || rrdset_contains_label_key(st1, chart_label_key, 0)))
                 build_context_param_list(&context_param_list, st1);
         }
         rrdhost_unlock(host);
