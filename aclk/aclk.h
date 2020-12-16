@@ -29,14 +29,18 @@ typedef struct aclk_rrdhost_state {
 // Define ACLK Feature Version Boundaries Here
 #define ACLK_V_COMPRESSION 2
 
+// How many MQTT PUBACKs we need to get to consider connection
+// stable for the purposes of TBEB (truncated binary exponential backoff)
+#define ACLK_PUBACKS_CONN_STABLE 3
+
 // TODO get rid of this shit
 extern int aclk_disable_runtime;
 extern int aclk_disable_single_updates;
 extern int aclk_kill_link;
 extern int aclk_connected;
 
-extern usec_t aclk_session_us;         // Used by the mqtt layer
-extern time_t aclk_session_sec;        // Used by the mqtt layer
+extern usec_t aclk_session_us;
+extern time_t aclk_session_sec;
 
 void *aclk_main(void *ptr);
 void aclk_single_update_disable();

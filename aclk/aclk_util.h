@@ -32,4 +32,6 @@ int aclk_get_conv_log_next();
 #endif
 #endif
 
+unsigned long int aclk_reconnect_delay(int mode);
+
 #endif /* ACLK_UTIL_H */

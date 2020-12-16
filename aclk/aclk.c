@@ -24,6 +24,8 @@ int aclk_disable_runtime = 0;
 int aclk_disable_single_updates = 0;
 int aclk_kill_link = 0;
 
+int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
+
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -226,9 +228,13 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 
 static void puback_callback(uint16_t packet_id)
 {
+    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
+        aclk_reconnect_delay(0);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
 #endif
+
     if (aclk_shared_state.mqtt_shutdown_msg_id == (int)packet_id) {
         error("Got PUBACK for shutdown message. Can exit gracefully.");
         aclk_shared_state.mqtt_shutdown_msg_rcvd = 1;
@@ -312,6 +318,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
 
     aclk_stats_upd_online(1);
     aclk_connected = 1;
+    aclk_pubacks_per_conn = 0;
     aclk_hello_msg(client);
     ACLK_SHARED_STATE_LOCK;
     if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
@@ -380,6 +387,33 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     mqtt_wss_disconnect(client, 1000);
 }
 
+/* Block till aclk_reconnect_delay is satisifed or netdata_exit is signalled
+ * @return 0 - Go ahead and connect (delay expired)
+ *         1 - netdata_exit
+ */
+#define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
+static int aclk_block_till_recon_allowed() {
+    // Handle reconnect exponential backoff
+    // fnc aclk_reconnect_delay comes from ACLK Legacy @amoss
+    // but has been modifed slightly (more randomness)
+    unsigned long recon_delay = aclk_reconnect_delay(1);
+    info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
+    // we want to wake up from time to time to check netdata_exit
+    while (recon_delay)
+    {
+        if (netdata_exit)
+            return 1;
+        if (recon_delay > NETDATA_EXIT_POLL_MS) {
+            sleep_usec(NETDATA_EXIT_POLL_MS * USEC_PER_MS);
+            recon_delay -= NETDATA_EXIT_POLL_MS;
+            continue;
+        }
+        sleep_usec(recon_delay * USEC_PER_MS);
+        recon_delay = 0;
+    }
+    return 0;
+}
+
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
  * @return  0 - Successfull Connection,
@@ -406,6 +440,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             return -1;
         }
 
+        if (aclk_block_till_recon_allowed())
+            return 1;
+
+        info("Attempting connection now");
         freez(aclk_hostname);
         if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
             error("ACLK base URL configuration key could not be parsed. Will retry in %d seconds.", CLOUD_BASE_URL_READ_RETRY);
@@ -439,10 +477,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             return 0;
         }
 
-        printf("Connect failed\n");
-        // TODO exponential something thing or other thing instead of 1
-        sleep(1);
-        printf("Attempting Reconnect\n");
+        error("Connect failed\n");
     }
 #ifndef ACLK_DISABLE_CHALLENGE
     json_object_put(lwt);

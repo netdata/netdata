@@ -128,3 +128,36 @@ int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
     info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
     return 0;
 }
+
+/*
+ * TBEB with randomness
+ *
+ * @param mode 0 - to reset the delay,
+ *             1 - to advance a step and calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ * @returns delay in ms
+ *
+ */
+#define ACLK_MAX_BACKOFF_DELAY 1024
+unsigned long int aclk_reconnect_delay(int mode)
+{
+    static int fail = -1;
+    unsigned long int delay;
+
+    if (!mode || fail == -1) {
+        srandom(time(NULL));
+        fail = mode - 1;
+        return 0;
+    }
+
+    delay = (1 << fail);
+
+    if (delay >= ACLK_MAX_BACKOFF_DELAY) {
+        delay = ACLK_MAX_BACKOFF_DELAY * 1000;
+    } else {
+        fail++;
+        delay *= 1000;
+        delay += (random() % (MAX(1000, delay/2)));
+    }
+
+    return delay;
+}
