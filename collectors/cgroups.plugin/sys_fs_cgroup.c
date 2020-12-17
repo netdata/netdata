@@ -1468,7 +1468,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
         struct cgroup *t;
         for (t = discovered_cgroup_root; t; t = t->discovered_next) {
             if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
-                // TODO: use it after refactoring if system.slice can be scanned before init.scope/system.slice
+                // TODO: use it after refactoring if system.slice might be scanned before init.scope/system.slice
                 //
                 // if (!strncmp(t->id, "/system.slice/", 14) && !strncmp(cg->id, "/init.scope/system.slice/", 25)) {
                 //     error("CGROUP: chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
