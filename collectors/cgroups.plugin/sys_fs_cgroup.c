@@ -584,6 +584,7 @@ struct cgroup_network_interface {
 #define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
 #define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
 
+// *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup {
     uint32_t options;
 
@@ -1181,7 +1182,7 @@ static inline void read_all_cgroups(struct cgroup *root) {
     struct cgroup *cg;
 
     for(cg = root; cg ; cg = cg->next)
-        if(cg->enabled && cg->available && !cg->pending_renames)
+        if(cg->enabled && !cg->pending_renames)
             cgroup_read(cg);
 }
 
@@ -2684,7 +2685,7 @@ void update_systemd_services_charts(
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
+        if(unlikely(!cg->enabled || cg->pending_renames || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
@@ -3075,7 +3076,7 @@ void update_cgroup_charts(int update_every) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames))
+        if(unlikely(!cg->enabled || cg->pending_renames))
             continue;
 
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
