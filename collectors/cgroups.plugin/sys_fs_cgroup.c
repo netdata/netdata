@@ -1473,8 +1473,6 @@ static inline struct cgroup *cgroup_add(const char *id) {
                 // if (!strncmp(t->id, "/system.slice/", 14) && !strncmp(cg->id, "/init.scope/system.slice/", 25)) {
                 //     error("CGROUP: chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                 //           cg->chart_id, t->id, cg->id, t->id);
-                //     debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
-                //           cg->chart_id, t->id, cg->id, t->id);
                 //     t->enabled = 0;
                 //     t->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
                 // }
@@ -1482,8 +1480,6 @@ static inline struct cgroup *cgroup_add(const char *id) {
                 //
                 // https://github.com/netdata/netdata/issues/797#issuecomment-241248884
                 error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
-                        cg->chart_id, t->id, cg->id);
-                debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
                         cg->chart_id, t->id, cg->id);
                 cg->enabled = 0;
                 cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
