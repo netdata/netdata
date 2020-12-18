@@ -64,8 +64,7 @@ configure any of these collectors according to your setup and infrastructure.
 ### Generic
 
 -   [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
-    metrics from one or more Prometheus endpoints that use the OpenMetrics exposition format. Autodetects more than 600
-    endpoints.
+    metrics from any number of Prometheus endpoints, with support to autodetect more than 600 services and applications.
 
 ### APM (application performance monitoring)
 
