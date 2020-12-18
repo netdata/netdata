@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.28.0](https://github.com/netdata/netdata/tree/v1.28.0) (2020-12-18)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.27.0...v1.28.0)
+
+**Merged pull requests:**
+
+- Fix locking after on\_connect failure [\#10401](https://github.com/netdata/netdata/pull/10401) ([stelfrag](https://github.com/stelfrag))
+
 ## [v1.27.0](https://github.com/netdata/netdata/tree/v1.27.0) (2020-12-17)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.26.0...v1.27.0)
