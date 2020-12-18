@@ -111,6 +111,8 @@ configure any of these collectors according to your setup and infrastructure.
     database components using `_status/vars` endpoint.
 -   [Consul](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/consul/): Capture service and unbound
     checks status (passing, warning, critical, maintenance). 
+-   [Couchbase](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchbase/): Gather per-bucket
+    metrics from any number of instances of the distributed JSON document database.
 -   [CouchDB](/collectors/python.d.plugin/couchdb/README.md): Monitor database health and performance metrics
     (reads/writes, HTTP traffic, replication status, etc).
 -   [MongoDB](/collectors/python.d.plugin/mongodb/README.md): Collect memory-caching system performance metrics and
@@ -118,11 +120,15 @@ configure any of these collectors according to your setup and infrastructure.
 -   [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
     replication and per user statistics.
 -   [OracleDB](/collectors/python.d.plugin/oracledb/README.md): Monitor database performance and health metrics.
+-   [Pika](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pika/): Gather metric, such as clients,
+    memory usage, queries, and more from the Redis interface-compatible database.
 -   [Postgres](/collectors/python.d.plugin/postgres/README.md): Collect database health and performance metrics. 
 -   [ProxySQL](/collectors/python.d.plugin/proxysql/README.md): Monitor database backend and frontend performance
     metrics.
--   [Redis](/collectors/python.d.plugin/redis/): Monitor database status by reading the server's response to the `INFO`
-    command.
+-   [Redis (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
+    number of database instances by reading the server's response to the `INFO ALL` command.
+-   [Redis (Python)](/collectors/python.d.plugin/redis/): Monitor database status by reading the server's response to
+    the `INFO` command.
 -   [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): Collect database server and cluster statistics.
 -   [Riak KV](/collectors/python.d.plugin/riakkv/README.md): Collect database stats from the `/stats` endpoint.
 -   [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper/): Monitor application
