@@ -83,8 +83,8 @@ Whenever you use a chart in this way, Netdata synchronizes all the other charts 
 | **Zoom** to a specific timeframe                  | `SHIFT` + `mouse selection`         |                                                           |                                                            |
 | **Zoom** in/out                                   | `SHIFT`/`ALT` + `mouse scrollwheel` | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) |
 
-![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
-charts](https://user-images.githubusercontent.com/1153921/93497197-071fed00-f8c5-11ea-96ff-60e77ed952bd.gif)
+![Animated GIF of interacting with Netdata
+charts](https://user-images.githubusercontent.com/1153921/102652236-051b3380-412b-11eb-8f7c-a2372ed92cd0.gif)
 
 These interactions can also be triggered using the icons on the bottom-right corner of every chart. They are,
 respectively, `Pan Left`, `Reset`, `Pan Right`, `Zoom In`, and `Zoom Out`.
@@ -97,7 +97,7 @@ You can resize any chart by clicking-and-dragging the icon on the bottom-right c
 to its original height, double-click the same icon.
 
 ![Resizing a chart and resetting it to the default
-height](https://user-images.githubusercontent.com/1153921/93497272-1acb5380-f8c5-11ea-851c-6cd5ac247e41.gif)
+height](https://user-images.githubusercontent.com/1153921/102652691-24b25c00-412b-11eb-9e2c-95325fcedc67.gif)
 
 ### Composite charts in Netdata Cloud
 

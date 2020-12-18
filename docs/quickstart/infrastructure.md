@@ -76,7 +76,7 @@ Overview features composite charts, which display aggregated metrics from every 
 are streamed on-demand from individual nodes and composited onto a single, familiar dashboard.
 
 ![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/95912630-e75ed600-0d57-11eb-8a3b-49e883d16833.png)
+Overview](https://user-images.githubusercontent.com/1153921/102651377-b1f4b100-4129-11eb-8e60-d2995d258c16.png)
 
 Read more about the Overview in the [infrastructure overview](/docs/visualize/overview-infrastructure.md) doc.
 
