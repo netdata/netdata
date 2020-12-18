@@ -158,7 +158,7 @@ jobs:
         - sudo chmod -R 755 "/var/lib/lxc"
         - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
       env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="32" BUILD_STRING="fedora/32"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata RPM package build check failed."
 
