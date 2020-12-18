@@ -6,7 +6,7 @@ sidebar_label: "BOINC"
 
 # BOINC monitoring with Netdata
 
-Monitors task counts for the Berkely Open Infrastructure Networking Computing (BOINC) distributed computing client using the same RPC interface that the BOINC monitoring GUI does.
+Monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client using the same RPC interface that the BOINC monitoring GUI does.
 
 It provides charts tracking the total number of tasks and active tasks, as well as ones tracking each of the possible states for tasks.
 

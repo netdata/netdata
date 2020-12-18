@@ -44,7 +44,7 @@ collector—we may be looking for contributions from users such as yourself! If 
 -   [System collectors](#system-collectors)
     -   [Applications](#applications)
     -   [Disks and filesystems](#disks-and-filesystems)
-    -   [eBPF (extended Berkely Backet Filter)](#ebpf)
+    -   [eBPF (extended Berkeley Packet Filter)](#ebpf)
     -   [Hardware](#hardware)
     -   [Memory](#memory)
     -   [Networks](#networks)
