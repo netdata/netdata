@@ -52,7 +52,7 @@ Let's walk through the best ways to improve the Netdata Agent's performance.
 
 The fastest way to improve the Agent's resource utilization is to reduce how often it collects metrics.
 
-## Global
+### Global
 
 If you don't need per-second metrics, or if the Agent uses a lot of CPU even when no one is viewing that node's
 dashboard, configure the Agent to collect metrics less often.
@@ -68,7 +68,7 @@ dedicated for metrics collection. Set this to `5` or `10` to collect metrics eve
   update every: 5
 ```
 
-## Specific plugin or collector
+### Specific plugin or collector
 
 If you did not [reduce the global collection frequency](#global) but find that a specific plugin/collector uses too many
 resources, you can reduce its frequency. You configure [internal
