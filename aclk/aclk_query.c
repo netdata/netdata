@@ -750,7 +750,7 @@ void *aclk_query_main_thread(void *ptr)
         rrdhost_aclk_state_lock(localhost);
         if (unlikely(localhost->aclk_state.metadata == ACLK_METADATA_REQUIRED)) {
             if (unlikely(aclk_queue_query("on_connect", localhost, NULL, NULL, 0, 1, ACLK_CMD_ONCONNECT))) {
-                ACLK_SHARED_STATE_UNLOCK;
+                rrdhost_aclk_state_unlock(localhost);
                 errno = 0;
                 error("ACLK failed to queue on_connect command");
                 sleep(1);
