@@ -2094,10 +2094,10 @@ void cgroup_discovery_worker(void *ptr)
         discovery_thread.start_discovery = 0;
         uv_mutex_unlock(&discovery_thread.mutex);
 
-        find_all_cgroups();
-
         if (unlikely(netdata_exit))
             break;
+
+        find_all_cgroups();
     }
 
     discovery_thread.exited = 1;
