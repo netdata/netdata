@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.28.0...HEAD)
+
+**Merged pull requests:**
+
+- Add centralized Cloud notifications to core docs [\#10374](https://github.com/netdata/netdata/pull/10374) ([joelhans](https://github.com/joelhans))
+
 ## [v1.28.0](https://github.com/netdata/netdata/tree/v1.28.0) (2020-12-18)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.27.0...v1.28.0)
