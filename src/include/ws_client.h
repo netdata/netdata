@@ -51,6 +51,7 @@ enum websocket_client_rx_ws_parse_state {
     WS_PAYLOAD_CONNECTION_CLOSE_EC,
     WS_PAYLOAD_CONNECTION_CLOSE_MSG,
     WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD,
+    WS_PAYLOAD_PING_REQ_PAYLOAD, // PING payload to be sent back as PONG
     WS_PACKET_DONE
 };
 
@@ -86,6 +87,7 @@ typedef struct websocket_client {
         uint64_t payload_processed;
         union {
             struct ws_op_close_payload op_close;
+            char *ping_msg;
         } specific_data;
     } rx;
 

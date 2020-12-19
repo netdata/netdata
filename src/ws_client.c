@@ -462,15 +462,13 @@ static int check_opcode(ws_client *client,enum websocket_opcode oc)
     switch(oc) {
         case WS_OP_BINARY_FRAME:
         case WS_OP_CONNECTION_CLOSE:
+        case WS_OP_PING:
             return 0;
         case WS_OP_CONTINUATION_FRAME:
             FATAL("WS_OP_CONTINUATION_FRAME NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_TEXT_FRAME:
             FATAL("WS_OP_TEXT_FRAME NOT IMPLEMENTED YET!!!!");
-            return 0;
-        case WS_OP_PING:
-            FATAL("WS_OP_PING NOT IMPLEMENTED YET!!!!");
             return 0;
         case WS_OP_PONG:
             FATAL("WS_OP_PONG NOT IMPLEMENTED YET!!!!");
@@ -488,6 +486,9 @@ static inline void ws_client_rx_post_hdr_state(ws_client *client)
             return;
         case WS_OP_CONNECTION_CLOSE:
             client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE;
+            return;
+        case WS_OP_PING:
+            client->rx.parse_state = WS_PAYLOAD_PING_REQ_PAYLOAD;
             return;
         default:
             client->rx.parse_state = WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD;
@@ -616,6 +617,23 @@ int ws_client_process_rx_ws(ws_client *client)
             WARN("Skipping Websocket Packet of unsupported/unknown type");
             if (client->rx.payload_length)
                 rbuf_bump_tail(client->buf_read, client->rx.payload_length);
+            client->rx.parse_state = WS_PACKET_DONE;
+            return WS_CLIENT_PARSING_DONE;
+        case WS_PAYLOAD_PING_REQ_PAYLOAD:
+            if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
+                ERROR("Ping arrived with payload of %d. That is too big!", client->rx.payload_length);
+                return WS_CLIENT_INTERNAL_ERROR;
+            }
+            BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
+            client->rx.specific_data.ping_msg = malloc(client->rx.payload_length);
+            rbuf_pop(client->buf_read, client->rx.specific_data.ping_msg, client->rx.payload_length);
+            // TODO schedule this instead of sending right away
+            // then attempt to send as soon as buffer space clears up
+            size = ws_client_send(client, WS_OP_PONG, client->rx.specific_data.ping_msg, client->rx.payload_length);
+            if (size != client->rx.payload_length) {
+                ERROR("Unable to send the PONG as one packet back. Closing connection.");
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             client->rx.parse_state = WS_PACKET_DONE;
             return WS_CLIENT_PARSING_DONE;
         case WS_PACKET_DONE:
