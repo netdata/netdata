@@ -26,7 +26,19 @@ char *rbuf_get_linear_read_range(rbuf_t buffer, size_t *bytes);
 int rbuf_bump_head(rbuf_t buffer, size_t bytes);
 int rbuf_bump_tail(rbuf_t buffer, size_t bytes);
 
+/* @param buffer related buffer instance
+ * @returns total capacity of buffer in bytes (not free/used)
+ */
+size_t rbuf_get_capacity(rbuf_t buffer);
+
+/* @param buffer related buffer instance
+ * @returns count of bytes stored in the buffer
+ */
 size_t rbuf_bytes_available(rbuf_t buffer);
+
+/* @param buffer related buffer instance
+ * @returns count of bytes available/free in the buffer (how many more bytes you can store in this buffer)
+ */
 size_t rbuf_bytes_free(rbuf_t buffer);
 
 /* writes as many bytes from `data` into the `buffer` as possible

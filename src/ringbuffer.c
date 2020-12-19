@@ -101,6 +101,11 @@ int rbuf_bump_tail(rbuf_t buffer, size_t bytes)
     return 1;
 }
 
+size_t rbuf_get_capacity(rbuf_t buffer)
+{
+    return buffer->size;
+}
+
 size_t rbuf_bytes_available(rbuf_t buffer)
 {
     return buffer->size_data;
