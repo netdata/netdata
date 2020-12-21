@@ -1,11 +1,11 @@
 <!--
-title: "Anomaly detection with Netdata"
+title: "Anomalies"
 description: "Use ML-driven anomaly detection to narrow your focus to only affected metrics and services/processes on your node to shorten root cause analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/anomalies/README.md
 sidebar_url: anomalies
 -->
 
-# Anomaly detection with Netdata
+# Anomalies
 
 This collector uses the Python [PyOD](https://pyod.readthedocs.io/en/latest/index.html) library to perform unsupervised [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) on your Netdata charts and/or dimensions.
 
