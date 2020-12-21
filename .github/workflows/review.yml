@@ -82,11 +82,11 @@ jobs:
           remark-frontmatter
       - name: Run remarklint
         if: env.run_remarklint == 1
-        uses: reviewdog/action-remark-lint@v0.0.5
+        uses: reviewdog/action-remark-lint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
-          filter_mode: file
+            filter_mode: file
 
   shellcheck:
     name: shellcheck
