@@ -9,10 +9,16 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/s
 When you install the Netdata Agent, the [daemon](/daemon/README.md) is configured to start at boot and stop and
 restart/shutdown.
 
-You will most often need to _restart_ the Agent, as those are required to load new configuration files or changes to
-existing configuration files, with the exception of [health configuration](#reload-health-configuration).
+You will most often need to _restart_ the Agent to load new or editing configuration files. [Health
+configuration](#reload-health-configuration) files are the only exception, as they can be reloaded without restarting
+the entire Agent.
 
-Stopping or restarting the Netdata Agent will cause gaps in stored metrics.
+Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates
+collectors and the database engine.
+
+## Using `service`, `systemctl`, or `init.d`
+
+This is the recommended way to start, stop, or restart the Netdata daemon.
 
 -   To **start** Netdata, run `sudo service netdata start`.
 -   To **stop** Netdata, run `sudo service netdata stop`.
@@ -25,21 +31,40 @@ Netdata based on your system. If any of the above commands fail, try using the e
 -   **systemd**: `sudo systemctl start netdata`, `sudo systemctl stop netdata`, `sudo systemctl restart netdata`
 -   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
 
+## Using `netdata`
+
+Use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon. 
+
+```bash
+sudo netdata
+```
+
+If you start the daemon this way, close it with `sudo killall netdata`.
+
+## Using `netdatacli`
+
+The Netdata Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns. Start the Agent back up
+using your preferred method listed above.
+
+```bash
+sudo netdatacli shutdown-agent
+```
+
 ## Reload health configuration
 
 You do not need to restart the Netdata Agent between changes to health configuration files, such as specific health
-entities. Instead, use [`netdatacli`](#netdatacli) and the `reload-health` option to prevent gaps in metrics collection.
+entities. Instead, use [`netdatacli`](#using-netdatacli) and the `reload-health` option to prevent gaps in metrics
+collection.
 
 ```bash
 sudo netdatacli reload-health
 ```
 
-## netdatacli
-
-The Netdata Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns.
+If `netdatacli` doesn't work on your system, send a `SIGUSR2` signal to the daemon, which reloads health configuration
+without restarting the entire process.
 
 ```bash
-sudo netdatacli shutdown-agent
+killall -USR2 netdata
 ```
 
 ## Force stop stalled or unresponsive `netdata` processes

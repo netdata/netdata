@@ -143,12 +143,12 @@ curl -o /etc/netdata/netdata.conf http://NODE:19999/netdata.conf
 Learn more about [starting, stopping, or restarting](/docs/configure/start-stop-restart.md) the Netdata daemon to apply
 configuration changes.
 
-
+Apply some [common configuration changes](/docs/configure/common-changes.md) to quickly tweak the Agent's behavior.
 
 [Add security to your node](/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
 and `edit-config`. We put together a few security best practices based on how you use the Netdata.
 
-You can also take what you've learned about node configuration to tweak the Agent's behavior or enable new features:
+You can also take what you've learned about node configuration to enable or enhance features:
 
 -   [Enable new collectors](/docs/collect/enable-configure.md) or tweak their behavior.
 -   [Configure existing health alarms](/docs/monitor/configure-alarms.md) or create new ones.

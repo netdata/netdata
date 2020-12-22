@@ -1,7 +1,7 @@
 <!--
 title: "Common configuration changes"
 description: "See the most popular configuration changes to make to the Netdata Agent, including longer metrics retention, reduce sampling, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/common-configuration.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/configure/common-changes.md
 -->
 
 # Common configuration changes
@@ -15,9 +15,9 @@ directory.
 
 ## Change dashboards and visualizations
 
-The Netdata Agent's [local dashboard](/web/gui/README.md), accessible at `http://NODE:19999` is highly configurable.
-Many of these changes are also seen on Netdata Cloud due to the way each claimed node streams metrics data and metadata
-to your browser.
+The Netdata Agent's [local dashboard](/web/gui/README.md), accessible at `http://NODE:19999` is highly configurable. If
+you use Netdata Cloud for [infrastructure monitoring](/docs/quickstart/infrastructure.md), you will see many of these
+changes reflected in those visualizations due to the way Netdata Cloud proxies metric data and metadata to your browser.
 
 ### Increase the long-term metrics retention period
 
@@ -71,7 +71,7 @@ sudo ./edit-config health.d/ram-usage.conf
 Or, append your new alarm to an existing file by editing a relevant existing file in the `health.d/` directory.
 
 Read more about [configuring alarms](/docs/monitor/configure-alarms.md) to get started, and see the [health monitoring
-reference](/health/REFERENCE.md) for a full listing of options available in heath entities.
+reference](/health/REFERENCE.md) for a full listing of options available in health entities.
 
 ### Configure a specific alarm
 
@@ -100,7 +100,7 @@ click on the link to your preferred notification method to find documentation fo
 
 ## Improve node security
 
-While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/) we
+While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
 Learn more about a few of the following changes in the [node security doc](/docs/configure/secure-nodes.md).
@@ -128,7 +128,7 @@ doc](/docs/configure/secure-nodes.md#restrict-access-to-the-local-dashboard).
 ### Stop sending anonymous statistics to Google Analytics
 
 Create a file called `.opt-out-from-anonymous-statistics` inside of your Netdata config directory to immediately stop
-the statistics script from running.
+the statistics script.
 
 ```bash
 sudo touch .opt-out-from-anonymous-statistics
@@ -174,6 +174,16 @@ templates.
 
 If you haven't already, learn how to [secure your nodes](/docs/configure/secure-nodes.md).
 
+As mentioned at the top, there are plenty of other 
+
+You can also take what you've learned about node configuration to tweak the Agent's behavior or enable new features:
+
+- [Enable new collectors](/docs/collect/enable-configure.md) or tweak their behavior.
+- [Configure existing health alarms](/docs/monitor/configure-alarms.md) or create new ones.
+- [Enable notifications](/docs/monitor/enable-notifications.md) to receive updates about the health of your
+  infrastructure.
+- Change [the long-term metrics retention period](/docs/store/change-metrics-storage.md) using the database engine.
+
 ### Related reference documentation
 
 - [Netdata Agent · Daemon](/health/README.md)
@@ -184,4 +194,4 @@ If you haven't already, learn how to [secure your nodes](/docs/configure/secure-
 - [Netdata Agent · Notifications](/health/notifications/README.md)
 - [Netdata Agent · Simple patterns](/libnetdata/simple_pattern/README.md)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fcommon-configuration&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fcommon-changes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
