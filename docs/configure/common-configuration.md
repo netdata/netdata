@@ -95,8 +95,8 @@ Set `enabled` to `no` in the [`[health]` section](/daemon/config/README.md#healt
 ### Enable alarm notifications
 
 Open `health_alarm_notify.conf` for editing. First, read the [enabling
-notifications](/monitor/enable-notifications.md#netdata-agent) doc for an example of the process using Slack, then click
-on the link to your preferred notification method to find documentation for that specific endpoint.
+notifications](/docs/monitor/enable-notifications.md#netdata-agent) doc for an example of the process using Slack, then
+click on the link to your preferred notification method to find documentation for that specific endpoint.
 
 ## Improve node security
 
@@ -120,7 +120,7 @@ Change the `mode` setting to `none` in the [`[web]` section](/web/server/README.
 ### Use access lists to restrict access to specific assets
 
 Allow access from only specific IP addresses, ranges of IP addresses, or hostnames using [access
-lists](/web/server/README.md#access-lists) and [simple patterns](/libnetdata/simple_patterns/README.md).
+lists](/web/server/README.md#access-lists) and [simple patterns](/libnetdata/simple_pattern/README.md).
 
 See a quickstart to access lists in the [node security
 doc](/docs/configure/secure-nodes.md#restrict-access-to-the-local-dashboard).

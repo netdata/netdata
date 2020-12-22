@@ -46,7 +46,7 @@ exist.
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
   **Application** charts from [`apps.plugin`](/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](/collectors/ebpf.plugin/README.md).
-- `health.d/` is a directory that contains [health configuration files](/docs/montior/configure-alarms.md).
+- `health.d/` is a directory that contains [health configuration files](/docs/monitor/configure-alarms.md).
 - `health_alarm_notify.conf` enables and configures [alarm notifications](/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](/collectors/statsd.plugin/README.md).
 - `stream.conf` configures [parent-child streaming](/streaming/README.md) between separate nodes running the Agent.
