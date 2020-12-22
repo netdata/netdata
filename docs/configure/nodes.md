@@ -95,9 +95,8 @@ To edit `netdata.conf`, run `./edit-config netdata.conf`. You may need to elevat
 method for `edit-config` to write into the config directory. Use your `$EDITOR`, make your changes, and save the file.
 
 > `edit-config` uses the `EDITOR` environment variable on your system to edit the file. On many systems, that is
-> defaulted to `vim` or `nano`. To change this variable for the current session (it will revert to the default when you
-> reboot), export a new value: `export EDITOR=nano`. Or, [make the change
-> permanent](https://stackoverflow.com/questions/13046624/how-to-permanently-export-a-variable-in-linux).
+> defaulted to `vim` or `nano`. Use `export EDITOR=` to change this temporarily, or edit your shell configuration file
+> to change to permanently.
 
 After you make your changes, you need to [restart the Agent](/docs/configure/start-stop-restart.md) with `service
 netdata restart` or the appropriate method for your system.
