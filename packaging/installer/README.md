@@ -50,8 +50,8 @@ releases](#nightly-vs-stable-releases).
 
 ### Post-installation
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node) or
-[infrastructure](/docs/quickstart/infrastructure) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
 Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 
