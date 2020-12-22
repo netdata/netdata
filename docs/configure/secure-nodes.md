@@ -112,7 +112,9 @@ We also have guides for [Apache](/docs/Running-behind-apache.md), [Lighttpd](/do
 
 ## What's next?
 
-If you haven't already, be sure to read about [Netdata's security design](/docs/netdata-security.md).
+Read about [Netdata's security design](/docs/netdata-security.md) and our [blog
+post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) about why the local Agent dashboard is both open and
+secure by design.
 
 Next up, learn about [collectors](/docs/collect/how-collectors-work.md) to ensure you're gathering every essential
 metric about your node, its applications, and your infrastructure at large.

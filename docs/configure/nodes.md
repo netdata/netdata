@@ -14,7 +14,7 @@ For example, you might want to increase metrics retention, configure a collector
 setup, or secure the local dashboard by restricting it to only connections from `localhost`.
 
 Whatever the reason, Netdata users should know how to configure individual nodes to act decisively if an incident,
-anomaly, or change in infrastructure affects how their Agents should peform.
+anomaly, or change in infrastructure affects how their Agents should perform.
 
 ## The Netdata config directory
 
@@ -31,20 +31,36 @@ scripts from inside that directory.
 
 ## Netdata's configuration files
 
-Upon installation, the Netdata config directory contains a few files and directories.
+Upon installation, the Netdata config directory contains a few files and directories. It's okay if you don't see all
+these files in your own Netdata config directory, as the next section describes how to edit any that might not already
+exist.
 
--   `netdata.conf` is the main configuration file. This is where you'll find most configuration options. This doc won't
-    go into exhaustive detail about each setting. You can read descriptions for each in the [daemon config
-    doc](/daemon/config/README.md).
--   `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains stock configuration files.
-    Stock versions are copied into the config directory when opened with `edit-config`. _Do not edit the files in
-    `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
--   `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-netdataconf).
--   `go.d/`, `python.d/`, `charts.d/`, `node.d`/, and `custom-plugins.d/`, which are directories for each of Netdata's
-    [orchestrators](/collectors/plugins.d/README.md). These directories can each contain additional `.conf` files for
-    configuring specific collectors.
+- `netdata.conf` is the main configuration file. This is where you'll find most configuration options. Read descriptions
+  for each in the [daemon config doc](/daemon/config/README.md).
+- `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
+- Various configuration files ending in `.conf` for [configuring plugins or
+  collectors](/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
+  `python.d.conf`, and `ebpf.conf`.
+- Various directories ending in `.d`, which contain other configuration files, each ending in `.conf`, for [configuring
+  specific collectors](/docs/collect/enable-configure.md#configure-a-collector).
+- `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
+  **Application** charts from [`apps.plugin`](/collectors/apps.plugin/README.md) or
+  [`ebpf.plugin`](/collectors/ebpf.plugin/README.md).
+- `health.d/` is a directory that contains [health configuration files](/docs/montior/configure-alarms.md).
+- `health_alarm_notify.conf` enables and configures [alarm notifications](/docs/monitor/enable-notifications.md).
+- `statsd.d/` is a directory for configuring Netdata's [statsd collector](/collectors/statsd.plugin/README.md).
+- `stream.conf` configures [parent-child streaming](/streaming/README.md) between separate nodes running the Agent.
+- `.environment` is a hidden file that describes the environment in which the Netdata Agent is installed, including the
+  `PATH` and any installation options. Useful for [reinstalling](/packaging/installer/REINSTALL.md) or
+  [uninstalling](/packaging/installer/UNINSTALL.md) the Agent.
 
-## Use `edit-config` to edit `netdata.conf`
+The Netdata config directory also contains one symlink:
+
+- `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains stock configuration files. Stock
+  versions are copied into the config directory when opened with `edit-config`. _Do not edit the files in
+  `/usr/lib/netdata/conf.d`, as they are overwritten by updates to the Netdata Agent._
+
+## Use `edit-config` to edit configuration files
 
 The **recommended way to easily and safely edit Netdata's configuration** is with the `edit-config` script. This script
 opens existing Netdata configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config
@@ -83,7 +99,8 @@ method for `edit-config` to write into the config directory. Use your `$EDITOR`,
 > reboot), export a new value: `export EDITOR=nano`. Or, [make the change
 > permanent](https://stackoverflow.com/questions/13046624/how-to-permanently-export-a-variable-in-linux).
 
-After you make your changes, you need to restart the Agent with `service netdata restart`.
+After you make your changes, you need to [restart the Agent](/docs/configure/start-stop-restart.md) with `service
+netdata restart` or the appropriate method for your system.
 
 Here's an example of editing the node's hostname, which appears in both the local dashboard and in Netdata Cloud.
 
@@ -103,11 +120,34 @@ You can edit any Netdata configuration file using `edit-config`. A few examples:
 
 The documentation for each of Netdata's components explains which file(s) to edit to achieve the desired behavior.
 
+## See an Agent's running configuration
+
+On start, the Netdata Agent daemon attempts to load `netdata.conf`. If that file is missing, incomplete, or contains
+invalid settings, the daemon attempts to run sane defaults instead. In other words, the state of `netdata.conf` on your
+filesystem may be different from the state of the Netdata Agent itself.
+
+To see the _running configuration_, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with
+the IP address or hostname of your node. The file displayed here is exactly the settings running live in the Netdata
+Agent.
+
+If you're having issues with configuring the Agent, apply the running configuration to `netdata.conf` by downloading the
+file to the Netdata config directory. Use `sudo` to elevate privileges.
+
+```bash
+wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
+# or
+curl -o /etc/netdata/netdata.conf http://NODE:19999/netdata.conf
+```
+
 ## What's next?
 
-Take advantage of this newfound understanding of node configuration to [add security to your
-node](/docs/configure/secure-nodes.md). We have a few best practices based on how you use the Netdata Agent and Netdata
-Cloud.
+Learn more about [starting, stopping, or restarting](/docs/configure/start-stop-restart.md) the Netdata daemon to apply
+configuration changes.
+
+
+
+[Add security to your node](/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
+and `edit-config`. We put together a few security best practices based on how you use the Netdata.
 
 You can also take what you've learned about node configuration to tweak the Agent's behavior or enable new features:
 
@@ -117,4 +157,10 @@ You can also take what you've learned about node configuration to tweak the Agen
     infrastructure.
 -   Change [the long-term metrics retention period](/docs/store/change-metrics-storage.md) using the database engine.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fnodesa&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+### Related reference documentation
+
+- [Netdata Agent · Daemon](/health/README.md)
+- [Netdata Agent · Health monitoring](/health/README.md)
+- [Netdata Agent · Notifications](/health/notifications/README.md)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fnodes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
