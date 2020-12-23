@@ -20,7 +20,9 @@ static inline void mountinfo_reload(int force) {
 
     if(force || now - last_loaded >= check_for_new_mountpoints_every) {
         // mountinfo_free_all() can be called with NULL disk_mountinfo_root
+        uv_rwlock_wrlock(&disk_mountinfo_lock);
         mountinfo_free_all(disk_mountinfo_root);
+        uv_rwlock_wrunlock(&disk_mountinfo_lock);
 
         // re-read mountinfo in case something changed
         disk_mountinfo_root = mountinfo_read(0);
