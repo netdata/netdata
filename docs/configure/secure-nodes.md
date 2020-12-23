@@ -51,7 +51,7 @@ static-threaded` setting, and change it to `none`.
 ```
 
 Save and close the editor, then [restart your Agent](/docs/configure/start-stop-restart.md) using `sudo systemctl
-netdata restart`. If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
+restart netdata`. If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
 that node no longer serves its local dashboard.
 
 > See the [configuration basics doc](/docs/configure/nodes.md) for details on how to find `netdata.conf` and use

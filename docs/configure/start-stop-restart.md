@@ -20,13 +20,13 @@ collectors and the database engine.
 
 This is the recommended way to start, stop, or restart the Netdata daemon.
 
-- To **start** Netdata, run `sudo systemctl netdata start`.
-- To **stop** Netdata, run `sudo systemctl netdata stop`.
-- To **restart** Netdata, run `sudo systemctl netdata restart`.
+- To **start** Netdata, run `sudo systemctl start netdata`.
+- To **stop** Netdata, run `sudo systemctl stop netdata`.
+- To **restart** Netdata, run `sudo systemctl restart netdata`.
 
 If the above commands fail, or you know that you're using a non-systemd system, try using the `service` command:
 
-- **service**: `sudo service netdata start`, `sudoservice netdata stop`, `sudo service netdata restart`
+- **service**: `sudo service netdata start`, `sudo service netdata stop`, `sudo service netdata restart`
 
 ## Using `netdata`
 
