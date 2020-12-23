@@ -1,414 +1,149 @@
 <!--
 title: "Netdata style guide"
-description: "Learn about Netdata's writing and Markdown standards for documentation and educational content."
+description: "The _Netdata style guide_ establishes editorial guidelines for all of Netdata's writings, including documentation, articles, in-product UX copy, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
 
 # Netdata style guide
 
-This in-progress style guide establishes editorial guidelines for anyone who wants to write documentation for Netdata
-products.
+The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata
+community, including documentation, articles, in-product UX copy, and more. This guide should be used by both internal
+Netdata teams and external contributors to any of Netdata's open-source projects.
 
-## Table of contents
+Netdata's writing should **empower** and **educate**. You want to help people understand Netdata's value, encourage them
+to learn more, and ultimately use Netdata's products to democratize monitoring in their organizations. To achieve those
+goals, your writing should be:
 
--   [Welcome!](#welcome)
--   [Goals of the Netdata style guide](#goals-of-the-Netdata-style-guide)
--   [General principles](#general-principles)
--   [Tone and content](#tone-and-content)
--   [Language and grammar](#language-and-grammar)
--   [Markdown syntax](#markdown-syntax)
--   [Accessibility](#accessibility)
+- **Clear**. Use simple words and sentences. Use strong, direct, and active language that encourages readers to action.
+- **Concise**. Provide solutions and answers as quickly as possible. Give users the information they need right now,
+  along with opportunities to learn more.
+- **Universal**. Think of yourself as a guide who is tasked with giving Netdata users a tour into Netdata's products,
+  features, and capabilities. Write to reach the widest possible audience. 
+- **Authentic**. Be honest about what Netdata can and cannot do, while focusing on our strengths. Emphasize technical
+  accuracy over hard sells and marketing jargon.
+- **Playful**. Be friendly, thoughtful, and engaging. Let your personality and writing style shine.
 
-## Welcome
+You can achieve these goals by reading and adhering to the principles outlined below.
 
-Proper documentation is essential to the success of any open-source project. Netdata is no different. The health of our
-monitoring agent and our community depends on this effort.
+## Tone and voice
 
-We're here to make developers, sysadmins, and DevOps engineers better at their jobs, after all!
+Netdata's writing should be authentic, passionate, playful, and respectful.
 
-We welcome contributions to Netdata's documentation. Begin with the [contributing to documentation
-guide](contributing-documentation.md), followed by this style guide.
+### Authentic
 
-## Goals of the Netdata style guide
+We upfront about who we are, what we can and can’t do, and why we do what we do
+Be honest and direct; take ownership of any issues & address them
+Use buzzwords or jargon, talk down to you, overpromise, hard sell
 
-An editorial style guide establishes standards for writing and maintaining documentation. At Netdata, we focus on the
-following principles:
+### Passionate
 
--   Consistency
--   High-quality writing
--   Conciseness
--   Accessibility
+We are excited about what we do &  want to share it with the world
+Use strong, direct language; be champions, challengers  & cheerleaders; take a position
+Use the passive voice; be lukewarm or wishy-washy; sound like everyone else
 
-These principles will make the documentation better for everyone who wants to use Netdata, whether they're a beginner or
-an expert.
+### Playful
+We take our products, but not ourselves, seriously
+Be friendly, thoughtful, & engaging; challenge the status quo
+Be too casual, obscure, or snarky at someone else’s expense
 
-### Breaking the rules
+### Respectful
 
-None of the rules described in this style guide are absolute. **We welcome rule-breaking if it creates better, more
-accessible documentation.**
-
-But be aware that Netdata staff or community members may ask you to justify your rule-breaking during the PR review
-process.
-
-## General principles
-
-Yes, this style guide is pretty overwhelming! Establishing standards for a global community is never easy.
-
-Let's start with a few key points to start. Where relevant, these points link to more in-depth information about a given
-rule.
-
-**[Tone and content](#tone-and-content)**:
-
--   Be [conversational and friendly](#conversational-and-friendly-tone).
--   Write [concisely](#write-concisely).
--   Don't use words like **here** when [creating hyperlinks](#use-informational-hyperlinks).
--   Don't mention [future releases or features](#mentioning-future-releases-or-features) in the documentation.
-
-**[Language and grammar](#language-and-grammar)**:
-
--   [Capitalize words](#capitalization) at the beginning of sentences, for proper nouns, and at the beginning of
-    document titles and section headers.
--   Use [second person](#second-person)—"you" rather than "we"—when giving instructions.
--   Use [active voice](#active-voice) to make clear who or what is acting.
--   Always employ an [Oxford comma](#oxford-comma) on lists.
-
-**[Markdown syntax](#markdown-syntax)**:
-
--   [Reference UI elements](#references-to-ui-elements) with bold text.
--   Use our [built-in syntax highlighter](#language-specific-syntax-highlighting-in-code-blocks) to improve the
-    readability and usefulness of code blocks.
-
-**[Accessibility](#accessibility)**:
-
--   Include [alt tags on images](#images).
-
----
-
-## Tone and content
-
-Netdata's documentation should be conversational, concise, and informational, without feeling overly formal.
-
-By following a few principles on tone and content we'll ensure more readers from every background and skill level will
-learn as much as possible about Netdata's capabilities.
-
-### Conversational and friendly tone
-
-Netdata's documentation should be conversational and friendly. To borrow from Google's fantastic [developer style
-guide](https://developers.google.com/style/tone):
-
-> Try to sound like a knowledgeable friend who understands what the developer wants to do.
-
-Feel free to let some of your personality show! Documentation can be highly professional without being dry, formal, or
-overly instructive.
-
-### Write concisely
-
-You should always try to use as few words as possible to explain a particular feature, configuration, or process.
-Conciseness leads to more accurate and understandable writing.
-
-### Use informational hyperlinks
-
-Hyperlinks should clearly state its destination. Don't use words like "here" to describe where a link will take your
-reader.
-
-```markdown
-# Not recommended
-To install Netdata, click [here](/packaging/installer/README.md).
-
-# Recommended
-To install Netdata, read our [installation instructions](/packaging/installer/README.md).
-```
-
-In general, guides should include fewer hyperlinks to keep the reader focused on the task at hand. Documentation should
-include as many hyperlinks as necessary to provide meaningful context.
-
-### Avoid words like "easy" or "simple"
-
-Never assume readers of Netdata documentation are experts in Netdata's inner workings or health monitoring/performance
-troubleshooting in general.
-
-If you claim that a task is easy and the reader struggles to complete it, you may inadvertently discourage them.
-
-If you perceive one option to be easier than another, be specific about how and why. For example, don't write,
-"Netdata's one-line installer is the easiest way to install Netdata." Instead, you might want to say, "Netdata's
-one-line installer requires fewer steps than manually installing from source."
-
-### Avoid slang, metaphors, and jargon
-
-A particular word, phrase, or metaphor you're familiar with might not translate well to the other cultures featured
-among Netdata's global community. We recommended you avoid slang or colloquialisms in your writing.
-
-In addition, don't use abbreviations that have not yet been defined in the document. See our section on
-[abbreviations](#abbreviations-acronyms-and-initialisms) for more information.
-
-If you must use industry jargon, such as "white-box monitoring," in a document, define the term as clearly and concisely
-as you can.
-
-> White-box monitoring: Monitoring of a system or application based on the metrics it directly exposes, such as logs.
-
-Avoid emojis whenever possible for the same reasons—they can be difficult to understand immediately and don't translate
-well.
-
-### Mentioning future releases or features
-
-Documentation is meant to describe the product as-is, not as it will be or could be in the future. Netdata documentation
-generally avoids talking about future features or products, even if we know they are inevitable.
-
-An exception can be made for documenting beta features that are subject to change with further development.
-
-## Language and grammar
-
-Netdata's documentation should be consistent in the way it uses certain words, phrases, and grammar. The following
-sections will outline the preferred usage for capitalization, point of view, active voice, and more.
-
-### Capitalization
-
-Follow the general [English standards](https://owl.purdue.edu/owl/general_writing/mechanics/help_with_capitals.html) for
-capitalization. In summary:
-
--   Capitalize the first word of every new sentence.
--   Don't use uppercase for emphasis. (Netdata is the BEST!)
--   Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata,
-    Docker, Apache, NGINX)
--   Avoid camel case (NetData) or all caps (NETDATA).
-
-#### Capitalization of 'Netdata' and 'netdata'
-
-Whenever you refer to the company Netdata, Inc., or the open-source monitoring agent the company develops, capitalize
-**Netdata**.
-
-However, if you are referring to a process, user, or group on a Linux system, you should not capitalize, as by default
-those are typically lowercased. In this case, you should also fence these terms in an inline code block: `` `netdata`
-``.
-
-```markdown
-# Not recommended
-The netdata agent, which spawns the netdata process, is actively maintained by netdata, inc.
-
-# Recommended
-The Netdata Agent, which spawns the `netdata` process, is actively maintained by Netdata, Inc.
-```
-
-#### Capitalization of 'Agent' and 'Cloud'
-
-Netdata is split into two products: the open source monitoring **Agent**, and the closed source web application
-**Cloud**. Because both Agent and Cloud are formal nouns, you should capitalize them.
-
-#### Capitalization of document titles and page headings
-
-Document titles and page headings should use sentence case. That means you should only capitalize the first word.
-
-If you need to use the name of a brand, software, product, and company, capitalize it according to their official
-guidelines.
-
-Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
-
-```markdown
-# Not recommended
-Getting Started Guide
-Service Discovery and Auto-Detection:
-Install netdata with docker
-
-# Recommended
-Getting started guide
-Service discovery and auto-detection
-Install Netdata with Docker
-```
-
-### Second person
-
-When writing documentation, you should use the second person ("you") to give instructions. When using the second person,
-you give the impression that you're personally leading your reader through the steps or tips in question.
-
-See how that works? It's a core part of making Netdata's documentation feel welcoming to all.
-
-Avoid using "we," "I," "let's," and "us" in documentation whenever possible.
-
-The "you" pronoun can also be implied, depending on your sentence structure. 
-
-```markdown
-# Not recommended
-To install Netdata, we should try the one-line installer...
-
-# Recommended
-To install Netdata, you should try the one-line installer...
-
-# Recommended, implied "you"
-To install Netdata, try the one-line installer...
-```
-
-### Active voice
-
-Use active voice instead of passive voice, because the active voice is more concise and easier to understand.
-
-When using voice, the subject of the sentence is action. In passive voice, the subject is acted upon. A famous example
-of passive voice is the phrase "mistakes were made."
-
-```plain
-# Not recommended (passive)
-When an alarm is triggered by a metric, a notification is sent by Netdata...
-
-# Recommended (active)
-When a metric triggers an alarm, Netdata sends a notification...
-```
-
-### Standard American spelling
-
-While the Netdata team is mostly _not_ American, we still aspire to use American spelling whenever possible, as it is
-the standard for the monitoring industry.
-
-### Clause order
-
-If you want to instruct your reader to take some action in a particular circumstance, such as optional steps, the
-beginning of the sentence should indicate that circumstance.
-
-```markup
-# Not recommended
-Read the reference guide if you'd like to learn more about custom dashboards.
-
-# Recommended
-If you'd like to learn more about custom dashboards, read the reference guide.
-```
-
-By placing the circumstance at the beginning of the sentence, readers can immediately know if they want to read more or
-follow a link.
-
-### Oxford comma
-
-The Oxford comma is the comma used after the second-to-last item in a list of three or more items. It appears just
-before "and" or "or."
-
-```markup
-# Not recommended
-Netdata can monitor RAM, disk I/O, MySQL queries per second and lm-sensors.
-
-# Recommended
-Netdata can monitor RAM, disk I/O, MySQL queries per second, and lm-sensors.
-```
-
-### Abbreviations (acronyms and initialisms)
-
-Use abbreviations (including [acronyms and initialisms](https://www.dictionary.com/e/acronym-vs-abbreviation/)) in
-documentation when one exists, when it's widely accepted within the monitoring/sysadmin community, and when it improves
-the readability of a document.
-
-When introducing an abbreviation to a document for the first time, give the reader both the spelled-out version and the
-shortened version at the same time. For example:
-
-```markup
-You can use Netdata to monitor Extended Berkeley Packet Filter (eBPF) metrics in real-time.
-```
-
-After you define an abbreviation, don't switch back and forth—use only the abbreviation for the rest of the document.
-
-You can also use abbreviations in a document's title to keep the title short and relevant. If you do this, you should
-still introduce the spelled-out name alongside the abbreviation as soon as possible.
-
-```markup
-# Monitoring HDFS with Netdata
-
-You can now use Netdata to collect real-time metrics from your Hadoop Distributed File System (HDFS).
-```
-
-## Markdown syntax
-
-The Netdata documentation uses the Markdown syntax for styling and formatting. If you're not familiar with how it works,
-please read the [Markdown introduction post](https://daringfireball.net/projects/markdown/) by its creator, followed by
-[Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub.
-
-You can follow the syntax specified in the above resources for the majority of documents, but the following sections
-specify a few particular use cases.
-
-### Linking between documents
-
-Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader. To
-ensure links function properly on both GitHub and our generated documentation on [Netdata
-Learn](https://learn.netdata.cloud/), links should always reference the full path to the document, beginning at the root
-of the Agent repository (`/`). Links should also always end with the filename of the destination document, ending in the
-`.md` extension.
-
-Avoid relative links or traversing up directories using `../`.
-
-For example, if you want to link to our installation guide, you should link to `/packaging/installer/README.md`. To
-reference the guide for increasing metrics storage, use `/docs/guides/longer-metrics-storage.md`.
-
-### References to UI elements
-
-If you need to instruct your reader to click a user interface (UI) element inside of a Netdata interface, you should
-reference the label text of the link/button with Markdown's (`**bold text**`) tag.
-
-```markdown
-Click on the **Sign in** button.
-```
-
-> ⚠️ Avoid using directional language to orient readers, because not every reader can use instructions like "look at the
-> top-left corner" to find their way around an interface.
-
-If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
-
-### Language-specific syntax highlighting in code blocks
-
-Our documentation site at [learn.netdata.cloud](https://learn.netdata.cloud) uses
-[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
-documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
-and `go`. If no language is specified, Prism tries to guess the language based on its content.
-
-Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C
-code, for example:
-
-````c
-```c
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-````
-
-And the prettified result:
-
-```c
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-
-Prism also supports titles and line highlighting. See the [Docusaurus
-documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
-
-> ⚠️ Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our
-> [documentation site](https://learn.netdata.cloud/). They should be used sparingly and only when necessary.
+We treat you the way you want to be treat
+Give you solutions & answers; honor your trust
+Impede, confuse or frustrate you; break your trust
 
 ## Accessibility
 
-Netdata's documentation should be as accessible as possible to as many people as possible. While the rules about [tone
-and content](#tone-and-content) and [language and grammar](#language-and-grammar) are helpful to an extent, we also need
-some additional rules to improve the reading experience for all readers.
+Don't make assumptions about who the reader is or their
+  level of understanding, education, or experience.
 
-### Images
 
-We have a few rules around using images. Perhaps most importantly, don't use only images to convey instructions. Each
-image should be accompanied by alt text and text-based instructions to ensure that every reader can access the
-information in the best way for them.
 
-#### Alt text
+Universal communication
+Netdata is a global company in every sense, with employees, contributors, and users from around the world. We strive to communicate in a way that is clear and easily understood by everyone.
+Accessible and responsive communication
+We need to ensure that all forms of communication address the needs of our entire community and can serve the broadest possible audience. Responsive, accessible design and communication should be at the core of what we do.
 
-Provide alt text for every image you include in Netdata's documentation. It should summarize the intent and content of
-the image.
+Our products and content will reach a diverse audience of users who will interact with them in different ways and with different devices. Here are some considerations to keep in mind:
 
-In Markdown, use the standard image syntax, `![]()`, and place the alt text between the brackets `[]`. Here's an example
-using our logo:
+Would this language make sense to someone who doesn’t work here?
+Could someone quickly scan this document and understand the material?
+If someone can’t see the colors, images or video, is the message still clear?
+Is the markup clean and structured?
+Mobile devices with accessibility features are increasingly becoming core communication tools, does this work well on them?
+Does this work for red/green color blind individuals?
+Does this work in low light conditions? What about for users with low vision?
 
-```markdown
-![The Netdata logo](../../web/gui/images/netdata-logomark.svg)
-```
+Basic guidelines can help make products and content accessible. Here are some ideas:
 
-#### Images of text
+Always create an information hierarchy with key information presented first and clearly called out to improve scannability.
+Avoid directional language like “sidebar on the right of the page” or “header at the top of the page” since presentation elements may adapt for devices.
+Use consistent form labels and input instructions.
+Use descriptive links rather than “click here” or “learn mo4re”.
+Include alt text for images and image links.
+Make closed captioning available for all videos. Make information in the video available in a text format.
+Aim for high contrast with visual elements. 
+Ensure any information contained within a graphic element is also available as plain text. This is important not just for accessibility, but also for localization.
+Test any product or content on a range of different devices to ensure compatibility and no loss of information or degradation of the user experience.
 
-Don't use images of text, code samples, or terminal output. Instead, put that text content in a code block so that all
-devices can render it clearly and screen readers can parse it.
+Some of these guidelines were adapted from MailChimp under the Creative Commons license.
+
+Translation and localization
+Our users will likely rely on translation by third party applications to interact with our products and content, such as web browsers or live captioning. Therefore, it is important that we keep a few things in mind when developing products and content.
+
+Keep text out of image elements if at all possible. For example, a button on a web page should be rendered using HTML/CSS rather than relying on a PNG or GIF if it contains text so that the web browser can translate it.
+Be mindful that double-byte characters may take up more space than single-byte characters in design elements, subtitling and captioning.
+Avoid idioms that may not be familiar to the user or that may not make sense when translated.
+Avoid local, cultural or historical references that may be unfamiliar to users.
+Prioritize active, direct language; avoid the passive voice.
+
+Unbiased communication
+Netdata has a company culture built on respect, and we extend that respect to our entire community. Here are some guidelines to ensure that we communicate in an unbiased way when we are referring to people:
+
+Avoid referring to someone’s age unless it is directly relevant; likewise, avoid referring to people with age-related descriptors like “young” or “elderly”.
+Avoid disability-related idioms like “lame” or “falling on deaf ears.” Don’t refer to a person’s disability unless it’s directly relevant to what you’re writing.
+Don’t call groups of people “guys.” Don’t call women “girls.”
+Avoid gendered terms in favor of neutral alternatives, like “server” instead of “waitress” and “businessperson” instead of “businessman.”
+It’s OK to use “they” as a singular pronoun.
+When writing about a person, use their communicated pronouns. When in doubt, just ask or use their name.
+When in doubt, leave it out. It is better to remove it if you can’t rephrase it.
+
+Some of these guidelines were adapted from MailChimp under the Creative Commons license.
+
+
+## Language, grammar, and mechanics
+
+## Markdown syntax
+
+### Syntax standards (`remark-lint`)
+
+## Glossary of Netdata terminology and preferred spelling
+
+The following tables describe the standard spelling, capitalization, and usage of common terms found in Netdata's
+writing.
+
+### Netdata-specific terms
+
+| Term                        | Definition                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **claimed node**            | A node that you've proved ownership of by completing the [claiming process](/docs/cloud/get-started#claim-a-node). The claimed node will then appear in your Space and any War Rooms you added it to.                                                                                                                                                                                                                 |
+| **Netdata**                 | The company behind the open-source Netdata Agent and the Netdata Cloud web application. Never use _netdata_ or _NetData_. <br /><br />In general, focus on the user's goals, actions, and solutions rather than what the company provides. For example, write _Learn more about enabling alarm notifications on your preferred platforms_ instead of _Netdata sends alarm notifications to your preferred platforms_. |
+| **Netdata Agent**           | The free and open source [monitoring agent](/docs/agent) that you can install on all of your distributed systems, whether they're physical, virtual, containerized, ephemeral, and more. The Agent monitors systems running Linux, Docker, Kubernetes, macOS, FreeBSD, and more, and collects metrics from hundreds of popular services and applications.                                                             |
+| **Netdata Cloud**           | The web application hosted at [https://app.netdata.cloud](https://app.netdata.cloud) that helps you monitor an entire infrastructure of distributed systems in real time. <br /><br />Never use _Cloud_ without the preceding _Netdata_ to avoid ambiguityq.                                                                                                                                                                                                                                            |
+| **Netdata community**       | Contributors to any of Netdata's [open-source projects](https://learn.netdata.cloud/contribute/projects), members of the [community forum](https://community.netdata.cloud/).                                                                                                                                                                                                                                         |
+| **Netdata community forum** | The Discourse-powered forum for feature requests, Netdata Cloud technical support, and conversations about Netdata's monitoring and troubleshooting products.                                                                                                                                                                                                                                                         |
+| **node**                    | Used to refer to a system on which the Netdata Agent is installed. The system can be physical, virtual, in a Docker container, and more. Depending on your infrastructure, you may have one, dozens, or hundreds of nodes. Some nodes are _ephemeral_, in that they're created/destroyed automatically by a orchestrator service.                                                                                     |
+| **Space**                   | The highest level container within Netdata Cloud for a user to organize their team members and nodes within their infrastructure. A Space likely represents an entire organization or a very large team. <br /><br />_Space_ is always capitalized.                                                                                                                                                                   |
+| **unreachable node**        | A claimed node with a disrupted [Agent-Cloud link](/docs/agent/aclk). Unreachable could mean the node no longer exists or is experiencing network connectivity issues with Cloud.                                                                                                                                                                                                                                     |
+| **visited node**            | A node which has had its Agent dashboard directly visited by a user. A list of these is maintained on a per-user basis.                                                                                                                                                                                                                                                                                               |
+| **War Room**                | A smaller grouping of nodes where users can view key metrics in real-time and monitor the health of many nodes with their alarm status. War Rooms can be used to organize nodes in any way that makes sense for your infrastructure, such as by a service, purpose, physical location, and more.  <br /><br />_War Room_ is always capitalized.                                                                       |
+
+### Other technical terms
+
+| Term                        | Definition                                                                                                                                                                                                   |
+| :-------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| **filesystem**              | Use instead of _file system_.                                                                                                                                                                                |
+| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure in order to find value.                                                                               |
+| **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported collectors. |
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fcontributing%2Fstyle-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
