@@ -16,20 +16,17 @@ the entire Agent.
 Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates
 collectors and the database engine.
 
-## Using `service`, `systemctl`, or `init.d`
+## Using `systemctl`, `service`, or `init.d`
 
 This is the recommended way to start, stop, or restart the Netdata daemon.
 
--   To **start** Netdata, run `sudo service netdata start`.
--   To **stop** Netdata, run `sudo service netdata stop`.
--   To **restart** Netdata, run `sudo service netdata restart`.
+- To **start** Netdata, run `sudo systemctl netdata start`.
+- To **stop** Netdata, run `sudo systemctl netdata stop`.
+- To **restart** Netdata, run `sudo systemctl netdata restart`.
 
-The `service` command is a wrapper script that tries to use your system's preferred method of starting or stopping
-Netdata based on your system. If any of the above commands fail, try using the equivalent commands for `systemd` and
-`init.d`:
+If the above commands fail, or you know that you're using a non-systemd system, try using the `service` command:
 
--   **systemd**: `sudo systemctl start netdata`, `sudo systemctl stop netdata`, `sudo systemctl restart netdata`
--   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
+- **service**: `sudo service netdata start`, `sudoservice netdata stop`, `sudo service netdata restart`
 
 ## Using `netdata`
 
