@@ -9,6 +9,8 @@
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
+static uv_rwlock_t disk_mountinfo_lock;
+static struct mountinfo *disk_mountinfo_busy_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
 
@@ -34,6 +36,7 @@ struct mount_point_metadata {
     int do_inodes;
     int shown_error;
     int updated;
+    int busy;
 
     size_t collected; // the number of times this has been collected
 
@@ -49,6 +52,7 @@ struct mount_point_metadata {
 };
 
 static DICTIONARY *dict_mountpoints = NULL;
+static uv_rwlock_t dict_mountpoints_lock;
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
@@ -84,6 +88,12 @@ int mount_point_cleanup(void *entry, void *data) {
 }
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+    if (mi->busy)
+        return;
+    uv_rwlock_rdlock(&disk_mountinfo_lock);
+    mi->busy = 1;
+    uv_rwlock_rdunlock(&disk_mountinfo_lock);
+
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
@@ -114,8 +124,18 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     }
 
+    uv_rwlock_rdlock(&dict_mountpoints_lock);
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
-    if(unlikely(!m)) {
+    if (likely(m)) {
+        if (m->busy) {
+            uv_rwlock_rdunlock(&dict_mountpoints_lock);
+            return;
+        }
+        m->busy = 1;
+    }
+    uv_rwlock_rdunlock(&dict_mountpoints_lock);
+
+    if (unlikely(!m)) {
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
 
@@ -168,6 +188,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .do_inodes = do_inodes,
                 .shown_error = 0,
                 .updated = 0,
+                .busy = 0,
 
                 .collected = 0,
 
@@ -181,17 +202,19 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_used = NULL,
                 .rd_inodes_reserved = NULL
         };
-
+        uv_rwlock_rdlock(&dict_mountpoints_lock);
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+        m->busy = 1;
+        uv_rwlock_rdunlock(&dict_mountpoints_lock);
     }
 
     m->updated = 1;
 
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
-        return;
+        goto exit;
 
     if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected && m->do_space != CONFIG_BOOLEAN_YES && m->do_inodes != CONFIG_BOOLEAN_YES))
-        return;
+        goto exit;
 
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
@@ -204,7 +227,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             );
             m->shown_error = 1;
         }
-        return;
+        goto exit;
     }
     m->shown_error = 0;
 
@@ -335,6 +358,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if(likely(rendered))
         m->collected++;
+
+exit:
+    mi->busy = 0;
+    m->busy = 0;
 }
 
 static struct loop_thread
@@ -403,6 +430,9 @@ void *diskspace_main(void *ptr) {
         check_for_new_mountpoints_every = update_every;
 
     struct rusage thread;
+
+    fatal_assert(0 == uv_rwlock_init(&disk_mountinfo_lock));
+    fatal_assert(0 == uv_rwlock_init(&dict_mountpoints_lock));
 
     int error = uv_thread_create(&loop_thread.thread, run_event_loop, NULL);
     if (error) {

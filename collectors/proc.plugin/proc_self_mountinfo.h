@@ -44,6 +44,8 @@ struct mountinfo {
 
     dev_t st_dev;           // id of device as given by stat()
 
+    int busy;
+
     struct mountinfo *next;
 };
 

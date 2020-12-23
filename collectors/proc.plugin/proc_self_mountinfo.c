@@ -332,6 +332,8 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             }
         }
 
+        mi->busy = 0;
+
         // link it
         if(unlikely(!root))
             root = mi;
