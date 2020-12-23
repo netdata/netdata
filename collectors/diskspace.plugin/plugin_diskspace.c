@@ -62,7 +62,7 @@ int mount_point_cleanup(void *entry, void *data) {
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
     if(!mp) return 0;
 
-    if(likely(mp->updated)) {
+    if(likely(mp->updated || mp->busy)) {
         mp->updated = 0;
         return 0;
     }
@@ -472,8 +472,11 @@ void *diskspace_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        if(dict_mountpoints)
+        if(dict_mountpoints) {
+            uv_rwlock_wrlock(&dict_mountpoints_lock);
             dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+            uv_rwlock_wrunlock(&dict_mountpoints_lock);
+        }
 
         if(vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
