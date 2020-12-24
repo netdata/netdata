@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add Realtek network cards to the list of physical interfaces on FreeBSD [\#10414](https://github.com/netdata/netdata/pull/10414) ([vlvkobal](https://github.com/vlvkobal))
+- Update main README with release news [\#10412](https://github.com/netdata/netdata/pull/10412) ([joelhans](https://github.com/joelhans))
 - Add centralized Cloud notifications to core docs [\#10374](https://github.com/netdata/netdata/pull/10374) ([joelhans](https://github.com/joelhans))
 
 ## [v1.28.0](https://github.com/netdata/netdata/tree/v1.28.0) (2020-12-18)
@@ -227,8 +229,6 @@
 - Fix HTTP header for the remote write exporting connector [\#9775](https://github.com/netdata/netdata/pull/9775) ([vlvkobal](https://github.com/vlvkobal))
 - Fix broken link in privacy policy [\#9771](https://github.com/netdata/netdata/pull/9771) ([joelhans](https://github.com/joelhans))
 - Fix numerous bugs in duplicate install handling [\#9769](https://github.com/netdata/netdata/pull/9769) ([Ferroin](https://github.com/Ferroin))
-- Add collecting `maxmemory` to `python.d/redis` [\#9767](https://github.com/netdata/netdata/pull/9767) ([ilyam8](https://github.com/ilyam8))
-- Fix unit tests for exporting engine [\#9766](https://github.com/netdata/netdata/pull/9766) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
