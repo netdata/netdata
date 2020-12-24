@@ -105,7 +105,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
     return NULL;
 }
 
-static void mountinfo_free(struct mountinfo *mi) {
+void mountinfo_free(struct mountinfo *mi) {
     freez(mi->root);
     freez(mi->mount_point);
     freez(mi->mount_options);

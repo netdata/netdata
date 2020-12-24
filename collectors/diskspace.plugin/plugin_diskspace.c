@@ -19,9 +19,39 @@ static inline void mountinfo_reload(int force) {
     time_t now = now_realtime_sec();
 
     if(force || now - last_loaded >= check_for_new_mountpoints_every) {
-        // mountinfo_free_all() can be called with NULL disk_mountinfo_root
         uv_rwlock_wrlock(&disk_mountinfo_lock);
-        mountinfo_free_all(disk_mountinfo_root);
+
+        // free mountinfo structures, keep busy mountinfo structures in a separate list
+        struct mountinfo *mi = disk_mountinfo_root;
+        while(mi) {
+            struct mountinfo *curr_mi = mi;
+            mi = mi->next;
+            if (!curr_mi->busy) {
+                mountinfo_free(curr_mi);
+            } else {
+                curr_mi->next = disk_mountinfo_busy_root;
+                disk_mountinfo_busy_root = curr_mi;
+            }
+        }
+
+        // finally remove and free mountinfo structures if they aren't busy anymore
+        mi = disk_mountinfo_busy_root;
+        struct mountinfo *prev_mi = disk_mountinfo_busy_root;
+        while (mi) {
+            struct mountinfo *curr_mi = mi;
+            mi = mi->next;
+            if (curr_mi->busy) {
+                prev_mi = curr_mi;
+            } else {
+                if (curr_mi == disk_mountinfo_busy_root)
+                    disk_mountinfo_busy_root = mi;
+                else
+                    prev_mi->next = mi;
+
+                mountinfo_free(curr_mi);
+            }
+        }
+
         uv_rwlock_wrunlock(&disk_mountinfo_lock);
 
         // re-read mountinfo in case something changed
