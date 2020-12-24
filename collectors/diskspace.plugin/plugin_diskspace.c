@@ -446,6 +446,20 @@ void run_event_loop(void *ptr)
     fatal_assert(0 == uv_loop_close(&loop_thread.loop));
 }
 
+struct work_data {
+    struct mountinfo *mi;
+    int update_every;
+};
+
+void disk_space_stats_work(uv_work_t* req)
+{
+    struct work_data *d = req->data;
+
+    do_disk_space_stats(d->mi, d->update_every);
+
+    free(d);
+}
+
 void *diskspace_main(void *ptr) {
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
@@ -498,7 +512,13 @@ void *diskspace_main(void *ptr) {
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
-            do_disk_space_stats(mi, update_every);
+            struct work_data *d = mallocz(sizeof(struct work_data));
+            d->mi = mi;
+            d->update_every = update_every;
+            mi->work.data = d;
+
+            fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, NULL));
+            // do_disk_space_stats(mi, update_every);
             if(unlikely(netdata_exit)) break;
         }
 
