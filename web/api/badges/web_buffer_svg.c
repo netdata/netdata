@@ -716,7 +716,7 @@ static int html_color_check(const char *str) {
 // or whatever is given as def (without checking - caller responsible to give sensible
 // safely escaped default) as default if it fails
 // in any case this function must always return something we can put directly in XML
-// so no escaping is necessary anymore (with excpetion of default where caller is responsible)
+// so no escaping is necessary anymore (with exception of default where caller is responsible)
 // to give sensible default
 #define BADGE_SVG_COLOR_ARG_MAXLEN 20
 
