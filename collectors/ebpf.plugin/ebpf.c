@@ -801,7 +801,7 @@ static void read_local_addresses()
 }
 
 /**
- * Start Ptherad Variable
+ * Start Pthread Variable
  *
  * This function starts all pthread variables.
  *
