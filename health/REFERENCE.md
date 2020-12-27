@@ -241,7 +241,7 @@ A `calc` is designed to apply some calculation to the values or variables availa
 calculation will be made available at the `$this` variable, overwriting the value from your `lookup`, to use in warning
 and critical expressions.
 
-When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retreived a value from Netdata's
+When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retrieved a value from Netdata's
 database.
 
 You can use `calc` without `lookup` if you are using [other available variables](#variables).
