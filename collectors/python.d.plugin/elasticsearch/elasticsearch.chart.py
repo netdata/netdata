@@ -245,7 +245,7 @@ CHARTS = {
                     'elastic.index_translog_operations', 'area'],
         'lines': [
             ['indices_translog_operations', 'total', 'absolute'],
-            ['indices_translog_uncommitted_operations', 'uncommited', 'absolute']
+            ['indices_translog_uncommitted_operations', 'uncommitted', 'absolute']
         ]
     },
     'index_translog_size': {
@@ -253,7 +253,7 @@ CHARTS = {
                     'elastic.index_translog_size', 'area'],
         'lines': [
             ['indices_translog_size_in_bytes', 'total', 'absolute', 1, 1048567],
-            ['indices_translog_uncommitted_size_in_bytes', 'uncommited', 'absolute', 1, 1048567]
+            ['indices_translog_uncommitted_size_in_bytes', 'uncommitted', 'absolute', 1, 1048567]
         ]
     },
     'index_segments_count': {
