@@ -68,7 +68,7 @@ If no configuration is given, the module will be disabled. Each `update_every` i
 
 Original author: BrainDoctor (github)
 
-The module supports any metrics that are parseable with RegEx. There is no API that gives direct access to the values (AFAIK), so the "workaround" is to parse the HTML output of the ISG.
+The module supports any metrics that are parsable with RegEx. There is no API that gives direct access to the values (AFAIK), so the "workaround" is to parse the HTML output of the ISG.
 
 ### Testing
 
