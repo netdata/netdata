@@ -1492,7 +1492,7 @@ install_apt_get() {
 prompt() {
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode, assuming yes (y)"
-    echo >&2 " > Would have promptedfor ${1} ..."
+    echo >&2 " > Would have prompted for ${1} ..."
     return 0
   fi
 
