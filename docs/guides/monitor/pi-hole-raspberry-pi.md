@@ -107,7 +107,7 @@ walkthrough of all its features. For a more expedited tour, see the [get started
 You need to manually enable Netdata's built-in [temperature sensor
 collector](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/sensors) to start collecting metrics.
 
-> Netdata uses a few plugins to manage its [collectors](/collectors/REFERENCE.md), each using a different lanaguge: Go,
+> Netdata uses a few plugins to manage its [collectors](/collectors/REFERENCE.md), each using a different language: Go,
 > Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
 > other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
 
