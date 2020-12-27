@@ -29,7 +29,7 @@ sudo ./edit-config go.d.conf
 ```
 
 Within this file, you can either disable the orchestrator entirely (`enabled: yes`), or find a specific collector and
-enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata deamon reads it on
+enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata daemon reads it on
 start.
 
 After you make your changes, restart the Agent with `service netdata restart`.
