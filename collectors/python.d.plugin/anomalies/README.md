@@ -161,7 +161,7 @@ local:
 
 In the `anomalies.conf` file you can also define some "custom models" which you can use to group one or more metrics into a single model much like is done by default for the charts you specify. This is useful if you have a handful of metrics that exist in different charts but perhaps are related to the same underlying thing you would like to perform anomaly detection on, for example a specific app or user. 
 
-To define a custom model you would include configuation like below in `anomalies.conf`. By default there should already be some commented out examples in there. 
+To define a custom model you would include configuration like below in `anomalies.conf`. By default there should already be some commented out examples in there. 
 
 `name` is a name you give your custom model, this is what will appear alongside any other specified charts in the `anomalies.probability` and `anomalies.anomaly` charts. `dimensions` is a string of metrics you want to include in your custom model. By default the [netdata-pandas](https://github.com/netdata/netdata-pandas) library used to pull the data from Netdata uses a "chart.a|dim.1" type of naming convention in the pandas columns it returns, hence the `dimensions` string should look like "chart.name|dimension.name,chart.name|dimension.name". The examples below hopefully make this clear.
 
