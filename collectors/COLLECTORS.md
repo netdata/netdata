@@ -511,7 +511,7 @@ the `go.d.plugin`.
 
 ## Third-party collectors
 
-These collectors are developed and maintined by third parties and, unlike the other collectors, are not installed by
+These collectors are developed and maintained by third parties and, unlike the other collectors, are not installed by
 default. To use a third-party collector, visit their GitHub/documentation page and follow their installation procedures.
 
 -   [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls CyberPower UPS data using
