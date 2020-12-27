@@ -141,7 +141,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
     s->name = strdupz(name);
     s->hash = hash;
 
-    // Add it to the current postion
+    // Add it to the current position
     if (slabinfo_root) {
         slabdebug("<-- Creating new slabstruct after %s", slabinfo_last_used->name);
         s->next = slabinfo_last_used->next;
