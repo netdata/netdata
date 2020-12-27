@@ -46,7 +46,7 @@ However, there are cases that auto-detection fails. Usually, the reason is that 
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
-View our [collectors quickstart](/collectors/QUICKSTART.md) for explict details on enabling and configuring collector modules.
+View our [collectors quickstart](/collectors/QUICKSTART.md) for explicit details on enabling and configuring collector modules.
 
 ## Troubleshoot a collector
 

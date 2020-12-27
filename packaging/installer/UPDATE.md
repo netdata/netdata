@@ -118,7 +118,7 @@ installation instructions](/packaging/docker/README.md#create-a-new-netdata-agen
 
 ## macOS
 
-If you installed Netdata on your macOS system using Homebrew, you can explictly request an update:
+If you installed Netdata on your macOS system using Homebrew, you can explicitly request an update:
 
 ```bash
 brew upgrade netdata
