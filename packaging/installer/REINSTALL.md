@@ -11,7 +11,7 @@ Netdata Agent on your node.
 
 Before you try reinstalling Netdata, figure out which [installation method you
 used](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used) if you do not already know. This will
-deterimine the reinstallation method.
+determine the reinstallation method.
 
 ## One-line installer script (`kickstart.sh`)
 
