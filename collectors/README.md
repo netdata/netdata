@@ -32,7 +32,7 @@ guide](/collectors/QUICKSTART.md).
 
 [Monitor Nginx or Apache web server log files with Netdata](/docs/guides/collect-apache-nginx-web-logs.md)
 
-[Monitor CockroadchDB metrics with Netdata](/docs/guides/monitor-cockroachdb.md)
+[Monitor CockroachDB metrics with Netdata](/docs/guides/monitor-cockroachdb.md)
 
 [Monitor Unbound DNS servers with Netdata](/docs/guides/collect-unbound-metrics.md)
 
