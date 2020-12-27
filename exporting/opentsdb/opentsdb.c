@@ -117,7 +117,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 }
 
 /**
- * Copy a label value and substitute underscores in place of charachters which can't be used in OpenTSDB output
+ * Copy a label value and substitute underscores in place of characters which can't be used in OpenTSDB output
  *
  * @param dst a destination string.
  * @param src a source string.
