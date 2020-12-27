@@ -11,7 +11,7 @@ To accurately monitor the health of your systems and applications, you need to k
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 
 
 Netdata comes with hundreds of pre-configured alarms that don't require configuration. They were designed by our
-community of system adminstrators to cover the most important parts of production systems, so, in many cases, you won't
+community of system administrators to cover the most important parts of production systems, so, in many cases, you won't
 need to edit them.
 
 Luckily, Netdata's alarm and notification system are incredibly adaptable to your infrastructure's unique needs.
