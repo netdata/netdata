@@ -142,7 +142,7 @@ local:
     # just the average of all anomaly probabilities at each time step
     include_average_prob: true
 
-    # Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
+    # Define any custom models you would like to create anomaly probabilities for, some examples below to show how.
     # For example below example creates two custom models, one to run anomaly detection user and system cpu for our demo servers
     # and one on the cpu and mem apps metrics for the python.d.plugin.
     # custom_models:
