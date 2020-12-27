@@ -1588,7 +1588,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
+                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;
