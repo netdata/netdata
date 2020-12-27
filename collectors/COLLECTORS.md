@@ -514,7 +514,7 @@ the `go.d.plugin`.
 These collectors are developed and maintined by third parties and, unlike the other collectors, are not installed by
 default. To use a third-party collector, visit their GitHub/documentation page and follow their installation procedures.
 
--   [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls Cyberpower UPS data using
+-   [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls CyberPower UPS data using
     PowerPanel® Personal Linux.
 -   [Logged-in users](https://github.com/veksh/netdata-numsessions): Collect the number of currently logged-on users.
 -   [nim-netdata-plugin](https://github.com/FedericoCeratto/nim-netdata-plugin): A helper to create native Netdata
