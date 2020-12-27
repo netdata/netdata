@@ -2695,7 +2695,7 @@ netdataDashboard.context = {
     },
 
     'boinc.tasks': {
-        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partially processed but suspended.'
     },
 
     'boinc.states': {
