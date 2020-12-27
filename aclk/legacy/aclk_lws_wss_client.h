@@ -8,7 +8,7 @@
 #include "libnetdata/libnetdata.h"
 
 // This is as define because ideally the ACLK at high level
-// can do mosqitto writes and reads only from one thread
+// can do mosquitto writes and reads only from one thread
 // which is cleaner implementation IMHO
 // in such case this mutexes are not necessarry and life
 // is simpler
