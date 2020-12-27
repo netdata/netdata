@@ -89,7 +89,7 @@ to create a new firewall rule.
 #### Amazon Web Services (AWS) / EC2
 
 Sign in to the [AWS console](https://console.aws.amazon.com/) and navigate to the EC2 dashboard. Click on the **Security
-Groups** link in the naviagtion, beneath the **Network & Security** heading. Find the Security Group your instance
+Groups** link in the navigation, beneath the **Network & Security** heading. Find the Security Group your instance
 belongs to, and either right-click on it or click the **Actions** button above to see a dropdown menu with **Edit
 inbound rules**.
 
