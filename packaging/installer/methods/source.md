@@ -64,7 +64,7 @@ Netdata Cloud functionality. To prepare this library for the build system:
     -   Navigating to https://github.com/netdata/mosquitto/releases and
         downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
-3.  If building on a platfom other than Linux, prepare the mosquitto
+3.  If building on a platform other than Linux, prepare the mosquitto
     sources by running `cmake -D WITH_STATIC_LIBRARIES:boolean=YES .` in
     the mosquitto source directory.
 4.  Build mosquitto by running `make -C lib` in the mosquitto source directory.
