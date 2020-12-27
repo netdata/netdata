@@ -9,7 +9,7 @@
 // Hardware counters
 #define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8800
 #define NETDATA_CHART_PRIO_PERF_INSTRUCTIONS          8801
-#define NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS   8802
+#define NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUCTIONS   8802
 #define NETDATA_CHART_PRIO_PERF_CACHE                 8803
 #define NETDATA_CHART_PRIO_PERF_BUS_CYCLES            8804
 #define NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES     8805
@@ -535,7 +535,7 @@ static void perf_send_metrics() {
                    , RRD_TYPE_PERF
                    , "branch_instructions"
                    , RRD_FAMILY_HW
-                   , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS
+                   , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUCTIONS
                    , update_every
                    , PLUGIN_PERF_NAME
             );
