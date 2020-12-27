@@ -4431,7 +4431,7 @@ function runOnceOnDashboardWithjQuery() {
 function finalizePage() {
     // resize all charts - without starting the background thread
     // this has to be done while NETDATA is paused
-    // if we ommit this, the affix menu will be wrong, since all
+    // if we omit this, the affix menu will be wrong, since all
     // the Dom elements are initially zero-sized
     NETDATA.parseDom();
 
