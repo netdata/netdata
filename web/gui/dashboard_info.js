@@ -2844,7 +2844,7 @@ netdataDashboard.context = {
 
     // VM specific
     'vsphere.vm_mem_usage_percentage': {
-        info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
+        info: 'Percentage of used virtual machine “physical” memory: <code>active</code> / <code>virtual machine configured size</code>.'
     },
 
     'vsphere.vm_mem_usage': {
