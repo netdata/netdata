@@ -134,7 +134,7 @@ local:
     diffs_n: 1
 
     # What is the typical proportion of anomalies in your data on average? 
-    # This paramater can control the sensitivity of your models to anomalies. 
+    # This parameter can control the sensitivity of your models to anomalies. 
     # Some discussion here: https://github.com/yzhao062/pyod/issues/144
     contamination: 0.001
 
