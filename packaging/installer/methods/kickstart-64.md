@@ -65,7 +65,7 @@ your installation. Here are a few important parameters:
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing installation is detected, reinstall instead of attempting to update it. Note
-    that this cannot be used to switch betwen installation types.
+    that this cannot be used to switch between installation types.
 -   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths:
     the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force
     kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
