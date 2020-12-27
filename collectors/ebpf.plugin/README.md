@@ -221,7 +221,7 @@ The following options are available:
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address. 
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this
     can be changed with the `ips` setting.
     
 By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
