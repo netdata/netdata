@@ -29,7 +29,7 @@ PREVIOUS_NIGHTLY_COUNT="$(rev <packaging/version | cut -d- -f 2 | rev)"
 
 # If no commits since release, just stop
 if [ "${COMMITS_SINCE_RELEASE}" == "${PREVIOUS_NIGHTLY_COUNT}" ]; then
-	echo "No changes since last nighthly release, nothing else to do"
+	echo "No changes since last nightly release, nothing else to do"
 	exit 0
 fi
 
