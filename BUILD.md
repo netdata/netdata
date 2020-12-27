@@ -349,7 +349,7 @@ We should follow these steps:
 Some smaller miscellaeneous suggestions:
 
 1. Remove the `_Generic` / `strerror_r` config to make the system simpler (use the technique
-   on the blog post to make the standard version re-enterant so that it is thread-safe).
+   on the blog post to make the standard version re-entrant so that it is thread-safe).
 2. Pull in jemalloc by source into the repo if it is our preferred malloc implementation.
 
 # Background
