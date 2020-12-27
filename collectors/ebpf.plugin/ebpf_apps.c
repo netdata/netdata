@@ -470,7 +470,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
 /**
  * Get PID entry
  *
- * Get or allocate the PID entry for the specifid pid.
+ * Get or allocate the PID entry for the specified pid.
  *
  * @param pid the pid to search the data.
  *
