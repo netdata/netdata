@@ -126,7 +126,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
         }
     }
 
-    // Search it from the begining to the last position we used
+    // Search it from the beginning to the last position we used
     for (s = slabinfo_root; s != slabinfo_last_used; s = s->next) {
         if (hash == s->hash && !strcmp(name, s->name)) {
             slabdebug("<-- Found existing slabstruct after root %s", slabinfo_root->name);
