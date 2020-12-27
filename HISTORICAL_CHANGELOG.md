@@ -164,7 +164,7 @@ netdata (1.6.0) - 2017-03-20
 
     1.  number of sensors by state
     2.  number of events in SEL
-    3.  Temperatures CELCIUS
+    3.  Temperatures CELSIUS
     4.  Temperatures FAHRENHEIT
     5.  Voltages
     6.  Currents

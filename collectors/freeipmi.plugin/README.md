@@ -25,7 +25,7 @@ The plugin creates (up to) 8 charts, based on the information collected from IPM
 
 1.  number of sensors by state
 2.  number of events in SEL
-3.  Temperatures CELCIUS
+3.  Temperatures CELSIUS
 4.  Temperatures FAHRENHEIT
 5.  Voltages
 6.  Currents
