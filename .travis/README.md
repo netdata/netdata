@@ -66,7 +66,7 @@ Briefly our activities include:
 
 ## Artifacts validation
 At this point we know our software is building, we need to go through the a set of checks, to guarantee
-that our product meets certain epxectations. At the current stage, we are focusing on basic capabilities
+that our product meets certain expectations. At the current stage, we are focusing on basic capabilities
 like installing in different distributions, running the full lifecycle of install-run-update-install and so on.
 We are still working on enriching this with more and more use cases, to get us closer to achieving full stability of our software.
 Briefly we currently evaluate the following activities:
