@@ -49,7 +49,7 @@ listen_save_replay_forever() {
 
 				if [ ${ret} -eq 0 ]
 					then
-					log "Successfuly sent the metrics to ${real_backend_host}:${real_backend_port}"
+					log "Successfully sent the metrics to ${real_backend_host}:${real_backend_port}"
 					mv "${file}" "${file}.old"
 					touch "${file}"
 				else

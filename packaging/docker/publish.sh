@@ -82,7 +82,7 @@ published() {
 }
 retry 5 published
 
-echo "Image ${TAG} published succesfully!"
+echo "Image ${TAG} published successfully!"
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."
