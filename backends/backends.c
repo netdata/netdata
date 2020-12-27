@@ -420,7 +420,7 @@ void backend_set_graphite_variables(int *default_port,
 /**
  * Select Type
  *
- * Select the backedn type based in the user input
+ * Select the backend type based in the user input
  *
  * @param type is the string that defines the backend type
  *
@@ -455,7 +455,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
 /**
  * Backend main
  *
- * The main thread used to control the backedns.
+ * The main thread used to control the backends.
  *
  * @param ptr a pointer to netdata_static_structure.
  *
