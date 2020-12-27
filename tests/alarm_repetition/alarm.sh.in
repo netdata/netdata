@@ -84,6 +84,6 @@ cp -a netdata.conf_with_repetition netdata.conf
 process_data "ram_with" "I" "activated."
 rm netdata.conf
 
-echo  -e "${GREEN} all the tests were sucessful ${NOCOLOR}"
+echo  -e "${GREEN} all the tests were successful ${NOCOLOR}"
 rm "$HEALTHDIR/ram.conf"
 rm -rf $OUTDIR
