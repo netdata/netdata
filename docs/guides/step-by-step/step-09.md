@@ -143,7 +143,7 @@ Add the following section to the file:
 ```
 
 [Restart](/docs/getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB exporting connector.
-Click on the **Netdata Montioring** menu and check out the **exporting my mongo instance** sub-menu. You should start
+Click on the **Netdata Monitoring** menu and check out the **exporting my mongo instance** sub-menu. You should start
 seeing these charts fill up with data about the exporting process!
 
 ![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
