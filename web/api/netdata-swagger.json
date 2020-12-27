@@ -998,7 +998,7 @@
     "/manage/health": {
       "get": {
         "summary": "Accesses the health management API to control health checks and notifications at runtime.",
-        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenaria, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
+        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenarios, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
         "parameters": [
           {
             "name": "cmd",
