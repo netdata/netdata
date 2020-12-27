@@ -382,7 +382,7 @@ netdata (1.4.0) - 2016-10-04
        cgroups,
        hddtemp,
        sensors,
-       phpfm,
+       phpfpm,
        tc (QoS)
 
  In detail:
@@ -483,7 +483,7 @@ netdata (1.3.0) - 2016-08-28
     -   hddtemp
     -   mysql
     -   nginx
-    -   phpfm
+    -   phpfpm
     -   postfix
     -   sensors
     -   squid
