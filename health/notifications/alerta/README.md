@@ -86,7 +86,7 @@ We can test alarms using the standard approach:
 
 Note: Netdata will send 3 alarms, and because last alarm is "CLEAR"
 you will not see them in main Alerta page, you need to select to see
-"closed" alarma in top-right lookup. A little change in `alarm-notify.sh`
+"closed" alarm in top-right lookup. A little change in `alarm-notify.sh`
 that let us test each state one by one will be useful.
 
 For more information see <https://docs.alerta.io>
