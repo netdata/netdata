@@ -760,7 +760,7 @@ create_netdata_conf() {
       run_ok "New configuration saved for you to edit at ${path}"
     else
       [ -f "${path}.new" ] && rm "${path}.new"
-      run_failed "Cannnot download configuration from netdata daemon using url '${url}'"
+      run_failed "Cannot download configuration from netdata daemon using url '${url}'"
       url=''
     fi
   fi
