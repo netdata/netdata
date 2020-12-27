@@ -55,7 +55,7 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(obj);
     UNUSED(rc);
 
-    info("Connection to cloud estabilished");
+    info("Connection to cloud established");
     aclk_connect();
 
     return;
