@@ -575,7 +575,7 @@ netdata (1.2.0) - 2016-05-16
         20% better performance for the core of netdata.
 
     -   More efficient threads locking in key components
-        contributed to the overal efficiency.
+        contributed to the overall efficiency.
 
 -   netdata now has a CENTRAL REGISTRY !
 
