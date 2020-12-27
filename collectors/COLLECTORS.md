@@ -445,7 +445,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 -   [systemd](/collectors/cgroups.plugin/README.md): Monitor the CPU and memory usage of systemd services using the
     `cgroups.plugin` collector.
 -   [systemd unit states](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/systemdunits): See the 
-    state (active, inactive, activating, deactiviating, failed) of various systemd unit types.
+    state (active, inactive, activating, deactivating, failed) of various systemd unit types.
 -   [System processes](/collectors/proc.plugin/README.md): Collect metrics on system load and total processes running
     using `/proc/loadavg` and the `proc.plugin` collector.
 -   [Uptime](/collectors/proc.plugin/README.md): Monitor the uptime of a system using the `proc.plugin` collector.
