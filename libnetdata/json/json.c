@@ -518,7 +518,7 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
  * @param callback_data additional data to be used together the callback function
  * @param callback_function function used to create a silencer.
  *
- * @return JSON_OK  case everything happend as expected, JSON_CANNOT_PARSE case there were errors in the
+ * @return JSON_OK  case everything happened as expected, JSON_CANNOT_PARSE case there were errors in the
  * parsing procces and JSON_CANNOT_DOWNLOAD case the string given(js) is NULL.
  */
 int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *))
