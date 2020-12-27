@@ -216,7 +216,7 @@ and are developed in a separate repository from the mian Netdata code.
 An installation without these collectors is still usable, but will be
 unable to collect metrics for a number of network services the system
 may be providing. You can either install a pre-built copy of these
-eollectors, or build them locally.
+collectors, or build them locally.
 
 #### Installing the pre-built Go collectors
 
