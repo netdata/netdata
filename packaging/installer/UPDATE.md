@@ -26,7 +26,7 @@ most installations, this is `/etc/netdata`.
 Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.environment`.
 
 -   If the `.environment` file _does not_ exist, reinstall with your [package manager](#deb-or-rpm-packages).
--   If the `.environtment` file _does_ exist, check its contents with `less .environment`.
+-   If the `.environment` file _does_ exist, check its contents with `less .environment`.
     -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
         binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
     -   In all other cases, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
