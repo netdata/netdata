@@ -67,7 +67,7 @@ This module will produce following charts (if data is available):
     -   immediate
     -   waited
 
-6.  **Table Select Join Issuess** in joins/s
+6.  **Table Select Join Issues** in joins/s
 
     -   full join
     -   full range join
@@ -75,7 +75,7 @@ This module will produce following charts (if data is available):
     -   range check
     -   scan
 
-7.  **Table Sort Issuess** in joins/s
+7.  **Table Sort Issues** in joins/s
 
     -   merge passes
     -   range
