@@ -112,7 +112,7 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# charts.d = yes
 ```
 
-By default, most plugins are enabled, so you don't need to enable them explicity to use their collectors. To enable or
+By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
 All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.
