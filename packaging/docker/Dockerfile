@@ -4,7 +4,7 @@
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
 # It is automated in `build.sh` script
 ARG ARCH=amd64
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 FROM netdata/builder:${ARCH} as builder
 
 # One of 'nightly' or 'stable'
@@ -55,7 +55,7 @@ RUN mkdir -p /app/usr/sbin/ \
 
 #####################################################################
 ARG ARCH
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 FROM netdata/base:${ARCH}
 
 # Configure system

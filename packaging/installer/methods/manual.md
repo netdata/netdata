@@ -147,7 +147,7 @@ And install the minimum required dependencies.
 ### CentOS / RHEL 8.x
 
 For CentOS / RHEL 8.x a lot of development packages have moved out into their
-own separate repositories. Some other dependeicies are either missing completely
+own separate repositories. Some other dependencies are either missing completely
 or have to be sourced by 3rd-parties.
 
 CentOS 8.x:

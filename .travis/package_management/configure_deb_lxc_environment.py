@@ -67,7 +67,7 @@ common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-p
 common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
 
 print("3.2 Installing package dependencies within LXC container")
-common.install_common_dependendencies(container)
+common.install_common_dependencies(container)
 
 friendly_version=""
 dest_archive=""

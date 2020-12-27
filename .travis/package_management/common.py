@@ -92,7 +92,7 @@ def prepare_repo(container):
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
 
-def install_common_dependendencies(container):
+def install_common_dependencies(container):
     if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])

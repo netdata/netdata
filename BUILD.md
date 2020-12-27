@@ -57,7 +57,7 @@ cmake -DENABLE_DBENGINE
 
 ### Dependency detection
 
-We have a mixture of soft- and hard-depedencies on libraries. For most of these we expect
+We have a mixture of soft- and hard-dependencies on libraries. For most of these we expect
 `pkg-config` information, for some we manually probe for libraries and include files. We
 should treat all of the external dependencies consistently:
 
