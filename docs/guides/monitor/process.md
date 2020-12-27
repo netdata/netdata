@@ -15,7 +15,7 @@ and performance of your infrastructure.
 One of these layers is the _process_. Every time a Linux system runs a program, it creates an independent process that
 executes the program's instructions in parallel with anything else happening on the system. Linux systems track the
 state and resource utilization of processes using the [`/proc` filesystem](https://en.wikipedia.org/wiki/Procfs), and
-Netdata is designed to hook into those metrics to create meaningul visualizations out of the box.
+Netdata is designed to hook into those metrics to create meaningful visualizations out of the box.
 
 While there are a lot of existing command-line tools for tracking processes on Linux systems, such as `ps` or `top`,
 only Netdata provides dozens of real-time charts, at both per-second and event frequency, without you having to write
