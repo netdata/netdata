@@ -62,7 +62,7 @@ typedef uint32_t storage_number;
 
 #define SN_EXISTS           (1 << 24) // the value exists
 #define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
-#define SN_EXISTS_100       (1 << 26) // very large value (multipler is 100 instead of 10)
+#define SN_EXISTS_100       (1 << 26) // very large value (multiplier is 100 instead of 10)
 
 // extract the flags
 #define get_storage_number_flags(value) ((((storage_number)(value)) & (1 << 24)) | (((storage_number)(value)) & (1 << 25)) | (((storage_number)(value)) & (1 << 26)))

@@ -190,7 +190,7 @@ that is information about lines that begin with `dim`, which affect a chart's di
 You may notice some settings that begin with `dim` beneath the ones defined in the table above. These settings determine
 which dimensions appear on the given chart and how Netdata calculates them.
 
-Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options are `name`, `algorithm`, `multipler`, and `divisor`.
+Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options are `name`, `algorithm`, `multiplier`, and `divisor`.
 
 | Setting      | Function                                                                                                                                                                                                                                                      |
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
