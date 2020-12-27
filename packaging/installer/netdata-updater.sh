@@ -360,7 +360,7 @@ while [ -n "${1}" ]; do
   fi
 done
 
-# Random sleep to aileviate stampede effect of Agents upgrading
+# Random sleep to alleviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
