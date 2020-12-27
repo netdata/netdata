@@ -1554,7 +1554,7 @@ void aclk_single_update_enable()
     aclk_disable_single_updates = 0;
 }
 
-// Trigged by a health reload, sends the alarm metadata
+// Triggered by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
     if (unlikely(aclk_host_initializing(localhost)))
