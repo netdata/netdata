@@ -1428,7 +1428,7 @@ int main(int argc, char **argv) {
 
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
-    // initialyze internal registry
+    // initialize internal registry
     registry_init();
     // fork the spawn server
     spawn_init();
