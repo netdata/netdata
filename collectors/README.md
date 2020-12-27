@@ -40,7 +40,7 @@ guide](/collectors/QUICKSTART.md).
 
 ## Related features
 
-**[Dashboards](/web/README.md)**: Vizualize your newly-collect metrics in real-time using Netdata's [built-in
+**[Dashboards](/web/README.md)**: Visualize your newly-collect metrics in real-time using Netdata's [built-in
 dashboard](/web/gui/README.md). 
 
 **[Backends](/backends/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
