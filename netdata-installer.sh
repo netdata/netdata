@@ -209,7 +209,7 @@ USAGE: ${PROGRAM} [options]
                              are: systemd, interval, crontab
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
-  --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
+  --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
