@@ -252,7 +252,7 @@ Debugging and troubleshooting an application takes a special combination of prac
 Netdata's eBPF metrics to back you up, you can rest assured that you see every minute detail of how your application
 interacts with the Linux kernel.
 
-If you're still trying to wrap your head aroud what we offer, be sure to read up on our accompanying documentation and
+If you're still trying to wrap your head around what we offer, be sure to read up on our accompanying documentation and
 other resources on eBPF monitoring with Netdata:
 
 -   [eBPF collector](/collectors/ebpf.plugin/README.md)
