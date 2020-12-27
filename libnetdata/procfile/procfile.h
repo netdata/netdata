@@ -50,7 +50,7 @@ typedef struct {
     char filename[FILENAME_MAX + 1]; // not populated until profile_filename() is called
 
     uint32_t flags;
-    int fd;               // the file desriptor
+    int fd;               // the file descriptor
     size_t len;           // the bytes we have placed into data
     size_t size;          // the bytes we have allocated for data
     pflines *lines;
