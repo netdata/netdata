@@ -13,7 +13,7 @@ troubleshoot issues with your cluster.
 
 Some k8s providers, like GKE (Google Kubernetes Engine), do deploy clusters bundled with monitoring capabilities, such
 as Google Stackdriver Monitoring. However, these pre-configured solutions might not offer the depth of metrics,
-customization, or integration with your perferred alerting methods. 
+customization, or integration with your preferred alerting methods. 
 
 Without this visibility, it's like you built an entire house and _then_ smashed your way through the finished walls to
 add windows.
