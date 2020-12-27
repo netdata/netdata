@@ -239,7 +239,7 @@ netdata (1.5.0) - 2017-01-22
     Vladimir Kobal (@vlvkobal) has done a magnificent work
     porting netdata to FreeBSD and MacOS.
 
-    Everyhing works: cpu, memory, disks performance, disks space,
+    Everything works: cpu, memory, disks performance, disks space,
     network interfaces, interrupts, IPv4 metrics, IPv6 metrics
     processes, context switches, softnet, IPC queues,
     IPC semaphores, IPC shared memory, uptime, etc. Wow!
