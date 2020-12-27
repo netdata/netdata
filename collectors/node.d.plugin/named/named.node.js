@@ -597,7 +597,7 @@ var named = {
     },
 
     // module.update()
-    // this is called repeatidly to collect data, by calling
+    // this is called repeatedly to collect data, by calling
     // netdata.serviceExecute()
     update: function(service, callback) {
         service.execute(function(serv, data) {
