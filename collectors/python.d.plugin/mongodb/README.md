@@ -80,7 +80,7 @@ Number of charts depends on mongodb version, storage engine and other features (
 13. **Cache metrics** (WiredTiger):
 
     -   percentage of bytes currently in the cache (amount of space taken by cached data)
-    -   percantage of tracked dirty bytes in the cache (amount of space taken by dirty data)
+    -   percentage of tracked dirty bytes in the cache (amount of space taken by dirty data)
 
 14. **Pages evicted from cache** (WiredTiger):
 
