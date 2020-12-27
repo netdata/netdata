@@ -9,7 +9,7 @@ static struct engine *engine = NULL;
  *
  * Clean all variables allocated inside engine structure
  *
- * @param en a pointer to the strcuture that will be cleaned.
+ * @param en a pointer to the structure that will be cleaned.
  */
 static void exporting_clean_engine()
 {
