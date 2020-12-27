@@ -812,7 +812,7 @@ paths:
         you to disable health checks completely, silence alarm notifications, or
         Disable/Silence specific alarms that match selectors on alarm/template
         name, chart, context, host and family. For the simple disable/silence
-        all scenaria, only the cmd parameter is required. The other parameters
+        all scenarios, only the cmd parameter is required. The other parameters
         are used to define alarm selectors. For more information and examples,
         refer to the netdata documentation.
       parameters:
