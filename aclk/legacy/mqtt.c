@@ -170,7 +170,7 @@ static int _mqtt_create_connection(char *username, char *password)
 
     int rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
-        error("Failed to tune the thread model for libmoquitto (%s)", mosquitto_strerror(rc));
+        error("Failed to tune the thread model for libmosquitto (%s)", mosquitto_strerror(rc));
 
 #if defined(LIBMOSQUITTO_VERSION_NUMBER) >= 1006000
     rc = mosquitto_int_option(mosq, MQTT_PROTOCOL_V311, 0);
