@@ -79,7 +79,7 @@ Input
       * PARSER_RC_ERROR -- Callback failed, exit
 
 Output
-- The correspoding keyword and callback will be registered
+- The corresponding keyword and callback will be registered
   
 Returns
 - 0 maximum callbacks already registered for this keyword
