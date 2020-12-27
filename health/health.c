@@ -523,7 +523,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
-static inline int check_if_resumed_from_suspention(void) {
+static inline int check_if_resumed_from_suspension(void) {
     static usec_t last_realtime = 0, last_monotonic = 0;
     usec_t realtime = now_realtime_usec(), monotonic = now_monotonic_usec();
     int ret = 0;
@@ -649,7 +649,7 @@ void *health_main(void *ptr) {
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
-        if (unlikely(check_if_resumed_from_suspention())) {
+        if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = 1;
 
             info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension.",
