@@ -452,7 +452,7 @@ paths:
             format: any text
         - name: text_color_lbl
           in: query
-          description: Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
@@ -474,7 +474,7 @@ paths:
                 format: ^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$
         - name: text_color_val
           in: query
-          description: Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
+          description: Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.
           required: false
           allowEmptyValue: true
           schema:
