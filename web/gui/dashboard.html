@@ -601,7 +601,7 @@ Unfortunatelly, Morris Charts are very slow. Here we force them to lower their d
 C3 charts are not usable in large scale. They suffer from the following issues:
 <ul>
  <li>extreme use of transitions (implemented with D3 instead of CSS, meaning they are javascript rendered) that cannot be disabled - even opacity is hardcoded in the javascript library</li>
- <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becomimg useless if more than 500 points are drawn</li>
+ <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becoming useless if more than 500 points are drawn</li>
  <li>lack of a <code>raw</code> data format, so every time a chart is updated, data convertion in javascript is required</li>
  <li>lack of <code>stacked</code> charts support</li>
 </ul>
