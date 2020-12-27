@@ -287,7 +287,7 @@ Now you update the list of certificates running the following, again either as `
 ```
 
 > Some Linux distributions have different methods of updating the certificate list. For more details, please read this
-> guide on [addding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
+> guide on [adding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
 
 Once you update your certificate list, you can set the stream parameters for Netdata to trust the parent certificate. Open `stream.conf` for editing and change the following lines:
 
