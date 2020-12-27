@@ -222,7 +222,7 @@ configure any of these collectors according to your setup and infrastructure.
 -   [ISC DHCP (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/isc_dhcpd): Reads a
     `dhcpd.leases` file and collects metrics on total active leases, pool active leases, and pool utilization.
 -   [ISC DHCP (Python)](/collectors/python.d.plugin/isc_dhcpd/README.md): Reads `dhcpd.leases` file and reports DHCP
-    pools utiliation and leases statistics (total number, leases per pool).
+    pools utilization and leases statistics (total number, leases per pool).
 -   [OpenLDAP](/collectors/python.d.plugin/openldap/README.md): Provides statistics information from the OpenLDAP
     (`slapd`) server.
 -   [NSD](/collectors/python.d.plugin/nsd/README.md): Monitor nameserver performance metrics using the `nsd-control`
