@@ -426,7 +426,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
 
     // Callback servicing is forced when we are closed from above.
     if (engine_instance->upstream_reconnect_request) {
-        error("Closing lws connectino due to libmosquitto error.");
+        error("Closing lws connection due to libmosquitto error.");
         char *upstream_connection_error = "MQTT protocol error. Closing underlying wss connection.";
         lws_close_reason(
             wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, (unsigned char *)upstream_connection_error,
