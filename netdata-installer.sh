@@ -249,7 +249,7 @@ If you also need to provide different LDFLAGS, use something like this:
 
   LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
 
-or use the following if both LDFLAGS and CFLAGS need to be overriden:
+or use the following if both LDFLAGS and CFLAGS need to be overridden:
 
   CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
 
