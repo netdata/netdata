@@ -20,7 +20,7 @@ the alert, directly to the chart that it triggered on.
 
 ## configuration
 
-To use this, you will need a Prowl API key, which can be rquested through
+To use this, you will need a Prowl API key, which can be requested through
 the Prowl website after registering.
 
 Once you have an API key, simply specify that as a recipient for Prowl
