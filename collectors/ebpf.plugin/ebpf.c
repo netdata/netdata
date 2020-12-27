@@ -225,7 +225,7 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); // Sleep 200 miliseconds to father dies.
+            sleep_usec(200000); // Sleep 200 milliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
