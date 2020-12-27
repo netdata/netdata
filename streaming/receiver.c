@@ -123,7 +123,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     if(strcmp(words[1], host->machine_guid)) {
         error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewehere else
+        return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
     rrdhost_aclk_state_lock(host);
