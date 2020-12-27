@@ -69,7 +69,7 @@ Sample output:
 ```json
 {
 "cmdline": ["./expvar-demo-binary"],
-"memstats": {"Alloc":630856,"TotalAlloc":630856,"Sys":3346432,"Lookups":27, <ommited for brevity>}
+"memstats": {"Alloc":630856,"TotalAlloc":630856,"Sys":3346432,"Lookups":27, <omitted for brevity>}
 }
 ```
 
