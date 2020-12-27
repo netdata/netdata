@@ -324,7 +324,7 @@ Netdata supports a number of chart libraries. The default chart library is
 Each chart library has a number of specific settings. To learn more about them,
 you should investigate the documentation of the given chart library, or visit
 the appropriate JavaScript file that defines the library's options. These files
-are concatenated into the monolithin `dashboard.js` for deployment.
+are concatenated into the monolithic `dashboard.js` for deployment.
 
 -   [Dygraph](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L2034)
 -   [d3](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L4095)
