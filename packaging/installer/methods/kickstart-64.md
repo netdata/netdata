@@ -37,7 +37,7 @@ The `kickstart.sh` script does the following after being downloaded and run:
     added.
 -   Installs `netdata-updater.sh` to `cron.daily` to enable automatic updates, unless you added the `--no-updates`
     option.
--   Prints a message about whether the insallation succeeded for failed for QA purposes.
+-   Prints a message about whether the installation succeeded for failed for QA purposes.
 
 If your shell fails to handle the above one-liner, you can download and run the `kickstart-static64.sh` script manually.
 

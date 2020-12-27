@@ -188,7 +188,7 @@ Cloud](https://user-images.githubusercontent.com/1153921/94497340-c1f49880-01ab-
 ## Update/reinstall the Netdata Helm chart
 
 If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata`
-with the name of the release, if you changed it upon installtion:
+with the name of the release, if you changed it upon installation:
 
 ```bash
 helm upgrade netdata netdata/netdata
