@@ -819,7 +819,7 @@ struct rrdhost {
     char *health_default_exec;                      // the full path of the alarms notifications program
     char *health_default_recipient;                 // the default recipient for all alarms
     char *health_log_filename;                      // the alarms event log filename
-    size_t health_log_entries_written;              // the number of alarm events writtern to the alarms event log
+    size_t health_log_entries_written;              // the number of alarm events written to the alarms event log
     FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
     uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
