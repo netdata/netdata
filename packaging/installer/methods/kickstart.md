@@ -56,7 +56,7 @@ installation. Here are a few important parameters:
 
 ## Verify script integrity
 
-To use `md5sum` to verify the intregity of the `kickstart.sh` script you will download using the one-line command above,
+To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
 run the following:
 
 ```bash
