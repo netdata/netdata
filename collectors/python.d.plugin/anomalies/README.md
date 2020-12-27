@@ -194,7 +194,7 @@ sudo su -s /bin/bash netdata
 /usr/libexec/netdata/plugins.d/python.d.plugin anomalies debug trace nolock
 ```
 
-## Deepdive turorial
+## Deepdive tutorial
 
 If you would like to go deeper on what exactly the anomalies collector is doing under the hood then check out this [deepdive tutorial](https://github.com/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) in our community repo where you can play around with some data from our demo servers (or your own if its accessible to you) and work through the calculations step by step.
 
