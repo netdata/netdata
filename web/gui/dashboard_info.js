@@ -3396,7 +3396,7 @@ netdataDashboard.context = {
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
