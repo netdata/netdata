@@ -62,7 +62,7 @@ Netdata Cloud functionality. To prepare this library for the build system:
     of `packaging/mosquitto.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
     -   Navigating to https://github.com/netdata/mosquitto/releases and
-        donwloading and unpacking the source code archive for that release.
+        downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  If building on a platfom other than Linux, prepare the mosquitto
     sources by running `cmake -D WITH_STATIC_LIBRARIES:boolean=YES .` in
@@ -89,7 +89,7 @@ library for the build system:
     of `packaging/libwebsockets.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
     -   Navigating to https://github.com/warmcat/libwebsockets/releases and
-        donwloading and unpacking the source code archive for that release.
+        downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the libweboskcets sources by running `cmake -D
     LWS_WITH_SOCKS5:bool=ON .` in the libwebsockets source directory.
@@ -112,7 +112,7 @@ you can do the following to prepare a copy for the build system:
 1.  Verify the tag that Netdata expects to be used by checking the contents
     of `packaging/jsonc.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/json-c/json-c and donwloading
+    -   Navigating to https://github.com/json-c/json-c and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the JSON-C sources by running `cmake -DBUILD_SHARED_LIBS=OFF .`
@@ -201,7 +201,7 @@ NPM. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/dashboard.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/dashboard and donwloading
+    -   Navigating to https://github.com/netdata/dashboard and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `npm install` in the dashboard source tree.
@@ -246,7 +246,7 @@ newer. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/go.d.plugin and donwloading
+    -   Navigating to https://github.com/netdata/go.d.plugin and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `make` in the go.d.plugin source tree.
