@@ -1888,7 +1888,7 @@ netdataDashboard.context = {
     },
 
     'beanstalk.connections_rate': {
-        info: 'Tthe rate of connections opened to beanstalkd.'
+        info: 'The rate of connections opened to beanstalkd.'
     },
 
     'beanstalk.commands_rate': {
