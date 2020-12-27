@@ -21,7 +21,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     altogether, run health checks more or less often, and more. See [daemon
     configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
--   The individual `.conf` files in `health.d/`. These health entitiy files are organized by the type of metric they are
+-   The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
