@@ -76,7 +76,7 @@ following:
 </html>
 ```
 
-Try visiting `http://HOST:19999/custom-dashbord.html` in your browser.
+Try visiting `http://HOST:19999/custom-dashboard.html` in your browser.
 
 If you get a blank page with this text: `Access to file is not permitted: /usr/share/netdata/web/custom-dashboard.html`.
 You can fix this error by changing the dashboard file's permissions to make it owned by the `netdata` user.

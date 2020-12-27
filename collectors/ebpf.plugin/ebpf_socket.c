@@ -579,7 +579,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -615,7 +615,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */

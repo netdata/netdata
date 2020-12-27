@@ -366,7 +366,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param charttype the chart type
  * @param order     the chart order
  */
@@ -419,7 +419,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param type   the chart type
  * @param id     the chart id
  * @param units   the axis label
- * @param family the group name used to attach the chart on dashaboard
+ * @param family the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  * @param ncd    a pointer to a function called to create dimensions
  * @param move   a pointer for a structure that has the dimensions
