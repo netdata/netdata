@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Send notifications to StackPulse
 
-[StackPulse](https://stackpulse.com/) is a software-as-a-service platform for site reliablility engineering.
+[StackPulse](https://stackpulse.com/) is a software-as-a-service platform for site reliability engineering.
 It helps SREs, DevOps Engineers and Software Developers reduce toil and alert fatigue while improving reliability of 
 software services by managing, analyzing and automating incident response activities.
 
