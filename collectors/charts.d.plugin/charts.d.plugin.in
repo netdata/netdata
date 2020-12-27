@@ -345,7 +345,7 @@ float2int() {
 	[ -z "${a}" ] && a="0"
 
 	# strip leading zeros from the integer part
-	# base 10 convertion
+	# base 10 conversion
 	a=$((10#$a))
 
 	# check the length of the decimal part
@@ -361,7 +361,7 @@ float2int() {
 	fi
 
 	# strip leading zeros from the decimal part
-	# base 10 convertion
+	# base 10 conversion
 	b=$((10#$b))
 
 	# store the result
