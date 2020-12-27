@@ -49,7 +49,7 @@ static int netdata_priority = 100004;
 http_t *http; // connection to the cups daemon
 
 /*
- * Used to aggregate job metrics for a destination (and all destianations).
+ * Used to aggregate job metrics for a destination (and all destinations).
  */
 struct job_metrics {
     int is_collected; // flag if this was collected in the current cycle
