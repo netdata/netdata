@@ -652,7 +652,7 @@ static void aclk_graceful_disconnect()
 
     aclk_shutting_down = 1;
     _link_shutdown();
-    aclk_lws_wss_mqtt_layer_disconect_notif();
+    aclk_lws_wss_mqtt_layer_disconnect_notif();
 
     write_q = 1;
     event_loop_timeout = now_realtime_sec() + 5;

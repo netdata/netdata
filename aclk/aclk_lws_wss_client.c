@@ -601,7 +601,7 @@ void aclk_lws_wss_service_loop()
 // in case the MQTT connection disconnect while lws transport is still operational
 // we should drop connection and reconnect
 // this function should be called when that happens to notify lws of that situation
-void aclk_lws_wss_mqtt_layer_disconect_notif()
+void aclk_lws_wss_mqtt_layer_disconnect_notif()
 {
     if (!engine_instance)
         return;

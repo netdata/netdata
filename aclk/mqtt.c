@@ -75,7 +75,7 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     }
     aclk_disconnect();
 
-    aclk_lws_wss_mqtt_layer_disconect_notif();
+    aclk_lws_wss_mqtt_layer_disconnect_notif();
 
     return;
 }
