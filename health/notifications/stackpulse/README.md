@@ -18,7 +18,7 @@ Sending Netdata alarm notifications to StackPulse allows you to create smart aut
 -   Performing triage actions and analyzing their results
 -   Orchestrating incident management and notification flows
 -   Performing automatic and semi-automatic remediation actions
--   Analzying incident data and remediation patterns to improve reliability of your services
+-   Analyzing incident data and remediation patterns to improve reliability of your services
 
 To send the notification you need:
 
