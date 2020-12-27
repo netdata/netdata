@@ -251,7 +251,7 @@ newer. Once you have the required tools, do the following:
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `make` in the go.d.plugin source tree.
 4.  Copy `bin/godplugin` to `/usr/libexec/netdata/plugins.d` or th
-    eequivalent location for your build of Netdata and rename it to
+    equivalent location for your build of Netdata and rename it to
     `go.d.plugin`.
 5.  Copy the contents of the `config` directory to `/etc/netdata` or the
     equivalent location for your build of Netdata.
