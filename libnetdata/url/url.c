@@ -68,7 +68,7 @@ char url_percent_escape_decode(char *s) {
  *
  * @param c is the utf8 character
  *  *
- * @return It reurns the length of the specific character.
+ * @return It returns the length of the specific character.
  */
 char url_utf8_get_byte_length(char c) {
     if(!IS_UTF8_BYTE(c))
