@@ -218,7 +218,7 @@ static int aclk_handle_version_response(struct aclk_request *cloud_to_agent, cha
 
     if (unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
         error(
-            "Unsuported version of \"version\" message from cloud. Expected %d, Got %d",
+            "Unsupported version of \"version\" message from cloud. Expected %d, Got %d",
             ACLK_VERSION_NEG_VERSION,
             cloud_to_agent->version);
         return 1;
