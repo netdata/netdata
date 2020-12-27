@@ -132,7 +132,7 @@ sudo ./edit-config apps_groups.conf
 
 Inside the file are lists of process names, oftentimes using wildcards (`*`), that the Netdata Agent looks for and
 groups together. For example, the Netdata Agent looks for processes starting with `mysqld`, `mariad`, `postgres`, and
-others, and groups them into `sql`. That makes sense, since all these procesess are for SQL databases.
+others, and groups them into `sql`. That makes sense, since all these processes are for SQL databases.
 
 ```conf
 sql: mysqld* mariad* postgres* postmaster* oracle_* ora_* sqlservr
@@ -274,7 +274,7 @@ piece of data needed to discover the root cause of an incident. See our [collect
 setup](/docs/collect/enable-configure.md) doc for details.
 
 [Create new dashboards](/docs/visualize/create-dashboards.md) in Netdata Cloud using charts from `apps.plugin`,
-`ebpf.plugin`, and application-specific collectors to build targeted dashboards for monitoring key procesess across your
+`ebpf.plugin`, and application-specific collectors to build targeted dashboards for monitoring key processes across your
 infrastructure.
 
 Try running [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) on a node that's
