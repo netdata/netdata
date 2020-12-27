@@ -53,7 +53,7 @@ size` and `dbengine multihost disk space`.
 
 `page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing.
 `dbengine multihost disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing
-compressed metrics. The default settings retain about two day's worth of metris on a system collecting 2,000 metrics
+compressed metrics. The default settings retain about two day's worth of metrics on a system collecting 2,000 metrics
 every second.
 
 [**See our database engine
