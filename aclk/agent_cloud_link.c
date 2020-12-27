@@ -936,7 +936,7 @@ static void aclk_try_to_connect(char *hostname, int port)
 {
     int rc;
 
-// this is usefull for developers working on ACLK
+// this is useful for developers working on ACLK
 // allows connecting agent to any MQTT broker
 // for debugging, development and testing purposes
 #ifndef ACLK_DISABLE_CHALLENGE
