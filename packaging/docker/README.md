@@ -15,7 +15,7 @@ Starting with v1.12, Netdata collects anonymous usage information by default and
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
 ## Limitations running the Agent in Docker
