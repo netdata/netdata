@@ -187,14 +187,14 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
         if (simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
             if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, st->name) || !strcmp(rrdc->chart, st->id)) {
-                char *usename = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rd->name, strlen(rd->name));
-                if (usename) {
-                    if(rrdcalc_exists(host, st->name, usename, 0, 0)){
-                        freez(usename);
+                char *username = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rd->name, strlen(rd->name));
+                if (username) {
+                    if(rrdcalc_exists(host, st->name, username, 0, 0)){
+                        freez(username);
                         continue;
                     }
 
-                    RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, usename, rd->name);
+                    RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, username, rd->name);
                     if (child) {
                         rrdcalc_add_to_host(host, child);
                         RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)child);
