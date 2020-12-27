@@ -229,7 +229,7 @@ we officially support. To use one of these:
     required release, and download the `go.d.plugin-*.tar.gz` file
     for your system type and CPu architecture and the `config.tar.gz`
     configuration file archive.
-3.  Extract the `go.d.plugin-*.tar.gz` archive into a temprary
+3.  Extract the `go.d.plugin-*.tar.gz` archive into a temporary
     location, and then copy the single file in the archive to
     `/usr/libexec/netdata/plugins.d` or the equivalent location for your
     build of Netdata and rename it to `go.d.plugin`.

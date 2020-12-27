@@ -68,7 +68,7 @@ if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
   if _cannot_use_tmpdir /tmp; then
     if _cannot_use_tmpdir "${PWD}"; then
       echo >&2
-      echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+      echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
       exit 1
     else
       TMPDIR="${PWD}"
