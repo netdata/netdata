@@ -10,7 +10,7 @@ performance of their web servers, and Netdata is taking important steps to make 
 
 By parsing web server log files with Netdata, and seeing the volume of redirects, requests, or server errors over time,
 you can better understand what's happening on your infrastructure. Too many bad requests? Maybe a recent deploy missed a
-few small SVG icons. Too many requsests? Time to batten down the hatches—it's a DDoS.
+few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
 Netdata has been capable of monitoring web log files for quite some time, thanks for the [weblog python.d
 module](/collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that effort
