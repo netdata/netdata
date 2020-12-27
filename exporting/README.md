@@ -234,7 +234,7 @@ Configure individual connectors and override any global settings with the follow
 
 -   `prefix = Netdata`, is the prefix to add to all metrics.
 
--   `update every = 10`, is the number of seconds between sending data to the external datanase. Netdata will add some
+-   `update every = 10`, is the number of seconds between sending data to the external database. Netdata will add some
     randomness to this number, to prevent stressing the external server when many Netdata servers send data to the same
     database. This randomness does not affect the quality of the data, only the time they are sent.
 
