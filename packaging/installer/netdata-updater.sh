@@ -215,7 +215,7 @@ parse_version() {
   r="${1}"
   if echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
-    # XXX: Need a regex group subsitutation here.
+    # XXX: Need a regex group substitution here.
     r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
   fi
 
