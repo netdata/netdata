@@ -141,7 +141,7 @@ EOF
 
 release2lsb_release() {
   # loads the given /etc/x-release file
-  # this file is normaly a single line containing something like
+  # this file is normally a single line containing something like
   #
   # X Linux release 1.2.3 (release-name)
   #
