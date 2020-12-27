@@ -58,7 +58,7 @@ while [ "${1}" ]; do
 done
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemtry"
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
 
 deleted_stock_configs=0
