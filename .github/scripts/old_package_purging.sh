@@ -2,7 +2,7 @@
 #
 # Script to handle package cloud retention policy
 # Our open source subscription is limited,
-# so we use this sript to control the number of packages maintained historically
+# so we use this script to control the number of packages maintained historically
 #
 # Dependencies:
 # - PACKAGE_CLOUD_RETENTION_DAYS
