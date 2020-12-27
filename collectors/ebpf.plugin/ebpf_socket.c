@@ -1700,7 +1700,7 @@ static void clean_allocated_socket_plot()
 }
 
 /**
- * Clean netowrk ports allocated during initializaion.
+ * Clean netowrk ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
  */

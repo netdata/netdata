@@ -2840,7 +2840,7 @@ function initializeDynamicDashboardWithData(data) {
     }
 }
 
-// an object to keep initilization configuration
+// an object to keep initialization configuration
 // needed due to the async nature of the XSS modal
 var initializeConfig = {
     url: null,
