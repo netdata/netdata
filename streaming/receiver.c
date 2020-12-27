@@ -30,7 +30,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
-        // the host pointer as it is unpredicable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
+        // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
             rpt->exited = 1;
             return;
