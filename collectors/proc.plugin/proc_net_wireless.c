@@ -48,7 +48,7 @@ static struct netwireless {
     const char *chart_family;
 
     // charts
-    // satus
+    // status
     RRDSET *st_status;
 
     // Quality
