@@ -6,7 +6,7 @@ Usage
 
 1. Define a structure that will be used to share user state across calls 
 1. Initialize the parser using `parser_init`
-2. Register keywords and assosiated callback function using `parser_add_keyword`
+2. Register keywords and associated callback function using `parser_add_keyword`
 3. Register actions on the keywords 
 4. Start a loop until EOF
    1.  Fetch the next line using `parser_next`
@@ -83,7 +83,7 @@ Output
   
 Returns
 - 0 maximum callbacks already registered for this keyword
-- > 0 which is the number of callbacks assosiated with this keyword.
+- > 0 which is the number of callbacks associated with this keyword.
 
    
 ----
