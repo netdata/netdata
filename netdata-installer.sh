@@ -238,7 +238,7 @@ USAGE: ${PROGRAM} [options]
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
