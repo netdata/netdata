@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 # Prowl
 
 [Prowl](https://www.prowlapp.com/) is a push notification service for iOS devices.  Netdata
-supprots delivering notifications to iOS devices through Prowl.
+supports delivering notifications to iOS devices through Prowl.
 
 Because of how Netdata integrates with Prowl, there is a hard limit of
 at most 1000 notifications per hour (starting from the first notification
