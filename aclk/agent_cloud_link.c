@@ -1210,7 +1210,7 @@ exited:
     /*
      * this must be last -> if all static threads signal
      * THREAD_EXITED rrdengine will dealloc the RRDSETs
-     * and RRDDIMs that are used by still runing stat thread.
+     * and RRDDIMs that are used by still running stat thread.
      * see netdata_cleanup_and_exit() for reference
      */
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
