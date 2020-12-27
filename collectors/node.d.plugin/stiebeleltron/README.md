@@ -40,7 +40,7 @@ The charts are configurable, however, the provided default configuration collect
     -   Heat circuit 1 room temperature in C (set/actual)
     -   Heat circuit 2 room temperature in C (set/actual)
 
-5.  **Eletric Reheating**
+5.  **Electric Reheating**
 
     -   Dual Mode Reheating temperature in C (hot water/heating)
 
