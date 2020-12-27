@@ -21,7 +21,7 @@ It produces the following charts:
 1.  **Syscall R/Ws** in kilobytes/s
 
     -   sendfile
-    -   recvfle
+    -   recvfile
 
 2.  **Smb2 R/Ws** in kilobytes/s
 
