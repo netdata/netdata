@@ -247,7 +247,7 @@ metrics](https://user-images.githubusercontent.com/1153921/101411810-d08fb800-38
 
 ### Using Netdata's eBPF collector (`ebpf.plugin`)
 
-Netdata's eBPF collector puts its charts in two places. Of most imporance to process monitoring are the **ebpf file**,
+Netdata's eBPF collector puts its charts in two places. Of most importance to process monitoring are the **ebpf file**,
 **ebpf syscall**, **ebpf process**, and **ebpf net** sub-sections under **Applications**, shown in the above screenshot.
 
 For example, running the above workload shows the entire "story" how MySQL interacts with the Linux kernel to open
