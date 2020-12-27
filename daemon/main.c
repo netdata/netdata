@@ -915,7 +915,7 @@ int main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
-    // parse depercated options
+    // parse deprecated options
     // TODO: Remove this block with the next major release.
     {
         i = 1;
