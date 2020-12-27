@@ -91,7 +91,7 @@ library for the build system:
     -   Navigating to https://github.com/warmcat/libwebsockets/releases and
         downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
-3.  Prepare the libweboskcets sources by running `cmake -D
+3.  Prepare the libwebsockets sources by running `cmake -D
     LWS_WITH_SOCKS5:bool=ON .` in the libwebsockets source directory.
 4.  Build libwebsockets by running `make` in the libwebsockets source
     directory.
