@@ -290,7 +290,7 @@ dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 
 `pattern` is a keyword. When set, `METRIC` is expected to be a Netdata simple pattern that will be used to match all the statsd metrics to be added to the chart. So, `pattern` automatically matches any number of statsd metrics, all of which will be added as separate chart dimensions.
 
-`TYPE`, `MUTLIPLIER`, `DIVIDER` and `OPTIONS` are optional.
+`TYPE`, `MULTIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 
 `TYPE` can be:
 
