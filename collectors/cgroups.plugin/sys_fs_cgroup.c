@@ -1457,7 +1457,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     }
 
     if(user_configurable) {
-        // allow the user to enable/disable this individualy
+        // allow the user to enable/disable this individually
         char option[FILENAME_MAX + 1];
         snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
         cg->enabled = (char) config_get_boolean("plugin:cgroups", option, def);
