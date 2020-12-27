@@ -120,7 +120,7 @@ calls to open/close files, call functions like `do_fork`, IO activity on the VFS
 See the [eBPF collector documentation](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) for the full list
 of per-application charts.
 
-Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to idenfity
+Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to identify
 anomalies in a few simulated scenarios.
 
 For example, the following screenshot shows the number of open files, failures to open files, and closed files on a
