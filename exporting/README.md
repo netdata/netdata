@@ -92,7 +92,7 @@ X seconds (though, it can send them per second if you need it to).
 
 ## Configuration
 
-Here are the configruation blocks for every supported connector. Your current `exporting.conf` file may look a little
+Here are the configuration blocks for every supported connector. Your current `exporting.conf` file may look a little
 different. 
 
 You can configure each connector individually using the available [options](#options). The
