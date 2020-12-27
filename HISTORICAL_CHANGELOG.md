@@ -625,7 +625,7 @@ netdata (1.1.0) - 2016-04-20
 -   Data collection: apps.plugin: grouping of processes now support patterns
 -   Data collection: apps.plugin: now it is faster, after the new features added
 -   Data collection: better auto-detection of partitions for disk monitoring
--   Data collection: better fireqos intergation for QoS monitoring
+-   Data collection: better fireqos integration for QoS monitoring
 -   Data collection: squid monitoring now uses squidclient
 -   Data collection: SNMP monitoring now supports 64bit counters
 -   API: fixed issues in CSV output generation
