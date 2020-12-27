@@ -259,7 +259,7 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 
 
 /**
- * Update the publish strctures to create the dimenssions
+ * Update the publish strctures to create the dimensions
  *
  * @param curr   Last values read from memory.
  * @param prev   Previous values read from memory.

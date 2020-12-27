@@ -202,7 +202,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -416,7 +416,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
