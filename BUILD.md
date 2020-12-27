@@ -346,7 +346,7 @@ We should follow these steps:
 9. Deprecate / remove the autotools build-system completely (so that we can support a single
    build-system).
 
-Some smaller miscellaeneous suggestions:
+Some smaller miscellaneous suggestions:
 
 1. Remove the `_Generic` / `strerror_r` config to make the system simpler (use the technique
    on the blog post to make the standard version re-entrant so that it is thread-safe).
