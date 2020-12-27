@@ -142,7 +142,7 @@ static enum cgroups_type cgroups_try_detect_version()
     enum cgroups_systemd_setting systemd_setting;
     int cgroups2_available = 0;
 
-    // 1. check if cgroups2 availible on system at all
+    // 1. check if cgroups2 available on system at all
     FILE *f = mypopen("grep cgroup /proc/filesystems", &command_pid);
     if (!f) {
         error("popen failed");

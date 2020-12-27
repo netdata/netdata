@@ -1265,7 +1265,7 @@ suitable_package() {
     return 0
   elif [ -z "${p}" ]; then
     echo >&2 "WARNING"
-    echo >&2 "package ${1} is not availabe in this system."
+    echo >&2 "package ${1} is not available in this system."
     echo >&2
     return 1
   else
