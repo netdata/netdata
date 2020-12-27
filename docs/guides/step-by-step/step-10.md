@@ -65,7 +65,7 @@ Check out [Nginx's installation
 instructions](https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/) for details on
 other Linux distributions.
 
-Certbot is a tool to help you create and renew certiciate+key pairs for your domain. Visit their
+Certbot is a tool to help you create and renew certificate+key pairs for your domain. Visit their
 [instructions](https://certbot.eff.org/instructions) to get a detailed installation process for your operating system.
 
 ### Fully qualified domain name
