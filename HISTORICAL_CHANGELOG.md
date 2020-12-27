@@ -518,7 +518,7 @@ netdata (1.3.0) - 2016-08-28
 -   apps.plugin improvements:
 
     -   can now run with command line argument 'without-files'
-        to prevent it from enumating all the open files/sockets/pipes
+        to prevent it from enumerating all the open files/sockets/pipes
         of all running processes.
 
     -   apps.plugin now scales the collected values to match the
