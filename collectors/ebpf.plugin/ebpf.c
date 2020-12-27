@@ -318,7 +318,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param id        chart id
  * @param title     chart title
  * @param units     units label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
@@ -376,7 +376,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param id        chart id
  * @param title     chart title
  * @param units     axis label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param context   chart context
  * @param charttype chart type
  * @param order     order number of the specified chart
