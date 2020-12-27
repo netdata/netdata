@@ -558,7 +558,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , "tokens"
                     , PLUGIN_TC_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_TOCKENS
+                    , NETDATA_CHART_PRIO_TC_QOS_TOKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -614,7 +614,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , "ctokens"
                     , PLUGIN_TC_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_CTOCKENS
+                    , NETDATA_CHART_PRIO_TC_QOS_CTOKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
