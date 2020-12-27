@@ -201,7 +201,7 @@ static SSL_CTX * security_initialize_openssl_server() {
  * @param selector informs the context that must be initialized, the following list has the valid values:
  *      NETDATA_SSL_CONTEXT_SERVER - the server context
  *      NETDATA_SSL_CONTEXT_STREAMING - Starts the streaming context.
- *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB contextv
+ *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
 void security_start_ssl(int selector) {
     switch (selector) {
