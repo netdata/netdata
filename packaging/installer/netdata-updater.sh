@@ -297,7 +297,7 @@ update() {
     rm netdata-latest.tar.gz >&3 2>&3
     cd netdata-* || exit 1
     RUN_INSTALLER=1
-    cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}" || exit 1
+    cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
@@ -376,7 +376,7 @@ source "${ENVIRONMENT_FILE}" || exit 1
 # We dont expect to find lib dir variable on older installations, so load this path if none found
 export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
-# Source the tarbal checksum, if not already available from environment (for existing installations with the old logic)
+# Source the tarball checksum, if not already available from environment (for existing installations with the old logic)
 [[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
 
 # Grab the nightlies baseurl (defaulting to our Google Storage bucket)

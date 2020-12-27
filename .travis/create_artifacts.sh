@@ -3,7 +3,7 @@
 # Artifacts creation script.
 # This script generates two things:
 #   1) The static binary that can run on all linux distros (built-in dependencies etc)
-#   2) The distribution source tarbal
+#   2) The distribution source tarball
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
