@@ -2992,8 +2992,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_errors = NULL, *rd_out_errors = NULL, *rd_in_csum_errors = NULL,
                               *rd_in_dest_unreachs = NULL, *rd_in_pkt_too_bigs = NULL, *rd_in_time_excds = NULL,
-                              *rd_in_parm_problems = NULL, *rd_out_dest_unreachs = NULL, *rd_out_time_excds = NULL,
-                              *rd_out_parm_problems = NULL;
+                              *rd_in_param_problems = NULL, *rd_out_dest_unreachs = NULL, *rd_out_time_excds = NULL,
+                              *rd_out_param_problems = NULL;
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
@@ -3010,30 +3010,30 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             RRDSET_TYPE_LINE
                     );
 
-                    rd_in_errors         = rrddim_add(st, "InErrors",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out_errors        = rrddim_add(st, "OutErrors",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_in_csum_errors    = rrddim_add(st, "InCsumErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_in_dest_unreachs  = rrddim_add(st, "InDestUnreachs",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_in_pkt_too_bigs   = rrddim_add(st, "InPktTooBigs",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_in_time_excds     = rrddim_add(st, "InTimeExcds",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_in_parm_problems  = rrddim_add(st, "InParmProblems",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out_dest_unreachs = rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out_time_excds    = rrddim_add(st, "OutTimeExcds",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out_parm_problems = rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_errors          = rrddim_add(st, "InErrors",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_errors         = rrddim_add(st, "OutErrors",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_csum_errors     = rrddim_add(st, "InCsumErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_dest_unreachs   = rrddim_add(st, "InDestUnreachs",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_pkt_too_bigs    = rrddim_add(st, "InPktTooBigs",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_time_excds      = rrddim_add(st, "InTimeExcds",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_param_problems  = rrddim_add(st, "InParmProblems",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_dest_unreachs  = rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_time_excds     = rrddim_add(st, "OutTimeExcds",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_param_problems = rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_in_errors,         icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen +
-                                                                icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort);
-                rrddim_set_by_pointer(st, rd_out_errors,        icmp6stat.icp6s_error);
-                rrddim_set_by_pointer(st, rd_in_csum_errors,    icmp6stat.icp6s_checksum);
-                rrddim_set_by_pointer(st, rd_in_dest_unreachs,  icmp6stat.icp6s_inhist[ICMP6_DST_UNREACH]);
-                rrddim_set_by_pointer(st, rd_in_pkt_too_bigs,   icmp6stat.icp6s_badlen);
-                rrddim_set_by_pointer(st, rd_in_time_excds,     icmp6stat.icp6s_inhist[ICMP6_TIME_EXCEEDED]);
-                rrddim_set_by_pointer(st, rd_in_parm_problems,  icmp6stat.icp6s_inhist[ICMP6_PARAM_PROB]);
-                rrddim_set_by_pointer(st, rd_out_dest_unreachs, icmp6stat.icp6s_outhist[ICMP6_DST_UNREACH]);
-                rrddim_set_by_pointer(st, rd_out_time_excds,    icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED]);
-                rrddim_set_by_pointer(st, rd_out_parm_problems, icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]);
+                rrddim_set_by_pointer(st, rd_in_errors,          icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen +
+                                                                 icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort);
+                rrddim_set_by_pointer(st, rd_out_errors,         icmp6stat.icp6s_error);
+                rrddim_set_by_pointer(st, rd_in_csum_errors,     icmp6stat.icp6s_checksum);
+                rrddim_set_by_pointer(st, rd_in_dest_unreachs,   icmp6stat.icp6s_inhist[ICMP6_DST_UNREACH]);
+                rrddim_set_by_pointer(st, rd_in_pkt_too_bigs,    icmp6stat.icp6s_badlen);
+                rrddim_set_by_pointer(st, rd_in_time_excds,      icmp6stat.icp6s_inhist[ICMP6_TIME_EXCEEDED]);
+                rrddim_set_by_pointer(st, rd_in_param_problems,  icmp6stat.icp6s_inhist[ICMP6_PARAM_PROB]);
+                rrddim_set_by_pointer(st, rd_out_dest_unreachs,  icmp6stat.icp6s_outhist[ICMP6_DST_UNREACH]);
+                rrddim_set_by_pointer(st, rd_out_time_excds,     icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED]);
+                rrddim_set_by_pointer(st, rd_out_param_problems, icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]);
                 rrdset_done(st);
             }
 
