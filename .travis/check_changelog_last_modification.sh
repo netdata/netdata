@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# This scriptplet validates nightlies age and notifies is if it gets too old
+# This scriptlet validates nightlies age and notifies is if it gets too old
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
