@@ -256,7 +256,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 }
 
 /**
- * Ppepare HTTP header
+ * Prepare HTTP header
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.

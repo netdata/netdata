@@ -205,7 +205,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
 }
 
 /**
- * Ppepare HTTP header
+ * Prepare HTTP header
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
