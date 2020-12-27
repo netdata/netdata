@@ -32,7 +32,7 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-/* Transform legacy UUID to be unique across hosts deterministacally */
+/* Transform legacy UUID to be unique across hosts deterministically */
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
