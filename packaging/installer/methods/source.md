@@ -274,7 +274,7 @@ using glibc or musl. To use one of these:
     the contents of `packaging/ebpf.version` in your Netdata sources.
 2.  Go to https://github.com/netdata/kernel-collector/releases, select the
     required release, and download the `netdata-kernel-collector-*.tar.xz`
-    file for the libc variant your system uses (eithe rmusl or glibc).
+    file for the libc variant your system uses (either rmusl or glibc).
 3.  Extract the contents of the archive to a temporary location, and then
     copy all of the `.o` and `.so.*` files and the contents of the `library/`
     directory to `/usr/libexec/netdata/plugins.d` or the equivalent location
