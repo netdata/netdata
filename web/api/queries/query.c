@@ -896,7 +896,7 @@ static RRDR *rrd2rrdr_fixedstep(
     // align the requested timeframe to fit it.
 
     if(aligned) {
-        // alignement has been requested, so align the values
+        // alignment has been requested, so align the values
         before_requested -= before_requested % (group * update_every);
         after_requested  -= after_requested % (group * update_every);
     }
@@ -1269,7 +1269,7 @@ static RRDR *rrd2rrdr_variablestep(
     // align the requested timeframe to fit it.
 
     if(aligned) {
-        // alignement has been requested, so align the values
+        // alignment has been requested, so align the values
         before_requested -= before_requested % (group * update_every);
         after_requested  -= after_requested % (group * update_every);
     }
