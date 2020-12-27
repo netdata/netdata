@@ -6,7 +6,7 @@ sidebar_label: "AM2320"
 
 # AM2320 sensor monitoring with netdata
 
-Displays a graph of the temperature and humity from a AM2320 sensor.
+Displays a graph of the temperature and humidity from a AM2320 sensor.
 
 ## Requirements
  - Adafruit Circuit Python AM2320 library
