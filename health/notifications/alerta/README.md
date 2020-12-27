@@ -29,7 +29,7 @@ The easiest way to install Alerta is to use the Docker image available
 on [Docker hub][1]. Alternatively, follow the ["getting started"][2]
 tutorial to deploy Alerta to an Ubuntu server. More advanced
 configurations are out os scope of this tutorial but information
-about different deployment scenaries can be found in the  [docs][3].
+about different deployment scenarios can be found in the  [docs][3].
 
 [1]: https://hub.docker.com/r/alerta/alerta-web/
 

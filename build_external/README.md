@@ -12,7 +12,7 @@ decoupled. This allows:
 -   Cross-compilation (e.g. linux development from macOS)
 -   Cross-distro (e.g. using CentOS user-land while developing on Debian)
 -   Multi-host scenarios (e.g. parent-child configurations)
--   Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
+-   Bleeding-edge scenarios (e.g. using the ACLK (**currently for internal-use only**))
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
 for developers. This is the first iteration of the build-system to allow the team to use
