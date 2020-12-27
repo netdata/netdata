@@ -153,7 +153,7 @@ typedef struct statsd_index {
 
     STATSD_METRIC *first;           // the linked list of metrics (new metrics are added in front)
     STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
-    STATSD_FIRST_PTR_MUTEX;         // when mutli-threading is enabled, a lock to protect the linked list
+    STATSD_FIRST_PTR_MUTEX;         // when multi-threading is enabled, a lock to protect the linked list
 
     STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
 } STATSD_INDEX;
