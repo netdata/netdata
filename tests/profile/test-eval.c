@@ -272,7 +272,7 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
 
 int main(int argc, char **argv) {
 	if(argc != 2) {
-		fprintf(stderr, "I need an epxression (enclose it in single-quotes (') as a single parameter)\n");
+		fprintf(stderr, "I need an expression (enclose it in single-quotes (') as a single parameter)\n");
 		exit(1);
 	}
 
