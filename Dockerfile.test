@@ -3,7 +3,7 @@
 #       `./packaging/docker/Dockerfile`.
 #
 # TODO: Create a netdata/package-builder:alpine9
-#FROM netdata/package-buidler:alpine AS build
+#FROM netdata/package-builder:alpine AS build
 FROM alpine:3.9 AS build
 
 # Install Dependencies
