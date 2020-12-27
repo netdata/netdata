@@ -78,7 +78,7 @@ int aclk_lws_wss_client_write(void *buf, size_t count);
 int aclk_lws_wss_client_read(void *buf, size_t count);
 void aclk_lws_wss_service_loop();
 
-void aclk_lws_wss_mqtt_layer_disconect_notif();
+void aclk_lws_wss_mqtt_layer_disconnect_notif();
 
 // Notifications inside the layer above
 void aclk_lws_connection_established();
