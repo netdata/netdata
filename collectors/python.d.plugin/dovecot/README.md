@@ -38,7 +38,7 @@ Module gives information with following charts:
 
 5.  **Context Switches**
 
-    -   volountary
+    -   voluntary
     -   involuntary
 
 6.  **disk** in bytes/s
