@@ -226,7 +226,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         for (p = 0; p < pagelines_cnt; p++) {
             pgl = &pagelines[p];
 
-            // Skip invalid, refused or empty pagelines if not explicitely requested
+            // Skip invalid, refused or empty pagelines if not explicitly requested
             if (!pgl
                 || do_detail == CONFIG_BOOLEAN_NO
                 || (do_detail == CONFIG_BOOLEAN_AUTO && pageline_total_count(pgl) == 0 && netdata_zero_metrics_enabled != CONFIG_BOOLEAN_YES))
@@ -236,7 +236,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             char setid[13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
             snprintfz(setid, 13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "pagetype_Node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
 
-            // Skip explicitely refused charts
+            // Skip explicitly refused charts
             if (simple_pattern_matches(filter_types, setid))
                 continue;
 
