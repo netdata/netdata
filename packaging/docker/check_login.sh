@@ -31,7 +31,7 @@ if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     exit 1
 fi
 
-# Login to docker hub to allow futher operations
+# Login to docker hub to allow further operations
 echo "Attempting to login to docker"
 echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
