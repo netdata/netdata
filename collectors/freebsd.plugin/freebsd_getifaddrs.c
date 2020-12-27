@@ -143,7 +143,7 @@ static struct cgroup_network_interface *get_network_interface(const char *name) 
 int do_getifaddrs(int update_every, usec_t dt) {
     (void)dt;
 
-#define DEFAULT_EXLUDED_INTERFACES "lo*"
+#define DEFAULT_EXCLUDED_INTERFACES "lo*"
 #define DEFAULT_PHYSICAL_INTERFACES "igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re*"
 #define CONFIG_SECTION_GETIFADDRS "plugin:freebsd:getifaddrs"
 
@@ -177,7 +177,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                         CONFIG_BOOLEAN_AUTO);
 
         excluded_interfaces = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DEFAULT_EXLUDED_INTERFACES)
+                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DEFAULT_EXCLUDED_INTERFACES)
                 , NULL
                 , SIMPLE_PATTERN_EXACT
         );
