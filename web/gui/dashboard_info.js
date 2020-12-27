@@ -2544,7 +2544,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.message_rates': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.'
     },
 
     'rabbitmq.global_counts': {
@@ -2587,7 +2587,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.queue_messages_stats': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
