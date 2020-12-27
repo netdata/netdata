@@ -340,7 +340,7 @@ delay: [[[up U] [down D] multiplier M] max X]
      will delay the notification by 1 minute. This is used to prevent notifications for flapping
      alarms. The default `D` is zero.
 
--   `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
+-   `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
      delayed. The default multiplier is `1.0`.
 
 -   `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
