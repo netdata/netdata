@@ -89,7 +89,7 @@ applications](https://github.com/netdata/helmchart#service-discovery-and-support
 by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
 
 If you haven't changed listening ports, image names, or other defaults, service discovery should find your pods, create
-the proper configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
+the proper configurations based on the service that pod runs, and begin monitoring them immediately after deployment.
 
 However, if you have changed some of these defaults, you need to copy a file from the Netdata Helm chart repository,
 make your edits, and pass the changed file to `helm install`/`helm upgrade`.
