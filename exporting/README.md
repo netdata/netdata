@@ -266,7 +266,7 @@ Configure individual connectors and override any global settings with the follow
 -   `send configured labels = yes | no` controls if labels defined in the `[host labels]` section in `netdata.conf`
     should be sent to the external database
 
--   `send automatic labels = yes | no` controls if automatially created labels, like `_os_name` or `_architecture`
+-   `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
     should be sent to the external database
 
 > Starting from Netdata v1.20 the host tags (defined in the `[backend]` section of `netdata.conf`) are parsed in
