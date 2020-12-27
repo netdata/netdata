@@ -10,7 +10,7 @@
 // This is as define because ideally the ACLK at high level
 // can do mosquitto writes and reads only from one thread
 // which is cleaner implementation IMHO
-// in such case this mutexes are not necessarry and life
+// in such case this mutexes are not necessary and life
 // is simpler
 #define ACLK_LWS_MOSQUITTO_IO_CALLS_MULTITHREADED 1
 

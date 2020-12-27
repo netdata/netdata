@@ -82,7 +82,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 /**
  * Callback Print
  *
- * Set callback print case necesary and wrinte an information inside a buffer to write in the log.
+ * Set callback print case necessary and wrinte an information inside a buffer to write in the log.
  *
  * @param e a pointer for a structure that has the complete information about json structure.
  *

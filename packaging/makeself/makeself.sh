@@ -40,7 +40,7 @@
 # - 2.0.1 : Added --copy
 # - 2.1.0 : Allow multiple tarballs to be stored in one archive, and incremental updates.
 #           Added --nochown for archives
-#           Stopped doing redundant checksums when not necesary
+#           Stopped doing redundant checksums when not necessary
 # - 2.1.1 : Work around insane behavior from certain Linux distros with no 'uncompress' command
 #           Cleaned up the code to handle error codes from compress. Simplified the extraction code.
 # - 2.1.2 : Some bug fixes. Use head -n to avoid problems.
