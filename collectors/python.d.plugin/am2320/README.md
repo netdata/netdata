@@ -28,10 +28,10 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/am2320.conf
 ```
 
-Raspbery Pi Instructions:
+Raspberry Pi Instructions:
 
 Hardware install:
-Connect the am2320 to the Raspbery Pi I2C pins
+Connect the am2320 to the Raspberry Pi I2C pins
 
 Raspberry Pi 3B/4 Pins:
 
