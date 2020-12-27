@@ -1236,7 +1236,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
     },
 
     'apps.bandwidth_udp_send': {
@@ -3338,7 +3338,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_retransmit': {
         title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
     },
 
     'ebpf.tcp_error': {
