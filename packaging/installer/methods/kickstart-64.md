@@ -73,7 +73,7 @@ your installation. Here are a few important parameters:
 
 ## Verify script integrity
 
-To use `md5sum` to verify the intregity of the `kickstart-static64.sh` script you will download using the one-line
+To use `md5sum` to verify the integrity of the `kickstart-static64.sh` script you will download using the one-line
 command above, run the following:
 
 ```bash
