@@ -39,7 +39,7 @@ apk add --no-cache -U \
   gzip \
   xz || exit 1
 
-# snappy doesnt have static version in alpine, let's compile it
+# snappy doesn't have static version in alpine, let's compile it
 export SNAPPY_VER="1.1.7"
 wget -O /snappy.tar.gz https://github.com/google/snappy/archive/${SNAPPY_VER}.tar.gz
 tar -C / -xf /snappy.tar.gz
