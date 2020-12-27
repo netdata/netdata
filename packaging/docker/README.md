@@ -107,7 +107,7 @@ You can control how the health checks run by using the environment variable `NET
     correctly or not. This is sufficient to ensure that Netdata did not
     hang during startup, but does not provide a rigorous verification
     that the daemon is collecting data or is otherwise usable.
--   If set to anything else, the health check will treat the vaule as a
+-   If set to anything else, the health check will treat the value as a
     URL to check for a 200 status code on. In most cases, this should
     start with `http://localhost:19999/` to check the agent running in
     the container.
