@@ -357,7 +357,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 -   [BCACHE](/collectors/proc.plugin/README.md): Monitor BCACHE statistics with the the `proc.plugin` collector.
 -   [Block devices](/collectors/proc.plugin/README.md): Gather metrics about the health and performance of block
     devices using the the `proc.plugin` collector.
--   [Btrfs](/collectors/proc.plugin/README.md): Montiors Btrfs filesystems with the the `proc.plugin` collector.
+-   [Btrfs](/collectors/proc.plugin/README.md): Monitors Btrfs filesystems with the the `proc.plugin` collector.
 -   [Device mapper](/collectors/proc.plugin/README.md): Gather metrics about the Linux device mapper with the proc
     collector.
 -   [Disk space](/collectors/diskspace.plugin/README.md): Collect disk space usage metrics on Linux mount points.
