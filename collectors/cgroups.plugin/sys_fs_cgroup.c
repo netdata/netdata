@@ -168,7 +168,7 @@ static enum cgroups_type cgroups_try_detect_version()
         return CGROUPS_AUTODETECT_FAIL;
 
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
-        // curently we prefer V1 if HYBRID is set as it seems to be more feature complete
+        // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
         // in the future we might want to continue here if SYSTEMD_CGROUP_HYBRID
         // and go ahead with V2
         return CGROUPS_V1;
