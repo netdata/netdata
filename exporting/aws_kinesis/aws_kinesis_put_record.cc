@@ -110,7 +110,7 @@ void kinesis_put_record(
 }
 
 /**
- * Get results from service responces
+ * Get results from service responses
  *
  * @param request_outcomes_p request outcome information.
  * @param error_message report error message to a caller.

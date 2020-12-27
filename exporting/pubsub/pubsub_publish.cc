@@ -178,7 +178,7 @@ int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buf
 }
 
 /**
- * Get results from service responces
+ * Get results from service responses
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
  * @param error_message report error message to a caller.
