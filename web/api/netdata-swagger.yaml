@@ -444,7 +444,7 @@ paths:
             multiple using a pipe with a condition each, like this:
             `color<value|color:null` The following operators are
             supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter.
-            Currently only integers are suported as values."
+            Currently only integers are supported as values."
           required: false
           allowEmptyValue: true
           schema:
