@@ -164,7 +164,7 @@ This module will produce following charts (if data is available):
     -   updated
     -   deleted
 
-24. **InnoDB Buffer Pool Pagess** in pages
+24. **InnoDB Buffer Pool Pages** in pages
 
     -   data
     -   dirty
