@@ -222,7 +222,7 @@ else
         fi
 
         # If we have GNU uname, we can use that to get CPU info (probably).
-        if unmae --version 2>/dev/null | grep -qF 'GNU coreutils' ; then
+        if uname --version 2>/dev/null | grep -qF 'GNU coreutils' ; then
                 CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
                 CPU_MODEL="$(uname -p)"
                 CPU_VENDOR="$(uname -i)"
