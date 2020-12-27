@@ -176,7 +176,7 @@ paths:
             of grouping. methods supported "min", "max", "average", "sum",
             "incremental-sum". "max" is actually calculated on the absolute
             value collected (so it works for both positive and negative
-            dimesions to return the most extreme value in either direction).
+            dimensions to return the most extreme value in either direction).
           required: true
           allowEmptyValue: false
           schema:
@@ -367,7 +367,7 @@ paths:
             of grouping. methods are supported "min", "max", "average", "sum",
             "incremental-sum". "max" is actually calculated on the absolute
             value collected (so it works for both positive and negative
-            dimesions to return the most extreme value in either direction).
+            dimensions to return the most extreme value in either direction).
           required: true
           allowEmptyValue: false
           schema:
