@@ -14,7 +14,7 @@
 usage="$(basename "$0") [-h] [-f ] -- program to calculate the answer to life, the universe and everything
 
 where:
-    -e, --env    path to environment file (defauls to '/etc/netdata/.environment'
+    -e, --env    path to environment file (defaults to '/etc/netdata/.environment'
     -f, --force  force uninstallation and do not ask any questions
     -h           show this help text
     -y, --yes    flag needs to be set to proceed with uninstallation"
