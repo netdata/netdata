@@ -124,7 +124,7 @@ static struct mount_point *get_mount_point(const char *name) {
 int do_getmntinfo(int update_every, usec_t dt) {
     (void)dt;
 
-#define DELAULT_EXCLUDED_PATHS "/proc/*"
+#define DEFAULT_EXCLUDED_PATHS "/proc/*"
 // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
 #define DEFAULT_EXCLUDED_FILESYSTEMS "autofs procfs subfs devfs none"
 #define CONFIG_SECTION_GETMNTINFO "plugin:freebsd:getmntinfo"
@@ -144,7 +144,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
         excluded_mountpoints = simple_pattern_create(
                 config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths",
-                           DELAULT_EXCLUDED_PATHS)
+                           DEFAULT_EXCLUDED_PATHS)
                 , NULL
                 , SIMPLE_PATTERN_EXACT
         );

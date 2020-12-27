@@ -4,7 +4,7 @@
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
-#define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
+#define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
@@ -100,7 +100,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXCLUDED_PATHS)
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DEFAULT_EXCLUDED_PATHS)
                 , NULL
                 , mode
         );
