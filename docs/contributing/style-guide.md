@@ -4,6 +4,9 @@ description: "The _Netdata style guide_ establishes editorial guidelines for all
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
 
+https://styleguide.mailchimp.com/writing-principles/
+https://docs.microsoft.com/en-us/style-guide/brand-voice-above-all-simple-human
+
 # Netdata style guide
 
 The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata
