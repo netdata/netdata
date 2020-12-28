@@ -1,6 +1,6 @@
 <!--
 title: "Anomaly detection with ML and the Netdata Agent"
-description: ""
+description: "Train a "
 image: /img/seo/guides/monitor/anomalies-ml.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomalies-ml.md
 -->
@@ -8,6 +8,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 # Anomaly detection with ML and the Netdata Agent
 
 **T/K**
+
+**anomaly detection** with machine learning (ML) and the Netdata Agent.
+
+If you choose, you'll use an Nginx web server to practice configuring the anomalies collector and making sense of the
+its real-time visualizations.
 
 ## Prerequisites
 
@@ -56,8 +61,7 @@ performance across the default charts to include.
 
 ## Configure the anomalies collector
 
-For this guide, we'll use the anomalies collector to monitor anomalies in an Nginx web server. Open
-`python.d/anomalies.conf` with `edit-conf`.
+Open `python.d/anomalies.conf` with `edit-conf`.
 
 ```bash
 sudo ./edit-config python.d/anomalies.conf
@@ -75,24 +79,25 @@ involve tweaking the behavior of the ML training itself.
 - `custom_models`: A way to define custom models that you want anomaly probabilities for, including multi-node or
   streaming setups.
 
-We're going to focus on just the first two and last settings in the list.
+### Run anomaly detection on Nginx and log file metrics
 
-### Add Nginx and log file metrics to anomaly detection
-
-**T/K**
+As mentioned above, this guide uses an Nginx web server to demonstrate how the anomalies collector works. You must
+configure the collector to monitor charts from the
+[Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) and [web
+log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) collectors.
 
 `charts_regex` allows for some basic regex, such as wildcards (`*`) to match all contexts with a certain pattern. For
 example, `system\..*` matches with any chart wit ha context that begins with `system.`, and ends in any number of other
 characters (`.*`). Note the escape character (`\`) around the first period to capture a period character exactly, and
 not any character.
 
-Change the line to the following:
+Change `charts_regex` in `anomalies.conf` to the following:
 
 ```conf
     charts_regex: 'system\..*|nginx_local\..*|web_log_nginx\..*|apps.cpu|apps.mem'
 ```
 
-This value tells the anomalies collector to train against every `system.` chart, every `nginx_local` chart, every
+This value tells the anomaly collector to train against every `system.` chart, every `nginx_local` chart, every
 `web_log_nginx` chart, and specifically the `apps.cpu` and `apps.mem` charts.
 
 ![The anomalies collector chart with many
@@ -100,24 +105,19 @@ dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880
 
 ### Remove some metrics from anomaly detection
 
-As you can see in the above screenshot, this node is now looking for anomalies in a lot of places, with a lot of
-associated dimensions, some of which are even hidden at the bottom of a scrollable area. We're now tracking system
-metrics, application CPU/memory, and every chart from the
-[Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) and [web
-log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) collectors.
+As you can see in the above screenshot, this node is now looking for anomalies in a lot of places. The result is a
+single `anomalies_local.probability` chart with more than twenty dimensions, some of which are hidden at the bottom of a
+scroll-able area. In addition, training and analyzing the anomaly collector on this many charts might require more CPU
+utilization that you're willing to give.
 
-With this many dimensions, it's hard to read the chart and determine which charts might be acting anomalously. In
-addition, training and analyzing this many charts requires more CPU.
-
-First, let's get specific about which `system.` charts to monitor, instead of all of them (`system\..*`).
+First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).
 
 ```conf
     charts_regex: 'system\.cpu|system\.load|system\.io|system\.net|system\.ram|nginx_local\..*|web_log_nginx\..*|apps.cpu|apps.mem'
 ```
 
-Let's remove some charts we're not interested in with the `charts_to_exclude` setting. While we do want the anomalies
-collector to monitor _some_ of the Nginx web log charts, we'll focus on anything related to the volume of
-requests/responses, not which type of 4xx response a user might receive.
+Next, remove some charts with the `charts_to_exclude` setting. For this example, using an Nginx web server, focus on the
+volume of requests/responses, not, for example, which type of 4xx response a user might receive.
 
 ```conf
     charts_to_exclude: 'web_log_nginx.excluded_requests,web_log_nginx.responses_by_status_code_class,web_log_nginx.status_code_class_2xx_responses,web_log_nginx.status_code_class_4xx_responses,web_log_nginx.current_poll_uniq_clients,web_log_nginx.requests_by_http_method,web_log_nginx.requests_by_http_version,web_log_nginx.requests_by_ip_proto'
@@ -126,15 +126,36 @@ requests/responses, not which type of 4xx response a user might receive.
 ![The anomalies collector with less
 dimensions](https://user-images.githubusercontent.com/1153921/102820642-d69f9180-4392-11eb-91c5-d3d166d40105.png)
 
-Apply the ideas behind 
+Apply the ideas behind the collector's regex and excluding settings to any other
+[system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), or
+[application](/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
 
-### Add a custom model
+### Add a custom anomaly detection model for Nginx
 
-With the chart cleaned up and 
+While you now have basic anomaly detection for your Nginx web server, the collector is only training and visualizing
+anomalies based on individual charts, not groups of connected charts.
+
+You may want to know if a group of charts is acting anomalously, not just a single chart related to a particular
+application or service. For example, a sudden increase in volume of requests on an Nginx web server may be anomalous, in
+that the website being served is seeing more traffic than usual, but the web server may still be operating normally. On
+the other hand, high requests _plus_ high CPU utilization or `4xx` responses most likely indicates an incident worth
+further investigation.
+
+```conf
+custom_models:
+    - name: 'nginx'
+      dimensions: 'apps.cpu|httpd,apps.mem|httpd,nginx.connections,web_log.requests,web_log.type_requests'
+```
+
+Let's break down this line.
 
 ## See anomaly detection in action
 
+### Alarms
 
+### Build an anomaly detection dashboard
+
+### Multi-node anomaly detection
 
 ## What's next?
 
