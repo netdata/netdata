@@ -60,8 +60,9 @@ each alarm and notification method is completely customizable.
 
 ### Add a new alarm
 
-To create a new alarm configuration file, initiate an empty file in the `health.d/` directory, then edit it with
-`edit-config`.
+To create a new alarm configuration file, initiate an empty file, with a filename that ends in `.conf`, in the
+`health.d/` directory. The Netdata Agent loads any valid alarm configuration file ending in `.conf` in that directory.
+Next, edit the new file with `edit-config`. For example, with a file called `ram-usage.conf`.
 
 ```bash
 sudo touch health.d/ram-usage.conf
