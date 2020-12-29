@@ -1,11 +1,8 @@
 <!--
 title: "Netdata style guide"
-description: "The _Netdata style guide_ establishes editorial guidelines for all of Netdata's writings, including documentation, articles, in-product UX copy, and more."
+description: "The _Netdata style guide_ establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
-
-https://styleguide.mailchimp.com/writing-principles/
-https://docs.microsoft.com/en-us/style-guide/brand-voice-above-all-simple-human
 
 # Netdata style guide
 
@@ -20,110 +17,393 @@ goals, your writing should be:
 - **Clear**. Use simple words and sentences. Use strong, direct, and active language that encourages readers to action.
 - **Concise**. Provide solutions and answers as quickly as possible. Give users the information they need right now,
   along with opportunities to learn more.
-- **Universal**. Think of yourself as a guide who is tasked with giving Netdata users a tour into Netdata's products,
-  features, and capabilities. Write to reach the widest possible audience. 
-- **Authentic**. Be honest about what Netdata can and cannot do, while focusing on our strengths. Emphasize technical
-  accuracy over hard sells and marketing jargon.
-- **Playful**. Be friendly, thoughtful, and engaging. Let your personality and writing style shine.
+- **Universal**. Think of yourself as a guide who is tasked with giving a diverse group of users a tour into Netdata's
+  products, features, and capabilities. Write to reach the widest possible audience.
 
 You can achieve these goals by reading and adhering to the principles outlined below.
 
-## Tone and voice
+## Voice and tone
 
-Netdata's writing should be authentic, passionate, playful, and respectful.
+One way we write empowering, educational content is by using a consistent voice and an appropriate tone.
 
-### Authentic
+_Voice_ is like your personality, which doesn't really change day to day.
 
-We upfront about who we are, what we can and can’t do, and why we do what we do
-Be honest and direct; take ownership of any issues & address them
-Use buzzwords or jargon, talk down to you, overpromise, hard sell
+_Tone_ is how you express your personality. Your expression changes based on your attitude or mood, or based on who
+you're around. In writing, your reflect tone in your word choice, punctuation, sentence structure, or even the use of
+emoji.
 
-### Passionate
+The same idea about voice and tone applies to organizations, too. Our voice shouldn't change much between two pieces of
+content, no matter who wrote each, but the tone might be quite different based on who we think is reading.
 
-We are excited about what we do &  want to share it with the world
-Use strong, direct language; be champions, challengers  & cheerleaders; take a position
-Use the passive voice; be lukewarm or wishy-washy; sound like everyone else
+For example, a [blog post](https://www.netdata.cloud/blog/) and a [press release](https://www.netdata.cloud/news/)
+should have similar voice, despite most often being written by different people. However, blog posts are relaxed and witty, while press releases are focused and academic. You won't see any emoji in a press release.
 
-### Playful
-We take our products, but not ourselves, seriously
-Be friendly, thoughtful, & engaging; challenge the status quo
-Be too casual, obscure, or snarky at someone else’s expense
+### Voice
 
-### Respectful
+Netdata's voice is authentic, passionate, playful, and respectful.
 
-We treat you the way you want to be treat
-Give you solutions & answers; honor your trust
-Impede, confuse or frustrate you; break your trust
+- **Authentic** writing is honest and fact-driven. Focus on Netdata's strength while accurately communicating what
+  Netdata can and cannot do, and emphasize technical accuracy over hard sells and marketing jargon.
+- **Passionate** writing is strong and direct. Be a champion for the product or feature you're writing about, and let
+  your unique personality and writing style shine.
+- **Playful** writing is friendly, thoughtful, and engaging. Feel free to not take yourself too seriously, as long as
+  it's not at the expense of Netdata or any of its users.
+- **Respectful** writing treats people the way you want to be treated. Prioritize giving solutions and answers as
+  quickly as possible.
 
-## Accessibility
+### Tone
 
-Don't make assumptions about who the reader is or their
-  level of understanding, education, or experience.
+Netdata's tone is fun and playful, but clarity and conciseness comes first. We also tend to be informal, and aren't
+afraid of a playful joke or two.
 
+While we have general standards for voice and tone, we do want every individual's unique writing style to reflect in
+published content.
 
+## Universal communication
 
-Universal communication
-Netdata is a global company in every sense, with employees, contributors, and users from around the world. We strive to communicate in a way that is clear and easily understood by everyone.
-Accessible and responsive communication
-We need to ensure that all forms of communication address the needs of our entire community and can serve the broadest possible audience. Responsive, accessible design and communication should be at the core of what we do.
+Netdata is a global company in every sense, with employees, contributors, and users from around the world. We strive to
+communicate in a way that is clear and easily understood by everyone.
 
-Our products and content will reach a diverse audience of users who will interact with them in different ways and with different devices. Here are some considerations to keep in mind:
+Here are some guidelines, pointers, and questions to be aware of as you write to ensure your writing is universal. Some
+of these are expanded into individual sections in the [language, grammar, and
+mechanics](#language-grammar-and-mechanics) section below.
 
-Would this language make sense to someone who doesn’t work here?
-Could someone quickly scan this document and understand the material?
-If someone can’t see the colors, images or video, is the message still clear?
-Is the markup clean and structured?
-Mobile devices with accessibility features are increasingly becoming core communication tools, does this work well on them?
-Does this work for red/green color blind individuals?
-Does this work in low light conditions? What about for users with low vision?
+- Would this language make sense to someone who doesn't work here?
+- Could someone quickly scan this document and understand the material?
+- Create an information hierarchy with key information presented first and clearly called out to improve scannability.
+- Avoid directional language like "sidebar on the right of the page" or "header at the top of the page" since
+  presentation elements may adapt for devices.
+- Use descriptive links rather than "click here" or "learn more".
+- Include alt text for images and image links.
+- Ensure any information contained within a graphic element is also available as plain text.
+- Avoid idioms that may not be familiar to the user or that may not make sense when translated.
+- Avoid local, culturalm or historical references that may be unfamiliar to users.
+- Prioritize active, direct language.
+- Avoid referring to someone's age unless it is directly relevant; likewise, avoid referring to people with age-related
+  descriptors like "young" or "elderly."
+- Avoid disability-related idioms like "lame" or "falling on deaf ears." Don't refer to a person's disability unless
+  it’s directly relevant to what you're writing.
+- Don't call groups of people "guys." Don't call women "girls."
+- Avoid gendered terms in favor of neutral alternatives, like "server" instead of "waitress" and "businessperson"
+  instead of "businessman."
+- When writing about a person, use their communicated pronouns. When in doubt, just ask or use their name. It's OK to
+  use "they" as a singular pronoun.
 
-Basic guidelines can help make products and content accessible. Here are some ideas:
-
-Always create an information hierarchy with key information presented first and clearly called out to improve scannability.
-Avoid directional language like “sidebar on the right of the page” or “header at the top of the page” since presentation elements may adapt for devices.
-Use consistent form labels and input instructions.
-Use descriptive links rather than “click here” or “learn mo4re”.
-Include alt text for images and image links.
-Make closed captioning available for all videos. Make information in the video available in a text format.
-Aim for high contrast with visual elements. 
-Ensure any information contained within a graphic element is also available as plain text. This is important not just for accessibility, but also for localization.
-Test any product or content on a range of different devices to ensure compatibility and no loss of information or degradation of the user experience.
-
-Some of these guidelines were adapted from MailChimp under the Creative Commons license.
-
-Translation and localization
-Our users will likely rely on translation by third party applications to interact with our products and content, such as web browsers or live captioning. Therefore, it is important that we keep a few things in mind when developing products and content.
-
-Keep text out of image elements if at all possible. For example, a button on a web page should be rendered using HTML/CSS rather than relying on a PNG or GIF if it contains text so that the web browser can translate it.
-Be mindful that double-byte characters may take up more space than single-byte characters in design elements, subtitling and captioning.
-Avoid idioms that may not be familiar to the user or that may not make sense when translated.
-Avoid local, cultural or historical references that may be unfamiliar to users.
-Prioritize active, direct language; avoid the passive voice.
-
-Unbiased communication
-Netdata has a company culture built on respect, and we extend that respect to our entire community. Here are some guidelines to ensure that we communicate in an unbiased way when we are referring to people:
-
-Avoid referring to someone’s age unless it is directly relevant; likewise, avoid referring to people with age-related descriptors like “young” or “elderly”.
-Avoid disability-related idioms like “lame” or “falling on deaf ears.” Don’t refer to a person’s disability unless it’s directly relevant to what you’re writing.
-Don’t call groups of people “guys.” Don’t call women “girls.”
-Avoid gendered terms in favor of neutral alternatives, like “server” instead of “waitress” and “businessperson” instead of “businessman.”
-It’s OK to use “they” as a singular pronoun.
-When writing about a person, use their communicated pronouns. When in doubt, just ask or use their name.
-When in doubt, leave it out. It is better to remove it if you can’t rephrase it.
-
-Some of these guidelines were adapted from MailChimp under the Creative Commons license.
-
+> Some of these guidelines were adapted from MailChimp under the Creative Commons license.
 
 ## Language, grammar, and mechanics
 
+**T/K**
+
+If you're writing about Netdata for an external publication, such as a guest blog post, follow that publication's
+style guide or standards, if they have one published.
+
+### Active voice
+
+Use active voice instead of passive voice, because the active voice is more concise and easier to understand.
+
+When using voice, the subject of the sentence is action. In passive voice, the subject is acted upon. A famous example
+of passive voice is the phrase "mistakes were made."
+
+|                 |                                                                                             |
+|-----------------|---------------------------------------------------------------------------------------------|
+| Not recommended | When an alarm is triggered by a metric, a notification is sent by Netdata.                  |
+| **Recommended** | When a metric triggers an alarm, Netdata sends a notification to your preferred endpoint.   |
+
+### Second person
+
+Use the second person ("you") to give instructions or "talk" directly to users. 
+
+In these situations, avoid "we," "I," "let's," and "us," particularly in documentation. The "you" pronoun can also be
+implied, depending on your sentence structure. 
+
+One valid exception is when a member of the Netdata team or community wants to write about said team or community.
+
+|                                |                                                                                           |
+|--------------------------------|-------------------------------------------------------------------------------------------|
+| Not recommended                | To install Netdata, we should try the one-line installer...                               |
+| **Recommended**                | To install Netdata, you should try the one-line installer...                              |
+| **Recommended**, implied "you" | To install Netdata, try the one-line installer...                                         |
+
+### "Easy" or "simple"
+
+Using words that imply the complexity of a task or feature goes against our policy of [universal
+communication](#universal-communication). If you claim that a task is easy and the reader struggles to complete it, you
+may inadvertently discourage them. 
+
+However, if you give users two options and want to relay that one option is genuinely less complex than another, be
+specific about how and why.
+
+For example, don't write, "Netdata's one-line installer is the easiest way to install Netdata." Instead, you might want
+to say, "Netdata's one-line installer requires fewer steps than manually installing from source."
+
+### Slang, metaphors, and jargon
+
+A particular word, phrase, or metaphor you're familiar with might not translate well to the other cultures featured
+among Netdata's global community. We recommended you avoid slang or colloquialisms in your writing.
+
+In addition, don't use abbreviations that have not yet been defined in the document. See our section on
+[abbreviations](#abbreviations-acronyms-and-initialisms) for additional guidance.
+
+If you must use industry jargon, such as "mean time to resolution," define the term as clearly and concisely as you can.
+
+> Netdata helps you reduce your organization's mean time to resolution (MTTR), which is the average time the responsible
+> team requires to repair a system and resolve an ongoing incident.
+
+### Spelling
+
+While the Netdata team is mostly _not_ American, we still aspire to use American spelling whenever possible, as it is
+the standard for the monitoring industry.
+
+See the [word list](#word-list) for spellings of specific words.
+
+### Capitalization
+
+Follow the general [English standards](https://owl.purdue.edu/owl/general_writing/mechanics/help_with_capitals.html) for
+capitalization. In summary:
+
+-   Capitalize the first word of every new sentence.
+-   Don't use uppercase for emphasis. (Netdata is the BEST!)
+-   Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata,
+    Docker, Apache, NGINX)
+-   Avoid camel case (NetData) or all caps (NETDATA).
+
+Whenever you refer to the company Netdata, Inc., or the open-source monitoring agent the company develops, capitalize
+**Netdata**.
+
+However, if you are referring to a process, user, or group on a Linux system, use lowercase and fence the word in an
+inline code block: `` `netdata` ``.
+
+|                 |                                                                                                |
+|-----------------|------------------------------------------------------------------------------------------------|
+| Not recommended | The netdata agent, which spawns the netdata process, is actively maintained by netdata, inc.   |
+| **Recommended** | The Netdata Agent, which spawns the `netdata` process, is actively maintained by Netdata, Inc. |
+
+#### Capitalization of document titles and page headings
+
+Document titles and page headings should use sentence case. That means you should only capitalize the first word.
+
+If you need to use the name of a brand, software, product, and company, capitalize it according to their official
+guidelines.
+
+Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
+
+|                 |                                                                                                     |
+|-----------------|-----------------------------------------------------------------------------------------------------|
+| Not recommended | Getting Started Guide <br />Service Discovery and Auto-Detection: <br />Install netdata with docker |
+| **Recommended** | Getting started guide <br />Service discovery and auto-detection <br />Install Netdata with Docker  |
+
+### Abbreviations (acronyms and initialisms)
+
+Use abbreviations (including [acronyms and initialisms](https://www.dictionary.com/e/acronym-vs-abbreviation/)) in
+documentation when one exists, when it's widely accepted within the monitoring/sysadmin community, and when it improves
+the readability of a document.
+
+When introducing an abbreviation to a document for the first time, give the reader both the spelled-out version and the
+shortened version at the same time. For example:
+
+> Use Netdata to monitor Extended Berkeley Packet Filter (eBPF) metrics in real-time.
+
+After you define an abbreviation, don't switch back and forth. Use only the abbreviation for the rest of the document.
+
+You can also use abbreviations in a document's title to keep the title short and relevant. If you do this, you should
+still introduce the spelled-out name alongside the abbreviation as soon as possible.
+
+### Clause order
+
+When instructing users to take action, give them the context first. By placing the context in an intial clause at the
+beginning of the sentence, users can immediately know if they want to read more, follow a link, or skip ahead.
+
+|                 |                                                                                |
+|-----------------|--------------------------------------------------------------------------------|
+| Not recommended | Read the reference guide if you'd like to learn more about custom dashboards.  |
+| **Recommended** | If you'd like to learn more about custom dashboards, read the reference guide. |
+
+### Oxford comma
+
+The Oxford comma is the comma used after the second-to-last item in a list of three or more items. It appears just
+before "and" or "or."
+
+|                 |                                                                              |
+|-----------------|------------------------------------------------------------------------------|
+| Not recommended | Netdata can monitor RAM, disk I/O, MySQL queries per second and lm-sensors.  |
+| **Recommended** | Netdata can monitor RAM, disk I/O, MySQL queries per second, and lm-sensors. |
+
+### Future releases or features
+
+Do not mention future releases or upcoming features in writing unless they have been previously communicated via a
+public roadmap.
+
+In particular, documentation must describe, as accurately as possible, the Netdata Agent _as of the [latest
+commit](https://github.com/netdata/netdata/commits/master) in the GitHub repository_. For Netdata Cloud, documentation
+must reflect the _current state of [production](https://app.netdata.cloud).
+
+### Informational hyperlinks
+
+Every hyperlink should clearly state its destination. Don't use words like "here" to describe where a link will take
+your reader.
+
+|                 |                                                                                           |
+|-----------------|-------------------------------------------------------------------------------------------|
+| Not recommended | To install Netdata, click [here](/packaging/installer/README.md).                         |
+| **Recommended** | To install Netdata, read the [installation instructions](/packaging/installer/README.md). |
+
+Use hyperlinks as often as required to provide necessary context. Blog posts and guides require less hyperlinks than
+documentation.
+
+### Contractions
+
+Contractions like "you'll" or "they're" are acceptable in most Netdata writing. They're both authentic and playful, and
+reinforce the idea that you, as a writer, are guiding users through a particular idea, process, or feature.
+
+Contractions are generally not used in press releases or other media engagements.
+
+### Emoji
+
+Emoji can add fun and character to your writing, but should be used sparingly and only if it matches the content's tone
+and desired audience.
+
 ## Markdown syntax
+
+Netdata's documentation uses Markdown syntax.
+
+If you're not familiar with Markdown, read the [Mastering
+Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating
+paragraphs, styled text, lists, tables, and more.
+
+The following sections describe situations in which a specific syntax is required.
 
 ### Syntax standards (`remark-lint`)
 
-## Glossary of Netdata terminology and preferred spelling
+The Netdata team uses [`remark-lint`](https://github.com/remarkjs/remark-lint) for Markdown code styling.
 
-The following tables describe the standard spelling, capitalization, and usage of common terms found in Netdata's
-writing.
+- Use a maximum of 120 characters per line.
+- Begin headings with hashes, such as `# H1 heading`, `## H2 heading`, and so on.
+- Use `_` for italics/emphasis.
+- Use `**` for bold.
+- Use dashes `-` to begin an unordered list, and put a single space after the dash.
+- Tables should be padded so that pipes line up vertically with added whitespace.
+
+If you want to see all the settings, open the
+[`remarkrc.js`](https://github.com/netdata/netdata/blob/master/.remarkrc.js) file in the `netdata/netdata` repository.
+
+### Frontmatter and 
+
+Every document must begin with frontmatter, followed by an H1 (`#`) heading.
+
+Unlike typical Markdown frontmatter, Netdata uses HTML comments (`<!--`, `-->`) to begin and end the frontmatter block.
+These HTML comments are later converted into typical frontmatter syntax when building [Netdata
+Learn](https://learn.netdata.cloud).
+
+Frontmatter _must_ contain the following variables:
+
+- A `title` that quickly and distinctly describes the document's content.
+- A `description` that elaborates on the purpose or goal of the document using no less than 100 characters and no more
+  than 155 characters.
+- A `custom_edit_url` that links directly to the GitHub URL where another user could suggest additional changes to the
+  published document.
+
+Some documents, like the Ansible guide and others in the `/docs/guides` folder, require an `image` variable as well. In
+this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of the path to the document in question. End
+the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
+
+For example, here is the frontmatter for the guide about [deploying the Netdata Agent with
+Ansible](https://learn.netdata.cloud/guides/deploy/ansible).
+
+```markdown
+<!--
+title: Deploy Netdata with Ansible
+description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
+image: /img/seo/guides/deploy/ansible.png
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/deploy/ansible.md
+-->
+
+# Deploy Netdata with Ansible
+
+...
+```
+
+Questions about frontmatter in documentation? [Ask on our community
+forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
+
+### Linking between documentation
+
+Documentation should link to relevant pages whenever it's relevant and provides valuable context to the reader. To
+ensure links function properly on both GitHub and our generated documentation on [Netdata
+Learn](https://learn.netdata.cloud/), links should always reference the full path to the document, beginning at the root
+of the Agent repository (`/`). Links should also always end with the filename of the destination document, ending in the
+`.md` extension.
+
+Avoid relative links or traversing up directories using `../`.
+
+For example, if you want to link to our installation guide, link to `/packaging/installer/README.md`. To reference the
+guide for deploying the Netdata Agent with Ansible, link to `/docs/guides/deploy/ansible.md`.
+
+### References to UI elements
+
+When referencing a user interface (UI) element in Netdata, reference the label text of the link/button with Markdown's
+(`**bold text**`) tag.
+
+```markdown
+Click the **Sign in** button.
+```
+
+Avoid directional language whenever possible. Not every user can use instructions like "look at the top-left corner" to
+find their way around an interface, and interfaces often change between devices. If you must use directional language,
+try to supplement the text with an [image](#images).
+
+### Images
+
+Don't rely on images to convey features, ideas, or instructions. Accompany every image with description alt text and
+relevant descriptions.
+
+In Markdown, use the standard image syntax, `![]()`, and place the alt text between the brackets `[]`. Here's an example
+using our logo:
+
+```markdown
+![The Netdata logo](../../web/gui/images/netdata-logomark.svg)
+```
+
+Reference in-product text, code samples, and terminal output with actual text content, not screen captures or other
+images. Place the text in an appropriate element, such as a blockquote or code block, so all users can parse the
+information.
+
+### Syntax highlighting
+
+Our documentation site at [learn.netdata.cloud](https://learn.netdata.cloud) uses
+[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
+documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
+and `go`. If no language is specified, Prism tries to guess the language based on its content.
+
+Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C
+code, for example:
+
+````c
+```c
+inline char *health_stock_config_dir(void) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
+    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
+}
+```
+````
+
+And the prettified result:
+
+```c
+inline char *health_stock_config_dir(void) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
+    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
+}
+```
+
+Prism also supports titles and line highlighting. See the [Docusaurus
+documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
+
+## Word list
+
+The following tables describe the standard spelling, capitalization, and usage of words found in Netdata's writing.
 
 ### Netdata-specific terms
 
