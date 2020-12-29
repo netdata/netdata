@@ -32,6 +32,13 @@
 #define NETDATA_RH_8 2048
 
 /**
+ *  Kernel 5.10
+ *
+ *  330240 = 5*65536 + 10*256
+ */
+#define NETDATA_EBPF_KERNEL_5_10 330240
+
+/**
  *  Kernel 4.17
  *
  *  266496 = 4*65536 + 17*256

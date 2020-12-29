@@ -242,16 +242,18 @@ char *ebpf_kernel_suffix(int version, int isrh)
 {
     if (isrh) {
         if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.18.0";
+            return "4.18";
         else
-            return "3.10.0";
+            return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_4_17)
-            return "5.4.20";
+        if (version >= NETDATA_EBPF_KERNEL_5_10)
+            return "5.10";
+        else if (version >= NETDATA_EBPF_KERNEL_4_17)
+            return "5.4";
         else if (version >= NETDATA_EBPF_KERNEL_4_15)
-            return "4.16.18";
+            return "4.16";
         else if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.14.171";
+            return "4.14";
     }
 
     return NULL;
