@@ -12,13 +12,13 @@ We store documentation related to the open-source Netdata Agent inside of the [`
 repository](https://github.com/netdata/netdata) on GitHub. Documentation related to Netdata Cloud is stored in a private
 repository and is not currently open to community contributions.
 
-All documentation is aggregated and published at [learn.netdata.cloud](https://learn.netdata.cloud/) using
+The Netdata team aggregates and publishes all documentation at [learn.netdata.cloud](https://learn.netdata.cloud/) using
 [Docusaurus](https://v2.docusaurus.io/) in a private GitHub repository.
 
 ## Before you get started
 
 Anyone interested in contributing to documentation should first read the [Netdata style
-guide](/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](/CODE_OF_CONDUCT.md)
+guide](/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](/CODE_OF_CONDUCT.md).
 
 Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read the [Mastering
 Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating
@@ -48,9 +48,9 @@ Netdata's documentation is separated into four sections.
   - Published at [`https://learn.netdata.cloud/guides`](https://learn.netdata.cloud/guides).
 
 Generally speaking, if you want to contribute to the reference documentation for a specific Netdata Agent feature, find
-the appropriate `.md` file co-located with that feature. If you want to contribute documentation that span features or
-products, or has no direct correlation with the existing directory structure, you should place it in the `/docs` folder
-of `netdata/netdata`.
+the appropriate `.md` file co-located with that feature. If you want to contribute documentation that spans features or
+products, or has no direct correlation with the existing directory structure, place it in the `/docs` folder within
+`netdata/netdata`.
 
 ## How to contribute
 
@@ -58,7 +58,7 @@ The easiest way to contribute to Netdata's documentation is to edit a file direc
 fixes to a single document, such as fixing a typo or clarifying a confusing sentence.
 
 Click on the **Edit this page** button on any published document on [Netdata Learn](https://learn.netdata.cloud). Each
-page has two of these buttons. One beneath the table of contents, and another at the end of the document, which take you
+page has two of these buttons: One beneath the table of contents, and another at the end of the document, which take you
 to GitHub's code editor. Make your suggested changes, keeping [Netdata style guide](/docs/contributing/style-guide.md)
 in mind, and use *Preview changes** button to ensure your Markdown syntax works as expected.
 
@@ -72,16 +72,14 @@ Jump down to our instructions on [PRs](#making-a-pull-request) for your next ste
 Editing documentation locally is the preferred method for complex changes that span multiple documents or change the
 documentation's style or structure.
 
-Create a fork 
-
-First, create a fork of the Netdata Agent repository, if you don't have one already. Visit the [Netdata
-repository](https://github.com/netdata/netdata) and click on the **Fork** button. 
+Create a fork of the Netdata Agent repository by visit the [Netdata repository](https://github.com/netdata/netdata) and
+clicking on the **Fork** button. 
 
 ![Screenshot of forking the Netdata
 repository](https://user-images.githubusercontent.com/1153921/59873572-25f5a380-9351-11e9-92a4-a681fe4a2ed9.png)
 
-GitHub will ask you where you want to clone the repository, and once finished, you end up at the index of your forked
-Netdata repository. Clone your fork to your local machine:
+GitHub will ask you where you want to clone the repository. When finished, you end up at the index of your forked
+Netdata Agent repository. Clone your fork to your local machine:
 
 ```bash
 git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
