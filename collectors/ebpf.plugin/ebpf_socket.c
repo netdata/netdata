@@ -1851,24 +1851,12 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
 }
 
-void change_socket_event()
-{
-    socket_probes[0].type = 'p';
-    socket_probes[4].type = 'p';
-    socket_probes[5].type = 'p';
-    socket_probes[7].name = NULL;
-}
-
 /**
  * Set local function pointers, this function will never be compiled with static libraries
  */
-static void set_local_pointers(ebpf_module_t *em)
+static void set_local_pointers()
 {
     map_fd = socket_data.map_fd;
-
-    if (em->mode == MODE_ENTRY) {
-        change_socket_event();
-    }
 }
 
 /**
@@ -1926,7 +1914,7 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
-    set_local_pointers(em);
+    set_local_pointers();
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);

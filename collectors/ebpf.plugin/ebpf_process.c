@@ -968,22 +968,10 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
 
-void change_process_event()
-{
-    int i;
-    if (running_on_kernel < NETDATA_KERNEL_V5_3)
-        process_probes[EBPF_SYS_CLONE_IDX].name = NULL;
-
-    for (i = 0; process_probes[i].name; i++) {
-        process_probes[i].type = 'p';
-    }
-}
-
 static void change_syscalls()
 {
     static char *lfork = { "do_fork" };
     process_id_names[7] = lfork;
-    process_probes[8].name = lfork;
 }
 
 /**
