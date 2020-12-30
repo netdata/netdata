@@ -36,13 +36,19 @@ to help you determine the exact settings for your desired retention period.
 
 ### Reduce the data collection frequency
 
-Increase `update every` in the [`[global]` section](/daemon/config/README.md#global-section-options) of `netdata.conf`.
-An `update every` of `5` means the Netdata Agent will collect and visualize metrics every 5 seconds.
+Change `update every` in the [`[global]` section](/daemon/config/README.md#global-section-options) of `netdata.conf` so
+that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
+of 5 seconds.
 
 ```conf
 [global]
     update every = 5
 ```
+
+Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
+`python.d.conf`, `node.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
+every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
+or configure a collector](/docs/collect/enable-configure.md) doc for details.
 
 ### Disable a collector or plugin
 
