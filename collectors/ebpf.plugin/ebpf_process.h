@@ -131,22 +131,6 @@ typedef struct ebpf_process_publish_apps {
     // Number of bytes during the last read
     uint64_t bytes_written;
     uint64_t bytes_read;
-
-    // Dimensions sent to chart
-    uint64_t publish_open;
-    uint64_t publish_closed;
-    uint64_t publish_deleted;
-    uint64_t publish_write_call;
-    uint64_t publish_write_bytes;
-    uint64_t publish_read_call;
-    uint64_t publish_read_bytes;
-    uint64_t publish_process;
-    uint64_t publish_thread;
-    uint64_t publish_task;
-    uint64_t publish_open_error;
-    uint64_t publish_close_error;
-    uint64_t publish_write_error;
-    uint64_t publish_read_error;
 } ebpf_process_publish_apps_t;
 
 #endif /* NETDATA_EBPF_PROCESS_H */

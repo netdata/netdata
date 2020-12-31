@@ -931,7 +931,6 @@ void cleanup_exited_pids()
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-            prev_apps_data[r] = NULL;
 
             // Clean socket structures
             if (socket_bandwidth_curr) {
@@ -1055,7 +1054,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
-            prev_apps_data[key] = NULL;
 
             // Clean socket structures
             if (socket_bandwidth_curr) {
