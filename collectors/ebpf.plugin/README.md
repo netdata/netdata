@@ -252,7 +252,7 @@ output.
 
 ```bash
 cd /usr/libexec/netdata/plugins.d/
-sudo -s /bin/bash netdata
+sudo su -s /bin/bash netdata
 ./ebpf.plugin
 ```
 
