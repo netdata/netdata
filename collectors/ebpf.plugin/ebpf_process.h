@@ -93,6 +93,20 @@ typedef enum ebpf_process_index {
 
 } ebpf_process_index_t;
 
+typedef enum netdata_publish_process {
+    NETDATA_KEY_PUBLISH_PROCESS_OPEN,
+    NETDATA_KEY_PUBLISH_PROCESS_CLOSE,
+    NETDATA_KEY_PUBLISH_PROCESS_UNLINK,
+    NETDATA_KEY_PUBLISH_PROCESS_READ,
+    NETDATA_KEY_PUBLISH_PROCESS_WRITE,
+    NETDATA_KEY_PUBLISH_PROCESS_EXIT,
+    NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK,
+    NETDATA_KEY_PUBLISH_PROCESS_FORK,
+    NETDATA_KEY_PUBLISH_PROCESS_CLONE,
+
+    NETDATA_KEY_PUBLISH_PROCESS_END
+} netdata_publish_process_t;
+
 typedef struct ebpf_process_publish_apps {
     // Number of calls during the last read
     uint64_t call_sys_open;

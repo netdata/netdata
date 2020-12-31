@@ -124,7 +124,7 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                netdata_publish_syscall_t *pio,
                                char **dim,
                                char **name,
-                               char *algorithm,
+                               int *algorithm,
                                int end);
 
 extern void ebpf_write_chart_cmd(char *type,

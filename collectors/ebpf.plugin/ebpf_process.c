@@ -11,9 +11,9 @@
  *
  *****************************************************************/
 
-static char *process_dimension_names[NETDATA_MAX_MONITOR_VECTOR] = { "open",    "close", "delete",  "read",  "write",
+static char *process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "open", "close", "delete",  "read",  "write",
                                                                      "process", "task",  "process", "thread" };
-static char *process_id_names[NETDATA_MAX_MONITOR_VECTOR] = { "do_sys_open",  "__close_fd", "vfs_unlink",
+static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open",  "__close_fd", "vfs_unlink",
                                                               "vfs_read",     "vfs_write",  "do_exit",
                                                               "release_task", "_do_fork",   "sys_clone" };
 static char *status[] = { "process", "zombie" };
@@ -51,38 +51,33 @@ static void ebpf_update_global_publish(
     netdata_publish_syscall_t *publish, netdata_publish_vfs_common_t *pvc, netdata_syscall_stat_t *input)
 {
     netdata_publish_syscall_t *move = publish;
+    int selector = NETDATA_KEY_PUBLISH_PROCESS_OPEN;
     while (move) {
-        if (input->call != move->pcall) {
-            //This condition happens to avoid initial values with dimensions higher than normal values.
-            if (move->pcall) {
-                move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
-                move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
-                move->nerr = (input->ecall > move->nerr) ? input->ecall - move->perr : move->perr - input->ecall;
-            } else {
-                move->ncall = 0;
-                move->nbyte = 0;
-                move->nerr = 0;
-            }
+        if (selector < NETDATA_KEY_PUBLISH_PROCESS_READ) {
+            move->ncall = input->call;
+            move->nbyte = input->bytes;
+            move->nerr = input->ecall;
+        } else {
+            move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
+            move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
+            move->nerr = (input->ecall > move->nerr) ? input->ecall - move->perr : move->perr - input->ecall;
 
             move->pcall = input->call;
             move->pbyte = input->bytes;
             move->perr = input->ecall;
-        } else {
-            move->ncall = 0;
-            move->nbyte = 0;
-            move->nerr = 0;
         }
 
         input = input->next;
         move = move->next;
+        selector++;
     }
 
-    pvc->write = -((long)publish[2].nbyte);
-    pvc->read = (long)publish[3].nbyte;
+    pvc->write = -((long)publish[NETDATA_KEY_PUBLISH_PROCESS_WRITE].nbyte);
+    pvc->read = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_READ].nbyte;
 
-    pvc->running = (long)publish[7].ncall - (long)publish[8].ncall;
-    publish[6].ncall = -publish[6].ncall; // release
-    pvc->zombie = (long)publish[5].ncall + (long)publish[6].ncall;
+    pvc->running = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_FORK].ncall - (long)publish[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ncall;
+    publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall = -publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
+    pvc->zombie = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_EXIT].ncall + (long)publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
 }
 
 /**
@@ -406,27 +401,27 @@ static void read_hash_global_tables()
         }
     }
 
-    process_aggregated_data[0].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
-    process_aggregated_data[1].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
-    process_aggregated_data[2].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    process_aggregated_data[3].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    process_aggregated_data[4].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
-    process_aggregated_data[5].call = res[NETDATA_KEY_CALLS_DO_EXIT];
-    process_aggregated_data[6].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
-    process_aggregated_data[7].call = res[NETDATA_KEY_CALLS_DO_FORK];
-    process_aggregated_data[8].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_OPEN].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLOSE].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_UNLINK].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_EXIT].call = res[NETDATA_KEY_CALLS_DO_EXIT];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_FORK].call = res[NETDATA_KEY_CALLS_DO_FORK];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLONE].call = res[NETDATA_KEY_CALLS_SYS_CLONE];
 
-    process_aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
-    process_aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
-    process_aggregated_data[2].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    process_aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    process_aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
-    process_aggregated_data[7].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
-    process_aggregated_data[8].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_OPEN].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLOSE].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_UNLINK].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_FORK].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
 
-    process_aggregated_data[2].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] +
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] +
                                        (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    process_aggregated_data[3].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] +
+    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] +
                                        (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
@@ -512,8 +507,10 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
            order,
            update_every);
 
-    printf("DIMENSION %s %s absolute 1 1\n", process_id_names[3], NETDATA_VFS_DIM_OUT_FILE_BYTES);
-    printf("DIMENSION %s %s absolute 1 1\n", process_id_names[4], NETDATA_VFS_DIM_IN_FILE_BYTES);
+    printf("DIMENSION %s %s absolute 1 1\n",
+           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ], NETDATA_VFS_DIM_OUT_FILE_BYTES);
+    printf("DIMENSION %s %s absolute 1 1\n",
+           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE], NETDATA_VFS_DIM_IN_FILE_BYTES);
 }
 
 /**
@@ -525,7 +522,8 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
  * @param web    the group name used to attach the chart on dashaboard
  * @param order  the order number of the specified chart
  */
-static void ebpf_process_status_chart(char *family, char *name, char *axis, char *web, int order)
+static void ebpf_process_status_chart(char *family, char *name, char *axis,
+                                      char *web, char *algo, int order)
 {
     printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d ''\n",
            family,
@@ -535,8 +533,8 @@ static void ebpf_process_status_chart(char *family, char *name, char *axis, char
            order,
            update_every);
 
-    printf("DIMENSION %s '' absolute 1 1\n", status[0]);
-    printf("DIMENSION %s '' absolute 1 1\n", status[1]);
+    printf("DIMENSION %s '' %s 1 1\n", status[0], algo);
+    printf("DIMENSION %s '' %s 1 1\n", status[1], algo);
 }
 
 /**
@@ -632,6 +630,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                               NETDATA_PROCESS_STATUS_NAME,
                               EBPF_COMMON_DIMENSION_DIFFERENCE,
                               NETDATA_PROCESS_GROUP,
+                              ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                               21008);
 
     if (em->mode < MODE_ENTRY) {
@@ -1068,9 +1067,15 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
+    int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
+        NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX, //open, close, unlink
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
+    };
+
     ebpf_global_labels(
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
-        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NETDATA_MAX_MONITOR_VECTOR);
+        algorithms, NETDATA_MAX_MONITOR_VECTOR);
 
     if (process_enabled) {
         ebpf_create_global_charts(em);

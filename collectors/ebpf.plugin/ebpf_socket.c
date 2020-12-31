@@ -1931,9 +1931,13 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
+    int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
+    };
     ebpf_global_labels(
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
-        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NETDATA_MAX_SOCKET_VECTOR);
+        algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
 

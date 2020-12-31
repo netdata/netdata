@@ -455,11 +455,11 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  * @param pio  structure used to generate charts.
  * @param dim  a pointer for the dimensions name
  * @param name a pointer for the tensor with the name of the functions.
- * @param algorithm the algorithm used on the dimension
+ * @param algorithm a vector with the algorithms used to make the charts
  * @param end  the number of elements in the previous 4 arguments.
  */
 void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim,
-                        char **name, char *algorithm, int end)
+                        char **name, int *algorithm, int end)
 {
     int i;
 
@@ -473,7 +473,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
-        pio[i].algorithm = strdupz(algorithm);
+        pio[i].algorithm = strdupz(ebpf_algorithms[algorithm[i]]);
         if (publish_prev) {
             publish_prev->next = &pio[i];
         }
