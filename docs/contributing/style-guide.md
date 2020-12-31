@@ -265,6 +265,68 @@ Contractions are generally not used in press releases or other media engagements
 Emoji can add fun and character to your writing, but should be used sparingly and only if it matches the content's tone
 and desired audience.
 
+## Technical/Linux standards
+
+Configuration or maintenance of the Netdata Agent requires some system administration skills, such as navigating
+directories, editing files, or starting/stopping/restarting services. Certain processes 
+
+### Switching Linux users
+
+Netdata documentation often suggests that users switch from their normal user to the `netdata` user to run specific
+commands. Use the following command to instruct users to make the switch:
+
+```bash
+sudo su -s /bin/bash netdata
+```
+
+### Hostname/IP address of a node
+
+Use `NODE` instead of an actual or example IP address/hostname when referencing the process of navigating to a dashboard
+or API endpoint in a browser.
+
+|                 |                                                                                                                                                                             |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Not recommended | Navigate to `http://example.com:19999` in your browser to see Netdata's dashboard. <br />Navigate to `http://203.0.113.0:19999` in your browser to see Netdata's dashboard. |
+| **Recommended** | Navigate to `http://NODE:19999` in your browser to see Netdata's dashboard.                                                                                                 |
+
+If you worry that `NODE` doesn't provide enough context for the user, particularly in documentation or guides designed
+for beginners, you can provide an explanation:
+
+> With the Netdata Agent running, visit `http://NODE:19999/api/v1/info` in your browser, replacing `NODE` with the IP
+> address or hostname of your Agent.
+
+### Paths and running commands
+
+When instructing users to run a Netdata-specific command, don't assume the path to said command, because not every
+Netdata Agent installation will have commands under the same paths. When applicable, help them navigate to the correct
+path, providing a recommendation or instructions on how to view the running configuration, which includes the correct
+paths.
+
+For example, the [configuration](/docs/configure/nodes.md) doc first teaches users how to find the Netdata config
+directory and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more
+universal.
+
+Don't include full paths, beginning from the system's root (`/`), as these might not work on certain systems.
+
+|                 |                                                                                                                                                                             |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`. |
+| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+
+### `sudo`
+
+Include `sudo` before a command if you believe most Netdata users will need to elevate privileges to run it. This makes
+our writing more universal, and users on `sudo`-less systems are generally already aware that they need to run commands
+differently.
+
+For example, most users need to use `sudo` with the `edit-config` script, because the Netdata config directory is owned
+by the `netdata` user. Same goes for restarting the Netdata Agent with `systemctl`.
+
+|                 |                                                                                                                                              |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| Not recommended | Run `edit-config netdata.conf` to configure the Netdata Agent. <br />Run `systemctl restart netdata` to restart the Netdata Agent.           |
+| **Recommended** | Run `sudo edit-config netdata.conf` to configure the Netdata Agent. <br />Run `sudo systemctl restart netdata` to restart the Netdata Agent. |
+
 ## Markdown syntax
 
 Netdata's documentation uses Markdown syntax.
@@ -413,7 +475,7 @@ The following tables describe the standard spelling, capitalization, and usage o
 | **Netdata Cloud**           | The web application hosted at [https://app.netdata.cloud](https://app.netdata.cloud) that helps you monitor an entire infrastructure of distributed systems in real time. <br /><br />Never use _Cloud_ without the preceding _Netdata_ to avoid ambiguity.                                                                                                                                                           |
 | **Netdata community**       | Contributors to any of Netdata's [open-source projects](https://learn.netdata.cloud/contribute/projects), members of the [community forum](https://community.netdata.cloud/).                                                                                                                                                                                                                                         |
 | **Netdata community forum** | The Discourse-powered forum for feature requests, Netdata Cloud technical support, and conversations about Netdata's monitoring and troubleshooting products.                                                                                                                                                                                                                                                         |
-| **node**                    | Used to refer to a system on which the Netdata Agent is installed. The system can be physical, virtual, in a Docker container, and more. Depending on your infrastructure, you may have one, dozens, or hundreds of nodes. Some nodes are _ephemeral_, in that they're created/destroyed automatically by an orchestrator service.                                                                                    |
+| **node**                    | A system on which the Netdata Agent is installed. The system can be physical, virtual, in a Docker container, and more. Depending on your infrastructure, you may have one, dozens, or hundreds of nodes. Some nodes are _ephemeral_, in that they're created/destroyed automatically by an orchestrator service.                                                                                                     |
 | **Space**                   | The highest level container within Netdata Cloud for a user to organize their team members and nodes within their infrastructure. A Space likely represents an entire organization or a large team. <br /><br />_Space_ is always capitalized.                                                                                                                                                                        |
 | **unreachable node**        | A claimed node with a disrupted [Agent-Cloud link](/aclk/README.md). Unreachable could mean the node no longer exists or is experiencing network connectivity issues with Cloud.                                                                                                                                                                                                                                      |
 | **visited node**            | A node which has had its Agent dashboard directly visited by a user. A list of these is maintained on a per-user basis.                                                                                                                                                                                                                                                                                               |
