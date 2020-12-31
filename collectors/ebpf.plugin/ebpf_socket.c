@@ -289,7 +289,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
       NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(
-        NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], socket_id_names[1], &common_tcp);
+        NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write,
+        socket_id_names[1], common_tcp.read);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
           NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
@@ -300,7 +301,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
         NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
     write_io_chart(
-        NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], socket_id_names[4], &common_udp);
+        NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write,
+        socket_id_names[4], (long long)common_udp.read);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
             NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
@@ -524,6 +526,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20080,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
@@ -531,6 +534,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
@@ -538,6 +542,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20082,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
@@ -545,6 +550,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20083,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
@@ -552,6 +558,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20084,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
@@ -559,6 +566,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20085,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
@@ -566,6 +574,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20086,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     socket_apps_created = 1;
@@ -1785,6 +1794,7 @@ static void ebpf_socket_cleanup(void *ptr)
     }
 
     freez(socket_aggregated_data);
+    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_publish_aggregated);
     freez(socket_hash_values);
 
@@ -1923,7 +1933,7 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_global_labels(
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
-        NETDATA_MAX_SOCKET_VECTOR);
+        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
 

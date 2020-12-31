@@ -164,7 +164,8 @@ static void ebpf_process_send_data(ebpf_module_t *em)
             NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_PROCESS_START], 2);
     }
 
-    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3], process_id_names[4], &pvc);
+    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3], (long long) pvc.write,
+                   process_id_names[4], (long long)pvc.read);
 }
 
 /**
@@ -661,6 +662,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_FILE_GROUP,
                                20061,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     if (em->mode < MODE_ENTRY) {
@@ -669,6 +671,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_FILE_GROUP,
                                    20062,
+                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                    root);
     }
 
@@ -677,6 +680,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_FILE_GROUP,
                                20063,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     if (em->mode < MODE_ENTRY) {
@@ -685,6 +689,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_FILE_GROUP,
                                    20064,
+                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                    root);
     }
 
@@ -693,6 +698,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
                                20065,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
@@ -700,6 +706,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
                                20066,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                apps_groups_root_target);
 
     if (em->mode < MODE_ENTRY) {
@@ -708,6 +715,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_VFS_GROUP,
                                    20067,
+                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                    root);
     }
 
@@ -716,6 +724,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
                                20068,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     if (em->mode < MODE_ENTRY) {
@@ -724,6 +733,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_VFS_GROUP,
                                    20069,
+                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                    root);
     }
 
@@ -732,6 +742,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_VFS_GROUP,
                                20070,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
@@ -739,6 +750,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_VFS_GROUP,
                                20071,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
@@ -746,6 +758,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                20072,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
@@ -753,6 +766,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                20073,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
@@ -760,6 +774,7 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                20074,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 }
 
@@ -924,6 +939,7 @@ static void ebpf_process_cleanup(void *ptr)
     }
 
     freez(process_aggregated_data);
+    ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
@@ -1054,7 +1070,7 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_global_labels(
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
-        NETDATA_MAX_MONITOR_VECTOR);
+        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NETDATA_MAX_MONITOR_VECTOR);
 
     if (process_enabled) {
         ebpf_create_global_charts(em);
