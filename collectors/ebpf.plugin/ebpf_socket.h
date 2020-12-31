@@ -271,6 +271,5 @@ extern ebpf_network_viewer_port_list_t *listen_ports;
 extern void update_listen_table(uint16_t value, uint8_t proto);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
-extern ebpf_socket_publish_apps_t **socket_bandwidth_prev;
 
 #endif

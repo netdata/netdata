@@ -936,7 +936,6 @@ void cleanup_exited_pids()
             if (socket_bandwidth_curr) {
                 freez(socket_bandwidth_curr[r]);
                 socket_bandwidth_curr[r] = NULL;
-                socket_bandwidth_prev[r] = NULL;
             }
         } else {
             if (unlikely(p->keep))
@@ -1059,7 +1058,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
             if (socket_bandwidth_curr) {
                 freez(socket_bandwidth_curr[key]);
                 socket_bandwidth_curr[key] = NULL;
-                socket_bandwidth_prev[key] = NULL;
             }
 
             pids = pids->next;

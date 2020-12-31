@@ -23,7 +23,6 @@ static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
 static ebpf_data_t socket_data;
 
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
-ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
@@ -257,24 +256,6 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
     }
 }
 
-
-/**
- * Update the publish strctures to create the dimenssions
- *
- * @param curr   Last values read from memory.
- * @param prev   Previous values read from memory.
- */
-static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr, ebpf_socket_publish_apps_t *prev)
-{
-    curr->publish_received_bytes = curr->bytes_received - prev->bytes_received;
-    curr->publish_sent_bytes = curr->bytes_sent - prev->bytes_sent;
-    curr->publish_tcp_sent = curr->call_tcp_sent - prev->call_tcp_sent;
-    curr->publish_tcp_received = curr->call_tcp_received - prev->call_tcp_received;
-    curr->publish_retransmit = curr->retransmit - prev->retransmit;
-    curr->publish_udp_sent = curr->call_udp_sent - prev->call_udp_sent;
-    curr->publish_udp_received = curr->call_udp_received - prev->call_udp_received;
-}
-
 /**
  * Send data to Netdata calling auxiliar functions.
  *
@@ -353,7 +334,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_sent_bytes));
+                                                                          bytes_sent));
             write_chart_dimension(w->name, value);
         }
     }
@@ -363,7 +344,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_received_bytes));
+                                                                          bytes_received));
             write_chart_dimension(w->name, value);
         }
     }
@@ -373,7 +354,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_tcp_sent));
+                                                                          call_tcp_sent));
             write_chart_dimension(w->name, value);
         }
     }
@@ -383,7 +364,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_tcp_received));
+                                                                          call_tcp_received));
             write_chart_dimension(w->name, value);
         }
     }
@@ -393,7 +374,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_retransmit));
+                                                                          retransmit));
             write_chart_dimension(w->name, value);
         }
     }
@@ -403,7 +384,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_udp_sent));
+                                                                          call_udp_sent));
             write_chart_dimension(w->name, value);
         }
     }
@@ -413,7 +394,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          publish_udp_received));
+                                                                          call_udp_received));
             write_chart_dimension(w->name, value);
         }
     }
@@ -526,7 +507,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20080,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
@@ -534,7 +515,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_BYTESS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
@@ -542,7 +523,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20082,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
@@ -550,7 +531,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20083,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
@@ -558,7 +539,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20084,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
@@ -566,7 +547,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20085,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
@@ -574,7 +555,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_NET_GROUP,
                                20086,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     socket_apps_created = 1;
@@ -1520,15 +1501,9 @@ static void read_hash_global_tables()
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
-    ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
     if (!curr) {
-        ebpf_socket_publish_apps_t *ptr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
-        curr = &ptr[0];
+        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
         socket_bandwidth_curr[current_pid] = curr;
-        prev = &ptr[1];
-        socket_bandwidth_prev[current_pid] = prev;
-    } else {
-        memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
     }
 
     curr->bytes_sent = eb->bytes_sent;
@@ -1538,8 +1513,6 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
     curr->retransmit = eb->retransmit;
     curr->call_udp_sent = eb->call_udp_sent;
     curr->call_udp_received = eb->call_udp_received;
-
-    ebpf_socket_update_apps_publish(curr, prev);
 }
 
 /**
@@ -1800,7 +1773,6 @@ static void ebpf_socket_cleanup(void *ptr)
 
     clean_thread_structures();
     freez(socket_bandwidth_curr);
-    freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
 
     freez(socket_values);
@@ -1853,7 +1825,6 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-    socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
