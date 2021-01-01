@@ -1760,7 +1760,7 @@ static void ebpf_socket_cleanup(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    uint32_t tick = 200*USEC_PER_MS;
+    uint32_t tick = 2*USEC_PER_MS;
     while (!read_thread_closed) {
         usec_t dt = heartbeat_next(&hb, tick);
         UNUSED(dt);
