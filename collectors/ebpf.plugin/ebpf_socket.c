@@ -85,11 +85,13 @@ static void ebpf_update_global_publish(
         move = move->next;
     }
 
-    tcp->write = -((long)publish[0].nbyte);
-    tcp->read = (long)publish[1].nbyte;
+    // We read bytes from function arguments, but bandiwdth is given in bits,
+    // so we need to multiply by 8 the read data.
+    tcp->write = -(((long)publish[0].nbyte)<<3)/1000;
+    tcp->read = (((long)publish[1].nbyte)<<3)/1000;
 
-    udp->write = -((long)publish[3].nbyte);
-    udp->read = (long)publish[4].nbyte;
+    udp->write = -(((long)publish[3].nbyte)<<3)/1000;
+    udp->read = (((long)publish[4].nbyte)<<3)/1000;
 }
 
 /**
@@ -270,7 +272,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
       NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(
-        NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write,
+        NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write,
         socket_id_names[1], common_tcp.read);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
@@ -282,7 +284,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
         NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
     write_io_chart(
-        NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write,
+        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write,
         socket_id_names[4], (long long)common_udp.read);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
@@ -335,7 +337,8 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_sent));
-            write_chart_dimension(w->name, value);
+            // We multiply by 0.008, because we read bytes, but we display bits
+            write_chart_dimension(w->name, ((value)<<3)/1000);
         }
     }
     write_end_chart();
@@ -345,7 +348,8 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_received));
-            write_chart_dimension(w->name, value);
+            // We multiply by 0.008, because we read bytes, but we display bits
+            write_chart_dimension(w->name, ((value)<<3)/1000);
         }
     }
     write_end_chart();
@@ -427,10 +431,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       socket_publish_aggregated,
                       3);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_TCP_FUNCTION_BYTES,
-                      "TCP bandwidth",
-                      EBPF_COMMON_DIMENSION_BYTESS,
+    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_TCP_FUNCTION_BITS,
+                      "TCP bandwidth", EBPF_COMMON_DIMENSION_BITS,
                       NETDATA_SOCKET_GROUP,
                       21071,
                       ebpf_create_global_dimension,
@@ -469,10 +471,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &socket_publish_aggregated[NETDATA_UDP_START],
                       2);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_UDP_FUNCTION_BYTES,
-                      "UDP bandwidth",
-                      EBPF_COMMON_DIMENSION_BYTESS,
+    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_UDP_FUNCTION_BITS,
+                      "UDP bandwidth", EBPF_COMMON_DIMENSION_BITS,
                       NETDATA_SOCKET_GROUP,
                       21075,
                       ebpf_create_global_dimension,
@@ -503,16 +503,14 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
 {
     UNUSED(em);
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
-                               "Bytes sent",
-                               EBPF_COMMON_DIMENSION_BYTESS,
+                               "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                20080,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
-                               "bytes received",
-                               EBPF_COMMON_DIMENSION_BYTESS,
+                               "bytes received", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
                                20081,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
@@ -648,8 +646,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
-                                    "Outbound connections (bytes).",
-                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Outbound connections (bytes).", EBPF_COMMON_DIMENSION_BYTESS,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21080,
                                     ptr);
@@ -669,8 +666,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                          ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
-                                    "Inbound connections (bytes)",
-                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Inbound connections (bytes)", EBPF_COMMON_DIMENSION_BYTESS,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21084,
                                     ptr);

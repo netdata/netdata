@@ -180,6 +180,7 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
+#define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
 #define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
