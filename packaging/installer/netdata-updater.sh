@@ -157,6 +157,8 @@ newer_commit_date() {
     commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date' | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
     commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
+  elif command -v python3 > /dev/null 2>&1;then
+    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python3 -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
   fi
 
   if [ -z "${commit_date}" ] ; then
