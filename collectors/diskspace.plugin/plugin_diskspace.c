@@ -5,7 +5,7 @@
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
 #define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
-#define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl"
+#define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
