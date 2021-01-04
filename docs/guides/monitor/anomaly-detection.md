@@ -1,18 +1,30 @@
 <!--
 title: "Anomaly detection with ML and the Netdata Agent"
-description: "Train a "
+description: "Detect anomalies in any system, container, or application in your infrastructure with machine learning and the open-source Netdata Agent."
 image: /img/seo/guides/monitor/anomalies-ml.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomalies-ml.md
 -->
 
 # Anomaly detection with ML and the Netdata Agent
 
-**T/K**
+Beginning with v1.27, the open-source Netdata Agent is capable of unsupervised anomaly detection with machine learning
+(ML). As with all things Netdata, the anomalies collector comes with preconfigured alarms and instant visualizations
+that require no query languages or organizing metrics. You configure the collector to look at specific charts, and it
+handles the rest. 
 
-**anomaly detection** with machine learning (ML) and the Netdata Agent.
+Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
+library](https://github.com/yzhao062/pyod/tree/master), which first runs a `train` function that learns what "normal"
+looks like on your node and creates an ML model, then utilizes the `predict_proba()` and `predict()` functions to
+visualize how anomalous cer
 
-If you choose, you'll use an Nginx web server to practice configuring the anomalies collector and making sense of the
-its real-time visualizations.
+All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud), if
+you choose to sign up and claim your nodes, which empowers you to run tailored anomaly detection on every node in your
+infrastructure, regardless of its purpose or workload.
+
+![Example anomaly detection with an Nginx web
+server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea2-11eb-944e-46edd3f83e3a.png)
+
+Let's get started.
 
 ## Prerequisites
 
@@ -23,7 +35,7 @@ its real-time visualizations.
 
 ## Install required Python packages
 
-The anomalies collector uses a few Python packages, available with `pip`, to run ML training. It requires `numba`,
+The anomalies collector uses a few Python packages, available with `pip3`, to run ML training. It requires `numba`,
 `scikit-learn`, `pyod`, in addition to `netdata-pandas`, which is a package built by the Netdata team to pull data from
 a Netdata Agent's API into a Pandas DataFrame. Read more about `netdata-pandas` on its [package
 repo](https://github.com/netdata/netdata-pandas) or in Netdata's [community
@@ -36,6 +48,9 @@ sudo su -s /bin/bash netdata
 # Install required packages for the netdata user
 pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
+
+> If the `pip3` command fails, you need to install it. For example, on an Ubuntu system, use `sudo apt install
+> python3-pip`.
 
 Use `exit` to become your normal user again.
 
@@ -55,9 +70,9 @@ doesn't exist, add it into the file anywhere you like. Either way, the final res
 anomalies: yes
 ```
 
-Restart the Agent with `service netdata restart` to start up the anomalies collector. By default, the model training
-process runs every 30 minutes, and uses the previous 4 hours of metrics to establish a baseline for health and
-performance across the default charts to include. 
+[Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to start up the
+anomalies collector. By default, the model training process runs every 30 minutes, and uses the previous 4 hours of
+metrics to establish a baseline for health and performance across the default charts to include.
 
 ## Configure the anomalies collector
 
@@ -130,39 +145,26 @@ Apply the ideas behind the collector's regex and excluding settings to any other
 [system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), or
 [application](/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
 
-### Add a custom anomaly detection model for Nginx
-
-While you now have basic anomaly detection for your Nginx web server, the collector is only training and visualizing
-anomalies based on individual charts, not groups of connected charts.
-
-You may want to know if a group of charts is acting anomalously, not just a single chart related to a particular
-application or service. For example, a sudden increase in volume of requests on an Nginx web server may be anomalous, in
-that the website being served is seeing more traffic than usual, but the web server may still be operating normally. On
-the other hand, high requests _plus_ high CPU utilization or `4xx` responses most likely indicates an incident worth
-further investigation.
-
-```conf
-custom_models:
-    - name: 'nginx'
-      dimensions: 'apps.cpu|httpd,apps.mem|httpd,nginx.connections,web_log.requests,web_log.type_requests'
-```
-
-Let's break down this line.
-
-## See anomaly detection in action
-
-### Alarms
-
-### Build an anomaly detection dashboard
-
-### Multi-node anomaly detection
-
 ## What's next?
 
-TK
+Now that you know how to set up unsupervised anomaly detection in the Netdata Agent, using an Nginx web server as an
+example, time to apply that knowledge to other mission critical parts of your infrastructure. If you're not sure what to
+monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata can
+collect from your systems, containers, and applications.
+
+For a more user-friendly anomaly detection experience, try out the [Metric
+Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Unlike the
+anomalies collector, Metric Correlations only runs when you tell it to, and also focuses the dashboard into only the
+most relevant charts.
+
+Stay tuned for the next two parts of this guide, which provide more real-world context for the anomalies collector.
+First, maximize the immediate value you get from anomaly detection by tracking preconfigured alarms, visualizing
+anomalies in charts, and building a new dashboard tailored to your applications. Then, learn about creating custom ML
+models, which help you holistically monitor an application or service by monitor anomalies across a _cluster of charts_.
 
 ### Related reference documentation
 
 - [Netdata Agent · Anomalies collector](/collectors/python.d/anomalies/README.md)
+- [Netdata Cloud · Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fanomaly-detectionl&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
