@@ -15,7 +15,7 @@ languages or organizing metrics. You configure the collector to look at specific
 Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
 library](https://github.com/yzhao062/pyod/tree/master), which first runs a `train` function that learns what "normal"
 looks like on your node and creates an ML model, then utilizes the `predict_proba()` and `predict()` functions to
-visualize how anomalous cer
+visualize how anomalous certain metrics are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud), if
 you choose to sign up and claim your nodes, which empowers you to run tailored anomaly detection on every node in your
@@ -65,8 +65,8 @@ to open the `python.d.conf` file.
 sudo ./edit-config python.d.conf
 ```
 
-In `python.d.conf` file, search for the `anomalies` line. If the line exists, set the value to `yes`. If the line
-doesn't exist, add it into the file anywhere you like. Either way, the final result should look like:
+In `python.d.conf` file, search for the `anomalies` line. If the line exists, set the value to `yes`. Add the line
+yourself if it doesn't already exist. Either way, the final result should look like:
 
 ```conf
 anomalies: yes
@@ -90,7 +90,7 @@ involve tweaking the behavior of the ML training itself.
 - `charts_regex`: Which charts to train against and include in anomaly detection.
 - `charts_to_exclude`: Specific charts, selected by the regex in `charts_regex`, to exclude.
 - `train_every_n`: How often to train the ML models.
-- `train_n_secs`: The amount of historical metrics to train ML models on. The default is 4 hours, but if your node
+- `train_n_secs`: The number of historical metrics to train ML models on. The default is 4 hours, but if your node
   doesn't have historical metrics going back that far, consider [changing the metrics retention
   policy](/docs/store/change-metrics-storage.md).
 - `custom_models`: A way to define custom models that you want anomaly probabilities for, including multi-node or
@@ -122,9 +122,9 @@ dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880
 
 ### Remove some metrics from anomaly detection
 
-As you can see in the above screenshot, this node is now looking for anomalies in a lot of places. The result is a
-single `anomalies_local.probability` chart with more than twenty dimensions, some of which are hidden at the bottom of a
-scroll-able area. In addition, training and analyzing the anomaly collector on this many charts might require more CPU
+As you can see in the above screenshot, this node is now looking for anomalies in many places. The result is a single
+`anomalies_local.probability` chart with more than twenty dimensions, some of which the dashboard hides at the bottom of
+a scroll-able area. In addition, training and analyzing the anomaly collector on this many charts might require more CPU
 utilization that you're willing to give.
 
 First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).
@@ -150,14 +150,14 @@ Apply the ideas behind the collector's regex and excluding settings to any other
 ## What's next?
 
 Now that you know how to set up unsupervised anomaly detection in the Netdata Agent, using an Nginx web server as an
-example, time to apply that knowledge to other mission critical parts of your infrastructure. If you're not sure what to
+example, time to apply that knowledge to other mission-critical parts of your infrastructure. If you're not sure what to
 monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata can
 collect from your systems, containers, and applications.
 
 For a more user-friendly anomaly detection experience, try out the [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Unlike the
-anomalies collector, Metric Correlations only runs when you tell it to, and also focuses the dashboard into only the
-most relevant charts.
+Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Metric
+Correlations runs only at your requests, removing unrelated charts from the dashboard to help you focus on root cause
+analysis.
 
 Stay tuned for the next two parts of this guide, which provide more real-world context for the anomalies collector.
 First, maximize the immediate value you get from anomaly detection by tracking preconfigured alarms, visualizing
