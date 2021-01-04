@@ -5,12 +5,12 @@ image: /img/seo/guides/monitor/anomalies-ml.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomalies-ml.md
 -->
 
-# Anomaly detection with ML and the Netdata Agent
+# Anomaly detection with machine learning and the Netdata Agent
 
-Beginning with v1.27, the open-source Netdata Agent is capable of unsupervised anomaly detection with machine learning
-(ML). As with all things Netdata, the anomalies collector comes with preconfigured alarms and instant visualizations
-that require no query languages or organizing metrics. You configure the collector to look at specific charts, and it
-handles the rest. 
+Beginning with v1.27, the open-source Netdata Agent is capable of unsupervised [anomaly
+detection](https://en.wikipedia.org/wiki/Anomaly_detection) with machine learning (ML). As with all things Netdata, the
+anomalies collector comes with preconfigured alarms and instant visualizations that require no query languages or
+organizing metrics. You configure the collector to look at specific charts, and it handles the rest.
 
 Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
 library](https://github.com/yzhao062/pyod/tree/master), which first runs a `train` function that learns what "normal"
@@ -21,10 +21,12 @@ All these metrics and alarms are available for centralized monitoring in [Netdat
 you choose to sign up and claim your nodes, which empowers you to run tailored anomaly detection on every node in your
 infrastructure, regardless of its purpose or workload.
 
+In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
+and/or the node that hosts it, which will give you the tools to configure parallel unsupervised monitors for any
+application in your infrastructure. Let's get started.
+
 ![Example anomaly detection with an Nginx web
 server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea2-11eb-944e-46edd3f83e3a.png)
-
-Let's get started.
 
 ## Prerequisites
 
