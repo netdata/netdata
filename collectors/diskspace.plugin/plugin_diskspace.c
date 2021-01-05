@@ -94,8 +94,13 @@ int mount_point_cleanup(void *entry, void *data) {
     struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
     if(!mp) return 0;
 
-    if(likely(mp->updated || mp->busy)) {
-        mp->updated = 0;
+
+    if (mp->busy) {
+        return 0;
+    }
+
+    if(likely(mp->updated > 0)) {
+        mp->updated--;
         return 0;
     }
 
@@ -120,18 +125,19 @@ int mount_point_cleanup(void *entry, void *data) {
 }
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
-    if (mi->busy)
-        return;
-    uv_rwlock_rdlock(&disk_mountinfo_lock);
-    mi->busy = 1;
-    uv_rwlock_rdunlock(&disk_mountinfo_lock);
-
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
     int do_space, do_inodes;
+
+    if (!mi->busy) {
+    #ifdef NETDATA_INTERNAL_CHECKS
+        error("DISKSPACE: mointpoint %s is not marked busy", mi->mount_point);
+    #endif
+        mi->busy = 1;
+    }
 
     if(unlikely(!dict_mountpoints)) {
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
@@ -220,7 +226,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .do_inodes = do_inodes,
                 .shown_error = 0,
                 .updated = 0,
-                .busy = 0,
+                .busy = 1,
 
                 .collected = 0,
 
@@ -234,13 +240,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_used = NULL,
                 .rd_inodes_reserved = NULL
         };
-        uv_rwlock_rdlock(&dict_mountpoints_lock);
         m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
-        m->busy = 1;
-        uv_rwlock_rdunlock(&dict_mountpoints_lock);
     }
 
-    m->updated = 1;
+    m->updated = 2;
 
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
         goto exit;
@@ -392,7 +395,6 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m->collected++;
 
 exit:
-    mi->busy = 0;
     m->busy = 0;
 }
 
@@ -456,7 +458,14 @@ void disk_space_stats_work(uv_work_t* req)
     struct work_data *d = req->data;
 
     do_disk_space_stats(d->mi, d->update_every);
+}
 
+void disk_space_stats_done(uv_work_t* req, int status)
+{
+    UNUSED(status);
+    struct work_data *d = req->data;
+
+    d->mi->busy = 0;
     free(d);
 }
 
@@ -509,16 +518,18 @@ void *diskspace_main(void *ptr) {
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
 
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND) || mi->busy))
                 continue;
+
+            mi->busy = 1;
 
             struct work_data *d = mallocz(sizeof(struct work_data));
             d->mi = mi;
             d->update_every = update_every;
             mi->work.data = d;
 
-            fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, NULL));
-            // do_disk_space_stats(mi, update_every);
+            fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, disk_space_stats_done));
+            
             if(unlikely(netdata_exit)) break;
         }
 
