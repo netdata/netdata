@@ -14,10 +14,12 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "mqtt_wss_client.h"
 
 int test_exit = 0;
+int port = 0;
 
 void mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 {
@@ -51,7 +53,7 @@ int client_handle(mqtt_wss_client client)
         .keep_alive = 10
     };
 
-    while (mqtt_wss_connect(client, "127.0.0.1", 9002, &params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
+    while (mqtt_wss_connect(client, "127.0.0.1", port, &params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
         printf("Connect failed\n");
         sleep(1);
         printf("Attempting Reconnect\n");
@@ -68,8 +70,14 @@ int client_handle(mqtt_wss_client client)
     return 0;
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc >= 2)
+        port = atoi(argv[1]);
+    if (!port)
+        port = 9002;
+    printf("Using port %d", port);
+
     mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
     while (!test_exit) {
         printf("client_handle = %d", client_handle(client));
