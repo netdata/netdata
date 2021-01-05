@@ -1,6 +1,6 @@
 <!--
 title: "Netdata style guide"
-description: "The _Netdata style guide_ establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
+description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
 -->
 
@@ -95,10 +95,10 @@ mechanics](#language-grammar-and-mechanics) section below.
 
 ## Language, grammar, and mechanics
 
-**T/K**
-
-If you're writing about Netdata for an external publication, such as a guest blog post, follow that publication's
-style guide or standards, if they have one published.
+To ensure Netdata's writing is clear, concise, and universal, we have established standards for language, grammar, and
+certain writing mechanics. However, if you're writing about Netdata for an external publication, such as a guest blog
+post, follow that publication's style guide or standards, while keeping the [preferred spelling of Netdata
+terms](#netdata-specific-terms) in mind.
 
 ### Active voice
 
