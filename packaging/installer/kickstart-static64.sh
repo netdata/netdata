@@ -350,7 +350,7 @@ else
 fi
 
 if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-  fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
+  fatal "Static binary checksum validation failed. Stopping Netdata Agent installation and leaving binary in ${TMPDIR}\nUsually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
 fi
 
 # ----------------------------------------------------------------------------
