@@ -1,11 +1,11 @@
 <!--
-title: "Detect anomalies in nodes and applications"
+title: "Detect anomalies in systems and applications"
 description: "Detect anomalies in any system, container, or application in your infrastructure with machine learning and the open-source Netdata Agent."
-image: /img/seo/guides/monitor/anomalies-ml.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomalies-ml.md
+image: /img/seo/guides/monitor/anomaly-detection.png
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomaly-detection.md
 -->
 
-# Detect anomalies in nodes and applications
+# Detect anomalies in systems and applications
 
 Beginning with v1.27, the [open-source Netdata Agent](https://github.com/netdata/netdata) is capable of unsupervised
 [anomaly detection](https://en.wikipedia.org/wiki/Anomaly_detection) with machine learning (ML). As with all things
