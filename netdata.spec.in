@@ -234,6 +234,7 @@ autoreconf -ivf
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-libJudy=externaldeps/libJudy \
 	%endif
+	--with-bundled-lws=externaldeps/libwebsockets
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
