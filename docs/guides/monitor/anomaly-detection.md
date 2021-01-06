@@ -14,7 +14,7 @@ languages or organizing metrics. You configure the collector to look at specific
 
 Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
 library](https://github.com/yzhao062/pyod/tree/master), which first runs a `train` function that learns what "normal"
-looks like on your node and creates an ML model, then utilizes the `predict_proba()` and `predict()` functions to
+looks like on your node and creates an ML model for each chart, then utilizes the `predict_proba()` and `predict()` functions to
 visualize how anomalous certain metrics are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud), if
