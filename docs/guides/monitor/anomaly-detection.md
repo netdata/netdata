@@ -17,9 +17,9 @@ library](https://github.com/yzhao062/pyod/tree/master), which first runs a `trai
 looks like on your node and creates an ML model, then utilizes the `predict_proba()` and `predict()` functions to
 visualize how anomalous certain metrics are.
 
-All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud), if
-you choose to sign up and claim your nodes, which empowers you to run tailored anomaly detection on every node in your
-infrastructure, regardless of its purpose or workload.
+All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
+you choose to sign up for Netdata Cloud and [claim your nodes](/claim/README.md), you will have the ability to run
+tailored anomaly detection on every node in your infrastructure, regardless of its purpose or workload.
 
 In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
 and/or the node that hosts it, which will give you the tools to configure parallel unsupervised monitors for any
@@ -74,7 +74,7 @@ anomalies: yes
 
 [Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to start up the
 anomalies collector. By default, the model training process runs every 30 minutes, and uses the previous 4 hours of
-metrics to establish a baseline for health and performance across the default charts to include.
+metrics to establish a baseline for health and performance across the default included charts.
 
 ## Configure the anomalies collector
 
@@ -124,7 +124,7 @@ dimensions](https://user-images.githubusercontent.com/1153921/102813877-db5e4880
 
 As you can see in the above screenshot, this node is now looking for anomalies in many places. The result is a single
 `anomalies_local.probability` chart with more than twenty dimensions, some of which the dashboard hides at the bottom of
-a scroll-able area. In addition, training and analyzing the anomaly collector on this many charts might require more CPU
+a scroll-able area. In addition, training and analyzing the anomaly collector on many charts might require more CPU
 utilization that you're willing to give.
 
 First, explicitly declare which `system.` charts to monitor rather than of all of them using regex (`system\..*`).
@@ -143,16 +143,16 @@ volume of requests/responses, not, for example, which type of 4xx response a use
 ![The anomalies collector with less
 dimensions](https://user-images.githubusercontent.com/1153921/102820642-d69f9180-4392-11eb-91c5-d3d166d40105.png)
 
-Apply the ideas behind the collector's regex and excluding settings to any other
+Apply the ideas behind the collector's regex and exclude settings to any other
 [system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), or
 [application](/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
 
 ## What's next?
 
 Now that you know how to set up unsupervised anomaly detection in the Netdata Agent, using an Nginx web server as an
-example, time to apply that knowledge to other mission-critical parts of your infrastructure. If you're not sure what to
-monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata can
-collect from your systems, containers, and applications.
+example, it's time to apply that knowledge to other mission-critical parts of your infrastructure. If you're not sure
+what to monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata
+can collect from your systems, containers, and applications.
 
 For a more user-friendly anomaly detection experience, try out the [Metric
 Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Metric
@@ -162,7 +162,8 @@ analysis.
 Stay tuned for the next two parts of this guide, which provide more real-world context for the anomalies collector.
 First, maximize the immediate value you get from anomaly detection by tracking preconfigured alarms, visualizing
 anomalies in charts, and building a new dashboard tailored to your applications. Then, learn about creating custom ML
-models, which help you holistically monitor an application or service by monitor anomalies across a _cluster of charts_.
+models, which help you holistically monitor an application or service by monitoring anomalies across a _cluster of
+charts_.
 
 ### Related reference documentation
 
