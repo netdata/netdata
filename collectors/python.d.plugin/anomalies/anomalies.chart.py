@@ -26,8 +26,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # ignore some sklearn/numpy warnings that are ok
 warnings.filterwarnings('ignore', r'All-NaN slice encountered')
 warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
-warnings.filterwarnings('ignore', r'divide by zero encountered in true_divide')
-warnings.filterwarnings('ignore', r'invalid value encountered in subtract')
 
 disabled_by_default = True
 
@@ -101,7 +99,7 @@ class Service(SimpleService):
             self.custom_models_host_charts_dict = {}
             for host in self.custom_models_hosts:
                 self.custom_models_host_charts_dict[host] = list(set([dim.split('::')[1].split('|')[0] for dim in self.custom_models_dims if dim.startswith(host)]))
-            self.custom_models_dims_renamed = [f"{model['name']}.{dim}" for model in self.custom_models for dim in model['dimensions'].split(',')]
+            self.custom_models_dims_renamed = [f"{model['name']}|{dim}" for model in self.custom_models for dim in model['dimensions'].split(',')]
             self.models_in_scope = list(set([f'{self.host}::{c}' for c in self.charts_in_scope] + self.custom_models_names))
             self.charts_in_scope = list(set(self.charts_in_scope + self.custom_models_charts))
             self.host_charts_dict = {self.host: self.charts_in_scope}
@@ -287,7 +285,7 @@ class Service(SimpleService):
         df_allmetrics = get_allmetrics_async(
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', wide=True, sort_cols=True,
             protocol=self.protocol, numeric_only=True, float_size='float32', user=self.username, pwd=self.password
-            )[self.expected_cols]
+            )
         if self.custom_models:
             df_allmetrics = self.add_custom_models_dims(df_allmetrics)
         self.df_allmetrics = self.df_allmetrics.append(df_allmetrics).ffill().tail((max(self.lags_n.values()) + max(self.smooth_n.values()) + max(self.diffs_n.values())) * 2)
