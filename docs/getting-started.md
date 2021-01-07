@@ -1,9 +1,7 @@
 <!--
----
 title: "Get started guide"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started.md
----
 -->
 
 # Get started guide

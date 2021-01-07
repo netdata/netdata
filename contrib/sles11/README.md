@@ -1,8 +1,6 @@
 <!--
----
 title: "Spec to build Netdata RPM for sles 11"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/contrib/sles11/README.md
----
 -->
 
 # Spec to build Netdata RPM for sles 11

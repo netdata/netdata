@@ -1,8 +1,6 @@
 <!--
----
 title: "Value formatter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/value/README.md
----
 -->
 
 # Value formatter

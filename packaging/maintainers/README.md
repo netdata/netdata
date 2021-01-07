@@ -1,9 +1,7 @@
 <!--
----
 title: "Package Maintainers"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md
----
 -->
 
 # Package Maintainers

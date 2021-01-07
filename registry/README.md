@@ -1,8 +1,7 @@
 <!--
----
 title: "Registry"
+description: "Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/registry/README.md
----
 -->
 
 # Registry

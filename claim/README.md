@@ -1,6 +1,6 @@
 <!--
 title: "Agent claiming"
-description: "Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's administrator creates a claiming token, which is used to add an Agent to their Space via the Agent-Cloud link."
+description: "Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud via the encrypted Agent-Cloud link (ACLK)."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 -->
 

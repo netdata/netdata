@@ -1,8 +1,6 @@
 <!--
----
 title: "cups.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cups.plugin/README.md
----
 -->
 
 # cups.plugin
@@ -60,3 +58,5 @@ For each destination the plugin provides these charts:
     -   processing
 
 At the moment only job status pending, processing, and held are reported because we do not have a method to collect stopped, canceled, aborted and completed jobs which scales.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2cups.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

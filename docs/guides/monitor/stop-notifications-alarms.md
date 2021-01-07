@@ -1,8 +1,6 @@
 <!--
----
 title: "Stop notifications for individual alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/stop-notifications-alarms.md
----
 -->
 
 # Stop notifications for individual alarms

@@ -1,8 +1,6 @@
 <!--
----
 title: "Rocket.Chat"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/rocketchat/README.md
----
 -->
 
 # Rocket.Chat

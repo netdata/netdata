@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata, Prometheus, Grafana stack"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/WALKTHROUGH.md
----
 -->
 
 # Netdata, Prometheus, Grafana stack

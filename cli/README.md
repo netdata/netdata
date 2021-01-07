@@ -1,13 +1,12 @@
 <!--
----
-title: "Netdata cli"
+title: "Netdata CLI"
+description: "The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/cli/README.md
----
 -->
 
-# Netdata cli
+# Netdata CLI
 
-You can see the commands netdatacli supports by executing it with `netdatacli` and entering `help` in
+You can see the commands `netdatacli` supports by executing it with `netdatacli` and entering `help` in
 standard input. All commands are given as standard input to `netdatacli`.
 
 The commands that a running netdata agent can execute are the following:

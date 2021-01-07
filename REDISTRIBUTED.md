@@ -1,8 +1,6 @@
 <!--
----
 title: "Redistributed software"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md
----
 -->
 
 # Redistributed software

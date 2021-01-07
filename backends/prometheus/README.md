@@ -1,8 +1,6 @@
 <!--
----
 title: "Using Netdata with Prometheus"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/prometheus/README.md
----
 -->
 
 # Using Netdata with Prometheus

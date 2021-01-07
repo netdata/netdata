@@ -1,8 +1,7 @@
 <!--
----
 title: "Custom dashboards"
+description: "Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md
----
 -->
 
 # Custom dashboards
