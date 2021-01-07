@@ -160,10 +160,14 @@ packages](/packaging/installer/methods/packages.md), and more.
 
 ### Post-installation
 
-When you're finished with installation, check out our
-[single-node](https://learn.netdata.cloud/docs/quickstart/single-node) or
-[infrastructure](https://learn.netdata.cloud/docs/quickstart/infrastructure) monitoring quickstart guides based on your
-use case. Then, see our [documentation](https://learn.netdata.cloud/docs) for the full picture.
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
 
 ## How it works
 

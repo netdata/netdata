@@ -145,12 +145,14 @@ quickstart](/docs/quickstart/single-node.md).
 If you're looking to monitor an entire infrastructure with Netdata, see the [infrastructure monitoring
 quickstart](/docs/quickstart/infrastructure.md).
 
+Or, skip ahead to [Agent configuration](/docs/configure/nodes.md).
+
 ### Related reference documentation
 
--   [Packaging &amp; installer](/packaging/installer/README.md)
--   [Reinstall Netdata](/packaging/installer/REINSTALL.md)
--   [Update Netdata](/packaging/installer/UPDATE.md)
--   [Agent-Cloud link](/aclk/README.md)
--   [Agent claiming](/claim/README.md)
+-   [Netdata Agent · Packaging &amp; installer](/packaging/installer/README.md)
+-   [Netdata Agent · Reinstall Netdata](/packaging/installer/REINSTALL.md)
+-   [Netdata Agent · Update Netdata](/packaging/installer/UPDATE.md)
+-   [Netdata Agent · Agent-Cloud link](/aclk/README.md)
+-   [Netdata Agent · Agent claiming](/claim/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Foverview%2Fnetdata-monitoring-stacka&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

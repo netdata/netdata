@@ -199,8 +199,9 @@ helm upgrade netdata netdata/netdata
 Read the [monitoring a Kubernetes cluster guide](/docs/guides/monitor/kubernetes-k8s-netdata.md) for details on the
 various metrics and charts created by the Helm chart and some best practices on real-time troubleshooting using Netdata.
 
-Check out our [Agent's getting started guide](/docs/getting-started.md) for a quick overview of Netdata's capabilities,
-especially if you want to change any of the configuration settings for either the parent or child nodes.
+Check out our [infrastructure](/docs/quickstart/infrastructure.md) for details about additional k8s monitoring features,
+and learn more about [configuring the Netdata Agent](/docs/configure/nodes.md) to better understand the settings you
+might be interested in changing.
 
 To futher configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
 the [service discovery repository](https://github.com/netdata/agent-service-discovery/).
