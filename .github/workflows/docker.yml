@@ -27,10 +27,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Determine if we should push changes and which tags to use
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
         run: |
           echo "publish=true" >> $GITHUB_ENV
-          echo "tags=netdata/netdata:latest,netdata/netdata:${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,netdata/netdata:${{ github.event.inputs.version }}" >> $GITHUB_ENV
+      - name: Determine if we should push changes and which tags to use
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'nightly'
+        run: |
+          echo "publish=true" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> $GITHUB_ENV
       - name: Determine if we should push changes and which tags to use
         if: github.event_name != 'workflow_dispatch'
         run: |
