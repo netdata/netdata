@@ -54,14 +54,15 @@ The fastest way to improve the Agent's resource utilization is to reduce how oft
 
 ### Global
 
-If you don't need per-second metrics, or if the Agent uses a lot of CPU even when no one is viewing that node's
+If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's
 dashboard, configure the Agent to collect metrics less often.
 
-Open `netdata.conf` and edit the `update every` setting. The default is `1`, meaning that the Agent updates every
-second.
+Open `netdata.conf` and edit the `update every` setting. The default is `1`, meaning that the Agent collects metrics
+every second.
 
-If you change this to `2`, Netdata collects metrics every other second, which will effectively halve the CPU utilization
-dedicated for metrics collection. Set this to `5` or `10` to collect metrics every 5 or 10 seconds, respectively.
+If you change this to `2`, Netdata enforces a minimum `update every` setting of 2 seconds, and collects metrics every
+other second, which will effectively halve CPU utilization. Set this to `5` or `10` to collect metrics every 5 or 10
+seconds, respectively.
 
 ```conf
 [global]
@@ -70,10 +71,10 @@ dedicated for metrics collection. Set this to `5` or `10` to collect metrics eve
 
 ### Specific plugin or collector
 
-If you did not [reduce the global collection frequency](#global) but find that a specific plugin/collector uses too many
-resources, you can reduce its frequency. You configure [internal
-collectors](/docs/collect/how-collectors-work.md#collector-architecture-and-terminolog) in `netdata.conf` and external
-collectors in their individual `.conf` files.
+Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
+`python.d.conf`, `node.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
+every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
+or configure a collector](/docs/collect/enable-configure.md) doc for details.
 
 To reduce the frequency of an [internal
 plugin/collector](/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and

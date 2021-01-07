@@ -46,8 +46,8 @@ want to store more metrics _specifically in memory_, you can increase the cache 
 ## Edit `netdata.conf` with recommended database engine settings
 
 Now that you have a recommended setting for `dbengine multihost disk space`, open `netdata.conf` with
-[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-netdataconf) and look for the `dbengine multihost disk
-space` setting. Change it to the value recommended above. For example:
+[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) and look for the `dbengine
+multihost disk space` setting. Change it to the value recommended above. For example:
 
 ```conf
 [global]

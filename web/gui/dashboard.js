@@ -2199,6 +2199,9 @@ NETDATA.dygraphChartCreate = function (state, data) {
         visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
         logscale: NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
 
+        // Expects a string in the format "<series name>: <style>" where each series is separated by a |
+        perSeriesStyle: NETDATA.dataAttribute(state.element, 'dygraph-per-series-style', ''),
+
         axes: {
             x: {
                 pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
@@ -2855,9 +2858,14 @@ NETDATA.dygraphChartCreate = function (state, data) {
         //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
     }
 
-    state.tmp.dygraph_instance = new Dygraph(state.element_chart,
-        data.result.data, state.tmp.dygraph_options);
+    let seriesStyles = NETDATA.dygraphGetSeriesStyle(state.tmp.dygraph_options);
+    state.tmp.dygraph_options.series = seriesStyles;
 
+    state.tmp.dygraph_instance = new Dygraph(
+        state.element_chart,
+        data.result.data,
+        state.tmp.dygraph_options
+    );
 
     state.tmp.dygraph_history_tip_element = document.createElement('div');
     state.tmp.dygraph_history_tip_element.innerHTML = `
@@ -2894,6 +2902,51 @@ NETDATA.dygraphChartCreate = function (state, data) {
     }
 
     return true;
+};
+
+NETDATA.dygraphGetSeriesStyle = function(dygraphOptions) {
+    const seriesStyleStr = dygraphOptions.perSeriesStyle;
+    let formattedStyles = {};
+
+    if (seriesStyleStr === '') {
+      return formattedStyles;
+    }
+
+    // Parse the config string into a JSON object
+    let styles = seriesStyleStr.replace(' ', '').split('|');
+
+    styles.forEach(style => {
+        const keys = style.split(':');
+        formattedStyles[keys[0]] = keys[1];
+    });
+
+    for (let key in formattedStyles) {
+        if (formattedStyles.hasOwnProperty(key)) {
+            let settings;
+
+            switch (formattedStyles[key]) {
+                case 'line':
+                    settings = { fillGraph: false };
+                    break;
+                case 'area':
+                    settings = { fillGraph: true };
+                    break;
+                case 'dot':
+                    settings = {
+                        fillGraph: false,
+                        drawPoints: true,
+                        pointSize: dygraphOptions.pointSize
+                    };
+                    break;
+                default:
+                    settings = undefined;
+            }
+
+            formattedStyles[key] = settings;
+        }
+    }
+
+    return formattedStyles;
 };
 // ----------------------------------------------------------------------------------------------------------------
 // sparkline

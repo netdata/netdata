@@ -69,7 +69,7 @@ With the information that appears on Netdata Cloud and the local dashboard about
 alarms](/docs/monitor/configure-alarms.md) to match your infrastructure's needs or your team's goals.
 
 If you're happy with the pre-configured alarms, skip ahead to [enable
-notifications](/docs/monitor/enable-notifications.md) to instantly see alarms in email, Slack, PagerDuty, Twilio, and
-many other platforms.
+notifications](/docs/monitor/enable-notifications.md) to use Netdata Cloud's centralized alarm notifications and/or
+per-node notifications to endpoints like Slack, PagerDuty, Twilio, and more.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fmonitor%2Fview-active-alarms&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

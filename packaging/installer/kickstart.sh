@@ -463,7 +463,7 @@ else
 fi
 
 if ! grep netdata-latest.tar.gz "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-  fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${ndtmpdir}"
+  fatal "Tarball checksum validation failed. Stopping Netdata Agent installation and leaving tarball in ${ndtmpdir}.\nUsually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
 fi
 run tar -xf netdata-latest.tar.gz
 rm -rf netdata-latest.tar.gz > /dev/null 2>&1

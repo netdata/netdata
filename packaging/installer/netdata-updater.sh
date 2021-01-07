@@ -98,18 +98,22 @@ create_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
     echo "${NETDATA_TMPDIR_PATH}"
   else
-    if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-      if _cannot_use_tmpdir /tmp ; then
-        if _cannot_use_tmpdir "${PWD}" ; then
-          echo >&2
-          echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
-          exit 1
+    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_find_tmpdir "${NETDATA_TMPDIR}" ; then
+      if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
+        if _cannot_use_tmpdir /tmp ; then
+          if _cannot_use_tmpdir "${PWD}" ; then
+            echo >&2
+            echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+            exit 1
+          else
+            TMPDIR="${PWD}"
+          fi
         else
-          TMPDIR="${PWD}"
+          TMPDIR="/tmp"
         fi
-      else
-        TMPDIR="/tmp"
       fi
+    else
+      TMPDIR="${NETDATA_TMPDIR}"
     fi
 
     mktemp -d -t netdata-updater-XXXXXXXXXX
@@ -153,6 +157,8 @@ newer_commit_date() {
     commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | jq '.[0].commit.committer.date' | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
     commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
+  elif command -v python3 > /dev/null 2>&1;then
+    commit_date="$(_safe_download "https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1" /dev/stdout | python3 -c 'from __future__ import print_function;import sys,json;print(json.load(sys.stdin)[0]["commit"]["committer"]["date"])')"
   fi
 
   if [ -z "${commit_date}" ] ; then
@@ -263,7 +269,7 @@ update() {
   else
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
     if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}"
+      fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour."
     fi
     NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
     tar -xf netdata-latest.tar.gz >&3 2>&3
@@ -386,7 +392,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
   download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
   if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}"
+    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somehere and can be resolved by simply retrying in an hour."
   fi
 
   # Do not pass any options other than the accept, for now
