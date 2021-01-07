@@ -13,9 +13,11 @@ Netdata, the anomalies collector comes with preconfigured alarms and instant vis
 languages or organizing metrics. You configure the collector to look at specific charts, and it handles the rest.
 
 Netdata's implementation uses a handful of functions in the [Python Outlier Detection (PyOD)
-library](https://github.com/yzhao062/pyod/tree/master), which first runs a `train` function that learns what "normal"
-looks like on your node and creates an ML model for each chart, then utilizes the `predict_proba()` and `predict()` functions to
-visualize how anomalous certain charts are.
+library](https://github.com/yzhao062/pyod/tree/master), which periodically runs a `train` function that learns what
+"normal" looks like on your node and creates an ML model for each chart, then utilizes the
+[`predict_proba()`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba) and
+[`predict()`](https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict) PyOD functions to
+quantify how anomalous certain charts are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
 you choose to sign up for Netdata Cloud and [claim your nodes](/claim/README.md), you will have the ability to run
@@ -37,9 +39,11 @@ server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea
 
 ## Install required Python packages
 
-The anomalies collector uses a few Python packages, available with `pip3`, to run ML training. It requires `numba`,
-`scikit-learn`, `pyod`, in addition to `netdata-pandas`, which is a package built by the Netdata team to pull data from
-a Netdata Agent's API into a Pandas DataFrame. Read more about `netdata-pandas` on its [package
+The anomalies collector uses a few Python packages, available with `pip3`, to run ML training. It requires
+[`numba`](http://numba.pydata.org/), [`scikit-learn`](https://scikit-learn.org/stable/),
+[`pyod`](https://pyod.readthedocs.io/en/latest/), in addition to
+[`netdata-pandas`](https://github.com/netdata/netdata-pandas), which is a package built by the Netdata team to pull data
+from a Netdata Agent's API into a [Pandas](https://pandas.pydata.org/). Read more about `netdata-pandas` on its [package
 repo](https://github.com/netdata/netdata-pandas) or in Netdata's [community
 repo](https://github.com/netdata/community/tree/main/netdata-agent-api/netdata-pandas).
 
@@ -76,6 +80,10 @@ anomalies: yes
 anomalies collector. By default, the model training process runs every 30 minutes, and uses the previous 4 hours of
 metrics to establish a baseline for health and performance across the default included charts.
 
+> 💡 The anomaly collector may need 30-60 seconds to finish its initial training and have enough data to start
+> generating anomaly scores. You may need to refresh your browser tab for the **Anomalies** section to appear in menus
+> on both the local Agent dashboard or Netdata Cloud.
+
 ## Configure the anomalies collector
 
 Open `python.d/anomalies.conf` with `edit-conf`.
@@ -87,14 +95,21 @@ sudo ./edit-config python.d/anomalies.conf
 The file contains many user-configurable settings with sane defaults. Here are some important settings that don't
 involve tweaking the behavior of the ML training itself.
 
-- `charts_regex`: Which charts to train against and include in anomaly detection.
+- `charts_regex`: Which charts to train models for and run anomaly detection on, with each chart getting a separate
+  model.
 - `charts_to_exclude`: Specific charts, selected by the regex in `charts_regex`, to exclude.
 - `train_every_n`: How often to train the ML models.
-- `train_n_secs`: The number of historical metrics to train ML models on. The default is 4 hours, but if your node
+- `train_n_secs`: The number of historical observations to train each model on. The default is 4 hours, but if your node
   doesn't have historical metrics going back that far, consider [changing the metrics retention
-  policy](/docs/store/change-metrics-storage.md).
+  policy](/docs/store/change-metrics-storage.md) or reducing this window.
 - `custom_models`: A way to define custom models that you want anomaly probabilities for, including multi-node or
-  streaming setups.
+  streaming setups. More on custom models in part 3 of this guide series.
+
+> ⚠️ Setting `charts_regex` with many charts or `train_n_secs` to a very large number will have an impact on the
+> resources and time required to train a model for every chart. The actual performance implications depend on the
+> resources available on your node. If you plan on changing these settings beyond the default, or what's mentioned in
+> this guide, make incremental changes to observe the performance impact. Considering `train_max_n` to cap the number of
+> observations actually used to train on.
 
 ### Run anomaly detection on Nginx and log file metrics
 
