@@ -56,7 +56,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
 You can now install Netdata from the FreeBSD repository.
 
 ```bash
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.26.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.28.0.txz
 ```
 
 > ⚠️ If the above command returns a `Not Found` error, you need to manually search for the latest version of Netdata in
