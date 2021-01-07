@@ -45,7 +45,7 @@ This module will produce following charts (if data is available):
     -   cache hits
     -   replace
 
-4.  **Handlerse** in handlers/s
+4.  **Handlers** in handlers/s
 
     -   commit
     -   delete
