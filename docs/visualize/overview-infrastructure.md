@@ -15,7 +15,7 @@ anomalies, then drill down with filtering or single-node dashboards to see more.
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
 ![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/95912630-e75ed600-0d57-11eb-8a3b-49e883d16833.png)
+Overview](https://user-images.githubusercontent.com/1153921/102651377-b1f4b100-4129-11eb-8e60-d2995d258c16.png)
 
 ## Using the Overview
 

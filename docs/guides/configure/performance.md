@@ -52,7 +52,7 @@ Let's walk through the best ways to improve the Netdata Agent's performance.
 
 The fastest way to improve the Agent's resource utilization is to reduce how often it collects metrics.
 
-## Global
+### Global
 
 If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's
 dashboard, configure the Agent to collect metrics less often.
@@ -69,17 +69,12 @@ seconds, respectively.
   update every: 5
 ```
 
+### Specific plugin or collector
+
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
 `python.d.conf`, `node.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
 or configure a collector](/docs/collect/enable-configure.md) doc for details.
-
-## Specific plugin or collector
-
-If you did not [reduce the global collection frequency](#global) but find that a specific plugin/collector uses too many
-resources, you can reduce its frequency. You configure [internal
-collectors](/docs/collect/how-collectors-work.md#collector-architecture-and-terminolog) in `netdata.conf` and external
-collectors in their individual `.conf` files.
 
 To reduce the frequency of an [internal
 plugin/collector](/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and

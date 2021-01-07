@@ -11,6 +11,9 @@ database](/docs/export/external-databases.md#supported-databases), you can now e
 connector itself. We'll walk through the process of enabling the exporting engine itself, followed by two examples using
 the OpenTSDB and Graphite connectors.
 
+> When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
+> restart its process_, not the entire [database of long-term metrics](/docs/store/change-metrics-storage.md).
+
 Once you understand the process of enabling a connector, you can translate that knowledge to any other connector.
 
 ## Enable the exporting engine
@@ -44,9 +47,9 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the IP
 address or hostname of your OpenTSDB database.
 
-Restart your Agent with `service netdata restart` to begin exporting to your OpenTSDB database. Because the
-Agent exports metrics as they're collected, you should start seeing data in your external database after only a few
-seconds.
+Restart your Agent with `sudo systemctl restart netdata` to begin exporting to your OpenTSDB database. The Netdata Agent
+exports metrics _beginning from the time the process starts_, and because it exports as metrics are collected, you
+should start seeing data in your external database after only a few seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the
 [OpenTSDB connector doc](/exporting/opentsdb/README.md) and [exporting engine
@@ -65,8 +68,8 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 Replace `my_graphite_instance` with an instance name of your choice, and change the `destination` setting to the IP
 address or hostname of your Graphite-supported database.
 
-Restart your Agent with `service netdata restart` to begin exporting to your Graphite-supported database. Because the
-Agent exports metrics as they're collected, you should start seeing data in your external database after only a few
+Restart your Agent with `sudo systemctl restart netdata` to begin exporting to your Graphite-supported database. Because
+the Agent exports metrics as they're collected, you should start seeing data in your external database after only a few
 seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your Graphite-supported database.

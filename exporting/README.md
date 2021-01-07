@@ -17,6 +17,9 @@ databases](/docs/export/external-databases.md), or jump in to [enabling a connec
 The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
 the same time. You can have different update intervals and filters configured for every exporting connector instance. 
 
+When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
+restart its process_, not the entire [database of long-term metrics](/docs/store/change-metrics-storage.md).
+
 The exporting engine has its own configuration file `exporting.conf`. The configuration is almost similar to the
 deprecated [backends](/backends/README.md#configuration) system. The most important difference is that type of a
 connector should be specified in a section name before a colon and an instance name after the colon. Also, you can't use
