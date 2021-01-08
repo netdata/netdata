@@ -15,7 +15,6 @@ typedef enum aclk_cmd {
     ACLK_CMD_CHILD_DISCONNECT
 } ACLK_CMD;
 
-#ifdef ENABLE_ACLK
 typedef enum aclk_metadata_state {
     ACLK_METADATA_REQUIRED,
     ACLK_METADATA_CMD_QUEUED,
@@ -26,7 +25,6 @@ typedef enum aclk_agent_state {
     ACLK_HOST_INITIALIZING,
     ACLK_HOST_STABLE
 } ACLK_POPCORNING_STATE;
-#endif /* ENABLE_ACLK */
 
 typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
