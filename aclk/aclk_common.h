@@ -1,33 +1,7 @@
 #ifndef ACLK_COMMON_H
 #define ACLK_COMMON_H
 
-#include "libnetdata/libnetdata.h"
-
-extern netdata_mutex_t aclk_shared_state_mutex;
-#define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
-#define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
-
-// minimum and maximum supported version of ACLK
-// in this version of agent
-#define ACLK_VERSION_MIN 2
-#define ACLK_VERSION_MAX 3
-
-// Version negotiation messages have they own versioning
-// this is also used for LWT message as we set that up
-// before version negotiation
-#define ACLK_VERSION_NEG_VERSION 1
-
-// Maximum time to wait for version negotiation before aborting
-// and defaulting to oldest supported version
-#define VERSION_NEG_TIMEOUT 3
-
-#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
-#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
-#endif
-
-// Define ACLK Feature Version Boundaries Here
-#define ACLK_V_COMPRESSION   2
-#define ACLK_V_CHILDRENSTATE 3
+#include "../libnetdata/libnetdata.h"
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
@@ -65,10 +39,36 @@ typedef struct aclk_rrdhost_state {
 #endif
 } aclk_rrdhost_state;
 
+#include "../daemon/common.h"
+
+extern netdata_mutex_t aclk_shared_state_mutex;
+#define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
+#define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
+
+// minimum and maximum supported version of ACLK
+// in this version of agent
+#define ACLK_VERSION_MIN 2
+#define ACLK_VERSION_MAX 3
+
+// Version negotiation messages have they own versioning
+// this is also used for LWT message as we set that up
+// before version negotiation
+#define ACLK_VERSION_NEG_VERSION 1
+
+// Maximum time to wait for version negotiation before aborting
+// and defaulting to oldest supported version
+#define VERSION_NEG_TIMEOUT 3
+
+#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
+#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
+#endif
+
+// Define ACLK Feature Version Boundaries Here
+#define ACLK_V_COMPRESSION   2
+#define ACLK_V_CHILDRENSTATE 3
+
 #define ACLK_IS_HOST_INITIALIZING(host) (host->aclk_state.state == ACLK_HOST_INITIALIZING)
 #define ACLK_IS_HOST_POPCORNING(host) (ACLK_IS_HOST_INITIALIZING(host) && host->aclk_state.t_last_popcorn_update)
-
-typedef struct rrdhost RRDHOST;
 
 extern struct aclk_shared_state {
     // optimization to avoid looping trough hosts
