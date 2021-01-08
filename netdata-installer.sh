@@ -1612,8 +1612,8 @@ remove_old_ebpf() {
   # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs"
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/*netdata_ebpf_process*.o"
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/*netdata_ebpf_socket*.o"
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
   fi
 
 }
