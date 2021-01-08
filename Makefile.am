@@ -524,6 +524,7 @@ PARSER_FILES = \
     $(NULL)
 
 ACLK_FILES = \
+    aclk/aclk_rrdhost_state.h \
     aclk/aclk_common.c \
     aclk/aclk_common.h \
     aclk/aclk_stats.c \
