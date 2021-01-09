@@ -104,6 +104,8 @@ upstream backend {
 
 server {
     listen 80;
+    # uncomment the line if you want nginx to listen on IPv6 address
+    #listen [::]:80;
 
     # Change `example.com` to match your domain name.
     server_name netdata.example.com;
