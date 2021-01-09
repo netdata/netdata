@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fixes for SEO housekeeping/improvements [\#10468](https://github.com/netdata/netdata/pull/10468) ([joelhans](https://github.com/joelhans))
 - Add missing section to Netdata style guide [\#10453](https://github.com/netdata/netdata/pull/10453) ([joelhans](https://github.com/joelhans))
 - Add guide: Detect anomalies in nodes and applications with Netdata [\#10451](https://github.com/netdata/netdata/pull/10451) ([joelhans](https://github.com/joelhans))
 - Updated messages about checksum validation failures on install. [\#10448](https://github.com/netdata/netdata/pull/10448) ([Ferroin](https://github.com/Ferroin))
