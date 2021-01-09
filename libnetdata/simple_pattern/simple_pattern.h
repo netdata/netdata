@@ -3,8 +3,7 @@
 #ifndef NETDATA_SIMPLE_PATTERN_H
 #define NETDATA_SIMPLE_PATTERN_H
 
-#include "../libnetdata.h"
-
+#include "../sysinc.h"
 
 typedef enum {
     SIMPLE_PATTERN_EXACT,

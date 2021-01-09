@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <dlfcn.h>
-#include <sys/utsname.h>
+#include "ebpf.h"
 
-#include "../libnetdata.h"
+#include "../log/log.h"
+#include "../inlined.h"
+#include "../sysinc.h"
+
+#include <sys/utsname.h>
 
 /*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)

@@ -2,6 +2,11 @@
 
 #include "os.h"
 
+#include "log/log.h"
+#include "procfile/procfile.h"
+
+#include "inlined.h"
+
 // ----------------------------------------------------------------------------
 // system functions
 // to retrieve settings of the system

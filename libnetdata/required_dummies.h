@@ -3,6 +3,9 @@
 #ifndef NETDATA_LIB_DUMMIES_H
 #define NETDATA_LIB_DUMMIES_H 1
 
+#include "sysinc.h"
+#include "storage_number/storage_number.h"
+
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret)
 {
@@ -21,6 +24,8 @@ void send_statistics(const char *action, const char *action_result, const char *
 void signals_block(void){};
 void signals_unblock(void){};
 void signals_reset(void){};
+
+struct rrdcalc;
 
 // callback required by eval()
 int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result)

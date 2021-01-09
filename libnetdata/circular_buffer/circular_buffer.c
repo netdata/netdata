@@ -1,4 +1,5 @@
-#include "../libnetdata.h"
+#include "circular_buffer.h"
+#include "../utils.h"
 
 struct circular_buffer *cbuffer_new(size_t initial, size_t max) {
     struct circular_buffer *result = mallocz(sizeof(*result));

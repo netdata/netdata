@@ -1,8 +1,9 @@
 #include "jsmn.h"
-#include "../libnetdata.h"
 #include "json.h"
-#include "libnetdata/libnetdata.h"
-#include "../../health/health.h"
+
+#include "../buffer/buffer.h"
+#include "../health/health.h"
+#include "../log/log.h"
 
 #define JSON_TOKENS 1024
 

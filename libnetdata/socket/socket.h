@@ -3,7 +3,11 @@
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
 
-#include "../libnetdata.h"
+#include "security.h"
+
+#include "../sysinc.h"
+#include "../simple_pattern/simple_pattern.h"
+
 
 #ifndef MAX_LISTEN_FDS
 #define MAX_LISTEN_FDS 50

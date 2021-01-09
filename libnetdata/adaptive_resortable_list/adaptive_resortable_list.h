@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
-
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
 #define NETDATA_ADAPTIVE_RESORTABLE_LIST_H 1
+
+#include "../sysinc.h"
+#include "../log/log.h"
 
 #define ARL_ENTRY_FLAG_FOUND    0x01    // the entry has been found in the source data
 #define ARL_ENTRY_FLAG_EXPECTED 0x02    // the entry is expected by the program

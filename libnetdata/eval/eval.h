@@ -3,9 +3,11 @@
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H 1
 
-#include "../libnetdata.h"
-
 #define EVAL_MAX_VARIABLE_NAME_LENGTH 300
+
+#include "../sysinc.h"
+#include "../storage_number/storage_number.h"
+#include "../buffer/buffer.h"
 
 typedef enum rrdcalc_status {
     RRDCALC_STATUS_REMOVED       = -2,

@@ -3,7 +3,8 @@
 #ifndef NETDATA_CLOCKS_H
 #define NETDATA_CLOCKS_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
+#include "../storage_number/storage_number.h"
 
 #ifndef HAVE_STRUCT_TIMESPEC
 struct timespec {

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "popen.h"
+#include "../utils.h"
+#include "../locks/locks.h"
+#include "../log/log.h"
 
 static pthread_mutex_t myp_lock;
 static int myp_tracking = 0;

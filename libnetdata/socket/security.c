@@ -1,6 +1,8 @@
-#include "../libnetdata.h"
+#include "security.h"
 
 #ifdef ENABLE_HTTPS
+
+#include "../log/log.h"
 
 SSL_CTX *netdata_exporting_ctx=NULL;
 SSL_CTX *netdata_client_ctx=NULL;

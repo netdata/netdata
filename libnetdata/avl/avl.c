@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "avl.h"
+#include "../log/log.h"
 
 /* ------------------------------------------------------------------------- */
 /*

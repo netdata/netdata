@@ -3,7 +3,8 @@
 #ifndef NETDATA_DICTIONARY_H
 #define NETDATA_DICTIONARY_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
+#include "../avl/avl.h"
 
 struct dictionary_stats {
     unsigned long long inserts;

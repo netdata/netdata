@@ -1,6 +1,7 @@
 #ifndef CHECKIN_JSON_H
 #define CHECKIN_JSON_H 1
 
+#include "../sysinc.h"
 
 #if ENABLE_JSONC
 # include <json-c/json.h>

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "threads.h"
+#include "../utils.h"
+#include "../log/log.h"
+#include "../inlined.h"
 
 static size_t default_stacksize = 0, wanted_stacksize = 0;
 static pthread_attr_t *attr = NULL;

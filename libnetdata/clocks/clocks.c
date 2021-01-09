@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "clocks.h"
+#include "../log/log.h"
+#include "../procfile/procfile.h"
 
 static int clock_boottime_valid = 1;
 static int clock_monotonic_coarse_valid = 1;

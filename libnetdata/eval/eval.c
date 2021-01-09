@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "eval.h"
+
+#include "../clocks/clocks.h"
+#include "../log/log.h"
+
+#include "../inlined.h"
 
 // ----------------------------------------------------------------------------
 // data structures for storing the parsed expression in memory

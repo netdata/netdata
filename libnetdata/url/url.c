@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "url.h"
+
+#include "../log/log.h"
+#include "../string/utf8.h"
+
+#include "../utils.h"
+#include "../inlined.h"
 
 // ----------------------------------------------------------------------------
 // URL encode / decode

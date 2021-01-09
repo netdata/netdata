@@ -1,5 +1,10 @@
 #include "health.h"
 
+#include "../log/log.h"
+
+#include "../utils.h"
+#include "../inlined.h"
+
 SILENCERS *silencers;
 
 /**

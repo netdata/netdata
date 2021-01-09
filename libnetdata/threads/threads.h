@@ -3,7 +3,7 @@
 #ifndef NETDATA_THREADS_H
 #define NETDATA_THREADS_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
 
 extern pid_t gettid(void);
 

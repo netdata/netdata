@@ -3,7 +3,9 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
+#include "../utils.h"
+#include "../storage_number/storage_number.h"
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 

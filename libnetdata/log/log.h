@@ -7,7 +7,8 @@
 extern "C" {
 # endif
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
+#include "../utils.h"
 
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002

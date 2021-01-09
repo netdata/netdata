@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "buffer.h"
+
+#include "../log/log.h"
 
 #define BUFFER_OVERFLOW_EOF "EOF"
 

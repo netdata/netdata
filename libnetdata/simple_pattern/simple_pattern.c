@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "simple_pattern.h"
+
+#include "../log/log.h"
+
+#include "../inlined.h"
+#include "../utils.h"
 
 struct simple_pattern {
     const char *match;

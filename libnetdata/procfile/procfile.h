@@ -3,7 +3,7 @@
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
 
 // ----------------------------------------------------------------------------
 // An array of words

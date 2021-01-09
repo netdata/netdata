@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "adaptive_resortable_list.h"
+#include "../utils.h"
+#include "../inlined.h"
 
 // the default processor() of the ARL
 // can be overwritten at arl_create()

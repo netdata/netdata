@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "storage_number.h"
+#include "../log/log.h"
+#include "../buffer/buffer.h"
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 32 = sign 0:positive, 1:negative

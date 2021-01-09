@@ -78,7 +78,9 @@
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
+#include "../avl/avl.h"
+#include "../buffer/buffer.h"
 
 #define CONFIG_FILENAME "netdata.conf"
 

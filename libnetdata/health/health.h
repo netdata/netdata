@@ -1,7 +1,8 @@
 #ifndef NETDATA_HEALTH_LIB
 # define NETDATA_HEALTH_LIB 1
 
-# include "../libnetdata.h"
+#include "../simple_pattern/simple_pattern.h"
+#include "../json/json.h"
 
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"

@@ -3,7 +3,7 @@
 #ifndef NETDATA_STATISTICAL_H
 #define NETDATA_STATISTICAL_H 1
 
-#include "../libnetdata.h"
+#include "../storage_number/storage_number.h"
 
 extern void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg);
 

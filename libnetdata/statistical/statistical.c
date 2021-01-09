@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "statistical.h"
+#include "../utils.h"
 
 LONG_DOUBLE default_single_exponential_smoothing_alpha = 0.1;
 

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+
+#include "appconfig.h"
+#include "../log/log.h"
+#include "../inlined.h"
 
 /*
  * @Input:

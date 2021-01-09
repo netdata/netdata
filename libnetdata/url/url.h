@@ -3,7 +3,7 @@
 #ifndef NETDATA_URL_H
 #define NETDATA_URL_H 1
 
-#include "../libnetdata.h"
+#include "../sysinc.h"
 
 // ----------------------------------------------------------------------------
 // URL encode / decode

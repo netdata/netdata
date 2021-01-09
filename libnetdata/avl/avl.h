@@ -3,7 +3,8 @@
 #ifndef _AVL_H
 #define _AVL_H 1
 
-#include "../libnetdata.h"
+#include "../utils.h"
+#include "../locks/locks.h"
 
 /* Maximum AVL tree height. */
 #ifndef AVL_MAX_HEIGHT

@@ -3,7 +3,8 @@
 #ifndef NETDATA_OS_H
 #define NETDATA_OS_H
 
-#include "libnetdata.h"
+#include "sysinc.h"
+#include "utils.h"
 
 // =====================================================================================================================
 // Linux

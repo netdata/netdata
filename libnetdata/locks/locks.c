@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "locks.h"
+#include "../log/log.h"
+#include "../threads/threads.h"
+#include "../clocks/clocks.h"
 
 // ----------------------------------------------------------------------------
 // automatic thread cancelability management, based on locks
