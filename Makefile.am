@@ -155,7 +155,6 @@ LIBNETDATA_FILES = \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
-    libnetdata/libndinc.h \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
     libnetdata/locks/locks.c \
