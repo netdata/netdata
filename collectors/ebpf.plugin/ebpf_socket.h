@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef NETDATA_EBPF_SOCKET_H
 #define NETDATA_EBPF_SOCKET_H 1
-#include <stdint.h>
-#include "libnetdata/avl/avl.h"
+
+#include "libnetdata/libnetdata.h"
 
 // Vector indexes
 #define NETDATA_MAX_SOCKET_VECTOR 6
