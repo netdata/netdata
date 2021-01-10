@@ -155,7 +155,7 @@ LIBNETDATA_FILES = \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
-    libnetdata/libnetdata.c \
+    libnetdata/libndinc.h \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
     libnetdata/locks/locks.c \
@@ -178,10 +178,13 @@ LIBNETDATA_FILES = \
     libnetdata/statistical/statistical.h \
     libnetdata/storage_number/storage_number.c \
     libnetdata/storage_number/storage_number.h \
+    libnetdata/sysinc.h \
     libnetdata/threads/threads.c \
     libnetdata/threads/threads.h \
     libnetdata/url/url.c \
     libnetdata/url/url.h \
+    libnetdata/utils.c \
+    libnetdata/utils.h \
     libnetdata/json/json.c \
     libnetdata/json/json.h \
     libnetdata/json/jsmn.c \

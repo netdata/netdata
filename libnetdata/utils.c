@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
+#include "utils.h"
+#include "./log/log.h"
+
+#ifdef NETDATA_LOG_ALLOCATIONS
+#include "threads/threads.h"
+#endif
 
 #ifdef __APPLE__
 #define INHERIT_NONE 0
