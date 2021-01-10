@@ -3,10 +3,6 @@
 #ifndef SYSINC_H
 #define SYSINC_H 1
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -152,9 +148,5 @@ extern "C" {
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
 #endif
-
-# ifdef __cplusplus
-}
-# endif
 
 #endif // SYSINC_H

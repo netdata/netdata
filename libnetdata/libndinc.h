@@ -18,17 +18,21 @@ extern "C" {
 #include "clocks/clocks.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
+
 #ifdef ENABLE_HTTPS
 # include "socket/security.h"
 #endif
+
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
-#ifdef HAVE_LIBBPF
+
+#if !defined(__cplusplus) && defined(HAVE_LIBBPF)
 #include "ebpf/ebpf.h"
 #endif
+
 #include "eval/eval.h"
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
