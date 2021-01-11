@@ -238,6 +238,7 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
+        // wait for backend subsystem to be initialized
         for (int retries = 0; !global_backend_source && retries < 1000; retries++)
             sleep_usec(10000);
 
