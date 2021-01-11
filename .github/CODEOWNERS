@@ -5,8 +5,8 @@
 * @ktsaou @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @knatsakis @kaskavel
-.github/ @Ferroin @knatsakis @kaskavel
+.travis/ @Ferroin @knatsakis @kaskavel @vkalintiris
+.github/ @Ferroin @knatsakis @kaskavel @vkalintiris
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
@@ -14,7 +14,7 @@ backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @Ferroin @knatsakis
-contrib/debian @Ferroin @knatsakis
+contrib/debian @Ferroin @knatsakis @vkalintiris
 collectors/ @vlvkobal @mfundul
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -34,10 +34,10 @@ health/ @thiagoftsm @vlvkobal
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm @mfundul
-packaging/ @Ferroin @knatsakis
+packaging/ @Ferroin @knatsakis @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @knatsakis
+system/ @Ferroin @knatsakis @vkalintiris
 tests/ @Ferroin @knatsakis @kaskavel
 web/ @thiagoftsm @mfundul @vlvkobal
 web/gui/ @jacekkolasa
@@ -49,7 +49,7 @@ Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
 .gitignore @Ferroin @knatsakis
-.travis.yml @Ferroin @knatsakis @kaskavel
+.travis.yml @Ferroin @knatsakis @kaskavel @vkalintiris
 .lgtm.yml @Ferroin @knatsakis
 .eslintrc @Ferroin @knatsakis
 .eslintignore @Ferroin @knatsakis
@@ -57,8 +57,8 @@ Dockerfile* @Ferroin @knatsakis
 .codeclimate.yml @Ferroin @knatsakis
 .codacy.yml @Ferroin @knatsakis
 .yamllint.yml @Ferroin @knatsakis
-netdata.spec.in @Ferroin @knatsakis
-netdata-installer.sh @Ferroin @knatsakis
+netdata.spec.in @Ferroin @knatsakis @vkalintiris
+netdata-installer.sh @Ferroin @knatsakis @vkalintiris
 package.json @jacekkolasa @Ferroin @knatsakis
 packaging/version @netdatabot @Ferroin @knatsakis
 
