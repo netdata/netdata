@@ -28,6 +28,7 @@
 const char *global_backend_prefix = "netdata";
 int global_backend_update_every = 10;
 BACKEND_OPTIONS global_backend_options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
+const char *global_backend_source = NULL;
 
 // ----------------------------------------------------------------------------
 // helper functions for backends
@@ -528,6 +529,7 @@ void *backends_main(void *ptr) {
     // and prepare for sending data to our backend
 
     global_backend_options = backend_parse_data_source(source, global_backend_options);
+    global_backend_source = source;
 
     if(timeoutms < 1) {
         error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, global_backend_update_every * 2 * 1000);
