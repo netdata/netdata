@@ -2103,7 +2103,7 @@ void update_systemd_services_charts(
     if(likely(do_cpu)) {
         if(unlikely(!st_cpu)) {
             char title[CHART_TITLE_MAX + 1];
-            snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (%d%% = %d core%s)", (processors * 100), processors, (processors > 1) ? "s" : "");
+            snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (100%% = 1 core)");
 
             st_cpu = rrdset_create_localhost(
                     "services"
@@ -3046,7 +3046,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) for cgroup %s", cg->chart_title);
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3174,7 +3174,7 @@ void update_cgroup_charts(int update_every) {
             unsigned int i;
 
             if(unlikely(!cg->st_cpu_per_core)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) Per Core for cgroup %s", cg->chart_title);
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
