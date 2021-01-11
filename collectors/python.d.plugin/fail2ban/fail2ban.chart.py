@@ -50,7 +50,7 @@ def charts(jails):
     return ch
 
 
-RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
+RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= +(true|yes|false|no)')
 
 # Example:
 # 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 195.201.88.33
@@ -196,9 +196,9 @@ class Service(LogService):
             if name in exclude:
                 continue
 
-            if status == 'true' and name not in active_jails:
+            if status in ('true','yes') and name not in active_jails:
                 active_jails.append(name)
-            elif status == 'false' and name in active_jails:
+            elif status in ('false','no') and name in active_jails:
                 active_jails.remove(name)
 
         return active_jails or DEFAULT_JAILS
