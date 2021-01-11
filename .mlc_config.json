@@ -1,7 +1,10 @@
 {
     "ignorePatterns": [
 		{
-			"pattern": "^https:\/\/pi-hole.net"
+			"pattern": "^https:\/\/pi-hole\.net\b"
+		},
+		{
+			"pattern": "^https:\/\/docs\.stackpulse\.io\b"
 		}
 	],
     "replacementPatterns": [
@@ -9,5 +12,9 @@
             "pattern": "^/",
             "replacement": "/github/workspace/"
         }
+    ],
+    "aliveStatusCodes": [
+        200,
+        429
     ]
 }
