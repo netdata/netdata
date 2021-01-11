@@ -1,7 +1,7 @@
 #ifndef NETDATA_SECURITY_H
 # define NETDATA_SECURITY_H
 
-#include "config.h"
+#include "../sysinc.h"
 
 # define NETDATA_SSL_HANDSHAKE_COMPLETE 0    //All the steps were successful
 # define NETDATA_SSL_START 1                 //Starting handshake, conn variable is NULL
