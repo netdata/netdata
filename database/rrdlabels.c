@@ -140,21 +140,13 @@ void update_label_list(struct label **labels, struct label *new_labels)
 
 struct label *label_list_lookup_key(struct label *head, char *key, uint32_t key_hash)
 {
-    SIMPLE_PATTERN *pattern = NULL;
-
-    if (!key_hash)
-        pattern = simple_pattern_create(key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-
     while (head != NULL)
     {
-        if ((key_hash && head->key_hash == key_hash && !strcmp(head->key, key)) ||
-            (pattern && simple_pattern_matches(pattern, head->key)))
-            break;
+        if (head->key_hash == key_hash && !strcmp(head->key, key))
+            return head;
         head = head->next;
     }
-    if (pattern)
-        simple_pattern_free(pattern);
-    return head;
+    return NULL;
 }
 
 int label_list_contains_key(struct label *head, char *key, uint32_t key_hash)
@@ -166,6 +158,31 @@ int label_list_contains(struct label *head, struct label *check)
 {
     return label_list_contains_key(head, check->key, check->key_hash);
 }
+
+struct label *label_list_lookup_keylist(struct label *head, char *key)
+{
+    SIMPLE_PATTERN *pattern = NULL;
+
+    pattern = simple_pattern_create(key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    if (!pattern)
+        return NULL;
+
+    while (head != NULL)
+    {
+        if (simple_pattern_matches(pattern, head->key))
+            break;
+        head = head->next;
+    }
+    simple_pattern_free(pattern);
+    return head;
+}
+
+int label_list_contains_keylist(struct label *head, char *keylist)
+{
+    return (label_list_lookup_keylist(head, keylist) != NULL);
+}
+
 
 /* Create a list with entries from both lists.
    If any entry in the low priority list is masked by an entry in the high priority list then delete it.

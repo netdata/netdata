@@ -1949,7 +1949,7 @@ void rrdset_update_labels(RRDSET *st, struct label *labels)
     rrdset_finalize_labels(st);
 }
 
-int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash)
+int rrdset_contains_label_keylist(RRDSET *st, char *keylist)
 {
     struct label_index *labels = &st->state->labels;
     int ret;
@@ -1958,7 +1958,7 @@ int rrdset_contains_label_key(RRDSET *st, char *key, uint32_t key_hash)
         return 0;
 
     netdata_rwlock_rdlock(&labels->labels_rwlock);
-    ret = label_list_contains_key(labels->head, key, key_hash);
+    ret = label_list_contains_keylist(labels->head, keylist);
     netdata_rwlock_unlock(&labels->labels_rwlock);
 
     return ret;

@@ -115,11 +115,11 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
             buffer_strcat(wb, sq);
         }
         buffer_strcat(wb, "],\n");
-
         if (chart_label_key) {
             buffer_sprintf(wb, "   %schart_labels%s: { ", kq, kq);
 
             SIMPLE_PATTERN *pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *original_pattern = pattern;
             char *label_key = NULL;
             int keys = 0;
             while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
@@ -132,25 +132,20 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                 keys++;
 
                 for (c = 0, i = 0, rd = temp_rd; rd && c < r->d; c++, rd = rd->next) {
-                    if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) {
+                    if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
                         continue;
-                    }
-                    if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) {
+                    if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
                         continue;
-                    }
-
-                    if (i) {
+                    if (i)
                         buffer_strcat(wb, ", ");
-                    }
 
                     current_label = rrdset_lookup_label_key(rd->rrdset, label_key, key_hash);
                     if (current_label) {
                         buffer_strcat(wb, sq);
                         buffer_strcat(wb, current_label->value);
                         buffer_strcat(wb, sq);
-                    } else {
+                    } else
                         buffer_strcat(wb, "null");
-                    }
                     i++;
                 }
                 if (!i) {
@@ -162,7 +157,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                 buffer_strcat(wb, "]");
             }
             buffer_strcat(wb, "},\n");
-            simple_pattern_free(pattern);
+            simple_pattern_free(original_pattern);
         }
     }
 
