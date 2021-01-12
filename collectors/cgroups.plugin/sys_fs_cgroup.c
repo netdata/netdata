@@ -2103,7 +2103,7 @@ void update_systemd_services_charts(
     if(likely(do_cpu)) {
         if(unlikely(!st_cpu)) {
             char title[CHART_TITLE_MAX + 1];
-            snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (%d%% = %d core%s)", (processors * 100), processors, (processors > 1) ? "s" : "");
+            snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (100%% = 1 core)");
 
             st_cpu = rrdset_create_localhost(
                     "services"
@@ -3046,7 +3046,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core)");
 
                 cg->st_cpu = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3119,7 +3119,7 @@ void update_cgroup_charts(int update_every) {
                         rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, value);
 
                         if(unlikely(!cg->st_cpu_limit)) {
-                            snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits for cgroup %s", cg->chart_title);
+                            snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits");
 
                             cg->st_cpu_limit = rrdset_create_localhost(
                                     cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3174,7 +3174,7 @@ void update_cgroup_charts(int update_every) {
             unsigned int i;
 
             if(unlikely(!cg->st_cpu_per_core)) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (100%% = 1 core) Per Core");
 
                 cg->st_cpu_per_core = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3210,7 +3210,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem)) {
-                snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Memory Usage");
 
                 cg->st_mem = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3270,7 +3270,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem);
 
             if(unlikely(!cg->st_writeback)) {
-                snprintfz(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Writeback Memory");
 
                 cg->st_writeback = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3305,7 +3305,7 @@ void update_cgroup_charts(int update_every) {
 
             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                 if(unlikely(!cg->st_mem_activity)) {
-                    snprintfz(title, CHART_TITLE_MAX, "Memory Activity for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "Memory Activity");
 
                     cg->st_mem_activity = rrdset_create_localhost(
                             cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3336,7 +3336,7 @@ void update_cgroup_charts(int update_every) {
             }
 
             if(unlikely(!cg->st_pgfaults)) {
-                snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults");
 
                 cg->st_pgfaults = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3368,7 +3368,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem_usage)) {
-                snprintfz(title, CHART_TITLE_MAX, "Used Memory %sfor cgroup %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Used Memory %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"");
 
                 cg->st_mem_usage = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3431,7 +3431,7 @@ void update_cgroup_charts(int update_every) {
                         memory_limit = cg->memory_limit;
 
                     if(unlikely(!cg->st_mem_usage_limit)) {
-                        snprintfz(title, CHART_TITLE_MAX, "Used RAM without Cache within the limits for cgroup %s", cg->chart_title);
+                        snprintfz(title, CHART_TITLE_MAX, "Used RAM without Cache within the limits");
 
                         cg->st_mem_usage_limit = rrdset_create_localhost(
                                 cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3475,7 +3475,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem_failcnt)) {
-                snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures");
 
                 cg->st_mem_failcnt = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3505,7 +3505,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_io)) {
-                snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks)");
 
                 cg->st_io = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3537,7 +3537,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_serviced_ops)) {
-                snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks)");
 
                 cg->st_serviced_ops = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3569,7 +3569,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_throttle_io)) {
-                snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks)");
 
                 cg->st_throttle_io = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3601,7 +3601,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_throttle_serviced_ops)) {
-                snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks)");
 
                 cg->st_throttle_serviced_ops = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3633,7 +3633,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_queued_ops)) {
-                snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks)");
 
                 cg->st_queued_ops = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3665,7 +3665,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_merged_ops)) {
-                snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks)");
 
                 cg->st_merged_ops = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3700,7 +3700,7 @@ void update_cgroup_charts(int update_every) {
             if (likely(res->updated && res->some.enabled)) {
                 if (unlikely(!res->some.st)) {
                     RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "CPU pressure for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "CPU pressure");
 
                     chart = res->some.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3733,7 +3733,7 @@ void update_cgroup_charts(int update_every) {
             if (likely(res->updated && res->some.enabled)) {
                 if (unlikely(!res->some.st)) {
                     RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "Memory pressure for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "Memory pressure");
 
                     chart = res->some.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3765,7 +3765,7 @@ void update_cgroup_charts(int update_every) {
             if (likely(res->updated && res->full.enabled)) {
                 if (unlikely(!res->full.st)) {
                     RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "Memory full pressure for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "Memory full pressure");
 
                     chart = res->full.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3798,7 +3798,7 @@ void update_cgroup_charts(int update_every) {
             if (likely(res->updated && res->some.enabled)) {
                 if (unlikely(!res->some.st)) {
                     RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "I/O pressure for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "I/O pressure");
 
                     chart = res->some.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
@@ -3830,7 +3830,7 @@ void update_cgroup_charts(int update_every) {
             if (likely(res->updated && res->full.enabled)) {
                 if (unlikely(!res->full.st)) {
                     RRDSET *chart;
-                    snprintfz(title, CHART_TITLE_MAX, "I/O full pressure for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "I/O full pressure");
 
                     chart = res->full.st = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
