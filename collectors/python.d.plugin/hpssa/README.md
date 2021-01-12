@@ -29,14 +29,20 @@ This module produces:
 3.  Logical drive state
 4.  Physical drive state and temperature
 
+## Enable the collector
+
+The `hpssa` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d.conf
+```
+
+Change the value of the `hpssa` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl
+restart netdata`, or the appropriate method for your system, to finish enabling the `hpssa` collector.
 
 ## Configuration
-
-**hpssa** is disabled by default. Should be explicitly enabled in `python.d.conf`.
-
-```yaml
-hpssa: yes
-```
 
 Edit the `python.d/hpssa.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.

@@ -26,6 +26,19 @@ It provides the following charts:
 
     -   Seats
 
+## Enable the collector
+
+The `logind` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d.conf
+```
+
+Change the value of the `logind` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl
+restart netdata`, or the appropriate method for your system, to finish enabling the `logind` collector.
+
 ## Configuration
 
 This module needs no configuration. Just make sure the `netdata` user

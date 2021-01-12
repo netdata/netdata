@@ -70,7 +70,7 @@ Edit the `python.d/elasticsearch.conf` configuration file using `edit-config` fr
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d/elasticsearch.conf
 ```
 
