@@ -44,6 +44,26 @@ error() {
   echo >&3 "$(date) : ERROR: " "${@}"
 }
 
+: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
+
+if [ "${ENVIRONMENT_FILE}" == "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; then
+  if [ -r "${script_dir}/../../../etc/netdata/.environment" ]; then
+    ENVIRONMENT_FILE="${script_dir}/../../../etc/netdata/.environment"
+  elif [ -r "/etc/netdata/.environment" ]; then
+    ENVIRONMENT_FILE="/etc/netdata/.environment"
+  elif [ -r "/opt/netdata/etc/netdata/.environment" ]; then
+    ENVIRONMENT_FILE="/opt/netdata/etc/netdata/.environment"
+  else
+    envpath="$(find / -type d \( -path /sys -o -path /proc -o -path /dev \) -prune -false -o -path '*netdata/.environment' -type f  2> /dev/null | head -n 1)"
+    if [ -r "${envpath}" ]; then
+      ENVIRONMENT_FILE="${envpath}"
+    else
+      error "Cannot find environment file, unable to update."
+      exit 1
+    fi
+  fi
+fi
+
 safe_sha256sum() {
   # Within the contexct of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
@@ -183,7 +203,8 @@ self_update() {
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
-      exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)"
+      export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
+      exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)" 
     else
       echo >&3 "Failed to download newest version of updater script, continuing with current version."
     fi
@@ -346,9 +367,6 @@ done
 if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
     sleep $(((RANDOM % 3600) + 1))
 fi
-
-# Usually stored in /etc/netdata/.environment
-: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
 # shellcheck source=/dev/null
 source "${ENVIRONMENT_FILE}" || exit 1
