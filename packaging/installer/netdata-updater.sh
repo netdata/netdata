@@ -118,7 +118,7 @@ create_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
     echo "${NETDATA_TMPDIR_PATH}"
   else
-    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_find_tmpdir "${NETDATA_TMPDIR}" ; then
+    if [ -z "${NETDATA_TMPDIR}" ] || _cannot_use_tmpdir "${NETDATA_TMPDIR}" ; then
       if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
         if _cannot_use_tmpdir /tmp ; then
           if _cannot_use_tmpdir "${PWD}" ; then
