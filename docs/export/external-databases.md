@@ -56,6 +56,7 @@ documentation and the [enabling a connector](/docs/export/enable-connector.md) d
 -   **OpenTSDB**: [OpenTSDB](/exporting/opentsdb/README.md), [Prometheus remote
     write](/exporting/prometheus/remote_write/README.md)
 -   **PostgreSQL**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md)
+    via [PostgreSQL Prometheus Adapter](https://github.com/CrunchyData/postgresql-prometheus-adapter)
 -   **Prometheus**: [Prometheus scraper](/exporting/prometheus/README.md)
 -   **TimescaleDB**: [Prometheus remote write](/exporting/prometheus/remote_write/README.md),
     [netdata-timescale-relay](/exporting/TIMESCALE.md)
