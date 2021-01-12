@@ -315,17 +315,16 @@ attempt_contact () {
 
 for i in {1..5}
 do
-        attempt_contact
-        if [ $? -eq 0 ] ; then
+        if attempt_contact ; then
                 echo "Connection attempt $i successful"
                 break
         fi
         echo "Connection attempt $i failed. Retry in ${i}s."
-        if [ $i -eq 5 ] ; then
+        if [ "$i" -eq 5 ] ; then
                 rm -f "${CLAIMING_DIR}/tmpin.txt"
                 exit 4
         fi
-        sleep $i
+        sleep "$i"
 done
 
 rm -f "${CLAIMING_DIR}/tmpin.txt"
