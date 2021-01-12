@@ -103,9 +103,9 @@ override_dh_fixperms:
 	# apps.plugin should only be runnable by the netdata user. It will be
 	# given extra capabilities in the postinst script.
 	#
-	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/apps.plugin
-	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
-	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/slabinfo.plugin
+	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/apps.plugin
+	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
+	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/slabinfo.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
 
 	# CUPS plugin package
