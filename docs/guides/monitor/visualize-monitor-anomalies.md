@@ -92,7 +92,7 @@ trained model. The `anomalies_local.anomaly` chart visualizes 0&rarr;1 predictio
 data is anomalous based on the trained model. Both charts have an equal number of 
 
 In other words, the `probability` chart shows the amplitude of anomaly, whereas the `anomaly` chart provides quick
-yes/no context. 
+yes/no context.
 
 ![Two charts created by the anomalies
 collector](https://user-images.githubusercontent.com/1153921/104226380-ef84eb00-5404-11eb-9faf-9e64c43b95ff.png)
@@ -118,9 +118,25 @@ documentation about why the dashboard exists and where to look next based on wha
 ![An example anomaly detection
 dashboard](https://user-images.githubusercontent.com/1153921/104226915-c6188f00-5405-11eb-9bb4-559a18016fa7.png)
 
+Use the anomaly charts for instant visual identification of potential anomalies, and then Nginx-specific charts, in the
+right column, to validate whether the probability and anomaly counters are showing a valid incident worth further
+investigation using [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) to narrow
+the dashboard into only the charts relevant to what you're seeing from the anomalies collector.
+
 ## What's next?
 
+Between this guide and [part 1](/docs/guides/monitor/anomaly-detection.md), which covered setup and configuration, you
+now have a fundamental understanding of how unsupervised anomaly detection in Netdata works, from root cause to alarms
+to preconfigured or custom dashboards.
 
+We'd love to hear your feedback on whether the anomalies collector. Hop over to the [community
+forum](https://community.netdata.cloud/c/agent-development/9) and let us know if you're already getting value from
+unsupervised anomaly detection, or would like to see something added to it. You might even post a custom configuration
+that works well for monitoring some other popular application, like MySQL, PostgreSQL, Redis, or anything else we
+[support through collectors](/collectors/COLLECTORS.md).
+
+In part 3 of this series on unsupervised anomaly detection using Netdata, we'll create a custom model to apply
+unsupervised anomaly detection to an entire mission-critical application. Stay tuned!
 
 ### Related reference documentation
 
