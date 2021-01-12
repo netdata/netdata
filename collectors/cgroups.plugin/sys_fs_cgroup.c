@@ -3368,7 +3368,7 @@ void update_cgroup_charts(int update_every) {
 
         if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem_usage)) {
-                snprintfz(title, CHART_TITLE_MAX, "Used Memory %sfor cgroup %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"", cg->chart_title);
+                snprintfz(title, CHART_TITLE_MAX, "Used Memory %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"");
 
                 cg->st_mem_usage = rrdset_create_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
