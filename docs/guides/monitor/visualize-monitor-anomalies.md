@@ -11,7 +11,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 # Monitor and visualize anomalies with Netdata
 
 Welcome to part 2 of our series of guides on using _unsupervised anomaly detection_ to detect issues with your systems,
-containers, and applications using the open-source Netdata Agent. For an introduction into detecting anomalies and
+containers, and applications using the open-source Netdata Agent. For an introduction to detecting anomalies and
 monitoring associated metrics, see [part 1](/docs/guides/monitor/anomaly-detection.md), which covers prerequisites and
 configuration basics.
 
@@ -19,9 +19,9 @@ With anomaly detection in the Netdata Agent set up, you will now want to visuali
 anomalous data, when, and where to look next.
 
 > 💡 In certain cases, the anomalies collector doesn't start immediately after restarting the Netdata Agent. If this
-> happens, you won't see the dashboard section, or the relevant [charts](#visualize-anomalies-in-charts) right away.
-> Wait a minute or two, refresh, and look again. If the anomalies charts and alarms are still not present, investigate
-> the error log with `less /var/log/netdata/error.log | grep anomalies`.
+> happens, you won't see the dashboard section or the relevant [charts](#visualize-anomalies-in-charts) right away. Wait
+> a minute or two, refresh, and look again. If the anomalies charts and alarms are still not present, investigate the
+> error log with `less /var/log/netdata/error.log | grep anomalies`.
 
 ## Test anomaly detection
 
@@ -112,7 +112,7 @@ immediately shot to 100% anomaly probability, and remained there during the test
 editor](/docs/visualize/create-dashboards.md) that helps you create entirely new dashboards with charts target for your
 specific applications.
 
-For example, here's an dashboard designed for visualizing anomalies present in an Nginx web server, including
+For example, here's a dashboard designed for visualizing anomalies present in an Nginx web server, including
 documentation about why the dashboard exists and where to look next based on what you're seeing:
 
 ![An example anomaly detection
