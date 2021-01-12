@@ -584,6 +584,7 @@ struct cgroup_network_interface {
 #define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
 #define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
 
+// *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup {
     uint32_t options;
 
@@ -691,8 +692,21 @@ struct cgroup {
     RRDDIM *rd_io_merged_write;
 
     struct cgroup *next;
+    struct cgroup *discovered_next;
 
 } *cgroup_root = NULL;
+
+uv_mutex_t cgroup_root_mutex;
+
+struct cgroup *discovered_cgroup_root = NULL;
+
+struct discovery_thread {
+    uv_thread_t thread;
+    uv_mutex_t mutex;
+    uv_cond_t cond_var;
+    int start_discovery;
+    int exited;
+} discovery_thread;
 
 // ----------------------------------------------------------------------------
 // read values from /sys
@@ -1168,7 +1182,7 @@ static inline void read_all_cgroups(struct cgroup *root) {
     struct cgroup *cg;
 
     for(cg = root; cg ; cg = cg->next)
-        if(cg->enabled && cg->available && !cg->pending_renames)
+        if(cg->enabled && !cg->pending_renames)
             cgroup_read(cg);
 }
 
@@ -1380,13 +1394,13 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     if(cgroup_use_unified_cgroups) cg->options |= CGROUP_OPTIONS_IS_UNIFIED;
 
-    if(!cgroup_root)
-        cgroup_root = cg;
+    if(!discovered_cgroup_root)
+        discovered_cgroup_root = cg;
     else {
         // append it
         struct cgroup *e;
-        for(e = cgroup_root; e->next ;e = e->next) ;
-        e->next = cg;
+        for(e = discovered_cgroup_root; e->discovered_next ;e = e->discovered_next) ;
+        e->discovered_next = cg;
     }
 
     cgroup_root_count++;
@@ -1452,24 +1466,23 @@ static inline struct cgroup *cgroup_add(const char *id) {
     // detect duplicate cgroups
     if(cg->enabled) {
         struct cgroup *t;
-        for (t = cgroup_root; t; t = t->next) {
+        for (t = discovered_cgroup_root; t; t = t->discovered_next) {
             if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
-                if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
-                    error("CGROUP: chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
-                          cg->chart_id, t->id, cg->id, t->id);
-                    debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
-                          cg->chart_id, t->id, cg->id, t->id);
-                    t->enabled = 0;
-                    t->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
-                }
-                else {
-                    error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
-                          cg->chart_id, t->id, cg->id);
-                    debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
-                          cg->chart_id, t->id, cg->id);
-                    cg->enabled = 0;
-                    cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
-                }
+                // TODO: use it after refactoring if system.slice might be scanned before init.scope/system.slice
+                //
+                // if (!strncmp(t->id, "/system.slice/", 14) && !strncmp(cg->id, "/init.scope/system.slice/", 25)) {
+                //     error("CGROUP: chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
+                //           cg->chart_id, t->id, cg->id, t->id);
+                //     t->enabled = 0;
+                //     t->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
+                // }
+                // else {}
+                //
+                // https://github.com/netdata/netdata/issues/797#issuecomment-241248884
+                error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
+                        cg->chart_id, t->id, cg->id);
+                cg->enabled = 0;
+                cg->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
 
                 break;
             }
@@ -1560,7 +1573,7 @@ static inline struct cgroup *cgroup_find(const char *id) {
     uint32_t hash = simple_hash(id);
 
     struct cgroup *cg;
-    for(cg = cgroup_root; cg ; cg = cg->next) {
+    for(cg = discovered_cgroup_root; cg ; cg = cg->discovered_next) {
         if(hash == cg->hash && strcmp(id, cg->id) == 0)
             break;
     }
@@ -1686,103 +1699,16 @@ static inline void mark_all_cgroups_as_not_available() {
     struct cgroup *cg;
 
     // mark all as not available
-    for(cg = cgroup_root; cg ; cg = cg->next) {
+    for(cg = discovered_cgroup_root; cg ; cg = cg->discovered_next) {
         cg->available = 0;
     }
 }
 
-static inline void cleanup_all_cgroups() {
-    struct cgroup *cg = cgroup_root, *last = NULL;
-
-    for(; cg ;) {
-        if(!cg->available) {
-            // enable the first duplicate cgroup
-            {
-                struct cgroup *t;
-                for(t = cgroup_root; t ; t = t->next) {
-                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
-                        debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
-                        t->enabled = 1;
-                        t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;
-                        break;
-                    }
-                }
-            }
-
-            if(!last)
-                cgroup_root = cg->next;
-            else
-                last->next = cg->next;
-
-            cgroup_free(cg);
-
-            if(!last)
-                cg = cgroup_root;
-            else
-                cg = last->next;
-        }
-        else {
-            last = cg;
-            cg = cg->next;
-        }
-    }
-}
-
-static inline void find_all_cgroups() {
-    debug(D_CGROUP, "searching for cgroups");
-
-    mark_all_cgroups_as_not_available();
-    if(!cgroup_use_unified_cgroups) {
-        if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
-            if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
-                cgroup_enable_cpuacct_stat =
-                cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
-                error("CGROUP: disabled cpu statistics.");
-            }
-        }
-
-        if(cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io || cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
-            if(find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir) == -1) {
-                cgroup_enable_blkio_io =
-                cgroup_enable_blkio_ops =
-                cgroup_enable_blkio_throttle_io =
-                cgroup_enable_blkio_throttle_ops =
-                cgroup_enable_blkio_merged_ops =
-                cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
-                error("CGROUP: disabled blkio statistics.");
-            }
-        }
-
-        if(cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
-            if(find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir) == -1) {
-                cgroup_enable_memory =
-                cgroup_enable_detailed_memory =
-                cgroup_enable_swap =
-                cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
-                error("CGROUP: disabled memory statistics.");
-            }
-        }
-
-        if(cgroup_search_in_devices) {
-            if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
-                cgroup_search_in_devices = 0;
-                error("CGROUP: disabled devices statistics.");
-            }
-        }
-    }
-    else {
-        if (find_dir_in_subdirs(cgroup_unified_base, NULL, found_subdir_in_dir) == -1) {
-            cgroup_unified_exist = CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled unified cgroups statistics.");
-        }
-    }
-
-    // remove any non-existing cgroups
-    cleanup_all_cgroups();
-
+static inline void update_filenames()
+{
     struct cgroup *cg;
     struct stat buf;
-    for(cg = cgroup_root; cg ; cg = cg->next) {
+    for(cg = discovered_cgroup_root; cg ; cg = cg->discovered_next) {
         // fprintf(stderr, " >>> CGROUP '%s' (%u - %s) with name '%s'\n", cg->id, cg->hash, cg->available?"available":"stopped", cg->name);
 
         if(unlikely(cg->pending_renames))
@@ -2046,9 +1972,136 @@ static inline void find_all_cgroups() {
             }
         }
     }
+}
+
+static inline void cleanup_all_cgroups() {
+    struct cgroup *cg = discovered_cgroup_root, *last = NULL;
+
+    for(; cg ;) {
+        if(!cg->available) {
+            // enable the first duplicate cgroup
+            {
+                struct cgroup *t;
+                for(t = discovered_cgroup_root; t ; t = t->discovered_next) {
+                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+                        debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
+                        t->enabled = 1;
+                        t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;
+                        break;
+                    }
+                }
+            }
+
+            if(!last)
+                discovered_cgroup_root = cg->discovered_next;
+            else
+                last->discovered_next = cg->discovered_next;
+
+            cgroup_free(cg);
+
+            if(!last)
+                cg = discovered_cgroup_root;
+            else
+                cg = last->discovered_next;
+        }
+        else {
+            last = cg;
+            cg = cg->discovered_next;
+        }
+    }
+}
+
+static inline void copy_discovered_cgroups()
+{
+    debug(D_CGROUP, "copy discovered cgroups to the main group list");
+
+    struct cgroup *cg;
+
+    for(cg = discovered_cgroup_root; cg ; cg = cg->discovered_next) {
+        cg->next = cg->discovered_next;
+    }
+
+    cgroup_root = discovered_cgroup_root;
+}
+
+static inline void find_all_cgroups() {
+    debug(D_CGROUP, "searching for cgroups");
+
+    mark_all_cgroups_as_not_available();
+    if(!cgroup_use_unified_cgroups) {
+        if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
+            if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_cpuacct_stat =
+                cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled cpu statistics.");
+            }
+        }
+
+        if(cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io || cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
+            if(find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_blkio_io =
+                cgroup_enable_blkio_ops =
+                cgroup_enable_blkio_throttle_io =
+                cgroup_enable_blkio_throttle_ops =
+                cgroup_enable_blkio_merged_ops =
+                cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled blkio statistics.");
+            }
+        }
+
+        if(cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
+            if(find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_memory =
+                cgroup_enable_detailed_memory =
+                cgroup_enable_swap =
+                cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled memory statistics.");
+            }
+        }
+
+        if(cgroup_search_in_devices) {
+            if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_search_in_devices = 0;
+                error("CGROUP: disabled devices statistics.");
+            }
+        }
+    }
+    else {
+        if (find_dir_in_subdirs(cgroup_unified_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_unified_exist = CONFIG_BOOLEAN_NO;
+            error("CGROUP: disabled unified cgroups statistics.");
+        }
+    }
+
+    update_filenames();
+
+    uv_mutex_lock(&cgroup_root_mutex);
+    cleanup_all_cgroups();
+    copy_discovered_cgroups();
+    uv_mutex_unlock(&cgroup_root_mutex);
 
     debug(D_CGROUP, "done searching for cgroups");
 }
+
+void cgroup_discovery_worker(void *ptr)
+{
+    UNUSED(ptr);
+
+    while (!netdata_exit) {
+        uv_mutex_lock(&discovery_thread.mutex);
+        while (!discovery_thread.start_discovery)
+            uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
+        discovery_thread.start_discovery = 0;
+        uv_mutex_unlock(&discovery_thread.mutex);
+
+        if (unlikely(netdata_exit))
+            break;
+
+        find_all_cgroups();
+    }
+
+    discovery_thread.exited = 1;
+} 
 
 // ----------------------------------------------------------------------------
 // generate charts
@@ -2631,7 +2684,7 @@ void update_systemd_services_charts(
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
+        if(unlikely(!cg->enabled || cg->pending_renames || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
@@ -3022,7 +3075,7 @@ void update_cgroup_charts(int update_every) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames))
+        if(unlikely(!cg->enabled || cg->pending_renames))
             continue;
 
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
@@ -3880,6 +3933,21 @@ static void cgroup_main_cleanup(void *ptr) {
 
     info("cleaning up...");
 
+    usec_t max = 2 * USEC_PER_SEC, step = 50000;
+
+    if (!discovery_thread.exited) {
+        info("stopping discovery thread worker");
+        uv_mutex_unlock(&discovery_thread.mutex);
+        discovery_thread.start_discovery = 1;
+        uv_cond_signal(&discovery_thread.cond_var);
+    }
+
+    while (!discovery_thread.exited && max > 0) {
+        max -= step;
+        info("waiting for discovery thread to finish...");
+        sleep_usec(step);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -3895,6 +3963,31 @@ void *cgroups_main(void *ptr) {
 
     RRDSET *stcpu_thread = NULL;
 
+    if (uv_mutex_init(&cgroup_root_mutex)) {
+        error("CGROUP: cannot initialize mutex for the main cgroup list");
+        goto exit;
+    }
+
+    // dispatch a discovery worker thread
+    discovery_thread.start_discovery = 0;
+    discovery_thread.exited = 0;
+
+    if (uv_mutex_init(&discovery_thread.mutex)) {
+        error("CGROUP: cannot initialize mutex for discovery thread");
+        goto exit;
+    }
+    if (uv_cond_init(&discovery_thread.cond_var)) {
+        error("CGROUP: cannot initialize conditional variable for discovery thread");
+        goto exit;
+    }
+
+    int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
+    if (error) {
+        error("CGROUP: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
+        goto exit;
+    }
+    uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = cgroup_update_every * USEC_PER_SEC;
@@ -3904,19 +3997,18 @@ void *cgroups_main(void *ptr) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         if(unlikely(netdata_exit)) break;
 
-        // BEGIN -- the job to be done
-
         find_dt += hb_dt;
         if(unlikely(find_dt >= find_every || cgroups_check)) {
-            find_all_cgroups();
+            uv_cond_signal(&discovery_thread.cond_var);
+            discovery_thread.start_discovery = 1;
             find_dt = 0;
             cgroups_check = 0;
         }
 
+        uv_mutex_lock(&cgroup_root_mutex);
         read_all_cgroups(cgroup_root);
         update_cgroup_charts(cgroup_update_every);
-
-        // END -- the job is done
+        uv_mutex_unlock(&cgroup_root_mutex);
 
         // --------------------------------------------------------------------
 
@@ -3952,6 +4044,7 @@ void *cgroups_main(void *ptr) {
         }
     }
 
+exit:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
