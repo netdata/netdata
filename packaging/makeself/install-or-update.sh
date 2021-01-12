@@ -130,25 +130,6 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-progress "Check SSL certificates paths"
-
-if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]; then
-  if [ ! -f /opt/netdata/.curlrc ]; then
-    cacert=
-
-    # CentOS
-    [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
-
-    if [ -n "${cacert}" ]; then
-      echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
-      echo > /opt/netdata/.curlrc "cacert=${cacert}"
-    else
-      run_failed "Failed to find /etc/ssl/certs/ca-certificates.crt"
-    fi
-  fi
-fi
-
-# -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
