@@ -2,7 +2,7 @@
 title: "Anomaly detection with Netdata"
 description: "Use ML-driven anomaly detection to narrow your focus to only affected metrics and services/processes on your node to shorten root cause analysis."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/anomalies/README.md
-sidebar_url: anomalies
+sidebar_url: Anomalies
 -->
 
 # Anomaly detection with Netdata
