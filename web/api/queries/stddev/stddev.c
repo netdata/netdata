@@ -15,10 +15,8 @@ struct grouping_stddev {
 };
 
 void *grouping_create_stddev(RRDR *r) {
-    long entries = r->group;
-    if(entries < 0) entries = 0;
-
-    return callocz(1, sizeof(struct grouping_stddev) + entries * sizeof(LONG_DOUBLE));
+    UNUSED (r);
+    return callocz(1, sizeof(struct grouping_stddev));
 }
 
 // resets when switches dimensions
