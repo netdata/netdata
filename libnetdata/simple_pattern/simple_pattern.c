@@ -361,5 +361,5 @@ char *simple_pattern_iterate(SIMPLE_PATTERN **p)
     struct simple_pattern **Proot = (struct simple_pattern **)p;
 
     (*Proot) = (*Proot)->next;
-    return root->match;
+    return (char *) root->match;
 }
