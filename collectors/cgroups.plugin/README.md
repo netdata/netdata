@@ -145,7 +145,7 @@ Support per distribution:
 |Fedora 25|YES|[here](http://pastebin.com/ax0373wF)||
 |Debian 8|NO||can be enabled, see below|
 |AMI|NO|[here](http://pastebin.com/FrxmptjL)|not a systemd system|
-|Centos 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below|
+|CentOS 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below|
 
 ### how to enable cgroup accounting on systemd systems that is by default disabled
 

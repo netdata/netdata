@@ -55,11 +55,11 @@ common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" 
 # Exceptional cases, not available everywhere
 #
 print("2.2 Running uncommon dependencies and preparing LXC environment")
-# Not on Centos-7
+# Not on CentOS-7
 if os.environ["BUILD_STRING"].count("el/7") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
 
-# Not on Centos-6
+# Not on CentOS-6
 if os.environ["BUILD_STRING"].count("el/6") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autoconf-archive"])
 
