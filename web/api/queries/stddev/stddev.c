@@ -15,6 +15,7 @@ struct grouping_stddev {
 };
 
 void *grouping_create_stddev(RRDR *r) {
+    UNUSED (r);
     return callocz(1, sizeof(struct grouping_stddev));
 }
 
