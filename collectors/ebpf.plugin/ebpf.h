@@ -109,8 +109,6 @@ extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern char *ebpf_plugin_dir;
 extern char kernel_string[64];
-extern netdata_ebpf_events_t process_probes[];
-extern netdata_ebpf_events_t socket_probes[];
 
 extern pthread_mutex_t collect_data_mutex;
 extern pthread_cond_t collect_data_cond_var;
@@ -192,9 +190,5 @@ extern int update_every;
 extern uint32_t finalized_threads;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
-
-// External functions
-extern void change_socket_event();
-extern void change_process_event();
 
 #endif /* NETDATA_COLLECTOR_EBPF_H */

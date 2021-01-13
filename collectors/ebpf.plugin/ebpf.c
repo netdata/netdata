@@ -75,43 +75,15 @@ pthread_mutex_t lock;
 pthread_mutex_t collect_data_mutex;
 pthread_cond_t collect_data_cond_var;
 
-netdata_ebpf_events_t process_probes[] = {
-    { .type = 'r', .name = "vfs_write" },
-    { .type = 'r', .name = "vfs_writev" },
-    { .type = 'r', .name = "vfs_read" },
-    { .type = 'r', .name = "vfs_readv" },
-    { .type = 'r', .name = "do_sys_open" },
-    { .type = 'r', .name = "vfs_unlink" },
-    { .type = 'p', .name = "do_exit" },
-    { .type = 'p', .name = "release_task" },
-    { .type = 'r', .name = "_do_fork" },
-    { .type = 'r', .name = "__close_fd" },
-    { .type = 'p', .name = "try_to_wake_up" },
-    { .type = 'r', .name = "__x64_sys_clone" },
-    { .type = 0, .name = NULL }
-};
-
-netdata_ebpf_events_t socket_probes[] = {
-    { .type = 'p', .name = "tcp_cleanup_rbuf" },
-    { .type = 'p', .name = "tcp_close" },
-    { .type = 'p', .name = "udp_recvmsg" },
-    { .type = 'r', .name = "udp_recvmsg" },
-    { .type = 'r', .name = "udp_sendmsg" },
-    { .type = 'p', .name = "do_exit" },
-    { .type = 'p', .name = "tcp_sendmsg" },
-    { .type = 'r', .name = "tcp_sendmsg" },
-    { .type = 0, .name = NULL }
-};
-
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = process_probes,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0 },
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY, .probes = socket_probes,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
-      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY, .probes = NULL,
+      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0 },
 };
 
@@ -164,15 +136,6 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
         move = next;
     }
     *clean = NULL;
-}
-
-static void change_events()
-{
-    if (ebpf_modules[0].mode == MODE_ENTRY)
-        change_process_event();
-
-    if (ebpf_modules[1].mode == MODE_ENTRY)
-        change_socket_event();
 }
 
 /**
@@ -1966,7 +1929,6 @@ int main(int argc, char **argv)
         {NULL          , NULL, NULL, 0, NULL, NULL, NULL}
     };
 
-    change_events();
     //clean_loaded_events();
 
     int i;

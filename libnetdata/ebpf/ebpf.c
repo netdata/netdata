@@ -242,16 +242,18 @@ char *ebpf_kernel_suffix(int version, int isrh)
 {
     if (isrh) {
         if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.18.0";
+            return "4.18";
         else
-            return "3.10.0";
+            return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_4_17)
-            return "5.4.20";
+        if (version >= NETDATA_EBPF_KERNEL_5_10)
+            return "5.10";
+        else if (version >= NETDATA_EBPF_KERNEL_4_17)
+            return "5.4";
         else if (version >= NETDATA_EBPF_KERNEL_4_15)
-            return "4.16.18";
+            return "4.16";
         else if (version >= NETDATA_EBPF_KERNEL_4_11)
-            return "4.14.171";
+            return "4.14";
     }
 
     return NULL;
@@ -294,6 +296,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir, lname);
     if (bpf_prog_load(lpath, BPF_PROG_TYPE_KPROBE, obj, &prog_fd)) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         info("Cannot load program: %s", lpath);
         return NULL;
     } else {

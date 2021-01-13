@@ -1608,6 +1608,14 @@ remove_old_ebpf() {
     echo >&2 "Renaming eBPF configuration file."
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
   fi
+
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
+    echo >&2 "Removing old eBPF programs"
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
+  fi
+
 }
 
 install_ebpf() {

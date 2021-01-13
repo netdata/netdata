@@ -32,6 +32,13 @@
 #define NETDATA_RH_8 2048
 
 /**
+ *  Kernel 5.10
+ *
+ *  330240 = 5*65536 + 10*256
+ */
+#define NETDATA_EBPF_KERNEL_5_10 330240
+
+/**
  *  Kernel 4.17
  *
  *  266496 = 4*65536 + 17*256
@@ -54,11 +61,6 @@
 
 #define VERSION_STRING_LEN 256
 #define EBPF_KERNEL_REJECT_LIST_FILE "ebpf_kernel_reject_list.txt"
-
-typedef struct netdata_ebpf_events {
-    char type;
-    char *name;
-} netdata_ebpf_events_t;
 
 typedef struct ebpf_data {
     int *map_fd;
@@ -83,14 +85,12 @@ typedef struct ebpf_module {
     int global_charts;
     int apps_charts;
     netdata_run_mode_t mode;
-    netdata_ebpf_events_t *probes;
     uint32_t thread_id;
     int optional;
 } ebpf_module_t;
 
 #define NETDATA_MAX_PROBES 64
 
-extern int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
 extern int get_kernel_version(char *out, int size);
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);
