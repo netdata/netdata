@@ -6,6 +6,9 @@ yaml-files:
   - 'collectors/python.d.plugin/*.conf'
   - 'collectors/python.d.plugin/*/*.conf'
 
+ignore: |
+  /web/api/netdata-swagger.yaml
+
 rules:
   line-length:
     max: 120

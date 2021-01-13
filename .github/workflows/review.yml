@@ -86,7 +86,9 @@ jobs:
           fetch-depth: 0
       - name: Check files
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.ya?ml|python\.d/.*\.conf' ; then
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | \
+            grep -v web/api/netdata-swagger.yaml | \
+            grep -Eq '*\.ya?ml|python\.d/.*\.conf' ; then
             echo 'run_yamllint=1' >> $GITHUB_ENV
           fi
       - name: Run yamllint
