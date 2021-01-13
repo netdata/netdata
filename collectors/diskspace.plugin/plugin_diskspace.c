@@ -455,6 +455,8 @@ struct work_data {
 
 void disk_space_stats_work(uv_work_t* req)
 {
+    // TODO: syncronize the thread with the main loop
+    
     struct work_data *d = req->data;
 
     do_disk_space_stats(d->mi, d->update_every);
@@ -489,6 +491,8 @@ void *diskspace_main(void *ptr) {
     fatal_assert(0 == uv_rwlock_init(&disk_mountinfo_lock));
     fatal_assert(0 == uv_rwlock_init(&dict_mountpoints_lock));
 
+
+    // TODO: create a thread pool for fast mountpoints
     int error = uv_thread_create(&loop_thread.thread, run_event_loop, NULL);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
@@ -523,15 +527,35 @@ void *diskspace_main(void *ptr) {
 
             mi->busy = 1;
 
+            // TODO:
+            // if a mount point is fast - wait for an available thread - uv_sem_wait()
+            // if a mount point is slow
+            //   check for an available thread - uv_thread_trywait()
+            //   if no threads are available
+            //     create a new thread if possible - uv_sem_post(),uv_thread_create()
+            //     or add to the slow queue (increase the queue counter)
+            // pick a free thread - go throug the list and check for the free flag
+            
+            // prepare data to pass - assign a pointer to the mi data
             struct work_data *d = mallocz(sizeof(struct work_data));
             d->mi = mi;
             d->update_every = update_every;
             mi->work.data = d;
-
+            
+            // wake the thread - uv_cond_signal()
             fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, disk_space_stats_done));
+            // if the thread is not busy - repeat the signal
+
+            // :TODO
             
             if(unlikely(netdata_exit)) break;
         }
+
+        // TODO:
+        // go through the slow queue
+        //   check for an available thread with small intervals 
+        //   dispatch jobs (decrease the queue counter)
+        //   end the loop if too few time left before the next heartbeat
 
         if(unlikely(netdata_exit)) break;
 
@@ -547,6 +571,10 @@ void *diskspace_main(void *ptr) {
 
             // ----------------------------------------------------------------
 
+            // TODO: more useful stats
+            // -time until all jobs are dispatched
+            // -total number of slow moutpoints
+            // -number of skipped mountpoints (the slow queue counter)
             getrusage(RUSAGE_THREAD, &thread);
 
             if(unlikely(!stcpu_thread)) {
