@@ -121,7 +121,7 @@ The following distributions are supported
   - Bionic
   - artful
 
-- Enterprise Linux versions (Covers Redhat, CentOS, and Amazon Linux with version 6)
+- Enterprise Linux versions (Covers Red Hat, CentOS, and Amazon Linux with version 6)
   - Version 8 (TBD)
   - Version 7
   - Version 6
