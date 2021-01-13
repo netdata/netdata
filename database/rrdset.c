@@ -331,11 +331,6 @@ void rrdset_free(RRDSET *st) {
     rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
-    // remove it from the configuration
-
-    appconfig_section_destroy_non_loaded(&netdata_config, st->config_section);
-
-    // ------------------------------------------------------------------------
     // free its children structures
 
     freez(st->exporting_flags);
@@ -352,6 +347,11 @@ void rrdset_free(RRDSET *st) {
 
     debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, st->id);
     rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
+
+    // ------------------------------------------------------------------------
+    // remove it from the configuration
+
+    appconfig_section_destroy_non_loaded(&netdata_config, st->config_section);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
