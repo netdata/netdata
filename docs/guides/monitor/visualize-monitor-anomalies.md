@@ -66,11 +66,11 @@ The second class triggers warning alarms when the number of anomalies in the las
 alarm](https://user-images.githubusercontent.com/1153921/104225769-0aa32b00-5404-11eb-95f3-7309f9429fe1.png)
 
 If you see either of these alarms in Netdata Cloud, the local Agent dashboard, or on your preferred notification
-platform, it's a safe bet that the nodes current metrics have deviated from normal. That doesn't necessarily mean
+platform, it's a safe bet that the node's current metrics have deviated from normal. That doesn't necessarily mean
 there's a full-blown incident, depending on what application/service you're using anomaly detection on, but it's worth
 further investigation.
 
-As you use the anomalies collector, you may find that the default settings provide too many or two few genuine alarms.
+As you use the anomalies collector, you may find that the default settings provide too many or too few genuine alarms.
 In this case, [configure the alarm](/docs/monitor/configure-alarms.md) with `sudo ./edit-config
 health.d/anomalies.conf`. Take a look at the `lookup` line syntax in the [health
 reference](/health/REFERENCE.md#alarm-line-lookup) to understand how the anomalies collector automatically creates
@@ -89,28 +89,29 @@ give context as to where to look next.
 
 The `anomalies_local.probability` chart shows the probability that the latest observed data is anomalous, based on the
 trained model. The `anomalies_local.anomaly` chart visualizes 0&rarr;1 predictions based on whether the latest observed
-data is anomalous based on the trained model. Both charts have an equal number of 
+data is anomalous based on the trained model. Both charts share the same dimensions, which you configured via
+`charts_regex` and `charts_to_exclude` in [part 1](/docs/guides/monitor/anomaly-detection.md).
 
-In other words, the `probability` chart shows the amplitude of anomaly, whereas the `anomaly` chart provides quick
+In other words, the `probability` chart shows the amplitude of the anomaly, whereas the `anomaly` chart provides quick
 yes/no context.
 
 ![Two charts created by the anomalies
 collector](https://user-images.githubusercontent.com/1153921/104226380-ef84eb00-5404-11eb-9faf-9e64c43b95ff.png)
 
 Before `08:32:00`, both charts show little in the way of verified anomalies. Based on the metrics the anomalies
-collector has trained on, a certain percentage of anomaly probably score is normal, as seen in the
+collector has trained on, a certain percentage of anomaly probability score is normal, as seen in the
 `web_log_nginx_requests_prob` dimension and a few others. What you're looking for is large deviations from the "noise"
 in the `anomalies.probability` chart, or any increments to the `anomalies.anomaly` chart.
 
-Unsurprisingly, the stress test ran at `08:32:00` caused significant changes to these charts. The three dimensions that
-immediately shot to 100% anomaly probability, and remained there during the test, were `web_log_nginx.requests_prob`,
-`nginx_local.connections_accepted_handled_prob`, and `system.cpu_pressure_prob`. 
+Unsurprisingly, the stress test that began at `08:32:00` caused significant changes to these charts. The three
+dimensions that immediately shot to 100% anomaly probability, and remained there during the test, were
+`web_log_nginx.requests_prob`, `nginx_local.connections_accepted_handled_prob`, and `system.cpu_pressure_prob`. 
 
 ## Build an anomaly detection dashboard
 
 [Netdata Cloud](https://app.netdata.cloud) features a drag-and-drop [dashboard
-editor](/docs/visualize/create-dashboards.md) that helps you create entirely new dashboards with charts target for your
-specific applications.
+editor](/docs/visualize/create-dashboards.md) that helps you create entirely new dashboards with charts targeted for
+your specific applications.
 
 For example, here's a dashboard designed for visualizing anomalies present in an Nginx web server, including
 documentation about why the dashboard exists and where to look next based on what you're seeing:
@@ -130,7 +131,7 @@ now have a fundamental understanding of how unsupervised anomaly detection in Ne
 to preconfigured or custom dashboards.
 
 We'd love to hear your feedback on whether the anomalies collector. Hop over to the [community
-forum](https://community.netdata.cloud/c/agent-development/9) and let us know if you're already getting value from
+forum](https://community.netdata.cloud/c/agent-development/9), and let us know if you're already getting value from
 unsupervised anomaly detection, or would like to see something added to it. You might even post a custom configuration
 that works well for monitoring some other popular application, like MySQL, PostgreSQL, Redis, or anything else we
 [support through collectors](/collectors/COLLECTORS.md).
