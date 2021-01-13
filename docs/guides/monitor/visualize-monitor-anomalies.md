@@ -1,5 +1,5 @@
 <!--
-title: "Monitor and visualize anomalies with Netdata"
+title: "Monitor and visualize anomalies with Netdata (part 2)"
 description: "Using unsupervised anomaly detection and machine learning, get notified "
 image: /img/seo/guides/monitor/visualize-monitor-anomalies.png
 author: "Joel Hans"
@@ -8,7 +8,7 @@ author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/visualize-monitor-anomalies.md
 -->
 
-# Monitor and visualize anomalies with Netdata
+# Monitor and visualize anomalies with Netdata (part 2)
 
 Welcome to part 2 of our series of guides on using _unsupervised anomaly detection_ to detect issues with your systems,
 containers, and applications using the open-source Netdata Agent. For an introduction to detecting anomalies and
@@ -130,7 +130,7 @@ Between this guide and [part 1](/docs/guides/monitor/anomaly-detection.md), whic
 now have a fundamental understanding of how unsupervised anomaly detection in Netdata works, from root cause to alarms
 to preconfigured or custom dashboards.
 
-We'd love to hear your feedback on whether the anomalies collector. Hop over to the [community
+We'd love to hear your feedback on the anomalies collector. Hop over to the [community
 forum](https://community.netdata.cloud/c/agent-development/9), and let us know if you're already getting value from
 unsupervised anomaly detection, or would like to see something added to it. You might even post a custom configuration
 that works well for monitoring some other popular application, like MySQL, PostgreSQL, Redis, or anything else we
