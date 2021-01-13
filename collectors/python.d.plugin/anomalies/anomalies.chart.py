@@ -73,7 +73,6 @@ class Service(SimpleService):
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
-        self.expected_cols = []
         self.last_train_at = 0
         self.include_average_prob = bool(self.configuration.get('include_average_prob', True))
 
@@ -245,7 +244,6 @@ class Service(SimpleService):
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
             sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
             ).ffill()
-        self.expected_cols = list(df_train.columns)
         if self.custom_models:
             df_train = self.add_custom_models_dims(df_train)
 
