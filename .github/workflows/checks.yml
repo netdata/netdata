@@ -113,4 +113,9 @@ jobs:
       - name: Build netdata
         run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install /tmp/install
       - name: Check that repo is clean
-        run: if [ "$(git status --porcelain=v1 | wc -l)" -gt 0 ] ; then exit 1 ; fi
+        run: |
+          git status --porcelain=v1 > /tmp/porcelain
+          if [ -s /tmp/porcelain ]; then
+            cat /tmp/porcelain
+            exit 1
+          fi
