@@ -322,8 +322,8 @@ user_picks_distribution() {
   echo >&2 "I found though that the following installers are available:"
   echo >&2
   [ -n "${apt_get}" ] && echo >&2 " - Debian/Ubuntu based (installer is: apt-get)" && opts="apt-get ${opts}"
-  [ -n "${yum}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: yum)" && opts="yum ${opts}"
-  [ -n "${dnf}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: dnf)" && opts="dnf ${opts}"
+  [ -n "${yum}" ] && echo >&2 " - Redhat/Fedora/CentOS based (installer is: yum)" && opts="yum ${opts}"
+  [ -n "${dnf}" ] && echo >&2 " - Redhat/Fedora/CentOS based (installer is: dnf)" && opts="dnf ${opts}"
   [ -n "${zypper}" ] && echo >&2 " - SuSe based (installer is: zypper)" && opts="zypper ${opts}"
   [ -n "${pacman}" ] && echo >&2 " - Arch Linux based (installer is: pacman)" && opts="pacman ${opts}"
   [ -n "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
