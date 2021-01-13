@@ -165,9 +165,6 @@ struct label *label_list_lookup_keylist(struct label *head, char *key)
 
     pattern = simple_pattern_create(key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
 
-    if (!pattern)
-        return NULL;
-
     while (head != NULL)
     {
         if (simple_pattern_matches(pattern, head->key))
