@@ -411,6 +411,14 @@ static void diskspace_main_cleanup(void *ptr) {
 
     info("cleaning up...");
 
+    /* stop event loop */
+    fatal_assert(0 == uv_async_send(&loop_thread.async));
+
+    int error = uv_thread_join(&loop_thread.thread);
+    if (error) {
+        error("uv_thread_join(): %s", uv_strerror(error));
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -419,9 +427,25 @@ void close_async(uv_async_t *handle)
     uv_close((uv_handle_t *)handle, NULL);
 }
 
-void stop_event_loop()
+void run_event_loop(void *ptr)
 {
-    fatal_assert(0 == uv_async_send(&loop_thread.async));
+    UNUSED(ptr);
+    int error;
+
+    error = uv_loop_init(&loop_thread.loop);
+    if (error) {
+        error("uv_loop_init(): %s", uv_strerror(error));
+        return;
+    }
+
+    error = uv_async_init(&loop_thread.loop, &loop_thread.async, close_async);
+    if (error) {
+        error("uv_async_init(): %s", uv_strerror(error));
+    }
+    
+    uv_run(&loop_thread.loop, UV_RUN_DEFAULT);
+
+    fatal_assert(0 == uv_loop_close(&loop_thread.loop));
 }
 
 struct work_data {
@@ -445,133 +469,14 @@ void disk_space_stats_done(uv_work_t* req, int status)
     free(d);
 }
 
-int vdo_cpu_netdata;
-int update_every;
-usec_t step;
-heartbeat_t hb;
-
-void diskspace_loop (uv_idle_t *handle)
-{
-    UNUSED(handle);
-
-    if(unlikely(netdata_exit))
-        stop_event_loop();
-
-    usec_t duration = heartbeat_monotonic_dt_to_now_usec(&hb);
-    /* usec_t hb_dt = */ heartbeat_next(&hb, step);
-
-    if(unlikely(netdata_exit))
-        stop_event_loop();
-
-
-    // --------------------------------------------------------------------------
-    // this is smart enough not to reload it every time
-
-    mountinfo_reload(0);
-
-
-    // --------------------------------------------------------------------------
-    // disk space metrics
-
-    struct mountinfo *mi;
-    for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-
-        if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND) || mi->busy))
-            continue;
-
-        mi->busy = 1;
-
-        struct work_data *d = mallocz(sizeof(struct work_data));
-        d->mi = mi;
-        d->update_every = update_every;
-        mi->work.data = d;
-
-        fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, disk_space_stats_done));
-        
-        if(unlikely(netdata_exit))
-            stop_event_loop();
-    }
-
-    if(unlikely(netdata_exit))
-        stop_event_loop();
-
-    if(dict_mountpoints) {
-        uv_rwlock_wrlock(&dict_mountpoints_lock);
-        dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
-        uv_rwlock_wrunlock(&dict_mountpoints_lock);
-    }
-
-    if(vdo_cpu_netdata) {
-        static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
-        static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
-
-        // ----------------------------------------------------------------
-
-        struct rusage thread;
-        getrusage(RUSAGE_THREAD, &thread);
-
-        if(unlikely(!stcpu_thread)) {
-            stcpu_thread = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_diskspace"
-                    , NULL
-                    , "diskspace"
-                    , NULL
-                    , "NetData Disk Space Plugin CPU usage"
-                    , "milliseconds/s"
-                    , PLUGIN_DISKSPACE_NAME
-                    , NULL
-                    , NETDATA_CHART_PRIO_NETDATA_DISKSPACE
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-
-            rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        }
-        else
-            rrdset_next(stcpu_thread);
-
-        rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-        rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-        rrdset_done(stcpu_thread);
-
-        // ----------------------------------------------------------------
-
-        if(unlikely(!st_duration)) {
-            st_duration = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_diskspace_dt"
-                    , NULL
-                    , "diskspace"
-                    , NULL
-                    , "NetData Disk Space Plugin Duration"
-                    , "milliseconds/run"
-                    , PLUGIN_DISKSPACE_NAME
-                    , NULL
-                    , 132021
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        }
-        else
-            rrdset_next(st_duration);
-
-        rrddim_set_by_pointer(st_duration, rd_duration, duration);
-        rrdset_done(st_duration);
-    }
-}
-
 void *diskspace_main(void *ptr) {
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
-    vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
@@ -579,35 +484,129 @@ void *diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    struct rusage thread;
+
     fatal_assert(0 == uv_rwlock_init(&disk_mountinfo_lock));
     fatal_assert(0 == uv_rwlock_init(&dict_mountpoints_lock));
 
-    step = update_every * USEC_PER_SEC;
+    int error = uv_thread_create(&loop_thread.thread, run_event_loop, NULL);
+    if (error) {
+        error("uv_thread_create(): %s", uv_strerror(error));
+        return NULL;
+    }
+
+    usec_t duration = 0;
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
     heartbeat_init(&hb);
+    while(!netdata_exit) {
+        duration = heartbeat_monotonic_dt_to_now_usec(&hb);
+        /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
-    int error;
+        if(unlikely(netdata_exit)) break;
 
-    error = uv_loop_init(&loop_thread.loop);
-    if (error) {
-        error("uv_loop_init(): %s", uv_strerror(error));
-        goto exit;
+
+        // --------------------------------------------------------------------------
+        // this is smart enough not to reload it every time
+
+        mountinfo_reload(0);
+
+
+        // --------------------------------------------------------------------------
+        // disk space metrics
+
+        struct mountinfo *mi;
+        for(mi = disk_mountinfo_root; mi; mi = mi->next) {
+
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND) || mi->busy))
+                continue;
+
+            mi->busy = 1;
+
+            struct work_data *d = mallocz(sizeof(struct work_data));
+            d->mi = mi;
+            d->update_every = update_every;
+            mi->work.data = d;
+
+            fatal_assert(0 == uv_queue_work(&loop_thread.loop, &mi->work, disk_space_stats_work, disk_space_stats_done));
+            
+            if(unlikely(netdata_exit)) break;
+        }
+
+        if(unlikely(netdata_exit)) break;
+
+        if(dict_mountpoints) {
+            uv_rwlock_wrlock(&dict_mountpoints_lock);
+            dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+            uv_rwlock_wrunlock(&dict_mountpoints_lock);
+        }
+
+        if(vdo_cpu_netdata) {
+            static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
+            static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
+
+            // ----------------------------------------------------------------
+
+            getrusage(RUSAGE_THREAD, &thread);
+
+            if(unlikely(!stcpu_thread)) {
+                stcpu_thread = rrdset_create_localhost(
+                        "netdata"
+                        , "plugin_diskspace"
+                        , NULL
+                        , "diskspace"
+                        , NULL
+                        , "NetData Disk Space Plugin CPU usage"
+                        , "milliseconds/s"
+                        , PLUGIN_DISKSPACE_NAME
+                        , NULL
+                        , NETDATA_CHART_PRIO_NETDATA_DISKSPACE
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
+
+                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else
+                rrdset_next(stcpu_thread);
+
+            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+            rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+            rrdset_done(stcpu_thread);
+
+            // ----------------------------------------------------------------
+
+            if(unlikely(!st_duration)) {
+                st_duration = rrdset_create_localhost(
+                        "netdata"
+                        , "plugin_diskspace_dt"
+                        , NULL
+                        , "diskspace"
+                        , NULL
+                        , "NetData Disk Space Plugin Duration"
+                        , "milliseconds/run"
+                        , PLUGIN_DISKSPACE_NAME
+                        , NULL
+                        , 132021
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
+
+                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(st_duration);
+
+            rrddim_set_by_pointer(st_duration, rd_duration, duration);
+            rrdset_done(st_duration);
+
+            // ----------------------------------------------------------------
+
+            if(unlikely(netdata_exit)) break;
+        }
     }
 
-    error = uv_async_init(&loop_thread.loop, &loop_thread.async, close_async);
-    if (error) {
-        error("uv_async_init(): %s", uv_strerror(error));
-        goto exit;
-    }
-    
-    uv_idle_t idle_handle;
-    uv_idle_init(&loop_thread.loop, &idle_handle);
-    uv_idle_start(&idle_handle, diskspace_loop);
-
-    uv_run(&loop_thread.loop, UV_RUN_DEFAULT);
-
-    fatal_assert(0 == uv_loop_close(&loop_thread.loop));
-
-exit:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
