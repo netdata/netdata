@@ -302,7 +302,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     if(cv_new) goto cleanup;
 
     if(unlikely(appconfig_option_index_del(co_old, cv_old) != cv_old))
-        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted tge wrong config entry.", cv_old->name, co_old->name);
+        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.", cv_old->name, co_old->name);
 
     if(co_old->values == cv_old) {
         co_old->values = cv_old->next;

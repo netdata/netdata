@@ -30,7 +30,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
-        // the host pointer as it is unpredicable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
+        // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
             rpt->exited = 1;
             return;
@@ -123,7 +123,7 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     if(strcmp(words[1], host->machine_guid)) {
         error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewehere else
+        return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
     rrdhost_aclk_state_lock(host);

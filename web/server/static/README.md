@@ -1,6 +1,6 @@
 <!--
 title: "`static-threaded` web server"
-description: "The Netdata Agent's static-threaded web server spawns a fixed nubmer of threads that listen to web requests and uses non-blocking I/O."
+description: "The Netdata Agent's static-threaded web server spawns a fixed number of threads that listen to web requests and uses non-blocking I/O."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/static/README.md
 -->
 

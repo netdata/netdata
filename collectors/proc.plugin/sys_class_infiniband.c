@@ -367,7 +367,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                 char buffer[FILENAME_MAX + 1];
 
-                // Check if counters are availablea (mandatory)
+                // Check if counters are available (mandatory)
                 // /sys/class/infiniband/<device>/ports/<port>/counters
                 char counters_dirname[FILENAME_MAX + 1];
                 snprintfz(counters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "counters");
@@ -377,7 +377,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                     continue;
                 closedir(counters_dir);
 
-                // Hardware Counters are optionnal, used later
+                // Hardware Counters are optional, used later
                 char hwcounters_dirname[FILENAME_MAX + 1];
                 snprintfz(
                     hwcounters_dirname, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "hw_counters");

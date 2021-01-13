@@ -1,0 +1,13 @@
+name: Spell checking
+on:
+  push:
+
+jobs:
+  build:
+    name: Spell checking
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2.0.0
+      with:
+        fetch-depth: 5
+    - uses: check-spelling/check-spelling@prerelease

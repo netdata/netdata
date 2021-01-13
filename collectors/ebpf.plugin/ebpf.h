@@ -81,7 +81,7 @@ extern ebpf_module_t ebpf_modules[];
 #endif
 #endif
 
-// Chart defintions
+// Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 
 // Log file

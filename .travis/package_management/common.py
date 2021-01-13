@@ -92,7 +92,7 @@ def prepare_repo(container):
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
 
-def install_common_dependendencies(container):
+def install_common_dependencies(container):
     if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
@@ -163,7 +163,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".5 Run make dist")
     run_command_in_host(['make', 'dist'], tmp_src)
 
-    print(".6 Copy generated tarbal to desired path")
+    print(".6 Copy generated tarball to desired path")
     generated_tarball = '%s/netdata-%s.tar.gz' % (tmp_src, pkg_friendly_version)
 
     if os.path.exists(generated_tarball):

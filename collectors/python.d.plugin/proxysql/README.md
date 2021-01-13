@@ -31,7 +31,7 @@ It produces:
     -   questions: total number of queries sent from frontends
     -   slow_queries: number of queries that ran for longer than the threshold in milliseconds defined in global variable `mysql-long_query_time`
 
-3.  **Overall Bandwith (backends)**
+3.  **Overall Bandwidth (backends)**
 
     -   in
     -   out
@@ -45,7 +45,7 @@ It produces:
         -   `4=OFFLINE_HARD`: when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren't accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work
         -   `-1`: Unknown status
 
-5.  **Bandwith (backends)**
+5.  **Bandwidth (backends)**
 
     -   Backends
         -   in

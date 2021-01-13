@@ -22,7 +22,7 @@ Following charts are drawn:
 
     -   active
 
-3.  **Current Backend Processe Usage** percentage
+3.  **Current Backend Process Usage** percentage
 
     -   used
     -   available

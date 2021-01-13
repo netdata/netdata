@@ -514,7 +514,7 @@ section(s) you need to trace.
 
 We have made the most to make Netdata crash free. If however, Netdata crashes on your system, it would be very helpful
 to provide stack traces of the crash. Without them, is will be almost impossible to find the issue (the code base is
-quite large to find such an issue by just objerving it).
+quite large to find such an issue by just observing it).
 
 To provide stack traces, **you need to have Netdata compiled with debugging**. There is no need to enable any tracing
 (`debug flags`).

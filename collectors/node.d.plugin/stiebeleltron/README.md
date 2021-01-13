@@ -40,7 +40,7 @@ The charts are configurable, however, the provided default configuration collect
     -   Heat circuit 1 room temperature in C (set/actual)
     -   Heat circuit 2 room temperature in C (set/actual)
 
-5.  **Eletric Reheating**
+5.  **Electric Reheating**
 
     -   Dual Mode Reheating temperature in C (hot water/heating)
 
@@ -68,7 +68,7 @@ If no configuration is given, the module will be disabled. Each `update_every` i
 
 Original author: BrainDoctor (github)
 
-The module supports any metrics that are parseable with RegEx. There is no API that gives direct access to the values (AFAIK), so the "workaround" is to parse the HTML output of the ISG.
+The module supports any metrics that are parsable with RegEx. There is no API that gives direct access to the values (AFAIK), so the "workaround" is to parse the HTML output of the ISG.
 
 ### Testing
 

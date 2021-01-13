@@ -48,7 +48,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
 > Python from the FreeBSD repository as instructed above.
 
 > ⚠️ If you are using the `apcupsd` collector, you need to make sure that apcupsd is up before starting Netdata.
-> Otherwise a infinitely running `cat` process triggered by the default activated apcuspd charts plugin will eat up CPU
+> Otherwise a infinitely running `cat` process triggered by the default activated apcupsd charts plugin will eat up CPU
 > and RAM (`/tmp/.netdata-charts.d-*/run-*`). This also applies to `OPNsense`.
 
 ## Install Netdata

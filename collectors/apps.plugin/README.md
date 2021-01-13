@@ -59,7 +59,7 @@ Each of these sections provides the same number of charts:
     -   Pipes open (`apps.pipes`)
 -   Swap memory
     -   Swap memory used (`apps.swap`)
-    -   Major page faults (i.e. swap activiy, `apps.major_faults`)
+    -   Major page faults (i.e. swap activity, `apps.major_faults`)
 -   Network
     -   Sockets open (`apps.sockets`)
     

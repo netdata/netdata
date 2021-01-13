@@ -1,0 +1,36 @@
+# YouTube
+https?://(?:(?:www\.|)youtube\.com|youtu.be)/(?:channel/|embed/|)[-a-zA-Z0-9?&=_]*
+# data urls
+data:[a-zA-Z=;,/0-9+-]+
+# Google Analytics
+\bgoogle-analytics\.com/collect.[0-9a-zA-Z?%=&_.~-]*
+# GitHub SHAs
+(?:\[[0-9a-f]+\]\(https:/|)/github\.com/[^/]+/[^/]+/[^/]+/[0-9a-f]+\b
+\bgithub\.com/[^/]+/[^/]+[@#][0-9a-f]+\b
+# githubusercontent
+/[a-z-]+\.githubusercontent\.com/[-a-zA-Z0-9?&=_\/.]*
+# gist github
+/gist\.github\.com/[^/]+/[0-9a-f]+
+# imgur
+\.imgur\.com/[^.]+
+# discord
+/discord(?:app\.com|\.gg)/(?:invite/)?[a-zA-Z0-9]{7,8}
+# Slack
+slack://[a-zA-Z0-9?&=]+
+\bslack\.com/[-0-9a-zA-Z/]*
+
+# time zones
+selected_server_timezone.*</a>
+#\('[^']'\)
+# URL escaped characters
+\%[0-9A-F]{2}
+# hex digits including css/html color classes:
+(?:[\\0][xX]|\\u|[uU]\+|#|\%23)[0-9a-fA-FgGrR]{2,}[uU]?[lL]{0,2}\b
+# uuid:
+\b[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\b
+# hex runs
+"[0-9a-f]{32,}"
+# ignore long runs of a single character:
+\b([A-Za-z])\1{3,}\b
+
+ -D

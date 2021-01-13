@@ -89,7 +89,7 @@ applications](https://github.com/netdata/helmchart#service-discovery-and-support
 by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
 
 If you haven't changed listening ports, image names, or other defaults, service discovery should find your pods, create
-the proper configurations based on the service that pod runs, and begin monitoring them immediately after depolyment.
+the proper configurations based on the service that pod runs, and begin monitoring them immediately after deployment.
 
 However, if you have changed some of these defaults, you need to copy a file from the Netdata Helm chart repository,
 make your edits, and pass the changed file to `helm install`/`helm upgrade`.
@@ -188,7 +188,7 @@ Cloud](https://user-images.githubusercontent.com/1153921/94497340-c1f49880-01ab-
 ## Update/reinstall the Netdata Helm chart
 
 If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata`
-with the name of the release, if you changed it upon installtion:
+with the name of the release, if you changed it upon installation:
 
 ```bash
 helm upgrade netdata netdata/netdata
@@ -203,7 +203,7 @@ Check out our [infrastructure](/docs/quickstart/infrastructure.md) for details a
 and learn more about [configuring the Netdata Agent](/docs/configure/nodes.md) to better understand the settings you
 might be interested in changing.
 
-To futher configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
+To further configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
 the [service discovery repository](https://github.com/netdata/agent-service-discovery/).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fkubernetes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

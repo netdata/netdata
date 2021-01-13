@@ -225,7 +225,7 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); // Sleep 200 miliseconds to father dies.
+            sleep_usec(200000); // Sleep 200 milliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
@@ -366,7 +366,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param charttype the chart type
  * @param order     the chart order
  */
@@ -419,7 +419,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param type   the chart type
  * @param id     the chart id
  * @param units   the axis label
- * @param family the group name used to attach the chart on dashaboard
+ * @param family the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  * @param ncd    a pointer to a function called to create dimensions
  * @param move   a pointer for a structure that has the dimensions
@@ -801,7 +801,7 @@ static void read_local_addresses()
 }
 
 /**
- * Start Ptherad Variable
+ * Start Pthread Variable
  *
  * This function starts all pthread variables.
  *
@@ -1588,7 +1588,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
+                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;

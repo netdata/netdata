@@ -178,12 +178,12 @@ int pubsub_publish(void *pubsub_specific_data_p, char *error_message, size_t buf
 }
 
 /**
- * Get results from service responces
+ * Get results from service responses
  *
  * @param pubsub_specific_data_p a pointer to a structure with instance-wide data.
  * @param error_message report error message to a caller.
- * @param sent_metrics report to a caller how many metrics was successfuly sent.
- * @param sent_bytes report to a caller how many bytes was successfuly sent.
+ * @param sent_metrics report to a caller how many metrics was successfully sent.
+ * @param sent_bytes report to a caller how many bytes was successfully sent.
  * @param lost_metrics report to a caller how many metrics was lost during transmission.
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
  * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission.

@@ -69,7 +69,7 @@ echo "Manifest list: ${MANIFEST_LIST}"
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
-# Login to docker hub to allow futher operations
+# Login to docker hub to allow further operations
 echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
@@ -82,7 +82,7 @@ published() {
 }
 retry 5 published
 
-echo "Image ${TAG} published succesfully!"
+echo "Image ${TAG} published successfully!"
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."

@@ -697,7 +697,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rbytes;
                     d->rd_rbytes = d->rd_tbytes;
@@ -843,7 +843,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_rmulticast = rrddim_add(d->st_packets, "multicast", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rpackets;
                     d->rd_rpackets = d->rd_tpackets;
@@ -890,7 +890,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rerrors;
                     d->rd_rerrors = d->rd_terrors;
@@ -936,7 +936,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rdrops;
                     d->rd_rdrops = d->rd_tdrops;
@@ -982,7 +982,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rfifo;
                     d->rd_rfifo = d->rd_tfifo;
@@ -1028,7 +1028,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_tcompressed = rrddim_add(d->st_compressed, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
-                    // flip receive/trasmit
+                    // flip receive/transmit
 
                     RRDDIM *td = d->rd_rcompressed;
                     d->rd_rcompressed = d->rd_tcompressed;

@@ -21,7 +21,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     altogether, run health checks more or less often, and more. See [daemon
     configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
--   The individual `.conf` files in `health.d/`. These health entitiy files are organized by the type of metric they are
+-   The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
@@ -241,7 +241,7 @@ A `calc` is designed to apply some calculation to the values or variables availa
 calculation will be made available at the `$this` variable, overwriting the value from your `lookup`, to use in warning
 and critical expressions.
 
-When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retreived a value from Netdata's
+When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retrieved a value from Netdata's
 database.
 
 You can use `calc` without `lookup` if you are using [other available variables](#variables).
@@ -340,7 +340,7 @@ delay: [[[up U] [down D] multiplier M] max X]
      will delay the notification by 1 minute. This is used to prevent notifications for flapping
      alarms. The default `D` is zero.
 
--   `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
+-   `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
      delayed. The default multiplier is `1.0`.
 
 -   `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`

@@ -31,7 +31,7 @@ directly using a keyboard, mouse, and monitor.
 Netdata helps you monitor and troubleshoot all kinds of devices and the applications they run, including IoT devices
 like the Raspberry Pi and applications like Pi-hole.
 
-After a two-minute installation and with zero configuration, you'll be able to seeall of Pi-hole's metrics, including
+After a two-minute installation and with zero configuration, you'll be able to see all of Pi-hole's metrics, including
 the volume of queries, connected clients, DNS queries per type, top clients, top blocked domains, and more.
 
 With Netdata installed, you can also monitor system metrics and any other applications you might be running. By default,
@@ -107,7 +107,7 @@ walkthrough of all its features. For a more expedited tour, see the [get started
 You need to manually enable Netdata's built-in [temperature sensor
 collector](https://learn.netdata.cloud/docs/agent/collectors/charts.d.plugin/sensors) to start collecting metrics.
 
-> Netdata uses a few plugins to manage its [collectors](/collectors/REFERENCE.md), each using a different lanaguge: Go,
+> Netdata uses a few plugins to manage its [collectors](/collectors/REFERENCE.md), each using a different language: Go,
 > Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
 > other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
 

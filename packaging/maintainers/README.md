@@ -22,7 +22,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 | Debian | Release | @lhw @FedericoCeratto | [netdata @ debian](http://salsa.debian.org/debian/netdata) |
 | Slackware | Release | @willysr | [netdata @ slackbuilds](https://slackbuilds.org/repository/14.2/system/netdata/) |
 | Ubuntu |  |  |  |
-| Red Hat / Fedora / Centos |  |  |  |
+| Red Hat / Fedora / CentOS |  |  |  |
 | SUSE SLE / openSUSE Tumbleweed & Leap |  |  | [netdata @ SUSE OpenBuildService](https://software.opensuse.org/package/netdata) |
 
 ---

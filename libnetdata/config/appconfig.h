@@ -131,7 +131,7 @@ struct section {
 
     char *name;
 
-    struct section *next;    // gloabl config_mutex protects just this
+    struct section *next;    // global config_mutex protects just this
 
     struct config_option *values;
     avl_tree_lock values_index;

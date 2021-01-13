@@ -565,7 +565,7 @@ PARSER_RC pluginsd_overwrite(char **words, void *user, PLUGINSD_ACTION  *plugins
     UNUSED(words);
 
     RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
-    debug(D_PLUGINSD, "requested a OVERWITE a variable");
+    debug(D_PLUGINSD, "requested a OVERWRITE a variable");
 
     struct label *new_labels = ((PARSER_USER_OBJECT *)user)->new_labels;
     ((PARSER_USER_OBJECT *)user)->new_labels = NULL;

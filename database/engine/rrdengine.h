@@ -26,7 +26,7 @@
 
 #endif /* NETDATA_RRD_INTERNALS */
 
-/* Forward declerations */
+/* Forward declarations */
 struct rrdengine_instance;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */

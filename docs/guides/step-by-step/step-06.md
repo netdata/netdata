@@ -34,7 +34,7 @@ underlying architecture.
 
 By default, Netdata collects a lot of metrics every second using any number of discrete collector. Collectors, in turn,
 are organized and manged by plugins. **Internal** plugins collect system metrics, **external** plugins collect
-non-system metrics, and **orchestrator** plugins group individal collectors together based on the programming language
+non-system metrics, and **orchestrator** plugins group individual collectors together based on the programming language
 they were built in.
 
 These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and

@@ -32,7 +32,7 @@ and other operating systems and is regularly tested. You can find this tool [her
 
 -   **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
 
--   **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
+-   **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
     -   Please note that for RHEL/CentOS you need
         [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
         In addition, RHEL/CentOS version 6 also need
@@ -147,7 +147,7 @@ And install the minimum required dependencies.
 ### CentOS / RHEL 8.x
 
 For CentOS / RHEL 8.x a lot of development packages have moved out into their
-own separate repositories. Some other dependeicies are either missing completely
+own separate repositories. Some other dependencies are either missing completely
 or have to be sourced by 3rd-parties.
 
 CentOS 8.x:

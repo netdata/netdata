@@ -38,7 +38,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
      `:value` can be omitted and statsd will assume it is `1`. `|c`, `|C` and `|m` can be omitted an statsd will assume it is `|m`. So, the application may send just `name` and statsd will parse it as `name:1|m`.
 
-     For counters use `|c` (esty/statsd compatible) or `|C` (brubeck compatible), for meters use `|m`.
+     For counters use `|c` (etsy/statsd compatible) or `|C` (brubeck compatible), for meters use `|m`.
 
      Sampling rate is supported (check below).
 
@@ -290,7 +290,7 @@ dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 
 `pattern` is a keyword. When set, `METRIC` is expected to be a Netdata simple pattern that will be used to match all the statsd metrics to be added to the chart. So, `pattern` automatically matches any number of statsd metrics, all of which will be added as separate chart dimensions.
 
-`TYPE`, `MUTLIPLIER`, `DIVIDER` and `OPTIONS` are optional.
+`TYPE`, `MULTIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 
 `TYPE` can be:
 

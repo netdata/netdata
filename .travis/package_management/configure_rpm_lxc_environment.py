@@ -55,16 +55,16 @@ common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" 
 # Exceptional cases, not available everywhere
 #
 print("2.2 Running uncommon dependencies and preparing LXC environment")
-# Not on Centos-7
+# Not on CentOS-7
 if os.environ["BUILD_STRING"].count("el/7") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
 
-# Not on Centos-6
+# Not on CentOS-6
 if os.environ["BUILD_STRING"].count("el/6") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autoconf-archive"])
 
 print("2.3 Installing common dependencies")
-common.install_common_dependendencies(container)
+common.install_common_dependencies(container)
 
 print("3. Setting up macros")
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])

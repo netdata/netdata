@@ -290,7 +290,7 @@ class Service(MySQLService):
     @staticmethod
     def histogram_chart(cmd):
         return [
-            'commands_historgram_' + cmd['name'],
+            'commands_histogram_' + cmd['name'],
             None,
             'ProxySQL {0} Command Histogram'.format(cmd['name'].title()),
             'commands',

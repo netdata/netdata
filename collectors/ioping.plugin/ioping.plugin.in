@@ -16,7 +16,7 @@ usage="$(basename "$0") [install] [-h] [-e]
 
 where:
     install      install ioping binary
-    -e, --env    path to environment file (defauls to '/etc/netdata/.environment'
+    -e, --env    path to environment file (defaults to '/etc/netdata/.environment'
     -h           show this help text"
 
 INSTALL=0

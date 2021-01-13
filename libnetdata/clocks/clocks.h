@@ -112,8 +112,8 @@ extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
  * All now_*_timeval() functions fill the `struct timeval` with the time from the appropriate clock.
  * Those functions return 0 on success, -1 else with errno set appropriately.
  *
- * All now_*_sec() functions return the time in seconds from the approriate clock, or 0 on error.
- * All now_*_usec() functions return the time in microseconds from the approriate clock, or 0 on error.
+ * All now_*_sec() functions return the time in seconds from the appropriate clock, or 0 on error.
+ * All now_*_usec() functions return the time in microseconds from the appropriate clock, or 0 on error.
  *
  * Most functions will attempt to use CLOCK_MONOTONIC_COARSE if available to reduce contention overhead and improve
  * performance scaling. If high precision is required please use one of the available now_*_high_precision_* functions.

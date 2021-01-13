@@ -82,7 +82,7 @@ void *checks_main(void *ptr) {
         now_realtime_timeval(&now);
         loop_usec = dt_usec(&now, &last);
         usec = loop_usec - susec;
-        debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
+        debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, slept for %llu).", loop_usec, usec, susec);
 
         if(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
         else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;

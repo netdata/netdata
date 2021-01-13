@@ -63,7 +63,7 @@ case "${running_os}" in
 	;;
 esac
 
-# Run depednency scriptlet, before anything else
+# Run dependency scriptlet, before anything else
 #
 ./packaging/installer/install-required-packages.sh --non-interactive netdata
 

@@ -1515,7 +1515,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
     );
 }
 
-// costants for test_dbengine
+// constants for test_dbengine
 static const int CHARTS = 64;
 static const int DIMS = 16; // That gives us 64 * 16 = 1024 metrics
 #define REGIONS  (3) // 3 regions of update_every

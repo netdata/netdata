@@ -37,7 +37,7 @@ The `kickstart.sh` script does the following after being downloaded and run:
     added.
 -   Installs `netdata-updater.sh` to `cron.daily` to enable automatic updates, unless you added the `--no-updates`
     option.
--   Prints a message about whether the insallation succeeded for failed for QA purposes.
+-   Prints a message about whether the installation succeeded for failed for QA purposes.
 
 If your shell fails to handle the above one-liner, you can download and run the `kickstart-static64.sh` script manually.
 
@@ -65,7 +65,7 @@ your installation. Here are a few important parameters:
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing installation is detected, reinstall instead of attempting to update it. Note
-    that this cannot be used to switch betwen installation types.
+    that this cannot be used to switch between installation types.
 -   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths:
     the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force
     kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
@@ -73,7 +73,7 @@ your installation. Here are a few important parameters:
 
 ## Verify script integrity
 
-To use `md5sum` to verify the intregity of the `kickstart-static64.sh` script you will download using the one-line
+To use `md5sum` to verify the integrity of the `kickstart-static64.sh` script you will download using the one-line
 command above, run the following:
 
 ```bash
