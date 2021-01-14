@@ -363,14 +363,14 @@ fi
 # -------------------------------------------------------------------------------------------------
 # Detect whether the node is kubernetes node
 
-HOST_IS_K8S_NODE="no"
+HOST_IS_K8S_NODE="false"
 
 if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_SERVICE_PORT}" ]; then
   # These env vars are set for every container managed by k8s.
-  HOST_IS_K8S_NODE="yes"
+  HOST_IS_K8S_NODE="true"
 elif pgrep "kubelet"; then
   # The kubelet is the primary "node agent" that runs on each node.
-  HOST_IS_K8S_NODE="yes"
+  HOST_IS_K8S_NODE="true"
 fi
 
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
