@@ -983,6 +983,10 @@ static struct label *rrdhost_load_auto_labels(void)
         label_list =
             add_label_to_list(label_list, "_virt_detection", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
 
+    if (localhost->system_info->is_k8_node)
+        label_list =
+            add_label_to_list(label_list, "_is_k8_node", localhost->system_info->is_k8_node, LABEL_SOURCE_AUTO);
+
     label_list = add_label_to_list(
         label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);
 
