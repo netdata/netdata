@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 
+#include "../config/appconfig.h"
 #include "../log/log.h"
 #include "../inlined.h"
 #include "../sysinc.h"
