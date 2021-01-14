@@ -82,6 +82,7 @@ They capture the following:
 -   Operating system name and version
 -   CPU architecture, system cores, CPU frequency, RAM, and disk space
 -   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
+-   Whether Netdata is running inside K8s node 
 -   What virtualization layer the system runs on top of, if any
 -   Whether the system is a streaming parent or child
 
