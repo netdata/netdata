@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix segmentation fault in the agent [\#10498](https://github.com/netdata/netdata/pull/10498) ([mfundul](https://github.com/mfundul))
+- Fixed handling of TLS config so that cURL works in all cases. [\#10491](https://github.com/netdata/netdata/pull/10491) ([Ferroin](https://github.com/Ferroin))
 - Bump ini from 1.3.5 to 1.3.8 [\#10489](https://github.com/netdata/netdata/pull/10489) ([dependabot[bot]](https://github.com/apps/dependabot))
 - health: make mdstat\_mismatch\_cnt alarm less strict [\#10488](https://github.com/netdata/netdata/pull/10488) ([ilyam8](https://github.com/ilyam8))
 - Mention PostgreSQL Prometheus Adapter in the documentation [\#10487](https://github.com/netdata/netdata/pull/10487) ([vlvkobal](https://github.com/vlvkobal))
+- Fix memory allocation when computing standard deviation [\#10484](https://github.com/netdata/netdata/pull/10484) ([stelfrag](https://github.com/stelfrag))
+- Add guide: Monitor and visualize anomalies with Netdata [\#10480](https://github.com/netdata/netdata/pull/10480) ([joelhans](https://github.com/joelhans))
 - Truncate excessive information from titles for apps and cgroups [\#10479](https://github.com/netdata/netdata/pull/10479) ([vlvkobal](https://github.com/vlvkobal))
 - Add vkalintiris to CODEOWNERS for CI, packaging, and installer code. [\#10478](https://github.com/netdata/netdata/pull/10478) ([Ferroin](https://github.com/Ferroin))
 - GitHub action markdown link check update [\#10474](https://github.com/netdata/netdata/pull/10474) ([jsoref](https://github.com/jsoref))
@@ -22,6 +26,7 @@
 - Updated messages about checksum validation failures on install. [\#10448](https://github.com/netdata/netdata/pull/10448) ([Ferroin](https://github.com/Ferroin))
 - Fixed handling of environment file in updater script. [\#10447](https://github.com/netdata/netdata/pull/10447) ([Ferroin](https://github.com/Ferroin))
 - Exclude autofs by default in diskspace plugin [\#10441](https://github.com/netdata/netdata/pull/10441) ([nabijaczleweli](https://github.com/nabijaczleweli))
+- New eBPF kernel [\#10434](https://github.com/netdata/netdata/pull/10434) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update and improve the Netdata style guide [\#10433](https://github.com/netdata/netdata/pull/10433) ([joelhans](https://github.com/joelhans))
 - Change HDDtemp to report None instead of 0 [\#10429](https://github.com/netdata/netdata/pull/10429) ([slavox](https://github.com/slavox))
 - Use bash shell as user netdata for debug [\#10425](https://github.com/netdata/netdata/pull/10425) ([Steve8291](https://github.com/Steve8291))
@@ -150,7 +155,7 @@
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...v1.26.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/before_rebase...v1.26.0)
 
 **Merged pull requests:**
 
@@ -194,15 +199,22 @@
 - Add information about Cloud disabled status to `-W buildinfo`. [\#9936](https://github.com/netdata/netdata/pull/9936) ([underhood](https://github.com/underhood))
 - Fix resource leak in case of malformed cloud request [\#9934](https://github.com/netdata/netdata/pull/9934) ([underhood](https://github.com/underhood))
 - Added context parameter to the data endpoint [\#9931](https://github.com/netdata/netdata/pull/9931) ([stelfrag](https://github.com/stelfrag))
-- Add notice to Docker docs about systemd volumes [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add persistent configuration details to Docker docs [\#9926](https://github.com/netdata/netdata/pull/9926) ([joelhans](https://github.com/joelhans))
 - Update claiming document to instruct users to install `uuidgen`. [\#9925](https://github.com/netdata/netdata/pull/9925) ([OdysLam](https://github.com/OdysLam))
 - Added a way to get build configuration info from the agent. [\#9913](https://github.com/netdata/netdata/pull/9913) ([Ferroin](https://github.com/Ferroin))
 - add mirrored\_hosts\_status into OpenAPI of api/info [\#9867](https://github.com/netdata/netdata/pull/9867) ([underhood](https://github.com/underhood))
 
+## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...before_rebase)
+
+**Merged pull requests:**
+
+- Add notice to Docker docs about systemd volumes [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
+
 ## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.24.0...v1.25.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/poc2...v1.25.0)
 
 **Merged pull requests:**
 
@@ -224,14 +236,10 @@
 - Fix typo in health documentation [\#9860](https://github.com/netdata/netdata/pull/9860) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove dependency on libJudy for systems which don't have it [\#9859](https://github.com/netdata/netdata/pull/9859) ([Ferroin](https://github.com/Ferroin))
 - Fix multi-host DB corruption when legacy metrics reside in localhost. [\#9855](https://github.com/netdata/netdata/pull/9855) ([mfundul](https://github.com/mfundul))
-- Fix TLS over LDAP in the `python.d/openldap` collector [\#9853](https://github.com/netdata/netdata/pull/9853) ([scatenag](https://github.com/scatenag))
-- Fix broken `Edit this page` link in simple patterns doc [\#9847](https://github.com/netdata/netdata/pull/9847) ([joelhans](https://github.com/joelhans))
-- Fixes compilation warnings on FreeBSD [\#9845](https://github.com/netdata/netdata/pull/9845) ([underhood](https://github.com/underhood))
-- Fix installation to not install eBPF plugin components when they shouldn't be installed [\#9844](https://github.com/netdata/netdata/pull/9844) ([vlvkobal](https://github.com/vlvkobal))
-- Add collecting active processes limit on Linux systems [\#9843](https://github.com/netdata/netdata/pull/9843) ([Ancairon](https://github.com/Ancairon))
-- Fixed tmpdir handling failure on macOS/FreeBSD. [\#9842](https://github.com/netdata/netdata/pull/9842) ([Ferroin](https://github.com/Ferroin))
-- Fix bugs in handling of Python 3 dependencies on install [\#9839](https://github.com/netdata/netdata/pull/9839) ([Ferroin](https://github.com/Ferroin))
-- dashboard v1.4.2 [\#9837](https://github.com/netdata/netdata/pull/9837) ([jacekkolasa](https://github.com/jacekkolasa))
+
+## [poc2](https://github.com/netdata/netdata/tree/poc2) (2020-08-25)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.24.0...poc2)
 
 ## [v1.24.0](https://github.com/netdata/netdata/tree/v1.24.0) (2020-08-10)
 
@@ -287,7 +295,11 @@
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.16.1...v1.17.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/issue_4934...v1.17.0)
+
+## [issue_4934](https://github.com/netdata/netdata/tree/issue_4934) (2019-08-03)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.16.1...issue_4934)
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
