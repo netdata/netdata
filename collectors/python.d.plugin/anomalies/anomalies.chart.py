@@ -73,7 +73,6 @@ class Service(SimpleService):
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.data_latest = {}
-        self.expected_cols = []
         self.last_train_at = 0
         self.include_average_prob = bool(self.configuration.get('include_average_prob', True))
 
@@ -101,7 +100,7 @@ class Service(SimpleService):
             self.custom_models_host_charts_dict = {}
             for host in self.custom_models_hosts:
                 self.custom_models_host_charts_dict[host] = list(set([dim.split('::')[1].split('|')[0] for dim in self.custom_models_dims if dim.startswith(host)]))
-            self.custom_models_dims_renamed = [f"{model['name']}.{dim}" for model in self.custom_models for dim in model['dimensions'].split(',')]
+            self.custom_models_dims_renamed = [f"{model['name']}|{dim}" for model in self.custom_models for dim in model['dimensions'].split(',')]
             self.models_in_scope = list(set([f'{self.host}::{c}' for c in self.charts_in_scope] + self.custom_models_names))
             self.charts_in_scope = list(set(self.charts_in_scope + self.custom_models_charts))
             self.host_charts_dict = {self.host: self.charts_in_scope}
@@ -245,7 +244,6 @@ class Service(SimpleService):
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
             sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
             ).ffill()
-        self.expected_cols = list(df_train.columns)
         if self.custom_models:
             df_train = self.add_custom_models_dims(df_train)
 
@@ -287,7 +285,7 @@ class Service(SimpleService):
         df_allmetrics = get_allmetrics_async(
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', wide=True, sort_cols=True,
             protocol=self.protocol, numeric_only=True, float_size='float32', user=self.username, pwd=self.password
-            )[self.expected_cols]
+            )
         if self.custom_models:
             df_allmetrics = self.add_custom_models_dims(df_allmetrics)
         self.df_allmetrics = self.df_allmetrics.append(df_allmetrics).ffill().tail((max(self.lags_n.values()) + max(self.smooth_n.values()) + max(self.diffs_n.values())) * 2)
