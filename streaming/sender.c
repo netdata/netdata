@@ -258,7 +258,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , se.os_version
                  , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
                  , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-                 , (host->system_info->is_k8_node) ? host->system_info->is_k8_node : ""
+                 , (host->system_info->is_k8s_node) ? host->system_info->is_k8s_node : ""
                  , se.kernel_name
                  , se.kernel_version
                  , (host->system_info->architecture) ? host->system_info->architecture : ""

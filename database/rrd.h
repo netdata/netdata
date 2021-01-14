@@ -719,7 +719,7 @@ struct rrdhost_system_info {
     char *virt_detection;
     char *container;
     char *container_detection;
-    char *is_k8_node;
+    char *is_k8s_node;
 };
 
 struct rrdhost {
