@@ -50,6 +50,7 @@ read the status of your agent. For example, from a VPS system running Debian 10:
 {
   ...
   "host_labels": {
+    "_is_k8_node": "false",
     "_is_parent": "false",
     "_virt_detection": "systemd-detect-virt",
     "_container_detection": "none",
