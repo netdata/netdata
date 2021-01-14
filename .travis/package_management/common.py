@@ -101,6 +101,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libwebsockets-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
@@ -111,6 +112,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-compiler"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libwebsockets-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "g++"])
@@ -132,6 +134,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-compiler"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libwebsockets-devel"])
 
     if os.environ["BUILD_STRING"].count("el/6") <= 0:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
