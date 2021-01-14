@@ -354,3 +354,12 @@ char *simple_pattern_trim_around_equal(char *src) {
 
     return store;
 }
+
+char *simple_pattern_iterate(SIMPLE_PATTERN **p)
+{
+    struct simple_pattern *root = (struct simple_pattern *) *p;
+    struct simple_pattern **Proot = (struct simple_pattern **)p;
+
+    (*Proot) = (*Proot)->next;
+    return (char *) root->match;
+}

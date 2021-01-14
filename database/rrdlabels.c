@@ -159,6 +159,28 @@ int label_list_contains(struct label *head, struct label *check)
     return label_list_contains_key(head, check->key, check->key_hash);
 }
 
+struct label *label_list_lookup_keylist(struct label *head, char *key)
+{
+    SIMPLE_PATTERN *pattern = NULL;
+
+    pattern = simple_pattern_create(key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    while (head != NULL)
+    {
+        if (simple_pattern_matches(pattern, head->key))
+            break;
+        head = head->next;
+    }
+    simple_pattern_free(pattern);
+    return head;
+}
+
+int label_list_contains_keylist(struct label *head, char *keylist)
+{
+    return (label_list_lookup_keylist(head, keylist) != NULL);
+}
+
+
 /* Create a list with entries from both lists.
    If any entry in the low priority list is masked by an entry in the high priority list then delete it.
 */

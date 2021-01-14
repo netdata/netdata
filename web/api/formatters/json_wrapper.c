@@ -116,42 +116,50 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         }
         buffer_strcat(wb, "],\n");
         if (chart_label_key) {
-            uint32_t key_hash = simple_hash(chart_label_key);
-            struct label *current_label;
+            buffer_sprintf(wb, "   %schart_labels%s: { ", kq, kq);
 
-            buffer_sprintf(
-                wb,
-                "   %schart_labels%s: { %s%s%s : [",
-                kq, kq, kq, chart_label_key, kq);
+            SIMPLE_PATTERN *pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *original_pattern = pattern;
+            char *label_key = NULL;
+            int keys = 0;
+            while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
+                uint32_t key_hash = simple_hash(label_key);
+                struct label *current_label;
 
-            for (c = 0, i = 0, rd = temp_rd; rd && c < r->d; c++, rd = rd->next) {
-                if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
-                    continue;
-                if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
-                    continue;
-
-                if (i)
+                if (keys)
                     buffer_strcat(wb, ", ");
+                buffer_sprintf(wb, "%s%s%s : [", kq, label_key, kq);
+                keys++;
 
-                current_label = rrdset_lookup_label_key(rd->rrdset, chart_label_key, key_hash);
-                if (current_label) {
+                for (c = 0, i = 0, rd = temp_rd; rd && c < r->d; c++, rd = rd->next) {
+                    if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
+                        continue;
+                    if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
+                        continue;
+                    if (i)
+                        buffer_strcat(wb, ", ");
+
+                    current_label = rrdset_lookup_label_key(rd->rrdset, label_key, key_hash);
+                    if (current_label) {
+                        buffer_strcat(wb, sq);
+                        buffer_strcat(wb, current_label->value);
+                        buffer_strcat(wb, sq);
+                    } else
+                        buffer_strcat(wb, "null");
+                    i++;
+                }
+                if (!i) {
+                    rows = 0;
                     buffer_strcat(wb, sq);
-                    buffer_strcat(wb, current_label->value);
+                    buffer_strcat(wb, "no data");
                     buffer_strcat(wb, sq);
-                } else
-                    buffer_strcat(wb, "null");
-                i++;
+                }
+                buffer_strcat(wb, "]");
             }
-            if (!i) {
-                rows = 0;
-                buffer_strcat(wb, sq);
-                buffer_strcat(wb, "no data");
-                buffer_strcat(wb, sq);
-            }
-            buffer_strcat(wb, "] },\n");
+            buffer_strcat(wb, "},\n");
+            simple_pattern_free(original_pattern);
         }
     }
-
 
     buffer_sprintf(wb, "   %slatest_values%s: ["
                    , kq, kq);
