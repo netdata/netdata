@@ -758,6 +758,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->virt_detection);
         freez(system_info->container);
         freez(system_info->container_detection);
+        freez(system_info->is_k8_node);
         freez(system_info);
     }
 }
@@ -1522,6 +1523,10 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
         freez(system_info->container_detection);
         system_info->container_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_IS_K8S_NODE")){
+        freez(system_info->is_k8_node);
+        system_info->is_k8_node = strdupz(value);
     }
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
         return res;
