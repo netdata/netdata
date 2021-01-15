@@ -289,26 +289,45 @@ fi
 if [ "${VERBOSE}" == 1 ]; then
     echo "${URLCOMMAND} \"${TARGET_URL}\""
 fi
-eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
-URLCOMMAND_EXIT_CODE=$?
-if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
-# We consider the server issuing an error response a successful attempt at communicating
-        URLCOMMAND_EXIT_CODE=0
-fi
+
+attempt_contact () {
+        eval "${URLCOMMAND} \"${TARGET_URL}\"" >"${CLAIMING_DIR}/tmpout.txt"
+        URLCOMMAND_EXIT_CODE=$?
+        if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
+        # We consider the server issuing an error response a successful attempt at communicating
+                URLCOMMAND_EXIT_CODE=0
+        fi
+
+        # Check if URLCOMMAND connected and received reply
+        if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
+                echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
+                rm -f "${CLAIMING_DIR}/tmpout.txt"
+                return 4
+        fi
+
+        if [ "${VERBOSE}" == 1 ] ; then
+            echo "Response from server:"
+            cat "${CLAIMING_DIR}/tmpout.txt"
+        fi
+
+        return 0
+}
+
+for i in {1..5}
+do
+        if attempt_contact ; then
+                echo "Connection attempt $i successful"
+                break
+        fi
+        echo "Connection attempt $i failed. Retry in ${i}s."
+        if [ "$i" -eq 5 ] ; then
+                rm -f "${CLAIMING_DIR}/tmpin.txt"
+                exit 4
+        fi
+        sleep "$i"
+done
 
 rm -f "${CLAIMING_DIR}/tmpin.txt"
-
-# Check if URLCOMMAND connected and received reply
-if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
-        echo >&2 "Failed to connect to ${URL_BASE}, return code ${URLCOMMAND_EXIT_CODE}"
-        rm -f "${CLAIMING_DIR}/tmpout.txt"
-        exit 4
-fi
-
-if [ "${VERBOSE}" == 1 ] ; then
-    echo "Response from server:"
-    cat "${CLAIMING_DIR}/tmpout.txt"
-fi
 
 ERROR_KEY=$(grep "\"errorMsgKey\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "errorMsgKey\":\"" '{print $2}' | awk -F "\"" '{print $1}')
 case ${ERROR_KEY} in
