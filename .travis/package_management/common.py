@@ -101,7 +101,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c"])
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libwebsockets-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
