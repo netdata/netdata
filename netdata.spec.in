@@ -132,6 +132,9 @@ BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
+%if 0%{?centos_ver} >= 8 || 0%{?fedora}
+BuildRequires: libwebsockets-devel >= 3.2
+%endif
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
@@ -218,7 +221,9 @@ happened, on your systems and applications.
 %prep
 %setup -q -n %{name}-%{version}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%if 0%{?centos_ver} >= 8 || 0%{?fedora}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%endif
 # Only bundle libJudy if this isn't Fedora or SUSE
 %if 0%{!?fedora:1} && 0%{!?suse_version:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
@@ -234,15 +239,17 @@ autoreconf -ivf
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-libJudy=externaldeps/libJudy \
 	%endif
-	--with-bundled-lws=externaldeps/libwebsockets
+	%if 0%{?centos_ver} >= 8 || 0%{?fedora}
+	--with-libwebsockets=externaldeps/libwebsockets \
+	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
 	--libexecdir="%{_libexecdir}" \
-        --libdir="%{_libdir}" \
+	--libdir="%{_libdir}" \
 	--with-zlib \
 	--with-math \
-	--with-user=netdata \
+	--with-user=netdata
 
 # Build step
 %{__make} %{?_smp_mflags}
