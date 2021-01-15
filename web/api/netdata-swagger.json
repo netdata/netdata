@@ -1162,6 +1162,11 @@
             "description": "OS parameters detection method.",
             "example": "Mixed"
           },
+          "is_k8s_node": {
+            "type": "boolean",
+            "description": "Netdata is running on K8s node.",
+            "example": "false"
+          },
           "kernel_name": {
             "type": "string",
             "description": "Kernel Name.",
