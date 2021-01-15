@@ -1165,7 +1165,7 @@
           "is_k8s_node": {
             "type": "boolean",
             "description": "Netdata is running on K8s node.",
-            "example": "false"
+            "example": false
           },
           "kernel_name": {
             "type": "string",
