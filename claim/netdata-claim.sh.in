@@ -99,7 +99,7 @@ get_config_value() {
             NETDATA_RUNNING=0
         fi
     fi
-    if [ "${result}" -ne "0" ] || [ "${NETDATA_RUNNING}" -eq 0 ]; then
+    if [ "${NETDATA_RUNNING}" -eq 0 ]; then
         config_result=$(@sbindir_POST@/netdata 2>/dev/null -W get2 "$conf_file" "$section" "$key_name" unknown_default)
     fi
     echo "$config_result"
