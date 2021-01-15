@@ -103,14 +103,6 @@ jobs:
       env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
-    - name: Docker container build process (alpine installation)
-      script:
-        - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
-        - packaging/docker/build.sh
-      env:
-        - ARCH=amd64
-      after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
-
     - name: Build/Install for ubuntu 20.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
@@ -353,48 +345,7 @@ jobs:
 
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
-      _template: &RELEASE_TEMPLATE
-        env:
-          - RELEASE_CHANNEL: stable
-        git:
-          depth: false
-        script:
-          - echo "GIT Branch:" && git branch
-          - echo "Last commit:" && git log -1
-          - echo "GIT Describe:" && git describe
-          - echo "packaging/version:" && cat packaging/version
-          - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
-          - packaging/docker/check_login.sh
-            && echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
-            && tick packaging/docker/build.sh
-            && packaging/docker/publish.sh
-        after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
-
-      name: Build & Publish docker image for i386
-      <<: *RELEASE_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=i386
-
-    - name: Build & Publish docker image for amd64
-      <<: *RELEASE_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=amd64
-
-    - name: Build & Publish docker image for armhf
-      <<: *RELEASE_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=armhf
-
-    - name: Build & Publish docker image for aarch64
-      <<: *RELEASE_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=aarch64
-
-    - name: Create release draft
+      name: Create release draft
       git:
         depth: false
       env:
@@ -409,6 +360,10 @@ jobs:
         - .travis/draft_release.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
 
+    - name: Trigger Docker image build and publish
+      script: >-
+        curl -X POST -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml' -d '{"ref": "master", "inputs": {"version": "${build_version}"}}'
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
 
     - stage: Trigger deb and rpm package build (release)
       name: Trigger deb and rpm package build
@@ -452,31 +407,7 @@ jobs:
             && packaging/docker/publish.sh
         after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
 
-      name: Build & Publish docker image for i386
-      <<: *NIGHTLY_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=i386
-
-    - name: Build & Publish docker image for amd64
-      <<: *NIGHTLY_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=amd64
-
-    - name: Build & Publish docker image for armhf
-      <<: *NIGHTLY_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=armhf
-
-    - name: Build & Publish docker image for aarch64
-      <<: *NIGHTLY_TEMPLATE
-      env:
-        - ALLOW_SOFT_FAILURE_HERE=true
-        - ARCH=aarch64
-
-    - name: Create nightly release artifacts, publish to GCS
+      name: Create nightly release artifacts, publish to GCS
       script:
         - echo "GIT Branch:" && git branch
         - echo "Last commit:" && git log -1
@@ -525,6 +456,11 @@ jobs:
             branch: master
             condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} = "netdata/netdata"
       after_deploy: rm -f .travis/gcs-credentials.json
+
+    - name: Trigger Docker image build and publish
+      script: >-
+        curl -X POST -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml' -d '{"ref": "master", "inputs": {"version": "nightly"}}'
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during nightly release" "${NOTIF_CHANNEL}"
 
     - stage: Trigger deb and rpm package build (nightly release)
       name: Trigger deb and rpm package build

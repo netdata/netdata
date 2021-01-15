@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # author  : paulfantom
 
-# Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
-# It is automated in `build.sh` script
-ARG ARCH=amd64
 # This image contains preinstalled dependecies
-FROM netdata/builder:${ARCH} as builder
+# hadolint ignore=DL3007
+FROM netdata/builder:latest as builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -54,9 +52,9 @@ RUN mkdir -p /app/usr/sbin/ \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
-ARG ARCH
 # This image contains preinstalled dependecies
-FROM netdata/base:${ARCH}
+# hadolint ignore=DL3007
+FROM netdata/base:latest as base
 
 # Configure system
 ARG NETDATA_UID=201
