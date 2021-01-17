@@ -236,7 +236,6 @@
 - Fix handling of libJudy bundling for RPM packages. [\#9875](https://github.com/netdata/netdata/pull/9875) ([Ferroin](https://github.com/Ferroin))
 - Fix latency-avg chart units in `python.d/dnsdist` [\#9871](https://github.com/netdata/netdata/pull/9871) ([scottymuse](https://github.com/scottymuse))
 - Change instruction to reload HEALTH [\#9869](https://github.com/netdata/netdata/pull/9869) ([thiagoftsm](https://github.com/thiagoftsm))
-- labeler: add `area/exporting` [\#9866](https://github.com/netdata/netdata/pull/9866) ([ilyam8](https://github.com/ilyam8))
 
 ## [poc2](https://github.com/netdata/netdata/tree/poc2) (2020-08-25)
 
