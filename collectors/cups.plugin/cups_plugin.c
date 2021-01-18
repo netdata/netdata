@@ -7,6 +7,7 @@
  */
 
 #include "../../libnetdata/libnetdata.h"
+#include <cups/cups.h>
 #include <limits.h>
 
 // callback required by fatal()
@@ -44,10 +45,6 @@ static int debug = 0;
 
 static int netdata_update_every = 1;
 static int netdata_priority = 100004;
-
-
-#ifdef HAVE_CUPS
-#include <cups/cups.h>
 
 http_t *http; // connection to the cups daemon
 
@@ -468,12 +465,3 @@ int main(int argc, char **argv) {
     httpClose(http);
     info("CUPS process exiting");
 }
-
-#else // !HAVE_CUPS
-
-int main(int argc, char **argv)
-{
-    fatal("cups.plugin is not compiled.");
-}
-
-#endif // !HAVE_CUPS

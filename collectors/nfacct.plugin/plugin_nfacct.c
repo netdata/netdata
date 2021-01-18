@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../../libnetdata/libnetdata.h"
+#include <linux/netfilter/nfnetlink_conntrack.h>
+#include <libmnl/libmnl.h>
+#include <libnetfilter_acct/libnetfilter_acct.h>
 
 #define PLUGIN_NFACCT_NAME "nfacct.plugin"
 
@@ -12,9 +15,6 @@
 
 #define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
 #define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
-
-#ifdef HAVE_LIBMNL
-#include <libmnl/libmnl.h>
 
 static inline size_t mnl_buffer_size() {
     long s = MNL_SOCKET_BUFFER_SIZE;
@@ -50,24 +50,12 @@ int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *
 
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";
-
-// Variables
-
+// variables
 static int debug = 0;
-
 static int netdata_update_every = 1;
-
-// ----------------------------------------------------------------------------
-// DO_NFSTAT - collect netfilter connection tracker statistics via netlink
-// example: https://github.com/formorer/pkg-conntrack-tools/blob/master/src/conntrack.c
-
-#ifdef HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H
-#define DO_NFSTAT 1
 
 #define RRD_TYPE_NET_STAT_NETFILTER "netfilter"
 #define RRD_TYPE_NET_STAT_CONNTRACK "netlink"
-
-#include <linux/netfilter/nfnetlink_conntrack.h>
 
 static struct {
     int update_every;
@@ -530,16 +518,6 @@ static void nfstat_send_metrics() {
     printf("END\n");
 }
 
-#endif // HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H
-
-
-// ----------------------------------------------------------------------------
-// DO_NFACCT - collect netfilter accounting statistics via netlink
-
-#ifdef HAVE_LIBNETFILTER_ACCT
-#define DO_NFACCT 1
-
-#include <libnetfilter_acct/libnetfilter_acct.h>
 
 struct nfacct_data {
     char *name;
@@ -760,8 +738,6 @@ static void nfacct_send_metrics() {
     printf("END\n");
 }
 
-#endif // HAVE_LIBNETFILTER_ACCT
-
 static void nfacct_signal_handler(int signo)
 {
     exit((signo == SIGPIPE)?1:0);
@@ -866,15 +842,13 @@ int main(int argc, char **argv) {
     else if(freq)
         error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
 
-#ifdef DO_NFACCT
-    if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_init()\n");
+    if (debug)
+        fprintf(stderr, "nfacct.plugin: calling nfacct_init()\n");
     int nfacct = !nfacct_init(netdata_update_every);
-#endif
 
-#ifdef DO_NFSTAT
-    if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_init()\n");
+    if (debug)
+        fprintf(stderr, "nfacct.plugin: calling nfstat_init()\n");
     int nfstat = !nfstat_init(netdata_update_every);
-#endif
 
     // ------------------------------------------------------------------------
     // the main loop
@@ -899,7 +873,6 @@ int main(int argc, char **argv) {
                     , dt
             );
 
-#ifdef DO_NFACCT
         if(likely(nfacct)) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_collect()\n");
             nfacct = !nfacct_collect();
@@ -909,9 +882,7 @@ int main(int argc, char **argv) {
                 nfacct_send_metrics();
             }
         }
-#endif
 
-#ifdef DO_NFSTAT
         if(likely(nfstat)) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_collect()\n");
             nfstat = !nfstat_collect();
@@ -921,7 +892,6 @@ int main(int argc, char **argv) {
                 nfstat_send_metrics();
             }
         }
-#endif
 
         fflush(stdout);
 
@@ -931,14 +901,3 @@ int main(int argc, char **argv) {
 
     info("NFACCT process exiting");
 }
-
-#else // !HAVE_LIBMNL
-
-int main(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-
-    fatal("nfacct.plugin is not compiled.");
-}
-
-#endif // !HAVE_LIBMNL

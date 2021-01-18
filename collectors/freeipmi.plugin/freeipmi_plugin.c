@@ -26,8 +26,6 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-#ifdef HAVE_FREEIPMI
-
 #define IPMI_PARSE_DEVICE_LAN_STR       "lan"
 #define IPMI_PARSE_DEVICE_LAN_2_0_STR   "lan_2_0"
 #define IPMI_PARSE_DEVICE_LAN_2_0_STR2  "lan20"
@@ -1861,11 +1859,3 @@ int main (int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) exit(0);
     }
 }
-
-#else // !HAVE_FREEIPMI
-
-int main(int argc, char **argv) {
-    fatal("freeipmi.plugin is not compiled.");
-}
-
-#endif // !HAVE_FREEIPMI

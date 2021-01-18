@@ -116,7 +116,7 @@
 #define FEAT_CUPS "NO"
 #endif
 
-#ifdef HAVE_LIBMNL
+#ifdef HAVE_NFACCT
 #define FEAT_NFACCT "YES"
 #else
 #define FEAT_NFACCT "NO"
