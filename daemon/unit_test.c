@@ -2196,6 +2196,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         assert(0 == uv_thread_join(&query_threads[i]->thread));
     }
     test_duration = now_realtime_sec() - (time_start - HISTORY_SECONDS);
+    if (!test_duration)
+        test_duration = 1;
     fprintf(stderr, "\nDB-engine stress test finished in %ld seconds.\n", test_duration);
     unsigned long stored_metrics_nr = 0;
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
