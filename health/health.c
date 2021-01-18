@@ -2,12 +2,6 @@
 
 #include "health.h"
 
-struct health_cmdapi_thread_status {
-    int status;
-    ;
-    struct rusage rusage;
-};
-
 unsigned int default_health_enabled = 1;
 char *silencers_filename;
 
