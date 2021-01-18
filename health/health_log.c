@@ -22,14 +22,14 @@ inline int health_alarm_log_open(RRDHOST *host) {
     return -1;
 }
 
-inline void health_alarm_log_close(RRDHOST *host) {
+static inline void health_alarm_log_close(RRDHOST *host) {
     if(host->health_log_fp) {
         fclose(host->health_log_fp);
         host->health_log_fp = NULL;
     }
 }
 
-inline void health_log_rotate(RRDHOST *host) {
+static inline void health_log_rotate(RRDHOST *host) {
     static size_t rotate_every = 0;
 
     if(unlikely(rotate_every == 0)) {
@@ -158,7 +158,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 #endif
 }
 
-uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
+static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
 {
     uint32_t hash_chart = simple_hash(chart);
     uint32_t hash_name = simple_hash(name);
@@ -174,7 +174,7 @@ uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, u
     return 1;
 }
 
-inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
+static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     errno = 0;
 
     char *s, *buf = mallocz(65536 + 1);

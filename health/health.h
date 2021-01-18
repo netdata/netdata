@@ -70,10 +70,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 extern int health_alarm_log_open(RRDHOST *host);
-extern void health_alarm_log_close(RRDHOST *host);
-extern void health_log_rotate(RRDHOST *host);
 extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-extern ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename);
 extern void health_alarm_log_load(RRDHOST *host);
 
 extern ALARM_ENTRY* health_create_alarm_entry(
@@ -102,7 +99,6 @@ extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);
 extern char *health_stock_config_dir(void);
-extern void health_reload_host(RRDHOST *host);
 extern void health_alarm_log_free(RRDHOST *host);
 
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
