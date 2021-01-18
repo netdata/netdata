@@ -55,7 +55,7 @@ terms related to collecting metrics.
 
 -   **Modules** are a type of collector.
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
-    The Go orchestator is in active development.
+    The Go orchestrator is in active development.
     -   [go.d.plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/): An orchestrator for data
         collection modules written in `go`.
     -   [python.d.plugin](/collectors/python.d.plugin/README.md): An orchestrator for data collection modules written in

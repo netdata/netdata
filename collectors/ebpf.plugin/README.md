@@ -221,7 +221,7 @@ The following options are available:
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address. 
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this
     can be changed with the `ips` setting.
     
 By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
@@ -275,7 +275,7 @@ curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tool
 
 If this script returns no output, your system is ready to compile and run the eBPF collector.
 
-If you see a warning about a missing kerkel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
+If you see a warning about a missing kernel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
 BPF_JIT`), you will need to recompile your kernel to support this configuration. The process of recompiling Linux
 kernels varies based on your distribution and version. Read the documentation for your system's distribution to learn
 more about the specific workflow for recompiling the kernel, ensuring that you set all the necessary 

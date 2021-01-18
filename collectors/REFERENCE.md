@@ -46,7 +46,7 @@ However, there are cases that auto-detection fails. Usually, the reason is that 
 allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
 metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
 
-View our [collectors quickstart](/collectors/QUICKSTART.md) for explict details on enabling and configuring collector modules.
+View our [collectors quickstart](/collectors/QUICKSTART.md) for explicit details on enabling and configuring collector modules.
 
 ## Troubleshoot a collector
 
@@ -112,7 +112,7 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# charts.d = yes
 ```
 
-By default, most plugins are enabled, so you don't need to enable them explicity to use their collectors. To enable or
+By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
 All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.

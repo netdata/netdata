@@ -39,7 +39,7 @@ TimescaleDB.
 Finally, another member of Netdata's community has built a project that quickly launches Netdata, TimescaleDB, and
 Grafana in easy-to-manage Docker containers. Rune Juhl Jacobsen's
 [project](https://github.com/runejuhl/grafana-timescaledb) uses a `Makefile` to create everything, which makes it
-perferct for testing and experimentation.
+perfect for testing and experimentation.
 
 ## Netdata&#8596;TimescaleDB in action
 

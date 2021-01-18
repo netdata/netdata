@@ -120,7 +120,7 @@ calls to open/close files, call functions like `do_fork`, IO activity on the VFS
 See the [eBPF collector documentation](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) for the full list
 of per-application charts.
 
-Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to idenfity
+Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to identify
 anomalies in a few simulated scenarios.
 
 For example, the following screenshot shows the number of open files, failures to open files, and closed files on a
@@ -252,7 +252,7 @@ Debugging and troubleshooting an application takes a special combination of prac
 Netdata's eBPF metrics to back you up, you can rest assured that you see every minute detail of how your application
 interacts with the Linux kernel.
 
-If you're still trying to wrap your head aroud what we offer, be sure to read up on our accompanying documentation and
+If you're still trying to wrap your head around what we offer, be sure to read up on our accompanying documentation and
 other resources on eBPF monitoring with Netdata:
 
 -   [eBPF collector](/collectors/ebpf.plugin/README.md)

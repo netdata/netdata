@@ -26,7 +26,7 @@ most installations, this is `/etc/netdata`.
 Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look for a file called `.environment`.
 
 -   If the `.environment` file _does not_ exist, reinstall with your [package manager](#deb-or-rpm-packages).
--   If the `.environtment` file _does_ exist, check its contents with `less .environment`.
+-   If the `.environment` file _does_ exist, check its contents with `less .environment`.
     -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
         binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
     -   In all other cases, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
@@ -118,7 +118,7 @@ installation instructions](/packaging/docker/README.md#create-a-new-netdata-agen
 
 ## macOS
 
-If you installed Netdata on your macOS system using Homebrew, you can explictly request an update:
+If you installed Netdata on your macOS system using Homebrew, you can explicitly request an update:
 
 ```bash
 brew upgrade netdata

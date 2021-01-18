@@ -18,10 +18,10 @@ enable or configure a collector to gather all available metrics from your system
 ## Enable a collector or its orchestrator
 
 You can enable/disable collectors individually, or enable/disable entire orchestrators, using their configuration files.
-For example, you can change the behavior of the Go orchestator, or any of its collectors, by editing `go.d.conf`.
+For example, you can change the behavior of the Go orchestrator, or any of its collectors, by editing `go.d.conf`.
 
 Use `edit-config` from your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) to open
-the orchestrator's primary configuration file:
+the orchestrator primary configuration file:
 
 ```bash
 cd /etc/netdata
@@ -29,7 +29,7 @@ sudo ./edit-config go.d.conf
 ```
 
 Within this file, you can either disable the orchestrator entirely (`enabled: yes`), or find a specific collector and
-enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata deamon reads it on
+enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata daemon reads it on
 start.
 
 After you make your changes, restart the Agent with `service netdata restart`.

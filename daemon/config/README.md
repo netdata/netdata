@@ -100,7 +100,7 @@ Additionally, there will be the following options:
 |:-----:|:-----:|:---|
 | PATH environment variable|`auto-detected`||
 | PYTHONPATH environment variable||Used to set a custom python path|
-| enable running new plugins|`yes`|When set to `yes`, Netdata will enable detected plugins, even if they are not configured explicitly. Setting this to `no` will only enable plugins explicitly configirued in this file with a `yes`|
+| enable running new plugins|`yes`|When set to `yes`, Netdata will enable detected plugins, even if they are not configured explicitly. Setting this to `no` will only enable plugins explicitly configured in this file with a `yes`|
 | check for new plugins every|60|The time in seconds to check for new plugins in the plugins directory. This allows having other applications dynamically creating plugins for Netdata.|
 | checks|`no`|This is a debugging plugin for the internal latency|
 
@@ -190,7 +190,7 @@ that is information about lines that begin with `dim`, which affect a chart's di
 You may notice some settings that begin with `dim` beneath the ones defined in the table above. These settings determine
 which dimensions appear on the given chart and how Netdata calculates them.
 
-Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options are `name`, `algorithm`, `multipler`, and `divisor`.
+Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options are `name`, `algorithm`, `multiplier`, and `divisor`.
 
 | Setting      | Function                                                                                                                                                                                                                                                      |
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

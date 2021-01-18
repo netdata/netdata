@@ -134,7 +134,7 @@ local:
     diffs_n: 1
 
     # What is the typical proportion of anomalies in your data on average? 
-    # This paramater can control the sensitivity of your models to anomalies. 
+    # This parameter can control the sensitivity of your models to anomalies. 
     # Some discussion here: https://github.com/yzhao062/pyod/issues/144
     contamination: 0.001
 
@@ -142,7 +142,7 @@ local:
     # just the average of all anomaly probabilities at each time step
     include_average_prob: true
 
-    # Define any custom models you would like to create anomaly probabilties for, some examples below to show how.
+    # Define any custom models you would like to create anomaly probabilities for, some examples below to show how.
     # For example below example creates two custom models, one to run anomaly detection user and system cpu for our demo servers
     # and one on the cpu and mem apps metrics for the python.d.plugin.
     # custom_models:
@@ -161,7 +161,7 @@ local:
 
 In the `anomalies.conf` file you can also define some "custom models" which you can use to group one or more metrics into a single model much like is done by default for the charts you specify. This is useful if you have a handful of metrics that exist in different charts but perhaps are related to the same underlying thing you would like to perform anomaly detection on, for example a specific app or user. 
 
-To define a custom model you would include configuation like below in `anomalies.conf`. By default there should already be some commented out examples in there. 
+To define a custom model you would include configuration like below in `anomalies.conf`. By default there should already be some commented out examples in there. 
 
 `name` is a name you give your custom model, this is what will appear alongside any other specified charts in the `anomalies.probability` and `anomalies.anomaly` charts. `dimensions` is a string of metrics you want to include in your custom model. By default the [netdata-pandas](https://github.com/netdata/netdata-pandas) library used to pull the data from Netdata uses a "chart.a|dim.1" type of naming convention in the pandas columns it returns, hence the `dimensions` string should look like "chart.name|dimension.name,chart.name|dimension.name". The examples below hopefully make this clear.
 
@@ -194,7 +194,7 @@ sudo su -s /bin/bash netdata
 /usr/libexec/netdata/plugins.d/python.d.plugin anomalies debug trace nolock
 ```
 
-## Deepdive turorial
+## Deepdive tutorial
 
 If you would like to go deeper on what exactly the anomalies collector is doing under the hood then check out this [deepdive tutorial](https://github.com/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) in our community repo where you can play around with some data from our demo servers (or your own if its accessible to you) and work through the calculations step by step.
 
@@ -206,7 +206,7 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 - Python 3 is also required for the underlying ML libraries of [numba](https://pypi.org/project/numba/), [scikit-learn](https://pypi.org/project/scikit-learn/), and [PyOD](https://pypi.org/project/pyod/).
 - It may take a few hours or so (depending on your choice of `train_secs_n`) for the collector to 'settle' into it's typical behaviour in terms of the trained models and probabilities you will see in the normal running of your node.
 - As this collector does most of the work in Python itself, with [PyOD](https://pyod.readthedocs.io/en/latest/) leveraging [numba](https://numba.pydata.org/) under the hood, you may want to try it out first on a test or development system to get a sense of its performance characteristics on a node similar to where you would like to use it.
-- `lags_n`, `smooth_n`, and `diffs_n` together define the preprocessing done to the raw data before models are trained and before each prediction. This essentially creates a [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)#:~:text=In%20pattern%20recognition%20and%20machine,features%20that%20represent%20some%20object.&text=Feature%20vectors%20are%20often%20combined,score%20for%20making%20a%20prediction.) for each chart model (or each custom model). The default settings for these parameters aim to create a rolling matrix of recent smoothed [differenced](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) values for each chart. The aim of the model then is to score how unusual this 'matrix' of features is for each chart based on what it has learned as 'normal' from the training data. So as opposed to just looking at the single most recent value of a dimension and considering how strange it is, this approach looks at a recent smoothed window of all dimensions for a chart (or dimensions in a custom model) and asks how unusual the data as a whole looks. This should be more flexibile in capturing a wider range of [anomaly types](https://andrewm4894.com/2020/10/19/different-types-of-time-series-anomalies/) and be somewhat more robust to temporary 'spikes' in the data that tend to always be happening somewhere in your metrics but often are not the most important type of anomaly (this is all covered in a lot more detail in the [deepdive tutorial](https://nbviewer.jupyter.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb)).
+- `lags_n`, `smooth_n`, and `diffs_n` together define the preprocessing done to the raw data before models are trained and before each prediction. This essentially creates a [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)#:~:text=In%20pattern%20recognition%20and%20machine,features%20that%20represent%20some%20object.&text=Feature%20vectors%20are%20often%20combined,score%20for%20making%20a%20prediction.) for each chart model (or each custom model). The default settings for these parameters aim to create a rolling matrix of recent smoothed [differenced](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average#Differencing) values for each chart. The aim of the model then is to score how unusual this 'matrix' of features is for each chart based on what it has learned as 'normal' from the training data. So as opposed to just looking at the single most recent value of a dimension and considering how strange it is, this approach looks at a recent smoothed window of all dimensions for a chart (or dimensions in a custom model) and asks how unusual the data as a whole looks. This should be more flexible in capturing a wider range of [anomaly types](https://andrewm4894.com/2020/10/19/different-types-of-time-series-anomalies/) and be somewhat more robust to temporary 'spikes' in the data that tend to always be happening somewhere in your metrics but often are not the most important type of anomaly (this is all covered in a lot more detail in the [deepdive tutorial](https://nbviewer.jupyter.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb)).
 - You can see how long model training is taking by looking in the logs for the collector `grep 'anomalies' /var/log/netdata/error.log | grep 'training'` and you should see lines like `2020-12-01 22:02:14: python.d INFO: anomalies[local] : training complete in 2.81 seconds (runs_counter=2700, model=pca, train_n_secs=14400, models=26, n_fit_success=26, n_fit_fails=0, after=1606845731, before=1606860131).`. 
   - This also gives counts of the number of models, if any, that failed to fit and so had to default back to the DefaultModel (which is currently [HBOS](https://pyod.readthedocs.io/en/latest/_modules/pyod/models/hbos.html)).
   - `after` and `before` here refer to the start and end of the training data used to train the models.
@@ -215,8 +215,8 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
   - Typically ~3%-3.5% additional cpu usage from scoring, jumping to ~60% for a couple of seconds during model training.
   - About ~150mb of ram (`apps.mem`) being continually used by the `python.d.plugin`.
 - If you activate this collector on a fresh node, it might take a little while to build up enough data to calculate a realistic and useful model.
-- Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relativley high `update_every` maybe 10, 15 or 30 in `anomalies.conf`.
-- Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisey model if you set `train_n_secs` to be too small for how your node tends to behave.
+- Some models like `iforest` can be comparatively expensive (on same n1-standard-2 system above ~2s runtime during predict, ~40s training time, ~50% cpu on both train and predict) so if you would like to use it you might be advised to set a relatively high `update_every` maybe 10, 15 or 30 in `anomalies.conf`.
+- Setting a higher `train_every_n` and `update_every` is an easy way to devote less resources on the node to anomaly detection. Specifying less charts and a lower `train_n_secs` will also help reduce resources at the expense of covering less charts and maybe a more noisy model if you set `train_n_secs` to be too small for how your node tends to behave.
 
 ## Useful links and further reading
 

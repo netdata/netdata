@@ -28,8 +28,8 @@ package downloads.
 If you are using such a setup, there are a couple of ways to work around this:
 
 -   Configure your proxy to automatically pass through HTTPS connections without caching them. This is the simplest
-    solution, but means that downloads of Netdata pacakges will not be cached.
--   Mirror the respository locally on your proxy system, and use that mirror when installing on other systems. This
+    solution, but means that downloads of Netdata packages will not be cached.
+-   Mirror the repository locally on your proxy system, and use that mirror when installing on other systems. This
     requires more setup and more disk space on the caching host, but it lets you cache the packages locally.
 -   Some specific caching proxies may have alternative configuration options to deal with these issues. Find
     such options in their documentation.

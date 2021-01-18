@@ -93,7 +93,7 @@ Please refer [Spring Boot Actuator: Production-ready Features](https://docs.spri
     -   MarkSweep
     -   ...
 
-4.  **Heap Mmeory Usage** in KB
+4.  **Heap Memory Usage** in KB
 
     -   used
     -   committed
