@@ -307,7 +307,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         }
         else
             error_report("Host machine GUID %s is not valid", host->machine_guid);
-        host->compaction_id = 0;
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 

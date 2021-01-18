@@ -936,7 +936,6 @@ RRDSET *rrdset_create_custom(
             st->chart_uuid = create_chart_uuid(st, id, name);
 
         store_active_chart(st->chart_uuid);
-        st->compaction_id = 0;
     }
 #endif
 
