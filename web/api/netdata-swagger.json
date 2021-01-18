@@ -9,7 +9,7 @@
     "/info": {
       "get": {
         "summary": "Get netdata basic information",
-        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization, K8s nodes and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
         "responses": {
           "200": {
             "description": "netdata basic information.",
@@ -1171,6 +1171,11 @@
             "type": "string",
             "description": "Kernel Version.",
             "example": "4.19.32-1-MANJARO"
+          },
+          "is_k8s_node": {
+            "type": "boolean",
+            "description": "Netdata is running on a K8s node.",
+            "example": false
           },
           "architecture": {
             "type": "string",

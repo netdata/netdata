@@ -933,6 +933,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
         buffer_sprintf(wb, "\t\"container_os_version_id\": \"%s\",\n", host->system_info->container_os_version_id);
     if (host->system_info->container_os_detection)
         buffer_sprintf(wb, "\t\"container_os_detection\": \"%s\",\n", host->system_info->container_os_detection);
+    if (host->system_info->is_k8s_node)
+        buffer_sprintf(wb, "\t\"is_k8s_node\": \"%s\",\n", host->system_info->is_k8s_node);
 
     buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", (host->system_info->kernel_name) ? host->system_info->kernel_name : "");
     buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", (host->system_info->kernel_version) ? host->system_info->kernel_version : "");

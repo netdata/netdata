@@ -63,6 +63,7 @@ if [ -n "$(command -v curl 2> /dev/null)" ]; then
     --data-urlencode "cd17=${NETDATA_CONTAINER_OS_VERSION}" \
     --data-urlencode "cd18=${NETDATA_CONTAINER_OS_VERSION_ID}" \
     --data-urlencode "cd19=${NETDATA_CONTAINER_OS_DETECTION}" \
+    --data-urlencode "cd20=${NETDATA_HOST_IS_K8S_NODE}" \
     "https://www.google-analytics.com/collect" > /dev/null 2>&1
 else
   wget -q -O - --timeout=1 "https://www.google-analytics.com/collect?\
@@ -98,5 +99,6 @@ else
 &cd17=${NETDATA_CONTAINER_OS_VERSION} \
 &cd18=${NETDATA_CONTAINER_OS_VERSION_ID} \
 &cd19=${NETDATA_CONTAINER_OS_DETECTION} \
+&cd20=${NETDATA_HOST_IS_K8S_NODE} \
 " > /dev/null 2>&1
 fi

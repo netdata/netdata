@@ -221,6 +221,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  "&NETDATA_SYSTEM_OS_VERSION=%s"
                  "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
                  "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                 "&NETDATA_HOST_IS_K8S_NODE=%s"
                  "&NETDATA_SYSTEM_KERNEL_NAME=%s"
                  "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
                  "&NETDATA_SYSTEM_ARCHITECTURE=%s"
@@ -257,6 +258,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , se.os_version
                  , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
                  , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
+                 , (host->system_info->is_k8s_node) ? host->system_info->is_k8s_node : ""
                  , se.kernel_name
                  , se.kernel_version
                  , (host->system_info->architecture) ? host->system_info->architecture : ""

@@ -12,7 +12,7 @@ paths:
         * netdata version
         * netdata unique id
         * list of hosts mirrored (includes itself)
-        * Operating System, Virtualization and Container technology information
+        * Operating System, Virtualization, K8s nodes and Container technology information
         * List of active collector plugins and modules
         * number of alarms in the host
           * number of alarms in normal state
@@ -948,6 +948,10 @@ components:
           type: string
           description: Kernel Version.
           example: 4.19.32-1-MANJARO
+        is_k8s_node:
+          type: boolean
+          description: Netdata is running on a K8s node.
+          example: false
         architecture:
           type: string
           description: Kernel architecture.
