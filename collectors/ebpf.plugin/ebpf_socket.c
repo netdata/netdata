@@ -284,8 +284,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
         NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
     write_io_chart(
-        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write*8/100
-                                                                                0,
+        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY,
+        socket_id_names[3],(long long)common_udp.write*8/100,
         socket_id_names[4], (long long)common_udp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
