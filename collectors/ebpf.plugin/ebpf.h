@@ -167,7 +167,7 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *units,
                                        char *family,
                                        int order,
-                                       char *algo,
+                                       char *algorithm,
                                        struct target *root);
 
 extern void write_end_chart();
@@ -181,7 +181,7 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
 #define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
-#define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
+#define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 

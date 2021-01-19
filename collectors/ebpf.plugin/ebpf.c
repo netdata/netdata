@@ -428,17 +428,18 @@ void ebpf_create_chart(char *type,
  * @param units  the value displayed on vertical axis.
  * @param family Submenu that the chart will be attached on dashboard.
  * @param order  the chart order
+ * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order,
-                                char *algo, struct target *root)
+                                char *algorithm, struct target *root)
 {
     struct target *w;
     ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", order);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algo);
+            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }
 

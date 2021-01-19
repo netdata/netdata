@@ -646,7 +646,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
-                                    "Outbound connections (bytes).", EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Outbound connections (bytes).", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21080,
                                     ptr);
@@ -666,7 +666,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                          ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
-                                    "Inbound connections (bytes)", EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Inbound connections (bytes)", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21084,
                                     ptr);

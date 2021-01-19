@@ -483,7 +483,7 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
  * @param order  the order number of the specified chart
  */
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
-                                      char *web, char *algo, int order)
+                                      char *web, char *algorithm, int order)
 {
     printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d ''\n",
            family,
@@ -493,8 +493,8 @@ static void ebpf_process_status_chart(char *family, char *name, char *axis,
            order,
            update_every);
 
-    printf("DIMENSION %s '' %s 1 1\n", status[0], algo);
-    printf("DIMENSION %s '' %s 1 1\n", status[1], algo);
+    printf("DIMENSION %s '' %s 1 1\n", status[0], algorithm);
+    printf("DIMENSION %s '' %s 1 1\n", status[1], algorithm);
 }
 
 /**
@@ -549,7 +549,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       2);
 
     ebpf_create_io_chart(NETDATA_EBPF_FAMILY,
-                         NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTESS,
+                         NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
                          NETDATA_VFS_GROUP,
                          21004);
 
@@ -696,14 +696,14 @@ static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *ro
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
-                               "Bytes written on disk", EBPF_COMMON_DIMENSION_BYTESS,
+                               "Bytes written on disk", EBPF_COMMON_DIMENSION_BYTES,
                                NETDATA_APPS_VFS_GROUP,
                                20070,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
-                               "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTESS,
+                               "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
                                NETDATA_APPS_VFS_GROUP,
                                20071,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
