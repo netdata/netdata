@@ -68,11 +68,11 @@ each alarm and notification method is completely customizable.
 
 To create a new alarm configuration file, initiate an empty file, with a filename that ends in `.conf`, in the
 `health.d/` directory. The Netdata Agent loads any valid alarm configuration file ending in `.conf` in that directory.
-Next, edit the new file with `edit-config`. For example, with a file called `ram-usage.conf`.
+Next, edit the new file with `edit-config`. For example, with a file called `example-alarm.conf`.
 
 ```bash
-sudo touch health.d/ram-usage.conf
-sudo ./edit-config health.d/ram-usage.conf
+sudo touch health.d/example-alarm.conf
+sudo ./edit-config health.d/example-alarm.conf
 ```
 
 Or, append your new alarm to an existing file by editing a relevant existing file in the `health.d/` directory.
@@ -87,12 +87,22 @@ the Agent responds to anomalies related to CPU utilization.
 
 To see which configuration file you need to edit to configure a specific alarm, [view your active
 alarms](/docs/monitor/view-active-alarms.md) in Netdata Cloud or the local Agent dashboard and look for the **source**
-line. For example, it might read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. Because the source path contains
-`health.d/cpu.conf`, you now you that you should run `sudo edit-config health.d/cpu.conf` to configure that alarm.
+line. For example, it might read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. 
+
+Because the source path contains `health.d/cpu.conf`, run `sudo edit-config health.d/cpu.conf` to configure that alarm.
 
 ### Disable a specific alarm
 
 Open the configuration file for that alarm and set the `to` line to `silent`.
+
+```conf
+template: disk_fill_rate
+       on: disk.space
+   lookup: max -1s at -30m unaligned of avail
+     calc: ($this - $avail) / (30 * 60)
+    every: 15s
+       to: silent
+```
 
 ### Turn of all alarms and notifications
 

@@ -66,7 +66,7 @@ seconds, respectively.
 
 ```conf
 [global]
-  update every: 5
+    update every = 5
 ```
 
 ### Specific plugin or collector
@@ -128,6 +128,7 @@ sudo ./edit-config charts.d.conf
 For example, to disable a few Python collectors:
 
 ```conf
+modules:
   apache: no
 	dockerd: no
 	fail2ban: no
@@ -149,9 +150,9 @@ All the settings are found in the `[global]` section of `netdata.conf`:
 
 ```conf
 [global]
-	memory mode = dbengine
-	page cache size = 32
-  dbengine multihost disk space = 256
+    memory mode = dbengine
+    page cache size = 32
+    dbengine multihost disk space = 256
 ```
 
 ## Run Netdata behind Nginx
@@ -194,15 +195,15 @@ To disable gzip compression, open `netdata.conf` and find the `[web]` section:
 
 ```conf
 [web]
-	enable gzip compression = no
+    enable gzip compression = no
 ```
 
 Or to lower the default compression level:
 
 ```conf
 [web]
-	enable gzip compression = yes
-	gzip compression level = 1
+    enable gzip compression = yes
+    gzip compression level = 1
 ```
 
 ## Disable logs
@@ -212,9 +213,9 @@ If you installation is working correctly, and you're not actively auditing Netda
 
 ```conf
 [global]
-	debug log = none
-	error log = none
-	access log = none
+    debug log = none
+    error log = none
+    access log = none
 ```
 
 ## What's next?
