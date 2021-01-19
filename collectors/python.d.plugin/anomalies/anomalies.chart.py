@@ -117,7 +117,7 @@ class Service(SimpleService):
         self.model_display_names = {model: model.split('::')[1] if '::' in model else model for model in self.models_in_scope}
 
     def model_params_init(self):
-        """Model paramaters initialisation.
+        """Model parameters initialisation.
         """
         self.train_max_n = self.configuration.get('train_max_n', 100000)
         self.train_n_secs = self.configuration.get('train_n_secs', 14400)

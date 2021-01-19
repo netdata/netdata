@@ -103,7 +103,7 @@ CHARTS = {
             ['backend_unhealthy', 'unhealthy', 'incremental'],
             ['backend_reuse', 'reused', 'incremental'],
             ['backend_toolate', 'closed', 'incremental'],
-            ['backend_recycle', 'resycled', 'incremental'],
+            ['backend_recycle', 'recycled', 'incremental'],
             ['backend_fail', 'failed', 'incremental']
         ]
     },
