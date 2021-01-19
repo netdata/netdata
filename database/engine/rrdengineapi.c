@@ -120,7 +120,6 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     }
     rd->state->rrdeng_uuid = &page_index->id;
     rd->state->page_index = page_index;
-    rd->state->compaction_id = 0;
 }
 
 /*

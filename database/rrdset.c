@@ -382,7 +382,6 @@ void rrdset_free(RRDSET *st) {
     freez(st->plugin_name);
     freez(st->module_name);
     freez(st->state->old_title);
-    freez(st->state->old_family);
     freez(st->state->old_context);
     free_label_list(st->state->labels.head);
     freez(st->state);
@@ -554,8 +553,8 @@ RRDSET *rrdset_create_custom(
             changed_from_archived_to_active = 1;
             mark_rebuild |= META_CHART_ACTIVATED;
         }
-        char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_family = NULL, *old_context = NULL,
-             *old_title_v = NULL, *old_family_v = NULL, *old_context_v = NULL;
+        char *old_plugin = NULL, *old_module = NULL, *old_title = NULL, *old_context = NULL,
+             *old_title_v = NULL, *old_context_v = NULL;
         int rc;
 
         if(unlikely(name))
@@ -653,10 +652,8 @@ RRDSET *rrdset_create_custom(
             freez(old_plugin);
             freez(old_module);
             freez(old_title);
-            freez(old_family);
             freez(old_context);
             freez(old_title_v);
-            freez(old_family_v);
             freez(old_context_v);
             if (mark_rebuild != META_CHART_ACTIVATED) {
                 info("Collector updated metadata for chart %s", st->id);
@@ -848,7 +845,6 @@ RRDSET *rrdset_create_custom(
 
     st->state = callocz(1, sizeof(*st->state));
     st->family     = config_get(st->config_section, "family", family?family:st->type);
-    st->state->old_family = strdupz(st->family);
     json_fix_string(st->family);
 
     st->units      = config_get(st->config_section, "units", units?units:"");
@@ -936,7 +932,6 @@ RRDSET *rrdset_create_custom(
             st->chart_uuid = create_chart_uuid(st, id, name);
 
         store_active_chart(st->chart_uuid);
-        st->compaction_id = 0;
     }
 #endif
 
