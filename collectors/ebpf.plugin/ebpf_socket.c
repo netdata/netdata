@@ -85,20 +85,11 @@ static void ebpf_update_global_publish(
         move = move->next;
     }
 
-    // We read bytes from function arguments, but bandiwdth is given in bits,
-    // so we need to multiply by 8 to convert for the final value.
     tcp->write = -(long)publish[0].nbyte;
     tcp->read = (long)publish[1].nbyte;
 
     udp->write = -(long)publish[3].nbyte;
     udp->read = (long)publish[4].nbyte;
-    /*
-    tcp->write = -(((long)publish[0].nbyte)*8)/1000;
-    tcp->read = (((long)publish[1].nbyte)*8)/1000;
-
-    udp->write = -(((long)publish[3].nbyte)*8)/1000;
-    udp->read = (((long)publish[4].nbyte)*8)/1000;
-     */
 }
 
 /**
@@ -276,6 +267,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
 
+    // We read bytes from function arguments, but bandiwdth is given in bits,
+    // so we need to multiply by 8 to convert for the final value.
     write_count_chart(
       NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(
@@ -291,7 +284,8 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     write_count_chart(
         NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
     write_io_chart(
-        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write*8/1000,
+        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[3], (long long)common_udp.write*8/100
+                                                                                0,
         socket_id_names[4], (long long)common_udp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
