@@ -11,7 +11,7 @@ This collector uses the Python [PyOD](https://pyod.readthedocs.io/en/latest/inde
 
 Instead of this collector just _collecting_ data, it also does some computation on the data it collects to return an anomaly probability and anomaly flag for each chart or custom model you define. This computation consists of a **train** function that runs every `train_n_secs` to train the ML models to learn what 'normal' typically looks like on your node. At each iteration there is also a **predict** function that uses the latest trained models and most recent metrics to produce an anomaly probability and anomaly flag for each chart or custom model you define.
 
-> As this is a somewhat unique collector and involves often subjective concepts like anomalies and anomaly probabilities, we would love to hear any feedback on it from the community. Please let us know on the [community forum](https://community.netdata.cloud/c/agent-development/9) or drop us a note at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) for any and all feedback, both positive and negative. This sort of feedback is priceless to help us make complex features more useful.
+> As this is a somewhat unique collector and involves often subjective concepts like anomalies and anomaly probabilities, we would love to hear any feedback on it from the community. Please let us know on the [community forum](https://community.netdata.cloud/t/anomalies-collector-feedback-megathread/767) or drop us a note at [analytics-ml-team@netdata.cloud](mailto:analytics-ml-team@netdata.cloud) for any and all feedback, both positive and negative. This sort of feedback is priceless to help us make complex features more useful.
 
 ## Charts
 
