@@ -321,10 +321,12 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 /**
  * Call the necessary functions to create a chart.
  *
- * @param chart is the chart name
+ * @param chart  the chart name
  * @param family  the chart family
- * @param dwrite is the dimension name
- * @param
+ * @param dwrite the dimension name
+ * @param vwrite the value for previous dimension
+ * @param dread the dimension name
+ * @param vread the value for previous dimension
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
