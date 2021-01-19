@@ -1,6 +1,6 @@
 #include "aclk_common.h"
 
-#include "../daemon/common.h"
+#include "../../daemon/common.h"
 
 #ifdef ENABLE_ACLK
 #include <libwebsockets.h>

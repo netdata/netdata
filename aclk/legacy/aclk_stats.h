@@ -3,7 +3,7 @@
 #ifndef NETDATA_ACLK_STATS_H
 #define NETDATA_ACLK_STATS_H
 
-#include "../daemon/common.h"
+#include "../../daemon/common.h"
 #include "libnetdata/libnetdata.h"
 #include "aclk_common.h"
 

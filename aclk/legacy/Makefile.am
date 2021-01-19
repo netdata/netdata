@@ -15,5 +15,5 @@ SUFFIXES = .in
 #    $(NULL)
 
 dist_noinst_SCRIPTS = tests/install-fake-charts.d.sh
-dist_noinst_DATA = README.md tests/install-fake-charts.d.sh.in
+dist_noinst_DATA = tests/install-fake-charts.d.sh.in
 

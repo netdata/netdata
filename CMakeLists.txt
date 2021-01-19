@@ -713,26 +713,26 @@ set(BACKENDS_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
         claim/claim.h
-        aclk/aclk_rrdhost_state.h
-        aclk/aclk_common.c
-        aclk/aclk_common.h
+        aclk/legacy/aclk_rrdhost_state.h
+        aclk/legacy/aclk_common.c
+        aclk/legacy/aclk_common.h
         )
 
 set(ACLK_PLUGIN_FILES
-        aclk/agent_cloud_link.c
-        aclk/agent_cloud_link.h
-        aclk/aclk_query.c
-        aclk/aclk_query.h
-        aclk/aclk_lws_wss_client.c
-        aclk/aclk_lws_wss_client.h
-        aclk/aclk_lws_https_client.c
-        aclk/aclk_lws_https_client.h
-        aclk/mqtt.c
-        aclk/mqtt.h
-        aclk/aclk_stats.c
-        aclk/aclk_stats.h
-        aclk/aclk_rx_msgs.c
-        aclk/aclk_rx_msgs.h
+        aclk/legacy/agent_cloud_link.c
+        aclk/legacy/agent_cloud_link.h
+        aclk/legacy/aclk_query.c
+        aclk/legacy/aclk_query.h
+        aclk/legacy/aclk_lws_wss_client.c
+        aclk/legacy/aclk_lws_wss_client.h
+        aclk/legacy/aclk_lws_https_client.c
+        aclk/legacy/aclk_lws_https_client.h
+        aclk/legacy/mqtt.c
+        aclk/legacy/mqtt.h
+        aclk/legacy/aclk_stats.c
+        aclk/legacy/aclk_stats.h
+        aclk/legacy/aclk_rx_msgs.c
+        aclk/legacy/aclk_rx_msgs.h
         )
 
 set(SPAWN_PLUGIN_FILES

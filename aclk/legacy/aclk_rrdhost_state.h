@@ -1,7 +1,7 @@
 #ifndef ACLK_RRDHOST_STATE_H
 #define ACLK_RRDHOST_STATE_H
 
-#include "../libnetdata/libnetdata.h"
+#include "../../libnetdata/libnetdata.h"
 
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
