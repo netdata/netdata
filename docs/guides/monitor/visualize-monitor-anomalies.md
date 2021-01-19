@@ -131,7 +131,7 @@ now have a fundamental understanding of how unsupervised anomaly detection in Ne
 to preconfigured or custom dashboards.
 
 We'd love to hear your feedback on the anomalies collector. Hop over to the [community
-forum](https://community.netdata.cloud/c/agent-development/9), and let us know if you're already getting value from
+forum](https://community.netdata.cloud/t/anomalies-collector-feedback-megathread/767), and let us know if you're already getting value from
 unsupervised anomaly detection, or would like to see something added to it. You might even post a custom configuration
 that works well for monitoring some other popular application, like MySQL, PostgreSQL, Redis, or anything else we
 [support through collectors](/collectors/COLLECTORS.md).
