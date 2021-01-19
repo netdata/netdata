@@ -86,12 +86,12 @@ static void ebpf_update_global_publish(
     }
 
     // We read bytes from function arguments, but bandiwdth is given in bits,
-    // so we need to multiply by 8 the read data.
-    tcp->write = -(((long)publish[0].nbyte)<<3)/1000;
-    tcp->read = (((long)publish[1].nbyte)<<3)/1000;
+    // so we need to multiply by 8 to convert for the final value.
+    tcp->write = -(((long)publish[0].nbyte)*8)/1000;
+    tcp->read = (((long)publish[1].nbyte)*8)/1000;
 
-    udp->write = -(((long)publish[3].nbyte)<<3)/1000;
-    udp->read = (((long)publish[4].nbyte)<<3)/1000;
+    udp->write = -(((long)publish[3].nbyte)*8)/1000;
+    udp->read = (((long)publish[4].nbyte)*8)/1000;
 }
 
 /**
@@ -338,7 +338,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_sent));
             // We multiply by 0.008, because we read bytes, but we display bits
-            write_chart_dimension(w->name, ((value)<<3)/1000);
+            write_chart_dimension(w->name, ((value)*8)/1000);
         }
     }
     write_end_chart();
@@ -349,7 +349,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_received));
             // We multiply by 0.008, because we read bytes, but we display bits
-            write_chart_dimension(w->name, ((value)<<3)/1000);
+            write_chart_dimension(w->name, ((value)*8)/1000);
         }
     }
     write_end_chart();
