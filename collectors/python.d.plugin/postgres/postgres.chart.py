@@ -1162,7 +1162,7 @@ def zero_lock_types(databases):
 
 
 def hide_password(config):
-    return dict((k, v if k != 'password' else '*****') for k, v in config.items())
+    return dict((k, v if k != 'password' or not v else '*****') for k, v in config.items())
 
 
 def add_database_lock_chart(order, definitions, database_name):
