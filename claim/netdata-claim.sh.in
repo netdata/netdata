@@ -148,13 +148,33 @@ NETDATA_USER=$(get_config_value netdata global "run as user")
 [ -z "$EUID" ] && EUID="$(id -u)"
 
 
+gen_id() {
+    local id
+
+    id="$(uuidgen)"
+
+    if [ "${id}" = "8a795b0c-2311-11e6-8563-000c295076a6" ] || [ "${id}" = "4aed1458-1c3e-11e6-a53f-000c290fc8f5" ]; then
+        gen_id
+    else
+        echo "${id}"
+    fi
+}
+
 # get the MACHINE_GUID by default
 if [ -r "${MACHINE_GUID_FILE}" ]; then
         ID="$(cat "${MACHINE_GUID_FILE}")"
         MGUID=$ID
-else
-        echo >&2 "netdata.public.unique.id is not generated yet or not readable. Please run agent at least once before attempting to claim. Agent generates this file on first startup. If the ID is generated already make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
+elif [ -f "${MACHINE_GUID_FILE}" ]; then
+        echo >&2 "netdata.public.unique.id is not readable. Please make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
         exit 18
+else
+        if mkdir -p "${MACHINE_GUID_FILE%/*}" && /bin/echo -n "$(gen_id)" > "${MACHINE_GUID_FILE}"; then
+                ID="$(cat "${MACHINE_GUID_FILE}")"
+                MGUID=$ID
+        else
+                echo >&2 "Failed to write new machine GUID. Please make sure you have rights to write to ${MACHINE_GUID_FILE}."
+                exit 18
+        fi
 fi
 
 # get token from file
