@@ -52,6 +52,9 @@ static void ebpf_update_global_publish(
     netdata_publish_syscall_t *move = publish;
     int selector = NETDATA_KEY_PUBLISH_PROCESS_OPEN;
     while (move) {
+        // Until NETDATA_KEY_PUBLISH_PROCESS_READ we are creating accumulators, so it is possible
+        // to use incremental charts, but after this we will do some math with the values, so we are storing
+        // absolute values
         if (selector < NETDATA_KEY_PUBLISH_PROCESS_READ) {
             move->ncall = input->call;
             move->nbyte = input->bytes;
@@ -470,12 +473,12 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
            update_every);
 
     printf("DIMENSION %s %s %s 1 1\n",
-           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
-           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
-           ebpf_algorithms[algorithm]);
-    printf("DIMENSION %s %s %s 1 1\n",
            process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
            process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
+           ebpf_algorithms[algorithm]);
+    printf("DIMENSION %s %s %s 1 1\n",
+           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
+           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
            ebpf_algorithms[algorithm]);
 }
 
@@ -558,7 +561,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                          NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
                          NETDATA_VFS_GROUP,
                          21004,
-                         NETDATA_EBPF_INCREMENTAL_IDX);
+                         NETDATA_EBPF_ABSOLUTE_IDX);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -1031,7 +1034,7 @@ void *ebpf_process_thread(void *ptr)
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX, //open, close, unlink
-        NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
     };
 
