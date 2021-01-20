@@ -129,8 +129,9 @@ static void ebpf_process_send_data(ebpf_module_t *em)
             NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_PROCESS_START], 2);
     }
 
-    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY, process_id_names[3], (long long) pvc.write,
-                   process_id_names[4], (long long)pvc.read);
+    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY,
+                   process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE], (long long) pvc.write,
+                   process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ], (long long)pvc.read);
 }
 
 /**
@@ -456,8 +457,9 @@ static void ebpf_process_update_apps_data()
  * @param axis   the axis label
  * @param web    the group name used to attach the chart on dashaboard
  * @param order  the order number of the specified chart
+ * @param algorithm the algorithm used to make the charts.
  */
-static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order)
+static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order, int algorithm)
 {
     printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d\n",
            family,
@@ -467,10 +469,14 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
            order,
            update_every);
 
-    printf("DIMENSION %s %s absolute 1 1\n",
-           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ], NETDATA_VFS_DIM_OUT_FILE_BYTES);
-    printf("DIMENSION %s %s absolute 1 1\n",
-           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE], NETDATA_VFS_DIM_IN_FILE_BYTES);
+    printf("DIMENSION %s %s %s 1 1\n",
+           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
+           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
+           ebpf_algorithms[algorithm]);
+    printf("DIMENSION %s %s %s 1 1\n",
+           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
+           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
+           ebpf_algorithms[algorithm]);
 }
 
 /**
@@ -551,7 +557,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
     ebpf_create_io_chart(NETDATA_EBPF_FAMILY,
                          NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
                          NETDATA_VFS_GROUP,
-                         21004);
+                         21004,
+                         NETDATA_EBPF_INCREMENTAL_IDX);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -1024,7 +1031,7 @@ void *ebpf_process_thread(void *ptr)
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX, //open, close, unlink
-        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
     };
 

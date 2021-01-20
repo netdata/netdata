@@ -32,8 +32,6 @@
 #define NETDATA_PROCESS_STATUS_NAME "process_status"
 
 #define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
-#define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
-#define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
 // Charts created on Apps submenu
 #define NETDATA_SYSCALL_APPS_FILE_OPEN "file_open"
