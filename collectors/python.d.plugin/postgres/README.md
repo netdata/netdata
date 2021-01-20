@@ -10,7 +10,7 @@ Collects database health and performance metrics.
 
 ## Requirements
 
--   `python-psycopg2` package. You have to install it manually.
+-   `python-psycopg2` package. You have to install it manually and make sure that it is available to the `netdata` user, either using `pip`, the package manager of your Linux distribution, or any other method you prefer.
 
 Following charts are drawn:
 
