@@ -352,14 +352,15 @@ void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     unsigned int count = 0;
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
-
-        if(likely(!((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL)
-                    && !ae->updated_by_id)))
-            continue;
-
-        if(likely(count)) buffer_strcat(wb, ",");
+        if (!ae->updated_by_id &&
+            ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
+             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL) &&
+              ae->new_status == RRDCALC_STATUS_REMOVED))) {
+            if (likely(count))
+                buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
-        count++;
+            count++;
+        }
     }
     buffer_strcat(wb, "]");
 
