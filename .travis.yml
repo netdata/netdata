@@ -362,7 +362,11 @@ jobs:
 
     - name: Trigger Docker image build and publish
       script: >-
-        curl -X POST -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml' -d '{"ref": "master", "inputs": {"version": "${build_version}"}}'
+        curl -X POST \
+             -H 'Accept: application/vnd.github.v3+json' \
+             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml/dispatches' \
+             -d '{"ref": "master", "inputs": {"version": "${build_version}"}}'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
 
     - stage: Trigger deb and rpm package build (release)
@@ -459,7 +463,11 @@ jobs:
 
     - name: Trigger Docker image build and publish
       script: >-
-        curl -X POST -H 'Accept: application/vnd.github.v3+json' 'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml' -d '{"ref": "master", "inputs": {"version": "nightly"}}'
+        curl -X POST \
+             -H 'Accept: application/vnd.github.v3+json' \
+             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             'https://api.github.com/repos/netdata/netdata/actions/workflows/docker.yml/dispatches' \
+             -d '{"ref": "master", "inputs": {"version": "${build_version}"}}'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during nightly release" "${NOTIF_CHANNEL}"
 
     - stage: Trigger deb and rpm package build (nightly release)
