@@ -1,7 +1,7 @@
 #!/bin/sh
 
-token="${0}"
-version="${1}"
+token="${1}"
+version="${2}"
 
 resp="$(curl -X POST \
              -H 'Accept: application/vnd.github.v3+json' \
