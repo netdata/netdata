@@ -3,7 +3,7 @@
 #include "json_wrapper.h"
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
-                             struct context_param *context_param_list, char *chart_label_key) {
+                             struct context_param *context_param_list, char *chart_label_key)
 {
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
