@@ -797,7 +797,7 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
     }
 
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-        , options, &last_timestamp_in_data, context_param_list);
+        , options, &last_timestamp_in_data, context_param_list, NULL);
 
     free_context_param_list(&context_param_list);
 
