@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Fixed triggering of Docker image builds from Travis. [\#10541](https://github.com/netdata/netdata/pull/10541) ([Ferroin](https://github.com/Ferroin))
 - Update README.md on postgres collector [\#10532](https://github.com/netdata/netdata/pull/10532) ([OdysLam](https://github.com/OdysLam))
 - fix postgres password bug and change default config [\#10531](https://github.com/netdata/netdata/pull/10531) ([OdysLam](https://github.com/OdysLam))
+- Make some tweaks/improvements to conf docs [\#10528](https://github.com/netdata/netdata/pull/10528) ([joelhans](https://github.com/joelhans))
 - Spelling python plugin [\#10525](https://github.com/netdata/netdata/pull/10525) ([jsoref](https://github.com/jsoref))
 - Reduce the number of alarm updates on ACLK [\#10524](https://github.com/netdata/netdata/pull/10524) ([stelfrag](https://github.com/stelfrag))
 - dashboard@v2.12.5 [\#10520](https://github.com/netdata/netdata/pull/10520) ([jacekkolasa](https://github.com/jacekkolasa))
@@ -243,7 +245,6 @@
 - Fix buffer overflow in rrdr structure [\#9903](https://github.com/netdata/netdata/pull/9903) ([mfundul](https://github.com/mfundul))
 - Fix missing newline concatentation slash causing rpm build to fail [\#9900](https://github.com/netdata/netdata/pull/9900) ([prologic](https://github.com/prologic))
 - installer: update go.d.plugin version to v0.22.0 [\#9898](https://github.com/netdata/netdata/pull/9898) ([ilyam8](https://github.com/ilyam8))
-- Add v2 HTTP message with compression to ACLK [\#9895](https://github.com/netdata/netdata/pull/9895) ([underhood](https://github.com/underhood))
 
 ## [poc2](https://github.com/netdata/netdata/tree/poc2) (2020-08-25)
 
