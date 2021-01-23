@@ -60,6 +60,6 @@ extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
 extern void sql_archived_database_hosts(BUFFER *wb, int count);
 
-extern void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context);
+extern void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context, char *chart);
 
 #endif //NETDATA_SQLITE_FUNCTIONS_H
