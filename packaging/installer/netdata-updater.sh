@@ -116,7 +116,7 @@ _cannot_use_tmpdir() {
 
 create_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
-    echo "${NETDATA_TMPDIR_PATH}"
+    TMPDIR="${NETDATA_TMPDIR_PATH}"
   else
     if [ -z "${NETDATA_TMPDIR}" ] || _cannot_use_tmpdir "${NETDATA_TMPDIR}" ; then
       if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
