@@ -376,7 +376,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
             break;
         }
         if (aclk_shared_state.mqtt_shutdown_msg_rcvd) {
-            error("MQTT disconnect message sent successfully");
+            error("MQTT App Layer `disconnect` message sent successfully");
             break;
         }
     }
