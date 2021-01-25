@@ -726,7 +726,6 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
     else
         enable_aclk=$enable_cloud
     fi
-    AC_SUBST([can_enable_aclk])
 
     if test "${enable_aclk}" = "yes"; then
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
@@ -756,6 +755,8 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         fi
     fi
 fi
+AC_SUBST([enable_cloud])
+AC_SUBST([enable_aclk])
 AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
 
