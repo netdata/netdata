@@ -668,11 +668,13 @@ int ws_client_process(ws_client *client)
         case WS_ESTABLISHED:
             do {
                 ret = ws_client_process_rx_ws(client);
-                if (ret == WS_CLIENT_PROTOCOL_ERROR)
-                    client->state = WS_ERROR;
-                if (ret == WS_CLIENT_CONNECTION_CLOSED) {
-                    //TODO HANDLE PROPERLY
-                    client->state = WS_ERROR;
+                switch(ret) {
+                    case WS_CLIENT_PROTOCOL_ERROR:
+                        client->state = WS_ERROR;
+                        break;
+                    case WS_CLIENT_CONNECTION_CLOSED:
+                        client->state = WS_CONN_CLOSED_GRACEFUL;
+                        break;
                 }
                 // if ret == 0 we can continue parsing
                 // if ret == WS_CLIENT_PARSING_DONE we processed
@@ -683,6 +685,12 @@ int ws_client_process(ws_client *client)
         case WS_ERROR:
             ERROR("ws_client is in error state. Restart the connection!");
             return WS_CLIENT_PROTOCOL_ERROR;
+        case WS_CONN_CLOSED_GRACEFUL:
+            ERROR("Connection has been gracefully closed. Calling this is useless (and probably bug) until you reconnect again.");
+            return WS_CLIENT_CONNECTION_CLOSED;
+        default:
+            FATAL("Unknown connection state! Probably memory corruption.");
+            return WS_CLIENT_INTERNAL_ERROR;
     }
     return ret;
 }

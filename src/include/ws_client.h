@@ -30,7 +30,8 @@ enum websocket_client_conn_state {
     WS_RAW = 0,
     WS_HANDSHAKE,
     WS_ESTABLISHED,
-    WS_ERROR        // connection has to be restarted if this is reached
+    WS_ERROR,        // connection has to be restarted if this is reached
+    WS_CONN_CLOSED_GRACEFUL
 };
 
 enum websocket_client_hdr_parse_state {

@@ -668,13 +668,17 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     }
 
     ret = ws_client_process(client->ws_client);
-    if (ret == WS_CLIENT_PROTOCOL_ERROR)
-        return MQTT_WSS_ERR_PROTO_WS;
-    if (ret == WS_CLIENT_NEED_MORE_BYTES) {
+    switch(ret) {
+        case WS_CLIENT_PROTOCOL_ERROR:
+            return MQTT_WSS_ERR_PROTO_WS;
+        case WS_CLIENT_NEED_MORE_BYTES:
 #ifdef DEBUG_ULTRA_VERBOSE
-        mws_debug(client->log, "WSCLIENT WANT READ");
+            mws_debug(client->log, "WSCLIENT WANT READ");
 #endif
-        client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
+            client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
+            break;
+        case WS_CLIENT_CONNECTION_CLOSED:
+            return MQTT_WSS_ERR_CONN_DROP;
     }
 
     if (handle_mqtt(client))
