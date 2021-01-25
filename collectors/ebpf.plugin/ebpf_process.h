@@ -91,6 +91,11 @@ typedef enum ebpf_process_index {
 
 } ebpf_process_index_t;
 
+// This enum acts as an index for publish vector.
+// Do not change the enum order because we use
+// different algorithms to make charts with incremental
+// values (the three initial positions) and absolute values
+// (the remaining charts). 
 typedef enum netdata_publish_process {
     NETDATA_KEY_PUBLISH_PROCESS_OPEN,
     NETDATA_KEY_PUBLISH_PROCESS_CLOSE,
