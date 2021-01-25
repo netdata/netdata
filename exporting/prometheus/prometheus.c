@@ -493,7 +493,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                                         .host_header_printed = 0 };
         foreach_host_variable_callback(host, print_host_variables, &opts);
     }
-
+    
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host)
@@ -514,12 +514,16 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
+            int prometheus_collector = 0;
             if (as_collected) {
                 if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
                     homogeneous = 0;
+
+                if (st->module_name && !strcmp(st->module_name, "prometheus"))
+                    prometheus_collector = 1;
             } else {
                 if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
                     !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
@@ -568,54 +572,99 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(
-                                    wb,
-                                    "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
-                                    " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
-                                    st->context,
-                                    st->family,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
-                                    rd->multiplier,
-                                    rd->divisor,
-                                    h,
-                                    st->units,
-                                    t);
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+                                if (prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * 1 / 1 %s %s (%s)\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
+                                        st->context,
+                                        st->family,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                        h,
+                                        st->units,
+                                        t);
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
+                                        " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
+                                        st->context,
+                                        st->family,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                        rd->multiplier,
+                                        rd->divisor,
+                                        h,
+                                        st->units,
+                                        t);
+                            }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, t);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
-                                    " %llu\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    dimension,
-                                    labels,
-                                    rd->last_collected_value,
-                                    timeval_msec(&rd->last_collected_time));
+                                if (prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT
+                                        " %llu\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        dimension,
+                                        labels,
+                                        (calculated_number)rd->last_collected_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor,
+                                        timeval_msec(&rd->last_collected_time));
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
+                                        " %llu\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        dimension,
+                                        labels,
+                                        rd->last_collected_value,
+                                        timeval_msec(&rd->last_collected_time));
                             else
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
-                                    "\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    dimension,
-                                    labels,
-                                    rd->last_collected_value);
+                                if(prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT
+                                        "\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        dimension,
+                                        labels,
+                                        (calculated_number)rd->last_collected_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor);
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
+                                        "\n",
+                                        prefix,
+                                        context,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        dimension,
+                                        labels,
+                                        rd->last_collected_value);
                         } else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
@@ -625,54 +674,99 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(
-                                    wb,
-                                    "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
-                                    " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
-                                    st->context,
-                                    st->family,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
-                                    rd->multiplier,
-                                    rd->divisor,
-                                    h,
-                                    st->units,
-                                    t);
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+                                if (prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * 1 / 1 %s %s (%s)\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
+                                        st->context,
+                                        st->family,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                        h,
+                                        st->units,
+                                        t);
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
+                                        " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
+                                        st->context,
+                                        st->family,
+                                        (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
+                                        rd->multiplier,
+                                        rd->divisor,
+                                        h,
+                                        st->units,
+                                        t);
+                            }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
                                     wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
 
-                            if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    labels,
-                                    rd->last_collected_value,
-                                    timeval_msec(&rd->last_collected_time));
-                            else
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT "\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    labels,
-                                    rd->last_collected_value);
+                            if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
+                                if (prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        labels,
+                                        (calculated_number)rd->last_collected_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor,
+                                        timeval_msec(&rd->last_collected_time));
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        labels,
+                                        rd->last_collected_value,
+                                        timeval_msec(&rd->last_collected_time));
+                            } else {
+                                if (prometheus_collector)
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " CALCULATED_NUMBER_FORMAT "\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        labels,
+                                        (calculated_number)rd->last_collected_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor);
+                                else
+                                    buffer_sprintf(
+                                        wb,
+                                        "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT "\n",
+                                        prefix,
+                                        context,
+                                        dimension,
+                                        suffix,
+                                        chart,
+                                        family,
+                                        labels,
+                                        rd->last_collected_value);
+                            }
                         }
                     } else {
                         // we need average or sum of the data
