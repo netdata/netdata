@@ -379,7 +379,7 @@ json_object *aclk_generate_disconnect(const char *message)
     return msg;
 }
 
-int aclk_send_graceful_disconnect(mqtt_wss_client client, const char *message)
+int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
 {
     int pid;
     json_object *msg = aclk_generate_disconnect(message);

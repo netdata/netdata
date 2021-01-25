@@ -368,7 +368,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     error("Preparing to Gracefully Shutdown the ACLK");
     aclk_queue_lock();
     aclk_queue_flush();
-    aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_graceful_disconnect(client, "graceful");
+    aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_app_layer_disconnect(client, "graceful");
     time_t t = now_monotonic_sec();
     while (!mqtt_wss_service(client, 100)) {
         if (now_monotonic_sec() - t >= 2) {

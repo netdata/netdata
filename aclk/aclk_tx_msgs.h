@@ -19,6 +19,6 @@ void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart);
 void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg);
 
 json_object *aclk_generate_disconnect(const char *message);
-int aclk_send_graceful_disconnect(mqtt_wss_client client, const char *message);
+int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message);
 
 #endif
