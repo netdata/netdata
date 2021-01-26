@@ -25,9 +25,11 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
+        "Content-Encoding: snappy\r\n"
+        "Content-Type: application/x-protobuf\r\n"
         "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: %zu\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
+        "\r\n",
         connector_specific_config->remote_write_path,
         instance->config.destination,
         buffer_strlen(simple_connector_data->last_buffer->buffer));
