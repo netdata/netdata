@@ -580,7 +580,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                                         .host_header_printed = 0 };
         foreach_host_variable_callback(host, print_host_variables, &opts);
     }
-    
+
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host)
