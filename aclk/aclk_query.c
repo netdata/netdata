@@ -232,7 +232,6 @@ int aclk_query_process_msgs(struct aclk_query_thread *info)
 void *aclk_query_main_thread(void *ptr)
 {
     struct aclk_query_thread *info = ptr;
-    error("Started Thread %d", info->idx);
     while (!netdata_exit) {
         ACLK_SHARED_STATE_LOCK;
         if (unlikely(!aclk_shared_state.version_neg)) {
