@@ -1179,9 +1179,11 @@ static void test_prometheus_remote_write_prepare_header(void **state)
         "POST /receive HTTP/1.1\r\n"
         "Host: localhost\r\n"
         "Accept: */*\r\n"
+        "Content-Encoding: snappy\r\n"
+        "Content-Type: application/x-protobuf\r\n"
         "X-Prometheus-Remote-Write-Version: 0.1.0\r\n"
         "Content-Length: 11\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
+        "\r\n");
 
     free(connector_specific_config->remote_write_path);
 
