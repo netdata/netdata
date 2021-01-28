@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix prometheus remote write header [\#10560](https://github.com/netdata/netdata/pull/10560) ([vlvkobal](https://github.com/vlvkobal))
+- fix minor vulnerability alert, updating socket-io dependency [\#10557](https://github.com/netdata/netdata/pull/10557) ([jacekkolasa](https://github.com/jacekkolasa))
 - Fix values in Prometheus export for metrics, collected by the Prometheus collector [\#10551](https://github.com/netdata/netdata/pull/10551) ([vlvkobal](https://github.com/vlvkobal))
 - Properly handle saved temporary directory on updates. [\#10550](https://github.com/netdata/netdata/pull/10550) ([Ferroin](https://github.com/Ferroin))
 - installer: update go.d.plugin version to v0.27.0 [\#10544](https://github.com/netdata/netdata/pull/10544) ([ilyam8](https://github.com/ilyam8))
@@ -243,7 +245,6 @@
 **Merged pull requests:**
 
 - Fix memory mode none not dropping stale dimension data [\#9917](https://github.com/netdata/netdata/pull/9917) ([mfundul](https://github.com/mfundul))
-- Fix memory mode none not marking dimensions as obsolete. [\#9912](https://github.com/netdata/netdata/pull/9912) ([mfundul](https://github.com/mfundul))
 
 ## [poc2](https://github.com/netdata/netdata/tree/poc2) (2020-08-25)
 
