@@ -213,8 +213,8 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
             ALARM_ENTRY *ae = NULL;
 
-            if(entries < 26) {
-                error("HEALTH [%s]: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring it.", host->hostname, line, filename, entries);
+            if(entries < 27) {
+                error("HEALTH [%s]: line %zu of file '%s' should have at least 27 entries, but it has %d. Ignoring it.", host->hostname, line, filename, entries);
                 errored++;
                 continue;
             }
