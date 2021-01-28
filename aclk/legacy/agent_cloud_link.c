@@ -639,7 +639,7 @@ static void aclk_graceful_disconnect()
     // Send a graceful disconnect message
     BUFFER *b = buffer_create(512);
     aclk_create_header(b, "disconnect", NULL, 0, 0, aclk_shared_state.version_neg);
-    buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}\n");
+    buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}");
     aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
     buffer_free(b);
 
