@@ -555,8 +555,7 @@ void *aclk_main(void *ptr)
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
 
-        // TODO
-        // warning this assumes the popcorning is relative short
+        // warning this assumes the popcorning is relative short (3s)
         // if that changes call mqtt_wss_service from within
         // to keep OpenSSL, WSS and MQTT connection alive
         if (wait_popcorning_finishes(mqttwss_client, &query_threads))
