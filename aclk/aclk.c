@@ -35,7 +35,6 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 #define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
-//TODO remove
 struct aclk_shared_state aclk_shared_state = {
     .agent_state = AGENT_INITIALIZING,
     .last_popcorn_interrupt = 0,
