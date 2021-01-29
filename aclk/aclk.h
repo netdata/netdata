@@ -91,10 +91,6 @@ typedef enum aclk_proxy_type {
 // TODO
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
-void aclk_dummy();
-
-#define aclk_wss_set_proxy(...) aclk_dummy()
-
 void aclk_alarm_reload(void);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 
