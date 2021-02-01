@@ -240,7 +240,7 @@ autoreconf -ivf
 	--with-libJudy=externaldeps/libJudy \
 	%endif
 	%if 0%{?centos_ver} >= 8 || 0%{?fedora}
-	--with-libwebsockets=externaldeps/libwebsockets \
+	--with-bundled-lws=externaldeps/libwebsockets \
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
