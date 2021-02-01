@@ -391,6 +391,7 @@ STACKPULSE_WEBHOOK=
 
 # opsgenie configs
 OPSGENIE_API_KEY=
+OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
 
 # load the stock and user configuration files
 # these will overwrite the variables above
@@ -2177,9 +2178,8 @@ send_opsgenie() {
     "src" : "${src}"
   }
 EOF
-)
 
-  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
