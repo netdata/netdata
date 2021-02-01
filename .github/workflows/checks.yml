@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Build
         run: >
-          docker run -v "$PWD":/netdata -w /netdata alpine:3.11 /bin/sh -c
+          docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
           'apk add bash;
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
