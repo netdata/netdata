@@ -80,12 +80,13 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Claim an Agent running in Docker
 
-The claiming process works with Agents running inside of Docker containers. You can either set a specific set
-of environment variables in the container to have it automatically claimed on startup or restart, or you can use
-`docker exec` to manually claim an already-running container.
+The claiming process works with the Netdata Agent running inside of a Docker container. You can either set a
+specific set of environment variables in the container to have it automatically claimed on startup or restart,
+or you can use `docker exec` to manually claim an already-running container.
 
-Note that for claiming to wokr, the contents of `/var/lib/netdata` _must_ be preserved across container restarts
-using a persistent volume.
+For claiming to work, the contents of `/var/lib/netdata` _must_ be preserved across container restarts
+using a persistent volume.  See our [recommended `docker run` and Docker Compose
+examples](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
 #### Using environment variables
 
@@ -96,9 +97,9 @@ The Netdata Docker container looks for the following environment variables on st
 - `NETDATA_CLAIM_ROOMS`
 - `NETDATA_CLAIM_PROXY`
 
-If the token and URL are specified in their corresponding variables _and_ the container is not already claimed, it
-will use these values to attempt to claim the container, automatically adding the node to the specified rooms. If
-a proxy is specified, it will be used for the claiming process and for connecting to the cloud.
+If the token and URL are specified in their corresponding variables _and_ the container is not already claimed,
+it will use these values to attempt to claim the container, automatically adding the node to the specified War
+Rooms. If a proxy is specified, it will be used for the claiming process and for connecting to Netdata Cloud.
 
 These variables can be specified using any mechanism supported by your container tooling for setting environment
 variables inside containers. For example, when creating a new Netdata continer using `docker run`, the following
@@ -130,7 +131,7 @@ as it works in the widest variety of situations and simplifies configuration man
 
 #### Using docker exec
 
-Claim a _running Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing
+Claim a _running Netdata Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing
 `netdata` with the name of your running container:
 
 ```bash
