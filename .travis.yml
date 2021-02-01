@@ -324,14 +324,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-    - name: "Build & Publish RPM package for openSUSE 15.1"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.1" BUILD_STRING="opensuse/15.1"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
     - name: "Build & Publish RPM package for openSUSE 15.2"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/

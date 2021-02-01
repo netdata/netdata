@@ -37,7 +37,6 @@ jobs:
           - 'fedora:33'
           - 'fedora:32'
           - 'opensuse/leap:15.2'
-          - 'opensuse/leap:15.1'
           - 'opensuse/tumbleweed:latest'
           - 'ubuntu:20.10'
           - 'ubuntu:20.04'
@@ -79,8 +78,6 @@ jobs:
             rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'opensuse/leap:15.2'
-            rmjsonc: 'zypper rm -y libjson-c-devel'
-          - distro: 'opensuse/leap:15.1'
             rmjsonc: 'zypper rm -y libjson-c-devel'
           - distro: 'opensuse/tumbleweed:latest'
             rmjsonc: 'zypper rm -y libjson-c-devel'
