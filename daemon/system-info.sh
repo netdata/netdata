@@ -8,7 +8,10 @@ KERNEL_VERSION="$(uname -r)"
 ARCHITECTURE="$(uname -m)"
 
 # -------------------------------------------------------------------------------------------------
-# detect the virtualization
+# detect the virtualization and possibly the container technology
+
+CONTAINER="unknown"
+CONT_DETECTION="none"
 
 if [ -z "${VIRTUALIZATION}" ]; then
   VIRTUALIZATION="unknown"
@@ -41,9 +44,6 @@ fi
 
 # -------------------------------------------------------------------------------------------------
 # detect containers with heuristics
-
-CONTAINER="unknown"
-CONT_DETECTION="none"
 
 if [ "${CONTAINER}" = "unknown" ]; then
   if [ -f /proc/1/sched ]; then
