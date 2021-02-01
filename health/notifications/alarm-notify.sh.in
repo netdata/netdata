@@ -2178,6 +2178,7 @@ send_opsgenie() {
     "src" : "${src}"
   }
 EOF
+)
 
   httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
