@@ -33,7 +33,7 @@ if ! POD_LABELS=$(jq -r '.metadata.labels' <<< "$POD_DATA" | grep ':' | tr -d ',
 fi
 
 if ! KUBE_SYSTEM_NS_UID=$(jq -r '.metadata.uid' <<< "$KUBE_SYSTEM_NS_DATA" 2>&1); then
-  echo "error on 'jq' parse kube_system_ns: ${KUBE_SYSTEM_NS_DATA}."
+  echo "error on 'jq' parse kube_system_ns: ${KUBE_SYSTEM_NS_UID}."
   exit 1
 fi
 
