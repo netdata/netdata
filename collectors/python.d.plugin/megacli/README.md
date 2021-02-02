@@ -10,9 +10,8 @@ Collects adapter, physical drives and battery stats.
 
 ## Requirements
 
-Uses the `megacli` program, which can only be executed by root.  It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `megacli` as root without password.
+Uses the `megacli` program, which can only be executed by root. It uses
+`sudo` and assumes that it is configured such that the `netdata` user can execute `megacli` as root without password.
 
 Add to `sudoers`:
 
@@ -20,25 +19,22 @@ Add to `sudoers`:
 netdata ALL=(root)       NOPASSWD: /path/to/megacli
 ```
 
-
 To grab stats it executes:
 
--   `sudo -n megacli -LDPDInfo -aAll`
--   `sudo -n megacli -AdpBbuCmd -a0`
+- `sudo -n megacli -LDPDInfo -aAll`
+- `sudo -n megacli -AdpBbuCmd -a0`
 
 It produces:
 
-1.  **Adapter State**
+1. **Adapter State**
 
-2.  **Physical Drives Media Errors**
+2. **Physical Drives Media Errors**
 
-3.  **Physical Drives Predictive Failures**
+3. **Physical Drives Predictive Failures**
 
-4.  **Battery Relative State of Charge**
+4. **Battery Relative State of Charge**
 
-5.  **Battery Cycle Count**
-
-
+5. **Battery Cycle Count**
 
 ## Configuration
 
@@ -48,8 +44,8 @@ It produces:
 megacli: yes
 ```
 
-Edit the `python.d/megacli.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `python.d/megacli.conf` configuration file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
