@@ -6,39 +6,53 @@ sidebar_label: "MegaRAID controllers"
 
 # MegaRAID controller monitoring with Netdata
 
-Collects adapter, physical drives and battery stats.
+Collects adapter, physical drives and battery stats using `megacli` command-line tool.
 
-## Requirements
-
-Uses the `megacli` program, which can only be executed by root. It uses
-`sudo` and assumes that it is configured such that the `netdata` user can execute `megacli` as root without password.
-
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/megacli
-```
-
-To grab stats it executes:
+Executed commands:
 
 - `sudo -n megacli -LDPDInfo -aAll`
 - `sudo -n megacli -AdpBbuCmd -a0`
 
-It produces:
+## Requirements
 
-1. **Adapter State**
+The module uses `megacli`, which can only be executed by `root`. It uses
+`sudo` and assumes that it is configured such that the `netdata` user can execute `megacli` as root without a password.
 
-2. **Physical Drives Media Errors**
+- add to the `sudoers`
 
-3. **Physical Drives Predictive Failures**
+```bash
+netdata ALL=(root)       NOPASSWD: /path/to/megacli
+```
 
-4. **Battery Relative State of Charge**
+- reset netdata systemd
+  unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
+  distributions with systemd)
 
-5. **Battery Cycle Count**
+Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in general.
+
+> :warning: Resetting it is not an optimal solution,
+> but we couldn't find exact set of capabilities to execute megacli with sudo.
+
+As the `root` user do the following:
+
+```cmd
+mkdir /etc/systemd/system/netdata.service.d
+echo -e '[Service]\nCapabilityBoundingSet=~' | tee /etc/systemd/system/netdata.service.d/unset-capability-bounding-set.conf
+systemctl daemon-reload
+systemctl restart netdata.service
+```
+
+## Charts
+
+- Adapter State
+- Physical Drives Media Errors
+- Physical Drives Predictive Failures
+- Battery Relative State of Charge
+- Battery Cycle Count
 
 ## Configuration
 
-**megacli** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+`megacli` is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
 megacli: yes
