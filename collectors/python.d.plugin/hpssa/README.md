@@ -8,25 +8,46 @@ sidebar_label: "HP Smart Storage Arrays"
 
 Monitors controller, cache module, logical and physical drive state and temperature using `ssacli` tool.
 
+Executed commands:
+
+- `sudo -n ssacli ctrl all show config detail`
+
 ## Requirements:
 
 This module uses `ssacli`, which can only be executed by root. It uses
-`sudo` and assumes that it is configured such that the `netdata` user can execute `ssacli` as root without password.
+`sudo` and assumes that it is configured such that the `netdata` user can execute `ssacli` as root without a password.
 
-Add to `sudoers`:
+- add to the `sudoers`
 
+```bash
+netdata ALL=(root)       NOPASSWD: /path/to/arcconf
 ```
-netdata ALL=(root)       NOPASSWD: /path/to/ssacli
+
+- reset netdata systemd
+  unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
+  distributions with systemd)
+
+Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in general.
+
+> :warning: Resetting it is not an optimal solution,
+> but we couldn't find exact set of capabilities to execute ssacli with sudo.
+
+As the `root` user do the following:
+
+```cmd
+mkdir /etc/systemd/system/netdata.service.d
+echo -e '[Service]\nCapabilityBoundingSet=~' | tee /etc/systemd/system/netdata.service.d/unset-capability-bounding-set.conf
+systemctl daemon-reload
+systemctl restart netdata.service
 ```
 
-To collect metrics, the module executes: `sudo -n ssacli ctrl all show config detail`
+## Charts
 
-This module produces:
-
-1. Controller state and temperature
-2. Cache module state and temperature
-3. Logical drive state
-4. Physical drive state and temperature
+- Controller status
+- Controller temperature
+- Logical drive status
+- Physical drive status
+- Physical drive temperature
 
 ## Enable the collector
 
