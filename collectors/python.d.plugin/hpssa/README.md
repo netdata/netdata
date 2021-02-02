@@ -17,7 +17,9 @@ Executed commands:
 This module uses `ssacli`, which can only be executed by root. It uses
 `sudo` and assumes that it is configured such that the `netdata` user can execute `ssacli` as root without a password.
 
-- add to the `sudoers`
+- add to the `/etc/sudoers`
+
+`which ssacli` shows the full path to the binary.
 
 ```bash
 netdata ALL=(root)       NOPASSWD: /path/to/ssacli
@@ -61,8 +63,7 @@ sudo ./edit-config python.d.conf
 ```
 
 Change the value of the `hpssa` setting to `yes`. Save the file and restart the Netdata Agent
-with `sudo systemctl restart netdata`, or the appropriate method for your system, to finish enabling the `hpssa`
-collector.
+with `sudo systemctl restart netdata`, or the appropriate method for your system.
 
 ## Configuration
 

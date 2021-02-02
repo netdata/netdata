@@ -23,7 +23,9 @@ The module uses `smbstatus`, which can only be executed by `root`. It uses
 `sudo` and assumes that it is configured such that the `netdata` user can execute `smbstatus` as root without a
 password.
 
-- add to the `sudoers`
+- add to the `/etc/sudoers`
+
+`which smbstatus` shows the full path to the binary.
 
 ```bash
 netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
@@ -92,13 +94,21 @@ systemctl restart netdata.service
     - break
     - sessetup
 
-## Configuration
+## Enable the collector
 
-`samba` is disabled by default. Should be explicitly enabled in `python.d.conf`.
+The `samba` collector is disabled by default. To enable it, use `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
+file.
 
-```yaml
-samba: yes
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config python.d.conf
 ```
+
+Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent
+with `sudo systemctl restart netdata`, or the appropriate method for your system.
+
+## Configuration
 
 Edit the `python.d/samba.conf` configuration file using `edit-config` from the
 Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
