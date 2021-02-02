@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fixed Netdata Cloud support in RPM packages. [\#10578](https://github.com/netdata/netdata/pull/10578) ([Ferroin](https://github.com/Ferroin))
+- Fix container detection from systemd-detect-virt [\#10569](https://github.com/netdata/netdata/pull/10569) ([cakrit](https://github.com/cakrit))
 - dashboard v2.13.0 [\#10565](https://github.com/netdata/netdata/pull/10565) ([jacekkolasa](https://github.com/jacekkolasa))
 - bytes after last '}' trip JSON parser [\#10563](https://github.com/netdata/netdata/pull/10563) ([underhood](https://github.com/underhood))
 - Fix prometheus remote write header [\#10560](https://github.com/netdata/netdata/pull/10560) ([vlvkobal](https://github.com/vlvkobal))
@@ -226,17 +228,10 @@
 - Updated RPM spec file to use automatic dependency list generation. [\#9937](https://github.com/netdata/netdata/pull/9937) ([Ferroin](https://github.com/Ferroin))
 - Add information about Cloud disabled status to `-W buildinfo`. [\#9936](https://github.com/netdata/netdata/pull/9936) ([underhood](https://github.com/underhood))
 - Fix resource leak in case of malformed cloud request [\#9934](https://github.com/netdata/netdata/pull/9934) ([underhood](https://github.com/underhood))
-- Added context parameter to the data endpoint [\#9931](https://github.com/netdata/netdata/pull/9931) ([stelfrag](https://github.com/stelfrag))
-- Add persistent configuration details to Docker docs [\#9926](https://github.com/netdata/netdata/pull/9926) ([joelhans](https://github.com/joelhans))
-- Update claiming document to instruct users to install `uuidgen`. [\#9925](https://github.com/netdata/netdata/pull/9925) ([OdysLam](https://github.com/OdysLam))
 
 ## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...before_rebase)
-
-**Merged pull requests:**
-
-- Add notice to Docker docs about systemd volumes [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 
