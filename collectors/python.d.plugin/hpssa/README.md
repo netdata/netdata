@@ -11,8 +11,7 @@ Monitors controller, cache module, logical and physical drive state and temperat
 ## Requirements:
 
 This module uses `ssacli`, which can only be executed by root. It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `ssacli` as root without password.
+`sudo` and assumes that it is configured such that the `netdata` user can execute `ssacli` as root without password.
 
 Add to `sudoers`:
 
@@ -24,28 +23,30 @@ To collect metrics, the module executes: `sudo -n ssacli ctrl all show config de
 
 This module produces:
 
-1.  Controller state and temperature
-2.  Cache module state and temperature
-3.  Logical drive state
-4.  Physical drive state and temperature
+1. Controller state and temperature
+2. Cache module state and temperature
+3. Logical drive state
+4. Physical drive state and temperature
 
 ## Enable the collector
 
-The `hpssa` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+The `hpssa` collector is disabled by default. To enable it, use `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
+file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d.conf
 ```
 
-Change the value of the `hpssa` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl
-restart netdata`, or the appropriate method for your system, to finish enabling the `hpssa` collector.
+Change the value of the `hpssa` setting to `yes`. Save the file and restart the Netdata Agent
+with `sudo systemctl restart netdata`, or the appropriate method for your system, to finish enabling the `hpssa`
+collector.
 
 ## Configuration
 
-Edit the `python.d/hpssa.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `python.d/hpssa.conf` configuration file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
