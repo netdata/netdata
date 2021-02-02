@@ -6,37 +6,52 @@ sidebar_label: "Adaptec RAID"
 
 # Adaptec RAID controller monitoring with Netdata
 
-Collects logical and physical devices metrics.
+Collects logical and physical devices metrics using `arcconf` command-line utility.
 
-## Requirements
-
-The module uses `arcconf`, which can only be executed by root. It uses
-`sudo` and assumes that it is configured such that the `netdata` user can execute `arcconf` as root without a password.
-
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/arcconf
-```
-
-To grab stats it executes:
+Executed commands:
 
 - `sudo -n arcconf GETCONFIG 1 LD`
 - `sudo -n arcconf GETCONFIG 1 PD`
 
-It produces:
+## Requirements
 
-1. **Logical Device Status**
+The module uses `arcconf`, which can only be executed by `root`. It uses
+`sudo` and assumes that it is configured such that the `netdata` user can execute `arcconf` as root without a password.
 
-2. **Physical Device State**
+- add to the `sudoers`
 
-3. **Physical Device S.M.A.R.T warnings**
+```bash
+netdata ALL=(root)       NOPASSWD: /path/to/arcconf
+```
 
-4. **Physical Device Temperature**
+- reset netdata systemd
+  unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
+  distributions with systemd)
+
+Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in general.
+
+> :warning: Resetting it is not an optimal solution,
+> but we couldn't find exact set of capabilities to execute arcconf with sudo.
+
+As the `root` user do the following:
+
+```cmd
+mkdir /etc/systemd/system/netdata.service.d
+echo -e '[Service]\nCapabilityBoundingSet=~' | tee /etc/systemd/system/netdata.service.d/unset-capability-bounding-set.conf
+systemctl daemon-reload
+systemctl restart netdata.service
+```
+
+## Charts
+
+- Logical Device Status
+- Physical Device State
+- Physical Device S.M.A.R.T warnings
+- Physical Device Temperature
 
 ## Configuration
 
-**adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+`adaptec_raid` is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
 adaptec_raid: yes
