@@ -1,0 +1,41 @@
+---
+name: Updater`
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  source-build:
+    name: Build & Install
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - 'debian:10'
+#          - 'fedora:33'
+        include:
+          - distro: 'debian:10'
+            pre: 'apt-get update'
+            rmjsonc: 'apt-get remove -y libjson-c-dev'
+#          - distro: 'fedora:33'
+#            rmjsonc: 'dnf remove -y json-c-devel'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+      - name: install-required-packages.sh on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
+          RMJSONC: ${{ matrix.rmjsonc }}
+        run: |
+          echo $PRE > ./prep-cmd.sh
+          echo $RMJSONC > ./rmjsonc.sh && chmod +x ./rmjsonc.sh
+          docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
+      - name: Build artifacts
+        run: |
+          .github/scripts/build-artifacts.sh
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Artifacts
+          path: ./artifacts/
