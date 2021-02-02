@@ -20,7 +20,7 @@ This module uses `ssacli`, which can only be executed by root. It uses
 - add to the `sudoers`
 
 ```bash
-netdata ALL=(root)       NOPASSWD: /path/to/arcconf
+netdata ALL=(root)       NOPASSWD: /path/to/ssacli
 ```
 
 - reset netdata systemd
