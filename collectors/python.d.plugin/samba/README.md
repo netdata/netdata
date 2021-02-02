@@ -10,62 +10,61 @@ Monitors the performance metrics of Samba file sharing.
 
 ## Requirements
 
--   `smbstatus` program
--   `sudo` program
--   `smbd` must be compiled with profiling enabled
--   `smbd` must be started either with the `-P 1` option or inside `smb.conf` using `smbd profiling level`
--   `netdata` user needs to be able to sudo the `smbstatus` program without password
+- `smbstatus` program
+- `sudo` program
+- `smbd` must be compiled with profiling enabled
+- `smbd` must be started either with the `-P 1` option or inside `smb.conf` using `smbd profiling level`
+- `netdata` user needs to be able to sudo the `smbstatus` program without password
 
 It produces the following charts:
 
-1.  **Syscall R/Ws** in kilobytes/s
+1. **Syscall R/Ws** in kilobytes/s
 
-    -   sendfile
-    -   recvfile
+    - sendfile
+    - recvfile
 
-2.  **Smb2 R/Ws** in kilobytes/s
+2. **Smb2 R/Ws** in kilobytes/s
 
-    -   readout
-    -   writein
-    -   readin
-    -   writeout
+    - readout
+    - writein
+    - readin
+    - writeout
 
-3.  **Smb2 Create/Close** in operations/s
+3. **Smb2 Create/Close** in operations/s
 
-    -   create
-    -   close
+    - create
+    - close
 
-4.  **Smb2 Info** in operations/s
+4. **Smb2 Info** in operations/s
 
-    -   getinfo
-    -   setinfo
+    - getinfo
+    - setinfo
 
-5.  **Smb2 Find** in operations/s
+5. **Smb2 Find** in operations/s
 
-    -   find
+    - find
 
-6.  **Smb2 Notify** in operations/s
+6. **Smb2 Notify** in operations/s
 
-    -   notify
+    - notify
 
-7.  **Smb2 Lesser Ops** as counters
+7. **Smb2 Lesser Ops** as counters
 
-    -   tcon
-    -   negprot
-    -   tdis
-    -   cancel
-    -   logoff
-    -   flush
-    -   lock
-    -   keepalive
-    -   break
-    -   sessetup
+    - tcon
+    - negprot
+    - tdis
+    - cancel
+    - logoff
+    - flush
+    - lock
+    - keepalive
+    - break
+    - sessetup
 
 ## prerequisite
 
-This module uses `smbstatus` which can only be executed by root.  It uses
-`sudo` and assumes that it is configured such that the `netdata` user can
-execute `smbstatus` as root without password.
+This module uses `smbstatus` which can only be executed by root. It uses
+`sudo` and assumes that it is configured such that the `netdata` user can execute `smbstatus` as root without password.
 
 Add to `sudoers`:
 
@@ -81,8 +80,8 @@ netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
 samba: yes
 ```
 
-Edit the `python.d/samba.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `python.d/samba.conf` configuration file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
