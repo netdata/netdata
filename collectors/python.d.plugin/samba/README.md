@@ -6,7 +6,11 @@ sidebar_label: "Samba"
 
 # Samba monitoring with Netdata
 
-Monitors the performance metrics of Samba file sharing.
+Monitors the performance metrics of Samba file sharing using `smbstatus` command-line tool.
+
+Executed commands:
+
+- `sudo -n smbstatus -P`
 
 ## Requirements
 
@@ -14,9 +18,36 @@ Monitors the performance metrics of Samba file sharing.
 - `sudo` program
 - `smbd` must be compiled with profiling enabled
 - `smbd` must be started either with the `-P 1` option or inside `smb.conf` using `smbd profiling level`
-- `netdata` user needs to be able to sudo the `smbstatus` program without password
 
-It produces the following charts:
+The module uses `smbstatus`, which can only be executed by `root`. It uses
+`sudo` and assumes that it is configured such that the `netdata` user can execute `smbstatus` as root without a
+password.
+
+- add to the `sudoers`
+
+```bash
+netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
+```
+
+- reset netdata systemd
+  unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
+  distributions with systemd)
+
+Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in general.
+
+> :warning: Resetting it is not an optimal solution,
+> but we couldn't find exact set of capabilities to execute smbstatus with sudo.
+
+As the `root` user do the following:
+
+```cmd
+mkdir /etc/systemd/system/netdata.service.d
+echo -e '[Service]\nCapabilityBoundingSet=~' | tee /etc/systemd/system/netdata.service.d/unset-capability-bounding-set.conf
+systemctl daemon-reload
+systemctl restart netdata.service
+```
+
+## Charts
 
 1. **Syscall R/Ws** in kilobytes/s
 
@@ -61,20 +92,9 @@ It produces the following charts:
     - break
     - sessetup
 
-## prerequisite
-
-This module uses `smbstatus` which can only be executed by root. It uses
-`sudo` and assumes that it is configured such that the `netdata` user can execute `smbstatus` as root without password.
-
-Add to `sudoers`:
-
-```
-netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
-```
-
 ## Configuration
 
-**samba** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+`samba` is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
 samba: yes
