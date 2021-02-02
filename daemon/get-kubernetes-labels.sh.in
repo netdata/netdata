@@ -37,5 +37,5 @@ if ! KUBE_SYSTEM_NS_UID=$(jq -r '.metadata.uid' <<< "$KUBE_SYSTEM_NS_DATA" 2>&1)
   exit 1
 fi
 
-echo -e "$POD_LABELS" "\n" "k8s_cluster_id:$KUBE_SYSTEM_NS_UID"
+echo -e "$POD_LABELS\nk8s_cluster_id:$KUBE_SYSTEM_NS_UID"
 exit 0
