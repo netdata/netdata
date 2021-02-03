@@ -34,17 +34,11 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.28.0, December 18, 2020**
+> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.29.0, February 2, 2021**
 >
-> Release v1.28.0 is a hotfix release to address a deadlock in the Netdata Agent. We intended to release this hotfix as 
-> v1.27.1, but we can't backtrack on a release once we've begun to publish new Docker images and binary packages on 
-> other platforms.
->
-> **v1.27.0, December 17, 2020**
->
-> The v1.27.0 release of the Netdata Agent brings dramatic improvements to long-term metrics storage via the database 
-> engine, and new dashboard features like a time & date picker for visualizing precise timeframes. Two new collectors 
-> bring incredible new value to existing features, including a bit of machine learning magic.
+> The v1.29.0 release of the Netdata Agent is a maintenance release that brings incremental but necessary improvements 
+> that make your monitoring experience more robust. We've pushed improvements and bug fixes to the installation and 
+> update scripts, enriched our library of collectors, and focused on fixing bugs reported by the community.
 
 ## Menu
 
