@@ -430,17 +430,22 @@ static int aclk_block_till_recon_allowed() {
  *          >0 - netdata_exit
  */
 #define CLOUD_BASE_URL_READ_RETRY 30
+#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
+#define ACLK_SSL_FLAGS MQTT_WSS_SSL_ALLOW_SELF_SIGNED
+#else
+#define ACLK_SSL_FLAGS MQTT_WSS_SSL_CERT_CHECK_FULL
+#endif
 static int aclk_attempt_to_connect(mqtt_wss_client client)
 {
     char *aclk_hostname = NULL;
     int aclk_port;
 
+#ifndef ACLK_DISABLE_CHALLENGE
     char *mqtt_otp_user = NULL;
     char *mqtt_otp_pass = NULL;
-
-#ifndef ACLK_DISABLE_CHALLENGE
-    json_object *lwt;
 #endif
+
+    json_object *lwt;
 
     while (!netdata_exit) {
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
@@ -459,27 +464,28 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             sleep(CLOUD_BASE_URL_READ_RETRY);
             continue;
         }
-#ifndef ACLK_DISABLE_CHALLENGE
-        aclk_get_mqtt_otp(aclk_private_key, aclk_hostname, aclk_port, &mqtt_otp_user, &mqtt_otp_pass);
-        lwt = aclk_generate_disconnect(NULL);
+
         struct mqtt_connect_params mqtt_conn_params = {
-            .clientid   = mqtt_otp_user,
-            .username   = mqtt_otp_user,
-            .password   = mqtt_otp_pass,
+            .clientid   = "anon",
+            .username   = "anon",
+            .password   = "anon",
             .will_topic = aclk_get_topic(ACLK_TOPICID_METADATA),
-            .will_msg   = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN),
+            .will_msg   = NULL,
             .will_flags = MQTT_WSS_PUB_QOS2,
             .keep_alive = 60
         };
+#ifndef ACLK_DISABLE_CHALLENGE
+        aclk_get_mqtt_otp(aclk_private_key, aclk_hostname, aclk_port, &mqtt_otp_user, &mqtt_otp_pass);
+        mqtt_conn_params.clientid = mqtt_otp_user;
+        mqtt_conn_params.username = mqtt_otp_user;
+        mqtt_conn_params.password = mqtt_otp_pass;
+#endif
+
+        lwt = aclk_generate_disconnect(NULL);
+        mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
+
         mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
-#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
-        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
-#else
-        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, MQTT_WSS_SSL_CERT_CHECK_FULL)) {
-#endif
-#else
-        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, "anon", "anon")) {
-#endif
+        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, ACLK_SSL_FLAGS)) {
             freez(aclk_hostname);
             info("MQTTWSS connection succeeded");
             mqtt_connected_actions(client);
@@ -488,9 +494,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         error("Connect failed\n");
     }
-#ifndef ACLK_DISABLE_CHALLENGE
     json_object_put(lwt);
-#endif
 
     freez(aclk_hostname);
     return 1;
