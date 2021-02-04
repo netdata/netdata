@@ -1,8 +1,16 @@
 # Changelog
 
-## [v](https://github.com/netdata/netdata/tree/v) (2021-02-03)
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.28.0...v)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.0...HEAD)
+
+**Merged pull requests:**
+
+- Update latest release on main README [\#10590](https://github.com/netdata/netdata/pull/10590) ([joelhans](https://github.com/joelhans))
+
+## [v1.29.0](https://github.com/netdata/netdata/tree/v1.29.0) (2021-02-03)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.28.0...v1.29.0)
 
 **Merged pull requests:**
 
@@ -225,8 +233,6 @@
 - Add missing period in netdata dashboard [\#9960](https://github.com/netdata/netdata/pull/9960) ([hydrogen-mvm](https://github.com/hydrogen-mvm))
 - Fixed chart's last accessed time during context queries [\#9952](https://github.com/netdata/netdata/pull/9952) ([stelfrag](https://github.com/stelfrag))
 - adds missing file netdata.crontab to gitignore [\#9946](https://github.com/netdata/netdata/pull/9946) ([underhood](https://github.com/underhood))
-- Updated RPM spec file to use automatic dependency list generation. [\#9937](https://github.com/netdata/netdata/pull/9937) ([Ferroin](https://github.com/Ferroin))
-- Add information about Cloud disabled status to `-W buildinfo`. [\#9936](https://github.com/netdata/netdata/pull/9936) ([underhood](https://github.com/underhood))
 
 ## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
 
