@@ -391,7 +391,6 @@ STACKPULSE_WEBHOOK=
 
 # opsgenie configs
 OPSGENIE_API_KEY=
-OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
 
 # load the stock and user configuration files
 # these will overwrite the variables above
@@ -411,6 +410,8 @@ else
     fi
   done
 fi
+
+OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
