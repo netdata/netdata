@@ -31,6 +31,7 @@ struct aclk_query_threads {
 struct aclk_cloud_req_v2 {
     char *data;
     RRDHOST *host;
+    char *query_endpoint;
 };
 
 void *aclk_query_main_thread(void *ptr);
