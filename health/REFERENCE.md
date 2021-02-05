@@ -391,7 +391,7 @@ repeat: [off] [warning DURATION] [critical DURATION]
 The only possible value for the `option` line is
 
 ```yaml
-option: no-clear-notification
+options: no-clear-notification
 ```
 
 For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an
