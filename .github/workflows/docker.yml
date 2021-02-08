@@ -17,7 +17,7 @@ on:
     inputs:
       version:
         name: Version Tag
-        default: latest
+        default: nightly
         required: true
 jobs:
   docker-build:

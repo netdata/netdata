@@ -353,7 +353,9 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
 
     - name: Trigger Docker image build and publish
-      script: .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}"
+      script:
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+        - .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
 
     - stage: Trigger deb and rpm package build (release)
