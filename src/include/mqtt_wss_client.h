@@ -53,6 +53,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
 void mqtt_wss_destroy(mqtt_wss_client client);
 
 struct mqtt_connect_params;
+struct mqtt_wss_proxy;
 
 #define MQTT_WSS_SSL_CERT_CHECK_FULL   0x00
 #define MQTT_WSS_SSL_ALLOW_SELF_SIGNED 0x01
@@ -63,8 +64,9 @@ struct mqtt_connect_params;
  * @param host to connect to (where MQTT over WSS server is listening)
  * @param port to connect to (where MQTT over WSS server is listening)
  * @param mqtt_params pointer to mqtt_connect_params structure which contains MQTT credentials and settings
+ * @param ssl_flags parameters for OpenSSL, 0=MQTT_WSS_SSL_CERT_CHECK_FULL
  */
-int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags);
+int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags, struct mqtt_wss_proxy *proxy);
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
@@ -87,6 +89,17 @@ struct mqtt_connect_params {
     enum mqtt_wss_publish_flags will_flags;
     size_t will_msg_len;
     int keep_alive;
+};
+
+enum mqtt_wss_proxy_type {
+    MQTT_WSS_DIRECT = 0,
+    MQTT_WSS_PROXY_HTTP
+};
+
+struct mqtt_wss_proxy {
+    enum mqtt_wss_proxy_type type;
+    const char *host;
+    int port;
 };
 
 /* Publishes MQTT message

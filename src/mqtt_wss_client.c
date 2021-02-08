@@ -66,8 +66,15 @@ struct mqtt_wss_client {
 
     mqtt_wss_log_ctx_t log;
 
-    char *host;
+// immediate connection (e.g. proxy server)
+    char *host; 
     int port;
+
+// target of connection (e.g. where we want to connect to)
+    char *target_host;
+    int target_port;
+
+    enum mqtt_wss_proxy_type proxy_type;
 
 // nonblock IO related
     int sockfd;
@@ -181,7 +188,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
 
-    client->ws_client = ws_client_new(0, &client->host, log);
+    client->ws_client = ws_client_new(0, &client->target_host, log);
     if (!client->ws_client) {
         mws_error(log, "Error creating ws_client");
         goto fail_1;
@@ -260,7 +267,12 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 
     // deleted after client->ws_client
     // as it "borrows" this pointer and might use it
-    free(client->host);
+    if (client->target_host == client->host)
+        client->target_host = NULL;
+    if (client->target_host)
+        free(client->target_host);
+    if (client->host)
+        free(client->host);
 
     if (client->ssl)
         SSL_free(client->ssl);
@@ -311,12 +323,141 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     return preverify_ok;
 }
 
-int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags)
+#define PROXY_CONNECT "CONNECT"
+#define PROXY_HTTP "HTTP/1.1"
+#define HTTP_ENDLINE "\x0D\x0A"
+#define HTTP_HDR_TERMINATOR "\x0D\x0A\x0D\x0A"
+#define HTTP_CODE_LEN 4
+#define HTTP_REASON_MAX_LEN 512
+static int http_parse_reply(mqtt_wss_client client, rbuf_t buf)
+{
+    char *ptr;
+    char http_code_s[4];
+    int http_code;
+    int idx;
+
+    if (rbuf_memcmp_n(buf, PROXY_HTTP, strlen(PROXY_HTTP))) {
+        mws_error(client->log, "http_proxy expected reply with \"" PROXY_HTTP "\"");
+        return 1;
+    }
+
+    rbuf_bump_tail(buf, strlen(PROXY_HTTP));
+
+    if (!rbuf_pop(buf, http_code_s, 1) || http_code_s[0] != 0x20) {
+        mws_error(client->log, "http_proxy missing space after \"" PROXY_HTTP "\"");
+        return 2;
+    }
+
+    if (!rbuf_pop(buf, http_code_s, HTTP_CODE_LEN)) {
+        mws_error(client->log, "http_proxy missing HTTP code");
+        return 3;
+    }
+
+    for (int i = 0; i < HTTP_CODE_LEN - 1; i++)
+        if (http_code_s[i] > 0x39 || http_code_s[i] < 0x30) {
+            mws_error(client->log, "http_proxy HTTP code non numeric");
+            return 4;
+        }
+
+    http_code_s[HTTP_CODE_LEN - 1] = 0;
+    http_code = atoi(http_code_s);
+
+    // TODO check if we ever have more headers here
+    rbuf_find_bytes(buf, HTTP_ENDLINE, strlen(HTTP_ENDLINE), &idx);
+    if (idx >= HTTP_REASON_MAX_LEN) {
+        mws_error(client->log, "http_proxy returned reason that is too long");
+        return 5;
+    }
+
+    if (http_code != 200) {
+        ptr = malloc(idx + 1);
+        if (!ptr)
+            return 6;
+        rbuf_pop(buf, ptr, idx);
+        ptr[idx] = 0;
+
+        mws_error(client->log, "http_proxy returned error code %d \"%s\"", http_code, ptr);
+        free(ptr);
+        return 7;
+    }/* else
+        rbuf_bump_tail(buf, idx);*/
+
+    rbuf_find_bytes(buf, HTTP_HDR_TERMINATOR, strlen(HTTP_HDR_TERMINATOR), &idx);
+    if (idx)
+        rbuf_bump_tail(buf, idx);
+
+    rbuf_bump_tail(buf, strlen(HTTP_HDR_TERMINATOR));
+
+    if (rbuf_bytes_available(buf)) {
+        mws_error(client->log, "http_proxy unexpected trailing bytes after end of HTTP hdr");
+        return 8;
+    }
+
+    mws_debug(client->log, "http_proxy CONNECT succeeded");
+    return 0;
+}
+
+static int http_proxy_connect(mqtt_wss_client client)
+{
+    int rc;
+    struct pollfd poll_fd;
+    rbuf_t r_buf = rbuf_create(4096);
+    if (!r_buf)
+        return 1;
+    char *r_buf_ptr;
+    size_t r_buf_linear_insert_capacity;
+
+    poll_fd.fd = client->sockfd;
+    poll_fd.events = POLLIN;
+
+    r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
+    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_HDR_TERMINATOR, PROXY_CONNECT, client->target_host, client->target_port, PROXY_HTTP);
+    write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
+
+    // read until you find CRLF, CRLF (HTTP HDR end)
+    // or ring buffer is full
+    // or timeout
+    while ((rc = poll(&poll_fd, 1, 1000)) >= 0) {
+        if (!rc) {
+            mws_error(client->log, "http_proxy timeout waiting reply from proxy server");
+            rc = 2;
+            goto cleanup;
+        }
+        r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
+        if (!r_buf_ptr) {
+            mws_error(client->log, "http_proxy read ring buffer full");
+            rc = 3;
+            goto cleanup;
+        }
+        if ((rc = read(client->sockfd, r_buf_ptr, r_buf_linear_insert_capacity)) < 0) {
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                continue;
+            }
+            mws_error(client->log, "http_proxy error reading from socket \"%s\"", strerror(errno));
+            rc = 4;
+            goto cleanup;
+        }
+        rbuf_bump_head(r_buf, rc);
+        if (rbuf_find_bytes(r_buf, HTTP_HDR_TERMINATOR, strlen(HTTP_HDR_TERMINATOR), &rc)) {
+            rc = 0;
+            if (http_parse_reply(client, r_buf))
+                rc = 5;
+
+            goto cleanup;
+        }
+    }
+    mws_error(client->log, "proxy negotiation poll error \"%s\"", strerror(errno));
+    rc = 5;
+cleanup:
+    rbuf_free(r_buf);
+    return rc;
+}
+
+int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags, struct mqtt_wss_proxy *proxy)
 {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
 
     struct hostent *he;
     struct in_addr **addr_list;
@@ -332,16 +473,31 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     client->mqtt_disconnecting = 0;
     ws_client_reset(client->ws_client);
 
-    if(client->host)
+    if (client->target_host == client->host)
+        client->target_host = NULL;
+    if (client->target_host)
+        free(client->target_host);
+    if (client->host)
         free(client->host);
-    client->host = strdup(host);
-    client->port = port;
+
+    if (proxy && proxy->type != MQTT_WSS_DIRECT) {
+        client->host = strdup(proxy->host);
+        client->port = proxy->port;
+        client->target_host = strdup(host);
+        client->target_port = port;
+        client->proxy_type = proxy->type;
+    } else {
+        client->host = strdup(host);
+        client->port = port;
+        client->target_host = client->host;
+        client->target_port = port;
+    }
 
     client->ssl_flags = ssl_flags;
 
     //TODO gethostbyname -> getaddinfo
     //     hstrerror -> gai_strerror
-    if ((he = gethostbyname(host)) == NULL) {
+    if ((he = gethostbyname(client->host)) == NULL) {
         mws_error(client->log, "gethostbyname() error \"%s\"", hstrerror(h_errno));
         return -1;
     }
@@ -353,6 +509,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     }
     mws_debug(client->log, "Resolved IP: %s", inet_ntoa(*addr_list[0]));
     addr.sin_addr = *addr_list[0];
+    addr.sin_port = htons(client->port);
 
     if (client->sockfd > 0)
         close(client->sockfd);
@@ -372,13 +529,17 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
        mws_error(client->log, "Could not dissable NAGLE");
 
     if (connect(client->sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        mws_error(client->log, "Could not connect to remote endpoint \"%s\", port %d.\n", host, port);
+        mws_error(client->log, "Could not connect to remote endpoint \"%s\", port %d.\n", client->host, client->port);
         return -3;
     }
 
     client->poll_fds[POLLFD_SOCKET].fd = client->sockfd;
 
     fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK);
+
+    if (client->proxy_type != MQTT_WSS_DIRECT)
+        if (http_proxy_connect(client))
+            return -4;
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 #if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)

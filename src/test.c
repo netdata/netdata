@@ -53,7 +53,13 @@ int client_handle(mqtt_wss_client client)
         .keep_alive = 10
     };
 
-    while (mqtt_wss_connect(client, "127.0.0.1", port, &params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED)) {
+/*    struct mqtt_wss_proxy proxy = {
+        .host = "127.0.0.1",
+        .port = 3128,
+        .type = MQTT_WSS_PROXY_HTTP
+    };*/
+
+    while (mqtt_wss_connect(client, "127.0.0.1", port, &params, MQTT_WSS_SSL_ALLOW_SELF_SIGNED, NULL /*&proxy*/)) {
         printf("Connect failed\n");
         sleep(1);
         printf("Attempting Reconnect\n");
