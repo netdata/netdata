@@ -204,7 +204,7 @@ self_update() {
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
-      exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)" 
+      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update --tmpdir-path "$(pwd)"
     else
       echo >&3 "Failed to download newest version of updater script, continuing with current version."
     fi
