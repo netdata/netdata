@@ -65,6 +65,20 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
+void *analytics_thread(void *ptr) {
+
+    debug(D_MANOLIS, "Analytics thread starts");
+
+    sleep(10); /* TODO: decide how long to wait... */
+
+    setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
+
+    if (netdata_anonymous_statistics_enabled > 0)
+        send_statistics("META", "-", "-");
+
+    return NULL;
+}
+
 struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_CHECKS
@@ -89,6 +103,7 @@ struct netdata_static_thread static_threads[] = {
     {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"ANALYTICS",            NULL,                    NULL,         1, NULL, NULL, analytics_thread}, //DO NOT START IF USER HAS OPTED OUT
 
     NETDATA_PLUGIN_HOOK_PLUGINSD
     NETDATA_PLUGIN_HOOK_HEALTH
@@ -694,6 +709,27 @@ static void get_system_timezone(void) {
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
 }
 
+void set_late_global_environment() {
+
+    setenv("NETDATA_CONFIG_STREAM_ENABLED"        , default_rrdpush_enabled ? "true" : "false",        1);
+    setenv("NETDATA_CONFIG_MEMORY_MODE"           , rrd_memory_mode_name(default_rrd_memory_mode), 1);
+
+    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
+    setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"    , "N/A", 1);
+
+#ifdef ENABLE_DBENGINE
+    {
+        char b[16];
+        snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
+        setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"        , b,        1);
+
+        snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
+        setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"     , b,        1);
+    }
+#endif
+
+}
+
 void set_global_environment() {
     {
         char b[16];
@@ -714,6 +750,13 @@ void set_global_environment() {
     setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
+
+    /* Maybe add default values for the late_global_enviroment here */
+    /* In case of an exit with error */
+    setenv("NETDATA_CONFIG_STREAM_ENABLED"        , "N/A", 1);
+    setenv("NETDATA_CONFIG_IS_PARENT"             , "N/A", 1);
+    setenv("NETDATA_CONFIG_MEMORY_MODE"           , "N/A", 1);
+    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
@@ -1495,6 +1538,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+
+    set_late_global_environment();
 
     send_statistics("START", "-",  "-");
 
