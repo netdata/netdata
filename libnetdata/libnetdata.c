@@ -1406,7 +1406,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     if (!dir) {
         error("CONFIG cannot open stock config directory '%s'.", sdir);
     }
-    else {
+    else if (strcmp(udir, sdir)) {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
             if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
