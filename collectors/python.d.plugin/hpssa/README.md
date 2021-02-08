@@ -17,7 +17,7 @@ Executed commands:
 This module uses `ssacli`, which can only be executed by root. It uses
 `sudo` and assumes that it is configured such that the `netdata` user can execute `ssacli` as root without a password.
 
-- add to the `/etc/sudoers`
+- Add to your `/etc/sudoers` file:
 
 `which ssacli` shows the full path to the binary.
 
