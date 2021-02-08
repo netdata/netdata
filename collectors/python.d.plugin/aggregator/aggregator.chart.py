@@ -136,12 +136,12 @@ class Service(SimpleService):
                     data_chart[out_dim] = ( sum(x) / len(x) ) * 1000
 
             self.validate_charts(
-                name=out_chart, 
-                title=out_chart, 
-                units=self.chart_defs.get(chart,{'units':''}).get('units'), 
-                family=chart.replace('.','_'), 
-                context=out_chart, 
-                chart_type=self.chart_defs.get(chart,{'chart_type':'line'}).get('chart_type'), 
+                name=out_chart,
+                title=out_chart,
+                units=self.chart_defs.get(chart,{'units':''}).get('units'),
+                family=chart.replace('.','_'),
+                context=out_chart,
+                chart_type=self.chart_defs.get(chart,{'chart_type':'line'}).get('chart_type'),
                 data=data_chart,
                 divisor=1000
             )
@@ -151,17 +151,17 @@ class Service(SimpleService):
         return data
 
     def reset_data(self):
-        """Reset list of metrics for each chart to be empty. 
+        """Reset list of metrics for each chart to be empty.
         """
         self.allmetrics_list = {c: {} for c in self.charts_to_agg}
 
     def get_data(self):
 
-        self.get_children_to_agg()      
+        self.get_children_to_agg()
 
         if len(self.children) > 0:
             self.scrape_children()
-            self.append_metrics()            
+            self.append_metrics()
             data = self.aggregate_data()
             self.reset_data()
 
