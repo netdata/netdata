@@ -35,7 +35,7 @@ Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in 
 > :warning: Resetting it is not an optimal solution,
 > but we couldn't find exact set of capabilities to execute arcconf with sudo.
 
-As the `root` user do the following:
+As the `root` user, do the following:
 
 ```cmd
 mkdir /etc/systemd/system/netdata.service.d
