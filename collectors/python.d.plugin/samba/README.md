@@ -37,8 +37,6 @@ netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
 
 The default CapabilityBoundingSet doesn't allow using `sudo`, and is quite strict in general. Resetting is not optimal, but a next-best solution given the inability to execute `arcconf` using `sudo`.
 
-> :warning: Resetting it is not an optimal solution,
-> but we couldn't find exact set of capabilities to execute smbstatus with sudo.
 
 As the `root` user, do the following:
 
