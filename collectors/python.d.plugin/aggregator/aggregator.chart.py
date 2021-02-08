@@ -74,15 +74,14 @@ class Service(SimpleService):
 
     def get_children_to_agg(self):
         """Define the list of children to aggregate over.
-        """
-        if len(self.children) <= 1 or self.runs_counter % self.refresh_children_every_n == 0:
-            self.children = self.get_children()
-            if self.child_contains:
-                self.children = [child for child in self.children if any(c in child for c in self.child_contains.split(','))]
-            if self.child_not_contains:
-                self.children = [child for child in self.children if not any(c in child for c in self.child_not_contains.split(','))]
-            self.chart_defs = self.get_charts(child=self.children[0])
-            self.info('aggregating data from {}'.format(self.children))
+        """        
+        self.children = self.get_children()
+        if self.child_contains:
+            self.children = [child for child in self.children if any(c in child for c in self.child_contains.split(','))]
+        if self.child_not_contains:
+            self.children = [child for child in self.children if not any(c in child for c in self.child_not_contains.split(','))]
+        self.chart_defs = self.get_charts(child=self.children[0])
+        self.info('aggregating data from {}'.format(self.children))
 
     def get_allmetrics(self, child):
         """Get allmetrics data into a json dictionary.
@@ -157,7 +156,8 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        self.get_children_to_agg()
+        if len(self.children) <= 1 or self.runs_counter % self.refresh_children_every_n == 0:
+            self.get_children_to_agg()
 
         if len(self.children) > 0:
             self.scrape_children()
