@@ -26,7 +26,7 @@ The module uses `megacli`, which can only be executed by `root`. It uses
 netdata ALL=(root)       NOPASSWD: /path/to/megacli
 ```
 
-- reset netdata systemd
+- Reset Netdata's systemd
   unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
   distributions with systemd)
 
