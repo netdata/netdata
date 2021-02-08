@@ -31,7 +31,7 @@ netdata ALL=(root)       NOPASSWD: /path/to/ssacli
 
 The default CapabilityBoundingSet doesn't allow using `sudo`, and is quite strict in general. Resetting is not optimal, but a next-best solution given the inability to execute `arcconf` using `sudo`.
 
-As the `root` user do the following:
+As the `root` user, do the following:
 
 ```cmd
 mkdir /etc/systemd/system/netdata.service.d
