@@ -29,10 +29,7 @@ netdata ALL=(root)       NOPASSWD: /path/to/ssacli
   unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
   distributions with systemd)
 
-Default CapabilityBoundingSet doesn't allow using `sudo` and is quite strict in general.
-
-> :warning: Resetting it is not an optimal solution,
-> but we couldn't find exact set of capabilities to execute ssacli with sudo.
+The default CapabilityBoundingSet doesn't allow using `sudo`, and is quite strict in general. Resetting is not optimal, but a next-best solution given the inability to execute `arcconf` using `sudo`.
 
 As the `root` user do the following:
 
