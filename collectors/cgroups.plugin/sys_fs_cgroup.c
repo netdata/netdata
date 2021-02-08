@@ -3937,9 +3937,10 @@ static void cgroup_main_cleanup(void *ptr) {
 
     if (!discovery_thread.exited) {
         info("stopping discovery thread worker");
-        uv_mutex_unlock(&discovery_thread.mutex);
+        uv_mutex_lock(&discovery_thread.mutex);
         discovery_thread.start_discovery = 1;
         uv_cond_signal(&discovery_thread.cond_var);
+        uv_mutex_unlock(&discovery_thread.mutex);
     }
 
     while (!discovery_thread.exited && max > 0) {
