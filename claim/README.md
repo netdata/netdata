@@ -80,12 +80,12 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Claim an Agent running in Docker
 
-The claiming process works with the Netdata Agent running inside of a Docker container. You can either set a
-specific set of environment variables in the container to have it automatically claimed on startup or restart,
-or you can use `docker exec` to manually claim an already-running container.
+To claim an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
+variables in the container to have it automatically claimed on startup or restart, or use `docker exec` to manually
+claim an already running container.
 
-For claiming to work, the contents of `/var/lib/netdata` _must_ be preserved across container restarts
-using a persistent volume.  See our [recommended `docker run` and Docker Compose
+For claiming to work, the contents of `/var/lib/netdata` _must_ be preserved across container
+restarts using a persistent volume.  See our [recommended `docker run` and Docker Compose
 examples](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
 #### Using environment variables
@@ -116,7 +116,7 @@ docker run -d --name=netdata \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
   -e NETDATA_CLAIM_TOKEN=TOKEN \
-  -e NETDATA_CLAIM_URL=https://app.netdata.cloud \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
   -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
