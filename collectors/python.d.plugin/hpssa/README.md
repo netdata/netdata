@@ -25,7 +25,7 @@ This module uses `ssacli`, which can only be executed by root. It uses
 netdata ALL=(root)       NOPASSWD: /path/to/ssacli
 ```
 
-- reset netdata systemd
+- Reset Netdata's systemd
   unit [CapabilityBoundingSet](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Capabilities) (Linux
   distributions with systemd)
 
