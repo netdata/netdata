@@ -314,8 +314,10 @@ update() {
       do_not_start="--dont-start-it"
     fi
 
+    env="TMPDIR='${TMPDIR}'"
+
     if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
-      env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
+      env="${env} NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
     if [ ! -x ./netdata-installer.sh ]; then
