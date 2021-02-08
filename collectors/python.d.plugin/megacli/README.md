@@ -18,7 +18,7 @@ Executed commands:
 The module uses `megacli`, which can only be executed by `root`. It uses
 `sudo` and assumes that it is configured such that the `netdata` user can execute `megacli` as root without a password.
 
-- add to the `/etc/sudoers`
+- Add to your `/etc/sudoers` file:
 
 `which megacli` shows the full path to the binary.
 
