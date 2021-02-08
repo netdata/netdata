@@ -583,6 +583,12 @@ netdataDashboard.menu = {
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
 
+    'aggregator': {
+        title: 'Aggregator',
+        icon: '<i class="fas fa-layer-group"></i>',
+        info: 'Aggregate child nodes into single charts. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/aggregator/README.md" target="_blank">here</a>.'
+    },
+
 };
 
 

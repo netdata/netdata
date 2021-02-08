@@ -40,6 +40,7 @@ dist_pythonconfig_DATA = \
     $(NULL)
 
 include adaptec_raid/Makefile.inc
+include aggregator/Makefile.inc
 include alarms/Makefile.inc
 include am2320/Makefile.inc
 include anomalies/Makefile.inc
