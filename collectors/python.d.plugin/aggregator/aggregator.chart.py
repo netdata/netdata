@@ -32,7 +32,8 @@ class Service(SimpleService):
         }
         self.refresh_children_every_n = self.configuration.get('refresh_children_every_n', 60)
         self.children = []
-        self.chart_defs = self.get_charts()
+        self.parent_chart_defs = self.get_charts()
+        self.child_chart_defs = self.get_charts()
         self.allmetrics = {}
         self.allmetrics_list = {c: {} for c in self.charts_to_agg}
 
@@ -80,7 +81,7 @@ class Service(SimpleService):
             self.children = [child for child in self.children if any(c in child for c in self.child_contains.split(','))]
         if self.child_not_contains:
             self.children = [child for child in self.children if not any(c in child for c in self.child_not_contains.split(','))]
-        self.chart_defs = self.get_charts(child=self.children[0])
+        self.child_chart_defs = self.get_charts(child=self.children[0])
         self.info('aggregating data from {}'.format(self.children))
 
     def get_allmetrics(self, child):
@@ -137,10 +138,10 @@ class Service(SimpleService):
             self.validate_charts(
                 name=out_chart,
                 title=out_chart,
-                units=self.chart_defs.get(chart,{'units':''}).get('units'),
+                units=self.child_chart_defs.get(chart,self.parent_chart_defs).get('units',''),
                 family=chart.replace('.','_'),
                 context=out_chart,
-                chart_type=self.chart_defs.get(chart,{'chart_type':'line'}).get('chart_type'),
+                chart_type=self.child_chart_defs.get(chart,self.parent_chart_defs).get('chart_type','line'),
                 data=data_chart,
                 divisor=1000
             )
