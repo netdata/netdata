@@ -1026,9 +1026,10 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     int stock_enabled = (int)config_get_boolean(CONFIG_SECTION_HEALTH, "enable stock health configuration",
                                                 CONFIG_BOOLEAN_YES);
 
-    if (!stock_enabled)
+    if (!stock_enabled) {
         info("Netdata will not load stock alarms.");
+        stock_path = user_path;
+    }
 
-    const char *stock_arg = (stock_enabled)?stock_path:user_path;
-    recursive_config_double_dir_load(user_path, stock_arg, subpath, health_readfile, (void *) host, 0);
+    recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
 }
