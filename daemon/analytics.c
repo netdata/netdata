@@ -13,17 +13,21 @@ struct array_printer {
     BUFFER *module;
 };
 
+extern int aclk_connected;
+
 int collector_counter(void *entry, void *data) {
 
     struct array_printer *ap = (struct array_printer *)data;
+    struct collector *col=(struct collector *) entry;
 
     BUFFER *pl = ap->plugin;
     BUFFER *md = ap->module;
-    struct collector *col=(struct collector *) entry;
 
-    if (unlikely(ap->c!=0)) buffer_strcat(pl, "|");
+    if (likely(ap->c)) {
+        buffer_strcat(pl, "|");
+        buffer_strcat(md, "|");
+    }
     buffer_strcat(pl, col->plugin);
-    if (unlikely(ap->c!=0)) buffer_strcat(md, "|");
     buffer_strcat(md, col->module);
 
     (ap->c)++;
@@ -48,10 +52,10 @@ void *analytics_main(void *ptr) {
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
-                                    .plugin = st->plugin_name ? st->plugin_name : "",
-                                    .module = st->module_name ? st->module_name : ""
+                    .plugin = st->plugin_name ? st->plugin_name : "",
+                    .module = st->module_name ? st->module_name : ""
             };
-            sprintf(name, "%s:%s", col.plugin, col.module);
+            snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
         }
     }
@@ -68,10 +72,36 @@ void *analytics_main(void *ptr) {
     setenv("NETDATA_COLLECTOR_PLUGINS", buffer_tostring(ap.plugin), 1);
     setenv("NETDATA_COLLECTOR_MODULES", buffer_tostring(ap.module), 1);
 
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", ap.c);
+        setenv("NETDATA_COLLECTOR_COUNT"  , b, 1);
+    }
+
+    /* free buffers? */
+
+#ifdef ENABLE_ACLK
+    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "true",  1);
+#else
+    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "false",  1);
+#endif
+    if (is_agent_claimed())
+        setenv("NETDATA_CONFIG_CLAIMED"    , "true",  1);
+    else {
+        setenv("NETDATA_CONFIG_CLAIMED"    , "false",  1);
+    }
+#ifdef ENABLE_ACLK
+    if (aclk_connected)
+        setenv("NETDATA_ACLK_AVAILABLE"    , "true",  1);
+    else
+#endif
+        setenv("NETDATA_ACLK_AVAILABLE"    , "false",  1);
+
     if (netdata_anonymous_statistics_enabled > 0)
         send_statistics("META", "-", "-");
 
-    /* free buffers? */
+
+
     
     return NULL;
 }
@@ -80,9 +110,6 @@ void set_late_global_environment() {
 
     setenv("NETDATA_CONFIG_STREAM_ENABLED"        , default_rrdpush_enabled ? "true" : "false",        1);
     setenv("NETDATA_CONFIG_MEMORY_MODE"           , rrd_memory_mode_name(default_rrd_memory_mode), 1);
-
-    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
-    setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"    , "N/A", 1);
 
 #ifdef ENABLE_DBENGINE
     {
@@ -93,11 +120,15 @@ void set_late_global_environment() {
         snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
         setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"     , b,        1);
     }
+#else
+    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
+    setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"    , "N/A", 1);
 #endif
 
-    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "false", 1);
 #ifdef ENABLE_HTTPS
-    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "true", 1);
+    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "true",  1);
+#else
+    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "false", 1);
 #endif
 
 }
@@ -224,12 +255,25 @@ void set_global_environment() {
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
+#ifdef DISABLE_CLOUD
+    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "false", 1);
+#else
+    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false", 1);
+#endif
+
     /* Maybe add default values for the late_global_enviroment here */
     /* In case of an exit with error */
     setenv("NETDATA_CONFIG_STREAM_ENABLED"        , "N/A", 1);
     setenv("NETDATA_CONFIG_IS_PARENT"             , "N/A", 1);
     setenv("NETDATA_CONFIG_MEMORY_MODE"           , "N/A", 1);
     setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
+    setenv("NETDATA_COLLECTOR_PLUGINS"            , "N/A", 1);
+    setenv("NETDATA_COLLECTOR_MODULES"            , "N/A", 1);
+    setenv("NETDATA_COLLECTOR_COUNT"              , "N/A", 1);
+    setenv("NETDATA_CONFIG_CLOUD_ENABLED"         , "N/A", 1);
+    setenv("NETDATA_CONFIG_CLAIMED"               , "N/A", 1);
+    setenv("NETDATA_ACLK_AVAILABLE"               , "N/A", 1);
+
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
