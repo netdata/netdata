@@ -32,6 +32,8 @@
 
 #include "global_statistics.h"
 
+#include "analytics.h"
+
 // the netdata database
 #include "database/rrd.h"
 
