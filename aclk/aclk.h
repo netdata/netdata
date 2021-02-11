@@ -7,6 +7,7 @@ typedef struct aclk_rrdhost_state {
 } aclk_rrdhost_state;
 
 #include "../daemon/common.h"
+#include "aclk_util.h"
 
 // minimum and maximum supported version of ACLK
 // in this version of agent
@@ -79,17 +80,6 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_id;
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
-
-typedef enum aclk_proxy_type {
-    PROXY_TYPE_UNKNOWN = 0,
-    PROXY_TYPE_SOCKS5,
-    PROXY_TYPE_HTTP,
-    PROXY_DISABLED,
-    PROXY_NOT_SET,
-} ACLK_PROXY_TYPE;
-
-// TODO
-const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
 void aclk_alarm_reload(void);
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);

@@ -54,11 +54,6 @@ void aclk_single_update_enable()
     aclk_disable_single_updates = 0;
 }
 
-const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
-{
-    *type = PROXY_DISABLED;
-    return NULL;
-}
 //ENDTODO
 
 static RSA *aclk_private_key = NULL;
@@ -423,6 +418,45 @@ static int aclk_block_till_recon_allowed() {
     return 0;
 }
 
+#define HTTP_PROXY_PREFIX "http://"
+static void set_proxy(struct mqtt_wss_proxy *out)
+{
+    ACLK_PROXY_TYPE pt;
+    const char *ptr = aclk_get_proxy(&pt);
+    char *tmp;
+    char *host;
+    if (pt != PROXY_TYPE_HTTP)
+        return;
+
+    out->port = 0;
+
+    if (!strncmp(ptr, HTTP_PROXY_PREFIX, strlen(HTTP_PROXY_PREFIX)))
+        ptr += strlen(HTTP_PROXY_PREFIX);
+
+    if ((tmp = strchr(ptr, '@')))
+        ptr = tmp;
+
+    if ((tmp = strchr(ptr, '/'))) {
+        host = mallocz((tmp - ptr) + 1);
+        memcpy(host, ptr, (tmp - ptr));
+        host[tmp - ptr] = 0;
+    } else
+        host = strdupz(ptr);
+
+    if ((tmp = strchr(host, ':'))) {
+        *tmp = 0;
+        tmp++;
+        out->port = atoi(tmp);
+    }
+
+    if (out->port <= 0 || out->port > 65535)
+        out->port = 8080;
+
+    out->host = host;
+
+    out->type = MQTT_WSS_PROXY_HTTP;
+}
+
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
  * @return  0 - Successfull Connection,
@@ -465,6 +499,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
+        struct mqtt_wss_proxy proxy_conf;
+        proxy_conf.type = MQTT_WSS_DIRECT;
+        set_proxy(&proxy_conf);
+
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",
             .username   = "anon",
@@ -485,7 +523,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
 
         mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
-        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, ACLK_SSL_FLAGS)) {
+        if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf)) {
             freez(aclk_hostname);
             info("MQTTWSS connection succeeded");
             mqtt_connected_actions(client);
@@ -518,6 +556,14 @@ void *aclk_main(void *ptr)
 
     struct aclk_query_threads query_threads;
     query_threads.thread_list = NULL;
+
+    ACLK_PROXY_TYPE proxy_type;
+    const char *proxy = aclk_get_proxy(&proxy_type);
+    if (proxy_type == PROXY_TYPE_SOCKS5) {
+        error("SOCKS5 proxy is not supported by ACLK-NG yet.");
+        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+        return NULL;
+    }
 
     // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
     // as it must notify the far end that it shutdown gracefully and avoid the LWT.
