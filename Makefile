@@ -16,15 +16,12 @@ CFLAGS = -Wextra -Wall `pkg-config --cflags openssl`
 BUILD_DIR = build
 
 # dir having our version of mqtt_pal.h must preceede dir of MQTT-C to override this hdr
-INCLUDES = -Isrc/include -Ibase64 -Ic-rbuf/include -Imqtt/include -IMQTT-C/include
+INCLUDES = -Isrc/include -Ic-rbuf/include -Imqtt/include -IMQTT-C/include
 
 all: test
 
 c-rbuf/build/ringbuffer.o:
 	cd c-rbuf && $(MAKE) build/ringbuffer.o
-
-$(BUILD_DIR)/base64.o: base64/base64.c base64/base64.h
-	$(CC) -o $(BUILD_DIR)/base64.o -c base64/base64.c $(CFLAGS)
 
 $(BUILD_DIR)/ws_client.o: src/ws_client.c src/include/ws_client.h src/include/common_internal.h
 	$(CC) -o $(BUILD_DIR)/ws_client.o -c src/ws_client.c $(CFLAGS) $(INCLUDES)
@@ -38,8 +35,8 @@ $(BUILD_DIR)/mqtt_wss_log.o: src/mqtt_wss_log.c src/include/mqtt_wss_log.h
 $(BUILD_DIR)/mqtt_wss_client.o: src/mqtt_wss_client.c src/include/mqtt_wss_client.h src/include/ws_client.h MQTT-C/include/mqtt.h src/include/common_internal.h
 	$(CC) -o $(BUILD_DIR)/mqtt_wss_client.o -c src/mqtt_wss_client.c $(CFLAGS) $(INCLUDES)
 
-libmqttwebsockets.a: $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o $(BUILD_DIR)/base64.o c-rbuf/build/ringbuffer.o $(BUILD_DIR)/mqtt.o $(BUILD_DIR)/mqtt_wss_log.o
-	ar rcs libmqttwebsockets.a $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o $(BUILD_DIR)/base64.o c-rbuf/build/ringbuffer.o $(BUILD_DIR)/mqtt.o $(BUILD_DIR)/mqtt_wss_log.o
+libmqttwebsockets.a: $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o c-rbuf/build/ringbuffer.o $(BUILD_DIR)/mqtt.o $(BUILD_DIR)/mqtt_wss_log.o
+	ar rcs libmqttwebsockets.a $(BUILD_DIR)/mqtt_wss_client.o $(BUILD_DIR)/ws_client.o c-rbuf/build/ringbuffer.o $(BUILD_DIR)/mqtt.o $(BUILD_DIR)/mqtt_wss_log.o
 
 test: $(BUILD_DIR)/test.o libmqttwebsockets.a
 	$(CC) -o test $(BUILD_DIR)/test.o libmqttwebsockets.a `pkg-config --libs openssl` -lpthread

@@ -20,8 +20,6 @@
 
 #include <openssl/evp.h>
 
-#include <base64.h>
-
 #include "ws_client.h"
 #include "common_internal.h"
 
@@ -156,7 +154,7 @@ int ws_client_start_handshake(ws_client *client)
     }
 
     ws_client_get_nonce(nonce, WEBSOCKET_NONCE_SIZE);
-    bintob64(nonce_b64, nonce, 16);
+    EVP_EncodeBlock((unsigned char *)nonce_b64, (const unsigned char *)nonce, WEBSOCKET_NONCE_SIZE);
     snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr,
         *client->host,
         nonce_b64);
@@ -196,7 +194,7 @@ int ws_client_start_handshake(ws_client *client)
     EVP_DigestUpdate(md_ctx, second, strlen(second));
     EVP_DigestFinal_ex(md_ctx, digest, &md_len);
 
-    bintob64(nonce_b64, digest, md_len);
+    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, md_len);
 
     free(client->hs.nonce_reply);
     client->hs.nonce_reply = strdup(nonce_b64);
