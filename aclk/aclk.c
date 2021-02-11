@@ -558,7 +558,7 @@ void *aclk_main(void *ptr)
     query_threads.thread_list = NULL;
 
     ACLK_PROXY_TYPE proxy_type;
-    const char *proxy = aclk_get_proxy(&proxy_type);
+    aclk_get_proxy(&proxy_type);
     if (proxy_type == PROXY_TYPE_SOCKS5) {
         error("SOCKS5 proxy is not supported by ACLK-NG yet.");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
