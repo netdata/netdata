@@ -43,6 +43,7 @@ typedef uint64_t netdata_idx_t;
 typedef struct netdata_publish_syscall {
     char *dimension;
     char *name;
+    char *algorithm;
     unsigned long nbyte;
     unsigned long pbyte;
     uint64_t ncall;
@@ -98,6 +99,11 @@ extern ebpf_module_t ebpf_modules[];
 #define EBPF_SYS_CLONE_IDX 11
 #define EBPF_MAX_MAPS 32
 
+enum ebpf_algorithms_list {
+    NETDATA_EBPF_ABSOLUTE_IDX,
+    NETDATA_EBPF_INCREMENTAL_IDX
+};
+
 // Threads
 extern void *ebpf_process_thread(void *ptr);
 extern void *ebpf_socket_thread(void *ptr);
@@ -118,6 +124,7 @@ extern void ebpf_global_labels(netdata_syscall_stat_t *is,
                                netdata_publish_syscall_t *pio,
                                char **dim,
                                char **name,
+                               int *algorithm,
                                int end);
 
 extern void ebpf_write_chart_cmd(char *type,
@@ -128,7 +135,7 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *charttype,
                                  int order);
 
-extern void ebpf_write_global_dimension(char *n, char *d);
+extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
 
 extern void ebpf_create_global_dimension(void *ptr, int end);
 
@@ -150,7 +157,8 @@ extern void write_count_chart(char *name, char *family, netdata_publish_syscall_
 
 extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
 
-extern void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc);
+extern void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
+                           char *dread, long long vread);
 
 extern void fill_ebpf_data(ebpf_data_t *ef);
 
@@ -159,9 +167,12 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *units,
                                        char *family,
                                        int order,
+                                       char *algorithm,
                                        struct target *root);
 
 extern void write_end_chart();
+
+extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 
 #define EBPF_GLOBAL_SECTION "global"
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
@@ -169,7 +180,8 @@ extern void write_end_chart();
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
-#define EBPF_COMMON_DIMENSION_BYTESS "bytes/s"
+#define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
+#define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 
@@ -178,6 +190,7 @@ extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
+extern char *ebpf_algorithms[];
 
 // Socket functions and variables
 // Common functions
