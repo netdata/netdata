@@ -791,3 +791,26 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
     query->data.metadata_alarms.initial_on_connect = 0;
     aclk_queue_query(query);
 }
+
+struct label *add_aclk_host_labels(struct label *label) {
+#ifdef ENABLE_ACLK
+    ACLK_PROXY_TYPE aclk_proxy;
+    char *proxy_str;
+    aclk_get_proxy(&aclk_proxy);
+
+    switch(aclk_proxy) {
+        case PROXY_TYPE_SOCKS5:
+            proxy_str = "SOCKS5";
+            break;
+        case PROXY_TYPE_HTTP:
+            proxy_str = "HTTP";
+            break;
+        default:
+            proxy_str = "none";
+            break;
+    }
+    return add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
+#else
+    return label;
+#endif
+}
