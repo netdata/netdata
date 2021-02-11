@@ -29,7 +29,7 @@ behind an [Nginx proxy](https://learn.netdata.cloud/docs/agent/running-behind-ng
 Beyond charts, the local dashboard can be broken down into three key areas:
 
 1.  [**Sections**](#sections)
-2.  [**Time & date picker](#time--date-picker)
+2.  [**Time & date picker**](#time--date-picker)
 3.  [**Metrics menus/submenus**](#metrics-menus)
 4.  [**Netdata Cloud menus: Spaces, War Rooms, and Visited nodes)**](#cloud-menus-spaces-war-rooms-and-visited-nodes)
 
