@@ -39,6 +39,8 @@ void *analytics_main(void *ptr) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     char name[500];
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
     BUFFER *pl = buffer_create(1000);
     BUFFER *md = buffer_create(1000);
     
@@ -100,9 +102,8 @@ void *analytics_main(void *ptr) {
     if (netdata_anonymous_statistics_enabled > 0)
         send_statistics("META", "-", "-");
 
-
-
-    
+    /* TODO: either do not exit, or try from main not to try and stop it */
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
 
