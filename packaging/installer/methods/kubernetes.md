@@ -1,6 +1,6 @@
 <!--
-title: "Install Netdata on a Kubernetes cluster"
-description: "Use Netdata's Helm chart to bootstrap a Netdata monitoring and troubleshooting toolkit on your Kubernetes (k8s) cluster."
+title: "Deploy Kubernetes monitoring with Netdata"
+description: "Install Netdata to monitor a Kubernetes cluster to monitor the health, performance, and resource utilization of a Kubernetes deployment in real time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
 -->
 
@@ -50,13 +50,76 @@ helm install netdata netdata/netdata
 ### Post-installation
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
-`parent` pod, and three `child` pods.
+parent pod, and multiple child pods.
 
-You've now installed Netdata on your Kubernetes cluster. See how to [access the Netdata
-dashboard](#access-the-netdata-dashboard) to confirm it's working as expected, or see the next section to [configure the
-Helm chart](#configure-the-netdata-helm-chart) to suit your cluster's particular setup.
+Take note of the name of the parent pod, which will look like: `netdata-parent-xxxxxxxxx-xxxxx`.
 
-## Configure the Netdata Helm chart
+You've now installed Netdata on your Kubernetes cluster. Next, it's time to enable the powerful Kubernetes dashboards
+available in Netdata Cloud.
+
+## Claim your Kubernetes cluster to Netdata Cloud
+
+[Claim](/claim/README.md) your Kubernetes cluster to stream metadata for monitoring. Claiming securely connects your
+node to [Netdata Cloud](https://app.netdata.cloud) to create visualizations and alerts. 
+
+Ensure persistence is enabled on the parent pod by running the following `helm upgrade` command.
+
+```bash
+helm upgrade \
+  --set parent.database.persistence=true \
+  --set parent.alarms.persistence=true \
+  netdata netdata/netdata
+```
+
+Next, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**. Click
+the **Nodes** tab. Netdata Cloud shows a script similar to the following:
+
+```bash
+sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+```
+
+You will need the values of `TOKEN` and `ROOM1,ROOM2` for the command, which sets `parent.claiming.enabled`,
+`parent.claiming.token`, and `parent.claiming.rooms` to complete the parent pod claiming process.
+
+Run the following `helm upgrade` command after replacing `TOKEN` and `ROOM1` with the values found in the claiming
+script from Netdata Cloud. The quotations are required.
+
+```bash
+helm upgrade \
+  --set parent.claiming.enabled=true \
+  --set parent.claiming.token="TOKEN" \
+  --set parent.claiming.rooms="ROOM" \
+  netdata netdata/netdata
+```
+
+The cluster terminates the old parent pod and creates a new one with the proper claiming configuration. You'll see your
+parent pod appear in Netdata Cloud in a few seconds.
+
+![Netdata's Kubernetes monitoring
+visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
+
+### Claim child pods (optional)
+
+It's possible to claim child pods to Netdata Cloud to visualize all available metrics from both the Kubernetes cluster
+itself _and_ any running applications.
+
+Child pod claiming comes with one large caveat: Because the child pods have no persistent storage, they are re-claimed
+under a new GUID every time they are restarted. Depending on how often this happens, this can create many nodes marked
+**unreachable** that [cannot be removed]().
+
+Run another `helm upgrade` command, replacing `TOKEN` and `ROOM1` with the same values from the claiming script.
+
+```bash
+helm upgrade \
+  --set child.claiming.enabled=true \
+  --set child.claiming.token="TOKEN" \
+  --set child.claiming.rooms="ROOM" \
+  netdata netdata/netdata
+```
+
+You'll see your child nodes appear in a few seconds.
+
+## Configure your Netdata deployment
 
 Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
@@ -113,78 +176,6 @@ helm upgrade --set-file sd.child.configmap.from.value=./child.yml netdata netdat
 
 Your configured service discovery is now pushed to your cluster.
 
-## Access the Netdata dashboard
-
-Accessing the Netdata dashboard itself depends on how you set up your k8s cluster and the Netdata Helm chart. If you
-installed the Helm chart with the default `service.type=ClusterIP`, you will need to forward a port to the parent pod.
-
-```bash
-kubectl port-forward netdata-parent-0 19999:19999 
-```
-
-You can now access the dashboard at `http://CLUSTER:19999`, replacing `CLUSTER` with the IP address or hostname of your
-k8s cluster.
-
-If you set up the Netdata Helm chart with `service.type=LoadBalancer`, you can find the external IP for the load
-balancer with `kubectl get services`, under the `EXTERNAL-IP` column.
-
-```bash
-kubectl get services
-NAME                 TYPE           CLUSTER-IP       EXTERNAL-IP    PORT(S)              AGE
-cockroachdb          ClusterIP      None             <none>         26257/TCP,8080/TCP   46h
-cockroachdb-public   ClusterIP      10.245.148.233   <none>         26257/TCP,8080/TCP   46h
-kubernetes           ClusterIP      10.245.0.1       <none>         443/TCP              47h
-netdata              LoadBalancer   10.245.160.131   203.0.113.0    19999:32231/TCP      74m
-```
-
-In the above example, access the dashboard by navigating to `http://203.0.113.0:19999`.
-
-## Claim a Kubernetes cluster's parent pod
-
-You can [claim](/claim/README.md) a cluster's parent Netdata pod to see its real-time metrics alongside any other nodes
-you monitor using [Netdata Cloud](https://app.netdata.cloud).
-
-> Netdata Cloud does not currently support claiming child nodes because the Helm chart does not allocate a persistent
-> volume for them.
-
-Ensure persistence is enabled on the parent pod by running the following `helm upgrade` command.
-
-```bash
-helm upgrade \
-  --set parent.database.persistence=true \
-  --set parent.alarms.persistence=true \
-  netdata netdata/netdata
-```
-
-Next, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**. Click
-the **Nodes** tab. Netdata Cloud shows a script similar to the following:
-
-```bash
-sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
-```
-
-You will need the values of `TOKEN` and `ROOM1,ROOM2` for the command, which sets `parent.claiming.enabled`,
-`parent.claiming.token`, and `parent.claiming.rooms` to complete the parent pod claiming process.
-
-Run the following `helm upgrade` command after replacing `TOKEN` and `ROOM1,ROOM2` with the values found in the claiming
-script from Netdata Cloud. The quotations are required.
-
-```bash
-helm upgrade \
-  --set parent.claiming.enabled=true \
-  --set parent.claiming.token="TOKEN" \
-  --set parent.claiming.rooms="ROOM1,ROOM2" \
-  netdata netdata/netdata
-```
-
-The cluster terminates the old parent pod and creates a new one with the proper claiming configuration. You can see your
-parent pod in Netdata Cloud after a few moments. You can now [build new
-dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards) using the parent pod's metrics or run [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) to troubleshoot anomalies.
-
-![A parent Netdata pod in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/94497340-c1f49880-01ab-11eb-97b2-6044537565af.png)
-
 ## Update/reinstall the Netdata Helm chart
 
 If you update the Helm chart's configuration, run `helm upgrade` to redeploy your Netdata service, replacing `netdata`
@@ -199,9 +190,9 @@ helm upgrade netdata netdata/netdata
 Read the [monitoring a Kubernetes cluster guide](/docs/guides/monitor/kubernetes-k8s-netdata.md) for details on the
 various metrics and charts created by the Helm chart and some best practices on real-time troubleshooting using Netdata.
 
-Check out our [infrastructure](/docs/quickstart/infrastructure.md) for details about additional k8s monitoring features,
-and learn more about [configuring the Netdata Agent](/docs/configure/nodes.md) to better understand the settings you
-might be interested in changing.
+Netdata Cloud features per-container and per-pod visualizations and composite charts using aggregated CPU, memory, disk,
+and networking metrics from every later of your cluster. To learn more, see our [Kubernetes
+visualization](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) reference doc.
 
 To further configure Netdata for your cluster, see our [Helm chart repository](https://github.com/netdata/helmchart) and
 the [service discovery repository](https://github.com/netdata/agent-service-discovery/).
