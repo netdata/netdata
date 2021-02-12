@@ -1533,6 +1533,14 @@ netdataDashboard.context = {
             'Assuming non-superuser accounts are being used to connect to Postgres (so <i>superuser_reserved_connections</i> are subtracted from <i>max_connections</i>).<br/>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/runtime-config-connection.html" target="_blank">Connections and Authentication</a>.'
     },
+    'postgres.stat_replication': {
+        info: 'Stat Replication.<ul>' +
+            '<li><strong>nodes:</strong> Nodes are replications of the master database.</li>' +
+            '</ul>' +
+            'Node equal to 1 is active.<br/>' +
+            'Node equal to 0 is inactive.<br/>' +
+            'For more information see <a href="https://www.postgresql.org/docs/13/monitoring-stats.html#MONITORING-PG-STAT-REPLICATION-VIEW" target="_blank">Stat Replication</a>.'
+    },
 
 
     // ------------------------------------------------------------------------
