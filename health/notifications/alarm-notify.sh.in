@@ -855,7 +855,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && sendmail --help 2>&1 | grep -q "\-F " && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
@@ -2054,7 +2054,7 @@ send_dynatrace() {
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
-  
+
   payload=$(cat <<EOF
 {
   "title": "NetData Alarm from ${host}",
