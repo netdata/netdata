@@ -628,6 +628,7 @@ static int aclk_process_query(struct aclk_query_thread *t_info)
         ACLK_STATS_LOCK;
         aclk_metrics_per_sample.queries_dispatched++;
         aclk_queries_per_thread[t_info->idx]++;
+        getrusage(RUSAGE_THREAD, &rusage_per_thread[t_info->idx]);
         ACLK_STATS_UNLOCK;
     }
 

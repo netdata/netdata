@@ -83,6 +83,7 @@ extern struct aclk_metrics_per_sample {
 } aclk_metrics_per_sample;
 
 extern uint32_t *aclk_queries_per_thread;
+extern struct rusage *rusage_per_thread;
 
 void *aclk_stats_main_thread(void *ptr);
 void aclk_stats_thread_cleanup();
