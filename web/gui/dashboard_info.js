@@ -582,7 +582,11 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-bell"></i>',
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
-
+    'statsd': { 
+        title: 'StatsD',
+        icon: '<i class="fas fa-chart-line"></i>',
+        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
+    }
 };
 
 
