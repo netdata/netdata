@@ -21,6 +21,7 @@ struct aclk_cpu_data {
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
 struct rusage *rusage_per_thread;
+uint8_t *getrusage_called_this_tick = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -278,6 +279,7 @@ void *aclk_stats_main_thread(void *ptr)
     aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
     aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
     rusage_per_thread = callocz(query_thread_count, sizeof(struct rusage));
+    getrusage_called_this_tick = callocz(query_thread_count, sizeof(uint8_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -305,6 +307,7 @@ void *aclk_stats_main_thread(void *ptr)
 
         memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
         memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
+        memset(getrusage_called_this_tick, 0, sizeof(uint8_t) * query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
