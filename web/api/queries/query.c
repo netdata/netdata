@@ -305,7 +305,8 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
                || (match_names && simple_pattern_matches(pattern, d->name))
                 ) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
+            if(unlikely((r->od[c] & RRDR_DIMENSION_HIDDEN) && !( r->od[c] & RRDR_DIMENSION_INCOGNITO)))
+                r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
             dims_selected++;
 
             // since the user needs this dimension
@@ -1590,6 +1591,11 @@ RRDR *rrd2rrdr(
     if (options & RRDR_OPTION_ALLOW_PAST)
         if (first_entry_t > after_requested)
             first_entry_t = after_requested;
+
+    if (context_param_list) {
+        context_param_list->after = after_requested;
+        context_param_list->before = before_requested;
+    }
 
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
