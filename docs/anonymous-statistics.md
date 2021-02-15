@@ -1,12 +1,13 @@
 <!--
+---
 title: "Anonymous statistics"
-description: "The Netdata Agent collects anonymous usage information by default and sends it to Google Analytics for quality assurance and product decisions."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
+---
 -->
 
 # Anonymous statistics
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. We use
+Netdata collects anonymous usage information by default using the open source product analytics platform [PostHog](https://github.com/PostHog/posthog). We self host our PostHog instance so your data is never sent or processed by any third parties outside of the Netdata infrastructure. We use
 the statistics gathered from this information for two purposes:
 
 1.  **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
@@ -15,49 +16,48 @@ the statistics gathered from this information for two purposes:
 2.  **Usage statistics**, to help us interpret how people use the Netdata agent in real-world environments, and to help
      us identify how our development/design decisions influence the community.
 
-Netdata sends information to Google Analytics via two different channels:
+Netdata collects usage information via two different channels:
 
--   Google Tag Manager fires when you access an agent's dashboard.
--   The Netdata daemon executes the [`anonymous-statistics.sh`
-    script](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in)
-    when Netdata starts, stops cleanly, or fails.
+-   **Agent Dashboard** - We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an agent's dashboard.
+-   **Agent Backend** - The Netdata daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 You can opt-out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
 
-## Google tag manager
+## Agent Dashboard - PostHog JavaScript
 
-Google tag manager (GTM) is the recommended way of collecting statistics for new implementations using GA. Unlike the
-older API, the logic of when to send information to GA and what information to send is controlled centrally.
+When you kick off an agent dashboard session Netdata will initialise a PostHog session and mask various event attributes.
 
-We have configured GTM to trigger the tag only when the variable `anonymous_statistics` is true. The value of this
+_Note_: You can see the relevant code in the [dashboard repository here](https://github.com/netdata/dashboard/blob/posthog-test/src/domains/global/sagas.ts#L77).  
+
+```JavaScript
+const injectPosthog = (machineGuid: string) => {
+  if (window.posthog) {
+    return
+  }
+  /* eslint-disable */
+  // @ts-ignore
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+  /* eslint-enable */
+  window.posthog.init("zR4pStMtxgP3wJ27vIjQJvZNXwMWqZlzP0x4dKbHOHg", { api_host: "https://app.posthog.com" })
+  window.posthog.register({
+    distinct_id: machineGuid,
+    $ip: "127.0.0.1",
+    $current_url: "agent dashboard",
+    $pathname: "netdata-dashboard",
+    $host: "dashboard.netdata.io",
+  })
+}
+```
+
+In the above snippet a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname` and `host` attributes are set to constant values for all events that may be sent during the session. This way things like the ip or hostname of the agent will not be sent as part of the product usage event data.
+
+We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this
 variable is controlled via the [opt-out mechanism](#opt-out).
 
-To ensure anonymity of the stored information, we have configured GTM's GA variable "Fields to set" as follows: 
-
-| Field name     | Value                                              |
-| -------------- | -------------------------------------------------- |
-| page           | netdata-dashboard                                  |
-| hostname       | dashboard.my-netdata.io                            |
-| anonymizeIp    | true                                               |
-| title          | Netdata dashboard                                  |
-| campaignSource | {{machine_guid}}                                   |
-| campaignMedium | web                                                |
-| referrer       | <http://dashboard.my-netdata.io>                   |
-| Page URL       | <http://dashboard.my-netdata.io/netdata-dashboard> |
-| Page Hostname  | <http://dashboard.my-netdata.io>                   |
-| Page Path      | /netdata-dashboard                                 |
-| location       | <http://dashboard.my-netdata.io>                   |
-
-In addition, the Netdata-generated unique machine guid is sent to GA via a custom dimension.
-You can verify the effect of these settings by examining the GA `collect` request parameters.
-
-The only thing that's impossible for us to prevent from being **sent** is the URL in the "Referrer" Header of the
-browser request to GA. However, the settings above ensure that all **stored** URLs and host names are anonymized.
-
-## Anonymous Statistics Script
+## Agent Backend - Anonymous Statistics Script
 
 Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous
-statistics script to collect system information and send it to GA via an http call. The information collected for all
+statistics script to collect system information and send it to the Netdata PostHog via an http call. The information collected for all
 events is:
 
 -   Netdata version
@@ -103,7 +103,10 @@ Each of these opt-out processes does the following:
 
 -   Prevents the daemon from executing the anonymous statistics script.
 -   Forces the anonymous statistics script to exit immediately.
--   Stops the Google Tag Manager Javascript snippet, which remains on the dashboard, from firing and sending any data to
-    Google Analytics.
+-   Stops the PostHog Javascript snippet, which remains on the dashboard, from firing and sending any data to the Netdata PostHog.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fanonymous-statistics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+## Migration from Google Analytics and Google Tag Manager.
+
+Prior to vX.XX we used Google Analytics to capture this information. This led to discomfot with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
+
+While we migrate fully away from Google Analytics to PostHog there maybe be a small period of time where we run both in parallel before we remove all Google Analytics related code. This is to ensure we can fully test and validate the Netdata PostHog implementation before fully defaulting to it.
