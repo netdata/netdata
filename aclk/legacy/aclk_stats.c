@@ -234,7 +234,6 @@ static void aclk_stats_cpu_threads(void)
 {
     char id[100 + 1];
     char title[100 + 1];
-    char dim_name[MAX_DIM_NAME];
 
     for (int i = 0; i < query_thread_count; i++) {
         if (unlikely(!aclk_cpu_data[i].st)) {
