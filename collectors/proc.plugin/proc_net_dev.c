@@ -590,10 +590,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
                 d->filename_duplex = strdupz(buffer);
-
-                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
-                d->filename_operstate = strdupz(buffer);
             }
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+            d->filename_operstate = strdupz(buffer);
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
