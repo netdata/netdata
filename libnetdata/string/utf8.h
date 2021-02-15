@@ -6,4 +6,6 @@
 #define IS_UTF8_BYTE(x) (x & 0x80)
 #define IS_UTF8_STARTBYTE(x) (IS_UTF8_BYTE(x)&&(x & 0x40))
 
+const unsigned char *utf8_check(const unsigned char *s);
+
 #endif /* NETDATA_STRING_UTF8_H */
