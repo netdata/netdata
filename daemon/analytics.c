@@ -14,6 +14,7 @@ struct array_printer {
 };
 
 extern int aclk_connected;
+extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
 
 int collector_counter(void *entry, void *data) {
 
@@ -46,7 +47,16 @@ void *analytics_main(void *ptr) {
     
     debug(D_ANALYTICS, "Analytics thread starts");
 
-    sleep(10); /* TODO: decide how long to wait... */
+    //sleep(10); /* TODO: decide how long to wait... */
+    /* Could this from aclk work? What if it is disabled? */
+    while (!netdata_exit) {
+        if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
+            break;
+        }
+        sleep_usec(USEC_PER_SEC * 1);
+    }
+
+    debug(D_ANALYTICS, "Seems stable?");
 
     setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
 
