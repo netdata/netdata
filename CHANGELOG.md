@@ -1,3 +1,7 @@
+<!--
+custom_edit_url: null
+-->
+
 # Changelog
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
