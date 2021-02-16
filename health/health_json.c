@@ -2,6 +2,7 @@
 
 #include "health.h"
 #include "libnetdata/libnetdata.h"
+#include <stdbool.h>
 
 #define BOOL_STR(x)         (x) ? "true" : "false";
 #define DEFAULT_STR(x, y)   (x) ? (x) : (y);
