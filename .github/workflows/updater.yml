@@ -2,9 +2,12 @@
 name: Updater
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+
 jobs:
   source-build:
     name: Install, Build & Update
@@ -14,6 +17,12 @@ jobs:
         distro:
           - 'debian:10'
           - 'fedora:33'
+          - 'ubuntu:20.10'
+          - 'alpine:3.13'
+          - 'archlinux:latest'
+          - 'centos:8'
+          - 'clearlinux:latest'
+          - 'opensuse/tumbleweed:latest'
     runs-on: ubuntu-latest
     steps:
       - name: Install netdata latest
@@ -30,12 +39,22 @@ jobs:
         run: |
           ORIG_TARBALL="export NETDATA_TARBALL_URL=.*"
           ORIG_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=.*"
+          CURRENT_VERSION="current_version=.*"
           NEW_TARBALL="export NETDATA_TARBALL_URL=http://localhost:8080/artifacts/netdata-latest.tar.gz"
           NEW_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=http://localhost:8080/artifacts/sha256sums.txt"
           sed -i "s|${ORIG_TARBALL}|${NEW_TARBALL}|g" packaging/installer/netdata-updater.sh
           sed -i "s|${ORIG_CHECKSUM}|${NEW_CHECKSUM}|g" packaging/installer/netdata-updater.sh
+          sed -i "s|"current_version=.*"|"current_version=1"|g" packaging/installer/netdata-updater.sh
       - name: Run the updater
         run: |
-          netdata -V
-          sudo ./packaging/installer/netdata-updater.sh
-          netdata -V
+          sudo netdata -v
+          sudo ./packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
+          sudo netdata -v
+          cat ./packaging/version
+          updater_version=$(cat packaging/version)
+          if [[ $(netdata -v | awk '{print $2}') == "${updater_version}" ]];
+          then
+            echo "Update successfull!"
+          else
+            exit 1
+          fi
