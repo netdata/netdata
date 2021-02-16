@@ -143,7 +143,9 @@ HOST_VERSION="unknown"
 HOST_VERSION_ID="unknown"
 HOST_ID="unknown"
 HOST_ID_LIKE="unknown"
-if [ "${CONTAINER}" = "unknown" ]; then
+
+# 'systemd-detect-virt' returns 'none' if there is no hardware/container virtualization.
+if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
   for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
     eval "HOST_$v=\$CONTAINER_$v; CONTAINER_$v=none"
   done
