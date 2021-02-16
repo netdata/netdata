@@ -49,12 +49,16 @@ void *analytics_main(void *ptr) {
 
     //sleep(10); /* TODO: decide how long to wait... */
     /* Could this from aclk work? What if it is disabled? */
+#ifdef ENABLE_ACLK
     while (!netdata_exit) {
         if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
             break;
         }
         sleep_usec(USEC_PER_SEC * 1);
     }
+#else
+    sleep(10);
+#endif
 
     debug(D_ANALYTICS, "Seems stable?");
 
