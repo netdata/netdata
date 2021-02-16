@@ -36,6 +36,29 @@ int collector_counter(void *entry, void *data) {
     return 0;
 }
 
+int alarms_count (void) {
+    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
+    RRDCALC *rc;
+    rrdhost_rdlock(localhost);
+    for(rc = localhost->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        switch(rc->status) {
+        case RRDCALC_STATUS_WARNING:
+            alarm_warn++;
+            break;
+        case RRDCALC_STATUS_CRITICAL:
+            alarm_crit++;
+            break;
+        default:
+            alarm_normal++;
+        }
+    }
+    rrdhost_unlock(localhost);
+    return alarm_normal + alarm_warn + alarm_crit;
+}
+
 void *analytics_main(void *ptr) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
@@ -112,6 +135,12 @@ void *analytics_main(void *ptr) {
     else
 #endif
         setenv("NETDATA_ACLK_AVAILABLE"    , "false",  1);
+
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", alarms_count());
+        setenv("NETDATA_ALARMS_COUNT"  , b, 1);
+    }
 
     if (netdata_anonymous_statistics_enabled > 0)
         send_statistics("META", "-", "-");
