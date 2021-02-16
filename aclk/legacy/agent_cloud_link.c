@@ -103,14 +103,6 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
                 data->version = e->data.number;
                 break;
             }
-            if (!strcmp(e->name, "min-version")) {
-                data->min_version = e->data.number;
-                break;
-            }
-            if (!strcmp(e->name, "max-version")) {
-                data->max_version = e->data.number;
-                break;
-            }
 
             break;
 
@@ -639,7 +631,7 @@ static void aclk_graceful_disconnect()
 
     // Send a graceful disconnect message
     BUFFER *b = buffer_create(512);
-    aclk_create_header(b, "disconnect", NULL, 0, 0, aclk_shared_state.version_neg);
+    aclk_create_header(b, "disconnect", NULL, 0, 0, ACLK_VERSION);
     buffer_strcat(b, ",\n\t\"payload\": \"graceful\"}");
     aclk_send_message(ACLK_METADATA_TOPIC, (char*)buffer_tostring(b), NULL);
     buffer_free(b);
@@ -963,35 +955,10 @@ static void aclk_try_to_connect(char *hostname, int port)
     aclk_connecting = 1;
     create_publish_base_topic();
 
-    ACLK_SHARED_STATE_LOCK;
-    aclk_shared_state.version_neg = 0;
-    aclk_shared_state.version_neg_wait_till = 0;
-    ACLK_SHARED_STATE_UNLOCK;
-
     rc = mqtt_attempt_connection(hostname, port, aclk_username, aclk_password);
     if (unlikely(rc)) {
         error("Failed to initialize the agent cloud link library");
     }
-}
-
-// Sends "hello" message to negotiate ACLK version with cloud
-static inline void aclk_hello_msg()
-{
-    BUFFER *buf = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-
-    char *msg_id = create_uuid();
-
-    ACLK_SHARED_STATE_LOCK;
-    aclk_shared_state.version_neg = 0;
-    aclk_shared_state.version_neg_wait_till = now_monotonic_usec() + USEC_PER_SEC * VERSION_NEG_TIMEOUT;
-    ACLK_SHARED_STATE_UNLOCK;
-
-    //Hello message is versioned separately from the rest of the protocol
-    aclk_create_header(buf, "hello", msg_id, 0, 0, ACLK_VERSION_NEG_VERSION);
-    buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
-    aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
-    freez(msg_id);
-    buffer_free(buf);
 }
 
 /**
@@ -1161,7 +1128,6 @@ void *aclk_main(void *ptr)
 
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 1);
-            aclk_hello_msg();
         }
 
         if (unlikely(!query_threads.thread_list)) {
@@ -1388,9 +1354,9 @@ void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted)
     // session.
 
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0, aclk_shared_state.version_neg);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, 0, 0, ACLK_VERSION);
     else
-        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
+        aclk_create_header(local_buffer, "connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
 
@@ -1433,9 +1399,9 @@ int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *hos
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (metadata_submitted == ACLK_METADATA_SENT)
-        aclk_create_header(local_buffer, "update", msg_id, 0, 0, aclk_shared_state.version_neg);
+        aclk_create_header(local_buffer, "update", msg_id, 0, 0, ACLK_VERSION);
     else
-        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
+        aclk_create_header(local_buffer, "connect", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     buffer_sprintf(local_buffer, "{\n\t \"info\" : ");
@@ -1459,14 +1425,14 @@ int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd)
     BUFFER *local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    if(aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE)
-        fatal("This function should not be called if ACLK version is less than %d (current %d)", ACLK_V_CHILDRENSTATE, aclk_shared_state.version_neg);
+    if(ACLK_VERSION < ACLK_V_CHILDRENSTATE)
+        fatal("This function should not be called if ACLK version is less than %d (current %d)", ACLK_V_CHILDRENSTATE, ACLK_VERSION);
 
     debug(D_ACLK, "Sending Child Disconnect");
 
     char *msg_id = create_uuid();
 
-    aclk_create_header(local_buffer, cmd == ACLK_CMD_CHILD_CONNECT ? "child_connect" : "child_disconnect", msg_id, 0, 0, aclk_shared_state.version_neg);
+    aclk_create_header(local_buffer, cmd == ACLK_CMD_CHILD_CONNECT ? "child_connect" : "child_disconnect", msg_id, 0, 0, ACLK_VERSION);
 
     buffer_strcat(local_buffer, ",\"payload\":");
 
@@ -1488,12 +1454,8 @@ int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd)
 
 void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd)
 {
-#if ACLK_VERSION_MIN < ACLK_V_CHILDRENSTATE
-    if (aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE)
+    if (ACLK_VERSION < ACLK_V_CHILDRENSTATE)
         return;
-#else
-#warning "This check became unnecessary. Remove"
-#endif
 
     if (unlikely(aclk_host_initializing(localhost)))
         return;
@@ -1585,7 +1547,7 @@ int aclk_send_single_chart(RRDHOST *host, char *chart)
     buffer_flush(local_buffer);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
-    aclk_create_header(local_buffer, "chart", msg_id, 0, 0, aclk_shared_state.version_neg);
+    aclk_create_header(local_buffer, "chart", msg_id, 0, 0, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     rrdset2json(st, local_buffer, NULL, NULL, 1);
@@ -1611,7 +1573,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd)
     if (!netdata_cloud_setting)
         return 0;
 
-    if (aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE && host != localhost)
+    if (ACLK_VERSION < ACLK_V_CHILDRENSTATE && host != localhost)
         return 0;
 
     if (aclk_host_initializing(localhost))
@@ -1661,7 +1623,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     char *msg_id = create_uuid();
 
     buffer_flush(local_buffer);
-    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0, aclk_shared_state.version_neg);
+    aclk_create_header(local_buffer, "status-change", msg_id, 0, 0, ACLK_VERSION);
     buffer_strcat(local_buffer, ",\n\t\"payload\": ");
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);

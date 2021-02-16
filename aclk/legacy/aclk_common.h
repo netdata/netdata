@@ -8,23 +8,7 @@ extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
-// minimum and maximum supported version of ACLK
-// in this version of agent
-#define ACLK_VERSION_MIN 2
-#define ACLK_VERSION_MAX 3
-
-// Version negotiation messages have they own versioning
-// this is also used for LWT message as we set that up
-// before version negotiation
-#define ACLK_VERSION_NEG_VERSION 1
-
-// Maximum time to wait for version negotiation before aborting
-// and defaulting to oldest supported version
-#define VERSION_NEG_TIMEOUT 3
-
-#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
-#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
-#endif
+#define ACLK_VERSION 2
 
 // Define ACLK Feature Version Boundaries Here
 #define ACLK_V_COMPRESSION   2
@@ -38,10 +22,6 @@ extern struct aclk_shared_state {
     // every time Query Thread wakes up
     RRDHOST *next_popcorn_host;
 
-    // read only while ACLK connected
-    // protect by lock otherwise
-    int version_neg;
-    usec_t version_neg_wait_till;
 } aclk_shared_state;
 
 typedef enum aclk_proxy_type {

@@ -36,8 +36,6 @@ struct aclk_request {
     char *callback_topic;
     char *payload;
     int version;
-    int min_version;
-    int max_version;
 };
 
 typedef enum aclk_init_action { ACLK_INIT, ACLK_REINIT } ACLK_INIT_ACTION;
