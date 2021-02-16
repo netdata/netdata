@@ -1592,10 +1592,8 @@ RRDR *rrd2rrdr(
         if (first_entry_t > after_requested)
             first_entry_t = after_requested;
 
-    if (context_param_list) {
-        context_param_list->after = after_requested;
-        context_param_list->before = before_requested;
-    }
+    if (context_param_list)
+        rebuild_context_param_list(context_param_list, after_requested);
 
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {

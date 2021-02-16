@@ -40,8 +40,6 @@ struct context_param {
     RRDDIM *rd;
     time_t first_entry_t;
     time_t last_entry_t;
-    time_t after;
-    time_t before;
 };
 
 #define META_CHART_UPDATED 1
