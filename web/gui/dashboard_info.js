@@ -583,6 +583,12 @@ netdataDashboard.menu = {
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
 
+    'alarm_values': {
+        title: 'Alarm Values',
+        icon: '<i class="fas fa-bell"></i>',
+        info: 'Charts showing calculated alarm values over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarm_values/README.md" target="_blank">here</a>.'
+    },
+
 };
 
 
