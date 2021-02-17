@@ -37,32 +37,25 @@ int collector_counter(void *entry, void *data) {
 }
 
 int alarms_count (void) {
-    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
+    int alarm = 0;
     RRDCALC *rc;
     rrdhost_rdlock(localhost);
     for(rc = localhost->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
-        switch(rc->status) {
-        case RRDCALC_STATUS_WARNING:
-            alarm_warn++;
-            break;
-        case RRDCALC_STATUS_CRITICAL:
-            alarm_crit++;
-            break;
-        default:
-            alarm_normal++;
+        alarm++;
         }
-    }
+
     rrdhost_unlock(localhost);
-    return alarm_normal + alarm_warn + alarm_crit;
+    return alarm;
 }
 
 void *analytics_main(void *ptr) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     char name[500];
+    int some=0;
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     BUFFER *pl = buffer_create(1000);
@@ -87,6 +80,8 @@ void *analytics_main(void *ptr) {
 
     setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
 
+    /* combine locks as needed */
+    /* dont lock again for other counts */
     rrdhost_rdlock(localhost);
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
@@ -96,6 +91,7 @@ void *analytics_main(void *ptr) {
             };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
+            some++;
         }
     }
     rrdhost_unlock(localhost);
@@ -104,7 +100,7 @@ void *analytics_main(void *ptr) {
     ap.c = 0;
     ap.plugin = pl;
     ap.module = md;
-    
+
     dictionary_get_all(dict, collector_counter, &ap);
     dictionary_destroy(dict);
 
