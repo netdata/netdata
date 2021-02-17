@@ -130,8 +130,8 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
 
     // set the hidden flag on hidden dimensions
     int c;
-    for(c = 0, rd = temp_rd?temp_rd:st->dimensions ; rd ; c++, rd = rd->next) {
-        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
+    for (c = 0, rd = temp_rd ? temp_rd : st->dimensions; rd; c++, rd = rd->next) {
+        if (unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
             r->od[c] = RRDR_DIMENSION_HIDDEN;
         else
             r->od[c] = RRDR_DIMENSION_DEFAULT;
