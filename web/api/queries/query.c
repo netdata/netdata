@@ -305,8 +305,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
                || (match_names && simple_pattern_matches(pattern, d->name))
                 ) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
-            if(unlikely((r->od[c] & RRDR_DIMENSION_HIDDEN) && !( r->od[c] & RRDR_DIMENSION_INCOGNITO)))
-                r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
             dims_selected++;
 
             // since the user needs this dimension
