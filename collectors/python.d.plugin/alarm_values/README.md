@@ -9,9 +9,9 @@ This collector creates an 'Alarm Values' menu with one line plot showing calcula
 
 ## Charts
 
-Below is an example of the chart produced. 
+Below is an example of the chart produced. In the screenshot we have just selected two `net_packets` related alarm values to look at over time.  
 
-![alarm values collector](https://user-images.githubusercontent.com/1153921/101641493-0b086a80-39ef-11eb-9f55-0713e5dfb19f.png)
+![alarm values collector](https://user-images.githubusercontent.com/2178292/108211532-aec77280-7124-11eb-8db4-dd12f6147bbe.png)
 
 ## Configuration
 
