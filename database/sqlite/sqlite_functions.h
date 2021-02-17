@@ -58,5 +58,5 @@ extern void add_migrated_file(char *path, uint64_t file_size);
 extern void db_unlock(void);
 extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
-
+extern void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
