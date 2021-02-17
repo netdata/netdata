@@ -315,7 +315,7 @@ configure any of these collectors according to your setup and infrastructure.
     metrics via `ngx_http_stub_status_module`.
 -   [Nginx Plus](/collectors/python.d.plugin/nginx_plus/README.md): Collect global and per-server zone, upstream, and
     cache metrics.
--   [Nginx VTS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx-vts/): Gathers metrics from
+-   [Nginx VTS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginxvts/): Gathers metrics from
     any Nginx deployment with the _virtual host traffic status module_ enabled, including metrics on uptime, memory
     usage, and cache, and more.
 -   [PHP-FPM (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
