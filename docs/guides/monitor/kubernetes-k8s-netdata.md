@@ -1,14 +1,11 @@
 <!--
-title: "Kubernetes monitoring with Netdata"
+title: "Monitor a Kubernetes (k8s) cluster with Netdata"
 description: "Use Netdata's helmchart, service discovery plugin, and Kubelet/kube-proxy collectors for real-time visibility into your Kubernetes cluster."
 image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
-author: "Joel Hans"
-author_title: "Editorial Director, Technical & Educational Resources"
-author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/kubernetes-k8s-netdata.md
 -->
 
-# Kubernetes monitoring with Netdata
+# Monitor a Kubernetes cluster with Netdata
 
 While Kubernetes (k8s) might simplify the way you deploy, scale, and load-balance your applications, not all clusters
 come with "batteries included" when it comes to monitoring. Doubly so for a monitoring stack that helps you actively

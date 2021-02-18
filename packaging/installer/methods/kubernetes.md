@@ -1,23 +1,19 @@
 <!--
 title: "Deploy Kubernetes monitoring with Netdata"
-description: "Install Netdata to monitor a Kubernetes cluster to monitor the health, performance, and resource utilization of a Kubernetes deployment in real time."
+description: "Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
 -->
 
 # Deploy Kubernetes monitoring with Netdata
 
 This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following these directions, you
-will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to bootstrap a Netdata deployment on your cluster.
-The Helm chart installs one parent pod for storing metrics and managing alarm notifications plus an additional child pod
-for every node in the cluster.
+will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to create a Kubernetes monitoring deployment on
+your cluster.
 
-Each child pod will collect metrics from the node it runs on, in addition to [compatible
-applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered
-by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus),
-via [service discovery](https://github.com/netdata/agent-service-discovery/). Each child pod will also collect
-[cgroups](/collectors/cgroups.plugin/README.md),
-[Kubelet](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet), and
-[kube-proxy](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy) metrics from its node.
+The Helm chart installs one `parent` pod for storing metrics and managing alarm notifications, plus an additional
+`child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
+pods/containers, and [supported application-specific
+metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
 To deploy Kubernetes monitoring with Netdata, you need:
 
@@ -26,12 +22,6 @@ To deploy Kubernetes monitoring with Netdata, you need:
     difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
     administrative system.
 -   The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
-
-The default configuration creates one `parent` pod, installed on one of your cluster's nodes, and a DaemonSet for
-additional `child` pods. This DaemonSet ensures that every node in your k8s cluster also runs a `child` pod, including
-the node that also runs `parent`. The `child` pods collect metrics and stream the information to the `parent` pod, which
-uses two persistent volumes to store metrics and alarms. The `parent` pod also handles alarm notifications and enables
-the Netdata dashboard using an ingress controller.
 
 ## Install the Netdata Helm chart
 
@@ -43,10 +33,6 @@ helm repo add netdata https://netdata.github.io/helmchart/
 helm install netdata netdata/netdata
 ```
 
-> You can also install the Netdata Helm chart by cloning the
-> [repository](https://artifacthub.io/packages/helm/netdata/netdata#install-by-cloning-the-repository) and manually
-> running Helm against the included chart.
-
 ### Post-installation
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
@@ -54,109 +40,131 @@ parent pod, and multiple child pods.
 
 Take note of the name of the parent pod, which will look like: `netdata-parent-xxxxxxxxx-xxxxx`.
 
-You've now installed Netdata on your Kubernetes cluster. Next, it's time to enable the powerful Kubernetes dashboards
-available in Netdata Cloud.
+You've now installed Netdata on your Kubernetes cluster. Next, it's time to opt-in and enable the powerful Kubernetes
+dashboards available in Netdata Cloud.
 
 ## Claim your Kubernetes cluster to Netdata Cloud
 
-[Claim](/claim/README.md) your Kubernetes cluster to stream metadata for monitoring. Claiming securely connects your
-node to [Netdata Cloud](https://app.netdata.cloud) to create visualizations and alerts. 
+To join our [open beta for Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) in
+[Netdata Cloud](https://app.netdata.cloud), you must first [claim](/claim/README.md) your Kubernetes cluster. Claiming
+securely connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific
+visualizations  like the health map and time-series composite charts.
 
 First, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**.
-Click the **Nodes** tab. Netdata Cloud shows a script similar to the following:
+Click the **Nodes** tab to reveal the `netdata-claim.sh` script for your Space in Netdata Cloud. You need the `TOKEN`
+and `ROOM` values.
+
+Next, create a file called `override.yml`.
 
 ```bash
-sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+touch override.yml
 ```
 
-You will need the values of `TOKEN` and `ROOM1,ROOM2` for the command, which sets `parent.claiming.enabled`,
-`parent.claiming.token`, and `parent.claiming.rooms` to complete the parent pod claiming process.
+Paste the following into your `override.yml` file, replacing instances of `ROOM` and `TOKEN` with those from the
+claiming script from Netdata Cloud. These settings claim your `parent`/`child` nodes to Netdata Cloud and store more
+metrics in the nodes' time-series databases.
 
-Run the following `helm upgrade` command after replacing `TOKEN` and `ROOM1` with the values found in the claiming
-script from Netdata Cloud. The quotations are required.
+```yaml
+parent:
+  claiming:
+    enabled: true
+    token: "TOKEN"
+    rooms: "ROOM"
+  configs:
+    netdata:
+      data: |
+        [global]
+          memory mode = dbengine
+          dbengine_multihost_disk_space = 4000
+          default memory mode = dbengine
+          
+        [plugins]
+          apps = yes
+          proc = yes
+          go.d = yes
+          python.d = yes
+ 
+child:
+  claiming:
+    enabled: true
+    token: "TOKEN"
+    rooms: "ROOM"
+  configs:
+    netdata:
+      data: |
+        [global]
+          memory mode = ram
+          history = 600
+        [health]
+          enabled = no
+```
 
-> Child pod claiming comes with one caveat: Because the child pods have no persistent storage, they are re-claimed under
-> a new GUID every time they are restarted. Depending on how often this happens, this can create many nodes marked
-> **unreachable** that [cannot be fully removed from the
-> Space](https://learn.netdata.cloud/docs/cloud/faq#how-do-i-remove-a-node-from-a-war-room).
+Apply these new settings:
 
 ```bash
-helm upgrade \
-  --set parent.claiming.enabled=true \
-  --set parent.claiming.token="TOKEN" \
-  --set parent.claiming.rooms="ROOM" \
-  --set child.claiming.enabled=true \
-  --set child.claiming.token="TOKEN" \
-  --set child.claiming.rooms="ROOM" \
-  netdata netdata/netdata
+helm upgrade -f override.yml netdata netdata/netdata
 ```
 
-The cluster terminates the old pods and creates new ones with the proper claiming configuration. You'll see your pods
-appear in Netdata Cloud in a few seconds.
+The cluster terminates the old pods and creates new ones with the proper persistence and claiming configuration. You'll
+see your nodes, containers, and pods appear in Netdata Cloud in a few seconds.
 
 ![Netdata's Kubernetes monitoring
 visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
 
-If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see more guides and resources on
-Kubernetes monitoring with Netdata.
+If you don't need to configure your Netdata deployment, [skip down](#whats-next) to learn how to opt-in to the
+Kubernetes monitoring open beta, in addition to more guides and resources on Kubernetes monitoring with Netdata.
 
 ## Configure your Netdata monitoring deployment
 
 Read up on the various configuration options in the [Helm chart
-documentation](https://github.com/netdata/helmchart#configuration) to see if you need to change any of the options based
-on your cluster's setup.
+documentation](https://github.com/netdata/helmchart#configuration) if you need to tweak your Kubernetes monitoring.
 
-To change a setting, use the `--set` or `--values` arguments with `helm install`, for the initial deployment, or `helm
-upgrade` to upgrade an existing deployment. 
+Your first option is to create an `override.yml` file, if you haven't created one already for
+[claim](#claim-your-kubernetes-cluster-to-netdata-cloud), then apply the new configuration to your cluster with `helm
+upgrade`.
 
 ```bash
-helm install --set a.b.c=xyz netdata netdata/netdata
-helm upgrade --set a.b.c=xyz netdata netdata/netdata
+helm upgrade -f override.yml netdata netdata/netdata
 ```
 
-For example, to change the size of the persistent metrics volume on the parent node:
+If you want to change only a single setting, use the `--set` argument with `helm upgrade`. For example, to change the
+size of the persistent metrics volume on the parent node:
 
 ```bash
-helm install --set parent.database.volumesize=4Gi netdata netdata/netdata
 helm upgrade --set parent.database.volumesize=4Gi netdata netdata/netdata
 ```
 
 ### Configure service discovery
 
-As mentioned in the introduction, Netdata has a [service discovery
-plugin](https://github.com/netdata/agent-service-discovery/#service-discovery) to identify compatible pods and collect
-metrics from the service they run. The Netdata Helm chart installs this service discovery plugin into your k8s cluster.
+Netdata's [service discovery](https://github.com/netdata/agent-service-discovery/#service-discovery), which is
+installed as part of the Helm chart installation, finds what services are running on a cluster's pods, converts that
+into configuration files, and exports them so they can be monitored.
 
-Service discovery scans your cluster for pods exposed on certain ports and with certain image names. By default, it
-looks for its supported services on the ports they most commonly listen on, and using default image names. Service
-discovery currently supports [popular
-applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services), plus any endpoints covered
-by our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
+Service discovery supports [popular applications](https://github.com/netdata/helmchart#applications) and [Prometheus
+endpoints](https://github.com/netdata/helmchart#prometheus-endpoints).
 
-If you haven't changed listening ports, image names, or other defaults, service discovery should find your pods, create
-the proper configurations based on the service that pod runs, and begin monitoring them immediately after deployment.
+If your cluster runs services on non-default ports or uses non-default names, you may need to configure service
+discovery to start collecting metrics from your services. You have to edit the default ConfigMap that is shipped with
+the Helmchart and deploy that to your cluster.
 
-However, if you have changed some of these defaults, you need to copy a file from the Netdata Helm chart repository,
-make your edits, and pass the changed file to `helm install`/`helm upgrade`.
-
-First, copy the file to your administrative system.
+First, copy the default file to your administrative system.
 
 ```bash
 curl https://raw.githubusercontent.com/netdata/helmchart/master/charts/netdata/sdconfig/child.yml -o child.yml
 ```
 
 Edit the new `child.yml` file according to your needs. See the [Helm chart
-configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details. 
+configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details.
 
-You can then run `helm install`/`helm upgrade` with the `--set-file` argument to use your configured `child.yml` file
-instead of the default, changing the path if you copied it elsewhere.
+You can then run `helm upgrade` with the `--set-file` argument to use your configured `child.yml` file instead of the
+default, changing the path if you copied it elsewhere.
 
 ```bash
-helm install --set-file sd.child.configmap.from.value=./child.yml netdata netdata/netdata
 helm upgrade --set-file sd.child.configmap.from.value=./child.yml netdata netdata/netdata
 ```
 
-Your configured service discovery is now pushed to your cluster.
+Now that you pushed an edited ConfigMap to your cluster, service discovery should find and set up metrics collection
+from your non-default service.
 
 ## Update/reinstall the Netdata Helm chart
 
@@ -167,7 +175,17 @@ with the name of the release, if you changed it upon installation:
 helm upgrade netdata netdata/netdata
 ```
 
+To update Netdata's Helm chart to the latest version, run `helm repo update`, then deploy `upgrade` it`:
+
+```bash
+helm repo update
+helm upgrade netdata netdata/netdata
+```
+
 ## What's next?
+
+[Join the Kubernetes monitoring beta](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) to see
+Netdata's beta Kubernetes dashboard, which comes with meaningful visualizations out of the box. 
 
 Read our guide, [_Kubernetes monitoring with Netdata_](/docs/guides/monitor/kubernetes-k8s-netdata.md), for a complete
 walkthrough of Netdata's Kubernetes monitoring capabilities, including a health map of every container in your
