@@ -1,5 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/* TODO:
+
+   - 1. Netdata Data Collectors in use -> OK
+   - 2. Whether streaming is enabled, i.e. whether the daemon receives collected data from another daemon, or sends collected data to another daemon. -> OK
+   - 3. Whether the collected agent data are archived in a separate application and the type of that application (e.g. Prometheus, InfluxDB)
+        How? Mark when the allmetrics is called? 
+   - 4. The data storage method being used (dbengine, ram, save) -> OK
+   - 5. The data retention period -> Implement the calculator in: https://learn.netdata.cloud/docs/store/change-metrics-storage#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics
+   - 6. When the agent HTTP user interface was last accessed.
+   - 7. Whether SSL is being used to encrypt the HTTP user interface
+   - 8. Which alarm notification methods are being used.
+   - 9. Dashboard enabled ([web] mode = none)
+   - 10. Default port changed ([web] default port = 39999)
+*/
+
 #include "common.h"
 
 struct collector {
@@ -16,7 +31,7 @@ struct array_printer {
 extern int aclk_connected;
 extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
 
-int collector_counter(void *entry, void *data) {
+int collector_counter_callb(void *entry, void *data) {
 
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col=(struct collector *) entry;
@@ -36,53 +51,34 @@ int collector_counter(void *entry, void *data) {
     return 0;
 }
 
-int alarms_count (void) {
-    int alarm = 0;
+void analytics_alarms (void) {
+    int alarms = 0;
+    char b[7];
     RRDCALC *rc;
-    rrdhost_rdlock(localhost);
+    //rrdhost_rdlock(localhost);
     for(rc = localhost->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
-        alarm++;
+        alarms++;
         }
 
-    rrdhost_unlock(localhost);
-    return alarm;
+    //rrdhost_unlock(localhost);
+    snprintfz(b, 6, "%d", alarms);
+    setenv("NETDATA_ALARMS_COUNT"  , b, 1);
+    debug(D_ANALYTICS, "Alarms: [%d]", alarms);
 }
 
-void *analytics_main(void *ptr) {
+void analytics_collectors(void) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     char name[500];
-    int some=0;
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
     BUFFER *pl = buffer_create(1000);
     BUFFER *md = buffer_create(1000);
     
-    debug(D_ANALYTICS, "Analytics thread starts");
-
-    //sleep(10); /* TODO: decide how long to wait... */
-    /* Could this from aclk work? What if it is disabled? */
-#ifdef ENABLE_ACLK
-    while (!netdata_exit) {
-        if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
-            break;
-        }
-        sleep_usec(USEC_PER_SEC * 1);
-    }
-#else
-    sleep(10);
-#endif
-
-    debug(D_ANALYTICS, "Seems stable?");
-
-    setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
-
     /* combine locks as needed */
     /* dont lock again for other counts */
-    rrdhost_rdlock(localhost);
+    //rrdhost_rdlock(localhost);
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -91,17 +87,17 @@ void *analytics_main(void *ptr) {
             };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
-            some++;
+            //some++;
         }
     }
-    rrdhost_unlock(localhost);
+    //rrdhost_unlock(localhost);
 
     struct array_printer ap;
     ap.c = 0;
     ap.plugin = pl;
     ap.module = md;
 
-    dictionary_get_all(dict, collector_counter, &ap);
+    dictionary_get_all(dict, collector_counter_callb, &ap);
     dictionary_destroy(dict);
 
     setenv("NETDATA_COLLECTOR_PLUGINS", buffer_tostring(ap.plugin), 1);
@@ -112,8 +108,23 @@ void *analytics_main(void *ptr) {
         snprintfz(b, 6, "%d", ap.c);
         setenv("NETDATA_COLLECTOR_COUNT"  , b, 1);
     }
+    debug(D_ANALYTICS, "Collectors count: [%d]", ap.c);
 
-    /* free buffers? */
+}
+
+void analytics_misc(void) {
+    
+    setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
+
+    {
+        char b[7];
+        snprintfz(b, 6, "%ld", rrd_hosts_available);
+        setenv("NETDATA_CONFIG_HOSTS_AVAILABLE"  , b, 1);
+        debug(D_ANALYTICS, "HOSTS_AVAILABLE: [%s]", b);
+    }
+
+    
+        
 
 #ifdef ENABLE_ACLK
     setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "true",  1);
@@ -131,12 +142,83 @@ void *analytics_main(void *ptr) {
     else
 #endif
         setenv("NETDATA_ACLK_AVAILABLE"    , "false",  1);
+}
 
+void analytics_charts (void) {
+    RRDSET *st;
+    int c = 0;
+    int show_archived = 0;
+    rrdset_foreach_read(st, localhost) {
+        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
+            c++;
+            //st->last_accessed_time = now; ??
+        }
+    }
     {
         char b[7];
-        snprintfz(b, 6, "%d", alarms_count());
-        setenv("NETDATA_ALARMS_COUNT"  , b, 1);
+        snprintfz(b, 6, "%d", c);
+        setenv("NETDATA_CHARTS_COUNT"  , b, 1);
     }
+    debug(D_ANALYTICS, "Charts count: [%d]", c);
+
+}
+
+void analytics_metrics (void) {
+    RRDSET *st;
+    long int dimensions = 0;
+    RRDDIM *rd;
+    rrdset_foreach_read(st, localhost) {
+        rrddim_foreach_read(rd, st) {
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+
+            dimensions++;
+        }
+    }
+    {
+        char b[7];
+        snprintfz(b, 6, "%ld", dimensions);
+        setenv("NETDATA_METRICS_COUNT"  , b, 1);
+    }
+    debug(D_ANALYTICS, "Dimensions count: [%ld]", dimensions);
+    
+    
+}
+
+void *analytics_main(void *ptr) {
+    
+    int some=0;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
+    debug(D_ANALYTICS, "Analytics thread starts");
+
+    //sleep(10); /* TODO: decide how long to wait... */
+    /* Could this from aclk work? What if it is disabled? */
+    /* Charts count e.g. must wait longer than this */
+#ifdef ENABLE_ACLK
+    while (!netdata_exit) {
+        if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
+            break;
+        }
+        sleep_usec(USEC_PER_SEC * 1);
+    }
+#else
+    sleep(30);
+#endif
+
+    sleep(10);
+
+    debug(D_ANALYTICS, "Stable...");
+
+    rrdhost_rdlock(localhost);
+    
+    analytics_collectors();
+    analytics_alarms();
+    analytics_charts();
+    analytics_metrics();
+
+    rrdhost_unlock(localhost);
+
+    analytics_misc();    
 
     if (netdata_anonymous_statistics_enabled > 0)
         send_statistics("META", "-", "-");
@@ -150,6 +232,13 @@ void set_late_global_environment() {
 
     setenv("NETDATA_CONFIG_STREAM_ENABLED"        , default_rrdpush_enabled ? "true" : "false",        1);
     setenv("NETDATA_CONFIG_MEMORY_MODE"           , rrd_memory_mode_name(default_rrd_memory_mode), 1);
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", default_rrd_update_every);
+        setenv("NETDATA_CONFIG_UPDATE_EVERY"  , b, 1);
+        debug(D_ANALYTICS, "NETDATA_CONFIG_UPDATE_EVERY [%s]", b);
+    }
+    
 
 #ifdef ENABLE_DBENGINE
     {
@@ -159,6 +248,7 @@ void set_late_global_environment() {
 
         snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
         setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"     , b,        1);
+        debug(D_ANALYTICS, "MULTIDB_DISK_QUOTA: [%s]", b);
     }
 #else
     setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
