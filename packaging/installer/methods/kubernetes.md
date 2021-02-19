@@ -45,10 +45,10 @@ dashboards available in Netdata Cloud.
 
 ## Claim your Kubernetes cluster to Netdata Cloud
 
-To join our [open beta for Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) in
-[Netdata Cloud](https://app.netdata.cloud), you must first [claim](/claim/README.md) your Kubernetes cluster. Claiming
-securely connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific
-visualizations  like the health map and time-series composite charts.
+To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) in [Netdata
+Cloud](https://app.netdata.cloud), you must first [claim](/claim/README.md) your Kubernetes cluster. Claiming securely
+connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
+like the health map and time-series composite charts.
 
 First, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**.
 Click the **Nodes** tab to reveal the `netdata-claim.sh` script for your Space in Netdata Cloud. You need the `TOKEN`
@@ -111,8 +111,8 @@ see your nodes, containers, and pods appear in Netdata Cloud in a few seconds.
 ![Netdata's Kubernetes monitoring
 visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
 
-If you don't need to configure your Netdata deployment, [skip down](#whats-next) to learn how to opt-in to the
-Kubernetes monitoring open beta, in addition to more guides and resources on Kubernetes monitoring with Netdata.
+If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works
+in Netdata, in addition to more guides and resources.
 
 ## Configure your Netdata monitoring deployment
 
@@ -184,8 +184,8 @@ helm upgrade netdata netdata/netdata
 
 ## What's next?
 
-[Join the Kubernetes monitoring beta](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) to see
-Netdata's beta Kubernetes dashboard, which comes with meaningful visualizations out of the box. 
+[Start Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) in Netdata Cloud, which
+comes with meaningful visualizations out of the box. 
 
 Read our guide, [_Kubernetes monitoring with Netdata_](/docs/guides/monitor/kubernetes-k8s-netdata.md), for a complete
 walkthrough of Netdata's Kubernetes monitoring capabilities, including a health map of every container in your
