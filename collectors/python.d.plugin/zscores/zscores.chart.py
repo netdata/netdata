@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from datetime import datetime
+import re
 
 import requests
 import numpy as np
@@ -37,10 +38,8 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.host = self.configuration.get('host', '127.0.0.1:19999')
-        if self.configuration.get('charts_in_scope', 'system.*') == 'system.*':
-            self.charts_in_scope = [c for c in requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys() if c.startswith('system.')]
-        else:
-            self.charts_in_scope = self.configuration.get('charts_in_scope').split(',')
+        self.charts_regex = re.compile(self.configuration.get('charts_regex', 'system.*'))
+        self.charts_in_scope = list(filter(self.charts_regex.match, requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys()))
         self.train_secs = self.configuration.get('train_secs', 14400)
         self.offset_secs = self.configuration.get('offset_secs', 300)
         self.train_every_n = self.configuration.get('train_every_n', 900)
