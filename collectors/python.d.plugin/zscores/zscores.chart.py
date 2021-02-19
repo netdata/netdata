@@ -60,8 +60,8 @@ class Service(SimpleService):
         self.df_std = pd.DataFrame()
         self.df_z_history = pd.DataFrame()
 
-    @staticmethod
-    def check():
+    def check(self):
+        _ = get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.')
         return True
 
     def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):
