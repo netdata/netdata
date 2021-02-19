@@ -73,8 +73,8 @@ The default configuration should look something like this. Here you can see each
 ```bash
 # what host to pull data from
 host: '127.0.0.1:19999'
-# what charts to pull data for. 'system.*' will use all system charts otherwise use a string like 'system.cpu,system.load,system.net'.
-charts_in_scope: 'system.*'
+# What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
+charts_regex: 'system\..*'
 # length of time to base calulcations off for mean and sigma
 train_secs: 14400 # use last 4 hours to work out the mean and sigma for the zscore
 # offset preceeding latest data to ignore when calculating mean and sigma
