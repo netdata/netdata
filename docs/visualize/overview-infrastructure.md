@@ -7,21 +7,17 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/o
 # See an overview of your infrastructure
 
 In Netdata Cloud, your nodes are organized into War Rooms. One of the two available views for a War Room is the
-**Overview**, which uses composite charts to display real-time, aggregated metrics from all the nodes (or a filtered
-selection) in a given War Room.
+[**Overview**](https://learn.netdata.cloud/docs/cloud/visualize/overview), which uses composite charts to display
+real-time, aggregated metrics from all the nodes (or a filtered selection) in a given War Room.
 
 With Overview's composite charts, you can see your infrastructure from a single pane of glass, discover trends or
 anomalies, then drill down with filtering or single-node dashboards to see more. In the screenshot below,
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
 ![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/102651377-b1f4b100-4129-11eb-8e60-d2995d258c16.png)
+Overview](https://user-images.githubusercontent.com/1153921/108563447-b28efc80-72be-11eb-8b51-1e085bdd956e.png)
 
 ## Using the Overview
-
-> ⚠️ In order for nodes to contribute to composite charts, and thus the Overview UI, they must run v1.26.0 or later of
-> the Netdata Agent. See our [update docs](/packaging/installer/UPDATE.md) for the preferred update method based on how
-> you installed the Agent.
 
 The Overview uses roughly the same interface as local Agent dashboards or single-node dashboards in Netdata Cloud. By
 showing all available metrics from all your nodes in a single interface, Netdata Cloud helps you visualize the overall
