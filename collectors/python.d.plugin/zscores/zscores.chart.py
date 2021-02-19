@@ -39,7 +39,12 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.host = self.configuration.get('host', '127.0.0.1:19999')
         self.charts_regex = re.compile(self.configuration.get('charts_regex', 'system.*'))
-        self.charts_in_scope = list(filter(self.charts_regex.match, requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys()))
+        self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
+        self.charts_in_scope = [ 
+            c for c in 
+            list(filter(self.charts_regex.match, requests.get(f'http://{self.host}/api/v1/charts').json()['charts'].keys()))
+            if c not in self.charts_to_exclude
+            ]
         self.train_secs = self.configuration.get('train_secs', 14400)
         self.offset_secs = self.configuration.get('offset_secs', 300)
         self.train_every_n = self.configuration.get('train_every_n', 900)
