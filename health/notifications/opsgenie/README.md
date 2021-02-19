@@ -20,10 +20,11 @@ directory](/docs/configure/nodes.md):
 ./edit-config health_alarm_notify.conf
 ```
 
-Change the variable `OPSGENIE_API_KEY` with the API key you got from Opsgenie. 
-`OPSGENIE_API_URL` defaults to https://api.opsgenie.com, however there are region specific API URLs such as https://eu.api.opsgenie.com, so set this if required.
+Change the variable `OPSGENIE_API_KEY` with the API key you got from Opsgenie. `OPSGENIE_API_URL` defaults to
+`https://api.opsgenie.com`, however there are region-specific API URLs such as `https://eu.api.opsgenie.com`, so set
+this if required.
 
-```
+```conf
 SEND_OPSGENIE="YES"
 
 # Api key

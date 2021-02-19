@@ -1,3 +1,7 @@
+<!--
+custom_edit_url: null
+-->
+
 # Changelog
 
 ## [v1.29.2](https://github.com/netdata/netdata/tree/v1.29.2) (2021-02-18)
