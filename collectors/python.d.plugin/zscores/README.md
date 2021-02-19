@@ -53,7 +53,7 @@ Install the underlying Python requirements, Enable the collector and restart Net
 cd /etc/netdata/
 sudo ./edit-config python.d.conf
 # Set `zscores: no` to `zscores: yes`
-sudo service netdata restart
+sudo systemctl restart netdata
 ```
 
 The configuration for the zscores collector defines how it will behave on your system and might take some experimentation with over time to set it optimally. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-netdata/) to get you started. 
