@@ -77,12 +77,6 @@ parent:
           memory mode = dbengine
           dbengine_multihost_disk_space = 4000
           default memory mode = dbengine
-          
-        [plugins]
-          apps = yes
-          proc = yes
-          go.d = yes
-          python.d = yes
  
 child:
   claiming:
