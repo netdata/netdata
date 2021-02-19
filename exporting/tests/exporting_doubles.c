@@ -168,6 +168,13 @@ int __mock_end_batch_formatting(struct instance *instance)
     return mock_type(int);
 }
 
+int __wrap_simple_connector_end_batch(struct instance *instance)
+{
+    function_called();
+    check_expected_ptr(instance);
+    return mock_type(int);
+}
+
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
 void *__wrap_init_write_request()
 {

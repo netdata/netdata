@@ -108,10 +108,22 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 }
 
+static inline int rrdcalc_test_additional_restriction(RRDCALC *rc, RRDSET *st){
+    if (rc->module_match && !simple_pattern_matches(rc->module_pattern, st->module_name))
+        return 0;
+
+    if (rc->plugin_match && !simple_pattern_matches(rc->plugin_pattern, st->plugin_name))
+        return 0;
+
+    return 1;
+}
+
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if(     (rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
-            (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name)))
-        return 1;
+    if(((rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
+        (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name))) &&
+        rrdcalc_test_additional_restriction(rc, st)) {
+            return 1;
+    }
 
     return 0;
 }
@@ -310,7 +322,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->calculation) {
         rc->calculation->status = &rc->status;
-        rc->calculation->this = &rc->value;
+        rc->calculation->myself = &rc->value;
         rc->calculation->after = &rc->db_after;
         rc->calculation->before = &rc->db_before;
         rc->calculation->rrdcalc = rc;
@@ -318,7 +330,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->warning) {
         rc->warning->status = &rc->status;
-        rc->warning->this = &rc->value;
+        rc->warning->myself = &rc->value;
         rc->warning->after = &rc->db_after;
         rc->warning->before = &rc->db_before;
         rc->warning->rrdcalc = rc;
@@ -326,7 +338,7 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(rc->critical) {
         rc->critical->status = &rc->status;
-        rc->critical->this = &rc->value;
+        rc->critical->myself = &rc->value;
         rc->critical->after = &rc->db_after;
         rc->critical->before = &rc->db_before;
         rc->critical->rrdcalc = rc;
@@ -564,6 +576,10 @@ void rrdcalc_free(RRDCALC *rc) {
     simple_pattern_free(rc->spdim);
     freez(rc->labels);
     simple_pattern_free(rc->splabels);
+    freez(rc->module_match);
+    simple_pattern_free(rc->module_pattern);
+    freez(rc->plugin_match);
+    simple_pattern_free(rc->plugin_pattern);
     freez(rc);
 }
 

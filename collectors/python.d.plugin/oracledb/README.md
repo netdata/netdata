@@ -41,6 +41,10 @@ It produces following charts:
     -   Size
     -   Usage
     -   Usage In Percent
+-   allocated space
+    -   Size
+    -   Usage
+    -   Usage In Percent
 
 ## prerequisite
 

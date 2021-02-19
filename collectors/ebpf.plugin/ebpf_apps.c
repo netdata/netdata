@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
@@ -910,10 +911,8 @@ static inline void del_pid_entry(pid_t pid)
 
 /**
  * Remove PIDs when they are not running more.
- *
- * @param out is the structure where PIDs are stored.
  */
-void cleanup_exited_pids(ebpf_process_stat_t **out)
+void cleanup_exited_pids()
 {
     struct pid_stat *p = NULL;
 
@@ -926,10 +925,19 @@ void cleanup_exited_pids(ebpf_process_stat_t **out)
             p = p->next;
             del_pid_entry(r);
 
-            ebpf_process_stat_t *w = out[r];
-            if (w) {
-                freez(w);
-                out[r] = NULL;
+            // Clean process structure
+            freez(global_process_stats[r]);
+            global_process_stats[r] = NULL;
+
+            freez(current_apps_data[r]);
+            current_apps_data[r] = NULL;
+            prev_apps_data[r] = NULL;
+
+            // Clean socket structures
+            if (socket_bandwidth_curr) {
+                freez(socket_bandwidth_curr[r]);
+                socket_bandwidth_curr[r] = NULL;
+                socket_bandwidth_prev[r] = NULL;
             }
         } else {
             if (unlikely(p->keep))
@@ -1007,12 +1015,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  * Read data from hash table and store it in appropriate vectors.
  * It also creates the link between targets and PIDs.
  *
- * @param out                   the output vector where we store data read from hash table.
- * @param index                 the vector to store the indexes read.
- * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
-void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int tbl_pid_stats_fd)
+void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
@@ -1032,25 +1037,36 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
 
     read_proc_filesystem();
 
-    int counter = 0;
     uint32_t key;
     pids = root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
-        ebpf_process_stat_t *w = out[key];
+        ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
             w = mallocz(sizeof(ebpf_process_stat_t));
-            out[key] = w;
+            global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+            // Clean Process structures
+            freez(w);
+            global_process_stats[key] = NULL;
+
+            freez(current_apps_data[key]);
+            current_apps_data[key] = NULL;
+            prev_apps_data[key] = NULL;
+
+            // Clean socket structures
+            if (socket_bandwidth_curr) {
+                freez(socket_bandwidth_curr[key]);
+                socket_bandwidth_curr[key] = NULL;
+                socket_bandwidth_prev[key] = NULL;
+            }
+
             pids = pids->next;
             continue;
         }
-
-        index[counter] = key;
-        counter++;
 
         pids = pids->next;
     }
@@ -1062,11 +1078,9 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
-    struct pid_stat *p = NULL;
-
     // // concentrate everything on the targets
-    for (p = root_of_pids; p; p = p->next)
-        aggregate_pid_on_target(p->target, p, NULL);
+    for (pids = root_of_pids; pids; pids = pids->next)
+        aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);
 }

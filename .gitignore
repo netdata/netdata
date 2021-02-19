@@ -146,6 +146,8 @@ cmake-build-release/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+.cmake
+compile_commands.json
 
 # jetbrains IDE
 .jetbrains*

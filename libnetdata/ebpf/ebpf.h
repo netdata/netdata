@@ -68,16 +68,38 @@ typedef struct ebpf_data {
     int isrh;
 } ebpf_data_t;
 
+typedef enum {
+    MODE_RETURN = 0, // This attaches kprobe when the function returns
+    MODE_DEVMODE,    // This stores log given description about the errors raised
+    MODE_ENTRY       // This attaches kprobe when the function is called
+} netdata_run_mode_t;
+
+typedef struct ebpf_module {
+    const char *thread_name;
+    const char *config_name;
+    int enabled;
+    void *(*start_routine)(void *);
+    int update_time;
+    int global_charts;
+    int apps_charts;
+    netdata_run_mode_t mode;
+    netdata_ebpf_events_t *probes;
+    uint32_t thread_id;
+    int optional;
+} ebpf_module_t;
+
+#define NETDATA_MAX_PROBES 64
+
 extern int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr);
 extern int get_kernel_version(char *out, int size);
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 extern char *ebpf_kernel_suffix(int version, int isrh);
 extern int ebpf_update_kernel(ebpf_data_t *ef);
-extern int ebpf_load_program(char *plugins_dir,
-                             int event_id, int mode,
+extern struct bpf_link **ebpf_load_program(char *plugins_dir,
+                             ebpf_module_t *em,
                              char *kernel_string,
-                             const char *name,
+                             struct bpf_object **obj,
                              int *map_fd);
 
 #endif /* NETDATA_EBPF_H */

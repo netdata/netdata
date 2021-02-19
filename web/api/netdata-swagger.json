@@ -130,13 +130,24 @@
           {
             "name": "chart",
             "in": "query",
-            "description": "The id of the chart as returned by the /charts call.",
-            "required": true,
+            "description": "The id of the chart as returned by the /charts call. Note chart or context must be specified",
+            "required": false,
             "allowEmptyValue": false,
             "schema": {
               "type": "string",
               "format": "as returned by /charts",
               "default": "system.cpu"
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "The context of the chart as returned by the /charts call. Note chart or context must be specified",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts"
             }
           },
           {
@@ -156,7 +167,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). If not specified the default is -600 seconds. Netdata will adapt this parameter to the boundaries of the round robin database unless the allow_past option is specified.",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -273,7 +284,8 @@
                   "unaligned",
                   "match-ids",
                   "match-names",
-                  "showcustomvars"
+                  "showcustomvars",
+                  "allow_past"
                 ]
               },
               "default": [
@@ -328,7 +340,7 @@
             "description": "Bad request - the body will include a message stating what is wrong."
           },
           "404": {
-            "description": "No chart with the given id is found."
+            "description": "Chart or context is not found. The supplied chart or context will be reported."
           },
           "500": {
             "description": "Internal server error. This usually means the server is out of memory."
@@ -478,7 +490,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -520,7 +532,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -551,7 +563,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -812,7 +824,7 @@
     "/alarms": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the Netdata agent. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned, the same response is delivered when \"?active\" is passed in the URL. By passing \"?all\", all the enabled alarms are returned.",
+        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned.",
         "parameters": [
           {
             "name": "all",
@@ -852,7 +864,7 @@
     "/alarms_values": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the Netdata agent. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned, the same response is delivered when \"?active\" is passed in the URL. By passing \"?all\", all the enabled alarms are returned.",
+        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value` and alarm `status`.",
         "parameters": [
           {
             "name": "all",

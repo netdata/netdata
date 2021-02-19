@@ -30,7 +30,7 @@ typedef struct registry_person_url REGISTRY_PERSON_URL;
 struct registry_person {
     char guid[GUID_LEN + 1];    // the person GUID
 
-    avl_tree person_urls;       // dictionary of PERSON_URLs
+    avl_tree_type person_urls;  // dictionary of PERSON_URLs
 
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this

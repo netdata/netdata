@@ -24,13 +24,15 @@ static netdata_publish_syscall_t *process_publish_aggregated = NULL;
 
 static ebpf_data_t process_data;
 
-static ebpf_process_stat_t **local_process_stats = NULL;
-static ebpf_process_publish_apps_t **current_apps_data = NULL;
-static ebpf_process_publish_apps_t **prev_apps_data = NULL;
+ebpf_process_stat_t **global_process_stats = NULL;
+ebpf_process_publish_apps_t **current_apps_data = NULL;
+ebpf_process_publish_apps_t **prev_apps_data = NULL;
 
 int process_enabled = 0;
 
 static int *map_fd = NULL;
+static struct bpf_object *objects = NULL;
+static struct bpf_link **probe_links = NULL;
 
 /*****************************************************************
  *
@@ -201,11 +203,11 @@ void ebpf_process_remove_pids()
     int pid_fd = map_fd[0];
     while (pids) {
         uint32_t pid = pids->pid;
-        ebpf_process_stat_t *w = local_process_stats[pid];
+        ebpf_process_stat_t *w = global_process_stats[pid];
         if (w) {
             if (w->removeme) {
                 freez(w);
-                local_process_stats[pid] = NULL;
+                global_process_stats[pid] = NULL;
                 bpf_map_delete_elem(pid_fd, &pid);
             }
         }
@@ -432,12 +434,14 @@ static void read_hash_global_tables()
  */
 static void ebpf_process_update_apps_data()
 {
-    size_t i;
-    for (i = 0; i < all_pids_count; i++) {
-        uint32_t current_pid = pid_index[i];
-        ebpf_process_stat_t *ps = local_process_stats[current_pid];
-        if (!ps)
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        uint32_t current_pid = pids->pid;
+        ebpf_process_stat_t *ps = global_process_stats[current_pid];
+        if (!ps) {
+            pids = pids->next;
             continue;
+        }
 
         ebpf_process_publish_apps_t *cad = current_apps_data[current_pid];
         ebpf_process_publish_apps_t *pad = prev_apps_data[current_pid];
@@ -477,6 +481,8 @@ static void ebpf_process_update_apps_data()
         cad->bytes_read = (uint64_t)ps->read_bytes + (uint64_t)ps->readv_bytes;
 
         ebpf_process_update_apps_publish(cad, pad, lstatus);
+
+        pids = pids->next;
     }
 }
 
@@ -832,8 +838,8 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
-        cleanup_exited_pids(local_process_stats);
-        collect_data_for_all_processes(local_process_stats, pid_index, pid_fd);
+        cleanup_exited_pids();
+        collect_data_for_all_processes(pid_fd);
 
         ebpf_create_apps_charts(em, apps_groups_root_target);
 
@@ -866,6 +872,40 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *
  *****************************************************************/
 
+void clean_global_memory() {
+    int pid_fd = map_fd[0];
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        uint32_t pid = pids->pid;
+        freez(global_process_stats[pid]);
+
+        bpf_map_delete_elem(pid_fd, &pid);
+        freez(current_apps_data[pid]);
+
+        pids = pids->next;
+    }
+}
+
+void clean_pid_on_target(struct pid_on_target *ptr) {
+    while (ptr) {
+        struct pid_on_target *next = ptr->next;
+        freez(ptr);
+
+        ptr = next;
+    }
+}
+
+void clean_apps_structures(struct target *ptr) {
+    struct target *agdt = ptr;
+    while (agdt) {
+        struct target *next = agdt->next;
+        clean_pid_on_target(agdt->root_pid);
+        freez(agdt);
+
+        agdt = next;
+    }
+}
+
 /**
  * Clean up the main thread.
  *
@@ -873,17 +913,35 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  */
 static void ebpf_process_cleanup(void *ptr)
 {
-    (void)ptr;
+    UNUSED(ptr);
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 200*USEC_PER_MS;
+    while (!finalized_threads) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
 
     freez(process_aggregated_data);
     freez(process_publish_aggregated);
     freez(process_hash_values);
 
-    freez(local_process_stats);
-
-    freez(process_data.map_fd);
+    clean_global_memory();
+    freez(global_process_stats);
     freez(current_apps_data);
     freez(prev_apps_data);
+
+    clean_apps_structures(apps_groups_root_target);
+    freez(process_data.map_fd);
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
 }
 
 /*****************************************************************
@@ -905,7 +963,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    local_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
+    global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
     current_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
     prev_apps_data = callocz((size_t)pid_max, sizeof(ebpf_process_publish_apps_t *));
 }
@@ -1000,8 +1058,8 @@ void *ebpf_process_thread(void *ptr)
     }
 
     set_local_pointers();
-    if (ebpf_load_program(
-            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, process_data.map_fd)) {
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
+    if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }

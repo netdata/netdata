@@ -51,6 +51,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for network interfaces.'
     },
 
+    'wireless': {
+        title: 'Wireless Interfaces',
+        icon: '<i class="fas fa-wifi"></i>',
+        info: 'Performance metrics for wireless interfaces.'
+    },
+
     'ip': {
         title: 'Networking Stack',
         icon: '<i class="fas fa-cloud"></i>',
@@ -191,14 +197,38 @@ netdataDashboard.menu = {
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
-    'aclk_test': {
-        title: 'ACLK Test Generator',
-        info: 'For internal use to perform integration testing.'
+    'anomalies': {
+        title: 'Anomalies',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Anomaly scores relating to key system metrics.'
+    },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
+    
+    'correlations': {
+        title: 'Correlations',
+        icon: '<i class="fas fa-random"></i>',
+        info: 'Cross correlations relating to key system metrics.'
+    },
+    
+    'smoothing': {
+        title: 'Smoothing',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Smoothing'
     },
 
     'example': {
         title: 'Example Charts',
         info: 'Example charts, demonstrating the external plugin architecture.'
+    },
+
+    'example2': {
+        title: 'Example Charts 2',
+        info: 'Example charts 2, demonstrating the external plugin architecture.'
     },
 
     'cgroup': {
@@ -753,15 +783,33 @@ netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
             void (os);
-            return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
+            return 'Total CPU utilization (all cores).. 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
                 + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
         },
         valueRange: "[0, 100]"
     },
 
+    'anomalies.score': {
+        info: 'This is the raw anomaly score from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
+            'It can be on different scales depending on the type of model used ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.decision_function">PyOD docs</a>).'
+    },
+
+    'anomalies.prob': {
+        info: 'This is the anomaly probability from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model. ' +
+            'This represents a post processing of the raw scores into a [0,1] range so as to behave more like a probability ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict_proba">PyOD docs</a>).'
+    },
+
+    'anomalies.flag': {
+        info: 'This is the anomaly flag from the trained <a href="https://pyod.readthedocs.io/en/latest/index.html">PyOD</a> model,' +
+            'it predicts a 1 if the model judges a particular observation to be an outlier ' +
+            '(<a href="https://pyod.readthedocs.io/en/latest/api_cc.html#pyod.models.base.BaseDetector.predict">PyOD docs</a>).'
+    },
+
     'system.load': {
-        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
+        info: 'Current system load, i.e.. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
         height: 0.7
     },
 
@@ -2272,6 +2320,106 @@ netdataDashboard.context = {
             '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
 
+     // ------------------------------------------------------------------------
+    // go web_log
+
+    'web_log.type_requests': {
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="success"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Successful"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redirect"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Redirects"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="bad"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Bad Requests"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="error"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Server Errors"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.request_processing_time': {
+        mainheads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="avg"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Average Response Time"'
+                    + ' data-units="milliseconds"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
     // ------------------------------------------------------------------------
     // Fronius Solar Power
 
@@ -2443,6 +2591,16 @@ netdataDashboard.context = {
 
     'rabbitmq.disk_space': {
         info: 'Total amount of disk space consumed by the message store(s).  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-disk-space" target=_"blank">Disk Space Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.queue_messages': {
+        info: 'Total amount of messages and their states in this queue.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.queue_messages_stats': {
+        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
@@ -3293,7 +3451,7 @@ netdataDashboard.context = {
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="queue_message_in"'
                     + ' data-chart-library="easypiechart"'
-                    + ' data-title="MQTT Recieve Rate"'
+                    + ' data-title="MQTT Receive Rate"'
                     + ' data-units="messages/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="14%"'
@@ -3544,5 +3702,89 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
         ],
+    },
+
+    // ------------------------------------------------------------------------
+    // Nvidia-smi
+
+    'nvidia_smi.fan_speed': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="speed"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Fan Speed"'
+                    + ' data-units="percentage"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.temperature': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="temp"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Temperature"'
+                    + ' data-units="celsius"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.memory_allocated': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Used Memory"'
+                    + ' data-units="MiB"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+    'nvidia_smi.power': {
+        heads: [
+            function (os, id) {
+                void (os);
+                return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="power"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Power Utilization"'
+                    + ' data-units="watts"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
     },
 };

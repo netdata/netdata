@@ -60,6 +60,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
+| [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
+| [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
@@ -148,6 +150,31 @@ begin with `redis`.
 
 ```yaml
 hosts: server1 server2 database* !redis3 redis*
+```
+
+#### Alarm line `plugin`
+
+The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
+you can create a filter for an alarm that applies specifically to `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+```
+
+The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
+inclusive filter that is unlikely to be of much use in production. See [`module`](#alarm-line-module) for a
+comprehensive example using both.
+
+#### Alarm line `module`
+
+The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+module: isc_dhcpd
 ```
 
 #### Alarm line `families`

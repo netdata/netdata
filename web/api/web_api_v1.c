@@ -35,6 +35,7 @@ static struct {
         , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
+        , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
         , {                  NULL, 0, 0}
 };
 
@@ -650,6 +651,9 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 /*
     int redirects = 0;
 */
+
+	// Don't cache registry responses
+    buffer_no_cacheable(w->response.data);
 
     while(url) {
         char *value = mystrsep(&url, "&");

@@ -24,8 +24,6 @@ Build-Depends: debhelper (>= 9),
                automake,
                pkg-config,
                curl,
-               gcc,
-               g++,
                protobuf-compiler
 Section: net
 Priority: optional

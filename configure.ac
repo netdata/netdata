@@ -172,6 +172,15 @@ AC_ARG_ENABLE(
     ,
     [enable_ebpf="detect"]
 )
+AC_ARG_WITH(
+    [bundled-lws],
+    [AS_HELP_STRING([--with-bundled-lws=DIR], [Use a specific Libwebsockets static library @<:@default use system library@:>@])],
+    [
+        with_bundled_lws="yes"
+        bundled_lws_dir="${withval}"
+    ],
+    [with_bundled_lws="no"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -651,15 +660,27 @@ if test "$enable_cloud" != "no"; then
     fi
     AC_MSG_RESULT([${HAVE_libmosquitto_a}])
 
-    AC_MSG_CHECKING([if libwebsockets static lib is present])
-    if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
-        LWS_CFLAGS="-I externaldeps/libwebsockets/include"
-        HAVE_libwebsockets_a="yes"
+    if test "${with_bundled_lws}" = "yes"; then
+        AC_MSG_CHECKING([if libwebsockets static lib is present])
+        if test -f "${bundled_lws_dir}/libwebsockets.a"; then
+            LWS_CFLAGS="-I ${bundled_lws_dir}/include"
+            OPTIONAL_LWS_LIBS="${bundled_lws_dir}/libwebsockets.a"
+            AC_MSG_RESULT([yes])
+            AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
+        else
+            AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+            # this should be error if installer ever changes default to system
+            # as currently this is default we prefer building netdata without ACLK
+            # instead of error fail
+            AC_MSG_RESULT([no])
+            AC_MSG_WARN([You required static libwebsockets to be used but we can't use it. Disabling ACLK])
+        fi
     else
-        HAVE_libwebsockets_a="no"
-        AC_DEFINE([ACLK_NO_LWS], [1], [libwebsockets.a was not found during build.])
+        AC_CHECK_LIB([websockets],
+            [lws_get_vhost_by_name],
+            [OPTIONAL_LWS_LIBS="-lwebsockets"],
+            [AC_DEFINE([ACLK_NO_LWS], [1], [usable system libwebsockets was not found during build.])])
     fi
-    AC_MSG_RESULT([${HAVE_libwebsockets_a}])
 
     if test "${build_target}" = "linux" -a "${enable_cloud}" != "no"; then
         if test "${have_libcap}" = "yes" -a "${with_libcap}" = "no"; then
@@ -678,7 +699,7 @@ if test "$enable_cloud" != "no"; then
         AC_MSG_ERROR([You have asked for ACLK to be built but no json-c available. ACLK requires json-c])
 
     AC_MSG_CHECKING([if netdata agent-cloud-link can be enabled])
-    if test "${HAVE_libmosquitto_a}" = "yes" -a "${HAVE_libwebsockets_a}" = "yes" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
+    if test "${HAVE_libmosquitto_a}" = "yes" -a -n "${OPTIONAL_LWS_LIBS}" -a -n "${SSL_LIBS}" -a "${enable_jsonc}" = "yes"; then
         can_enable_aclk="yes"
     else
         can_enable_aclk="no"
@@ -989,36 +1010,38 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # ebpf.plugin
 
-PKG_CHECK_MODULES(
-    [LIBELF],
-    [libelf],
-    [have_libelf=yes],
-    [have_libelf=no]
-)
+if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
+    PKG_CHECK_MODULES(
+        [LIBELF],
+        [libelf],
+        [have_libelf=yes],
+        [have_libelf=no]
+    )
 
-AC_CHECK_TYPE(
-    [struct bpf_prog_info],
-    [have_bpf=yes],
-    [have_bpf=no],
-    [#include <linux/bpf.h>]
-)
+    AC_CHECK_TYPE(
+        [struct bpf_prog_info],
+        [have_bpf=yes],
+        [have_bpf=no],
+        [#include <linux/bpf.h>]
+    )
 
-AC_CHECK_FILE(
-    externaldeps/libbpf/libbpf.a,
-    [have_libbpf=yes],
-    [have_libbpf=no]
-)
+    AC_CHECK_FILE(
+        externaldeps/libbpf/libbpf.a,
+        [have_libbpf=yes],
+        [have_libbpf=no]
+    )
 
-AC_MSG_CHECKING([if ebpf.plugin should be enabled])
-if test "${build_target}" = "linux" -a \
-        "${enable_ebpf}" != "no" -a \
-        "${have_libelf}" = "yes" -a \
-        "${have_bpf}" = "yes" -a \
-        "${have_libbpf}" = "yes"; then
-    OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
-    OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
-    AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
-    enable_ebpf="yes"
+    AC_MSG_CHECKING([if ebpf.plugin should be enabled])
+    if test "${have_libelf}" = "yes" -a \
+            "${have_bpf}" = "yes" -a \
+            "${have_libbpf}" = "yes"; then
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
+        OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
+        AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
+        enable_ebpf="yes"
+    else
+        enable_ebpf="no"
+    fi
 else
     enable_ebpf="no"
 fi
@@ -1450,6 +1473,7 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
+AC_SUBST([OPTIONAL_LWS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing

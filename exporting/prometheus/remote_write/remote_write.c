@@ -10,28 +10,18 @@ char family[PROMETHEUS_ELEMENT_MAX + 1];
 char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
 /**
- * Send header to a server
+ * Prepare HTTP header
  *
- * @param sock a communication socket.
  * @param instance an instance data structure.
- * @return Returns 0 on success, 1 on failure.
  */
-int prometheus_remote_write_send_header(int *sock, struct instance *instance)
+void prometheus_remote_write_prepare_header(struct instance *instance)
 {
-    int flags = 0;
-#ifdef MSG_NOSIGNAL
-    flags += MSG_NOSIGNAL;
-#endif
-
     struct prometheus_remote_write_specific_config *connector_specific_config =
         instance->config.connector_specific_config;
-
-    static BUFFER *header;
-    if (!header)
-        header = buffer_create(0);
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
 
     buffer_sprintf(
-        header,
+        simple_connector_data->last_buffer->header,
         "POST %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "Accept: */*\r\n"
@@ -40,17 +30,7 @@ int prometheus_remote_write_send_header(int *sock, struct instance *instance)
         "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
         connector_specific_config->remote_write_path,
         instance->config.destination,
-        buffer_strlen((BUFFER *)instance->buffer));
-
-    size_t header_len = buffer_strlen(header);
-    ssize_t written = send(*sock, buffer_tostring(header), header_len, flags);
-
-    buffer_flush(header);
-
-    if (written != -1 && (size_t)written == header_len)
-        return 0;
-    else
-        return 1;
+        buffer_strlen(simple_connector_data->last_buffer->buffer));
 }
 
 /**
@@ -90,7 +70,8 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
  */
 void clean_prometheus_remote_write(struct instance *instance)
 {
-    freez(instance->connector_specific_data);
+    struct simple_connector_data *simple_connector_data = instance->connector_specific_data;
+    freez(simple_connector_data->connector_specific_data);
 
     struct prometheus_remote_write_specific_config *connector_specific_config =
         instance->config.connector_specific_config;
@@ -115,22 +96,32 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = format_batch_prometheus_remote_write;
 
-    instance->send_header = prometheus_remote_write_send_header;
+    instance->prepare_header = prometheus_remote_write_prepare_header;
     instance->check_response = process_prometheus_remote_write_response;
 
     instance->buffer = (void *)buffer_create(0);
-    if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
-        return 1;
-    }
+
     if (uv_mutex_init(&instance->mutex))
         return 1;
     if (uv_cond_init(&instance->cond_var))
         return 1;
 
+    struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
+    instance->connector_specific_data = simple_connector_data;
+
+#ifdef ENABLE_HTTPS
+    simple_connector_data->flags = NETDATA_SSL_START;
+    simple_connector_data->conn = NULL;
+    if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
+        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+    }
+#endif
+
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));
-    instance->connector_specific_data = (void *)connector_specific_data;
+    simple_connector_data->connector_specific_data = (void *)connector_specific_data;
+
+    simple_connector_init(instance);
 
     connector_specific_data->write_request = init_write_request();
 
@@ -148,8 +139,10 @@ int init_prometheus_remote_write_instance(struct instance *instance)
  */
 int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(
@@ -198,19 +191,17 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
     prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
     prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-    if (likely(can_send_rrdset(instance, st))) {
-        as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
-        homogeneous = 1;
-        if (as_collected) {
-            if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
-                rrdset_update_heterogeneous_flag(st);
+    as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
+    homogeneous = 1;
+    if (as_collected) {
+        if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+            rrdset_update_heterogeneous_flag(st);
 
-            if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
-                homogeneous = 0;
-        } else {
-            if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
-                prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
-        }
+        if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+            homogeneous = 0;
+    } else {
+        if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AVERAGE)
+            prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
     }
 
     return 0;
@@ -225,8 +216,10 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
  */
 int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *rd)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     if (rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
         char name[PROMETHEUS_LABELS_MAX + 1];
@@ -247,7 +240,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     (unsigned long)rd->last_collected_time.tv_sec,
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
-                return 1;
+                return 0;
             }
 
             if (homogeneous) {
@@ -322,8 +315,10 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
  */
 int format_batch_prometheus_remote_write(struct instance *instance)
 {
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
     struct prometheus_remote_write_specific_data *connector_specific_data =
-        (struct prometheus_remote_write_specific_data *)instance->connector_specific_data;
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
     size_t data_size = get_write_request_size(connector_specific_data->write_request);
 
@@ -341,6 +336,8 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     }
     buffer->len = data_size;
     instance->stats.buffered_bytes = (collected_number)buffer_strlen(buffer);
+
+    simple_connector_end_batch(instance);
 
     return 0;
 }

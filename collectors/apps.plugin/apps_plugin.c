@@ -535,7 +535,7 @@ enum user_or_group_id_type {
 struct user_or_group_ids{
     enum user_or_group_id_type type;
 
-    avl_tree index;
+    avl_tree_type index;
     struct user_or_group_id *root;
 
     char filename[FILENAME_MAX + 1];
@@ -1691,7 +1691,7 @@ int file_descriptor_compare(void* a, void* b) {
 
 // int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
 
-avl_tree all_files_index = {
+avl_tree_type all_files_index = {
         NULL,
         file_descriptor_compare
 };

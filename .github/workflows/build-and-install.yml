@@ -24,28 +24,30 @@ jobs:
       matrix:
         distro:
           - 'alpine:edge'
+          - 'alpine:3.12'
           - 'alpine:3.11'
           - 'alpine:3.10'
           - 'alpine:3.9'
           - 'archlinux:latest'
-            #- 'centos:8'
+          - 'centos:8'
           - 'centos:7'
           - 'clearlinux:latest'
-          - 'debian:bullseye'
-          - 'debian:buster'
-          - 'debian:stretch'
-          - 'debian:jessie'
+          - 'debian:10'
+          - 'debian:9'
+          - 'fedora:33'
           - 'fedora:32'
-          - 'fedora:31'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.1'
           - 'opensuse/tumbleweed:latest'
+          - 'ubuntu:20.10'
           - 'ubuntu:20.04'
-          - 'ubuntu:19.10'
           - 'ubuntu:18.04'
           - 'ubuntu:16.04'
         include:
           - distro: 'alpine:edge'
+            pre: 'apk add -U bash'
+            rmjsonc: 'apk del json-c-dev'
+          - distro: 'alpine:3.12'
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
           - distro: 'alpine:3.11'
@@ -61,22 +63,19 @@ jobs:
           - distro: 'archlinux:latest'
             pre: 'pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi'
 
-            #- distro: 'centos:8'
-            #rmjsonc: 'dnf remove -y json-c-devel'
-
-          - distro: 'debian:bullseye'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'debian:buster'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'debian:stretch'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-
-          - distro: 'fedora:32'
+          - distro: 'centos:8'
             rmjsonc: 'dnf remove -y json-c-devel'
-          - distro: 'fedora:31'
+
+          - distro: 'debian:10'
+            pre: 'apt-get update'
+            rmjsonc: 'apt-get remove -y libjson-c-dev'
+          - distro: 'debian:9'
+            pre: 'apt-get update'
+            rmjsonc: 'apt-get remove -y libjson-c-dev'
+
+          - distro: 'fedora:33'
+            rmjsonc: 'dnf remove -y json-c-devel'
+          - distro: 'fedora:32'
             rmjsonc: 'dnf remove -y json-c-devel'
 
           - distro: 'opensuse/leap:15.2'
@@ -86,10 +85,10 @@ jobs:
           - distro: 'opensuse/tumbleweed:latest'
             rmjsonc: 'zypper rm -y libjson-c-devel'
 
-          - distro: 'ubuntu:20.04'
+          - distro: 'ubuntu:20.10'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'ubuntu:19.10'
+          - distro: 'ubuntu:20.04'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'ubuntu:18.04'
@@ -130,24 +129,23 @@ jobs:
       fail-fast: false
       matrix:
         distro:
-          # XXX: CentOS 8.x is broken (libjudy)
-          # - 'centos:8'
+          - 'centos:8'
           - 'debian:buster'
           - 'fedora:32'
           - 'ubuntu:20.04'
         include:
-          #- distro: 'centos:8'
-          #  pre: >-
-          #    yum -y update &&
-          #    yum -y groupinstall 'Development Tools' &&
-          #    yum -y install libcurl-devel openssl-devel libuuid-devel
-          #  build_kinesis: >-
-          #    git clone https://github.com/aws/aws-sdk-cpp.git &&
-          #    cmake -DCMAKE_INSTALL_PREFIX=/usr
-          #    -DBUILD_ONLY=kinesis
-          #    ./aws-sdk-cpp &&
-          #    make &&
-          #    make install
+          - distro: 'centos:8'
+            pre: >-
+              yum -y update &&
+              yum -y groupinstall 'Development Tools' &&
+              yum -y install libcurl-devel openssl-devel libuuid-devel
+            build_kinesis: >-
+              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              cmake -DCMAKE_INSTALL_PREFIX=/usr
+              -DBUILD_ONLY=kinesis
+              ./aws-sdk-cpp &&
+              make &&
+              make install
           - distro: 'debian:buster'
             pre: >-
               apt-get update &&

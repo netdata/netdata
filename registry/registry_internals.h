@@ -57,7 +57,7 @@ struct registry {
     DICTIONARY *persons;    // dictionary of REGISTRY_PERSON *,  with key the REGISTRY_PERSON.guid
     DICTIONARY *machines;   // dictionary of REGISTRY_MACHINE *, with key the REGISTRY_MACHINE.guid
 
-    avl_tree registry_urls_root_index;
+    avl_tree_type registry_urls_root_index;
 
     netdata_mutex_t lock;
 };

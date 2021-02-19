@@ -27,41 +27,49 @@ nodes and get helpful pointers about collecting all the metrics from every criti
 > those nodes to your Space in Netdata Cloud. If you haven't yet, see the [_Get Netdata_ doc](/docs/get/README.md) for
 > details on installation and claiming.
 
-## See your infrastructure's metrics
-
-To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. As you
-sign in, Netdata Cloud pings each claimed node to start on-demand streaming from your nodes to your browser. When
-Netdata Cloud loads your War Room's **Nodes** view, you'll immediately see key metrics from your nodes, streamed in
-real time, in a single interface.
-
-![Animated GIF of Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/80828986-1ebb3b00-8b9b-11ea-957f-2c8d0d009e44.gif)
-
-You can drill down into any node's full dashboard by clicking on that node's hostname in the Nodes view.
-
-![Screenshot of an embedded node
-dashboard](https://user-images.githubusercontent.com/1153921/87457036-9b678e00-c5bc-11ea-977d-ad561a73beef.png)
-
-You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
-investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
-Learn about [interacting with dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from
-all of Netdata's real-time metrics.
-
 > If you want to monitor a Kubernetes cluster with Netdata, see our [k8s installation
 > doc](/packaging/installer/methods/kubernetes.md) for setup details, and then read our guide, [_Monitor a Kubernetes
 > cluster with Netdata_](/docs/guides/monitor/kubernetes-k8s-netdata.md).
 
-## Build new dashboards for your infrastructure
+## See an overview of your infrastructure
 
-You can use Netdata Cloud to build new dashboards that match your infrastructure's topology or help you diagnose complex
-issues by aggregating correlated charts from any number of nodes.
+To see all your nodes from a single pane of glass, first [sign in](https://app.netdata.cloud) to Netdata Cloud. As you
+navigate to a particular War Room, Netdata Cloud pings each claimed node to start on-demand streaming from your nodes to
+your browser. 
 
-To build your first dashboard, click on the **Nodes** dropdown, then select **+ Add**. Enter a name to assign to this
-dashboard. Click on either of the **Add chart** buttons, then select the node you want to add a chart from. Select the
-context, which is Netdata's way to organize charts, and then click **Add chart**.
+Netdata Cloud then visualizes all these metrics, from any number of distributed nodes, in the War Room's **Overview**.
+The Overview features composite charts, which display aggregated metrics from multiple nodes.
 
-Once you add a few charts, you can move them around, resize them, and add text. Make sure you click the **Save** button
-before you navigate away.
+![The War Room
+Overview](https://user-images.githubusercontent.com/1153921/95912630-e75ed600-0d57-11eb-8a3b-49e883d16833.png)
+
+Netdata Cloud also features the **Nodes view**, which you can use to configure and see a few key metrics from every node
+in the War Room, view health status, and more.
+
+![The Nodes view](https://user-images.githubusercontent.com/1153921/95909704-cb593580-0d53-11eb-88fa-a3416ab09849.png)
+
+Read more about both features in the [infrastructure overview](/docs/visualize/overview-infrastructure.md) doc.
+
+## Drill down to specific nodes
+
+Both the Overview and Nodes view offer easy access to **single-node dashboards** for targeted analysis. You can use
+single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to investigate
+historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
+
+Read about the process in the [infrastructure
+overview](/docs/visualize/overview-infrastructure.md#single-node-dashboards) doc, then learn about [interacting with
+dashboards and charts](/docs/visualize/interact-dashboards-charts.md) to get the most from all of Netdata's real-time
+metrics.
+
+## Create new dashboards
+
+You can use Netdata Cloud to create new dashboards that match your infrastructure's topology or help you diagnose
+complex issues by aggregating correlated charts from any number of nodes. For example, you could monitor the system CPU
+from every node in your infrastructure on a single dashboard.
+
+![An example system CPU
+dashboard](https://user-images.githubusercontent.com/1153921/95915568-2db63400-0d5c-11eb-92cc-3c61cb6519dd.png)
+)
 
 Read more about [creating new dashboards](/docs/visualize/create-dashboards.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
@@ -114,10 +122,10 @@ Once you have a handle on configuration and are collecting all the right metrics
 infrastructure-focused features:
 
 -   [Organize your nodes](/docs/configure/spaces-war-rooms.md) into **War Rooms** based on your preferred strategy.
+-   [See an overview of your infrastructure](/docs/visualize/overview-infrastructure.md) using Netdata Cloud's various
+    preconfigured dashboards.
 -   [Invite your team](/docs/configure/invite-collaborate.md) to collaborate on identifying anomalies or troubleshooting
     complex performance problems.
--   [Export metrics](/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
-    other monitoring and troubleshooting tools.
 
 To change how the Netdata Agent runs on each node, dig in to configuration files:
 
@@ -127,5 +135,7 @@ To change how the Netdata Agent runs on each node, dig in to configuration files
 -   [Create new alarms](/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top
     of anomalies.
 -   [Enable notifications](/docs/monitor/enable-notifications.md) to Slack, PagerDuty, email, and 30+ other services.
+-   [Export metrics](/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
+    other monitoring and troubleshooting tools.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fquickstart%2Finfrastructure&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

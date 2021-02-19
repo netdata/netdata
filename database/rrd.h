@@ -18,6 +18,7 @@ typedef struct context_param CONTEXT_PARAM;
 // forward declarations
 struct rrddim_volatile;
 struct rrdset_volatile;
+struct context_param;
 #ifdef ENABLE_DBENGINE
 struct rrdeng_page_descr;
 struct rrdengine_instance;
@@ -32,6 +33,12 @@ struct pg_cache_page_index;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
+
+struct context_param {
+    RRDDIM *rd;
+    time_t first_entry_t;
+    time_t last_entry_t;
+};
 
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2

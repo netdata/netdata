@@ -40,15 +40,23 @@ int init_connectors(struct engine *engine)
                 if (init_graphite_instance(instance) != 0)
                     return 1;
                 break;
+            case EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP:
+                if (init_graphite_instance(instance) != 0)
+                    return 1;
+                break;
             case EXPORTING_CONNECTOR_TYPE_JSON:
                 if (init_json_instance(instance) != 0)
                     return 1;
                 break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET:
+            case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
+                if (init_json_http_instance(instance) != 0)
+                    return 1;
+                break;
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
                 if (init_opentsdb_telnet_instance(instance) != 0)
                     return 1;
                 break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP:
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
                 if (init_opentsdb_http_instance(instance) != 0)
                     return 1;
                 break;
@@ -95,4 +103,43 @@ int init_connectors(struct engine *engine)
     }
 
     return 0;
+}
+
+/**
+ * Initialize a ring buffer for a simple connector
+ *
+ * @param instance an instance data structure.
+ */
+void simple_connector_init(struct instance *instance)
+{
+    struct simple_connector_data *connector_specific_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+
+    if (connector_specific_data->first_buffer)
+        return;
+
+    connector_specific_data->header = buffer_create(0);
+    connector_specific_data->buffer = buffer_create(0);
+
+    // create a ring buffer
+    struct simple_connector_buffer *first_buffer = NULL;
+
+    if (instance->config.buffer_on_failures < 1)
+        instance->config.buffer_on_failures = 1;
+
+    for (int i = 0; i < instance->config.buffer_on_failures; i++) {
+        struct simple_connector_buffer *current_buffer = callocz(1, sizeof(struct simple_connector_buffer));
+
+        if (!connector_specific_data->first_buffer)
+            first_buffer = current_buffer;
+        else
+            current_buffer->next = connector_specific_data->first_buffer;
+
+        connector_specific_data->first_buffer = current_buffer;
+    }
+
+    first_buffer->next = connector_specific_data->first_buffer;
+    connector_specific_data->last_buffer = connector_specific_data->first_buffer;
+
+    return;
 }

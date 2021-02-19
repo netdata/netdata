@@ -67,14 +67,22 @@ charts](https://user-images.githubusercontent.com/1153921/93497197-071fed00-f8c5
 These interactions can also be triggered using the icons on the bottom-right corner of every chart. They are,
 respectively, `Pan Left`, `Reset`, `Pan Right`, `Zoom In`, and `Zoom Out`.
 
-You can show and hide individual dimensions by clicking on their names. Hiding dimensions simplifies the chart and can
-help you better discover exactly which aspect of your system is behaving strangely.
+You can show and hide individual dimensions by clicking on their names. Use `SHIFT + click` to hide or show dimensions
+one at a time. Hiding dimensions simplifies the chart and can help you better discover exactly which aspect of your
+system is behaving strangely.
 
 You can resize any chart by clicking-and-dragging the icon on the bottom-right corner of any chart. To restore the chart
 to its original height, double-click the same icon.
 
 ![Resizing a chart and resetting it to the default
 height](https://user-images.githubusercontent.com/1153921/93497272-1acb5380-f8c5-11ea-851c-6cd5ac247e41.gif)
+
+### Composite charts in Netdata Cloud
+
+Netdata Cloud now supports composite charts in the Overview interface. Composite charts come with a few additional UI
+elements and varied interactions, such as the location of dimensions and a utility bar for configuring the state of
+individual composite charts. All of these de4tails are covered in the [Overview
+reference](https://learn.netdata.cloud/docs/cloud/visualize/overview) doc.
 
 ## What's next?
 
@@ -85,5 +93,11 @@ perform more targeted troubleshooting, or keep tabs on a bird's eye view of your
 If you're finished with dashboards for now, skip to Netdata's health watchdog for information on [creating or
 configuring](/docs/monitor/configure-alarms.md) alarms, and [send notifications](/docs/monitor/enable-notifications.md)
 to get informed when something goes wrong in your infrastructure.
+
+### Related reference documentation
+
+-   [Netdata Agent · Web dashboards overview](/web/README.md)
+-   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
+-   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Finteract-dashboards-charts&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

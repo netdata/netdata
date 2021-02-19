@@ -181,7 +181,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
         r->read_buffer[scan] = 0;
         return &r->read_buffer[start];
     }
-    memcpy(r->read_buffer, &r->read_buffer[start], r->read_len - start);
+    memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
     r->read_len -= start;
     return NULL;
 }
@@ -279,8 +279,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
-    rpt->tags = (char*)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-    if(rpt->tags && !*rpt->tags) rpt->tags = NULL;
+    (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");

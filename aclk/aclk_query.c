@@ -22,6 +22,7 @@ static netdata_mutex_t queue_mutex = NETDATA_MUTEX_INITIALIZER;
 
 struct aclk_query {
     usec_t created;
+    usec_t created_boot_time;
     time_t run_after; // Delay run until after this time
     ACLK_CMD cmd;     // What command is this
     char *topic;      // Topic to respond to
@@ -233,6 +234,7 @@ int aclk_queue_query(char *topic, void *data, char *msg_id, char *query, int run
     new_query->data = data;
     new_query->next = NULL;
     new_query->created = now_realtime_usec();
+    new_query->created_boot_time = now_boottime_usec();
     new_query->run_after = run_after;
 
     debug(D_ACLK, "Added query (%s) (%s)", topic, query ? query : "");
@@ -319,22 +321,15 @@ static char *aclk_encode_response(char *src, size_t content_size, int keep_newli
 #pragma region ACLK_QUERY
 #endif
 
-static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
+static usec_t aclk_web_api_request_v1(RRDHOST *host, struct web_client *w, char *url, usec_t q_created)
 {
-    usec_t t;
+    usec_t t = now_boottime_usec();
+    aclk_metric_mat_update(&aclk_metrics_per_sample.cloud_q_recvd_to_processed, t - q_created);
 
-    t = now_monotonic_high_precision_usec();
     w->response.code = web_client_api_request_v1(host, w, url);
-    t = now_monotonic_high_precision_usec() - t;
+    t = now_boottime_usec() - t;
 
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_q_process_total += t;
-        aclk_metrics_per_sample.cloud_q_process_count++;
-        if (aclk_metrics_per_sample.cloud_q_process_max < t)
-            aclk_metrics_per_sample.cloud_q_process_max = t;
-        ACLK_STATS_UNLOCK;
-    }
+    aclk_metric_mat_update(&aclk_metrics_per_sample.cloud_q_db_query_time, t);
 
     return t;
 }
@@ -361,7 +356,7 @@ static int aclk_execute_query(struct aclk_query *this_query)
         mysep = strrchr(this_query->query, '/');
 
         // TODO: handle bad response perhaps in a different way. For now it does to the payload
-        aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+        aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop", this_query->created_boot_time);
         now_realtime_timeval(&w->tv_ready);
         w->response.data->date = w->tv_ready.tv_sec;
         web_client_build_http_header(w);  // TODO: this function should offset from date, not tv_ready
@@ -427,7 +422,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
     mysep = strrchr(this_query->query, '/');
 
     // execute the query
-    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop");
+    t = aclk_web_api_request_v1(localhost, w, mysep ? mysep + 1 : "noop", this_query->created_boot_time);
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used

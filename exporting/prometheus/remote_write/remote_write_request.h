@@ -7,10 +7,6 @@
 extern "C" {
 #endif
 
-struct prometheus_remote_write_specific_data {
-    void *write_request;
-};
-
 void *init_write_request();
 
 void add_host_info(
