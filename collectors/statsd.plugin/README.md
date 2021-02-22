@@ -246,7 +246,7 @@ Synthetic charts are organized in
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
-For example, if you want to monitor the application `myapp` using StatD and Netdata, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
+For example, if you want to monitor the application `myapp` using StatsD and Netdata, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
 
 ```
 [app]
