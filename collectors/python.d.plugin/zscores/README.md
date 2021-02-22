@@ -23,17 +23,17 @@ Below is an example of the charts produced by this collector and a typical examp
 
 So really its a combination of the zscores values themselves plus, perhaps more importantly, how they change when something strange occurs on your system which can be most useful. 
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal.jpg)
+![zscores-collector-normal](https://user-images.githubusercontent.com/2178292/108776300-21d44d00-755a-11eb-92a4-ecb8f7d2f175.png)
 
 For example, if we go onto the system and run a command like [`stress-ng --all 2`](https://wiki.ubuntu.com/Kernel/Reference/stress-ng) to create some stress, we see many charts begin to have zscores that jump outside the typical range. When the absolute zscore for a chart is greater than 3 you will see a corresponding line appear on the `zscores.3sigma` chart to make it a bit clearer what charts might be worth looking at first (for more background information on why 3 sigma see [here](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule#:~:text=In%20the%20empirical%20sciences%20the,99.7%25%20probability%20as%20near%20certainty.)). 
 
 In the example below we basically took a sledge hammer to our system so its not suprising that lots of charts light up after we run the stress command. In a more realistic setting you might just see a handful of charts with strange zscores and that could be a good indication of where to look first.
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-abnormal.jpg)
+![zscores-collector-abnormal](https://user-images.githubusercontent.com/2178292/108776316-28fb5b00-755a-11eb-80de-ec5d38089ecc.png)
 
 Then as the issue passes the zscores should settle back down into their normal range again as they are calculated in a rolling and smoothed way (as defined by your `zscores.conf` file). 
 
-![alt text](https://github.com/andrewm4894/random/blob/master/images/netdata/netdata-zscores-collector-normal-again.jpg)
+![zscores-collector-normal-again](https://user-images.githubusercontent.com/2178292/108776439-4fb99180-755a-11eb-8bb7-b4df144cb44c.png)
 
 ## Requirements
 
