@@ -526,7 +526,7 @@ You can also use StatsD with:
 
 ### Shell
 
-Getting the proper support for a programming language is not always easy, but shell is always available on most UNIX systems. You can use shell and `nc` to easily instrument your systems and send metric data to Netdata StatsD. Here is how:
+Getting the proper support for a programming language is not always easy, but the Unix shell is available on most Unix systems. You can use shell and `nc` to instrument your systems and send metric data to Netdata's StatsD implementation. Here's how:
 
 The command you need to run is:
 
