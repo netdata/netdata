@@ -166,7 +166,7 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 - `private charts memory mode`
 - `private charts history`
 
-### Optimise private metric charts visualization and storage
+### Optimize private metric charts visualization and storage
 
 If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
