@@ -482,7 +482,7 @@ You can find detailed documentation in their [documentation page](https://statsd
 
 ### Javascript and Node.js
 
-Using the client library by [sivy/node-statsd](https://github.com/sivy/node-statsd), you can easily embed StatsD into your Node.js project.
+Use the client library by [sivy/node-statsd](https://github.com/sivy/node-statsd) to embed StatsD into your Node.js project.
 
 ```javascript
   var StatsD = require('node-statsd'),
