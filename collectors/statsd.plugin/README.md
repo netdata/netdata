@@ -464,7 +464,7 @@ Using the above, the dimensions will be added as `GET`, `ADD` and `DELETE`.
 
 ### Python
 
-It's really easy to instrument your python application with StatsD, for example using [jsocol/pystatsd](https://github.com/jsocol/pystatsd). 
+Use [jsocol/pystatsd](https://github.com/jsocol/pystatsd) to quickly instrument a Python application with StatsD. 
 
 ```python
 import statsd
