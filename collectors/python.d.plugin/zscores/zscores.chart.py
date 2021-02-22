@@ -116,7 +116,7 @@ class Service(SimpleService):
 
         data_3sigma = {}
         for k in data_z:
-            data_3sigma[k.replace('_z','_3sigma')] = 1 if abs(data_z[k]) > 300 else 0
+            data_3sigma[k.replace('_z','')] = 1 if abs(data_z[k]) > 300 else 0
 
         return data_z, data_3sigma
 
