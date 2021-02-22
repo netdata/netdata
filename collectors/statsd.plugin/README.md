@@ -1,6 +1,6 @@
 <!--
 title: "statsd.plugin"
-description: "The Netdata Agent is a fully-featured statsd server that collects metrics from any custom application and visualizes them in real-time."
+description: "The Netdata Agent is a fully-featured StatsD server that collects metrics from any custom application and visualizes them in real-time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
 -->
 
@@ -10,23 +10,23 @@ StatsD is a system to collect data from any application. Applications send metri
 
 If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
 
-There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
+There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding StatsD metrics to any application framework. This makes StatsD quite popular for custom application metrics.
 
-Netdata is a fully featured StatsD server. It can collect statsd formatted metrics, visualize them on its dashboards, and store them in it's database for long-term retention.
+Netdata is a fully featured StatsD server. It can collect StatsD formatted metrics, visualize them on its dashboards, and store them in it's database for long-term retention.
 
-Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both tcp and udp packets at the same time. 
+Netdata StatsD is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard StatsD port 8125. Netdata supports both tcp and udp packets at the same time. 
 
-Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. 
+Since StatsD is embedded in Netdata, it means you now have a StatsD server embedded on all your servers. 
 
-Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
+Netdata StatsD is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained StatsD traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
 ## Metrics supported by Netdata
 
-Netdata fully supports the statsd protocol. All statsd client libraries can be used with Netdata too.
+Netdata fully supports the StatsD protocol. All StatsD client libraries can be used with Netdata too.
 
 -   **Gauges**
 
-     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, statsd reports the latest value collected and the number of times it was updated (events).
+     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the latest value collected and the number of times it was updated (events).
 
      The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
@@ -36,11 +36,11 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
 -   **Counters** and **Meters**
 
-     The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, statsd reports the **rate** and the number of times it was updated (events).
+     The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, StatsD reports the **rate** and the number of times it was updated (events).
 
-     `:value` can be omitted and statsd will assume it is `1`. `|c`, `|C` and `|m` can be omitted an statsd will assume it is `|m`. So, the application may send just `name` and statsd will parse it as `name:1|m`.
+     `:value` can be omitted and StatsD will assume it is `1`. `|c`, `|C` and `|m` can be omitted an StatsD will assume it is `|m`. So, the application may send just `name` and StatsD will parse it as `name:1|m`.
 
-     - Counters use `|c` (etsy/statsd compatible) or `|C` (brubeck compatible)
+     - Counters use `|c` (etsy/StatsD compatible) or `|C` (brubeck compatible)
      - Meters use `|m`
 
      [Sampling rate](#sampling-rates) is supported.
@@ -49,7 +49,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
      
 -   **Timers** and **Histograms**
 
-     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, statsd reports **min**, **max**, **average**, **sum**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events).
+     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, StatsD reports **min**, **max**, **average**, **sum**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events).
 
      - Timers use `|ms`
      - Histograms use `|h`
@@ -62,7 +62,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
 -   **Sets**
 
-      The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), statsd reports the number of unique values sent and the number of times it was updated (events).
+      The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
 
      Sampling rate is **not** supported for Sets. `value` is always considered text.
 
