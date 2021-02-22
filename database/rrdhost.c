@@ -986,6 +986,8 @@ static struct label *rrdhost_load_auto_labels(void)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
 
+    label_list = add_aclk_host_labels(label_list);
+
     label_list = add_label_to_list(
         label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);
 

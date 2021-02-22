@@ -411,6 +411,8 @@ else
   done
 fi
 
+OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
+
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
 # should be correct for almost all modern UNIX systems.
@@ -853,7 +855,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && sendmail --help 2>&1 | grep -q "\-F " && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
@@ -2052,7 +2054,7 @@ send_dynatrace() {
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
-  
+
   payload=$(cat <<EOF
 {
   "title": "NetData Alarm from ${host}",
@@ -2179,7 +2181,7 @@ send_opsgenie() {
 EOF
 )
 
-  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"

@@ -46,16 +46,16 @@ typedef enum ebpf_socket_idx {
 
 // Global chart name
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
-#define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
+#define NETDATA_TCP_FUNCTION_BITS "total_tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
 #define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
 #define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
-#define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
+#define NETDATA_UDP_FUNCTION_BITS "total_udp_bandwidth"
 #define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-#define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
-#define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_SENT "total_bandwidth_sent"
+#define NETDATA_NET_APPS_BANDWIDTH_RECV "total_bandwidth_recv"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
@@ -271,6 +271,5 @@ extern ebpf_network_viewer_port_list_t *listen_ports;
 extern void update_listen_table(uint16_t value, uint8_t proto);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
-extern ebpf_socket_publish_apps_t **socket_bandwidth_prev;
 
 #endif

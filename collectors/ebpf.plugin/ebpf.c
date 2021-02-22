@@ -56,6 +56,7 @@ char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
+char *ebpf_algorithms[] = {"absolute", "incremental"};
 int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
@@ -98,6 +99,19 @@ ebpf_network_viewer_options_t network_viewer_opt;
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
  *
  *****************************************************************/
+
+/**
+ * Cleanup publish syscall
+ *
+ * @param nps list of structures to clean
+ */
+void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
+{
+    while (nps) {
+        freez(nps->algorithm);
+        nps = nps->next;
+    }
+}
 
 /**
  * Clean port Structure
@@ -307,17 +321,21 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 /**
  * Call the necessary functions to create a chart.
  *
+ * @param chart  the chart name
  * @param family  the chart family
- * @param move    the pointer with the values that will be published
+ * @param dwrite the dimension name
+ * @param vwrite the value for previous dimension
+ * @param dread the dimension name
+ * @param vread the value for previous dimension
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc)
+void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread)
 {
     write_begin_chart(family, chart);
 
-    write_chart_dimension(dwrite, (long long)pvc->write);
-    write_chart_dimension(dread, (long long)pvc->read);
+    write_chart_dimension(dwrite, vwrite);
+    write_chart_dimension(dread, vread);
 
     write_end_chart();
 }
@@ -349,12 +367,13 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
 /**
  * Write the dimension command on standard output
  *
- * @param n the dimension name
- * @param d the dimension information
+ * @param name the dimension name
+ * @param id the dimension id
+ * @param algo the dimension algorithm
  */
-void ebpf_write_global_dimension(char *n, char *d)
+void ebpf_write_global_dimension(char *name, char *id, char *algorithm)
 {
-    printf("DIMENSION %s %s absolute 1 1\n", n, d);
+    printf("DIMENSION %s %s %s 1 1\n", name, id, algorithm);
 }
 
 /**
@@ -369,7 +388,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
 
     int i = 0;
     while (move && i < end) {
-        ebpf_write_global_dimension(move->name, move->dimension);
+        ebpf_write_global_dimension(move->name, move->dimension, move->algorithm);
 
         move = move->next;
         i++;
@@ -411,16 +430,18 @@ void ebpf_create_chart(char *type,
  * @param units  the value displayed on vertical axis.
  * @param family Submenu that the chart will be attached on dashboard.
  * @param order  the chart order
+ * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
  */
-void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order, struct target *root)
+void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order,
+                                char *algorithm, struct target *root)
 {
     struct target *w;
     ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", order);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }
 
@@ -437,9 +458,11 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  * @param pio  structure used to generate charts.
  * @param dim  a pointer for the dimensions name
  * @param name a pointer for the tensor with the name of the functions.
+ * @param algorithm a vector with the algorithms used to make the charts
  * @param end  the number of elements in the previous 4 arguments.
  */
-void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end)
+void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim,
+                        char **name, int *algorithm, int end)
 {
     int i;
 
@@ -453,6 +476,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
+        pio[i].algorithm = strdupz(ebpf_algorithms[algorithm[i]]);
         if (publish_prev) {
             publish_prev->next = &pio[i];
         }

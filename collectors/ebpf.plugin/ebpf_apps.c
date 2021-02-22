@@ -931,13 +931,11 @@ void cleanup_exited_pids()
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-            prev_apps_data[r] = NULL;
 
             // Clean socket structures
             if (socket_bandwidth_curr) {
                 freez(socket_bandwidth_curr[r]);
                 socket_bandwidth_curr[r] = NULL;
-                socket_bandwidth_prev[r] = NULL;
             }
         } else {
             if (unlikely(p->keep))
@@ -1055,13 +1053,11 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
-            prev_apps_data[key] = NULL;
 
             // Clean socket structures
             if (socket_bandwidth_curr) {
                 freez(socket_bandwidth_curr[key]);
                 socket_bandwidth_curr[key] = NULL;
-                socket_bandwidth_prev[key] = NULL;
             }
 
             pids = pids->next;
