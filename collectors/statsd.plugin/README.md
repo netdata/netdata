@@ -12,7 +12,7 @@ If you want to learn more about the StatsD protocol, we have written a [blog pos
 
 There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
-Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
+Netdata is a fully featured StatsD server. It can collect statsd formatted metrics, visualize them on its dashboards, and store them in it's database for long-term retention.
 
 Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both tcp and udp packets at the same time. 
 
