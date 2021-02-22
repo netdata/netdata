@@ -158,7 +158,7 @@ You can also take what you've learned about node configuration to enable or enha
 
 ### Related reference documentation
 
-- [Netdata Agent · Daemon](docs/agent/daemon)
+- [Netdata Agent · Daemon](/daemon/README.md)
 - [Netdata Agent · Health monitoring](/health/README.md)
 - [Netdata Agent · Notifications](/health/notifications/README.md)
 
