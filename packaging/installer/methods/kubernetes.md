@@ -33,20 +33,16 @@ helm repo add netdata https://netdata.github.io/helmchart/
 helm install netdata netdata/netdata
 ```
 
-### Post-installation
-
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
 parent pod, and multiple child pods.
-
-Take note of the name of the parent pod, which will look like: `netdata-parent-xxxxxxxxx-xxxxx`.
 
 You've now installed Netdata on your Kubernetes cluster. Next, it's time to opt-in and enable the powerful Kubernetes
 dashboards available in Netdata Cloud.
 
 ## Claim your Kubernetes cluster to Netdata Cloud
 
-To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/) in [Netdata
-Cloud](https://app.netdata.cloud), you must first [claim](/claim/README.md) your Kubernetes cluster. Claiming securely
+To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualizations/kubernetes/), you must first
+[claim](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). Claiming securely
 connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
 like the health map and time-series composite charts.
 
@@ -81,7 +77,7 @@ child:
       data: |
         [global]
           memory mode = ram
-          history = 600
+          history = 3600
         [health]
           enabled = no
 ```
