@@ -21,7 +21,7 @@ Two charts are available:
 
 Below is an example of the chart produced by this collector. The first 3/4 of the period looks normal in that we see a few individual changes being picked up somewhat randomly over time. But then at around 14:59 towards the end of the chart we see two periods with 'spikes' of multiple changes for a small period of time. This is the sort of pattern that might be a sign something on the system that has changed sufficiently enough to merit some investigation.
 
-![changepoint-collector](https://raw.githubusercontent.com/andrewm4894/random/master/images/netdata/netdata-changefinder-collector.jpg)
+![changepoint-collector](https://user-images.githubusercontent.com/2178292/108773528-665de980-7556-11eb-895d-798669bcd695.png)
 
 ## Requirements
 
