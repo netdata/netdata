@@ -76,7 +76,7 @@ Overview features composite charts, which display aggregated metrics from every 
 are streamed on-demand from individual nodes and composited onto a single, familiar dashboard.
 
 ![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/108563447-b28efc80-72be-11eb-8b51-1e085bdd956e.png)
+Overview](https://user-images.githubusercontent.com/1153921/108732681-09791980-74eb-11eb-9ba2-98cb1b6608de.png)
 
 Read more about the Overview in the [infrastructure overview](/docs/visualize/overview-infrastructure.md) doc.
 
@@ -101,7 +101,7 @@ complex issues by aggregating correlated charts from any number of nodes. For ex
 from every node in your infrastructure on a single dashboard.
 
 ![An example system CPU
-dashboard](https://user-images.githubusercontent.com/1153921/108526381-4f857180-728e-11eb-9d65-1613e60891a5.png)
+dashboard](https://user-images.githubusercontent.com/1153921/108732974-4b09c480-74eb-11eb-87a2-c67e569c08b6.png)
 
 Read more about [creating new dashboards](/docs/visualize/create-dashboards.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.

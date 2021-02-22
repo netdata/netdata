@@ -15,7 +15,7 @@ anomalies, then drill down with filtering or single-node dashboards to see more.
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
 ![The War Room
-Overview](https://user-images.githubusercontent.com/1153921/108563447-b28efc80-72be-11eb-8b51-1e085bdd956e.png)
+Overview](https://user-images.githubusercontent.com/1153921/108732681-09791980-74eb-11eb-9ba2-98cb1b6608de.png)
 
 ## Using the Overview
 
@@ -75,9 +75,6 @@ contributing. Click on the link icon <img class="img__inline img__inline--link"
 src="https://user-images.githubusercontent.com/1153921/95762109-1d219300-0c62-11eb-8daa-9ba509a8e71c.png" /> next to a
 given node to quickly _jump to the same chart in that node's single-node dashboard_ in Netdata Cloud.
 
-![Jumping to a single-node dashboard in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/99317327-1e2a7f00-2823-11eb-8fc3-76f260ced86a.gif)
-
 You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
 investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 All of the familiar [interactions](/docs/visualize/interact-dashboards-charts.md) are available, as is adding any chart
@@ -88,7 +85,7 @@ to a [new dashboard](/docs/visualize/create-dashboards.md).
 You can also use the **Nodes view** to monitor the health status and user-configurable key metrics from multiple nodes
 in a War Room. Read the [Nodes view doc](https://learn.netdata.cloud/docs/cloud/visualize/nodes) for details.
 
-![The Nodes view](https://user-images.githubusercontent.com/1153921/95909704-cb593580-0d53-11eb-88fa-a3416ab09849.png)
+![The Nodes view](https://user-images.githubusercontent.com/1153921/108733066-5fe65800-74eb-11eb-98e0-abaccd36deaf.png)
 
 ## What's next?
 
