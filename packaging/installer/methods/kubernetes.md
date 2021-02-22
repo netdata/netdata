@@ -70,14 +70,7 @@ parent:
     enabled: true
     token: "TOKEN"
     rooms: "ROOM"
-  configs:
-    netdata:
-      data: |
-        [global]
-          memory mode = dbengine
-          dbengine_multihost_disk_space = 4000
-          default memory mode = dbengine
- 
+
 child:
   claiming:
     enabled: true
