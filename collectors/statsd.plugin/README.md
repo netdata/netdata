@@ -70,7 +70,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
 #### Sampling Rates
 
-The application may append `|@sampling_rate`, where `sampling_rate` is a number from `0.0` to `1.0` in order for StatD to extrapolate the value and predict the total for the entire period. If the application reports to StatsD a value for 1/10th of the time, it can append `|@0.1` to the metrics it sends to statsd.
+The application may append `|@sampling_rate`, where `sampling_rate` is a number from `0.0` to `1.0` in order for StatsD to extrapolate the value and predict the total for the entire period. If the application reports to StatsD a value for 1/10th of the time, it can append `|@0.1` to the metrics it sends to statsd.
 
 #### Overlapping metrics
 
