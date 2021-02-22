@@ -82,6 +82,10 @@ child:
           enabled = no
 ```
 
+> ❗ These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`history =
+> 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on
+> your cluster, you may want to increase the `history` setting.
+
 Apply these new settings:
 
 ```bash
