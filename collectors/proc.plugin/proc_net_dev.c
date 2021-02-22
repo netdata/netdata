@@ -169,6 +169,10 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcollisions = NULL;
     d->rd_tcarrier    = NULL;
     d->rd_tcompressed = NULL;
+
+    d->chart_var_speed     = NULL;
+    d->chart_var_duplex    = NULL;
+    d->chart_var_operstate = NULL;
 }
 
 static void netdev_free_chart_strings(struct netdev *d) {
