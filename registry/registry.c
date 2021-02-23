@@ -23,7 +23,7 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
-    char edate[100];
+    char edate[100], domain[512];
     time_t et = now_realtime_sec() + registry.persons_expiration;
     struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
     strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
@@ -31,9 +31,11 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     snprintfz(w->cookie1, NETDATA_WEB_REQUEST_COOKIE_SIZE, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", guid, edate);
 
     if(registry.registry_domain && registry.registry_domain[0])
-        snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE,
-                  NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s; SameSite=None",
-                  guid, registry.registry_domain, edate);
+        snprintfz(domain, 511, "Domain=%s", registry.registry_domain);
+
+    snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE,
+              NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None ; %s",
+              guid, registry.registry_domain, edate, domain);
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {
