@@ -9,6 +9,8 @@
 
 #include "../daemon/common.h"
 
+#include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
+
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -167,37 +169,179 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
-#ifndef ACLK_NG_USE_LIBWEBSOCKETS_OTP
-// send_https_request is original code from @amoss copied from before comit
-// 10090b556b07463a0ca2412fc4be8b470d115e31 which changed this to use Libwebsockets in ACLK Legacy
-// TODO this has to be rewritten as it doesn't care about HTTP return code or anything (very naive implementation)!!!
+typedef enum http_req_type {
+    HTTP_REQ_GET,
+    HTTP_REQ_POST
+} http_req_type;
+
+enum http_parse_state {
+    HTTP_PARSE_INITIAL = 0,
+    HTTP_PARSE_HEADERS,
+    HTTP_PARSE_CONTENT
+};
+
+typedef struct {
+    enum http_parse_state state;
+    int content_length;
+    int http_code;
+} http_parse_ctx;
+
+#define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
+
+#define NEED_MORE_DATA  0
+#define PARSE_SUCCESS   1
+#define PARSE_ERROR    -1
+#define HTTP_LINE_TERM "\x0D\x0A"
+#define RESP_PROTO "HTTP/1.1 "
+#define HTTP_KEYVAL_SEPARATOR ": "
+#define HTTP_HDR_BUFFER_SIZE 256
 #define PORT_STR_MAX_BYTES 7
-#define HTTP_HDR_END "\x0D\x0A\x0D\x0A"
-int aclk_send_https_request(char *method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
+
+static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
+{
+    // currently we care only about content-length
+    // but in future the way this is written
+    // it can be extended
+    if (!strcmp("content-length", key)) {
+        parse_ctx->content_length = atoi(val);
+    }
+}
+
+static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
+{
+    int idx, idx_end;
+    char buf_key[HTTP_HDR_BUFFER_SIZE];
+    char buf_val[HTTP_HDR_BUFFER_SIZE];
+    char *ptr = buf_key;
+    if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx_end)) {
+        error("CRLF expected");
+        return 1;
+    }
+
+    char *separator = rbuf_find_bytes(buf, HTTP_KEYVAL_SEPARATOR, strlen(HTTP_KEYVAL_SEPARATOR), &idx);
+    if (!separator) {
+        error("Missing Key/Value separator");
+        return 1;
+    }
+    if (idx >= HTTP_HDR_BUFFER_SIZE) {
+        error("Key name is too long");
+        return 1;
+    }
+
+    rbuf_pop(buf, buf_key, idx);
+    buf_key[idx] = 0;
+
+    rbuf_bump_tail(buf, strlen(HTTP_KEYVAL_SEPARATOR));
+    idx_end -= strlen(HTTP_KEYVAL_SEPARATOR) + idx;
+    if (idx_end >= HTTP_HDR_BUFFER_SIZE) {
+        error("Value of key \"%s\" too long", buf_key);
+        return 1;
+    }
+
+    rbuf_pop(buf, buf_val, idx_end);
+    buf_val[idx_end] = 0;
+
+    rbuf_bump_tail(buf, strlen(HTTP_KEYVAL_SEPARATOR));
+
+    for (ptr = buf_key; *ptr; ptr++)
+        *ptr = tolower(*ptr);
+
+    process_http_hdr(parse_ctx, buf_key, buf_val);
+
+    return 0;
+}
+
+static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
+{
+    int idx;
+    char *ptr;
+    char rc[4];
+
+    do {
+        if (parse_ctx->state != HTTP_PARSE_CONTENT && !rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx))
+            return NEED_MORE_DATA;
+        switch (parse_ctx->state) {
+            case HTTP_PARSE_INITIAL:
+                if (rbuf_memcmp_n(buf, RESP_PROTO, strlen(RESP_PROTO))) {
+                    error("Expected response to start with \"%s\"", RESP_PROTO);
+                    return PARSE_ERROR;
+                }
+                rbuf_bump_tail(buf, strlen(RESP_PROTO));
+                if (rbuf_pop(buf, rc, 4) != 4) {
+                    error("Expected HTTP status code");
+                    return PARSE_ERROR;
+                }
+                if (rc[3] != ' ') {
+                    error("Expected space after HTTP return code");
+                    return PARSE_ERROR;
+                }
+                rc[3] = 0;
+                parse_ctx->http_code = atoi(rc);
+                if (parse_ctx->http_code < 100 || parse_ctx->http_code >= 600) {
+                    error("HTTP code not in range 100 to 599");
+                    return PARSE_ERROR;
+                }
+
+                ptr = rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
+
+                rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
+
+                parse_ctx->state = HTTP_PARSE_HEADERS;
+                break;
+            case HTTP_PARSE_HEADERS:
+                if (!idx) {
+                    parse_ctx->state = HTTP_PARSE_CONTENT;
+                    rbuf_bump_tail(buf, strlen(HTTP_LINE_TERM));
+                    break;
+                }
+                if (parse_http_hdr(buf, parse_ctx))
+                    return PARSE_ERROR;
+                ptr = rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
+                rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
+                break;
+            case HTTP_PARSE_CONTENT:
+                if (parse_ctx->content_length < 0) {
+                    error("content-length missing and http headers ended");
+                    return PARSE_ERROR;
+                }
+                if (rbuf_bytes_available(buf) >= (size_t)parse_ctx->content_length)
+                    return PARSE_SUCCESS;
+                return NEED_MORE_DATA;
+        }
+    } while(1);
+}
+
+static int https_request(http_req_type method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-    int rc=1;
     char sport[PORT_STR_MAX_BYTES];
-    char *pl;
+    size_t len = 0;
+    int ret;
+    char *ptr;
+    http_parse_ctx parse_ctx = HTTP_PARSE_CTX_INITIALIZER;
+
+    rbuf_t buffer = rbuf_create(b_size);
+    if (!buffer)
+        return 1;
 
     snprintf(sport, PORT_STR_MAX_BYTES, "%d", port);
 
-    size_t payload_len = 0, hdr_len;
     if (payload != NULL)
-        payload_len = strlen(payload);
+        len = strlen(payload);
 
     snprintf(
         b,
         b_size,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
+        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: application/json\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
         "User-Agent: Netdata/rocks\r\n\r\n",
-        method, url, host, payload_len);
-
-    hdr_len = strlen(b);
+        (method == HTTP_REQ_GET ? "GET" : "POST"), url, host, len);
 
     if (payload != NULL)
-        strncat(&b[hdr_len], payload, b_size - hdr_len);
-    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", payload_len + hdr_len, b);
+        strncat(b, payload, b_size - len);
+
+    len = strlen(b);
+
+    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", len, b);
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, sport, &timeout);
 
     if (unlikely(sock == -1)) {
@@ -218,49 +362,57 @@ int aclk_send_https_request(char *method, char *host, int port, char *url, char 
         goto exit_CTX;
     }
     SSL_set_fd(ssl, sock);
-    int err = SSL_connect(ssl);
-    if (err!=1) {
-        error("SSL_connect() failed with err=%d", err);
-        goto exit_SSL;
-    }
-    err = SSL_write(ssl, b, hdr_len + payload_len);
-    if (err <= 0)
-    {
-        error("SSL_write() failed with err=%d", err);
+    ret = SSL_connect(ssl);
+    if (ret != 1) {
+        error("SSL_connect() failed with err=%d", ret);
         goto exit_SSL;
     }
 
-    int bytes_read = SSL_read(ssl, b, b_size - 1);
-    if (bytes_read < 0)
+    ret = SSL_write(ssl, b, len);
+    if (ret <= 0)
     {
-        error("No response available - SSL_read()=%d", bytes_read);
-        goto exit_FULL;
-    }
-    b[bytes_read] = 0;
-
-    debug(D_ACLK, "Received %d bytes in response", bytes_read);
-
-    pl = strstr(b, HTTP_HDR_END);
-    if(!pl) {
-        error("Empty Payload of HTTP response");
-        b[0] = 0;
-        goto exit_FULL;
+        error("SSL_write() failed with err=%d", ret);
+        goto exit_SSL;
     }
 
-    strncpy(b, pl + strlen(HTTP_HDR_END), b_size);
+    b[0] = 0;
 
-    rc = 0;
+    do {
+        ptr = rbuf_get_linear_insert_range(buffer, &len);
+        ret = SSL_read(ssl, ptr, len - 1);
+        if (ret)
+            rbuf_bump_head(buffer, ret);
+        if (ret <= 0)
+        {
+            error("No response available - SSL_read()=%d", ret);
+            goto exit_FULL;
+        }
+    } while (!(ret = parse_http_response(buffer, &parse_ctx)));
+
+    if (ret != PARSE_SUCCESS) {
+        error("Error parsing HTTP response");
+        goto exit_FULL;
+    }
+
+    if (parse_ctx.http_code < 200 || parse_ctx.http_code >= 300) {
+        error("HTTP Response not Success (got %d)", parse_ctx.http_code);
+        goto exit_FULL;
+    }
+
+    rbuf_pop(buffer, b, b_size);
+
+    return 0;
+
 exit_FULL:
-    SSL_shutdown(ssl);
 exit_SSL:
     SSL_free(ssl);
 exit_CTX:
     SSL_CTX_free(ctx);
 exit_sock:
     close(sock);
-    return rc;
+    rbuf_free(buffer);
+    return 1;
 }
-#endif
 
 // aclk_get_mqtt_otp is slightly modified original code from @amoss
 void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass)
@@ -283,7 +435,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     char url[1024];
     sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
     info("Retrieving challenge from cloud: %s %d %s", aclk_hostname, port, url);
-    if(aclk_send_https_request("GET", aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
+    if (https_request(HTTP_REQ_GET, aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
     {
         error("Challenge failed: %s", data_buffer);
         goto CLEANUP;
@@ -291,13 +443,13 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
 
     debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
-    if ( json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
+    if (json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
         error("Could not parse the json response with the challenge: %s", data_buffer);
         goto CLEANUP;
     }
-    if (challenge.result == NULL ) {
+    if (challenge.result == NULL) {
         error("Could not retrieve challenge from auth response: %s", data_buffer);
         goto CLEANUP;
     }
@@ -320,7 +472,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     debug(D_ACLK, "Password phase: %s",response_json);
     // TODO - host
     sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if(aclk_send_https_request("POST", aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
+    if (https_request(HTTP_REQ_POST, aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
     {
         error("Challenge-response failed: %s", data_buffer);
         goto CLEANUP;
