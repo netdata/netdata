@@ -11,9 +11,9 @@ performance issue affects your node or the applications it runs.
 
 ## Netdata Cloud
 
-A War Room's [alarms indicator](/docs/cloud/war-rooms#indicators) displays the number of active `critical` (red) and
+A War Room's [alarms indicator](https://learn.netdata.cloud/docs/cloud/war-rooms#indicators) displays the number of active `critical` (red) and
 `warning` (yellow) alerts for the nodes in this War Room. Click on either the critical or warning badges to open a
-pre-filtered modal displaying only those types of [active alarms](/docs/cloud/monitoring/alarms).
+pre-filtered modal displaying only those types of [active alarms](https://learn.netdata.cloud/docs/cloud/monitoring/alarms).
 
 ![The Alarms panel in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/108564747-d2bfbb00-72c0-11eb-97b9-5863ad3324eb.png)
