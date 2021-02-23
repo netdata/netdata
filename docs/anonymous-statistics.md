@@ -25,7 +25,7 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 ## Agent Dashboard - PostHog JavaScript
 
-When you kick off an agent dashboard session Netdata will initialise a PostHog session and mask various event attributes.
+When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initialiszes a PostHog session and masks various event attributes.
 
 _Note_: You can see the relevant code in the [dashboard repository here](https://github.com/netdata/dashboard/blob/posthog-test/src/domains/global/sagas.ts#L77).  
 
