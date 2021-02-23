@@ -49,7 +49,7 @@ const injectPosthog = (machineGuid: string) => {
 }
 ```
 
-In the above snippet a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname` and `host` attributes are set to constant values for all events that may be sent during the session. This way things like the ip or hostname of the agent will not be sent as part of the product usage event data.
+In the above snippet a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname` and `host` attributes are set to constant values for all events that may be sent during the session. This way, information like the IP or hostname of the Agent will not be sent as part of the product usage event data.
 
 We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this
 variable is controlled via the [opt-out mechanism](#opt-out).
