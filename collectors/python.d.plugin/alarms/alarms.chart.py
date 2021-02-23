@@ -14,6 +14,7 @@ disabled_by_default = True
 def charts_template(sm):
     order = [
         'alarms',
+        'values'
     ]
 
     mappings = ', '.join(['{0}={1}'.format(k, v) for k, v in sm.items()])
@@ -24,14 +25,21 @@ def charts_template(sm):
             'variables': [
                 ['alarms_num'],
             ]
+        },
+        'values': {
+            'options': [None, 'Alarm Values', 'value', 'values', 'alarms.values', 'line'],
+            'lines': [],
+            'variables': [
+                [],
+            ]
         }
     }
     return order, charts
 
 
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
-
 DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
+DEFAULT_SHOW_ALARM_VALUES = False
 
 
 class Service(UrlService):
@@ -41,6 +49,7 @@ class Service(UrlService):
         self.order, self.definitions = charts_template(self.sm)
         self.url = self.configuration.get('url', DEFAULT_URL)
         self.collected_alarms = set()
+        self.show_alarm_values = bool(self.configuration.get('show_alarm_values', DEFAULT_SHOW_ALARM_VALUES))
 
     def _get_data(self):
         raw_data = self._get_raw_data()
@@ -51,21 +60,26 @@ class Service(UrlService):
         alarms = raw_data.get('alarms', {})
 
         data = {a: self.sm[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.sm}
-        self.update_charts(alarms, data)
+        self.update_charts('alarms', alarms, data, 1, 1)
         data['alarms_num'] = len(data)
+
+        if self.show_alarm_values:
+            data_values = {a: alarms[a]['value'] * 100 for a in alarms if 'value' in alarms[a] and alarms[a]['value'] is not None}
+            self.update_charts('values', alarms, data_values, 1, 100)
+            data = {**data, **data_values}
 
         return data
 
-    def update_charts(self, alarms, data):
+    def update_charts(self, chart, alarms, data, algorithim='absolute', multiplier=1, divisor=1):
         if not self.charts:
             return
 
         for a in data:
             if a not in self.collected_alarms:
                 self.collected_alarms.add(a)
-                self.charts['alarms'].add_dimension([a, a, 'absolute', '1', '1'])
+                self.charts[chart].add_dimension([a, a, algorithim, multiplier, divisor])
 
         for a in list(self.collected_alarms):
             if a not in alarms:
                 self.collected_alarms.remove(a)
-                self.charts['alarms'].del_dimension(a, hide=False)
+                self.charts[chart].del_dimension(a, hide=False)
