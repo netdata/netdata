@@ -11,8 +11,15 @@
    - 6. When the agent HTTP user interface was last accessed.
    - 7. Whether SSL is being used to encrypt the HTTP user interface
    - 8. Which alarm notification methods are being used.
+        Maybe: parse health_alarm_notify.conf and get specific items if have options
+               Run it? and get the env variables? Or pass them directly to the script?
+               
    - 9. Dashboard enabled ([web] mode = none)
-   - 10. Default port changed ([web] default port = 39999)
+   - 10. Default port changed ([web] default port = 39999) -> OK: NETDATA_LISTEN_PORT
+
+   General: Put everything in a struct, keep it there for maybe changes check or to provide them to api/v1
+   Do not start the thread is analytics is disabled by the user
+   Check if some data can be sent as integers etc...
 */
 
 #include "common.h"
@@ -30,6 +37,59 @@ struct array_printer {
 
 extern int aclk_connected;
 extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
+
+void analytics_log_data (void) {
+
+    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED     : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT          : [%s]", analytics_data.NETDATA_CONFIG_IS_PARENT);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE        : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE    : [%s]", analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA : [%s]", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE    : [%s]", analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_ACLK_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED  : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED       : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED              : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS        : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_MODULES        : [%s]", analytics_data.NETDATA_COLLECTORS_MODULES);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT          : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT              : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT              : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_METRICS_COUNT             : [%s]", analytics_data.NETDATA_METRICS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_NOTIFICATIONS_METHODS     : [%s]", analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+}
+
+void analytics_setenv_data (void) {
+
+    setenv ( "NETDATA_CONFIG_STREAM_ENABLED",     analytics_data.NETDATA_CONFIG_STREAM_ENABLED, 1);
+    setenv ( "NETDATA_CONFIG_IS_PARENT",          analytics_data.NETDATA_CONFIG_IS_PARENT, 1);
+    setenv ( "NETDATA_CONFIG_MEMORY_MODE",        analytics_data.NETDATA_CONFIG_MEMORY_MODE, 1);
+    setenv ( "NETDATA_CONFIG_PAGE_CACHE_SIZE",    analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE, 1);
+    setenv ( "NETDATA_CONFIG_MULTIDB_DISK_QUOTA", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, 1);
+    setenv ( "NETDATA_CONFIG_HOSTS_AVAILABLE",    analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE, 1);
+    setenv ( "NETDATA_CONFIG_ACLK_ENABLED",       analytics_data.NETDATA_CONFIG_ACLK_ENABLED, 1);
+    setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
+    setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
+    setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
+    setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
+    setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
+    setenv ( "NETDATA_COLLECTORS_PLUGINS",        analytics_data.NETDATA_COLLECTORS_PLUGINS, 1);
+    setenv ( "NETDATA_COLLECTORS_MODULES",        analytics_data.NETDATA_COLLECTORS_MODULES, 1);
+    setenv ( "NETDATA_COLLECTORS_COUNT",          analytics_data.NETDATA_COLLECTORS_COUNT, 1);
+    setenv ( "NETDATA_ALARMS_COUNT",              analytics_data.NETDATA_ALARMS_COUNT, 1);
+    setenv ( "NETDATA_CHARTS_COUNT",              analytics_data.NETDATA_CHARTS_COUNT, 1);
+    setenv ( "NETDATA_METRICS_COUNT",             analytics_data.NETDATA_METRICS_COUNT, 1);
+    setenv ( "NETDATA_NOTIFICATIONS_METHODS",     analytics_data.NETDATA_NOTIFICATIONS_METHODS, 1);
+}
+
+void analytics_set_data (char **name, char *value) {
+
+    if (*name) freez(*name);
+    *name = strdupz(value);
+
+}
 
 int collector_counter_callb(void *entry, void *data) {
 
@@ -51,6 +111,18 @@ int collector_counter_callb(void *entry, void *data) {
     return 0;
 }
 
+static const char *verify_required_directory(const char *dir) {
+    if(chdir(dir) == -1)
+        fatal("Cannot cd to directory '%s'", dir);
+
+    DIR *d = opendir(dir);
+    if(!d)
+        fatal("Cannot examine the contents of directory '%s'", dir);
+    closedir(d);
+
+    return dir;
+}
+
 void analytics_alarms (void) {
     int alarms = 0;
     char b[7];
@@ -65,8 +137,9 @@ void analytics_alarms (void) {
 
     //rrdhost_unlock(localhost);
     snprintfz(b, 6, "%d", alarms);
-    setenv("NETDATA_ALARMS_COUNT"  , b, 1);
-    debug(D_ANALYTICS, "Alarms: [%d]", alarms);
+    //setenv("NETDATA_ALARMS_COUNT"  , b, 1);
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT, b);
+    //debug(D_ANALYTICS, "Alarms: [%d]", alarms);
 }
 
 void analytics_collectors(void) {
@@ -100,48 +173,50 @@ void analytics_collectors(void) {
     dictionary_get_all(dict, collector_counter_callb, &ap);
     dictionary_destroy(dict);
 
-    setenv("NETDATA_COLLECTOR_PLUGINS", buffer_tostring(ap.plugin), 1);
-    setenv("NETDATA_COLLECTOR_MODULES", buffer_tostring(ap.module), 1);
-
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS, (char *)buffer_tostring(ap.plugin));
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES, (char *)buffer_tostring(ap.module));
+    
     {
         char b[7];
         snprintfz(b, 6, "%d", ap.c);
-        setenv("NETDATA_COLLECTOR_COUNT"  , b, 1);
+        analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT, b);
     }
-    debug(D_ANALYTICS, "Collectors count: [%d]", ap.c);
-
 }
 
 void analytics_misc(void) {
     
-    setenv("NETDATA_CONFIG_IS_PARENT"             , (localhost->next || configured_as_parent()) ? "true" : "false",        1);
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT, (localhost->next || configured_as_parent()) ? "true" : "false");
 
     {
         char b[7];
         snprintfz(b, 6, "%ld", rrd_hosts_available);
-        setenv("NETDATA_CONFIG_HOSTS_AVAILABLE"  , b, 1);
-        debug(D_ANALYTICS, "HOSTS_AVAILABLE: [%s]", b);
+        analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE, b);
     }
 
-    
-        
-
 #ifdef ENABLE_ACLK
-    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "true",  1);
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED, "true");
 #else
-    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "false",  1);
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED, "false");
 #endif
     if (is_agent_claimed())
-        setenv("NETDATA_CONFIG_CLAIMED"    , "true",  1);
+        analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED, "true");
     else {
-        setenv("NETDATA_CONFIG_CLAIMED"    , "false",  1);
+        analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED, "false");
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        setenv("NETDATA_ACLK_AVAILABLE"    , "true",  1);
+        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED, "true");
     else
 #endif
-        setenv("NETDATA_ACLK_AVAILABLE"    , "false",  1);
+        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED, "false");
+
+    //dont do it like this.... it should be already loaded somewhere...
+    analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
+
+    if (prometheus_exporter_instance)
+        debug(D_ANALYTICS, "Prometheus instance exists?");
+
+    
 }
 
 void analytics_charts (void) {
@@ -157,9 +232,8 @@ void analytics_charts (void) {
     {
         char b[7];
         snprintfz(b, 6, "%d", c);
-        setenv("NETDATA_CHARTS_COUNT"  , b, 1);
+        analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT, b);
     }
-    debug(D_ANALYTICS, "Charts count: [%d]", c);
 
 }
 
@@ -177,12 +251,74 @@ void analytics_metrics (void) {
     {
         char b[7];
         snprintfz(b, 6, "%ld", dimensions);
-        setenv("NETDATA_METRICS_COUNT"  , b, 1);
+        analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT, b);
     }
-    debug(D_ANALYTICS, "Dimensions count: [%ld]", dimensions);
-    
-    
 }
+
+void analytics_alarms_notifications (void) {
+    char *script;
+    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
+    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
+    if (unlikely(access(script, R_OK) != 0)) {
+        info("Alarm notify script %s not found.",script);
+        freez(script);
+        return;
+    }
+
+    strcat(script, " dump_methods");
+
+    pid_t command_pid;
+
+    info("Executing %s", script);
+    debug(D_ANALYTICS, "Executing %s", script);
+
+    BUFFER *b = buffer_create(1000);
+    int cnt = 0;
+    FILE *fp = mypopen(script, &command_pid);
+    if(fp) {
+        char line[200 + 1];
+
+        while (fgets(line, 200, fp) != NULL) {
+            char *end = line;
+            while (*end && *end != '\n') end++;
+            *end = '\0';
+
+            if (likely(cnt))
+                buffer_strcat(b, "|");
+            
+            buffer_strcat(b, line);
+
+            cnt++;
+        }
+        mypclose(fp, command_pid);
+    }
+    freez(script);
+
+    //check there is something to set
+    analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS, (char *)buffer_tostring(b));
+
+    //TODO Destroy buffer
+    
+    //return 0;
+}
+
+void analytics_exporters (void) {
+
+    extern const struct engine *engine;
+
+    if (!engine){
+        analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, "false");
+        return;
+    }
+        
+
+    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+        debug(D_ANALYTICS, "[%d]", instance->disabled);
+    }
+
+}
+
+
 
 void *analytics_main(void *ptr) {
     
@@ -208,6 +344,7 @@ void *analytics_main(void *ptr) {
     sleep(10);
 
     debug(D_ANALYTICS, "Stable...");
+    
 
     rrdhost_rdlock(localhost);
     
@@ -218,8 +355,13 @@ void *analytics_main(void *ptr) {
 
     rrdhost_unlock(localhost);
 
-    analytics_misc();    
+    analytics_misc();
+    analytics_alarms_notifications();
 
+    //analytics_exporters();
+    
+    analytics_log_data();
+    analytics_setenv_data();
     if (netdata_anonymous_statistics_enabled > 0)
         send_statistics("META", "-", "-");
 
@@ -228,51 +370,38 @@ void *analytics_main(void *ptr) {
     return NULL;
 }
 
+/* This is called after the rrdinit */
+/* These values will be sent on the START event */
 void set_late_global_environment() {
 
-    setenv("NETDATA_CONFIG_STREAM_ENABLED"        , default_rrdpush_enabled ? "true" : "false",        1);
-    setenv("NETDATA_CONFIG_MEMORY_MODE"           , rrd_memory_mode_name(default_rrd_memory_mode), 1);
-    {
-        char b[7];
-        snprintfz(b, 6, "%d", default_rrd_update_every);
-        setenv("NETDATA_CONFIG_UPDATE_EVERY"  , b, 1);
-        debug(D_ANALYTICS, "NETDATA_CONFIG_UPDATE_EVERY [%s]", b);
-    }
-    
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
 
 #ifdef ENABLE_DBENGINE
     {
         char b[16];
         snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
-        setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"        , b,        1);
+        analytics_set_data (&analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE, b);
 
         snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
-        setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"     , b,        1);
-        debug(D_ANALYTICS, "MULTIDB_DISK_QUOTA: [%s]", b);
+        analytics_set_data (&analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, b);
     }
-#else
-    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
-    setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA"    , "N/A", 1);
 #endif
 
 #ifdef ENABLE_HTTPS
-    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "true",  1);
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, "true");
 #else
-    setenv("NETDATA_CONFIG_HTTPS_ENABLED"    , "false", 1);
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, "false");
 #endif
 
-}
+    if(web_server_mode == WEB_SERVER_MODE_NONE)
+        analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED, "false");
+    else
+        analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED, "true");
 
-static const char *verify_required_directory(const char *dir) {
-    if(chdir(dir) == -1)
-        fatal("Cannot cd to directory '%s'", dir);
+    /* set what we have, to send the START event */
+    analytics_setenv_data();
 
-    DIR *d = opendir(dir);
-    if(!d)
-        fatal("Cannot examine the contents of directory '%s'", dir);
-    closedir(d);
-
-    return dir;
 }
 
 static void get_system_timezone(void) {
@@ -391,19 +520,26 @@ void set_global_environment() {
     setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false", 1);
 #endif
 
-    /* Maybe add default values for the late_global_enviroment here */
-    /* In case of an exit with error */
-    setenv("NETDATA_CONFIG_STREAM_ENABLED"        , "N/A", 1);
-    setenv("NETDATA_CONFIG_IS_PARENT"             , "N/A", 1);
-    setenv("NETDATA_CONFIG_MEMORY_MODE"           , "N/A", 1);
-    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE"       , "N/A", 1);
-    setenv("NETDATA_COLLECTOR_PLUGINS"            , "N/A", 1);
-    setenv("NETDATA_COLLECTOR_MODULES"            , "N/A", 1);
-    setenv("NETDATA_COLLECTOR_COUNT"              , "N/A", 1);
-    setenv("NETDATA_CONFIG_CLOUD_ENABLED"         , "N/A", 1);
-    setenv("NETDATA_CONFIG_CLAIMED"               , "N/A", 1);
-    setenv("NETDATA_ACLK_AVAILABLE"               , "N/A", 1);
-
+    /* Initialize values we'll get from late global and the thread to N/A */
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,     "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT,          "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE,    "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE,    "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED,       "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
+    analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS,     "N/A");
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
