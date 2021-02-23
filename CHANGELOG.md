@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.2...v1.29.3)
 
 **Merged pull requests:**
 
@@ -250,7 +250,6 @@
 - Fix README exporting link [\#10020](https://github.com/netdata/netdata/pull/10020) ([Dim-P](https://github.com/Dim-P))
 - Clean up and better cross-link new docsv2 documents [\#10015](https://github.com/netdata/netdata/pull/10015) ([joelhans](https://github.com/joelhans))
 - collector infiniband: fix file descriptor leak [\#10013](https://github.com/netdata/netdata/pull/10013) ([Saruspete](https://github.com/Saruspete))
-- changes default query thread count [\#10009](https://github.com/netdata/netdata/pull/10009) ([underhood](https://github.com/underhood))
 
 ## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
 
