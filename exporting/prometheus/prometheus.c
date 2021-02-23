@@ -834,6 +834,8 @@ static inline time_t prometheus_preparation(
             (unsigned long)now);
     }
 
+    analytics_log_prometheus(); //if analytics is not running ?
+
     return after;
 }
 

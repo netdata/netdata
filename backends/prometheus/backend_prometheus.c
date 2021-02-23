@@ -748,6 +748,8 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
         );
     }
 
+    analytics_log_prometheus();
+
     return after;
 }
 

@@ -37,5 +37,6 @@ char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldun
 void format_host_labels_prometheus(struct instance *instance, RRDHOST *host);
 
 extern void prometheus_clean_server_root();
+extern void analytics_log_prometheus();
 
 #endif //NETDATA_EXPORTING_PROMETHEUS_H
