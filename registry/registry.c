@@ -32,10 +32,12 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
 
     if(registry.registry_domain && registry.registry_domain[0])
         snprintfz(domain, 511, "Domain=%s", registry.registry_domain);
+    else
+        domain[0]='\0';
 
     snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE,
-              NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None ; %s",
-              guid, registry.registry_domain, edate, domain);
+              NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure; %s",
+              guid, edate, domain);
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {
