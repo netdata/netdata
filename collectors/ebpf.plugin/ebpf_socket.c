@@ -498,11 +498,13 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
- * @param em a pointer to the structure with the default values.
+ * @param em   a pointer to the structure with the default values.
+ * @param ptr  a pointer for targets
  */
-void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
+void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     UNUSED(em);
+    struct target *root = ptr;;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,

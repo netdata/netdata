@@ -194,7 +194,8 @@ extern char *ebpf_algorithms[];
 
 // Socket functions and variables
 // Common functions
-extern void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root);
+extern void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;

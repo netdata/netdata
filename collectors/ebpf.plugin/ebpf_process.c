@@ -621,10 +621,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
  * @param em   a pointer to the structure with the default values.
- * @param root a pointer for the targets.
+ * @param ptr  a pointer for the targets.
  */
-static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
+void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
+    struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -786,11 +787,12 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
     if (!newly_added)
         return;
 
-    if (ebpf_modules[EBPF_MODULE_PROCESS_IDX].apps_charts)
-        ebpf_process_create_apps_charts(em, root);
-
-    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts)
-        ebpf_socket_create_apps_charts(NULL, root);
+    int counter;
+    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
+        ebpf_module_t *ptr = &ebpf_modules[counter];
+        if (ptr->apps_charts && ptr->apps_routine)
+            ptr->apps_routine(em, root);
+    }
 }
 
 /*****************************************************************
