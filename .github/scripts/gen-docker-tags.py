@@ -4,7 +4,7 @@ import sys
 
 REPO = 'netdata/netdata'
 
-version = sys.argv[1].lstrip('v').split('.')
+version = sys.argv[1].split('.')
 
 MAJOR = ':'.join([REPO, version[0]])
 MINOR = ':'.join([REPO, '.'.join(version[0:2])])
