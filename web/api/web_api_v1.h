@@ -31,6 +31,8 @@ extern void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 extern void web_client_api_v1_init(void);
 extern void web_client_api_v1_management_init(void);
 
+extern void analytics_get_data(char *name, BUFFER *wb);
+
 extern char *api_secret;
 
 #endif //NETDATA_WEB_API_V1_H

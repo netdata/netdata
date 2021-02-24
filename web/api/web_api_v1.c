@@ -978,10 +978,26 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        buffer_strcat(wb, "\t\"aclk-available\": true\n");
+        buffer_strcat(wb, "\t\"aclk-available\": true,\n");
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false\n");     // Intentionally valid with/without #ifdef above
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
+
+    buffer_strcat(wb, "\t\"allmetrics-prometheus-used\":\"");
+    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, wb);
+    buffer_strcat(wb, "\",\n");
+
+    buffer_strcat(wb, "\t\"allmetrics-shell-used\":\"");
+    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_SHELL_USED, wb);
+    buffer_strcat(wb, "\",\n");
+
+    buffer_strcat(wb, "\t\"allmetrics-json-used\":\"");
+    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED, wb);
+    buffer_strcat(wb, "\",\n");
+
+    buffer_strcat(wb, "\t\"notifications-methods\":\"");
+    analytics_get_data(analytics_data.NETDATA_NOTIFICATIONS_METHODS, wb);
+    buffer_strcat(wb, "\"\n");
 
     buffer_strcat(wb, "}");
     return 0;

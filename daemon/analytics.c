@@ -124,6 +124,12 @@ void analytics_set_data (char **name, char *value) {
 
 }
 
+void analytics_get_data (char *name, BUFFER *wb) {
+
+    buffer_strcat(wb, name);
+
+}
+
 int collector_counter_callb(void *entry, void *data) {
 
     struct array_printer *ap = (struct array_printer *)data;
@@ -412,6 +418,8 @@ void *analytics_main(void *ptr) {
     analytics_log_data();
 
     send_statistics("META", "-", "-");
+
+    //debug (D_ANALYTICS, "Haha [%s]", analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED));
 
  cleanup:
     netdata_thread_cleanup_pop(1);
