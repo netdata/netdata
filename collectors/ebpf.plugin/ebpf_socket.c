@@ -583,6 +583,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          units,
                          family,
                          "stacked",
+                         "''",
                          order);
 
     uint32_t i;
@@ -619,6 +620,7 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
                          units,
                          family,
                          "stacked",
+                         "''",
                          order);
 
     uint32_t i;

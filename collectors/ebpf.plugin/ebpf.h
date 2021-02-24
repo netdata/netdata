@@ -133,6 +133,7 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *units,
                                  char *family,
                                  char *charttype,
+                                 char *context,
                                  int order);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
