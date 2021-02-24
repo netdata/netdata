@@ -66,16 +66,6 @@ ENV NETDATA_GID=$NETDATA_GID
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
 #ENV DO_NOT_TRACK=1
 
-# Copy files over
-RUN mkdir -p /opt/src /var/log/netdata && \
-    # Link log files to stdout
-    ln -sf /dev/stdout /var/log/netdata/access.log && \
-    ln -sf /dev/stdout /var/log/netdata/debug.log && \
-    ln -sf /dev/stderr /var/log/netdata/error.log && \
-    # fping from alpine apk is on a different location. Moving it.
-    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
-    chmod 4755 /usr/local/bin/fping && \
-
 # Long-term this should leverage BuildKit’s mount option.
 COPY --from=builder /wheels /wheels
 COPY --from=builder /app /
@@ -87,17 +77,22 @@ RUN chown -R root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
+    mkdir -p /opt/src /var/log/netdata && \
+    ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log && \
     chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
         /usr/libexec/netdata/plugins.d/apps.plugin \
         /usr/libexec/netdata/plugins.d/freeipmi.plugin && \
-    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     pip --no-cache-dir install /wheels/* && \
-    rm -rf /wheels
+    rm -rf /wheels && \
+    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
+    chmod 4755 /usr/local/bin/fping
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
