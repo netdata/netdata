@@ -442,7 +442,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
                                 char *algorithm, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", "''", order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", NULL, order);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
