@@ -882,10 +882,10 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     }
     rrd_unlock();
 
-#ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+//#ifdef ENABLE_DBENGINE
+//    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
         sql_archived_database_hosts(wb, count);
-#endif
+//#endif
     buffer_strcat(wb, "\n\t],\n");
 }
 

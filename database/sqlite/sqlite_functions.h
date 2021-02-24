@@ -49,7 +49,9 @@ extern void store_active_chart(uuid_t *dimension_uuid);
 
 extern int find_uuid_type(uuid_t *uuid);
 
+#ifdef ENABLE_DBENGINE
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb, int flag);
+#endif
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
 extern void db_execute(char *cmd);

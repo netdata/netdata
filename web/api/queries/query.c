@@ -1599,7 +1599,7 @@ RRDR *rrd2rrdr(
         if (first_entry_t > after_requested)
             first_entry_t = after_requested;
 
-    if (context_param_list) {
+    if (context_param_list /*&& context_param_list->archive_mode == 0*/) {
         rebuild_context_param_list(context_param_list, after_requested);
         st = context_param_list->rd ? context_param_list->rd->rrdset : NULL;
         if (unlikely(!st))

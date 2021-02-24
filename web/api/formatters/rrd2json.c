@@ -46,7 +46,11 @@ void rebuild_context_param_list(struct context_param *context_param_list, time_t
     RRDDIM *new_rd_list = NULL, *t;
     while (temp_rd) {
         t = temp_rd->next;
-        if (rrdset_last_entry_t(temp_rd->rrdset) >= after_requested) {
+        RRDSET *st = temp_rd->rrdset;
+
+        time_t last_entry_t = context_param_list->archive_mode ? st->upstream_resync_time : rrdset_last_entry_t(st);
+
+        if (last_entry_t >= after_requested) {
             temp_rd->next = new_rd_list;
             new_rd_list = temp_rd;
         } else {

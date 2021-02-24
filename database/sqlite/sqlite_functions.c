@@ -682,14 +682,13 @@ bind_fail:
 int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
                                 uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
 {
+#ifdef ENABLE_DBENGINE
+    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
     int rc;
     uuid_t  legacy_uuid;
     uuid_t  multihost_legacy_uuid;
 
-
     time_t dim_first_entry_t, dim_last_entry_t;
-
-    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
     if (unlikely(rc)) {
         rrdeng_generate_legacy_uuid(dim_id, chart_id, &legacy_uuid);
         rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
@@ -710,6 +709,16 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
         *last_entry_t = MAX(*last_entry_t, dim_last_entry_t);
     }
     return rc;
+#else
+    UNUSED(machine_guid);
+    UNUSED(chart_id);
+    UNUSED(dim_id);
+    UNUSED(uuid);
+    UNUSED(first_entry_t);
+    UNUSED(last_entry_t);
+    UNUSED(rrdeng_uuid);
+    return 1;
+#endif
 }
 
 
@@ -739,6 +748,7 @@ void sql_read_chart_labels(sqlite3_stmt *result_set, uuid_t *chart_uuid, BUFFER 
     return;
 }
 
+#ifdef ENABLE_DBENGINE
 //
 // Support for archived charts
 //
@@ -790,7 +800,6 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
     *dimensions_count += dimensions;
     buffer_sprintf(wb, "\n\t\t\t}");
 }
-
 
 #define SELECT_CHART "select chart_id, id, name, type, family, context, title, priority, plugin, " \
     "module, unit, chart_type, update_every from chart " \
@@ -1009,6 +1018,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb, int full)
 
     return;
 }
+#endif
 
 #define SELECT_HOST "select host_id, registry_hostname, update_every, os, timezone, tags from host where hostname = @hostname order by rowid desc;"
 #define SELECT_HOST_BY_UUID "select host_id, registry_hostname, update_every, os, timezone, tags from host where host_id = @host_id ;"
@@ -1177,6 +1187,7 @@ void add_migrated_file(char *path, uint64_t file_size)
 
 void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context, char *chart)
 {
+#ifdef ENABLE_DBENGINE
     int rc;
 
     if (unlikely(!param_list))
@@ -1242,12 +1253,19 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
                 st->name = strdupz(chart);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
+
+            st->last_accessed_time = LONG_MAX;  // First entry
+            st->upstream_resync_time = 0;       // last entry
         }
         st->counter++;
 
         //find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t)
         find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
                                     (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
+
+
+        st->last_accessed_time = MIN(st->last_accessed_time, (*param_list)->first_entry_t);
+        st->upstream_resync_time = MAX(st->upstream_resync_time, (*param_list)->last_entry_t);
 
         // d.id, d.name, c.id, c.type, c.name
         char uuid_str[GUID_LEN + 1];
@@ -1295,7 +1313,12 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
-
+#else
+    UNUSED(param_list);
+    UNUSED(host_uuid);
+    UNUSED(context);
+    UNUSED(chart);
+#endif
     return;
 }
 
