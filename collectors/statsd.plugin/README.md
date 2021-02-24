@@ -87,7 +87,7 @@ On disconnect, Netdata will process the entire buffer, even if it is not termina
 
 #### UDP packets
 
-When sending multiple packets over UDP, it is important not to exceed the network MTU, which is usually about 1500 packets.
+When sending multiple packets over UDP, it is important not to exceed the network MTU, which is usually 1500 bytes.
 
 Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
