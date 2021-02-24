@@ -46,7 +46,7 @@ const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
 const char *mqtt_protoid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #define DEFAULT_RINGBUFFER_SIZE (1024*128)
-#define ENTROPY_SOURCE "/dev/random"
+#define ENTROPY_SOURCE "/dev/urandom"
 ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log)
 {
     ws_client *client;
