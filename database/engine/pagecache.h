@@ -172,6 +172,8 @@ extern usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid
 extern void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
                                             usec_t point_in_time, pg_cache_page_info_filter_t *filter,
                                             struct rrdeng_page_info *page_info);
+extern struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t *id,
+                                                                      usec_t start_time);
 extern unsigned
         pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time,
                          struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp);

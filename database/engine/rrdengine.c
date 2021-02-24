@@ -305,19 +305,32 @@ after_crc_check:
         }
     }
 
-    for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        page = mallocz(RRDENG_BLOCK_SIZE);
-        descr = xt_io_descr->descr_array[i];
-        for (j = 0, page_offset = 0; j < count; ++j) {
+    for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
+        uint8_t is_prefetched_page;
+        descr = NULL;
+        for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
+            struct rrdeng_page_descr *descrj;
+
+            descrj = xt_io_descr->descr_array[j];
             /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*(uuid_t *) header->descr[j].uuid, *descr->id) &&
-                header->descr[j].page_length == descr->page_length &&
-                header->descr[j].start_time == descr->start_time &&
-                header->descr[j].end_time == descr->end_time) {
+            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
+                header->descr[i].page_length == descrj->page_length &&
+                header->descr[i].start_time == descrj->start_time &&
+                header->descr[i].end_time == descrj->end_time) {
+                descr = descrj;
                 break;
             }
-            page_offset += header->descr[j].page_length;
         }
+        is_prefetched_page = 0;
+        if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
+            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid,
+                                                         header->descr[i].start_time);
+            if (!descr)
+                continue; /* Failed to reserve a suitable page */
+            is_prefetched_page = 1;
+        }
+        page = mallocz(RRDENG_BLOCK_SIZE);
+
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
             /* Applications should make sure NULL values match 0 as does SN_EMPTY_SLOT */
@@ -334,7 +347,7 @@ after_crc_check:
         pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         pg_cache_replaceQ_insert(ctx, descr);
-        if (xt_io_descr->release_descr) {
+        if (xt_io_descr->release_descr || is_prefetched_page) {
             pg_cache_put(ctx, descr);
         } else {
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);

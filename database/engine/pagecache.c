@@ -699,6 +699,74 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
     }
     uv_rwlock_rdunlock(&page_index->lock);
 }
+
+/**
+ * Searches for an unallocated page without triggering disk I/O. Attempts to reserve the page and get a reference.
+ * @param ctx DB context
+ * @param id lookup by UUID
+ * @param start_time exact starting time in usec
+ * @param ret_page_indexp Sets the page index pointer (*ret_page_indexp) for the given UUID.
+ * @return the page descriptor or NULL on failure. It can fail if:
+ *         1. The page is already allocated to the page cache.
+ *         2. It did not succeed to get a reference.
+ *         3. It did not succeed to reserve a spot in the page cache.
+ */
+struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t *id,
+                                                               usec_t start_time)
+{
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdeng_page_descr *descr = NULL;
+    struct page_cache_descr *pg_cache_descr = NULL;
+    unsigned long flags;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index = NULL;
+    Word_t Index;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
+    if (likely(NULL != PValue)) {
+        page_index = *PValue;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if ((NULL == PValue) || !pg_cache_try_reserve_pages(ctx, 1)) {
+        /* Failed to find page or failed to reserve a spot in the cache */
+        return NULL;
+    }
+
+    uv_rwlock_rdlock(&page_index->lock);
+    Index = (Word_t)(start_time / USEC_PER_SEC);
+    PValue = JudyLGet(page_index->JudyL_array, Index, PJE0);
+    if (likely(NULL != PValue)) {
+        descr = *PValue;
+    }
+    if (NULL == PValue || 0 == descr->page_length) {
+        /* Failed to find non-empty page */
+        uv_rwlock_rdunlock(&page_index->lock);
+
+        pg_cache_release_pages(ctx, 1);
+        return NULL;
+    }
+
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    pg_cache_descr = descr->pg_cache_descr;
+    flags = pg_cache_descr->flags;
+    uv_rwlock_rdunlock(&page_index->lock);
+
+    if ((flags & RRD_PAGE_POPULATED) || !pg_cache_try_get_unsafe(descr, 1)) {
+        /* Failed to get reference or page is already populated */
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+        pg_cache_release_pages(ctx, 1);
+        return NULL;
+    }
+    /* success */
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+    rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
+
+    return descr;
+}
+
 /**
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
  * Does not get a reference.
