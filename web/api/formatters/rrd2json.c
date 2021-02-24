@@ -32,6 +32,30 @@ void free_context_param_list(struct context_param **param_list)
     *param_list = NULL;
 }
 
+void rebuild_context_param_list(struct context_param *context_param_list, time_t after_requested)
+{
+    RRDDIM *temp_rd = context_param_list->rd;
+    RRDDIM *new_rd_list = NULL, *t;
+    while (temp_rd) {
+        t = temp_rd->next;
+        if (rrdset_last_entry_t(temp_rd->rrdset) >= after_requested) {
+            temp_rd->next = new_rd_list;
+            new_rd_list = temp_rd;
+        } else {
+            freez((char *)temp_rd->id);
+            freez((char *)temp_rd->name);
+#ifdef ENABLE_DBENGINE
+            if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+                freez(temp_rd->state->metric_uuid);
+#endif
+            freez(temp_rd->state);
+            freez(temp_rd);
+        }
+        temp_rd = t;
+    }
+    context_param_list->rd = new_rd_list;
+};
+
 void build_context_param_list(struct context_param **param_list, RRDSET *st)
 {
     if (unlikely(!param_list || !st))
@@ -193,13 +217,14 @@ int rrdset2anything_api_v1(
     time_t last_accessed_time = now_realtime_sec();
     st->last_accessed_time = last_accessed_time;
 
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
+
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
         buffer_no_cacheable(wb);

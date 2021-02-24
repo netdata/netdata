@@ -1,6 +1,6 @@
 <!--
 title: "Use dimension templates to create dynamic alarms"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/health/dimension-templates.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/dimension-templates.md
 -->
 
 # Use dimension templates to create dynamic alarms

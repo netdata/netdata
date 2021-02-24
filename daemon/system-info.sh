@@ -108,9 +108,9 @@ else
   fi
 
   # shellcheck disable=SC2153
-  if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
+  if [ "${CONTAINER_NAME}" = "unknown" ] || [ "${CONTAINER_VERSION}" = "unknown" ] || [ "${CONTAINER_ID}" = "unknown" ]; then
     if [ -f "/etc/lsb-release" ]; then
-      if [ "${OS_DETECTION}" = "unknown" ]; then
+      if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
         CONTAINER_OS_DETECTION="/etc/lsb-release"
       else
         CONTAINER_OS_DETECTION="Mixed"
@@ -119,19 +119,19 @@ else
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
       eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" < /etc/lsb-release)"
-      if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
-      if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
-      if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
+      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
+      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
     fi
     if [ -n "$(command -v lsb_release 2> /dev/null)" ]; then
-      if [ "${OS_DETECTION}" = "unknown" ]; then
+      if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
         CONTAINER_OS_DETECTION="lsb_release"
       else
         CONTAINER_OS_DETECTION="Mixed"
       fi
-      if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2> /dev/null)"; fi
-      if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2> /dev/null)"; fi
-      if [ "${ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2> /dev/null)"; fi
+      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2> /dev/null)"; fi
+      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2> /dev/null)"; fi
+      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2> /dev/null)"; fi
     fi
   fi
 fi
@@ -143,7 +143,9 @@ HOST_VERSION="unknown"
 HOST_VERSION_ID="unknown"
 HOST_ID="unknown"
 HOST_ID_LIKE="unknown"
-if [ "${CONTAINER}" = "unknown" ]; then
+
+# 'systemd-detect-virt' returns 'none' if there is no hardware/container virtualization.
+if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
   for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
     eval "HOST_$v=\$CONTAINER_$v; CONTAINER_$v=none"
   done

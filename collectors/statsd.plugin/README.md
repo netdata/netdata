@@ -10,15 +10,14 @@ StatsD is a system to collect data from any application. Applications send metri
 
 If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
 
-There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding StatsD metrics to any application framework. This makes StatsD quite popular for custom application metrics.
 
-Netdata is a fully featured StatsD server. It can collect StatsD formatted metrics, visualize them on its dashboards, and store them in it's database for long-term retention.
+Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
 
-Netdata StatsD is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard StatsD port 8125. Netdata supports both tcp and udp packets at the same time. 
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both tcp and udp packets at the same time. 
 
-Since StatsD is embedded in Netdata, it means you now have a StatsD server embedded on all your servers. 
+Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. 
 
-Netdata StatsD is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained StatsD traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
+Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
 ## Metrics supported by Netdata
 
@@ -70,7 +69,7 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
 
 #### Sampling Rates
 
-The application may append `|@sampling_rate`, where `sampling_rate` is a number from `0.0` to `1.0` in order for StatsD to extrapolate the value and predict the total for the entire period. If the application reports to StatsD a value for 1/10th of the time, it can append `|@0.1` to the metrics it sends to statsd.
+The application may append `|@sampling_rate`, where `sampling_rate` is a number from `0.0` to `1.0` in order for StatD to extrapolate the value and predict the total for the entire period. If the application reports to StatsD a value for 1/10th of the time, it can append `|@0.1` to the metrics it sends to statsd.
 
 #### Overlapping metrics
 
@@ -168,6 +167,7 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 
 ### Optimize private metric charts visualization and storage
 
+
 If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
 The metrics above this soft limit are still processed by Netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
@@ -247,7 +247,6 @@ Synthetic charts are organized in
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
 For example, if you want to monitor the application `myapp` using StatsD and Netdata, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
-
 ```
 [app]
 	name = myapp
@@ -284,6 +283,7 @@ Using the above configuration `myapp` should get its own section on the dashboar
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts).
+
 -   `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
@@ -464,7 +464,7 @@ Using the above, the dimensions will be added as `GET`, `ADD` and `DELETE`.
 
 ### Python
 
-Use [jsocol/pystatsd](https://github.com/jsocol/pystatsd) to quickly instrument a Python application with StatsD. 
+It's really easy to instrument your python application with StatsD, for example using [jsocol/pystatsd](https://github.com/jsocol/pystatsd). 
 
 ```python
 import statsd
@@ -482,7 +482,7 @@ You can find detailed documentation in their [documentation page](https://statsd
 
 ### Javascript and Node.js
 
-Use the client library by [sivy/node-statsd](https://github.com/sivy/node-statsd) to embed StatsD into your Node.js project.
+Using the client library by [sivy/node-statsd](https://github.com/sivy/node-statsd), you can easily embed StatsD into your Node.js project.
 
 ```javascript
   var StatsD = require('node-statsd'),

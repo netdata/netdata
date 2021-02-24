@@ -3879,9 +3879,8 @@ static void parse_args(int argc, char **argv)
         }
 
         if(strcmp("debug", argv[i]) == 0) {
-#ifdef NETDATA_INTERNAL_CHECKS
             debug_enabled = 1;
-#else
+#ifndef NETDATA_INTERNAL_CHECKS
             fprintf(stderr, "apps.plugin has been compiled without debugging\n");
 #endif
             continue;

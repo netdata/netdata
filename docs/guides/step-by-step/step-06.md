@@ -1,6 +1,6 @@
 <!--
 title: "Step 6. Collect metrics from more services and apps"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/docs/step-by-step/step-06.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-06.md
 -->
 
 # Step 6. Collect metrics from more services and apps

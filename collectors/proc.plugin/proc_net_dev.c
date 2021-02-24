@@ -169,6 +169,10 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcollisions = NULL;
     d->rd_tcarrier    = NULL;
     d->rd_tcompressed = NULL;
+
+    d->chart_var_speed     = NULL;
+    d->chart_var_duplex    = NULL;
+    d->chart_var_operstate = NULL;
 }
 
 static void netdev_free_chart_strings(struct netdev *d) {
@@ -590,10 +594,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
                 d->filename_duplex = strdupz(buffer);
-
-                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
-                d->filename_operstate = strdupz(buffer);
             }
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+            d->filename_operstate = strdupz(buffer);
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
