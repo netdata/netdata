@@ -10,6 +10,7 @@
 /* Or they will be reported on the EXIT event */
 #define ANALYTICS_MAX_PROMETHEUS_HITS 5
 #define ANALYTICS_MAX_SHELL_HITS 5
+#define ANALYTICS_MAX_JSON_HITS 5
 
 /* Max number of seconds before the META analytics is sent */
 #define ANALYTICS_MAX_SLEEP_SEC 20
@@ -39,6 +40,7 @@ struct analytics_data {
     char *NETDATA_HOST_CLAIMED;
     char *NETDATA_ALLMETRICS_PROMETHEUS_USED;
     char *NETDATA_ALLMETRICS_SHELL_USED;
+    char *NETDATA_ALLMETRICS_JSON_USED;
     char *NETDATA_CONFIG_HTTPS_ENABLED;
     char *NETDATA_ALARMS_COUNT;
     char *NETDATA_CHARTS_COUNT;
@@ -50,6 +52,7 @@ struct analytics_data {
     
     uint8_t prometheus_hits;
     uint8_t shell_hits;
+    uint8_t json_hits;
 } analytics_data;
 
 extern void *analytics_main(void *ptr);

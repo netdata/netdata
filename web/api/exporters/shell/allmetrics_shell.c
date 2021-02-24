@@ -159,5 +159,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
 
     buffer_strcat(wb, "\n}");
     rrdhost_unlock(host);
+
+    analytics_log_json();
 }
 

@@ -53,6 +53,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED        : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
     debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED               : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS         : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
@@ -78,6 +79,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
     setenv ( "NETDATA_ALLMETRICS_PROMETHEUS_USED",analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
     setenv ( "NETDATA_ALLMETRICS_SHELL_USED",     analytics_data.NETDATA_ALLMETRICS_SHELL_USED, 1);
+    setenv ( "NETDATA_ALLMETRICS_JSON_USED",      analytics_data.NETDATA_ALLMETRICS_JSON_USED, 1);
     setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
     setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
     setenv ( "NETDATA_COLLECTORS_PLUGINS",        analytics_data.NETDATA_COLLECTORS_PLUGINS, 1);
@@ -102,6 +104,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
     freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
     freez(analytics_data.NETDATA_HOST_CLAIMED);
     freez(analytics_data.NETDATA_COLLECTORS_PLUGINS);
@@ -220,6 +223,13 @@ void analytics_log_shell(void) {
 
 }
 
+void analytics_log_json(void) {
+
+    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS))
+        analytics_data.json_hits++;
+
+}
+
 
 
 void analytics_misc(void) {
@@ -335,22 +345,6 @@ void analytics_alarms_notifications (void) {
     //return 0;
 }
 
-/* void analytics_exporters (void) { */
-
-/*     extern const struct engine *engine; */
-
-/*     if (!engine){ */
-/*         analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, "false"); */
-/*         return; */
-/*     } */
-
-
-/*     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) { */
-/*         debug(D_ANALYTICS, "[%d]", instance->disabled); */
-/*     } */
-
-/* } */
-
 void analytics_gather_meta_data (void) {
 
     rrdhost_rdlock(localhost);
@@ -374,6 +368,11 @@ void analytics_gather_meta_data (void) {
         analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "true");
     else
         analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "false");
+
+    if (analytics_data.json_hits == ANALYTICS_MAX_JSON_HITS)
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, "true");
+    else
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, "false");
 
     analytics_setenv_data();
 }
@@ -583,6 +582,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES,        "N/A");
@@ -593,6 +593,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS,     "N/A");
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
+    analytics_data.json_hits = 0;
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;

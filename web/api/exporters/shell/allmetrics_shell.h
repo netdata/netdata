@@ -18,5 +18,6 @@
 extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
 extern void analytics_log_shell();
+extern void analytics_log_json();
 
 #endif //NETDATA_API_ALLMETRICS_SHELL_H
