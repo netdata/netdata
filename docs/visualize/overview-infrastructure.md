@@ -14,6 +14,9 @@ With Overview's composite charts, you can see your infrastructure from a single 
 anomalies, then drill down with filtering or single-node dashboards to see more. In the screenshot below,
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
+Netdata also supports robust Kubernetes monitoring using the Overview. Read our [deployment
+doc](/packaging/installer/methods/kubernetes.md) for details on visualizing Kubernetes metrics in Netdata Cloud.
+
 ![The War Room
 Overview](https://user-images.githubusercontent.com/1153921/108732681-09791980-74eb-11eb-9ba2-98cb1b6608de.png)
 
@@ -93,10 +96,16 @@ To troubleshoot complex performance issues using Netdata, you need to understand
 visualizations. Learn more about [interaction](/docs/visualize/interact-dashboards-charts.md) to see historical metrics,
 highlight timeframes for targeted analysis, and more.
 
+If you're a Kubernetes user, read about Netdata's [Kubernetes
+visualizations](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes) for details about the health map and
+time-series k8s charts, and our tutorial, [_Kubernetes monitoring with Netdata: Overview and
+visualizations_](/docs/guides/monitor/kubernetes-k8s-netdata.md), for a full walkthrough.
+
 ### Related reference documentation
 
--   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
--   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
--   [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
+- [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
+- [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
+- [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
+- [Netdata Cloud · Kubernetes visualizations](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fvisualize%2Foverview-infrastructure&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
