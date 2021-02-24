@@ -6,10 +6,11 @@
 #include "../daemon/common.h"
 
 /* A maximum number of hits from prometheus_prepare that we consider that prometheus is indeed being used */
-/* These hits must come before the META analytics is sent */
-#define MAX_PROMETHEUS_HITS 5
+/* These hits must come before the META analytics is sent (ANALYTICS_MAX_SLEEP_SEC) */
+#define ANALYTICS_MAX_PROMETHEUS_HITS 5
 
 /* Max number of seconds before the META analytics is sent */
+#define ANALYTICS_MAX_SLEEP_SEC 30
 
 #define NETDATA_PLUGIN_HOOK_ANALYTICS \
     { \

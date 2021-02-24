@@ -15,7 +15,7 @@
                Run it? and get the env variables? Or pass them directly to the script?
                
    - 9. Dashboard enabled ([web] mode = none)
-   - 10. Default port changed ([web] default port = 39999) -> OK: NETDATA_LISTEN_PORT
+   - 10. Default port changed ([web] default port = 19999) -> OK: NETDATA_LISTEN_PORT
 
    General: Put everything in a struct, keep it there for maybe changes check or to provide them to api/v1
    Do not start the thread is analytics is disabled by the user
@@ -129,7 +129,7 @@ void analytics_alarms (void) {
     int alarms = 0;
     char b[7];
     RRDCALC *rc;
-    //rrdhost_rdlock(localhost);
+
     for(rc = localhost->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
@@ -137,11 +137,9 @@ void analytics_alarms (void) {
         alarms++;
         }
 
-    //rrdhost_unlock(localhost);
+
     snprintfz(b, 6, "%d", alarms);
-    //setenv("NETDATA_ALARMS_COUNT"  , b, 1);
     analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT, b);
-    //debug(D_ANALYTICS, "Alarms: [%d]", alarms);
 }
 
 void analytics_collectors(void) {
@@ -151,9 +149,6 @@ void analytics_collectors(void) {
     BUFFER *pl = buffer_create(1000);
     BUFFER *md = buffer_create(1000);
     
-    /* combine locks as needed */
-    /* dont lock again for other counts */
-    //rrdhost_rdlock(localhost);
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -162,10 +157,8 @@ void analytics_collectors(void) {
             };
             snprintfz(name, 499, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
-            //some++;
         }
     }
-    //rrdhost_unlock(localhost);
 
     struct array_printer ap;
     ap.c = 0;
@@ -187,7 +180,7 @@ void analytics_collectors(void) {
 
 void analytics_log_prometheus(void) {
     
-    if (likely(analytics_data.prometheus_hits < MAX_PROMETHEUS_HITS))
+    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS))
         analytics_data.prometheus_hits++;
 
 }
@@ -231,7 +224,6 @@ void analytics_charts (void) {
     rrdset_foreach_read(st, localhost) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             c++;
-            //st->last_accessed_time = now; ??
         }
     }
     {
@@ -249,7 +241,6 @@ void analytics_metrics (void) {
     rrdset_foreach_read(st, localhost) {
         rrddim_foreach_read(rd, st) {
             if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
-
             dimensions++;
         }
     }
@@ -337,9 +328,7 @@ void analytics_gather_meta_data (void) {
     analytics_misc();
     analytics_alarms_notifications();
 
-    //analytics_exporters();
-
-    if (analytics_data.prometheus_hits == MAX_PROMETHEUS_HITS)
+    if (analytics_data.prometheus_hits == ANALYTICS_MAX_PROMETHEUS_HITS)
         analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "true");
     else
         analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "false");
@@ -347,41 +336,64 @@ void analytics_gather_meta_data (void) {
     analytics_setenv_data();
 }
 
+void analytics_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
+    debug(D_ANALYTICS, "Cleaning up...");
+    freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_IS_PARENT);
+    freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    freez(analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
+    freez(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
+    freez(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
+    freez(analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    freez(analytics_data.NETDATA_HOST_PROMETHEUS_USED);
+    freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
+    freez(analytics_data.NETDATA_HOST_CLAIMED);
+    freez(analytics_data.NETDATA_COLLECTORS_PLUGINS);
+    freez(analytics_data.NETDATA_COLLECTORS_MODULES);
+    freez(analytics_data.NETDATA_COLLECTORS_COUNT);
+    freez(analytics_data.NETDATA_ALARMS_COUNT);
+    freez(analytics_data.NETDATA_CHARTS_COUNT);
+    freez(analytics_data.NETDATA_METRICS_COUNT);
+    freez(analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
 void *analytics_main(void *ptr) {
-    
-    int some=0;
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
+    int sec = 0;
 
     debug(D_ANALYTICS, "Analytics thread starts");
 
-    //sleep(10); /* TODO: decide how long to wait... */
-    /* Could this from aclk work? What if it is disabled? */
-    /* Charts count e.g. must wait longer than this */
-#ifdef ENABLE_ACLK
-    while (!netdata_exit) {
-        if(aclk_host_popcorn_check(localhost) == ACLK_HOST_STABLE) {
-            break;
-        }
-        sleep_usec(USEC_PER_SEC * 1);
-    }
-#else
-    sleep(30);
-#endif
+    while(!netdata_exit) {
+        sleep(1);
+        ++sec;
 
-    sleep(10);
+        if (sec == ANALYTICS_MAX_SLEEP_SEC)
+            break;
+
+        if(unlikely(netdata_exit))
+            goto cleanup;
+    }
+
+    if(unlikely(netdata_exit))
+        goto cleanup;
 
     debug(D_ANALYTICS, "Stable...");
-    
+
     analytics_gather_meta_data();
     analytics_log_data();
-    
-    if (netdata_anonymous_statistics_enabled > 0) //not needed, check already inside send_statistics
-        send_statistics("META", "-", "-");
 
-    /* TODO: either do not exit, or try from main not to try and stop it */
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    send_statistics("META", "-", "-");
+
+ cleanup:
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
