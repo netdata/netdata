@@ -677,27 +677,37 @@ bind_fail:
     return 1;
 }
 
-int find_dimension_first_last_t(char *machine_uid, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t)
+int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
+                                uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
 {
     int rc;
+    uuid_t  legacy_uuid;
+    uuid_t  multihost_legacy_uuid;
+
 
     time_t dim_first_entry_t, dim_last_entry_t;
 
-    rc = rrdeng_metric_latest_time_by_uuid(
-        (uuid_t *)sqlite3_column_text(res_dim, 2), &dim_first_entry_t, &dim_last_entry_t);
+    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
     if (unlikely(rc)) {
-        rrdeng_generate_legacy_uuid((const char *)sqlite3_column_text(res_dim, 0), chart_id, &legacy_uuid);
+        rrdeng_generate_legacy_uuid(dim_id, chart_id, &legacy_uuid);
         rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
         if (likely(rc)) {
             rrdeng_convert_legacy_uuid_to_multihost(machine_guid, &legacy_uuid, &multihost_legacy_uuid);
             rc = rrdeng_metric_latest_time_by_uuid(&multihost_legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
+            if (likely(!rc))
+                uuid_copy(*rrdeng_uuid, multihost_legacy_uuid);
         }
+        else
+            uuid_copy(*rrdeng_uuid, legacy_uuid);
     }
+    else
+        uuid_copy(*rrdeng_uuid, *uuid);
 
     if (likely(!rc)) {
         *first_entry_t = MIN(*first_entry_t, dim_first_entry_t);
         *last_entry_t = MAX(*last_entry_t, dim_last_entry_t);
     }
+    return rc;
 }
 
 //
@@ -1133,6 +1143,151 @@ void add_migrated_file(char *path, uint64_t file_size)
         error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
 
     return;
+}
+
+
+#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name from chart c, dimension d, host h " \
+    "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.context = @context " \
+    "order by c.type||c.id desc;"
+
+void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context)
+{
+    int rc;
+
+    if (unlikely(!param_list))
+        return;
+
+    if (unlikely(!(*param_list))) {
+        *param_list = mallocz(sizeof(struct context_param));
+        (*param_list)->first_entry_t = LONG_MAX;
+        (*param_list)->last_entry_t = 0;
+        (*param_list)->rd = NULL;
+        (*param_list)->archive_mode = 1;
+    }
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_CHART_CONTEXT, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host archived charts");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch archived charts");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 2, context, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch archived charts");
+        return;
+    }
+
+    RRDSET *st = NULL;
+    char machine_guid[GUID_LEN + 1];
+    uuid_unparse_lower(*host_uuid, machine_guid);
+    uuid_t rrdeng_uuid;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        char id[512];
+        sprintf(id, "%s.%s", sqlite3_column_text(res, 3), sqlite3_column_text(res, 1));
+
+        if (1 || !st) {
+            st = callocz(1, sizeof(*st));
+            char n[RRD_ID_LENGTH_MAX + 1];
+
+            snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", (char *) sqlite3_column_text(res, 4), (char *) sqlite3_column_text(res, 3));
+            st->name = strdupz(n);
+//            st->context = strdupz(context);
+            st->update_every = 1;
+//            if((char *) sqlite3_column_text(res, 5) && *(char *) sqlite3_column_text(res, 5) && rrdset_set_name(st, (char *) sqlite3_column_text(res, 5)))
+//                ;
+//            else
+//                rrdset_set_name(st, (char *) sqlite3_column_text(res, 3));
+        }
+
+        //find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t)
+        find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
+                                    (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
+
+        // d.id, d.name, c.id, c.type, c.name
+//        char uuid_str[GUID_LEN + 1];
+//        uuid_unparse_lower(rrdeng_uuid, uuid_str);
+//        info("Dimension [%s / %s] Chart [%s %s %s] --> %s",
+//             sqlite3_column_text(res, 1),   // dim id
+//             sqlite3_column_text(res, 2),    // dim
+//             sqlite3_column_text(res, 3),
+//             sqlite3_column_text(res, 4),
+//             sqlite3_column_text(res, 5), uuid_str);
+
+            RRDDIM *rd = mallocz(sizeof(*rd));
+            rd->rrdset = st;
+            rd->id = strdupz((char *) sqlite3_column_text(res, 1));
+            rd->name = strdupz((char *) sqlite3_column_text(res, 2));
+            rd->state = mallocz(sizeof(*rd->state));
+
+            rd->state->collect_ops.init = rrdeng_store_metric_init;
+            rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
+            rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
+            rd->state->query_ops.init = rrdeng_load_metric_init;
+            rd->state->query_ops.next_metric = rrdeng_load_metric_next;
+            rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
+            rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
+            rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
+            rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+    #ifdef ENABLE_DBENGINE
+            //if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                //rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+                rd->state->metric_uuid = NULL;
+                rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
+                uuid_copy(*rd->state->rrdeng_uuid, rrdeng_uuid);
+                rd->state->metric_uuid = rd->state->rrdeng_uuid;
+                //uuid_copy(*rd->state->metric_uuid, *(uuid_t *) sqlite3_column_blob(res, 0));
+            //}
+    #endif
+            rd->next = (*param_list)->rd;
+            (*param_list)->rd = rd;
+    }
+    if (likely(st)) {
+        st->context = strdupz(context);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived charts");
+
+    return;
+
+//
+//    RRDDIM *rd1;
+//    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
+//    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
+//
+//    st->last_accessed_time = now_realtime_sec();
+//    rrdset_rdlock(st);
+//
+//    rrddim_foreach_read(rd1, st) {
+//        RRDDIM *rd = mallocz(rd1->memsize);
+//        memcpy(rd, rd1, rd1->memsize);
+//        rd->id = strdupz(rd1->id);
+//        rd->name = strdupz(rd1->name);
+//        rd->state = mallocz(sizeof(*rd->state));
+//        memcpy(rd->state, rd1->state, sizeof(*rd->state));
+//        memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
+//        memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
+//#ifdef ENABLE_DBENGINE
+//        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+//            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+//            uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
+//        }
+//#endif
+//        rd->next = (*param_list)->rd;
+//        (*param_list)->rd = rd;
+//    }
+//
+//    rrdset_unlock(st);
 }
 
 
