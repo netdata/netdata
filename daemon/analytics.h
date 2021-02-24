@@ -5,6 +5,12 @@
 
 #include "../daemon/common.h"
 
+/* A maximum number of hits from prometheus_prepare that we consider that prometheus is indeed being used */
+/* These hits must come before the META analytics is sent */
+#define MAX_PROMETHEUS_HITS 5
+
+/* Max number of seconds before the META analytics is sent */
+
 #define NETDATA_PLUGIN_HOOK_ANALYTICS \
     { \
         .name = "ANALYTICS", \
@@ -28,6 +34,7 @@ struct analytics_data {
     char *NETDATA_CONFIG_EXPORTING_ENABLED;
     char *NETDATA_HOST_ACLK_CONNECTED;
     char *NETDATA_HOST_CLAIMED;
+    char *NETDATA_HOST_PROMETHEUS_USED;
     char *NETDATA_CONFIG_HTTPS_ENABLED;
     char *NETDATA_ALARMS_COUNT;
     char *NETDATA_CHARTS_COUNT;
@@ -37,7 +44,7 @@ struct analytics_data {
     char *NETDATA_COLLECTORS_COUNT;
     char *NETDATA_NOTIFICATIONS_METHODS;
     
-    
+    uint8_t prometheus_hits;
     
     
 } analytics_data;

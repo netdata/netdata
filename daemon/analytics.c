@@ -50,6 +50,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED  : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED       : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    debug(D_ANALYTICS, "NETDATA_HOST_PROMETHEUS_USED      : [%s]", analytics_data.NETDATA_HOST_PROMETHEUS_USED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
     debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED              : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS        : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
@@ -73,6 +74,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
     setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
+    setenv ( "NETDATA_HOST_PROMETHEUS_USED",      analytics_data.NETDATA_HOST_PROMETHEUS_USED, 1);    
     setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
     setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
     setenv ( "NETDATA_COLLECTORS_PLUGINS",        analytics_data.NETDATA_COLLECTORS_PLUGINS, 1);
@@ -183,6 +185,13 @@ void analytics_collectors(void) {
     }
 }
 
+void analytics_log_prometheus(void) {
+    
+    if (likely(analytics_data.prometheus_hits < MAX_PROMETHEUS_HITS))
+        analytics_data.prometheus_hits++;
+
+}
+
 void analytics_misc(void) {
     
     analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT, (localhost->next || configured_as_parent()) ? "true" : "false");
@@ -212,10 +221,6 @@ void analytics_misc(void) {
 
     //dont do it like this.... it should be already loaded somewhere...
     analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
-
-    if (prometheus_exporter_instance)
-        debug(D_ANALYTICS, "Prometheus instance exists?");
-
     
 }
 
@@ -318,6 +323,30 @@ void analytics_exporters (void) {
 
 }
 
+void analytics_gather_meta_data (void) {
+
+    rrdhost_rdlock(localhost);
+    
+    analytics_collectors();
+    analytics_alarms();
+    analytics_charts();
+    analytics_metrics();
+
+    rrdhost_unlock(localhost);
+
+    analytics_misc();
+    analytics_alarms_notifications();
+
+    //analytics_exporters();
+
+    if (analytics_data.prometheus_hits == MAX_PROMETHEUS_HITS)
+        analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "true");
+    else
+        analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "false");
+    
+    analytics_setenv_data();
+}
+
 
 
 void *analytics_main(void *ptr) {
@@ -345,24 +374,10 @@ void *analytics_main(void *ptr) {
 
     debug(D_ANALYTICS, "Stable...");
     
-
-    rrdhost_rdlock(localhost);
-    
-    analytics_collectors();
-    analytics_alarms();
-    analytics_charts();
-    analytics_metrics();
-
-    rrdhost_unlock(localhost);
-
-    analytics_misc();
-    analytics_alarms_notifications();
-
-    //analytics_exporters();
-    
+    analytics_gather_meta_data();
     analytics_log_data();
-    analytics_setenv_data();
-    if (netdata_anonymous_statistics_enabled > 0)
+    
+    if (netdata_anonymous_statistics_enabled > 0) //not needed, check already inside send_statistics
         send_statistics("META", "-", "-");
 
     /* TODO: either do not exit, or try from main not to try and stop it */
@@ -532,6 +547,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES,        "N/A");
@@ -540,6 +556,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS,     "N/A");
+    analytics_data.prometheus_hits = 0;
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
