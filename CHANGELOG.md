@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...HEAD)
+
+**Merged pull requests:**
+
+- Update screenshots and text for new Cloud nav [\#10664](https://github.com/netdata/netdata/pull/10664) ([joelhans](https://github.com/joelhans))
+
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.2...v1.29.3)
