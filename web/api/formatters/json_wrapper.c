@@ -7,8 +7,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 {
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+    int should_lock = (!context_param_list || (context_param_list && !context_param_list->archive_mode));
 
-    if (context_param_list && !context_param_list->archive_mode)
+    if (should_lock)
         rrdset_check_rdlock(r->st);
 
     long rows = rrdr_rows(r);
@@ -28,7 +29,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         sq[0] = '"';
     }
 
-    rrdset_rdlock(r->st);
+    if (should_lock)
+        rrdset_rdlock(r->st);
     buffer_sprintf(wb, "{\n"
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
@@ -50,7 +52,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
-    rrdset_unlock(r->st);
+    if (should_lock)
+        rrdset_unlock(r->st);
 
     for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;

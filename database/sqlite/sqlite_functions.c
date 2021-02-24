@@ -1146,10 +1146,10 @@ void add_migrated_file(char *path, uint64_t file_size)
 }
 
 
-#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every from chart c, " \
+#define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id from chart c, " \
     "dimension d, host h " \
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.context = @context " \
-    "order by c.type||c.id desc;"
+    "order by c.chart_id asc, c.type||c.id desc;"
 
 void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context)
 {
@@ -1190,48 +1190,49 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
     char machine_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_uuid, machine_guid);
     uuid_t rrdeng_uuid;
+    uuid_t chart_id;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         char id[512];
         sprintf(id, "%s.%s", sqlite3_column_text(res, 3), sqlite3_column_text(res, 1));
 
-        if (1 || !st) {
+        if (!st || uuid_compare(*(uuid_t *)sqlite3_column_blob(res, 7), chart_id)) {
             st = callocz(1, sizeof(*st));
             char n[RRD_ID_LENGTH_MAX + 1];
 
-            snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", (char *) sqlite3_column_text(res, 4), (char *) sqlite3_column_text(res, 3));
+            snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", (char *)sqlite3_column_text(res, 4), (char *)sqlite3_column_text(res, 3));
             st->name = strdupz(n);
-//            st->context = strdupz(context);
             st->update_every = sqlite3_column_int(res, 6);
-//            if((char *) sqlite3_column_text(res, 5) && *(char *) sqlite3_column_text(res, 5) && rrdset_set_name(st, (char *) sqlite3_column_text(res, 5)))
-//                ;
-//            else
-//                rrdset_set_name(st, (char *) sqlite3_column_text(res, 3));
+            st->counter = 0;
+            uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
         }
+        st->counter++;
 
         //find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t)
         find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
                                     (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
 
         // d.id, d.name, c.id, c.type, c.name
-//        char uuid_str[GUID_LEN + 1];
-//        uuid_unparse_lower(rrdeng_uuid, uuid_str);
-//        info("Dimension [%s / %s] Chart [%s %s %s] --> %s",
-//             sqlite3_column_text(res, 1),   // dim id
-//             sqlite3_column_text(res, 2),    // dim
-//             sqlite3_column_text(res, 3),
-//             sqlite3_column_text(res, 4),
-//             sqlite3_column_text(res, 5), uuid_str);
+        char uuid_str[GUID_LEN + 1];
+        uuid_unparse_lower(rrdeng_uuid, uuid_str);
+        info("Dimension [%s / %s] Chart [%s %s %s] --> %s",
+             sqlite3_column_text(res, 1),   // dim id
+             sqlite3_column_text(res, 2),    // dim
+             sqlite3_column_text(res, 3),
+             sqlite3_column_text(res, 4),
+             sqlite3_column_text(res, 5), uuid_str);
 
-            RRDDIM *rd = mallocz(sizeof(*rd));
+            RRDDIM *rd = callocz(1, sizeof(*rd));
             rd->rrdset = st;
+            rd->last_stored_value = NAN;
+            rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
             rd->id = strdupz((char *) sqlite3_column_text(res, 1));
             rd->name = strdupz((char *) sqlite3_column_text(res, 2));
             rd->state = mallocz(sizeof(*rd->state));
 
-            rd->state->collect_ops.init = rrdeng_store_metric_init;
-            rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-            rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
+            //rd->state->collect_ops.init = rrdeng_store_metric_init;
+            //rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
+            //rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
             rd->state->query_ops.init = rrdeng_load_metric_init;
             rd->state->query_ops.next_metric = rrdeng_load_metric_next;
             rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
@@ -1241,7 +1242,7 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
     #ifdef ENABLE_DBENGINE
             //if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 //rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-                rd->state->metric_uuid = NULL;
+                //rd->state->metric_uuid = NULL;
                 rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
                 uuid_copy(*rd->state->rrdeng_uuid, rrdeng_uuid);
                 rd->state->metric_uuid = rd->state->rrdeng_uuid;
@@ -1251,42 +1252,12 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
             rd->next = (*param_list)->rd;
             (*param_list)->rd = rd;
     }
-    if (likely(st)) {
+    if (likely(st))
         st->context = strdupz(context);
-    }
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
 
     return;
-
-//
-//    RRDDIM *rd1;
-//    (*param_list)->first_entry_t = MIN((*param_list)->first_entry_t, rrdset_first_entry_t(st));
-//    (*param_list)->last_entry_t  = MAX((*param_list)->last_entry_t, rrdset_last_entry_t(st));
-//
-//    st->last_accessed_time = now_realtime_sec();
-//    rrdset_rdlock(st);
-//
-//    rrddim_foreach_read(rd1, st) {
-//        RRDDIM *rd = mallocz(rd1->memsize);
-//        memcpy(rd, rd1, rd1->memsize);
-//        rd->id = strdupz(rd1->id);
-//        rd->name = strdupz(rd1->name);
-//        rd->state = mallocz(sizeof(*rd->state));
-//        memcpy(rd->state, rd1->state, sizeof(*rd->state));
-//        memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
-//        memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
-//#ifdef ENABLE_DBENGINE
-//        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-//            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-//            uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
-//        }
-//#endif
-//        rd->next = (*param_list)->rd;
-//        (*param_list)->rd = rd;
-//    }
-//
-//    rrdset_unlock(st);
 }

@@ -362,7 +362,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 1, temp_rd);
+        rrdr2json(r, wb, options, 1, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -374,7 +374,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 1, temp_rd);
+        rrdr2json(r, wb, options, 1, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -385,7 +385,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 0, temp_rd);
+        rrdr2json(r, wb, options, 0, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -398,7 +398,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 0, temp_rd);
+        rrdr2json(r, wb, options, 0, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
