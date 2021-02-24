@@ -355,7 +355,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
 void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
                           char *charttype, char *context, int order)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' %s %s %d %d\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
            type,
            id,
            title,
