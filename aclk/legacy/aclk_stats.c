@@ -246,8 +246,8 @@ static void aclk_stats_cpu_threads(void)
                                          "netdata", id, NULL, "aclk", NULL, title, "milliseconds/s",
                                          "netdata", "stats", 200008 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-            aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
-            aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
+            aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
 
         } else
             rrdset_next(aclk_cpu_data[i].st);
