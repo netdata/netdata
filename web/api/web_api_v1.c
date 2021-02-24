@@ -362,7 +362,7 @@ inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused
     w->response.data->contenttype = CT_APPLICATION_JSON;
 #ifdef ENABLE_DBENGINE
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        sql_rrdset2json(host, w->response.data);
+        sql_rrdset2json(host, w->response.data, 1);
 #endif
     return HTTP_RESP_OK;
 }
@@ -519,6 +519,23 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             st = rrdset_find_byname(host, chart);
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
+#ifdef ENABLE_DBENGINE
+        if (!st && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            sql_build_context_param_list(&context_param_list, &host->host_uuid, NULL, chart);
+            if (likely(context_param_list && context_param_list->rd)) {
+                st = context_param_list->rd->rrdset;
+                if (!st) {
+                    free_context_param_list(&context_param_list);
+                    context_param_list = NULL;
+                }
+            }
+            else {
+                st = NULL;
+                free_context_param_list(&context_param_list);
+                context_param_list = NULL;
+            }
+        }
+#endif
     }
 
     if (!st && !context_param_list) {
@@ -728,10 +745,15 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
     if (context && !chart) {
 #ifdef ENABLE_DBENGINE
         if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            sql_build_context_param_list(&context_param_list, &host->host_uuid, context);
+            sql_build_context_param_list(&context_param_list, &host->host_uuid, context, NULL);
 #endif
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
+        else {
+            st = NULL;
+            free_context_param_list(&context_param_list);
+            context_param_list = NULL;
+        }
     }
     else {
         st = rrdset_find(host, chart);
@@ -739,6 +761,23 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
             st = rrdset_find_byname(host, chart);
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
+#ifdef ENABLE_DBENGINE
+        if (!st && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            sql_build_context_param_list(&context_param_list, &host->host_uuid, NULL, chart);
+            if (likely(context_param_list && context_param_list->rd)) {
+                st = context_param_list->rd->rrdset;
+                if (!st) {
+                    free_context_param_list(&context_param_list);
+                    context_param_list = NULL;
+                }
+            }
+            else {
+                st = NULL;
+                free_context_param_list(&context_param_list);
+                context_param_list = NULL;
+            }
+        }
+#endif
     }
 
     if (!st && !context_param_list) {
@@ -809,8 +848,8 @@ inline int web_client_api_request_v1_archived_data(RRDHOST *host, struct web_cli
             // the client already has the latest data
             buffer_flush(w->response.data);
             buffer_sprintf(w->response.data,
-                           "%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
-                           responseHandler, google_version, google_reqId);
+                    "%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
+                    responseHandler, google_version, google_reqId);
         }
     }
     else if(format == DATASOURCE_JSONP)
@@ -1075,21 +1114,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         count++;
     }
-
-    buffer_strcat(wb, "\n\t],\n\t\"archived_hosts\": [\n");
-    count = 0;
-    rrdhost_foreach_read(host)
-    {
-        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
-            continue;
-        if (count > 0)
-            buffer_strcat(wb, ",\n");
-
-        buffer_sprintf(
-            wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\"", host->machine_guid, host->hostname);
-
-        count++;
-    }
     rrd_unlock();
 
 #ifdef ENABLE_DBENGINE
@@ -1235,7 +1259,6 @@ static struct api_command {
 } api_commands[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
-        { "archived_data",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_archived_data    },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
         { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_archivedcharts  },

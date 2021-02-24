@@ -17,12 +17,14 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_d1 on dimension (chart_id, id, name);",
     "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
-
+    "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
+    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
     "delete from chart_active;",
     "delete from dimension_active;",
 
     "delete from chart where chart_id not in (select chart_id from dimension);",
     "delete from host where host_id not in (select host_id from chart);",
+    "delete from chart_label where chart_id not in (select chart_id from chart);",
     NULL
 };
 
@@ -710,6 +712,33 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
     return rc;
 }
 
+
+#define SELECT_LABELS "select label_key, label_value, source_type from chart_label where chart_id = @chart_id;"
+
+void sql_read_chart_labels(sqlite3_stmt *result_set, uuid_t *chart_uuid, BUFFER *wb)
+{
+    int rc;
+
+    rc = sqlite3_bind_blob(result_set, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    if (rc != SQLITE_OK)
+        return;
+
+    buffer_strcat(wb, ",\n\t\t\t\"chart_labels\": {\n");
+
+    int count = 0;
+    char value[CONFIG_MAX_VALUE * 2 + 1];
+
+    while (sqlite3_step(result_set) == SQLITE_ROW) {
+        if (count > 0)
+            buffer_strcat(wb, ",\n");
+        sanitize_json_string(value, (char *) sqlite3_column_text(result_set, 1), CONFIG_MAX_VALUE * 2);
+        buffer_sprintf(wb, "\t\t\t\t\"%s\": \"%s\"", sqlite3_column_text(result_set, 0), value);
+        count++;
+    }
+    buffer_strcat(wb, "\n\t\t\t}\n");
+    return;
+}
+
 //
 // Support for archived charts
 //
@@ -756,7 +785,6 @@ void sql_rrdim2json(sqlite3_stmt *res_dim, uuid_t *chart_uuid, char *chart_id, c
         buffer_strcat(wb, "\": { \"name\": \"");
         buffer_strcat_jsonescape(wb, (const char *) sqlite3_column_text(res_dim, 1));
         buffer_strcat(wb, "\" }");
-
         dimensions++;
     }
     *dimensions_count += dimensions;
@@ -800,7 +828,7 @@ void sql_archived_database_hosts(BUFFER *wb, int count)
     "module, unit, chart_type, update_every from chart " \
     "where host_id = @host_uuid and chart_id not in (select chart_id from chart_active) order by chart_id asc;"
 
-void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
+void sql_rrdset2json(RRDHOST *host, BUFFER *wb, int full)
 {
     time_t first_entry_t = LONG_MAX;
     time_t last_entry_t = 0;
@@ -809,6 +837,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
 
     sqlite3_stmt *res_chart = NULL;
     sqlite3_stmt *res_dim = NULL;
+    sqlite3_stmt *res_label = NULL;
     time_t now = now_realtime_sec();
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_CHART, -1, &res_chart, 0);
@@ -829,35 +858,42 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         goto failed;
     };
 
+    rc = sqlite3_prepare_v2(db_meta, SELECT_LABELS, -1, &res_label, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch chart archived dimensions");
+        goto failed1;
+    };
+
     if(unlikely(!custom_dashboard_info_js_filename))
         custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
-    buffer_sprintf(wb, "{\n"
-                       "\t\"hostname\": \"%s\""
-                       ",\n\t\"version\": \"%s\""
-                       ",\n\t\"release_channel\": \"%s\""
-                       ",\n\t\"os\": \"%s\""
-                       ",\n\t\"timezone\": \"%s\""
-                       ",\n\t\"update_every\": %d"
-                       ",\n\t\"history\": %ld"
-                       ",\n\t\"memory_mode\": \"%s\""
-                       ",\n\t\"custom_info\": \"%s\""
-                       ",\n\t\"charts\": {"
-        , host->hostname
-        , host->program_version
-        , get_release_channel()
-        , host->os
-        , host->timezone
-        , host->rrd_update_every
-        , host->rrd_history_entries
-        , rrd_memory_mode_name(host->rrd_memory_mode)
-        , custom_dashboard_info_js_filename
-    );
+    if (full)
+        buffer_sprintf(wb, "{\n"
+                           "\t\"hostname\": \"%s\""
+                           ",\n\t\"version\": \"%s\""
+                           ",\n\t\"release_channel\": \"%s\""
+                           ",\n\t\"os\": \"%s\""
+                           ",\n\t\"timezone\": \"%s\""
+                           ",\n\t\"update_every\": %d"
+                           ",\n\t\"history\": %ld"
+                           ",\n\t\"memory_mode\": \"%s\""
+                           ",\n\t\"custom_info\": \"%s\""
+                           ",\n\t\"charts\": {"
+            , host->hostname
+            , host->program_version
+            , get_release_channel()
+            , host->os
+            , host->timezone
+            , host->rrd_update_every
+            , host->rrd_history_entries
+            , rrd_memory_mode_name(host->rrd_memory_mode)
+            , custom_dashboard_info_js_filename
+        );
 
     size_t c = 0;
     size_t dimensions = 0;
 
-    BUFFER *dimension_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    BUFFER *work_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
     while (sqlite3_step(res_chart) == SQLITE_ROW) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -876,16 +912,20 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         buffer_strcat(wb, id);
         buffer_strcat(wb, "\": ");
 
-        buffer_reset(dimension_buffer);
+        buffer_reset(work_buffer);
+
+        first_entry_t = LONG_MAX;
+        last_entry_t = 0;
 
         sql_rrdim2json(res_dim, (uuid_t *) sqlite3_column_blob(res_chart, 0), id,
                        host->machine_guid,
-                       dimension_buffer,
+                       work_buffer,
                        &dimensions, &first_entry_t, &last_entry_t);
 
         buffer_sprintf(
             wb,
             "\t\t{\n"
+            "\t\t\t\"status\": \"%s\",\n"
             "\t\t\t\"id\": \"%s\",\n"
             "\t\t\t\"name\": \"%s\",\n"
             "\t\t\t\"type\": \"%s\",\n"
@@ -903,6 +943,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             "\t\t\t\"first_entry\": %ld,\n"
             "\t\t\t\"last_entry\": %ld,\n"
             "\t\t\t\"update_every\": %d,\n",
+            "archived",
             id, //sqlite3_column_text(res_chart, 1)
             id, // sqlite3_column_text(res_chart, 2)
             sqlite3_column_text(res_chart, 3),
@@ -910,80 +951,90 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
             sqlite3_column_text(res_chart, 5),
             sqlite3_column_text(res_chart, 6), id, // title
             (long ) sqlite3_column_int(res_chart, 7), // priority
-            (const char *) sqlite3_column_text(res_chart, 8) ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",   // plugin
-            (const char *) sqlite3_column_text(res_chart, 9) ? (const char *) sqlite3_column_text(res_chart, 9) : (char *) "",   // module
+            (int) sqlite3_column_bytes(res_chart, 8) > 0 ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",   // plugin
+            (int) sqlite3_column_bytes(res_chart, 9) > 0 ? (const char *) sqlite3_column_text(res_chart, 9) : (char *) "",   // module
             (char *) "false",  // enabled
             (const char *) sqlite3_column_text(res_chart, 10),  // units
             id, //data url
             rrdset_type_name(sqlite3_column_int(res_chart, 11)),
-            last_entry_t - first_entry_t, // duration
-            first_entry_t, // first_entry
+            first_entry_t == LONG_MAX ? 0 : last_entry_t - first_entry_t, // duration
+            first_entry_t == LONG_MAX ? 0 : first_entry_t, // first_entry
             last_entry_t, // last_entry
             sqlite3_column_int(res_chart, 12)  // update every
-            );
+        );
 
-        buffer_strcat(wb, buffer_tostring(dimension_buffer));
+        buffer_strcat(wb, buffer_tostring(work_buffer));
 
         rc = sqlite3_reset(res_dim);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset the prepared statement when reading archived chart dimensions");
+
+        buffer_reset(work_buffer);
+        sql_read_chart_labels(res_label, (uuid_t *) sqlite3_column_blob(res_chart, 0), work_buffer);
+        buffer_strcat(wb, buffer_tostring(work_buffer));
+
+        rc = sqlite3_reset(res_label);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset the prepared statement when reading archived chart labels");
         buffer_strcat(wb, "\n\t\t}");
     }
 
-    buffer_free(dimension_buffer);
+    buffer_reset(work_buffer);
 
-    buffer_sprintf(wb
-        , "\n\t}"
-          ",\n\t\"charts_count\": %zu"
-          ",\n\t\"dimensions_count\": %zu"
-          ",\n\t\"alarms_count\": %zu"
-          ",\n\t\"rrd_memory_bytes\": %zu"
-          ",\n\t\"hosts_count\": %zu"
-          ",\n\t\"hosts\": ["
-        , c
-        , dimensions
-        , (size_t) 0
-        , (size_t) 0
-        , rrd_hosts_available
-    );
+    if (full) {
+        buffer_sprintf(
+            wb,
+            "\n\t}"
+            ",\n\t\"charts_count\": %zu"
+            ",\n\t\"dimensions_count\": %zu"
+            ",\n\t\"alarms_count\": %zu"
+            ",\n\t\"rrd_memory_bytes\": %zu"
+            ",\n\t\"hosts_count\": %zu"
+            ",\n\t\"hosts\": [",
+            c, dimensions, (size_t)0, (size_t)0, rrd_hosts_available);
 
-    if(unlikely(rrd_hosts_available > 1)) {
-        rrd_rdlock();
+        if (unlikely(rrd_hosts_available > 1)) {
+            rrd_rdlock();
 
-        size_t found = 0;
-        RRDHOST *h;
-        rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
-                buffer_sprintf(wb
-                    , "%s\n\t\t{"
-                      "\n\t\t\t\"hostname\": \"%s\""
-                      "\n\t\t}"
-                    , (found > 0) ? "," : ""
-                    , h->hostname
-                );
+            size_t found = 0;
+            RRDHOST *h;
+            rrdhost_foreach_read(h)
+            {
+                if (!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
+                    buffer_sprintf(
+                        wb,
+                        "%s\n\t\t{"
+                        "\n\t\t\t\"hostname\": \"%s\""
+                        "\n\t\t}",
+                        (found > 0) ? "," : "", h->hostname);
 
-                found++;
+                    found++;
+                }
             }
+
+            rrd_unlock();
+        } else {
+            buffer_sprintf(
+                wb,
+                "\n\t\t{"
+                "\n\t\t\t\"hostname\": \"%s\""
+                "\n\t\t}",
+                host->hostname);
         }
 
-        rrd_unlock();
-    }
-    else {
-        buffer_sprintf(wb
-            , "\n\t\t{"
-              "\n\t\t\t\"hostname\": \"%s\""
-              "\n\t\t}"
-            , host->hostname
-        );
+        buffer_sprintf(wb, "\n\t]\n}\n");
     }
 
-    buffer_sprintf(wb, "\n\t]\n}\n");
+    rc = sqlite3_finalize(res_label);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived chart labels");
 
+    failed1:
     rc = sqlite3_finalize(res_dim);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived chart dimensions");
 
-failed:
+    failed:
     rc = sqlite3_finalize(res_chart);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
@@ -1151,7 +1202,12 @@ void add_migrated_file(char *path, uint64_t file_size)
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.context = @context " \
     "order by c.chart_id asc, c.type||c.id desc;"
 
-void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context)
+#define SELECT_CHART_SINGLE  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id, c.context from chart c, " \
+    "dimension d, host h " \
+    "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.type||'.'||c.id = @chart " \
+    "order by c.chart_id asc, c.type||'.'||c.id desc;"
+
+void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context, char *chart)
 {
     int rc;
 
@@ -1168,7 +1224,10 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
 
     sqlite3_stmt *res = NULL;
 
-    rc = sqlite3_prepare_v2(db_meta, SELECT_CHART_CONTEXT, -1, &res, 0);
+    if (context)
+        rc = sqlite3_prepare_v2(db_meta, SELECT_CHART_CONTEXT, -1, &res, 0);
+    else
+        rc = sqlite3_prepare_v2(db_meta, SELECT_CHART_SINGLE, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch host archived charts");
         return;
@@ -1180,7 +1239,10 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
         return;
     }
 
-    rc = sqlite3_bind_text(res, 2, context, -1, SQLITE_STATIC);
+    if (context)
+        rc = sqlite3_bind_text(res, 2, context, -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_text(res, 2, chart, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
         return;
@@ -1200,10 +1262,17 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
             st = callocz(1, sizeof(*st));
             char n[RRD_ID_LENGTH_MAX + 1];
 
-            snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", (char *)sqlite3_column_text(res, 4), (char *)sqlite3_column_text(res, 3));
+            snprintfz(
+                n, RRD_ID_LENGTH_MAX, "%s.%s", (char *)sqlite3_column_text(res, 4),
+                (char *)sqlite3_column_text(res, 3));
             st->name = strdupz(n);
             st->update_every = sqlite3_column_int(res, 6);
             st->counter = 0;
+            if (chart) {
+                st->context = strdupz((char *)sqlite3_column_text(res, 8));
+                strncpyz(st->id, chart, RRD_ID_LENGTH_MAX);
+                st->name = strdupz(chart);
+            }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
         }
         st->counter++;
@@ -1252,12 +1321,44 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
             rd->next = (*param_list)->rd;
             (*param_list)->rd = rd;
     }
-    if (likely(st))
-        st->context = strdupz(context);
+    if (likely(st && context && !st->context))
+            st->context = strdupz(context);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
+
+    return;
+}
+
+#define SELECT_ARCHIVED_HOSTS "select host_id, hostname from host where host_id not in (select host_id from chart where chart_id in (select chart_id from chart_active));"
+
+void sql_archived_database_hosts(BUFFER *wb, int count)
+{
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_ARCHIVED_HOSTS, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch archived hosts");
+        return;
+    }
+
+    char machine_guid[GUID_LEN + 1];
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 0), machine_guid);
+        if (count > 0)
+            buffer_strcat(wb, ",\n");
+        buffer_sprintf(
+            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": false, \"claim_id\": null }", machine_guid); //, sqlite3_column_text(res, 1));
+        count++;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived hosts");
 
     return;
 }

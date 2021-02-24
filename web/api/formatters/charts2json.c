@@ -83,6 +83,12 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
         }
     }
 
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        if (c)
+            buffer_strcat(wb, ",\n\t");
+        sql_rrdset2json(host, wb, 0);
+    }
+
     RRDCALC *rc;
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(rc->rrdset)
