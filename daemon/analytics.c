@@ -5,7 +5,8 @@
    - 1. Netdata Data Collectors in use -> OK
    - 2. Whether streaming is enabled, i.e. whether the daemon receives collected data from another daemon, or sends collected data to another daemon. -> OK
    - 3. Whether the collected agent data are archived in a separate application and the type of that application (e.g. Prometheus, InfluxDB)
-        How? Mark when the allmetrics is called? 
+        How? Mark when the allmetrics is called?
+        TODO: Distinguish between allmetrics and backend exporters
    - 4. The data storage method being used (dbengine, ram, save) -> OK
    - 5. The data retention period -> Implement the calculator in: https://learn.netdata.cloud/docs/store/change-metrics-storage#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics
    - 6. When the agent HTTP user interface was last accessed.
@@ -13,7 +14,7 @@
    - 8. Which alarm notification methods are being used.
         Maybe: parse health_alarm_notify.conf and get specific items if have options
                Run it? and get the env variables? Or pass them directly to the script?
-               
+
    - 9. Dashboard enabled ([web] mode = none)
    - 10. Default port changed ([web] default port = 19999) -> OK: NETDATA_LISTEN_PORT
 
@@ -40,26 +41,27 @@ extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
 
 void analytics_log_data (void) {
 
-    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED     : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT          : [%s]", analytics_data.NETDATA_CONFIG_IS_PARENT);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE        : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE    : [%s]", analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA : [%s]", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE    : [%s]", analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_ACLK_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED  : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED       : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
-    debug(D_ANALYTICS, "NETDATA_HOST_PROMETHEUS_USED      : [%s]", analytics_data.NETDATA_HOST_PROMETHEUS_USED);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED              : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS        : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_MODULES        : [%s]", analytics_data.NETDATA_COLLECTORS_MODULES);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT          : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT              : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT              : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_METRICS_COUNT             : [%s]", analytics_data.NETDATA_METRICS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_NOTIFICATIONS_METHODS     : [%s]", analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT           : [%s]", analytics_data.NETDATA_CONFIG_IS_PARENT);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE     : [%s]", analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_ACLK_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED        : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED               : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS         : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_MODULES         : [%s]", analytics_data.NETDATA_COLLECTORS_MODULES);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT               : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.NETDATA_METRICS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_NOTIFICATIONS_METHODS      : [%s]", analytics_data.NETDATA_NOTIFICATIONS_METHODS);
 }
 
 void analytics_setenv_data (void) {
@@ -74,7 +76,8 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
     setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
-    setenv ( "NETDATA_HOST_PROMETHEUS_USED",      analytics_data.NETDATA_HOST_PROMETHEUS_USED, 1);    
+    setenv ( "NETDATA_ALLMETRICS_PROMETHEUS_USED",analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
+    setenv ( "NETDATA_ALLMETRICS_SHELL_USED",     analytics_data.NETDATA_ALLMETRICS_SHELL_USED, 1);
     setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
     setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
     setenv ( "NETDATA_COLLECTORS_PLUGINS",        analytics_data.NETDATA_COLLECTORS_PLUGINS, 1);
@@ -85,6 +88,31 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_METRICS_COUNT",             analytics_data.NETDATA_METRICS_COUNT, 1);
     setenv ( "NETDATA_NOTIFICATIONS_METHODS",     analytics_data.NETDATA_NOTIFICATIONS_METHODS, 1);
 }
+
+void analytics_free_data (void) {
+    freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_IS_PARENT);
+    freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    freez(analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
+    freez(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
+    freez(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
+    freez(analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
+    freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
+    freez(analytics_data.NETDATA_HOST_CLAIMED);
+    freez(analytics_data.NETDATA_COLLECTORS_PLUGINS);
+    freez(analytics_data.NETDATA_COLLECTORS_MODULES);
+    freez(analytics_data.NETDATA_COLLECTORS_COUNT);
+    freez(analytics_data.NETDATA_ALARMS_COUNT);
+    freez(analytics_data.NETDATA_CHARTS_COUNT);
+    freez(analytics_data.NETDATA_METRICS_COUNT);
+    freez(analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+}
+
 
 void analytics_set_data (char **name, char *value) {
 
@@ -109,7 +137,7 @@ int collector_counter_callb(void *entry, void *data) {
     buffer_strcat(md, col->module);
 
     (ap->c)++;
-   
+
     return 0;
 }
 
@@ -148,7 +176,7 @@ void analytics_collectors(void) {
     char name[500];
     BUFFER *pl = buffer_create(1000);
     BUFFER *md = buffer_create(1000);
-    
+
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
@@ -170,7 +198,7 @@ void analytics_collectors(void) {
 
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS, (char *)buffer_tostring(ap.plugin));
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES, (char *)buffer_tostring(ap.module));
-    
+
     {
         char b[7];
         snprintfz(b, 6, "%d", ap.c);
@@ -179,14 +207,23 @@ void analytics_collectors(void) {
 }
 
 void analytics_log_prometheus(void) {
-    
+
     if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS))
         analytics_data.prometheus_hits++;
 
 }
 
+void analytics_log_shell(void) {
+
+    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS))
+        analytics_data.shell_hits++;
+
+}
+
+
+
 void analytics_misc(void) {
-    
+
     analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT, (localhost->next || configured_as_parent()) ? "true" : "false");
 
     {
@@ -214,7 +251,7 @@ void analytics_misc(void) {
 
     //dont do it like this.... it should be already loaded somewhere...
     analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
-    
+
 }
 
 void analytics_charts (void) {
@@ -281,7 +318,7 @@ void analytics_alarms_notifications (void) {
 
             if (likely(cnt))
                 buffer_strcat(b, "|");
-            
+
             buffer_strcat(b, line);
 
             cnt++;
@@ -294,30 +331,30 @@ void analytics_alarms_notifications (void) {
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS, (char *)buffer_tostring(b));
 
     //TODO Destroy buffer
-    
+
     //return 0;
 }
 
-void analytics_exporters (void) {
+/* void analytics_exporters (void) { */
 
-    extern const struct engine *engine;
+/*     extern const struct engine *engine; */
 
-    if (!engine){
-        analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, "false");
-        return;
-    }
-        
+/*     if (!engine){ */
+/*         analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, "false"); */
+/*         return; */
+/*     } */
 
-    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-        debug(D_ANALYTICS, "[%d]", instance->disabled);
-    }
 
-}
+/*     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) { */
+/*         debug(D_ANALYTICS, "[%d]", instance->disabled); */
+/*     } */
+
+/* } */
 
 void analytics_gather_meta_data (void) {
 
     rrdhost_rdlock(localhost);
-    
+
     analytics_collectors();
     analytics_alarms();
     analytics_charts();
@@ -329,10 +366,15 @@ void analytics_gather_meta_data (void) {
     analytics_alarms_notifications();
 
     if (analytics_data.prometheus_hits == ANALYTICS_MAX_PROMETHEUS_HITS)
-        analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "true");
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "true");
     else
-        analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED, "false");
-    
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "false");
+
+    if (analytics_data.shell_hits == ANALYTICS_MAX_SHELL_HITS)
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "true");
+    else
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "false");
+
     analytics_setenv_data();
 }
 
@@ -341,26 +383,6 @@ void analytics_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     debug(D_ANALYTICS, "Cleaning up...");
-    freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
-    freez(analytics_data.NETDATA_CONFIG_IS_PARENT);
-    freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
-    freez(analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
-    freez(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
-    freez(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
-    freez(analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
-    freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
-    freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
-    freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
-    freez(analytics_data.NETDATA_HOST_PROMETHEUS_USED);
-    freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
-    freez(analytics_data.NETDATA_HOST_CLAIMED);
-    freez(analytics_data.NETDATA_COLLECTORS_PLUGINS);
-    freez(analytics_data.NETDATA_COLLECTORS_MODULES);
-    freez(analytics_data.NETDATA_COLLECTORS_COUNT);
-    freez(analytics_data.NETDATA_ALARMS_COUNT);
-    freez(analytics_data.NETDATA_CHARTS_COUNT);
-    freez(analytics_data.NETDATA_METRICS_COUNT);
-    freez(analytics_data.NETDATA_NOTIFICATIONS_METHODS);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -559,7 +581,8 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_PROMETHEUS_USED,      "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES,        "N/A");
@@ -569,6 +592,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS,     "N/A");
     analytics_data.prometheus_hits = 0;
+    analytics_data.shell_hits = 0;
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;

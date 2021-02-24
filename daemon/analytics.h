@@ -7,10 +7,12 @@
 
 /* A maximum number of hits from prometheus_prepare that we consider that prometheus is indeed being used */
 /* These hits must come before the META analytics is sent (ANALYTICS_MAX_SLEEP_SEC) */
+/* Or they will be reported on the EXIT event */
 #define ANALYTICS_MAX_PROMETHEUS_HITS 5
+#define ANALYTICS_MAX_SHELL_HITS 5
 
 /* Max number of seconds before the META analytics is sent */
-#define ANALYTICS_MAX_SLEEP_SEC 30
+#define ANALYTICS_MAX_SLEEP_SEC 20
 
 #define NETDATA_PLUGIN_HOOK_ANALYTICS \
     { \
@@ -35,7 +37,8 @@ struct analytics_data {
     char *NETDATA_CONFIG_EXPORTING_ENABLED;
     char *NETDATA_HOST_ACLK_CONNECTED;
     char *NETDATA_HOST_CLAIMED;
-    char *NETDATA_HOST_PROMETHEUS_USED;
+    char *NETDATA_ALLMETRICS_PROMETHEUS_USED;
+    char *NETDATA_ALLMETRICS_SHELL_USED;
     char *NETDATA_CONFIG_HTTPS_ENABLED;
     char *NETDATA_ALARMS_COUNT;
     char *NETDATA_CHARTS_COUNT;
@@ -46,8 +49,7 @@ struct analytics_data {
     char *NETDATA_NOTIFICATIONS_METHODS;
     
     uint8_t prometheus_hits;
-    
-    
+    uint8_t shell_hits;
 } analytics_data;
 
 extern void *analytics_main(void *ptr);

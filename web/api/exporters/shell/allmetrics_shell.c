@@ -87,6 +87,8 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
     }
 
     rrdhost_unlock(host);
+
+    analytics_log_shell();
 }
 
 // ----------------------------------------------------------------------------

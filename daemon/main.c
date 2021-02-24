@@ -6,6 +6,9 @@
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
+extern void analytics_gather_meta_data(void);
+extern void analytics_free_data(void);
+
 struct config netdata_config = {
         .first_section = NULL,
         .last_section = NULL,
@@ -27,7 +30,12 @@ void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
-    send_statistics("EXIT", ret?"ERROR":"OK","-");
+    //re-gather meta data
+    if (netdata_anonymous_statistics_enabled==1) {
+        analytics_gather_meta_data();
+        send_statistics("EXIT", ret?"ERROR":"OK","-");
+        analytics_free_data();
+    }
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
