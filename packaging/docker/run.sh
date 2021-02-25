@@ -20,7 +20,10 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/claim.d/claimed_id ]; then
+if [ -n "${NETDATA_CLAIM_URL}" ] &&
+  [ -n "${NETDATA_CLAIM_TOKEN}" ] &&
+  [ ! -f /var/lib/netdata/claim.d/claimed_id ] &&
+  [ -f /var/lib/netdata/registry/netdata.public.unique.id ]; then
   /usr/sbin/netdata-claim.sh \
     -token="${NETDATA_CLAIM_TOKEN}" \
     -url="${NETDATA_CLAIM_URL}" \
