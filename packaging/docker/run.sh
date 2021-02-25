@@ -21,10 +21,11 @@ if [ -n "${PGID}" ]; then
 fi
 
 if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/claim.d/claimed_id ]; then
-  /usr/sbin/netdata-claim.sh -token "${NETDATA_CLAIM_TOKEN}" \
-                             -url "${NETDATA_CLAIM_URL}" \
-                             ${NETDATA_CLAIM_ROOMS:+-rooms "${NETDATA_CLAIM_ROOMS}"} \
-                             ${NETDATA_CLAIM_PROXY:+-proxy "${NETDATA_CLAIM_PROXY}"}
+  /usr/sbin/netdata-claim.sh \
+    -token="${NETDATA_CLAIM_TOKEN}" \
+    -url="${NETDATA_CLAIM_URL}" \
+    ${NETDATA_CLAIM_ROOMS:+-rooms="${NETDATA_CLAIM_ROOMS}"} \
+    ${NETDATA_CLAIM_PROXY:+-proxy="${NETDATA_CLAIM_PROXY}"}
 fi
 
 exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" -W set web "web files group" root -W set web "web files owner" root "$@"
