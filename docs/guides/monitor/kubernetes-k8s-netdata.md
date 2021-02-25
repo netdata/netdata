@@ -102,7 +102,7 @@ Netdata and claim your cluster's nodes, you're ready to check out the visualizat
 To get started, [sign in](https://app.netdata.cloud/sign-in?cloudRoute=/spaces) to your Netdata Cloud account. Head over
 to the War Room you claimed your cluster to, if not **General**.
 
-Your Kubernetes metrics are already visualized in the
+Netdata Cloud is already visualizing your Kubernetes metrics, streamed in real-time from each node, in the
 [Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview):
 
 ![Netdata's Kubernetes monitoring
@@ -116,14 +116,14 @@ The gauges and time-series charts you see right away in the Overview show aggreg
 cluster.
 
 For example, the `apps.cpu` chart (in the **Applications** menu item), visualizes the CPU utilization of various
-application/services running on each of the nodes in your cluster. The **X Nodes** dropdown shows the hostnames of the
-Kubernetes nodes contributing to that chart, along with links to jump a single-node dashboard for further investigation.
+applications/services running on each of the nodes in your cluster. The **X Nodes** dropdown shows which nodes
+contribute to the chart and links to jump a single-node dashboard for further investigation.
 
 ![Per-application monitoring in a Kubernetes
 cluster](https://user-images.githubusercontent.com/1153921/109042169-19c8fa00-768d-11eb-91a7-1a7afc41fea2.png)
 
 For example, the chart above shows a spike in the CPU utilization from `rabbitmq` every minute or so, along with a
-baseline CPU utilization of 10-15% for all known applications running on the cluster.
+baseline CPU utilization of 10-15% across the cluster.
 
 Read about the [Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview) and some best practices on [viewing
 an overview of your infrastructure](/docs/visualize/overview-infrastructure.md) for details on using composite charts to
@@ -155,7 +155,7 @@ container](https://user-images.githubusercontent.com/1153921/109049544-a8417980-
 The **Context** tab shows `rabbitmq-5bb66bb6c9-6xr5b` as the container's image name, which means this container is
 running a [RabbitMQ](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/rabbitmq) workload.
 
-Click the **Metrics** tab to see real-time metrics from that container. Unsurprisingly, it shows spike in CPU
+Click the **Metrics** tab to see real-time metrics from that container. Unsurprisingly, it shows a spike in CPU
 utilization at regular intervals.
 
 ![Viewing real-time container
@@ -172,8 +172,8 @@ different namespaces.
 ![Time-series Kubernetes monitoring in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/109075210-126a1680-76b6-11eb-918d-5acdcdac152d.png)
 
-Each composite chart has a [dimension bar]() for complete customization. For example, grouping the top chart by
-`k8s_container_name` reveals interesting new information in relation to those around it.
+Each composite chart has a [definition bar](https://learn.netdata.cloud/docs/cloud/visualize/overview#definition-bar)
+for complete customization. For example, grouping the top chart by `k8s_container_name` reveals new information.
 
 ![Changing time-series charts](https://user-images.githubusercontent.com/1153921/109075212-139b4380-76b6-11eb-836f-939482ae55fc.png)
 
@@ -183,8 +183,8 @@ Netdata has a [service discovery plugin](https://github.com/netdata/agent-servic
 creates configuration files for [compatible
 services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) and any endpoints covered by
 our [generic Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus).
-With these configuration files, Netdata collects metrics from any compatible applications as they run _inside_ of a pod.
-Service discovery happens without manual intervention as pods are created, destroyed, or moved between nodes.
+Netdata uses these files to collect metrics from any compatible application as they run _inside_ of a pod. Service
+discovery happens without manual intervention as pods are created, destroyed, or moved between nodes.
 
 Service metrics show up on the Overview as well, beneath the **Kubernetes** section, and are labeled according to the
 service in question. For example, the **RabbitMQ** section has numerous charts from the [`rabbitmq`
@@ -194,11 +194,11 @@ collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules
 metrics](https://user-images.githubusercontent.com/1153921/109054511-2eac8a00-769b-11eb-97f1-da93acb4b5fe.png)
 
 > The robot-shop cluster has more supported services, such as MySQL, which are not visible with zero configuration. This
-> is usually because of services running on non-default ports, using non-default names, or passwords required collect
-> metrics. Read up on [configuring service
-> discovery](/packaging/installer/methods/kubernetes.md#configure-service-discovery) to collect more service metrics.
+> is usually because of services running on non-default ports, using non-default names, or required passwords. Read up
+> on [configuring service discovery](/packaging/installer/methods/kubernetes.md#configure-service-discovery) to collect
+> more service metrics.
 
-Service metrics are essential to infrastructure monitoring, as they're the best indicator of the end user experience,
+Service metrics are essential to infrastructure monitoring, as they're the best indicator of the end-user experience,
 and key signals for troubleshooting anomalies or issues.
 
 ## Kubernetes components
@@ -214,7 +214,7 @@ collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules
 Monitoring each node's kubelet can be invaluable when diagnosing issues with your Kubernetes cluster. For example, you
 can see if the number of running containers/pods has dropped, which could signal a fault or crash in a particular
 Kubernetes service or deployment (see `kubectl get services` or `kubectl get deployments` for more details). If the
-number of pods increases, it may be because of something more benign, like another member of your team scaling up a
+number of pods increases, it may be because of something more benign, like another team member scaling up a
 service with `kubectl scale`.
 
 You can also view charts for the Kubelet API server, the volume of runtime/Docker operations by type,
@@ -223,8 +223,8 @@ configuration-related errors, and the actual vs. desired numbers of volumes, plu
 ### kube-proxy
 
 The **k8s kube-proxy** section displays metrics about the network proxy that runs on each node in your Kubernetes
-cluster. kube-proxy allows for pods to communicate with each other and accept sessions from outside your cluster, and
-its metrics are collected by the [kube-proxy
+cluster. kube-proxy lets pods communicate with each other and accept sessions from outside your cluster. Its metrics are
+collected by the [kube-proxy
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy).
 
 With Netdata, you can monitor how often your k8s proxies are syncing proxy rules between nodes. Dramatic changes in
