@@ -35,6 +35,7 @@ struct pg_cache_page_index;
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
 #include "../aclk/legacy/aclk_rrdhost_state.h"
+#include "database/sqlite/sqlite_functions.h"
 
 struct context_param {
     RRDDIM *rd;
