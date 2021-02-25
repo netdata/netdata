@@ -689,12 +689,12 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
                                 uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
 {
 #ifdef ENABLE_DBENGINE
-    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
     int rc;
     uuid_t  legacy_uuid;
     uuid_t  multihost_legacy_uuid;
-
     time_t dim_first_entry_t, dim_last_entry_t;
+
+    rc = rrdeng_metric_latest_time_by_uuid(uuid, &dim_first_entry_t, &dim_last_entry_t);
     if (unlikely(rc)) {
         rrdeng_generate_legacy_uuid(dim_id, chart_id, &legacy_uuid);
         rc = rrdeng_metric_latest_time_by_uuid(&legacy_uuid, &dim_first_entry_t, &dim_last_entry_t);
