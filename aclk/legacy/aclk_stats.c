@@ -11,8 +11,17 @@ struct aclk_qt_data {
     RRDDIM *dim;
 } *aclk_qt_data = NULL;
 
+// ACLK per query thread cpu stats
+struct aclk_cpu_data {
+    RRDDIM *user;
+    RRDDIM *system;
+    RRDSET *st;
+} *aclk_cpu_data = NULL;
+
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
+struct rusage *rusage_per_thread;
+uint8_t *getrusage_called_this_tick = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -222,11 +231,42 @@ static void aclk_stats_mat_metric_process(struct aclk_metric_mat *metric, struct
     rrdset_done(metric->st);
 }
 
+static void aclk_stats_cpu_threads(void)
+{
+    char id[100 + 1];
+    char title[100 + 1];
+
+    for (int i = 0; i < query_thread_count; i++) {
+        if (unlikely(!aclk_cpu_data[i].st)) {
+
+            snprintfz(id, 100, "aclk_thread%d_cpu", i);
+            snprintfz(title, 100, "Cpu Usage For Thread No %d", i);
+
+            aclk_cpu_data[i].st = rrdset_create_localhost(
+                                         "netdata", id, NULL, "aclk", NULL, title, "milliseconds/s",
+                                         "netdata", "stats", 200008 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+            aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+
+        } else
+            rrdset_next(aclk_cpu_data[i].st);
+    }
+
+    for (int i = 0; i < query_thread_count; i++) {
+        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].user, rusage_per_thread[i].ru_utime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_utime.tv_usec);
+        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].system, rusage_per_thread[i].ru_stime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_stime.tv_usec);
+        rrdset_done(aclk_cpu_data[i].st);
+    }
+}
+
 void aclk_stats_thread_cleanup()
 {
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
     freez(aclk_queries_per_thread_sample);
+    freez(aclk_cpu_data);
+    freez(rusage_per_thread);
 }
 
 void *aclk_stats_main_thread(void *ptr)
@@ -235,8 +275,11 @@ void *aclk_stats_main_thread(void *ptr)
 
     query_thread_count = args->query_thread_count;
     aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_cpu_data = callocz(query_thread_count, sizeof(struct aclk_cpu_data));
     aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
     aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+    rusage_per_thread = callocz(query_thread_count, sizeof(struct rusage));
+    getrusage_called_this_tick = callocz(query_thread_count, sizeof(uint8_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -264,6 +307,7 @@ void *aclk_stats_main_thread(void *ptr)
 
         memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
         memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
+        memset(getrusage_called_this_tick, 0, sizeof(uint8_t) * query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
@@ -274,6 +318,8 @@ void *aclk_stats_main_thread(void *ptr)
 
         aclk_stats_cloud_req(&per_sample);
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
+
+        aclk_stats_cpu_threads();
 
 #ifdef NETDATA_INTERNAL_CHECKS
         aclk_stats_mat_metric_process(&aclk_mat_metrics.latency, &per_sample.latency);
