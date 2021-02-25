@@ -298,15 +298,16 @@ RRDHOST *rrdhost_create(const char *hostname,
         return NULL;
     }
 
+    if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
+        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        if (unlikely(rc))
+            error_report("Failed to store machine GUID to the database");
+    }
+    else
+        error_report("Host machine GUID %s is not valid", host->machine_guid);
+
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-            int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
-            if (unlikely(rc))
-                error_report("Failed to store machine GUID to the database");
-        }
-        else
-            error_report("Host machine GUID %s is not valid", host->machine_guid);
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
