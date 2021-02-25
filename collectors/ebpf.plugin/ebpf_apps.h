@@ -106,6 +106,9 @@ struct target {
     uid_t uid;
     gid_t gid;
 
+    // Page cache statistic per process
+    netdata_publish_cachestat_t cachestat;
+
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
@@ -427,5 +430,6 @@ extern void collect_data_for_all_processes(int tbl_pid_stats_fd);
 
 extern ebpf_process_stat_t **global_process_stats;
 extern ebpf_process_publish_apps_t **current_apps_data;
+extern netdata_publish_cachestat_t **cachestat_pid;
 
 #endif /* NETDATA_EBPF_APPS_H */
