@@ -360,9 +360,9 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
            id,
            title,
            units,
-           family,
-           context,
-           charttype,
+           (family)?family:"",
+           (context)?context:"",
+           (charttype)?charttype:"",
            order,
            update_every);
 }
