@@ -22,7 +22,7 @@ fi
 
 if [ -n "${NETDATA_CLAIM_URL}" ] &&
   [ -n "${NETDATA_CLAIM_TOKEN}" ] &&
-  [ ! -f /var/lib/netdata/claim.d/claimed_id ] &&
+  [ ! -f /var/lib/netdata/cloud.d/claimed_id ] &&
   [ -f /var/lib/netdata/registry/netdata.public.unique.id ]; then
   /usr/sbin/netdata-claim.sh \
     -token="${NETDATA_CLAIM_TOKEN}" \
