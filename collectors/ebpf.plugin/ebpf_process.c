@@ -797,9 +797,9 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
 
     int counter;
     for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
-        ebpf_module_t *ptr = &ebpf_modules[counter];
-        if (ptr->apps_charts && ptr->apps_routine)
-            ptr->apps_routine(em, root);
+        ebpf_module_t *current = &ebpf_modules[counter];
+        if (current->apps_charts && current->apps_routine)
+            current->apps_routine(em, root);
     }
 }
 
