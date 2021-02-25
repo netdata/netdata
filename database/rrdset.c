@@ -925,15 +925,11 @@ RRDSET *rrdset_create_custom(
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
-#ifdef ENABLE_DBENGINE
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        st->chart_uuid = find_chart_uuid(host, type, id, name);
-        if (unlikely(!st->chart_uuid))
-            st->chart_uuid = create_chart_uuid(st, id, name);
+    st->chart_uuid = find_chart_uuid(host, type, id, name);
+    if (unlikely(!st->chart_uuid))
+        st->chart_uuid = create_chart_uuid(st, id, name);
 
-        store_active_chart(st->chart_uuid);
-    }
-#endif
+    store_active_chart(st->chart_uuid);
 
     rrdhost_cleanup_obsolete_charts(host);
 
