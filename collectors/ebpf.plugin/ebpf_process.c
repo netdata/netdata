@@ -520,6 +520,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Open and close calls",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_FILE_GROUP,
+                      NULL,
                       21000,
                       ebpf_create_global_dimension,
                       process_publish_aggregated,
@@ -531,6 +532,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "Open fails",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_FILE_GROUP,
+                          NULL,
                           21001,
                           ebpf_create_global_dimension,
                           process_publish_aggregated,
@@ -542,6 +544,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Remove files",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_VFS_GROUP,
+                      NULL,
                       21002,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_DEL_START],
@@ -552,6 +555,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Calls to IO",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_VFS_GROUP,
+                      NULL,
                       21003,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_IN_START_BYTE],
@@ -569,6 +573,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "Fails to write or read",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_VFS_GROUP,
+                          NULL,
                           21005,
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[2],
@@ -580,6 +585,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Start process",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_PROCESS_GROUP,
+                      NULL,
                       21006,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_PROCESS_START],
@@ -590,6 +596,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Exit process",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_PROCESS_GROUP,
+                      NULL,
                       21007,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_EXIT_START],
@@ -608,6 +615,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "Fails to create process",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_PROCESS_GROUP,
+                          NULL,
                           21009,
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_PROCESS_START],
@@ -621,10 +629,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
  * @param em   a pointer to the structure with the default values.
- * @param root a pointer for the targets.
+ * @param ptr  a pointer for the targets.
  */
-static void ebpf_process_create_apps_charts(ebpf_module_t *em, struct target *root)
+void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
+    struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
                                "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -786,11 +795,12 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
     if (!newly_added)
         return;
 
-    if (ebpf_modules[EBPF_MODULE_PROCESS_IDX].apps_charts)
-        ebpf_process_create_apps_charts(em, root);
-
-    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts)
-        ebpf_socket_create_apps_charts(NULL, root);
+    int counter;
+    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
+        ebpf_module_t *current = &ebpf_modules[counter];
+        if (current->apps_charts && current->apps_routine)
+            current->apps_routine(em, root);
+    }
 }
 
 /*****************************************************************

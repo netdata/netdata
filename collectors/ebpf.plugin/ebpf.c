@@ -79,13 +79,13 @@ pthread_cond_t collect_data_cond_var;
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0 },
+      .optional = 0, .apps_routine = ebpf_process_create_apps_charts },
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0  },
+      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0 },
+      .optional = 0, .apps_routine = NULL },
 };
 
 // Link with apps.plugin
@@ -343,23 +343,26 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
 /**
  * Write chart cmd on standard output
  *
- * @param type      the chart type
- * @param id        the chart id
- * @param title     the chart title
- * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
- * @param charttype the chart type
- * @param order     the chart order
+ * @param type      chart type
+ * @param id        chart id
+ * @param title     chart title
+ * @param units     units label
+ * @param family    group name used to attach the chart on dashaboard
+ * @param charttype chart type
+ * @param context   chart context
+ * @param order     chart order
  */
-void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family, char *charttype, int order)
+void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+                          char *charttype, char *context, int order)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '' %s %d %d\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
            type,
            id,
            title,
            units,
-           family,
-           charttype,
+           (family)?family:"",
+           (context)?context:"",
+           (charttype)?charttype:"",
            order,
            update_every);
 }
@@ -398,26 +401,28 @@ void ebpf_create_global_dimension(void *ptr, int end)
 /**
  *  Call write_chart_cmd to create the charts
  *
- * @param type   the chart type
- * @param id     the chart id
- * @param units   the axis label
- * @param family the group name used to attach the chart on dashaboard
- * @param order  the order number of the specified chart
- * @param ncd    a pointer to a function called to create dimensions
- * @param move   a pointer for a structure that has the dimensions
- * @param end    number of dimensions for the chart created
+ * @param type    chart type
+ * @param id      chart id
+ * @param units   axis label
+ * @param family  group name used to attach the chart on dashaboard
+ * @param order   order number of the specified chart
+ * @param context chart context
+ * @param ncd     a pointer to a function called to create dimensions
+ * @param move    a pointer for a structure that has the dimensions
+ * @param end     number of dimensions for the chart created
  */
 void ebpf_create_chart(char *type,
                        char *id,
                        char *title,
                        char *units,
                        char *family,
+                       char *context,
                        int order,
                        void (*ncd)(void *, int),
                        void *move,
                        int end)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, "line", order);
+    ebpf_write_chart_cmd(type, id, title, units, family, "line", context, order);
 
     ncd(move, end);
 }
@@ -437,7 +442,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
                                 char *algorithm, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", NULL, order);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))

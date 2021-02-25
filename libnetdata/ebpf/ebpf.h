@@ -87,6 +87,7 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;
+    void (*apps_routine)(struct ebpf_module *em, void *ptr);
 } ebpf_module_t;
 
 #define NETDATA_MAX_PROBES 64
