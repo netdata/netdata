@@ -396,7 +396,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_DBENGINE
         uuid_t *dim_uuid = find_dimension_uuid(st, rd);
         rrdeng_metric_init(rd, dim_uuid);
-        store_active_dimension(rd->state->metric_uuid);
+        //store_active_dimension(rd->state->metric_uuid);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
         rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
@@ -408,6 +408,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
     } else {
+        rd->state->metric_uuid = find_dimension_uuid(st, rd);
+        if (unlikely(!rd->state->metric_uuid))
+            rd->state->metric_uuid = create_dimension_uuid(rd->rrdset, rd);
+        //store_active_dimension(rd->state->metric_uuid);
         rd->state->collect_ops.init         = rrddim_collect_init;
         rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
         rd->state->collect_ops.finalize     = rrddim_collect_finalize;
@@ -418,6 +422,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
+    store_active_dimension(rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
     // append this dimension
     if(!st->dimensions)

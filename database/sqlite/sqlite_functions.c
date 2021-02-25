@@ -140,7 +140,13 @@ int sql_init_database(void)
 
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
 
-    snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    int use_sqlite = config_get_boolean(CONFIG_SECTION_GLOBAL, "always store metadata", CONFIG_BOOLEAN_YES);
+
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || use_sqlite)
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+    else {
+        snprintfz(sqlite_database, FILENAME_MAX, ":memory:");
+    }
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s", sqlite_database);
