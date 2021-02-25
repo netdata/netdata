@@ -1,6 +1,6 @@
 <!--
 title: "statsd.plugin"
-description: "The Netdata Agent is a fully-featured statsd server that collects metrics from any custom application and visualizes them in real-time."
+description: "The Netdata Agent is a fully-featured StatsD server that collects metrics from any custom application and visualizes them in real-time."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
 -->
 
@@ -10,7 +10,6 @@ StatsD is a system to collect data from any application. Applications send metri
 
 If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
 
-There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
 Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
 
@@ -22,11 +21,11 @@ Netdata statsd is fast. It can collect more than **1.200.000 metrics per second*
 
 ## Metrics supported by Netdata
 
-Netdata fully supports the statsd protocol. All statsd client libraries can be used with Netdata too.
+Netdata fully supports the StatsD protocol. All StatsD client libraries can be used with Netdata too.
 
 -   **Gauges**
 
-     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, statsd reports the latest value collected and the number of times it was updated (events).
+     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the latest value collected and the number of times it was updated (events).
 
      The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
@@ -36,11 +35,11 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
 -   **Counters** and **Meters**
 
-     The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, statsd reports the **rate** and the number of times it was updated (events).
+     The application sends `name:value|c`, `name:value|C` or `name:value|m`, where `value` is a positive or negative **integer** number of events occurred, StatsD reports the **rate** and the number of times it was updated (events).
 
-     `:value` can be omitted and statsd will assume it is `1`. `|c`, `|C` and `|m` can be omitted an statsd will assume it is `|m`. So, the application may send just `name` and statsd will parse it as `name:1|m`.
+     `:value` can be omitted and StatsD will assume it is `1`. `|c`, `|C` and `|m` can be omitted an StatsD will assume it is `|m`. So, the application may send just `name` and StatsD will parse it as `name:1|m`.
 
-     - Counters use `|c` (etsy/statsd compatible) or `|C` (brubeck compatible)
+     - Counters use `|c` (etsy/StatsD compatible) or `|C` (brubeck compatible)
      - Meters use `|m`
 
      [Sampling rate](#sampling-rates) is supported.
@@ -49,7 +48,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
      
 -   **Timers** and **Histograms**
 
-     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, statsd reports **min**, **max**, **average**, **sum**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events).
+     The application sends `name:value|ms` or `name:value|h`, where `value` is any **decimal/fractional** number, StatsD reports **min**, **max**, **average**, **sum**, **95th percentile**, **median** and **standard deviation** and the total number of times it was updated (events).
 
      - Timers use `|ms`
      - Histograms use `|h`
@@ -62,7 +61,7 @@ Netdata fully supports the statsd protocol. All statsd client libraries can be u
 
 -   **Sets**
 
-      The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), statsd reports the number of unique values sent and the number of times it was updated (events).
+      The application sends `name:value|s`, where `value` is anything (**number or text**, leading and trailing spaces are removed), StatsD reports the number of unique values sent and the number of times it was updated (events).
 
      Sampling rate is **not** supported for Sets. `value` is always considered text.
 
@@ -88,7 +87,7 @@ On disconnect, Netdata will process the entire buffer, even if it is not termina
 
 #### UDP packets
 
-When sending multiple packets over UDP, it is important not to exceed the network MTU, usually about 1500 packets.
+When sending multiple packets over UDP, it is important not to exceed the network MTU, which is usually 1500 bytes.
 
 Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
@@ -152,7 +151,7 @@ Netdata can visualize StatsD collected metrics in 2 ways:
 
 ### Private metric charts
 
-Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space separated list of [simple patterns](/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**
+Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
 
 For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetric`, use:
 
@@ -166,7 +165,8 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 - `private charts memory mode`
 - `private charts history`
 
-### Optimise private metric charts visualization and storage
+### Optimize private metric charts visualization and storage
+
 
 If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
@@ -246,8 +246,7 @@ Synthetic charts are organized in
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
-For example, if you want to monitor the application `myapp` using StatD and Netdata, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
-
+For example, if you want to monitor the application `myapp` using StatsD and Netdata, create the file `/etc/netdata/statsd.d/myapp.conf`, with this content:
 ```
 [app]
 	name = myapp
@@ -284,7 +283,8 @@ Using the above configuration `myapp` should get its own section on the dashboar
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts).
--   `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our guide: [longer metrics storage](https://learn.netdata.cloud/guides/longer-metrics-storage).
+
+-   `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
 
@@ -526,7 +526,7 @@ You can also use StatsD with:
 
 ### Shell
 
-Getting the proper support for a programming language is not always easy, but shell is always available on most UNIX systems. You can use shell and `nc` to easily instrument your systems and send metric data to Netdata StatsD. Here is how:
+Getting the proper support for a programming language is not always easy, but the Unix shell is available on most Unix systems. You can use shell and `nc` to instrument your systems and send metric data to Netdata's StatsD implementation. Here's how:
 
 The command you need to run is:
 
@@ -600,6 +600,6 @@ StatsD "metric1:10|g" "metric2:10|c" ...
 ```
 The function is smart enough to call `nc` just once and pass all the metrics to it. It will also automatically switch to TCP if the metrics to send are above 1000 bytes.
 
-If you have gotten thus far, make sure to check out our [Community Forums](https://community.netdata.cloud) to share your experience using Netdata with StatsD.
+If you have gotten thus far, make sure to check out our [community forums](https://community.netdata.cloud) to share your experience using Netdata with StatsD.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fstatsd.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
