@@ -316,6 +316,7 @@ static int https_request(http_req_type method, char *host, int port, char *url, 
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
     char sport[PORT_STR_MAX_BYTES];
     size_t len = 0;
+    int rc = 1;
     int ret;
     char *ptr;
     http_parse_ctx parse_ctx = HTTP_PARSE_CTX_INITIALIZER;
@@ -401,8 +402,7 @@ static int https_request(http_req_type method, char *host, int port, char *url, 
 
     rbuf_pop(buffer, b, b_size);
 
-    return 0;
-
+    rc = 0;
 exit_FULL:
 exit_SSL:
     SSL_free(ssl);
@@ -411,7 +411,7 @@ exit_CTX:
 exit_sock:
     close(sock);
     rbuf_free(buffer);
-    return 1;
+    return rc;
 }
 
 // aclk_get_mqtt_otp is slightly modified original code from @amoss
