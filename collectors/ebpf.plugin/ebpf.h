@@ -70,8 +70,11 @@ typedef struct netdata_error_report {
 } netdata_error_report_t;
 
 extern ebpf_module_t ebpf_modules[];
-#define EBPF_MODULE_PROCESS_IDX 0
-#define EBPF_MODULE_SOCKET_IDX 1
+enum ebpf_module_indexes {
+    EBPF_MODULE_PROCESS_IDX,
+    EBPF_MODULE_SOCKET_IDX,
+    EBPF_MODULE_CACHESTAT_IDX
+};
 
 // Copied from musl header
 #ifndef offsetof
@@ -198,6 +201,7 @@ extern char *ebpf_algorithms[];
 // Common functions
 extern void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;

@@ -17,6 +17,7 @@
 #define NETDATA_APPS_NET_GROUP "ebpf net"
 
 #include "ebpf_process.h"
+#include "ebpf_cachestat.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
