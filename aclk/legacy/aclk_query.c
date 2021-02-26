@@ -62,6 +62,7 @@ static void aclk_query_free(struct aclk_query *this_query)
         freez(this_query->query);
     if(this_query->data && this_query->cmd == ACLK_CMD_CLOUD_QUERY_2) {
         struct aclk_cloud_req_v2 *del = (struct aclk_cloud_req_v2 *)this_query->data;
+        freez(del->query_endpoint);
         freez(del->data);
         freez(del);
     }
