@@ -60,9 +60,11 @@ FROM netdata/base:latest as base
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
+ARG NETDATA_USER=netdata
 
 ENV NETDATA_UID=$NETDATA_UID
 ENV NETDATA_GID=$NETDATA_GID
+ENV NETDATA_USER=$NETDATA_USER
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
 #ENV DO_NOT_TRACK=1
 
