@@ -218,7 +218,7 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out)
  * @param out     vector used to plot charts
  * @param publish vector with values read from hash tables.
  */
-static void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
+static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
 {
     if (!out->current.mark_page_accessed) {
         memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
@@ -461,12 +461,16 @@ void ebpf_cache_send_apps_data(struct target *root)
 
             uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
             uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+            w->cachestat.dirty = current->mark_buffer_dirty;
             uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
             uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
 
             cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
             value = (collected_number) w->cachestat.ratio;
-            write_chart_dimension(w->name, value);
+            // Like memory charts, we are not updating this chart when it is zero, but we do not expect smooth charts
+            // for all applications.
+            if (value)
+                write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
@@ -542,10 +546,10 @@ static void cachestat_collector(ebpf_module_t *em)
  *
  * Call ebpf_create_chart to create the charts for the collector.
  */
-static void ebpf_create_global_charts()
+static void ebpf_create_memory_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                      "Total cache added without dirties per total added because of red misses.",
+                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       "mem.pagecache",
                       21100,
@@ -644,7 +648,7 @@ void *ebpf_cachestat_thread(void *ptr)
                        cachestat_counter_dimension_name, cachestat_counter_dimension_name,
                        algorithms, NETDATA_CACHESTAT_END);
 
-    ebpf_create_global_charts();
+    ebpf_create_memory_charts();
 
     pthread_mutex_unlock(&lock);
 
