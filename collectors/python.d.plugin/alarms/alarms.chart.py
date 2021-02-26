@@ -49,6 +49,7 @@ class Service(UrlService):
         self.order, self.definitions = charts_template(self.sm)
         self.url = self.configuration.get('url', DEFAULT_URL)
         self.show_alarm_values = bool(self.configuration.get('show_alarm_values', DEFAULT_SHOW_ALARM_VALUES))
+        self.collected_dims = {'alarms': set(), 'values': set()}
 
     def _get_data(self):
         raw_data = self._get_raw_data()
@@ -74,5 +75,11 @@ class Service(UrlService):
             return
 
         for dim in data:
-            if dim not in self.charts[chart]:
+            if dim not in self.collected_dims[chart]:
+                self.collected_dims[chart].add(dim)
                 self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
+
+        for dim in list(self.collected_dims[chart]):
+            if dim not in data:
+                self.collected_dims[chart].remove(dim)
+                self.charts[chart].del_dimension(dim, hide=False)
