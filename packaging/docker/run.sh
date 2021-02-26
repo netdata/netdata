@@ -20,21 +20,23 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-if [ -f /var/lib/netdata/cloud.d/claimed_id ] || [ -z "${NETDATA_CLAIM_URL}" ] || [ -z "${NETDATA_CLAIM_TOKEN}" ]; then
-  exec /usr/sbin/netdata \
-    -u "${DOCKER_USR}" \
-    -D -s /host \
-    -p "${NETDATA_LISTENER_PORT}" \
-    -W set web "web files group" root -W set web "web files owner" root \
-    "$@"
-else
-  exec /usr/sbin/netdata \
-    -u "${DOCKER_USR}" \
-    -D -s /host \
-    -p "${NETDATA_LISTENER_PORT}" \
-    -W set web "web files group" root -W set web "web files owner" root \
-    -W set2 cloud global enabled true \
-    -W set2 cloud global "cloud base url" "${NETDATA_CLAIM_URL}" \
-    -W "claim -url=${NETDATA_CLAIM_URL} -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -proxy=${NETDATA_CLAIM_PROXY}" \
-    "$@"
+declare -a CLOUD_OPTS
+
+if [ ! -f /var/lib/netdata/cloud.d/claimed_id ] &&
+  [ -n "${NETDATA_CLAIM_URL}" ] &&
+  [ -n "${NETDATA_CLAIM_TOKEN}" ] &&
+  [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+  CLOUD_OPTS=(
+    -W set2 cloud global enabled true
+    -W set2 cloud global "cloud base url" "${NETDATA_CLAIM_URL}"
+    -W "claim -url=${NETDATA_CLAIM_URL} -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -proxy=${NETDATA_CLAIM_PROXY}"
+  )
 fi
+
+exec /usr/sbin/netdata \
+  -u "${DOCKER_USR}" \
+  -D -s /host \
+  -p "${NETDATA_LISTENER_PORT}" \
+  -W set web "web files group" root -W set web "web files owner" root \
+  "${CLOUD_OPTS[@]}" \
+  "$@"
