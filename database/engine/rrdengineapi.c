@@ -12,8 +12,8 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 
 static inline struct rrdengine_instance *get_rrdeng_ctx_from_host(RRDHOST *host)
 {
-    if (!host)
-        return &multidb_ctx;
+//    if (!host || (host && !host->rrdeng_ctx))
+//       return &multidb_ctx;
     return host->rrdeng_ctx;
 }
 
