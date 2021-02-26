@@ -184,6 +184,7 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 #define EBPF_NETWORK_VIEWER_SECTION "network connections"
 #define EBPF_SERVICE_NAME_SECTION "service name"
 
+#define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
 #define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
 #define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
