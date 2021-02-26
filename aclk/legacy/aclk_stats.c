@@ -190,7 +190,7 @@ static void aclk_stats_cloud_req_version(struct aclk_metrics_per_sample *per_sam
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req_version", NULL, "aclk", NULL, "Requests received from cloud by their version", "req/s",
-            "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_rq_v1 = rrddim_add(st, "v1",  NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_v2 = rrddim_add(st, "v2+", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -233,7 +233,7 @@ static void aclk_stats_cloud_req_cmd(struct aclk_metrics_per_sample *per_sample)
         initialized = 1;
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req_cmd", NULL, "aclk", NULL, "Requests received from cloud by their type (api endpoint queried)", "req/s",
-            "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < ACLK_STATS_CLOUD_REQ_TYPE_CNT; i++)
             rd_rq_types[i] = rrddim_add(st, cloud_req_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -256,7 +256,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
             if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
@@ -309,7 +309,7 @@ static void aclk_stats_cpu_threads(void)
 
             aclk_cpu_data[i].st = rrdset_create_localhost(
                                          "netdata", id, NULL, "aclk", NULL, title, "milliseconds/s",
-                                         "netdata", "stats", 200008 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+                                         "netdata", "stats", 200020 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
             aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
             aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
