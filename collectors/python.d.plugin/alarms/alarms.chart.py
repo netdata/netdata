@@ -39,7 +39,7 @@ def charts_template(sm):
 
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
 DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
-DEFAULT_SHOW_ALARM_VALUES = False
+DEFAULT_COLLECT_ALARM_VALUES = False
 
 
 class Service(UrlService):
@@ -48,7 +48,7 @@ class Service(UrlService):
         self.sm = self.configuration.get('status_map', DEFAULT_STATUS_MAP)
         self.order, self.definitions = charts_template(self.sm)
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.show_alarm_values = bool(self.configuration.get('show_alarm_values', DEFAULT_SHOW_ALARM_VALUES))
+        self.collect_alarm_values = bool(self.configuration.get('collect_alarm_values', DEFAULT_COLLECT_ALARM_VALUES))
         self.collected_dims = {'alarms': set(), 'values': set()}
 
     def _get_data(self):
