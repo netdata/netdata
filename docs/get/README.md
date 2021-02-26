@@ -38,7 +38,8 @@ from its source code.
 
 Copy the script, paste it into your node's terminal, and hit `Enter`. 
 
-Open your favorite browser and navigate to `http://localhost:19999` or `http://REMOTE-HOST:19999` to open the dashboard.
+Open your favorite browser and navigate to `http://localhost:19999` or `http://NODE:19999`, replacing `NODE` with the
+hostname or IP address of your system, to open the local Agent dashboard.
 
 <details>
 <summary>Watch how the one-line installer works</summary>
