@@ -191,6 +191,98 @@ static void calculate_stats(netdata_publish_cachestat_t *publish) {
  *****************************************************************/
 
 /**
+ * Apps Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ */
+static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out)
+{
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    netdata_cachestat_pid_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        netdata_cachestat_pid_t *w = &out[i];
+        total->account_page_dirtied += w->account_page_dirtied;
+        total->add_to_page_cache_lru += w->add_to_page_cache_lru;
+        total->mark_buffer_dirty += w->mark_buffer_dirty;
+        total->mark_page_accessed += w->mark_page_accessed;
+    }
+}
+
+/**
+ * Save Pid values
+ *
+ * Save the current values inside the structure
+ *
+ * @param out     vector used to plot charts
+ * @param publish vector with values read from hash tables.
+ */
+static void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
+{
+    if (!out->current.mark_page_accessed) {
+        memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
+        return;
+    }
+
+    memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_pid_t));
+    memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
+}
+
+/**
+ * Fill PID
+ *
+ * Fill PID structures
+ *
+ * @param current_pid pid that we are collecting data
+ * @param out         values read from hash tables;
+ */
+static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *publish)
+{
+    netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
+    if (!curr) {
+        curr = callocz(1, sizeof(netdata_publish_cachestat_t));
+        cachestat_pid[current_pid] = curr;
+
+        cachestat_save_pid_values(curr, publish);
+        return;
+    }
+
+    cachestat_save_pid_values(curr, publish);
+}
+
+/**
+ * Read APPS table
+ *
+ * Read the apps table and store data inside the structure.
+ */
+static void read_apps_table()
+{
+    netdata_cachestat_pid_t *cv = cachestat_vector;
+    uint32_t key;
+    struct pid_stat *pids = root_of_pids;
+    int fd = map_fd[NETDATA_CACHESTAT_PID_STATS];
+    size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
+    while (pids) {
+        key = pids->pid;
+
+        if (bpf_map_lookup_elem(fd, &key, cv)) {
+            pids = pids->next;
+            continue;
+        }
+
+        cachestat_apps_accumulator(cv);
+
+        cachestat_fill_pid(key, cv);
+
+        // We are cleaning to avoid passing data read from one process to other.
+        memset(cv, 0, length);
+
+        pids = pids->next;
+    }
+}
+
+/**
  * Create apps charts
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
@@ -200,6 +292,38 @@ static void calculate_stats(netdata_publish_cachestat_t *publish) {
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     UNUSED(em);
+    struct target *root = ptr;
+    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                               "The ratio is calculated dividing the Hit pages per total cache accesses without counting dirties.",
+                               EBPF_COMMON_DIMENSION_PERCENTAGE,
+                               NETDATA_APPS_CACHESTAT_GROUP,
+                               20090,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
+                               "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
+                               EBPF_CACHESTAT_DIMENSION_PAGE,
+                               NETDATA_APPS_CACHESTAT_GROUP,
+                               20091,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
+                               "Number of cache access without counting dirty pages and page additions.",
+                               EBPF_CACHESTAT_DIMENSION_HITS,
+                               NETDATA_APPS_CACHESTAT_GROUP,
+                               20092,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
+                               "Page caches added without counting dirty pages",
+                               EBPF_CACHESTAT_DIMENSION_MISSES,
+                               NETDATA_APPS_CACHESTAT_GROUP,
+                               20093,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               root);
 }
 
 /*****************************************************************
@@ -239,16 +363,23 @@ static void read_global_table()
  */
 void *ebpf_cachestat_read_hash(void *ptr)
 {
+    read_thread_closed = 0;
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS;
 
-    read_thread_closed = 0;
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         read_global_table();
+
+        if (apps)
+            read_apps_table();
     }
     read_thread_closed = 1;
 
@@ -265,7 +396,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
     calculate_stats(publish);
 
     netdata_publish_syscall_t *ptr = cachestat_counter_publish_aggregated;
-    // The algorithm sets this value to zero sometimes, we are not written them to have a sooth chart
+    // The algorithm sets this value to zero sometimes, we are not written them to have a smooth chart
     if (publish->ratio) {
         cachestat_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                                ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension, publish->ratio);
@@ -282,6 +413,91 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
                            ptr[NETDATA_CACHESTAT_IDX_MISS].dimension, publish->miss);
 }
 
+/**
+ * Cachestat sum PIDs
+ *
+ * Sum values for all PIDs associated to a group
+ *
+ * @param publish  output structure.
+ * @param root     structure with listed IPs
+ */
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on_target *root)
+{
+    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
+    memset(&publish->current, 0, sizeof(publish->current));
+
+    netdata_cachestat_pid_t *dst = &publish->current;
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_publish_cachestat_t *w = cachestat_pid[pid];
+        if (w) {
+            netdata_cachestat_pid_t *src = &w->current;
+            dst->account_page_dirtied += src->account_page_dirtied;
+            dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
+            dst->mark_buffer_dirty += src->mark_buffer_dirty;
+            dst->mark_page_accessed += src->mark_page_accessed;
+        }
+
+        root = root->next;
+    }
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param root the target list.
+*/
+void ebpf_cache_send_apps_data(struct target *root)
+{
+    struct target *w;
+    collected_number value;
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
+            netdata_cachestat_pid_t *current = &w->cachestat.current;
+            netdata_cachestat_pid_t *prev = &w->cachestat.prev;
+
+            uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
+            uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+            uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
+            uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+            cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
+            value = (collected_number) w->cachestat.ratio;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->cachestat.dirty;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->cachestat.hit;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_MISSES_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->cachestat.miss;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+}
 
 /**
 * Main loop for this collector.
@@ -298,6 +514,7 @@ static void cachestat_collector(ebpf_module_t *em)
 
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -305,6 +522,9 @@ static void cachestat_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         cachestat_send_global(&publish);
+
+        if (apps)
+            ebpf_cache_send_apps_data(apps_groups_root_target);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);

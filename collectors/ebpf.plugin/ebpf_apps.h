@@ -15,6 +15,7 @@
 #define NETDATA_APPS_VFS_GROUP "ebpf vfs"
 #define NETDATA_APPS_PROCESS_GROUP "ebpf process"
 #define NETDATA_APPS_NET_GROUP "ebpf net"
+#define NETDATA_APPS_CACHESTAT_GROUP "ebpf cachestat"
 
 #include "ebpf_process.h"
 #include "ebpf_cachestat.h"
