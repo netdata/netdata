@@ -92,7 +92,7 @@ platform to see specific instructions.
 
 Even more options available in our [packaging documentation](/packaging/installer/README.md#alternative-methods).
 
-## Claim your node on Netdata Cloud
+## Claim your node to Netdata Cloud
 
 You need to [claim](/claim/README.md) your nodes to see them in Netdata Cloud. Claiming establishes a secure TLS
 connection to Netdata Cloud using the [Agent-Cloud link](/aclk/README.md), and proves you have write and administrative
