@@ -1673,7 +1673,8 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer",
                                     CONFIG_BOOLEAN_NO);
     if (!enabled)
-        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name,
+        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                        ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
 
     if (enabled) {
