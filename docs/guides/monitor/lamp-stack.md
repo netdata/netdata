@@ -10,24 +10,30 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 
 # LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
 
-The LAMP stack is the "hello world" for deploying dynamic web applications. It's performant, flexible, and reliable,
-which means a developer or sysadmin won't go far in their career without interacting with the stack and its services.
+The LAMP stack is the "hello world" for deploying dynamic web applications. It's fast, flexible, and reliable, which
+means a developer or sysadmin won't go far in their career without interacting with the stack and its services.
 
 _LAMP_ is an acronym of the core services that make up the web application: **L**inux, **A**pache, **M**ySQL, and
-**P**HP. Linux is the operating system that runs everything, Apache is a web server that responds to HTTP requests,
-MySQL is the database that returns information, and PHP is the scripting language used to make the application dynamic.
+**P**HP. 
+
+- [Linux](https://en.wikipedia.org/wiki/Linux) is the operating system running the whole stack.
+- [Apache](https://httpd.apache.org/) is a web server that responds to HTTP requests from users and returns web pages.
+- [MySQL](https://www.mysql.com/) is a database that stores and returns information based on queries from the web
+  application.
+- [PHP](https://www.php.net/) is a scripting language used to query the MySQL database and build new pages.
+
 LAMP stacks are the foundation for tons of end-user applications, with [Wordpress](https://wordpress.org/) being the
 most popular.
 
 ## Challenge
 
-You've already deployed a LAMP stack, either in testing or production, and want to monitor the performance and
-availability of every service to ensure the best possible experience for your end users. You might also be particularly
-interested in using a free, open-source monitoring tool.
+You've already deployed a LAMP stack, either in testing or production. You want to monitor every service's performance
+and availability to ensure the best possible experience for your end-users. You might also be particularly interested in
+using a free, open-source monitoring tool.
 
-Depending on your monitoring experience, you may not even know what metrics you're looking for, much less how to build a
-dashboard using query language. You just need a robust monitoring experience that has the metrics you need without a ton
-required setup.
+Depending on your monitoring experience, you may not even know what metrics you're looking for, much less how to build
+dashboards using a query language. You need a robust monitoring experience that has the metrics you need without a ton
+of required setup.
 
 ## Solution
 
@@ -75,7 +81,7 @@ collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules
 
 Actually, there's nothing for you to do to enable Apache monitoring with Netdata.
 
-These days, Apache comes with `mod_status` enabled by default, and Netdata is smart enough to look for metrics at that
+Apache comes with `mod_status` enabled by default these days, and Netdata is smart enough to look for metrics at that
 endpoint without you configuring it. Netdata is already collecting [`mod_status`
 metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html) _and_ additional metrics from parsing Apache's
 `access.log` file, which is everything you need for Apache monitoring.
@@ -163,7 +169,7 @@ dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-
 
 The **System Overview** section, which you can also see in the right-hand menu, contains key hardware monitoring charts,
 including CPU utilization, memory page faults, network monitoring, and much more. The **Applications** section shows you
-exact which Linux processes are using the most system resources.
+exactly which Linux processes are using the most system resources.
 
 Next, let's check out LAMP-specific metrics. You should see four relevant sections: **Apache local**, **MySQL local**,
 **PHP-FPM local**, and **web log apache**. Click on any of these to see metrics from each service in your LAMP stack.
