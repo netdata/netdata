@@ -128,7 +128,7 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
     if (total < 0)
         total = 0;
 
-    calculated_number misses = (calculated_number) (((long long)apcl) -((long long)apd));
+    calculated_number misses = (calculated_number) ( ((long long) apcl) - ((long long) apd) );
     if (misses < 0)
         misses = 0;
 
@@ -140,7 +140,7 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
         hits = 0;
     }
 
-    calculated_number ratio = (total > 0)?hits/total:0;
+    calculated_number ratio = (total > 0) ? hits/total : 0;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;
