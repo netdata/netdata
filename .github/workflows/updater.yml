@@ -16,23 +16,29 @@ jobs:
       matrix:
         distro:
           - 'debian:10'
-          - 'fedora:33'
           - 'ubuntu:20.10'
           - 'alpine:3.13'
-          - 'archlinux:latest'
           - 'centos:8'
           - 'clearlinux:latest'
-          - 'opensuse/tumbleweed:latest'
+          - 'fedora:33'
+        include:
+          - distro: 'alpine:3.13'
+            pre: 'apk add -U bash'
+          - distro: 'centos:8'
+            rmjsonc: 'dnf remove -y json-c-devel'
+          - distro: 'debian:10'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:20.10'
+            pre: 'apt-get update'
     runs-on: ubuntu-latest
     steps:
-      - name: Install netdata latest
-        run: bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait
       - name: Git clone repository
         uses: actions/checkout@v2
-      - name: Build tarball
+      - name: Install required packages & build tarball
         run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           .github/scripts/build-dist.sh
-      - name: Run a dockerised web server to serve files used by the update script
+      - name: Run a dockerised web server to serve files used by the custom update script
         run: |
           docker run -dit --name my-apache-app -p 8080:80 -v "$PWD":/usr/local/apache2/htdocs/ httpd:2.4
       - name: Replace URLs in updater script to point at the local web server
@@ -45,16 +51,13 @@ jobs:
           sed -i "s|${ORIG_TARBALL}|${NEW_TARBALL}|g" packaging/installer/netdata-updater.sh
           sed -i "s|${ORIG_CHECKSUM}|${NEW_CHECKSUM}|g" packaging/installer/netdata-updater.sh
           sed -i "s|"current_version=.*"|"current_version=1"|g" packaging/installer/netdata-updater.sh
-      - name: Run the updater
+      - name: Install netdata and run the updater on ${{ matrix.distro }}
+        env:
+          PRE: ${{ matrix.pre }}
         run: |
-          sudo netdata -v
-          sudo ./packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
-          sudo netdata -v
-          cat ./packaging/version
-          updater_version=$(cat packaging/version)
-          if [[ $(netdata -v | awk '{print $2}') == "${updater_version}" ]];
-          then
-            echo "Update successfull!"
-          else
-            exit 1
-          fi
+          echo $PRE > ./prep-cmd.sh
+          docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
+          docker run --network host -w /netdata test \
+              /bin/sh -c '/netdata/packaging/installer/kickstart.sh --dont-wait \
+              && /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update \
+              && bash /netdata/.github/scripts/check-updater.sh'

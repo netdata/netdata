@@ -3,6 +3,8 @@
 # Builds the netdata-vX.y.Z-xxxx.tar.gz source tarball (dist)
 
 set -e
+
+# shellcheck source=.github/scripts/functions.sh
 . "$(dirname "$0")/functions.sh"
 
 NAME="${NAME:-netdata}"
