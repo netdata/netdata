@@ -1,0 +1,11 @@
+{
+    "image": "netdata/devenv", 
+    "extensions":[
+		"golang.go",
+		"exiasr.hadolint",
+		"ms-python.python",
+		"timonwong.shellcheck",
+		"redhat.vscode-yaml"
+	],
+    "forwardPorts": [19999]
+}
