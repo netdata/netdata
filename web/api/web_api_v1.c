@@ -349,9 +349,24 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
+    int show_archived = 0;
     buffer_flush(w->response.data);
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "archived"))
+            show_archived = (value && *value)?str2l(value):0;
+    }
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 0);
+    charts2json(host, w->response.data, 0, show_archived);
     return HTTP_RESP_OK;
 }
 

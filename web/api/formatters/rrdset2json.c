@@ -149,7 +149,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         );
     }
     buffer_strcat(wb, ",\n\t\t\t\"chart_labels\": {\n");
-    chart_labels2json(st, wb, 2);
+    chart_labels2json(st, wb, 4);
     buffer_strcat(wb, "\t\t\t}\n");
 
 

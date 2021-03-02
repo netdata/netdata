@@ -1928,6 +1928,15 @@ void rrdset_finalize_labels(RRDSET *st)
     } else {
         replace_label_list(labels, new_labels);
     }
+
+    netdata_rwlock_wrlock(&labels->labels_rwlock);
+    struct label *lbl = labels->head;
+    while (lbl) {
+        sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
+        lbl = lbl->next;
+    }
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+
     st->state->new_labels = NULL;
 }
 

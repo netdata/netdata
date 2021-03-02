@@ -1367,3 +1367,52 @@ void sql_archived_database_hosts(BUFFER *wb, int count)
 
     return;
 }
+
+#define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
+    "(chart_id, source_type, label_key, label_value, date_created) " \
+    "values (@chart, @source, @label, @value, strftime('%s'));"
+
+void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_INS_CHART_LABEL, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart_id parameter to store label information");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 2, source_type);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind size parameter to store label information");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind size parameter to store label information");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind size parameter to store label information");
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store migrated file, rc = %d", rc);
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing chart label information");
+
+    return;
+}
