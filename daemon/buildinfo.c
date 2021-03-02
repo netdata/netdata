@@ -227,3 +227,54 @@ void print_build_info(void) {
     printf("    MongoDB:                 %s\n", FEAT_MONGO);
     printf("    Prometheus Remote Write: %s\n", FEAT_REMOTE_WRITE);
 };
+
+// This intentionally does not use JSON-C so it works even if JSON-C is not present
+// This is used for anonymous statistics reporting, so it intentionally
+// does not include the configure options, which would be very easy to use
+// for tracking custom builds (and complicate outputting valid JSON).
+void print_build_info_json(void) {
+    printf("{\n");
+    printf("  \"features\": {\n");
+    printf("    \"dbengine\": \"%s\",\n",         FEAT_DBENGINE);
+    printf("    \"native-https\": \"%s\",\n",     FEAT_NATIVE_HTTPS);
+    printf("    \"cloud\": \"%s\",\n",            FEAT_CLOUD);
+    printf("    \"tls-host-verify\": \"%s\"\n",   FEAT_TLS_HOST_VERIFY);
+    printf("  },\n");
+
+    printf("  \"libs\": {\n");
+    printf("    \"jemalloc\": \"%s\",\n",         FEAT_JEMALLOC);
+    printf("    \"jsonc\": \"%s\",\n",            FEAT_JSONC);
+    printf("    \"libcap\": \"%s\",\n",           FEAT_LIBCAP);
+    printf("    \"libcrypto\": \"%s\",\n",        FEAT_CRYPTO);
+    printf("    \"libm\": \"%s\",\n",             FEAT_LIBM);
+#if defined(ENABLE_ACLK)
+    printf("    \"lws\": \"%s v%d.%d.%d\",\n",    FEAT_LWS, LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
+#else
+    printf("    \"lws\": \"%s\",\n",              FEAT_LWS);
+#endif
+    printf("    \"mosquitto\": \"%s\",\n",        FEAT_MOSQUITTO);
+    printf("    \"tcmalloc\": \"%s\",\n",         FEAT_TCMALLOC);
+    printf("    \"zlib\": \"%s\"\n",              FEAT_ZLIB);
+    printf("  },\n");
+
+    printf("  \"plugins\": {\n");
+    printf("    \"apps\": \"%s\",\n",             FEAT_APPS_PLUGIN);
+    printf("    \"cgroup-net\": \"%s\",\n",       FEAT_CGROUP_NET);
+    printf("    \"cups\": \"%s\",\n",             FEAT_CUPS);
+    printf("    \"ebpf\": \"%s\",\n",             FEAT_EBPF);
+    printf("    \"ipmi\": \"%s\",\n",             FEAT_IPMI);
+    printf("    \"nfacct\": \"%s\",\n",           FEAT_NFACCT);
+    printf("    \"perf\": \"%s\",\n",             FEAT_PERF);
+    printf("    \"slabinfo\": \"%s\",\n",         FEAT_SLABINFO);
+    printf("    \"xen\": \"%s\",\n",              FEAT_XEN);
+    printf("    \"xen-vbd-error\": \"%s\"\n",     FEAT_XEN_VBD_ERROR);
+    printf("  },\n");
+
+    printf("  \"exporters\": {\n");
+    printf("    \"kinesis\": \"%s\",\n",          FEAT_KINESIS);
+    printf("    \"pubsub\": \"%s\",\n",           FEAT_PUBSUB);
+    printf("    \"mongodb\": \"%s\",\n",          FEAT_MONGO);
+    printf("    \"prom-remote-write\": \"%s\"\n", FEAT_REMOTE_WRITE);
+    printf("  }\n");
+    printf("}\n");
+};
