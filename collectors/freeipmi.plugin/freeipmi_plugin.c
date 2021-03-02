@@ -1619,9 +1619,9 @@ int parse_outofband_driver_type (const char *str)
     return (-1);
 }
 
-int host_is_local(const char *hostname)
+int host_is_local(const char *host)
 {
-    if (hostname && (!strcmp(hostname, "localhost") || !strcmp(hostname, "127.0.0.1") || !strcmp(hostname, "::1")))
+    if (host && (!strcmp(host, "localhost") || !strcmp(host, "127.0.0.1") || !strcmp(host, "::1")))
         return (1);
 
     return (0);
