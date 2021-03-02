@@ -12,11 +12,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 
 At Netdata, we've built Kubernetes monitoring tools that add visibility without complexity while also helping you
 actively troubleshoot anomalies or outages. This guide walks you through each of the visualizations and offers best
-practices on how to use them to help you start Kubernetes monitoring in a matter of minutes, not hours or days.
+practices on how to use them to start Kubernetes monitoring in a matter of minutes, not hours or days.
 
-We already have a few complementary tools and collectors for monitoring the many layers of a Kubernetes cluster,
-_entirely for free_. These methods work together to help you troubleshoot performance or availability issues across your
-Kubernetes infrastructure.
+Netdata's Kubernetes monitoring solution uses a handful of [complementary tools and
+collectors](#related-reference-documentation) for peeling back the many complex layers of a Kubernetes cluster,
+_entirely for free_. These methods work together to give you every metric you need to troubleshoot performance or
+availability issues across your Kubernetes infrastructure.
 
 ## Challenge
 
