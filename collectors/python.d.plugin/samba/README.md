@@ -103,8 +103,8 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d.conf
 ```
 
-Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent
-with `sudo systemctl restart netdata`, or the appropriate method for your system.
+Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl
+restart netdata`, or the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
 
 ## Configuration
 

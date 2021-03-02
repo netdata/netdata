@@ -83,9 +83,9 @@ As far as configuring Netdata to monitor Pi-hole metrics, there's nothing you ac
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole) will autodetect the new service
 running on your Raspberry Pi and immediately start collecting metrics every second.
 
-Restart Netdata with `sudo service netdata restart` to start Netdata, which will then recognize that Pi-hole is running
-and start a per-second collection job. When you refresh your Netdata dashboard or load it up again in a new tab, you'll
-see a new entry in the menu for **Pi-hole** metrics.
+Restart Netdata with `sudo systemctl restart netdata`, which will then recognize that Pi-hole is running and start a
+per-second collection job. When you refresh your Netdata dashboard or load it up again in a new tab, you'll see a new
+entry in the menu for **Pi-hole** metrics.
 
 ## Use Netdata to explore and monitor your Raspberry Pi and Pi-hole
 
@@ -119,7 +119,7 @@ cd /etc/netdata
 sudo ./edit-config charts.d.conf
 ```
 
-Uncomment the `sensors=force` line and save the file. Restart Netdata with `sudo service netdata restart` to enable
+Uncomment the `sensors=force` line and save the file. Restart Netdata with `sudo systemctl restart netdata` to enable
 Raspberry Pi temperature sensor monitoring.
 
 ### Storing historical metrics on your Raspberry Pi

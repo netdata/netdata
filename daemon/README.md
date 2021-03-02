@@ -395,10 +395,10 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to restart netdata:
+then execute this to [restart Netdata](/docs/configure/start-stop-restart.md):
 
 ```sh
-sudo service netdata restart
+sudo systemctl restart netdata
 ```
 
 #### Example 2: Netdata with nice -1 on systemd systems

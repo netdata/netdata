@@ -7,8 +7,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step
 
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.
 
-To auto-detect and collect metrics from a source you just installed, you need to [restart
-Netdata](/docs/getting-started.md#start-stop-and-restart-netdata).
+To auto-detect and collect metrics from a source you just installed, you need to restart Netdata using `sudo systemctl
+restart netdata`, or the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
 
 However, auto-detection only works if you installed the source using its standard installation
 procedure. If Netdata isn't collecting metrics after a restart, your source probably isn't configured
@@ -99,9 +99,9 @@ Next, edit your `/etc/nginx/sites-enabled/default` file to include a `location` 
     }
 ```
 
-Restart Netdata using `service netdata restart` or the [correct
-alternative](/docs/getting-started.md#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
-metrics from your Nginx web server!
+Restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and Netdata will auto-detect metrics from your Nginx web
+server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collector itself
 by editing its configuration file:
