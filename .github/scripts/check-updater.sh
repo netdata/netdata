@@ -13,7 +13,7 @@ check_successfull_update() {
   (
     netdata_version=$(netdata -v | awk '{print $2}')
     updater_version=$(cat packaging/version)
-    if [ "$netdata_version" == "$netdata_version" ]; then
+    if [ "$netdata_version" == "$updater_version" ]; then
       echo "Update successfull!"
     else
       exit 1
