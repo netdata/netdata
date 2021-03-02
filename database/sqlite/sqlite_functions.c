@@ -886,15 +886,6 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb, int full)
         if (st && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
             continue;
 
-        if (c)
-            buffer_strcat(wb, ",\n\t\t\"");
-        else
-            buffer_strcat(wb, "\n\t\t\"");
-        c++;
-
-        buffer_strcat(wb, id);
-        buffer_strcat(wb, "\": ");
-
         buffer_reset(work_buffer);
 
         first_entry_t = LONG_MAX;
@@ -904,6 +895,22 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb, int full)
                        host->machine_guid,
                        work_buffer,
                        &dimensions, &first_entry_t, &last_entry_t);
+
+        if (unlikely(last_entry_t) == 0) {
+            rc = sqlite3_reset(res_dim);
+            if (unlikely(rc != SQLITE_OK))
+                error_report("Failed to reset the prepared statement when reading archived chart dimensions");
+            continue;
+        }
+
+        if (c)
+            buffer_strcat(wb, ",\n\t\t\"");
+        else
+            buffer_strcat(wb, "\n\t\t\"");
+        c++;
+
+        buffer_strcat(wb, id);
+        buffer_strcat(wb, "\": ");
 
         buffer_sprintf(
             wb,
@@ -1191,7 +1198,7 @@ void add_migrated_file(char *path, uint64_t file_size)
     "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id and c.type||'.'||c.id = @chart " \
     "order by c.chart_id asc, c.type||'.'||c.id desc;"
 
-void sql_build_context_param_list(struct context_param **param_list, uuid_t *host_uuid, char *context, char *chart)
+void sql_build_context_param_list(struct context_param **param_list, RRDHOST *host, char *context, char *chart)
 {
 #ifdef ENABLE_DBENGINE
     int rc;
@@ -1218,7 +1225,7 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
         return;
@@ -1235,7 +1242,7 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
 
     RRDSET *st = NULL;
     char machine_guid[GUID_LEN + 1];
-    uuid_unparse_lower(*host_uuid, machine_guid);
+    uuid_unparse_lower(host->host_uuid, machine_guid);
     uuid_t rrdeng_uuid;
     uuid_t chart_id;
 
@@ -1262,6 +1269,7 @@ void sql_build_context_param_list(struct context_param **param_list, uuid_t *hos
 
             st->last_accessed_time = LONG_MAX;  // First entry
             st->upstream_resync_time = 0;       // last entry
+            st->rrdhost = host;
         }
         st->counter++;
 

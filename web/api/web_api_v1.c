@@ -521,7 +521,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             st->last_accessed_time = now_realtime_sec();
 #ifdef ENABLE_DBENGINE
         if (!st && host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            sql_build_context_param_list(&context_param_list, &host->host_uuid, NULL, chart);
+            sql_build_context_param_list(&context_param_list, host, NULL, chart);
             if (likely(context_param_list && context_param_list->rd)) {
                 st = context_param_list->rd->rrdset;
                 if (!st) {
