@@ -11,7 +11,7 @@ update_every = 10
 disabled_by_default = True
 
 
-def charts_template(sm):
+def charts_template(sm, alarm_status_chart_type='line'):
     order = [
         'alarms',
         'values'
@@ -20,7 +20,7 @@ def charts_template(sm):
     mappings = ', '.join(['{0}={1}'.format(k, v) for k, v in sm.items()])
     charts = {
         'alarms': {
-            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'alarms', 'alarms.status', 'line'],
+            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'alarms', 'alarms.status', alarm_status_chart_type],
             'lines': [],
             'variables': [
                 ['alarms_num'],
@@ -40,13 +40,15 @@ def charts_template(sm):
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
 DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
 DEFAULT_COLLECT_ALARM_VALUES = False
+DEFAULT_ALARM_STATUS_CHART_TYPE = 'line'
 
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.sm = self.configuration.get('status_map', DEFAULT_STATUS_MAP)
-        self.order, self.definitions = charts_template(self.sm)
+        self.alarm_status_chart_type = self.configuration.get('alarm_status_chart_type', DEFAULT_ALARM_STATUS_CHART_TYPE)
+        self.order, self.definitions = charts_template(self.sm, self.alarm_status_chart_type)
         self.url = self.configuration.get('url', DEFAULT_URL)
         self.collect_alarm_values = bool(self.configuration.get('collect_alarm_values', DEFAULT_COLLECT_ALARM_VALUES))
         self.collected_dims = {'alarms': set(), 'values': set()}
