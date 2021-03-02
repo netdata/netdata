@@ -50,7 +50,6 @@ jobs:
           NEW_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=http://localhost:8080/artifacts/sha256sums.txt"
           sed -i "s|${ORIG_TARBALL}|${NEW_TARBALL}|g" packaging/installer/netdata-updater.sh
           sed -i "s|${ORIG_CHECKSUM}|${NEW_CHECKSUM}|g" packaging/installer/netdata-updater.sh
-          sed -i "s|"current_version=.*"|"current_version=1"|g" packaging/installer/netdata-updater.sh
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         env:
           PRE: ${{ matrix.pre }}
