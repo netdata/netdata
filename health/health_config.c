@@ -6,6 +6,9 @@
 
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
+#define HEALTH_CLASS_KEY "class"
+#define HEALTH_COMPONENT_KEY "component"
+#define HEALTH_TYPE_KEY "type"
 #define HEALTH_ON_KEY "on"
 #define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
@@ -483,6 +486,9 @@ static int health_readfile(const char *filename, void *data) {
     static uint32_t
             hash_alarm = 0,
             hash_template = 0,
+            hash_class = 0,
+            hash_component = 0,
+            hash_type = 0,
             hash_os = 0,
             hash_on = 0,
             hash_host = 0,
@@ -510,6 +516,9 @@ static int health_readfile(const char *filename, void *data) {
     if(unlikely(!hash_alarm)) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
+        hash_class = simple_uhash(HEALTH_CLASS_KEY);
+        hash_component = simple_uhash(HEALTH_COMPONENT_KEY);
+        hash_type = simple_uhash(HEALTH_TYPE_KEY);
         hash_on = simple_uhash(HEALTH_ON_KEY);
         hash_os = simple_uhash(HEALTH_OS_KEY);
         hash_host = simple_uhash(HEALTH_HOST_KEY);
@@ -696,6 +705,39 @@ static int health_readfile(const char *filename, void *data) {
                 rc->chart = strdupz(value);
                 rc->hash_chart = simple_hash(rc->chart);
             }
+            else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
+                if(rc->class) {
+                    if(strcmp(rc->class, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->class, value, value);
+
+                    freez(rc->class);
+                }
+                rc->class = strdupz(value);
+                strip_quotes(rc->class);
+            }
+            else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
+                if(rc->component) {
+                    if(strcmp(rc->component, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->component, value, value);
+
+                    freez(rc->component);
+                }
+                rc->component = strdupz(value);
+                strip_quotes(rc->component);
+            }
+            else if(hash == hash_type && !strcasecmp(key, HEALTH_TYPE_KEY)) {
+                if(rc->type) {
+                    if(strcmp(rc->type, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->type, value, value);
+
+                    freez(rc->type);
+                }
+                rc->type = strdupz(value);
+                strip_quotes(rc->type);
+            }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
                         &rc->update_every, &rc->options, &rc->dimensions, &rc->foreachdim);
@@ -847,6 +889,39 @@ static int health_readfile(const char *filename, void *data) {
                 }
                 rt->context = strdupz(value);
                 rt->hash_context = simple_hash(rt->context);
+            }
+            else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
+                if(rt->class) {
+                    if(strcmp(rt->class, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->class, value, value);
+
+                    freez(rt->class);
+                }
+                rt->class = strdupz(value);
+                strip_quotes(rt->class);
+            }
+            else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
+                if(rt->component) {
+                    if(strcmp(rt->component, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->component, value, value);
+
+                    freez(rt->component);
+                }
+                rt->component = strdupz(value);
+                strip_quotes(rt->component);
+            }
+            else if(hash == hash_type && !strcasecmp(key, HEALTH_TYPE_KEY)) {
+                if(rt->type) {
+                    if(strcmp(rt->type, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->type, value, value);
+
+                    freez(rt->type);
+                }
+                rt->type = strdupz(value);
+                strip_quotes(rt->type);
             }
             else if(hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
                 freez(rt->family_match);

@@ -47,6 +47,9 @@ extern unsigned int default_health_enabled;
 #define HEALTH_RECIPIENT_KEY "to"
 #define HEALTH_UNITS_KEY "units"
 #define HEALTH_INFO_KEY "info"
+#define HEALTH_CLASS_KEY "class"
+#define HEALTH_COMPONENT_KEY "component"
+#define HEALTH_TYPE_KEY "type"
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_FOREACH_KEY "foreach"
@@ -81,6 +84,9 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         const char *name,
         const char *chart,
         const char *family,
+        const char *class,
+        const char *component,
+        const char *type,
         const char *exec,
         const char *recipient,
         time_t duration,

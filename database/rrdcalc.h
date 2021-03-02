@@ -39,6 +39,10 @@ struct rrdcalc {
     char *name;                     // the name of this alarm
     uint32_t hash;                  // the hash of the alarm name
 
+    char *class;                    // the class that this alarm belongs
+    char *component;                // the component that this alarm refers to
+    char *type;                     // type of the alarm
+
     char *exec;                     // the command to execute when this alarm switches state
     char *recipient;                // the recipient of the alarm (the first parameter to exec)
 
