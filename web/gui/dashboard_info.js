@@ -1342,6 +1342,11 @@ netdataDashboard.context = {
         info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the system always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
     },
 
+    'disk.busy': {
+        colors: '#FF5588',
+        info: 'Disk Busy Time measures the amount of time the disk was busy with something.'
+    },
+    
     'disk.backlog': {
         colors: '#0099CC',
         info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the system is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
