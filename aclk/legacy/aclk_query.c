@@ -238,8 +238,8 @@ int aclk_queue_query(char *topic, void *data, char *msg_id, char *query, int run
 
     new_query->data = data;
     new_query->next = NULL;
-    new_query->created = now_realtime_usec();
     now_realtime_timeval(&new_query->tv_in);
+    new_query->created = (new_query->tv_in.tv_sec * USEC_PER_SEC) + new_query->tv_in.tv_usec;
     new_query->created_boot_time = now_boottime_usec();
     new_query->run_after = run_after;
 
