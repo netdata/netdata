@@ -467,10 +467,8 @@ void ebpf_cache_send_apps_data(struct target *root)
 
             cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
             value = (collected_number) w->cachestat.ratio;
-            // Like memory charts, we are not updating this chart when it is zero, but we do not expect smooth charts
-            // for all applications.
-            if (value)
-                write_chart_dimension(w->name, value);
+            // Here we are using different approach to have a chart more smooth
+            write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
