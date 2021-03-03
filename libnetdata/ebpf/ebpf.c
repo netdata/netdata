@@ -97,7 +97,7 @@ int get_kernel_version(char *out, int size)
         return -1;
 
     move = patch;
-    while (*version && *version != '\n')
+    while (*version && *version != '\n' && *version != '-')
         *move++ = *version++;
     *move = '\0';
 
