@@ -83,6 +83,9 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
+    { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
+        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+        .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL },
@@ -585,21 +588,23 @@ void ebpf_print_help()
             "\n"
             " Available command line options:\n"
             "\n"
-            " SECONDS           set the data collection frequency.\n"
+            " SECONDS             Set the data collection frequency.\n"
             "\n"
-            " --help or -h      show this help.\n"
+            " --help or -h        Show this help.\n"
             "\n"
-            " --version or -v   show software version.\n"
+            " --version or -v     Show software version.\n"
             "\n"
-            " --global or -g    disable charts per application.\n"
+            " --global or -g      Disable charts per application.\n"
             "\n"
-            " --all or -a       Enable all chart groups (global and apps), unless -g is also given.\n"
+            " --all or -a         Enable all chart groups (global and apps), unless -g is also given.\n"
             "\n"
-            " --net or -n       Enable network viewer charts.\n"
+            " --cachestat or -c   Enable charts related to process run time.\n"
             "\n"
-            " --process or -p   Enable charts related to process run time.\n"
+            " --net or -n         Enable network viewer charts.\n"
             "\n"
-            " --return or -r    Run the collector in return mode.\n"
+            " --process or -p     Enable charts related to process run time.\n"
+            "\n"
+            " --return or -r      Run the collector in return mode.\n"
             "\n",
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
@@ -1657,7 +1662,7 @@ static void read_collector_values(int *disable_apps)
 
     // Read ebpf programs section
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                    ebpf_modules[0].config_name, CONFIG_BOOLEAN_YES);
+                                    ebpf_modules[EBPF_MODULE_PROCESS_IDX].config_name, CONFIG_BOOLEAN_YES);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
@@ -1668,7 +1673,8 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer",
                                     CONFIG_BOOLEAN_NO);
     if (!enabled)
-        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name,
+        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                        ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
 
     if (enabled) {
@@ -1685,7 +1691,15 @@ static void read_collector_values(int *disable_apps)
     if (!enabled)
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                                         CONFIG_BOOLEAN_NO);
-    ebpf_modules[1].optional = enabled;
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].optional = enabled;
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
+                                    CONFIG_BOOLEAN_NO);
+
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_apps);
+        started++;
+    }
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
@@ -1761,13 +1775,14 @@ static void parse_args(int argc, char **argv)
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
-        {"help",     no_argument,    0,  'h' },
-        {"version",  no_argument,    0,  'v' },
-        {"global",   no_argument,    0,  'g' },
-        {"all",      no_argument,    0,  'a' },
-        {"net",      no_argument,    0,  'n' },
-        {"process",  no_argument,    0,  'p' },
-        {"return",   no_argument,    0,  'r' },
+        {"help",      no_argument,    0,  'h' },
+        {"version",   no_argument,    0,  'v' },
+        {"global",    no_argument,    0,  'g' },
+        {"all",       no_argument,    0,  'a' },
+        {"cachestat", no_argument,    0,  'c' },
+        {"net",       no_argument,    0,  'n' },
+        {"process",   no_argument,    0,  'p' },
+        {"return",    no_argument,    0,  'r' },
         {0, 0, 0, 0}
     };
 
@@ -1782,7 +1797,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvganpr", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgcanpr", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1808,6 +1823,15 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_all_charts(disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with all chart groups, because it was started with the option \"--all\" or \"-a\".");
+#endif
+                break;
+            }
+            case 'c': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info(
+                    "EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"--cachestat\" or \"-c\".");
 #endif
                 break;
             }
@@ -1953,9 +1977,14 @@ int main(int argc, char **argv)
     read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
     struct netdata_static_thread ebpf_threads[] = {
-        {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},
-        {"EBPF SOCKET" , NULL, NULL, 1, NULL, NULL, ebpf_modules[1].start_routine},
-        {NULL          , NULL, NULL, 0, NULL, NULL, NULL}
+        {"EBPF PROCESS", NULL, NULL, 1,
+          NULL, NULL, ebpf_modules[EBPF_MODULE_PROCESS_IDX].start_routine},
+        {"EBPF SOCKET" , NULL, NULL, 1,
+          NULL, NULL, ebpf_modules[EBPF_MODULE_SOCKET_IDX].start_routine},
+        {"EBPF CACHESTAT" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].start_routine},
+        {NULL          , NULL, NULL, 0,
+          NULL, NULL, NULL}
     };
 
     //clean_loaded_events();
