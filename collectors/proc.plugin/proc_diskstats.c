@@ -1157,13 +1157,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_util, RRDSET_FLAG_DETAIL);
 
-                d->rd_util_utilization = rrddim_add(d->st_util, "utilization", NULL, 1, 10 * update_every, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_util_utilization = rrddim_add(d->st_util, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_util);
 
-            collected_number disk_utilization = busy_ms - last_busy_ms;
-            if (disk_utilization > (collected_number)(MSEC_PER_SEC * update_every))
-                disk_utilization = (collected_number)(MSEC_PER_SEC * update_every);
+            collected_number disk_utilization = (busy_ms - last_busy_ms) / (10 * update_every);
+            if (disk_utilization > 100)
+                disk_utilization = 100;
 
             rrddim_set_by_pointer(d->st_util, d->rd_util_utilization, disk_utilization);
             rrdset_done(d->st_util);
