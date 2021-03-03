@@ -23,7 +23,7 @@ Below is an example of the chart produced when running `stress-ng --all 2` for a
 
 ## Configuration
 
-Enable the collector and restart Netdata.
+Enable the collector and [restart Netdata](/docs/configure/start-stop-restart.md).
 
 ```bash
 cd /etc/netdata/

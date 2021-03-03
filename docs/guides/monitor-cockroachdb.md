@@ -30,9 +30,9 @@ configuring CockroachDB. Netdata only needs to regularly query the database's `_
 display them on the dashboard.
 
 If your CockroachDB instance is accessible through `http://localhost:8080/` or `http://127.0.0.1:8080`, your setup is
-complete. Restart Netdata with `service netdata restart`, or use the [appropriate
-method](../getting-started.md#start-stop-and-restart-netdata) for your system, and refresh your browser. You should see
-CockroachDB metrics in your Netdata dashboard!
+complete. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and refresh your browser. You should see CockroachDB
+metrics in your Netdata dashboard!
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockroachDB database monitored by Netdata" />

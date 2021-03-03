@@ -211,16 +211,12 @@ You can use these features together or separately&mdash;the decision is up to yo
 When you install Netdata, it's configured to start at boot, and stop and restart/shutdown. You shouldn't need to start
 or stop Netdata manually, but you will probably need to restart Netdata at some point.
 
--   To **start** Netdata, open a terminal and run `service netdata start`.
--   To **stop** Netdata, run `service netdata stop`.
--   To **restart** Netdata, run `service netdata restart`.
+-   To **start** Netdata, open a terminal and run `sudo systemctl start netdata`.
+-   To **stop** Netdata, run `sudo systemctl stop netdata`.
+-   To **restart** Netdata, run `sudo systemctl restart netdata`.
 
-The `service` command is a wrapper script that tries to use your system's preferred method of starting or stopping
-Netdata based on your system. But, if either of those commands fails, try using the equivalent commands for `systemd`
-and `init.d`:
-
--   **systemd**: `systemctl start netdata`, `systemctl stop netdata`, `systemctl restart netdata`
--   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
+See our doc on [starting, stopping, and restarting](/docs/configure/start-stop-restart.md) the Netdata Agent for
+details.
 
 ## What's next?
 

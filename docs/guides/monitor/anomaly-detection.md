@@ -79,9 +79,10 @@ yourself if it doesn't already exist. Either way, the final result should look l
 anomalies: yes
 ```
 
-[Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to start up the
-anomalies collector. By default, the model training process runs every 30 minutes, and uses the previous 4 hours of
-metrics to establish a baseline for health and performance across the default included charts.
+[Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to start up the anomalies collector. By default, the
+model training process runs every 30 minutes, and uses the previous 4 hours of metrics to establish a baseline for
+health and performance across the default included charts.
 
 > 💡 The anomaly collector may need 30-60 seconds to finish its initial training and have enough data to start
 > generating anomaly scores. You may need to refresh your browser tab for the **Anomalies** section to appear in menus
