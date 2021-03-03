@@ -4,16 +4,12 @@ set -e
 # shellcheck source=.github/scripts/functions.sh
 . "$(dirname "$0")/functions.sh"
 
-NAME="${NAME:-netdata}"
-VERSION="${VERSION:-"$(git describe --always)"}"
-BASENAME="$NAME-$VERSION"
-
 check_successfull_update() {
   progress "Check netdata version after update"
   (
     netdata_version=$(netdata -v | awk '{print $2}')
     updater_version=$(cat packaging/version)
-    if [ "$netdata_version" == "$updater_version" ]; then
+    if [ "$netdata_version" = "$updater_version" ]; then
       echo "Update successfull!"
     else
       exit 1
