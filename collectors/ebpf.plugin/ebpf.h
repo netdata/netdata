@@ -73,7 +73,8 @@ extern ebpf_module_t ebpf_modules[];
 enum ebpf_module_indexes {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
-    EBPF_MODULE_CACHESTAT_IDX
+    EBPF_MODULE_CACHESTAT_IDX,
+    EBPF_MODULE_SYNC_IDX
 };
 
 // Copied from musl header
