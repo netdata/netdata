@@ -32,16 +32,16 @@ struct collector {
 
 struct array_printer {
     int c;
-    BUFFER *plugin;
-    BUFFER *module;
+    BUFFER *both;
 };
 
 extern int aclk_connected;
 extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
-//extern const char* get_release_channel();
+extern void analytics_build_info(BUFFER *b);
 
 void analytics_log_data (void) {
 
+    debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.NETDATA_BUILDINFO);
     debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT           : [%s]", analytics_data.NETDATA_CONFIG_IS_PARENT);
     debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
@@ -58,8 +58,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
     debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED               : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_PLUGINS         : [%s]", analytics_data.NETDATA_COLLECTORS_PLUGINS);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_MODULES         : [%s]", analytics_data.NETDATA_COLLECTORS_MODULES);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.NETDATA_COLLECTORS);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
     debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT               : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
     debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
@@ -69,6 +68,7 @@ void analytics_log_data (void) {
 
 void analytics_setenv_data (void) {
 
+    setenv ( "NETDATA_BUILDINFO",                 analytics_data.NETDATA_BUILDINFO, 1);
     setenv ( "NETDATA_CONFIG_STREAM_ENABLED",     analytics_data.NETDATA_CONFIG_STREAM_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_IS_PARENT",          analytics_data.NETDATA_CONFIG_IS_PARENT, 1);
     setenv ( "NETDATA_CONFIG_MEMORY_MODE",        analytics_data.NETDATA_CONFIG_MEMORY_MODE, 1);
@@ -85,8 +85,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_ALLMETRICS_JSON_USED",      analytics_data.NETDATA_ALLMETRICS_JSON_USED, 1);
     setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
     setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
-    setenv ( "NETDATA_COLLECTORS_PLUGINS",        analytics_data.NETDATA_COLLECTORS_PLUGINS, 1);
-    setenv ( "NETDATA_COLLECTORS_MODULES",        analytics_data.NETDATA_COLLECTORS_MODULES, 1);
+    setenv ( "NETDATA_COLLECTORS",                analytics_data.NETDATA_COLLECTORS, 1);
     setenv ( "NETDATA_COLLECTORS_COUNT",          analytics_data.NETDATA_COLLECTORS_COUNT, 1);
     setenv ( "NETDATA_ALARMS_COUNT",              analytics_data.NETDATA_ALARMS_COUNT, 1);
     setenv ( "NETDATA_CHARTS_COUNT",              analytics_data.NETDATA_CHARTS_COUNT, 1);
@@ -95,6 +94,7 @@ void analytics_setenv_data (void) {
 }
 
 void analytics_free_data (void) {
+    freez(analytics_data.NETDATA_BUILDINFO);
     freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_IS_PARENT);
     freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
@@ -111,8 +111,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
     freez(analytics_data.NETDATA_HOST_CLAIMED);
-    freez(analytics_data.NETDATA_COLLECTORS_PLUGINS);
-    freez(analytics_data.NETDATA_COLLECTORS_MODULES);
+    freez(analytics_data.NETDATA_COLLECTORS);
     freez(analytics_data.NETDATA_COLLECTORS_COUNT);
     freez(analytics_data.NETDATA_ALARMS_COUNT);
     freez(analytics_data.NETDATA_CHARTS_COUNT);
@@ -139,15 +138,18 @@ int collector_counter_callb(void *entry, void *data) {
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col=(struct collector *) entry;
 
-    BUFFER *pl = ap->plugin;
-    BUFFER *md = ap->module;
+    BUFFER *bt = ap->both;
 
     if (likely(ap->c)) {
-        buffer_strcat(pl, "|");
-        buffer_strcat(md, "|");
+        buffer_strcat(bt, ",");
     }
-    buffer_strcat(pl, col->plugin);
-    buffer_strcat(md, col->module);
+
+    buffer_strcat(bt, "{");
+    buffer_strcat(bt, " \"plugin\": \"");
+    buffer_strcat(bt, col->plugin);
+    buffer_strcat(bt, "\", \"module\":\"");
+    buffer_strcat(bt, col->module);
+    buffer_strcat(bt, "\" }");
 
     (ap->c)++;
 
@@ -196,8 +198,7 @@ void analytics_collectors(void) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     char name[500];
-    BUFFER *pl = buffer_create(1000);
-    BUFFER *md = buffer_create(1000);
+    BUFFER *bt = buffer_create(1000);
 
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
@@ -212,20 +213,19 @@ void analytics_collectors(void) {
 
     struct array_printer ap;
     ap.c = 0;
-    ap.plugin = pl;
-    ap.module = md;
+    ap.both = bt;
 
     dictionary_get_all(dict, collector_counter_callb, &ap);
     dictionary_destroy(dict);
 
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS, (char *)buffer_tostring(ap.plugin));
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES, (char *)buffer_tostring(ap.module));
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS, (char *)buffer_tostring(ap.both));
 
     {
         char b[7];
         snprintfz(b, 6, "%d", ap.c);
         analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT, b);
     }
+
 }
 
 void analytics_log_prometheus(void) {
@@ -469,6 +469,13 @@ void set_late_global_environment() {
     //get release channel //web/api/formatters/charts2json.c
     analytics_set_data(&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, (char *)get_release_channel());
 
+    {
+        BUFFER *bi = buffer_create(1000);
+        analytics_build_info(bi);
+        analytics_set_data (&analytics_data.NETDATA_BUILDINFO, (char *)buffer_tostring(bi));
+        buffer_free(bi);
+    }
+
     /* set what we have, to send the START event */
     analytics_setenv_data();
 
@@ -591,6 +598,7 @@ void set_global_environment() {
 #endif
 
     /* Initialize values we'll get from late global and the thread to N/A */
+    analytics_set_data (&analytics_data.NETDATA_BUILDINFO,                 "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,     "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT,          "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,        "N/A");
@@ -607,8 +615,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_PLUGINS,        "N/A");
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_MODULES,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS,                "\"N/A\""); //must, because this is an array
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");

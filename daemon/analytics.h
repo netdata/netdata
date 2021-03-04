@@ -25,6 +25,7 @@
     },
 
 struct analytics_data {
+    char *NETDATA_BUILDINFO;
     char *NETDATA_CONFIG_STREAM_ENABLED;
     char *NETDATA_CONFIG_IS_PARENT;
     char *NETDATA_CONFIG_MEMORY_MODE;
@@ -44,8 +45,7 @@ struct analytics_data {
     char *NETDATA_ALARMS_COUNT;
     char *NETDATA_CHARTS_COUNT;
     char *NETDATA_METRICS_COUNT;
-    char *NETDATA_COLLECTORS_PLUGINS;
-    char *NETDATA_COLLECTORS_MODULES;
+    char *NETDATA_COLLECTORS;
     char *NETDATA_COLLECTORS_COUNT;
     char *NETDATA_NOTIFICATIONS_METHODS;
     

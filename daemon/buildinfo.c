@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include "./config.h"
+#include "common.h"
 
 // Optional features
 
@@ -312,3 +313,47 @@ void print_build_info_json(void) {
     printf("  }\n");
     printf("}\n");
 };
+
+//return a list of enabled features for use in analytics
+void analytics_build_info(BUFFER *b) {
+    if(!strncmp(FEAT_DBENGINE,"YES",3))        buffer_strcat (b, "dbengine");
+    if(!strncmp(FEAT_NATIVE_HTTPS,"YES",3))    buffer_strcat (b, "|Native HTTPS");
+    if(!strncmp(FEAT_CLOUD,"YES",3))           buffer_strcat (b, "|Netdata Cloud");
+    if(!strncmp(FEAT_TLS_HOST_VERIFY,"YES",3)) buffer_strcat (b, "|TLS Host Verification");
+
+    if(!strncmp(FEAT_JEMALLOC,"YES",3))        buffer_strcat (b, "|jemalloc");
+    if(!strncmp(FEAT_JSONC,"YES",3))           buffer_strcat (b, "|JSON-C");
+    if(!strncmp(FEAT_LIBCAP,"YES",3))          buffer_strcat (b, "|libcap");
+    if(!strncmp(FEAT_CRYPTO,"YES",3))          buffer_strcat (b, "|libcrypto");
+    if(!strncmp(FEAT_LIBM,"YES",3))            buffer_strcat (b, "|libm");
+
+#if defined(ENABLE_ACLK)
+    {
+        char buf[20];
+        snprintfz(buf, 19, "|LWS v%d.%d.%d", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
+        if(!strncmp(FEAT_LWS, "YES",3))            buffer_strcat(b, buf);
+    }
+#else
+    if(!strncmp(FEAT_LWS, "YES",3))            buffer_strcat(b, "|LWS");
+#endif
+
+    if(!strncmp(FEAT_MOSQUITTO, "YES",3))      buffer_strcat(b, "|mosquitto");
+    if(!strncmp(FEAT_TCMALLOC, "YES",3))       buffer_strcat(b, "|tcalloc");
+    if(!strncmp(FEAT_ZLIB, "YES",3))           buffer_strcat(b, "|zlib");
+
+    if(!strncmp(FEAT_APPS_PLUGIN, "YES",3))    buffer_strcat(b, "|apps");
+    if(!strncmp(FEAT_CGROUP_NET, "YES",3))     buffer_strcat(b, "|cgroup Network Tracking");
+    if(!strncmp(FEAT_CUPS, "YES",3))           buffer_strcat(b, "|CUPS");
+    if(!strncmp(FEAT_EBPF, "YES",3))           buffer_strcat(b, "|EBPF");
+    if(!strncmp(FEAT_IPMI, "YES",3))           buffer_strcat(b, "|IPMI");
+    if(!strncmp(FEAT_NFACCT, "YES",3))         buffer_strcat(b, "|NFACCT");
+    if(!strncmp(FEAT_PERF, "YES",3))           buffer_strcat(b, "|perf");
+    if(!strncmp(FEAT_SLABINFO, "YES",3))       buffer_strcat(b, "|slabinfo");
+    if(!strncmp(FEAT_XEN, "YES",3))            buffer_strcat(b, "|Xen");
+    if(!strncmp(FEAT_XEN_VBD_ERROR, "YES",3))  buffer_strcat(b, "|Xen VBD Error Tracking");
+
+    if(!strncmp(FEAT_KINESIS, "YES",3))        buffer_strcat(b, "|AWS Kinesis");
+    if(!strncmp(FEAT_PUBSUB, "YES",3))         buffer_strcat(b, "|GCP PubSub");
+    if(!strncmp(FEAT_MONGO, "YES",3))          buffer_strcat(b, "|MongoDB");
+    if(!strncmp(FEAT_REMOTE_WRITE, "YES",3))   buffer_strcat(b, "|Prometheus Remote Write");
+}
