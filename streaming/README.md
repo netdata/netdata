@@ -6,80 +6,55 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README
 
 # Streaming and replication
 
-Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
-metrics, in real-time to it. This is quite different to [data archiving to third party time-series
-databases](/exporting/README.md).
+Welcome to the streaming and replication reference document.
 
-When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is
-capable of:
+For a quickstart guide for enabling a simple `parent-child` streaming relationship, see our [stream metrics between
+nodes](/docs/store/stream-metrics.md) doc. All other configuration options and scenarios are covered in the sections
+below.
 
--   Visualize metrics with a dashboard
--   Run health checks that trigger alarms and send alarm notifications
--   Export metrics to a external time-series database
+## What is streaming?
 
-The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
-There are also **proxies**, which collects metrics from a child and sends it to a parent.
+**TK**
 
-## Supported configurations
+## Supported streaming configurations
 
-### Netdata without a database or web API (headless collector)
+As we discuss various configurations, it's important to keep in mind some important terminology:
 
-Local Netdata (child), **without any database or alarms**, collects metrics and sends them to another Netdata
-(parent).
+- **Parent**: A node, running the Netdata Agent, that receives streamed metric data.
+- **Child**: A node, running the Netdata Agent, that sends metric data in real time.
+- **Proxy**: A node, running the Netdata Agent, that receives metric data from a child and "forwards" them on to a
+  separate parent node.
 
-The node menu shows a list of all "databases streamed to" the parent. Clicking one of those links allows the user to
-view the full dashboard of the child node. The URL has the form
-`http://parent-host:parent-port/host/child-host/`.
+Here are a few example streaming configurations:
 
-Alarms for the child are served by the parent.
+- **Headless collector**: 
+  - Child `A`, _without_ a database or web dashboard, streams metrics to parent `B`.
+  - `A` metrics are only available via the local Agent dashboard for `B`.
+  - `B` generates alarms for `A`.
+- **Replication**: 
+  - Child `A`, _with_ a database and web dashboard, streams metrics to parent `B`. 
+  - `A` metrics are available on both local Agent dashboards, and can be stored with the same or different metrics
+    retention policies.
+  - Both `A` and `B` generate alarms.
+- **Proxy**:
+  - Child `A`, _with or without_ a database, sends metrics to proxy `C`, also _with or without_ a database. `C` sends
+    metrics to parent `B`.
+  - Any node with a database can generate alarms.
 
-In this mode the child is just a plain data collector. It spawns all external plugins, but instead of maintaining a
-local database and accepting dashboard requests, it streams all metrics to the parent. The memory footprint is reduced
-significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as
-possible, refer to the [performance optimization guide](/docs/guides/configure/performance.md).
+Each configuration can be expanded for any number of child nodes, and proxy configurations can daisy-chain together any
+number of children, proxies, and parents.
 
-The same parent can collect data for any number of child nodes.
+## Viewing streamed metrics
 
-### Database Replication
+Parent nodes feature a **Replicated Nodes** section in the left-hand sidebar, which opens with the hamburger icon in the
+top navigation. The parent node, plus any child nodes, appear here. Click on any of the hostnames to switch between
+parent and child dashboards, all served by the parent's [web server](/web/server/README.md).
 
-Local Netdata (child), **with a local database (and possibly alarms)**, collects metrics and
-sends them to another Netdata (parent).
+![Switching between
+](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif))
 
-The user can use all the functions **at both** `http://child-ip:child-port/` and
-`http://parent-host:parent-port/host/child-host/`.
-
-The child and the parent may have different data retention policies for the same metrics.
-
-Alarms for the child are triggered by **both** the child and the parent (and actually
-each can have different alarms configurations or have alarms disabled).
-
-Take a note, that custom chart names, configured on the child, should be in the form `type.name` to work correctly. The parent will truncate the `type` part and substitute the original chart `type` to store the name in the database.
-
-### Netdata proxies
-
-Local Netdata (child), with or without a database, collects metrics and sends them to another
-Netdata (**proxy**), which may or may not maintain a database, which forwards them to another
-Netdata (parent).
-
-Alarms for the child can be triggered by any of the involved hosts that maintains a database.
-
-Any number of daisy chaining Netdata servers are supported, each with or without a database and
-with or without alarms for the child metrics.
-
-### mix and match with backends
-
-All nodes that maintain a database can also send their data to a backend database.
-This allows quite complex setups.
-
-Example:
-
-1.  Netdata `A`, `B` do not maintain a database and stream metrics to Netdata `C`(live streaming functionality, i.e. this PR)
-2.  Netdata `C` maintains a database for `A`, `B`, `C` and archives all metrics to `graphite` with 10 second detail (backends functionality)
-3.  Netdata `C` also streams data for `A`, `B`, `C` to Netdata `D`, which also collects data from `E`, `F` and `G` from another DMZ (live streaming functionality, i.e. this PR)
-4.  Netdata `D` is just a proxy, without a database, that streams all data to a remote site at Netdata `H`
-5.  Netdata `H` maintains a database for `A`, `B`, `C`, `D`, `E`, `F`, `G`, `H` and sends all data to `opentsdb` with 5 seconds detail (backends functionality)
-6.  alarms are triggered by `H` for all hosts
-7.  users can use all the Netdata that maintain a database to view metrics (i.e. at `H` all hosts can be viewed).
+Each child dashboard is also available directly at the following URL pattern:
+`http://PARENT-NODE:19999/host/CHILD-HOSTNAME`.
 
 ## Configuration
 
@@ -106,17 +81,6 @@ This also disables the registry (there cannot be a registry without an API).
 requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
 entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
-```
-[backend]
-    enabled = yes | no
-    type = graphite | opentsdb
-    destination = IP:PORT ...
-    update every = 10
-```
-
-`[backend]` configures data archiving to a backend (it archives all databases maintained on
-this host).
-
 ### streaming configuration
 
 A new file is introduced: `stream.conf` (to edit it on your system run
@@ -130,13 +94,13 @@ You can generate an API key with the command `uuidgen`. API keys are just random
 You can use the same API key on all your Netdata, or use a different API key for any pair of
 sending-receiving Netdata.
 
-##### options for the sending node
+#### Options for the child node
 
 This is the section for the sending Netdata. On the receiving node, `[stream].enabled` can be `no`.
 If it is `yes`, the receiving node will also stream the metrics to another node (i.e. it will be
 a proxy).
 
-```
+```conf
 [stream]
     enabled = yes | no
     destination = IP:PORT[:SSL] ...
@@ -152,9 +116,10 @@ This is an overview of how these options can be combined:
 | proxy with db|not `none`|not `none`|`yes`|possible|possible|yes|
 | central netdata|not `none`|not `none`|`no`|possible|possible|yes|
 
-For the options to encrypt the data stream between the child and the parent, refer to [securing the communication](#securing-streaming-communications)
+For the options to encrypt the data stream between the child and the parent, refer to [securing the
+communication](#securing-streaming-communications).
 
-##### options for the receiving node
+#### Options for the parent node
 
 `stream.conf` looks like this:
 
@@ -188,9 +153,9 @@ the unique id the Netdata generating the metrics (i.e. the Netdata that original
 them `/var/lib/netdata/registry/netdata.unique.id`). So, metrics for Netdata `A` that pass through
 any number of other Netdata, will have the same `MACHINE_GUID`.
 
-You can also use `default memory mode = dbengine` for an API key or `memory mode = dbengine` for
- a single host. The additional `page cache size` and `dbengine multihost disk space` configuration options
- are inherited from the global Netdata configuration.
+You can also use `default memory mode = dbengine` for an API key or `memory mode = dbengine` for a single host. The
+additional `page cache size` and `dbengine multihost disk space` configuration options are inherited from the global
+Netdata configuration.
 
 ##### allow from
 
@@ -315,15 +280,6 @@ With the introduction of TLS/SSL, the parent-child communication behaves as show
 | Yes|-/optional|No|no|The parent-child stream is unencrypted (expected situation for legacy child nodes and newer parent nodes)|
 | Yes|-/force/optional|Yes|no|The parent-child stream is encrypted, provided that the parent has a valid TLS/SSL certificate. Otherwise, the child refuses to connect.|
 | Yes|-/force/optional|Yes|yes|The parent-child stream is encrypted.|
-
-## Viewing remote host dashboards, using mirrored databases
-
-On any receiving Netdata, that maintains remote databases and has its web server enabled,
-The node menu will include a list of the mirrored databases.
-
-![image](https://cloud.githubusercontent.com/assets/2662304/24080824/24cd2d3c-0caf-11e7-909d-a8dd1dbb95d7.png)
-
-Selecting any of these, the server will offer a dashboard using the mirrored metrics.
 
 ## Monitoring ephemeral nodes
 
