@@ -8,6 +8,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
     int should_lock = (!context_param_list || (context_param_list && !context_param_list->archive_mode));
+    uint8_t context_mode = (!context_param_list || (context_param_list && !context_param_list->context_mode));
 
     if (should_lock)
         rrdset_check_rdlock(r->st);
@@ -98,7 +99,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     buffer_strcat(wb, "],\n");
 
     // Composite charts
-    if (temp_rd) {
+    if (temp_rd && context_mode) {
         buffer_sprintf(
             wb,
             "   %schart_ids%s: [",

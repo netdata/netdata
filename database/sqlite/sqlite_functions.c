@@ -1212,6 +1212,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         (*param_list)->last_entry_t = 0;
         (*param_list)->rd = NULL;
         (*param_list)->archive_mode = 1;
+        (*param_list)->context_mode = !context;
     }
 
     sqlite3_stmt *res = NULL;
@@ -1284,7 +1285,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         rd->id = strdupz((char *)sqlite3_column_text(res, 1));
         rd->name = strdupz((char *)sqlite3_column_text(res, 2));
         rd->state = mallocz(sizeof(*rd->state));
-
+        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
         rd->state->query_ops.init = rrdeng_load_metric_init;
         rd->state->query_ops.next_metric = rrdeng_load_metric_next;
         rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
