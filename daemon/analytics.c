@@ -163,19 +163,28 @@ static const char *verify_required_directory(const char *dir) {
 }
 
 void analytics_alarms (void) {
-    int alarms = 0;
-    char b[7];
+    int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
+    char b[20];
     RRDCALC *rc;
 
     for(rc = localhost->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
-        alarms++;
+        switch(rc->status) {
+        case RRDCALC_STATUS_WARNING:
+            alarm_warn++;
+            break;
+        case RRDCALC_STATUS_CRITICAL:
+            alarm_crit++;
+            break;
+        default:
+            alarm_normal++;
         }
 
+    }
 
-    snprintfz(b, 6, "%d", alarms);
+    snprintfz(b, 19, "%d|%d|%d", alarm_normal,alarm_warn,alarm_crit);
     analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT, b);
 }
 
