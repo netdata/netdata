@@ -1267,59 +1267,35 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
 
-            st->last_accessed_time = LONG_MAX;  // First entry
-            st->upstream_resync_time = 0;       // last entry
+            st->last_accessed_time = 0;       // This will hold the last_entry_t
             st->rrdhost = host;
         }
         st->counter++;
 
-        //find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t)
         find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
                                     (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
 
+        st->last_accessed_time = MAX(st->last_accessed_time, (*param_list)->last_entry_t);
 
-        st->last_accessed_time = MIN(st->last_accessed_time, (*param_list)->first_entry_t);
-        st->upstream_resync_time = MAX(st->upstream_resync_time, (*param_list)->last_entry_t);
+        RRDDIM *rd = callocz(1, sizeof(*rd));
+        rd->rrdset = st;
+        rd->last_stored_value = NAN;
+        rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
+        rd->id = strdupz((char *)sqlite3_column_text(res, 1));
+        rd->name = strdupz((char *)sqlite3_column_text(res, 2));
+        rd->state = mallocz(sizeof(*rd->state));
 
-        // d.id, d.name, c.id, c.type, c.name
-        char uuid_str[GUID_LEN + 1];
-        uuid_unparse_lower(rrdeng_uuid, uuid_str);
-        info("Dimension [%s / %s] Chart [%s %s %s] --> %s",
-             sqlite3_column_text(res, 1),   // dim id
-             sqlite3_column_text(res, 2),    // dim
-             sqlite3_column_text(res, 3),
-             sqlite3_column_text(res, 4),
-             sqlite3_column_text(res, 5), uuid_str);
-
-            RRDDIM *rd = callocz(1, sizeof(*rd));
-            rd->rrdset = st;
-            rd->last_stored_value = NAN;
-            rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-            rd->id = strdupz((char *) sqlite3_column_text(res, 1));
-            rd->name = strdupz((char *) sqlite3_column_text(res, 2));
-            rd->state = mallocz(sizeof(*rd->state));
-
-            //rd->state->collect_ops.init = rrdeng_store_metric_init;
-            //rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-            //rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
-            rd->state->query_ops.init = rrdeng_load_metric_init;
-            rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-            rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-            rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-            rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-            rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-    #ifdef ENABLE_DBENGINE
-            //if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                //rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-                //rd->state->metric_uuid = NULL;
-                rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
-                uuid_copy(*rd->state->rrdeng_uuid, rrdeng_uuid);
-                rd->state->metric_uuid = rd->state->rrdeng_uuid;
-                //uuid_copy(*rd->state->metric_uuid, *(uuid_t *) sqlite3_column_blob(res, 0));
-            //}
-    #endif
-            rd->next = (*param_list)->rd;
-            (*param_list)->rd = rd;
+        rd->state->query_ops.init = rrdeng_load_metric_init;
+        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
+        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
+        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
+        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
+        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+        rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
+        uuid_copy(*rd->state->rrdeng_uuid, rrdeng_uuid);
+        rd->state->metric_uuid = rd->state->rrdeng_uuid;
+        rd->next = (*param_list)->rd;
+        (*param_list)->rd = rd;
     }
     if (likely(st && context && !st->context))
             st->context = strdupz(context);
