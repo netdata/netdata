@@ -38,6 +38,7 @@ struct array_printer {
 
 extern int aclk_connected;
 extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
+//extern const char* get_release_channel();
 
 void analytics_log_data (void) {
 
@@ -50,6 +51,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_ACLK_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED        : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
@@ -76,6 +78,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_ACLK_ENABLED",       analytics_data.NETDATA_CONFIG_ACLK_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
+    setenv ( "NETDATA_CONFIG_RELEASE_CHANNEL",    analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, 1);
     setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
     setenv ( "NETDATA_ALLMETRICS_PROMETHEUS_USED",analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
     setenv ( "NETDATA_ALLMETRICS_SHELL_USED",     analytics_data.NETDATA_ALLMETRICS_SHELL_USED, 1);
@@ -101,6 +104,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
     freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
     freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
@@ -464,6 +468,9 @@ void set_late_global_environment() {
     else
         analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED, "true");
 
+    //get release channel //web/api/formatters/charts2json.c
+    analytics_set_data(&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, (char *)get_release_channel());
+
     /* set what we have, to send the START event */
     analytics_setenv_data();
 
@@ -595,6 +602,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
