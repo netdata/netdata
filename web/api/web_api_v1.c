@@ -527,16 +527,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
-        else if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        else
             sql_build_context_param_list(&context_param_list, host, context, NULL);
-//            if (likely(context_param_list && context_param_list->rd))
-//                st = context_param_list->rd->rrdset;
-//            else {
-//                st = NULL;
-//                free_context_param_list(&context_param_list);
-//                context_param_list = NULL;
-//            }
-        }
     }
     else {
         st = rrdset_find(host, chart);
@@ -544,16 +536,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             st = rrdset_find_byname(host, chart);
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
-        else if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        else
             sql_build_context_param_list(&context_param_list, host, NULL, chart);
-//            if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
-//                st = context_param_list->rd->rrdset;
-//            else {
-//                st = NULL;
-//                free_context_param_list(&context_param_list);
-//                context_param_list = NULL;
-//            }
-         }
     }
 
     if (!st) {

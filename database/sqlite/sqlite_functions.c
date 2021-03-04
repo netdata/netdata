@@ -1203,7 +1203,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
 #ifdef ENABLE_DBENGINE
     int rc;
 
-    if (unlikely(!param_list))
+    if (unlikely(!param_list) || host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
         return;
 
     if (unlikely(!(*param_list))) {
