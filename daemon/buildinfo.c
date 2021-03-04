@@ -262,9 +262,9 @@ void print_build_info_json(void) {
     printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
     printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
 #if defined(ENABLE_ACLK)
-    printf("    \"lws\": \"%s\",\n", FEAT_JSON_BOOL(FEAT_LWS));
+    printf("    \"lws\": %s,\n", FEAT_JSON_BOOL(FEAT_LWS));
     printf("    \"lws-version\": \"%d.%d.%d\",\n", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-    printf("    \"lws-type\": %s,\n", FEAT_LWS_MSG);
+    printf("    \"lws-type\": \"%s\",\n", FEAT_LWS_MSG);
 #else
     printf("    \"lws\": %s,\n",              FEAT_JSON_BOOL(FEAT_LWS));
 #endif
