@@ -995,8 +995,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED, wb);
     buffer_strcat(wb, "\",\n");
 
-    buffer_strcat(wb, "\t\"notifications-methods\":\"");
-    analytics_get_data(analytics_data.NETDATA_NOTIFICATIONS_METHODS, wb);
+    buffer_strcat(wb, "\t\"notification-methods\":\"");
+    analytics_get_data(analytics_data.NETDATA_NOTIFICATION_METHODS, wb);
     buffer_strcat(wb, "\"\n");
 
     buffer_strcat(wb, "}");
