@@ -55,7 +55,7 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
-static inline char *strip_control_characters(char *url) {
+char *strip_control_characters(char *url) {
     char *s = url;
     if(!s) return "";
 
