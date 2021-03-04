@@ -47,7 +47,7 @@ struct analytics_data {
     char *NETDATA_METRICS_COUNT;
     char *NETDATA_COLLECTORS;
     char *NETDATA_COLLECTORS_COUNT;
-    char *NETDATA_NOTIFICATIONS_METHODS;
+    char *NETDATA_NOTIFICATION_METHODS;
     
     uint8_t prometheus_hits;
     uint8_t shell_hits;

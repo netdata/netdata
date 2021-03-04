@@ -63,7 +63,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT               : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
     debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
     debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.NETDATA_METRICS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_NOTIFICATIONS_METHODS      : [%s]", analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+    debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.NETDATA_NOTIFICATION_METHODS);
 }
 
 void analytics_setenv_data (void) {
@@ -90,7 +90,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_ALARMS_COUNT",              analytics_data.NETDATA_ALARMS_COUNT, 1);
     setenv ( "NETDATA_CHARTS_COUNT",              analytics_data.NETDATA_CHARTS_COUNT, 1);
     setenv ( "NETDATA_METRICS_COUNT",             analytics_data.NETDATA_METRICS_COUNT, 1);
-    setenv ( "NETDATA_NOTIFICATIONS_METHODS",     analytics_data.NETDATA_NOTIFICATIONS_METHODS, 1);
+    setenv ( "NETDATA_NOTIFICATION_METHODS",      analytics_data.NETDATA_NOTIFICATION_METHODS, 1);
 }
 
 void analytics_free_data (void) {
@@ -116,7 +116,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_ALARMS_COUNT);
     freez(analytics_data.NETDATA_CHARTS_COUNT);
     freez(analytics_data.NETDATA_METRICS_COUNT);
-    freez(analytics_data.NETDATA_NOTIFICATIONS_METHODS);
+    freez(analytics_data.NETDATA_NOTIFICATION_METHODS);
 }
 
 
@@ -357,7 +357,7 @@ void analytics_alarms_notifications (void) {
     freez(script);
 
     //check there is something to set
-    analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS, (char *)buffer_tostring(b));
+    analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS, (char *)buffer_tostring(b));
 
     //TODO Destroy buffer
 
@@ -620,7 +620,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
-    analytics_set_data (&analytics_data.NETDATA_NOTIFICATIONS_METHODS,     "N/A");
+    analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS,      "N/A");
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
     analytics_data.json_hits = 0;
