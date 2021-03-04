@@ -12,13 +12,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 
 We love IoT and Edge at Netdata, we also love machine learning and using technology like this to ease the pain of
 monitoring increasingly complex systems. So we were quite excited recently when we began to explore what might be
-involved in enabling our Python based Anomalies collector on a Raspberry Pi. To our surprise and delight, it's actually
-quite straightforward, read on to learn what’s involved (spoiler - it’s just a couple of extra commands that will make
-you feel like a pro).
+involved in enabling our Python-based [anomalies collector](/collectors/python.d.plugin/anomalies/README.md) on a
+Raspberry Pi. To our surprise and delight, it's actually quite straightforward, read on to learn what’s involved
+(spoiler - it’s just a couple of extra commands that will make you feel like a pro).
+
+## What you need to get started
+
+- A Raspberry Pi running Raspbian, which we'll call a _node_.
+- The [open-source Netdata Agent](https://github.com/netdata/netdata). If you don't have it installed on your node yet,
+  [get it now](/docs/get/README.md).
 
 ## Install dependencies
 
-First make sure Netdata is using python 3 when it runs the python collectors. Edit the `[plugin:python.d]` section in
+First make sure Netdata is using Python 3 when it runs the python collectors. Edit the `[plugin:python.d]` section in
 your `netdata.conf` file to pass in the `-ppython3` command option. 
 
 ```conf
@@ -47,7 +53,7 @@ sudo su -s /bin/bash netdata
 LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
-## Enable collector
+## Enable the anomalies collector
 
 Now we are ready to just enable the collector and restart netdata as normal.
 
@@ -92,5 +98,6 @@ forum](https://community.netdata.cloud/t/anomalies-collector-feedback-megathread
 ### Related reference documentation
 
 - [Netdata Agent · Get Netdata](/docs/get/README.md)
+- [Netdata Agent · Anomalies collector](/collectors/python.d.plugin/anomalies/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fmonitor%2Fraspberry-pi-anomaly-detection&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
