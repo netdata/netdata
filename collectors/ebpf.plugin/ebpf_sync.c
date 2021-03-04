@@ -78,6 +78,15 @@ void *ebpf_sync_read_hash(void *ptr)
 }
 
 /**
+ * Send global
+ *
+ * Send global charts to Netdata
+ */
+static void sync_send_global()
+{
+}
+
+/**
 * Main loop for this collector.
 */
 static void sync_collector(ebpf_module_t *em)
@@ -95,6 +104,8 @@ static void sync_collector(ebpf_module_t *em)
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
+
+        sync_send_global();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);

@@ -325,6 +325,25 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 }
 
 /**
+ * Write charts
+ *
+ * Write the current information to publish the charts.
+ *
+ * @param family chart family
+ * @param chart  chart id
+ * @param dim    dimension name
+ * @param v1     value.
+ */
+void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1)
+{
+    write_begin_chart(family, chart);
+
+    write_chart_dimension(dim, v1);
+
+    write_end_chart();
+}
+
+/**
  * Call the necessary functions to create a chart.
  *
  * @param chart  the chart name

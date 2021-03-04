@@ -91,25 +91,6 @@ static void ebpf_cachestat_cleanup(void *ptr)
  *****************************************************************/
 
 /**
- * Write charts
- *
- * Write the current information to publish the charts.
- *
- * @param family chart family
- * @param chart  chart id
- * @param dim    dimension name
- * @param v1     value.
- */
-static inline void cachestat_write_charts(char *family, char *chart, char *dim, long long v1)
-{
-    write_begin_chart(family, chart);
-
-    write_chart_dimension(dim, v1);
-
-    write_end_chart();
-}
-
-/**
  * Update publish
  *
  * Update publish values before to write dimension.
@@ -398,19 +379,21 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
     netdata_publish_syscall_t *ptr = cachestat_counter_publish_aggregated;
     // The algorithm sets this value to zero sometimes, we are not written them to have a smooth chart
     if (publish->ratio) {
-        cachestat_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                               ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension, publish->ratio);
+        ebpf_one_dimension_write_charts(
+            NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART, ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension,
+            publish->ratio);
     }
 
-    cachestat_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
-                           ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
-                           cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY]);
+    ebpf_one_dimension_write_charts(
+        NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART, ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
+        cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY]);
 
-    cachestat_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
-                           ptr[NETDATA_CACHESTAT_IDX_HIT].dimension, publish->hit);
+    ebpf_one_dimension_write_charts(
+        NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART, ptr[NETDATA_CACHESTAT_IDX_HIT].dimension, publish->hit);
 
-    cachestat_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
-                           ptr[NETDATA_CACHESTAT_IDX_MISS].dimension, publish->miss);
+    ebpf_one_dimension_write_charts(
+        NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART, ptr[NETDATA_CACHESTAT_IDX_MISS].dimension,
+        publish->miss);
 }
 
 /**

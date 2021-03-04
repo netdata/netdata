@@ -205,6 +205,7 @@ extern char *ebpf_algorithms[];
 extern void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
+extern void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;
