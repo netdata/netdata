@@ -5,12 +5,10 @@
 
 #include "../daemon/common.h"
 
-/* A maximum number of hits from prometheus_prepare that we consider that prometheus is indeed being used */
-/* These hits must come before the META analytics is sent (ANALYTICS_MAX_SLEEP_SEC) */
-/* Or they will be reported on the EXIT event */
-#define ANALYTICS_MAX_PROMETHEUS_HITS 5
-#define ANALYTICS_MAX_SHELL_HITS 5
-#define ANALYTICS_MAX_JSON_HITS 5
+/* Maximum number of hits to log */
+#define ANALYTICS_MAX_PROMETHEUS_HITS 255
+#define ANALYTICS_MAX_SHELL_HITS 255
+#define ANALYTICS_MAX_JSON_HITS 255
 
 /* Max number of seconds before the META analytics is sent */
 #define ANALYTICS_MAX_SLEEP_SEC 20

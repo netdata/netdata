@@ -378,20 +378,18 @@ void analytics_gather_meta_data (void) {
     analytics_misc();
     analytics_alarms_notifications();
 
-    if (analytics_data.prometheus_hits == ANALYTICS_MAX_PROMETHEUS_HITS)
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "true");
-    else
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "false");
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, b);
 
-    if (analytics_data.shell_hits == ANALYTICS_MAX_SHELL_HITS)
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "true");
-    else
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, "false");
+        snprintfz(b, 6, "%d", analytics_data.shell_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, b);
 
-    if (analytics_data.json_hits == ANALYTICS_MAX_JSON_HITS)
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, "true");
-    else
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, "false");
+        snprintfz(b, 6, "%d", analytics_data.json_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, b);
+
+    }
 
     analytics_setenv_data();
 }

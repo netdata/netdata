@@ -794,6 +794,7 @@ static inline time_t prometheus_preparation(
     time_t now,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
+    analytics_log_prometheus(); //if analytics is not running ?
     if (!server || !*server)
         server = "default";
 
@@ -833,8 +834,6 @@ static inline time_t prometheus_preparation(
             (unsigned long)after,
             (unsigned long)now);
     }
-
-    analytics_log_prometheus(); //if analytics is not running ?
 
     return after;
 }
