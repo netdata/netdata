@@ -385,6 +385,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_context);
     free_label_list(st->state->labels.head);
     freez(st->state);
+    freez(st->chart_uuid);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -397,10 +398,6 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_DBENGINE:
-#ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-                freez(st->chart_uuid);
-#endif
             freez(st);
             break;
     }

@@ -2,7 +2,28 @@
 
 #include "web/api/web_api_v1.h"
 
-static inline void free_temp_rrddim(RRDDIM *temp_rd, int archive_mode)
+static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
+{
+    if (unlikely(!temp_rd))
+        return;
+
+    freez((char *)temp_rd->id);
+    freez((char *)temp_rd->name);
+
+    if (unlikely(archive_mode)) {
+        temp_rd->rrdset->counter--;
+        if (!temp_rd->rrdset->counter) {
+            freez((char *)temp_rd->rrdset->name);
+            freez(temp_rd->rrdset->context);
+            freez(temp_rd->rrdset);
+        }
+    }
+    freez(temp_rd->state->metric_uuid);
+    freez(temp_rd->state);
+    freez(temp_rd);
+}
+
+static inline void free_rrddim_list(RRDDIM *temp_rd, int archive_mode)
 {
     if (unlikely(!temp_rd))
         return;
@@ -10,22 +31,23 @@ static inline void free_temp_rrddim(RRDDIM *temp_rd, int archive_mode)
     RRDDIM *t;
     while (temp_rd) {
         t = temp_rd->next;
-        freez((char *)temp_rd->id);
-        freez((char *)temp_rd->name);
-        if (unlikely(archive_mode)) {
-            temp_rd->rrdset->counter--;
-            if (!temp_rd->rrdset->counter) {
-                freez((char *)temp_rd->rrdset->name);
-                freez(temp_rd->rrdset->context);
-                freez(temp_rd->rrdset);
-            }
-        }
-#ifdef ENABLE_DBENGINE
-        if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            freez(temp_rd->state->metric_uuid);
-#endif
-        freez(temp_rd->state);
-        freez(temp_rd);
+        free_single_rrdrim(temp_rd, archive_mode);
+//        freez((char *)temp_rd->id);
+//        freez((char *)temp_rd->name);
+//        if (unlikely(archive_mode)) {
+//            temp_rd->rrdset->counter--;
+//            if (!temp_rd->rrdset->counter) {
+//                freez((char *)temp_rd->rrdset->name);
+//                freez(temp_rd->rrdset->context);
+//                freez(temp_rd->rrdset);
+//            }
+//        }
+//#ifdef ENABLE_DBENGINE
+//        if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+//            freez(temp_rd->state->metric_uuid);
+//#endif
+//        freez(temp_rd->state);
+//        freez(temp_rd);
         temp_rd = t;
     }
 }
@@ -35,7 +57,7 @@ void free_context_param_list(struct context_param **param_list)
     if (unlikely(!param_list || !*param_list))
         return;
 
-    free_temp_rrddim(((*param_list)->rd), (*param_list)->archive_mode);
+    free_rrddim_list(((*param_list)->rd), (*param_list)->archive_mode);
     freez((*param_list));
     *param_list = NULL;
 }
@@ -54,14 +76,15 @@ void rebuild_context_param_list(struct context_param *context_param_list, time_t
             temp_rd->next = new_rd_list;
             new_rd_list = temp_rd;
         } else {
-            freez((char *)temp_rd->id);
-            freez((char *)temp_rd->name);
-#ifdef ENABLE_DBENGINE
-            if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-                freez(temp_rd->state->metric_uuid);
-#endif
-            freez(temp_rd->state);
-            freez(temp_rd);
+            free_single_rrdrim(temp_rd, context_param_list->archive_mode);
+//            freez((char *)temp_rd->id);
+//            freez((char *)temp_rd->name);
+//#ifdef ENABLE_DBENGINE
+//            if (temp_rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+//                freez(temp_rd->state->metric_uuid);
+//#endif
+//            freez(temp_rd->state);
+//            freez(temp_rd);
         }
         temp_rd = t;
     }
@@ -79,6 +102,7 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         (*param_list)->last_entry_t = 0;
         (*param_list)->rd = NULL;
         (*param_list)->archive_mode = 0;
+        (*param_list)->context_mode = 1;
     }
 
     RRDDIM *rd1;
@@ -97,12 +121,8 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         memcpy(rd->state, rd1->state, sizeof(*rd->state));
         memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
         memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
-#ifdef ENABLE_DBENGINE
-        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-            uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
-        }
-#endif
+        rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+        uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
