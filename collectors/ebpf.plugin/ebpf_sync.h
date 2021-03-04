@@ -3,10 +3,19 @@
 #ifndef NETDATA_EBPF_SYNC_H
 #define NETDATA_EBPF_SYNC_H 1
 
-enum netdata_sync {
-    NETDATA_SYNC_GLOBLAL_TABLE,
+// charts
+#define NETDATA_EBPF_SYNC_CHART "sync"
+#define NETDATA_EBPF_SYNC_SUBMENU "synchronization"
+
+enum netdata_sync_charts {
+    NETDATA_SYNC_CALL,
+    NETDATA_SYNC_ERROR,
 
     NETDATA_SYNC_END
+};
+
+enum netdata_sync_table {
+    NETDATA_SYNC_GLOBLAL_TABLE
 };
 
 extern void *ebpf_sync_thread(void *ptr);
