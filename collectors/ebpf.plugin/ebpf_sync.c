@@ -82,8 +82,15 @@ void *ebpf_sync_read_hash(void *ptr)
  *
  * Send global charts to Netdata
  */
-static void sync_send_global()
+static void sync_send_global(int mode)
 {
+    netdata_publish_syscall_t *ptr = sync_counter_publish_aggregated;
+    ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
+                                    ptr[NETDATA_SYNC_CALL].dimension, sync_hash_values[NETDATA_SYNC_CALL]);
+
+    if (mode == MODE_RETURN)
+        ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_ERROR_CHART,
+                                    ptr[NETDATA_SYNC_ERROR].dimension, sync_hash_values[NETDATA_SYNC_ERROR]);
 }
 
 /**
@@ -99,13 +106,14 @@ static void sync_collector(ebpf_module_t *em)
     netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_sync_read_hash, em);
 
+    int mode = em->mode;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
-        sync_send_global();
+        sync_send_global(mode);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -168,7 +176,7 @@ static void ebpf_create_sync_charts(ebpf_module_t *em)
                       ebpf_create_global_dimension, &sync_counter_publish_aggregated, 1);
 
     if (em->mode == MODE_RETURN)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
+        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_ERROR_CHART,
                           "Monitor return valor for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
                           EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL, 21301,
                           ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_ERROR], 1);
