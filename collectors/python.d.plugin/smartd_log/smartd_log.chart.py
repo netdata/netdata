@@ -49,6 +49,7 @@ ATTR198 = '198'
 ATTR199 = '199'
 ATTR202 = '202'
 ATTR206 = '206'
+ATTR233 = '233'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
 ATTR_WRITE_ERR_COR = 'write-total-err-corrected'
@@ -111,6 +112,7 @@ ORDER = [
     'current_pending_sector_count',
     'offline_uncorrectable_sector_count',
     'percent_lifetime_used',
+    'media_wearout_indicator',
 ]
 
 CHARTS = {
@@ -322,6 +324,12 @@ CHARTS = {
         'lines': [],
         'attrs': [ATTR202],
         'algo': ABSOLUTE,
+    },
+    'media_wearout_indicator': {
+        'options': [None, 'Media Wearout Indicator', 'percentage', 'wear', 'smartd_log.media_wearout_indicator', 'line'],
+        'lines': [],
+        'attrs': [ATTR233],
+        'algo': ABSOLUTE,
     }
 }
 
@@ -506,6 +514,7 @@ def ata_attribute_factory(value):
         ATTR7,
         ATTR202,
         ATTR206,
+        ATTR233,
     ]:
         return AtaNormalized(*value)
 
