@@ -541,7 +541,11 @@ struct memory {
 /*
     unsigned long long total_inactive_anon;
     unsigned long long total_active_anon;
+*/
+
     unsigned long long total_inactive_file;
+
+/*
     unsigned long long total_active_file;
     unsigned long long total_unevictable;
 */
@@ -670,6 +674,7 @@ struct cgroup {
 
     RRDDIM *rd_mem_detailed_cache;
     RRDDIM *rd_mem_detailed_rss;
+    RRDDIM *rd_mem_detailed_working_set;
     RRDDIM *rd_mem_detailed_mapped;
     RRDDIM *rd_mem_detailed_writeback;
     RRDDIM *rd_mem_detailed_pgpgin;
@@ -1069,6 +1074,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                 arl_expect(mem->arl_base, "total_pgpgout", &mem->total_pgpgout);
                 arl_expect(mem->arl_base, "total_pgfault", &mem->total_pgfault);
                 arl_expect(mem->arl_base, "total_pgmajfault", &mem->total_pgmajfault);
+                arl_expect(mem->arl_base, "total_inactive_files", &mem->total_inactive_file);
             } else {
                 mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
@@ -1082,6 +1088,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                 mem->arl_dirty = arl_expect(mem->arl_base, "file_dirty", &mem->total_dirty);
                 arl_expect(mem->arl_base, "pgfault", &mem->total_pgfault);
                 arl_expect(mem->arl_base, "pgmajfault", &mem->total_pgmajfault);
+                arl_expect(mem->arl_base, "inactive_file", &mem->total_inactive_file);
             }
         }
 
@@ -1105,9 +1112,9 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
 
         if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
             if(( (!parent_cg_is_unified) && ( mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
-                    || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault))
+                    || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
                || (parent_cg_is_unified && ( mem->anon || mem->total_dirty || mem->kernel_stack || mem->slab || mem->sock || mem->total_writeback
-                    || mem->anon_thp || mem->total_pgfault || mem->total_pgmajfault))
+                    || mem->anon_thp || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
                || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
                 mem->enabled_detailed = CONFIG_BOOLEAN_YES;
             else
@@ -2130,6 +2137,7 @@ void update_systemd_services_charts(
 
         *st_mem_detailed_cache = NULL,
         *st_mem_detailed_rss = NULL,
+        *st_mem_detailed_working_set = NULL,
         *st_mem_detailed_mapped = NULL,
         *st_mem_detailed_writeback = NULL,
         *st_mem_detailed_pgfault = NULL,
@@ -2223,6 +2231,27 @@ void update_systemd_services_charts(
         }
         else
             rrdset_next(st_mem_detailed_rss);
+
+        if(unlikely(!st_mem_detailed_working_set)) {
+
+            st_mem_detailed_working_set = rrdset_create_localhost(
+                    "services"
+                    , "mem_working_set"
+                    , NULL
+                    , "mem"
+                    , "services.mem_working_set"
+                    , "Systemd Services Working Set Memory"
+                    , "MiB"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
+                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 25
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+        }
+        else
+            rrdset_next(st_mem_detailed_working_set);
 
         if(unlikely(!st_mem_detailed_mapped)) {
 
@@ -2714,6 +2743,11 @@ void update_systemd_services_charts(
 
             rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.total_rss + cg->memory.total_rss_huge);
 
+            if(unlikely(!cg->rd_mem_detailed_working_set))
+                cg->rd_mem_detailed_working_set = rrddim_add(st_mem_detailed_working_set, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(st_mem_detailed_working_set, cg->rd_mem_detailed_working_set, cg->memory.usage_in_bytes - cg->memory.total_inactive_file);
+
             if(unlikely(!cg->rd_mem_detailed_mapped))
                 cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
@@ -2847,6 +2881,7 @@ void update_systemd_services_charts(
     if(unlikely(do_mem_detailed)) {
         rrdset_done(st_mem_detailed_cache);
         rrdset_done(st_mem_detailed_rss);
+        rrdset_done(st_mem_detailed_working_set);
         rrdset_done(st_mem_detailed_mapped);
         rrdset_done(st_mem_detailed_writeback);
         rrdset_done(st_mem_detailed_pgfault);
