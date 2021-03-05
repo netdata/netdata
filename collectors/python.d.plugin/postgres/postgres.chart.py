@@ -1108,6 +1108,9 @@ class Service(SimpleService):
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
 
+        QUERY_STAT_REPLICATION[DEFAULT] = CREATE_STAT_QUERY(self.secondaries)
+        self.queries[query_factory(QUERY_NAME_STAT_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_STAT_REPLICATION]
+
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:
             dim = [
@@ -1270,8 +1273,6 @@ def add_stat_replications_chart(s,order, definitions, name, secondaries):
                 result.append(new_line)
             return result
 
-    QUERY_STAT_REPLICATION[DEFAULT] = CREATE_STAT_QUERY(secondaries)
-    s.queries[query_factory(QUERY_NAME_STAT_REPLICATION, s.server_version)] = METRICS[QUERY_NAME_STAT_REPLICATION]
     chart_template = CHARTS[name]
     position = order.index('database_size')
     order.insert(position, name)
