@@ -226,9 +226,13 @@ any LAMP-related issues.
 
 Another powerful way to monitor the availability of a LAMP stack is the [`httpcheck`
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck), which pings a web server at
-a regular interval and tells you whether if and how quickly it's responding. The best way to use this collector is from
-a separate node from the one running your LAMP stack, which is why we're not covering it here, but it _does_ work in a
-single-node setup. Just don't expect it to tell you if your whole node crashed.
+a regular interval and tells you whether if and how quickly it's responding. The `response_match` option also lets you
+monitor when the web server's response isn't what you expect it to be, which might happen if PHP-FPM crashes, for
+example.
+
+The best way to use the `httpcheck` collector is from a separate node from the one running your LAMP stack, which is why
+we're not covering it here, but it _does_ work in a single-node setup. Just don't expect it to tell you if your whole
+node crashed.
 
 If you're planning on managing more than one node, or want to take advantage of advanced features, like finding the
 source of issues faster with [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations),
