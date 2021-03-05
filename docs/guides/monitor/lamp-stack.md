@@ -83,8 +83,19 @@ Actually, there's nothing for you to do to enable Apache monitoring with Netdata
 
 Apache comes with `mod_status` enabled by default these days, and Netdata is smart enough to look for metrics at that
 endpoint without you configuring it. Netdata is already collecting [`mod_status`
-metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html) _and_ additional metrics from parsing Apache's
-`access.log` file, which is everything you need for Apache monitoring.
+metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html), which is just _part_ of your web server monitoring.
+
+## Enable web log monitoring
+
+The Netdata Agent also comes with a [web log
+collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog), which reads Apache's access
+log file, procesess each line, and converts them into per-second metrics. On Debian systems, it reads the file at
+`/var/log/apache2/access.log`.
+
+At installation, the Netdata Agent adds itself to the [`adm`
+group](https://wiki.debian.org/SystemGroups#Groups_without_an_associated_user), which gives the `netdata` process the
+right privileges to read Apache's log files. In other words, you don't need to do anything to enable Apache web log
+monitoring.
 
 ## Enable MySQL monitoring
 
@@ -213,6 +224,12 @@ metrics will help you keep tabs on the performance and availability of your web 
 services. The per-second metrics granularity means you have the most accurate information possible for troubleshooting
 any LAMP-related issues.
 
+Another powerful way to monitor the availability of a LAMP stack is the [`httpcheck`
+collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck), which pings a web server at
+a regular interval and tells you whether if and how quickly it's responding. The best way to use this collector is from
+a separate node from the one running your LAMP stack, which is why we're not covering it here, but it _does_ work in a
+single-node setup. Just don't expect it to tell you if your whole node crashed.
+
 If you're planning on managing more than one node, or want to take advantage of advanced features, like finding the
 source of issues faster with [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations),
 [sign up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for a free Netdata Cloud account.
@@ -221,6 +238,7 @@ source of issues faster with [Metric Correlations](https://learn.netdata.cloud/d
 
 - [Netdata Agent · Get Netdata](/docs/get/README.md)
 - [Netdata Agent · Apache data collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache)
+- [Netdata Agent · Web log collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog)
 - [Netdata Agent · MySQL data collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql)
 - [Netdata Agent · PHP-FPM data collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm)
 
