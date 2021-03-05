@@ -632,6 +632,7 @@ struct cgroup {
     RRDSET *st_cpu_limit;
     RRDSET *st_cpu_per_core;
     RRDSET *st_mem;
+    RRDSET *st_mem_working_set;
     RRDSET *st_writeback;
     RRDSET *st_mem_activity;
     RRDSET *st_pgfaults;
@@ -1517,6 +1518,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
     if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
     if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
+    if(cg->st_mem_working_set)       rrdset_is_obsolete(cg->st_mem_working_set);
     if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
     if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
     if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
@@ -3356,6 +3358,33 @@ void update_cgroup_charts(int update_every) {
                 rrddim_set(cg->st_mem, "file", cg->memory.total_mapped_file);
             }
             rrdset_done(cg->st_mem);
+
+            if (unlikely(!cg->st_mem_working_set)) {
+                snprintfz(title, CHART_TITLE_MAX, "Memory Working Set");
+
+                cg->st_mem_working_set = rrdset_create_localhost(
+                        cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                        , "mem_working_set"
+                        , NULL
+                        , "mem"
+                        , "cgroup.mem_working_set"
+                        , title
+                        , "MiB"
+                        , PLUGIN_CGROUPS_NAME
+                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                        , cgroup_containers_chart_priority + 220
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
+
+                rrdset_update_labels(cg->st_mem_working_set, cg->chart_labels);
+
+                rrddim_add(cg->st_mem_working_set, "working_set", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            } else
+                rrdset_next(cg->st_mem_working_set);
+
+                rrddim_set(cg->st_mem_working_set, "working_set", cg->memory.usage_in_bytes - cg->memory.total_inactive_file);
+            rrdset_done(cg->st_mem_working_set);
 
             if(unlikely(!cg->st_writeback)) {
                 snprintfz(title, CHART_TITLE_MAX, "Writeback Memory");
