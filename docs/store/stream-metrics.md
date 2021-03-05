@@ -49,12 +49,13 @@ that it looks like the following:
 [11111111-2222-3333-4444-555555555555]
 ```
 
-Set `enabled` to `yes`. Leave all the other settings as their defaults. A simplified version of the configuration, minus
-the commented lines, looks like the following:
+Set `enabled` to `yes`, and `default memory mode` to `dbengine`. Leave all the other settings as their defaults. A
+simplified version of the configuration, minus the commented lines, looks like the following:
 
 ```conf
 [11111111-2222-3333-4444-555555555555]
     enabled = yes
+    default memory mode = dbengine
 ```
 
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
@@ -103,6 +104,10 @@ Now that you have a basic streaming setup with replication, you may want to twea
 child database, disable the child dashboard, or enable SSL on the streaming connection between the parent and child.
 
 See the [streaming reference](/streaming/README.md) for details on all the possible configurations and options.
+
+When using Netdata's default TSDB (`dbengine`), the parent node maintains separate databases for itself and every child
+node streaming to it. Each instance is sized identically based on the `dbengine multihost disk space` setting in
+`netdata.conf`. See our doc on [changing metrics retention](/docs/store/change-metrics-strorage.md) for details.
 
 ### Related reference documentation
 
