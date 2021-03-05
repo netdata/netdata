@@ -48,10 +48,9 @@ static void read_global_table()
 }
 
 /**
- * Socket read hash
+ * Sync read hash
  *
  * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
  *
  * @param ptr It is a NULL value for this thread.
  *
