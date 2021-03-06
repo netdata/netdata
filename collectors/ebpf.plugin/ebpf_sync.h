@@ -5,7 +5,7 @@
 
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"
-#define NETDATA_EBPF_SYNC_ERROR_CHART "sync_error"
+#define NETDATA_EBPF_SYNC_ERROR_CHART "sync_return"
 #define NETDATA_EBPF_SYNC_SUBMENU "synchronization"
 
 #define NETDATA_EBPF_SYNC_SLEEP_MS 800000ULL

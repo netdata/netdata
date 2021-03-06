@@ -18,7 +18,7 @@ static int read_thread_closed = 1;
 static int *map_fd = NULL;
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_END] = {0, 0};
 
-struct netdata_static_thread sync_threads = {"CACHESTAT KERNEL",
+struct netdata_static_thread sync_threads = {"SYNC KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
