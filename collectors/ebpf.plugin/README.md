@@ -194,6 +194,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
+-   `sync`: Montitor calls for syscall sync(2).
 
 ### `[network connections]`
 
