@@ -603,9 +603,9 @@ void set_global_environment() {
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
 #ifdef DISABLE_CLOUD
-    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , "false", 1);
+    setenv("NETDATA_HOST_CLOUD_ENABLED"    , "false", 1);
 #else
-    setenv("NETDATA_CONFIG_CLOUD_ENABLED"    , appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false", 1);
+    setenv("NETDATA_HOST_CLOUD_ENABLED"    , appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false", 1);
 #endif
 
     /* Initialize values we'll get from late global and the thread to N/A */
