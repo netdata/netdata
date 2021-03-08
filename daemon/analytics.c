@@ -60,7 +60,9 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED               : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.NETDATA_COLLECTORS);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
-    debug(D_ANALYTICS, "NETDATA_ALARMS_COUNT               : [%s]", analytics_data.NETDATA_ALARMS_COUNT);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_NORMAL              : [%s]", analytics_data.NETDATA_ALARMS_NORMAL);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_WARNING             : [%s]", analytics_data.NETDATA_ALARMS_WARNING);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_CRITICAL            : [%s]", analytics_data.NETDATA_ALARMS_CRITICAL);
     debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
     debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.NETDATA_METRICS_COUNT);
     debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.NETDATA_NOTIFICATION_METHODS);
@@ -87,7 +89,9 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
     setenv ( "NETDATA_COLLECTORS",                analytics_data.NETDATA_COLLECTORS, 1);
     setenv ( "NETDATA_COLLECTORS_COUNT",          analytics_data.NETDATA_COLLECTORS_COUNT, 1);
-    setenv ( "NETDATA_ALARMS_COUNT",              analytics_data.NETDATA_ALARMS_COUNT, 1);
+    setenv ( "NETDATA_ALARMS_NORMAL",             analytics_data.NETDATA_ALARMS_NORMAL, 1);
+    setenv ( "NETDATA_ALARMS_WARNING",            analytics_data.NETDATA_ALARMS_WARNING, 1);
+    setenv ( "NETDATA_ALARMS_CRITICAL",           analytics_data.NETDATA_ALARMS_CRITICAL, 1);
     setenv ( "NETDATA_CHARTS_COUNT",              analytics_data.NETDATA_CHARTS_COUNT, 1);
     setenv ( "NETDATA_METRICS_COUNT",             analytics_data.NETDATA_METRICS_COUNT, 1);
     setenv ( "NETDATA_NOTIFICATION_METHODS",      analytics_data.NETDATA_NOTIFICATION_METHODS, 1);
@@ -113,7 +117,9 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_HOST_CLAIMED);
     freez(analytics_data.NETDATA_COLLECTORS);
     freez(analytics_data.NETDATA_COLLECTORS_COUNT);
-    freez(analytics_data.NETDATA_ALARMS_COUNT);
+    freez(analytics_data.NETDATA_ALARMS_NORMAL);
+    freez(analytics_data.NETDATA_ALARMS_WARNING);
+    freez(analytics_data.NETDATA_ALARMS_CRITICAL);
     freez(analytics_data.NETDATA_CHARTS_COUNT);
     freez(analytics_data.NETDATA_METRICS_COUNT);
     freez(analytics_data.NETDATA_NOTIFICATION_METHODS);
@@ -170,7 +176,7 @@ static const char *verify_required_directory(const char *dir) {
 
 void analytics_alarms (void) {
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
-    char b[20];
+    char b[10];
     RRDCALC *rc;
 
     for(rc = localhost->alarms; rc ; rc = rc->next) {
@@ -190,10 +196,15 @@ void analytics_alarms (void) {
 
     }
 
-    snprintfz(b, 19, "%d|%d|%d", alarm_normal,alarm_warn,alarm_crit);
-    analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT, b);
+    snprintfz(b, 9, "%d", alarm_normal);
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_NORMAL, b);
+    snprintfz(b, 9, "%d", alarm_warn);
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_WARNING, b);
+    snprintfz(b, 9, "%d", alarm_crit);
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_CRITICAL, b);
 }
 
+/* Consider running the already existing function for this */
 void analytics_collectors(void) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
@@ -617,7 +628,9 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS,                "\"N/A\""); //must, because this is an array
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALARMS_COUNT,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_NORMAL,             "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_WARNING,            "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_CRITICAL,           "N/A");
     analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS,      "N/A");
