@@ -12,7 +12,7 @@ import numpy as np
 import changefinder
 from scipy.stats import percentileofscore
 
-update_every = 1
+update_every = 5
 disabled_by_default = True
 
 ORDER = [
