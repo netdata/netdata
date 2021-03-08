@@ -66,6 +66,9 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.NETDATA_CHARTS_COUNT);
     debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.NETDATA_METRICS_COUNT);
     debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.NETDATA_NOTIFICATION_METHODS);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.NETDATA_MIRRORED_HOST_COUNT);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE);
 }
 
 void analytics_setenv_data (void) {
@@ -95,6 +98,10 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CHARTS_COUNT",              analytics_data.NETDATA_CHARTS_COUNT, 1);
     setenv ( "NETDATA_METRICS_COUNT",             analytics_data.NETDATA_METRICS_COUNT, 1);
     setenv ( "NETDATA_NOTIFICATION_METHODS",      analytics_data.NETDATA_NOTIFICATION_METHODS, 1);
+    setenv ( "NETDATA_MIRRORED_HOST_COUNT",       analytics_data.NETDATA_MIRRORED_HOST_COUNT, 1);
+    setenv ( "NETDATA_MIRRORED_HOSTS_REACHABLE",  analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE, 1);
+    setenv ( "NETDATA_MIRRORED_HOSTS_UNREACHABLE",analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE, 1);
+
 }
 
 void analytics_free_data (void) {
@@ -123,6 +130,9 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CHARTS_COUNT);
     freez(analytics_data.NETDATA_METRICS_COUNT);
     freez(analytics_data.NETDATA_NOTIFICATION_METHODS);
+    freez(analytics_data.NETDATA_MIRRORED_HOST_COUNT);
+    freez(analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE);
+    freez(analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE);
 }
 
 
@@ -137,6 +147,35 @@ void analytics_get_data (char *name, BUFFER *wb) {
 
     buffer_strcat(wb, name);
 
+}
+
+void analytics_mirrored_hosts( void ) {
+    RRDHOST *host;
+    int count = 0;
+    int reachable = 0;
+    int unreachable = 0;
+    char b[10];
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host)
+    {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
+            continue;
+
+        netdata_mutex_lock(&host->receiver_lock);
+        ((host->receiver || host == localhost) ? reachable++ : unreachable++);
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        count++;
+    }
+    rrd_unlock();
+
+    snprintfz(b, 9, "%d", count);
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOST_COUNT, b);
+    snprintfz(b, 9, "%d", reachable);
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE, b);
+    snprintfz(b, 9, "%d", unreachable);
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE, b);
 }
 
 int collector_counter_callb(void *entry, void *data) {
@@ -386,6 +425,8 @@ void analytics_gather_meta_data (void) {
 
     rrdhost_unlock(localhost);
 
+    analytics_mirrored_hosts(); //needs complete lock ?
+
     analytics_misc();
     analytics_alarms_notifications();
 
@@ -634,6 +675,10 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
     analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
     analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS,      "N/A");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOST_COUNT,       "N/A");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE,  "N/A");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE,"N/A");
+
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
     analytics_data.json_hits = 0;

@@ -50,6 +50,9 @@ struct analytics_data {
     char *NETDATA_COLLECTORS;
     char *NETDATA_COLLECTORS_COUNT;
     char *NETDATA_NOTIFICATION_METHODS;
+    char *NETDATA_MIRRORED_HOST_COUNT;
+    char *NETDATA_MIRRORED_HOSTS_REACHABLE;
+    char *NETDATA_MIRRORED_HOSTS_UNREACHABLE;
     
     uint8_t prometheus_hits;
     uint8_t shell_hits;
