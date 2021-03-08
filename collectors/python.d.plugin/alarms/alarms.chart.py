@@ -20,7 +20,7 @@ def charts_template(sm, alarm_status_chart_type='line'):
     mappings = ', '.join(['{0}={1}'.format(k, v) for k, v in sm.items()])
     charts = {
         'alarms': {
-            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'alarms', 'alarms.status', alarm_status_chart_type],
+            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'status', 'alarms.status', alarm_status_chart_type],
             'lines': [],
             'variables': [
                 ['alarms_num'],
