@@ -57,7 +57,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_HOST_CLAIMED               : [%s]", analytics_data.NETDATA_HOST_CLAIMED);
+    debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.NETDATA_HOST_AGENT_CLAIMED);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.NETDATA_COLLECTORS);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.NETDATA_COLLECTORS_COUNT);
     debug(D_ANALYTICS, "NETDATA_ALARMS_NORMAL              : [%s]", analytics_data.NETDATA_ALARMS_NORMAL);
@@ -86,7 +86,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_ALLMETRICS_SHELL_USED",     analytics_data.NETDATA_ALLMETRICS_SHELL_USED, 1);
     setenv ( "NETDATA_ALLMETRICS_JSON_USED",      analytics_data.NETDATA_ALLMETRICS_JSON_USED, 1);
     setenv ( "NETDATA_CONFIG_HTTPS_ENABLED",      analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, 1);
-    setenv ( "NETDATA_HOST_CLAIMED",              analytics_data.NETDATA_HOST_CLAIMED, 1);
+    setenv ( "NETDATA_HOST_AGENT_CLAIMED",        analytics_data.NETDATA_HOST_AGENT_CLAIMED, 1);
     setenv ( "NETDATA_COLLECTORS",                analytics_data.NETDATA_COLLECTORS, 1);
     setenv ( "NETDATA_COLLECTORS_COUNT",          analytics_data.NETDATA_COLLECTORS_COUNT, 1);
     setenv ( "NETDATA_ALARMS_NORMAL",             analytics_data.NETDATA_ALARMS_NORMAL, 1);
@@ -114,7 +114,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
     freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
     freez(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED);
-    freez(analytics_data.NETDATA_HOST_CLAIMED);
+    freez(analytics_data.NETDATA_HOST_AGENT_CLAIMED);
     freez(analytics_data.NETDATA_COLLECTORS);
     freez(analytics_data.NETDATA_COLLECTORS_COUNT);
     freez(analytics_data.NETDATA_ALARMS_NORMAL);
@@ -278,9 +278,9 @@ void analytics_misc(void) {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED, "false");
 #endif
     if (is_agent_claimed())
-        analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED, "true");
+        analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED, "true");
     else {
-        analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED, "false");
+        analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED, "false");
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
@@ -621,7 +621,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_CLAIMED,              "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "N/A");
