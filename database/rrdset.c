@@ -1933,7 +1933,7 @@ void rrdset_finalize_labels(RRDSET *st)
         replace_label_list(labels, new_labels);
     }
 #ifdef ENABLE_DBENGINE
-    if (likely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)) {
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         netdata_rwlock_wrlock(&labels->labels_rwlock);
         struct label *lbl = labels->head;
         while (lbl) {
