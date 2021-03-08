@@ -52,7 +52,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
-    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_CONNECTED        : [%s]", analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.NETDATA_HOST_ACLK_AVAILABLE);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
@@ -81,7 +81,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_RELEASE_CHANNEL",    analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, 1);
-    setenv ( "NETDATA_HOST_ACLK_CONNECTED",       analytics_data.NETDATA_HOST_ACLK_CONNECTED, 1);
+    setenv ( "NETDATA_HOST_ACLK_AVAILABLE",       analytics_data.NETDATA_HOST_ACLK_AVAILABLE, 1);
     setenv ( "NETDATA_ALLMETRICS_PROMETHEUS_USED",analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
     setenv ( "NETDATA_ALLMETRICS_SHELL_USED",     analytics_data.NETDATA_ALLMETRICS_SHELL_USED, 1);
     setenv ( "NETDATA_ALLMETRICS_JSON_USED",      analytics_data.NETDATA_ALLMETRICS_JSON_USED, 1);
@@ -109,7 +109,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
-    freez(analytics_data.NETDATA_HOST_ACLK_CONNECTED);
+    freez(analytics_data.NETDATA_HOST_ACLK_AVAILABLE);
     freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
     freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
     freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
@@ -284,10 +284,10 @@ void analytics_misc(void) {
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED, "true");
+        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE, "true");
     else
 #endif
-        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED, "false");
+        analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE, "false");
 
     //dont do it like this.... it should be already loaded somewhere...
     analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
@@ -620,7 +620,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_CONNECTED,       "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
