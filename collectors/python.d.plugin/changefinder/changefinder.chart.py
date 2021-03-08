@@ -61,7 +61,8 @@ class Service(UrlService):
         self.cf_order = int(self.configuration.get('cf_order', DEFAULT_CF_ORDER))
         self.cf_smooth = int(self.configuration.get('cf_smooth', DEFAULT_CF_SMOOTH))
         self.cf_diff = bool(self.configuration.get('cf_diff', DEFAULT_CF_DIFF))
-        self.cf_threshold = float(self.configuration.get('cf_threshold', DEFAULT_CF_THRESHOLD))        
+        self.cf_threshold = float(self.configuration.get('cf_threshold', DEFAULT_CF_THRESHOLD))
+        self.collected_dims = {'scores': set(), 'flags': set()}
         self.models = {}
         self.x_latest = {}
         self.scores_latest = {}
@@ -105,11 +106,13 @@ class Service(UrlService):
             return
 
         for dim in data:
-            if dim not in self.charts[chart]:
+            if dim not in self.collected_dims[chart]:
+                self.collected_dims[chart].add(dim)
                 self.charts[chart].add_dimension([dim, dim, algo, multiplier, divisor])
 
-        for dim in self.charts[chart].dimensions:
+        for dim in list(self.collected_dims[chart]):
             if dim not in data:
+                self.collected_dims[chart].remove(dim)
                 self.charts[chart].del_dimension(dim, hide=False)
 
     def diff(self, x, model):
