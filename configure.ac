@@ -205,8 +205,6 @@ AC_ARG_WITH(
     [aclk_ng="fallback"]
 )
 
-AM_CONDITIONAL([ACLK_NG], [true])
-
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
