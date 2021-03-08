@@ -545,7 +545,7 @@ inline static void remote_write_split_words(char *str, char **words, int max_wor
     int i = 0;
 
     while(*s && i < max_words - 1) {
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag name
+        while(*s && isspace(*s)) s++; // skip spaces to the beginning of a tag name
 
         if(*s)
             words[i] = s;
@@ -560,7 +560,7 @@ inline static void remote_write_split_words(char *str, char **words, int max_wor
         s++;
         i++;
 
-        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
+        while(*s && isspace(*s)) s++; // skip spaces to the beginning of a tag value
 
         if(*s && *s == '"') s++; // strip an opening quote
         if(*s)
