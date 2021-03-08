@@ -12,6 +12,10 @@
 #  --local-files              Use a manually provided tarball for the installation
 #  --allow-duplicate-install  do not bail if we detect a duplicate install
 #  --reinstall                if an existing install would be updated, reinstall instead
+#  --claim-token              specify a token to use for claiming the newly installed instance
+#  --claim-url                specify a URL to use for claiming the newly installed isntance
+#  --claim-rooms              specify a list of rooms to claim the newly installed instance to
+#  --claim-proxy              specify a proxy to use while claiming the newly installed instance
 #
 # Environment options:
 #
@@ -224,54 +228,79 @@ NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
 RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
-  if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
-    opts="${opts} --accept"
-    shift 1
-  elif [ "${1}" = "--dont-start-it" ]; then
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
-    shift 1
-  elif [ "${1}" = "--no-updates" ]; then
-    NETDATA_UPDATES=""
-    shift 1
-  elif [ "${1}" = "--auto-update" ]; then
-    true # This is the default behaviour, so ignore it.
-    shift 1
-  elif [ "${1}" = "--stable-channel" ]; then
-    RELEASE_CHANNEL="stable"
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
-    shift 1
-  elif [ "${1}" = "--disable-telemetry" ]; then
-    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
-    shift 1
-  elif [ "${1}" = "--local-files" ]; then
-    NETDATA_UPDATES="" # Disable autoupdates if using pre-downloaded files.
-    shift 1
-    if [ -z "${1}" ]; then
-      fatal "Option --local-files requires extra information. The desired tarball full filename is needed"
-    fi
+  case "${1}" in
+    "--dont-wait") opts="${opts} --accept" ;;
+    "--non-interactive") opts="${opts} --accept" ;;
+    "--accept") opts="${opts} --accept" ;;
+    "--dont-start-it")
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+      ;;
+    "--no-updates") NETDATA_UPDATES="" ;;
+    "--stable-channel")
+      RELEASE_CHANNEL="stable"
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+      ;;
+    "--disable-telemetry") NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}";;
+    "--local-files")
+      NETDATA_UPDATES="" # Disable autoupdates if using pre-downloaded files.
+      if [ -z "${2}" ]; then
+        fatal "Option --local-files requires extra information. The desired tarball full filename is needed"
+      fi
 
-    NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
-    shift 1
-    if [ -z "${1}" ]; then
-      fatal "Option --local-files requires a pair of the tarball source and the checksum file"
-    fi
+      NETDATA_LOCAL_TARBALL_OVERRIDE="${2}"
 
-    NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
-    shift 1
-  elif [ "${1}" = "--allow-duplicate-install" ]; then
-    NETDATA_ALLOW_DUPLICATE_INSTALL=1
-    shift 1
-  elif [ "${1}" = "--reinstall" ]; then
-    NETDATA_REINSTALL=1
-    shift 1
-  else
-    echo >&2 "Unknown option '${1}' or invalid number of arguments. Please check the README for the available arguments of ${0} and try again"
-    exit 1
-  fi
+      if [ -z "${3}" ]; then
+        fatal "Option --local-files requires a pair of the tarball source and the checksum file"
+      fi
+
+      NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${3}"
+      shift 2
+      ;;
+    "--allow-duplicate-install") NETDATA_ALLOW_DUPLICATE_INSTALL=1 ;;
+    "--reinstall") NETDATA_REINSTALL=1 ;;
+    "--claim-token")
+      NETDATA_CLAIM_TOKEN="${2}"
+      shift 1
+      ;;
+    "--claim-rooms")
+      NETDATA_CLAIM_ROOMS="${2}"
+      shift 1
+      ;;
+    "--claim-url")
+      NETDATA_CLAIM_URL="${2}"
+      shift 1
+      ;;
+    "--claim-proxy")
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -proxy ${2}"
+      shift 1
+      ;;
+    *)
+      echo >&2 "Unknown option '${1}' or invalid number of arguments. Please check the README for the available arguments of ${0} and try again"
+      exit 1
+  esac
+  shift 1
 done
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemtry"
+fi
+
+if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ] || [ -n "${NETDATA_CLAIM_ROOMS}" ] || [ -n "${NETDATA_CLAIM_URL}" ]; then
+    run_failed "Cloud explicitly disabled but automatic claiming requested."
+    run_failed "Either enable Netdata Cloud, or remove the --claim-* options."
+    exit 1
+  fi
+fi
+
+# shellcheck disable=SC2235,SC2030
+if ( [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_URL}" ] ) || ( [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ -z "${NETDATA_CLAIM_URL}" ] ); then
+  run_failed "Invalid claiming options, both a claiming token and URL must be specified."
+  exit 1
+elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+  run_failed "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
+  exit 1
 fi
 
 # Netdata Tarball Base URL (defaults to our Google Storage Bucket)
@@ -365,4 +394,18 @@ if [ $? -eq 0 ]; then
   fi
 else
   echo >&2 "NOTE: did not remove: ${TMPDIR}/netdata-latest.gz.run"
+  exit 1
+fi
+
+# --------------------------------------------------------------------------------------------------------------------
+
+if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  NETDATA_CLAIM_PATH=/opt/netdata/bin/netdata-claim.sh
+
+  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
+    progress "Successfully claimed node"
+  else
+    run_failed "Unable to claim node, you must do so manually."
+  fi
 fi
