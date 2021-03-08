@@ -27,7 +27,7 @@ def charts_template(sm, alarm_status_chart_type='line'):
             ]
         },
         'values': {
-            'options': [None, 'Alarm Values', 'value', 'values', 'alarms.values', 'line'],
+            'options': [None, 'Alarm Values', 'value', 'value', 'alarms.value', 'line'],
             'lines': [],
             'variables': [
                 [],
