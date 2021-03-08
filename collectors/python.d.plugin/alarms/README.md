@@ -51,6 +51,8 @@ local:
     CLEAR: 0
     WARNING: 1
     CRITICAL: 2
+  # set to true to include a chart with calculated alarm values over time
+  collect_alarm_values: false
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`
