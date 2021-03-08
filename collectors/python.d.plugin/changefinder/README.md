@@ -31,7 +31,7 @@ Below is an example of the chart produced by this collector. The first 3/4 of th
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user numpy changefinder==0.03 scipy==1.5.4
+pip3 install --user numpy==1.19.5 changefinder==0.03 scipy==1.5.4
 ```
 
 **Note**: if you need to tell Netdata to use Python 3 then you can pass the below command in the python plugin section of your `netdata.conf` file. 
