@@ -15,8 +15,10 @@
 #define NETDATA_APPS_VFS_GROUP "ebpf vfs"
 #define NETDATA_APPS_PROCESS_GROUP "ebpf process"
 #define NETDATA_APPS_NET_GROUP "ebpf net"
+#define NETDATA_APPS_CACHESTAT_GROUP "ebpf cachestat"
 
 #include "ebpf_process.h"
+#include "ebpf_cachestat.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
@@ -104,6 +106,9 @@ struct target {
 
     uid_t uid;
     gid_t gid;
+
+    // Page cache statistic per process
+    netdata_publish_cachestat_t cachestat;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;
@@ -426,5 +431,6 @@ extern void collect_data_for_all_processes(int tbl_pid_stats_fd);
 
 extern ebpf_process_stat_t **global_process_stats;
 extern ebpf_process_publish_apps_t **current_apps_data;
+extern netdata_publish_cachestat_t **cachestat_pid;
 
 #endif /* NETDATA_EBPF_APPS_H */

@@ -30,7 +30,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
         run: |
           echo "publish=true" >> $GITHUB_ENV
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,netdata/netdata:${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" >> $GITHUB_ENV
       - name: Determine if we should push changes and which tags to use
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'nightly'
         run: |

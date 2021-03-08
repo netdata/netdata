@@ -115,8 +115,8 @@ the port accordingly.
     ...
 ```
 
-We'll not worry about the rest of the settings for now. Restart the Agent using `sudo service netdata restart`, or the
-appropriate method for your system, to spin up the exporting engine.
+We'll not worry about the rest of the settings for now. Restart the Agent using `sudo systemctl restart netdata`, or the
+[appropriate method](/docs/configure/start-stop-restart.md) for your system, to spin up the exporting engine.
 
 ## See and organize Netdata metrics in Graphite
 

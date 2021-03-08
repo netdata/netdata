@@ -9,6 +9,8 @@ rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
 rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
+static unsigned pages_per_extent = MAX_PAGES_PER_EXTENT;
+
 static void sanity_check(void)
 {
     /* Magic numbers must fit in the super-blocks */
@@ -679,7 +681,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
          PValue = JudyLFirst(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue ;
 
-         descr != NULL && count != MAX_PAGES_PER_EXTENT ;
+         descr != NULL && count != pages_per_extent ;
 
          PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
@@ -1044,6 +1046,21 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
     return ret;
 }
 
+static void load_configuration_dynamic(void)
+{
+    unsigned read_num;
+    static int printed_error = 0;
+
+    read_num = (unsigned) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine extent pages",
+                                                    MAX_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT) {
+        pages_per_extent = read_num;
+    } else if (!printed_error) {
+        printed_error = 1;
+        error("Invalid dbengine extent pages %u given. Defaulting to %u.", read_num, pages_per_extent);
+    }
+}
+
 void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -1097,6 +1114,7 @@ void timer_cb(uv_timer_t* handle)
             }
         }
     }
+    load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
         char buf[4096];

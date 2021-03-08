@@ -5,4 +5,6 @@
 
 extern void print_build_info(void);
 
+extern void print_build_info_json(void);
+
 #endif // NETDATA_BUILDINFO_H

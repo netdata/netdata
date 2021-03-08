@@ -43,7 +43,7 @@ You can always find the location of the alarm-notify.sh script in `netdata.conf`
 If you want an alternative to `sendmail` in order to have a simple MTA configuration for sending emails and auth to an existing SMTP server, you can do the following:
 
 - Install `msmtp`.
-- Modify the `sendmail` path in `health_alarm_notify.conf` to point to the location of `mstmp`:
+- Modify the `sendmail` path in `health_alarm_notify.conf` to point to the location of `msmtp`:
 ```
 # The full path to the sendmail command.
 # If empty, the system $PATH will be searched for it.

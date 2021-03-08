@@ -211,6 +211,7 @@ extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 extern int mysendfile(struct web_client *w, char *filename);
 
 extern void web_client_build_http_header(struct web_client *w);
+extern char *strip_control_characters(char *url);
 
 #include "daemon/common.h"
 

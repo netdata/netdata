@@ -38,7 +38,8 @@ from its source code.
 
 Copy the script, paste it into your node's terminal, and hit `Enter`. 
 
-Open your favorite browser and navigate to `http://localhost:19999` or `http://REMOTE-HOST:19999` to open the dashboard.
+Open your favorite browser and navigate to `http://localhost:19999` or `http://NODE:19999`, replacing `NODE` with the
+hostname or IP address of your system, to open the local Agent dashboard.
 
 <details>
 <summary>Watch how the one-line installer works</summary>
@@ -91,7 +92,7 @@ platform to see specific instructions.
 
 Even more options available in our [packaging documentation](/packaging/installer/README.md#alternative-methods).
 
-## Claim your node on Netdata Cloud
+## Claim your node to Netdata Cloud
 
 You need to [claim](/claim/README.md) your nodes to see them in Netdata Cloud. Claiming establishes a secure TLS
 connection to Netdata Cloud using the [Agent-Cloud link](/aclk/README.md), and proves you have write and administrative

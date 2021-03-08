@@ -11,8 +11,17 @@ struct aclk_qt_data {
     RRDDIM *dim;
 } *aclk_qt_data = NULL;
 
+// ACLK per query thread cpu stats
+struct aclk_cpu_data {
+    RRDDIM *user;
+    RRDDIM *system;
+    RRDSET *st;
+} *aclk_cpu_data = NULL;
+
 uint32_t *aclk_queries_per_thread = NULL;
 uint32_t *aclk_queries_per_thread_sample = NULL;
+struct rusage *rusage_per_thread;
+uint8_t *getrusage_called_this_tick = NULL;
 
 struct aclk_metrics aclk_metrics = {
     .online = 0,
@@ -153,7 +162,7 @@ static void aclk_stats_read_q(struct aclk_metrics_per_sample *per_sample)
 static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
-    static RRDDIM *rd_rq_rcvd = NULL;
+    static RRDDIM *rd_rq_ok = NULL;
     static RRDDIM *rd_rq_err = NULL;
 
     if (unlikely(!st)) {
@@ -161,13 +170,78 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
             "netdata", "aclk_cloud_req", NULL, "aclk", NULL, "Requests received from cloud", "req/s",
             "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_rq_rcvd = rrddim_add(st, "received", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_err = rrddim_add(st, "malformed", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_ok = rrddim_add(st, "accepted", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_err = rrddim_add(st, "rejected", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     } else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd_rq_rcvd, per_sample->cloud_req_recvd - per_sample->cloud_req_err);
+    rrddim_set_by_pointer(st, rd_rq_ok, per_sample->cloud_req_ok);
     rrddim_set_by_pointer(st, rd_rq_err, per_sample->cloud_req_err);
+
+    rrdset_done(st);
+}
+
+static void aclk_stats_cloud_req_version(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_rq_v1 = NULL;
+    static RRDDIM *rd_rq_v2 = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_cloud_req_version", NULL, "aclk", NULL, "Requests received from cloud by their version", "req/s",
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        rd_rq_v1 = rrddim_add(st, "v1",  NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_v2 = rrddim_add(st, "v2+", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd_rq_v1, per_sample->cloud_req_v1);
+    rrddim_set_by_pointer(st, rd_rq_v2, per_sample->cloud_req_v2);
+
+    rrdset_done(st);
+}
+
+static char *cloud_req_type_names[ACLK_STATS_CLOUD_REQ_TYPE_CNT] = {
+    "other",   
+    "info",
+    "data",
+    "alarms",
+    "alarm_log",
+    "chart",
+    "charts"
+    // if you change update:
+    // #define ACLK_STATS_CLOUD_REQ_TYPE_CNT 7
+};
+
+int aclk_cloud_req_type_to_idx(const char *name)
+{
+    for (int i = 1; i < ACLK_STATS_CLOUD_REQ_TYPE_CNT; i++)
+        if (!strcmp(cloud_req_type_names[i], name))
+            return i;
+    return 0;
+}
+
+static void aclk_stats_cloud_req_cmd(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st;
+    static int initialized = 0;
+    static RRDDIM *rd_rq_types[ACLK_STATS_CLOUD_REQ_TYPE_CNT];
+
+    if (unlikely(!initialized)) {
+        initialized = 1;
+        st = rrdset_create_localhost(
+            "netdata", "aclk_cloud_req_cmd", NULL, "aclk", NULL, "Requests received from cloud by their type (api endpoint queried)", "req/s",
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (int i = 0; i < ACLK_STATS_CLOUD_REQ_TYPE_CNT; i++)
+            rd_rq_types[i] = rrddim_add(st, cloud_req_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    for (int i = 0; i < ACLK_STATS_CLOUD_REQ_TYPE_CNT; i++)
+        rrddim_set_by_pointer(st, rd_rq_types[i], per_sample->cloud_req_by_type[i]);
 
     rrdset_done(st);
 }
@@ -182,7 +256,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
             if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
@@ -222,11 +296,42 @@ static void aclk_stats_mat_metric_process(struct aclk_metric_mat *metric, struct
     rrdset_done(metric->st);
 }
 
+static void aclk_stats_cpu_threads(void)
+{
+    char id[100 + 1];
+    char title[100 + 1];
+
+    for (int i = 0; i < query_thread_count; i++) {
+        if (unlikely(!aclk_cpu_data[i].st)) {
+
+            snprintfz(id, 100, "aclk_thread%d_cpu", i);
+            snprintfz(title, 100, "Cpu Usage For Thread No %d", i);
+
+            aclk_cpu_data[i].st = rrdset_create_localhost(
+                                         "netdata", id, NULL, "aclk", NULL, title, "milliseconds/s",
+                                         "netdata", "stats", 200020 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+            aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+
+        } else
+            rrdset_next(aclk_cpu_data[i].st);
+    }
+
+    for (int i = 0; i < query_thread_count; i++) {
+        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].user, rusage_per_thread[i].ru_utime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_utime.tv_usec);
+        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].system, rusage_per_thread[i].ru_stime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_stime.tv_usec);
+        rrdset_done(aclk_cpu_data[i].st);
+    }
+}
+
 void aclk_stats_thread_cleanup()
 {
     freez(aclk_qt_data);
     freez(aclk_queries_per_thread);
     freez(aclk_queries_per_thread_sample);
+    freez(aclk_cpu_data);
+    freez(rusage_per_thread);
 }
 
 void *aclk_stats_main_thread(void *ptr)
@@ -235,8 +340,11 @@ void *aclk_stats_main_thread(void *ptr)
 
     query_thread_count = args->query_thread_count;
     aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
+    aclk_cpu_data = callocz(query_thread_count, sizeof(struct aclk_cpu_data));
     aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
     aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
+    rusage_per_thread = callocz(query_thread_count, sizeof(struct rusage));
+    getrusage_called_this_tick = callocz(query_thread_count, sizeof(uint8_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -264,6 +372,7 @@ void *aclk_stats_main_thread(void *ptr)
 
         memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
         memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
+        memset(getrusage_called_this_tick, 0, sizeof(uint8_t) * query_thread_count);
         ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
@@ -273,7 +382,13 @@ void *aclk_stats_main_thread(void *ptr)
         aclk_stats_read_q(&per_sample);
 
         aclk_stats_cloud_req(&per_sample);
+        aclk_stats_cloud_req_version(&per_sample);
+
+        aclk_stats_cloud_req_cmd(&per_sample);
+
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
+
+        aclk_stats_cpu_threads();
 
 #ifdef NETDATA_INTERNAL_CHECKS
         aclk_stats_mat_metric_process(&aclk_mat_metrics.latency, &per_sample.latency);

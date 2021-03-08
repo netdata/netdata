@@ -97,7 +97,7 @@ int get_kernel_version(char *out, int size)
         return -1;
 
     move = patch;
-    while (*version && *version != '\n')
+    while (*version && *version != '\n' && *version != '-')
         *move++ = *version++;
     *move = '\0';
 
@@ -246,7 +246,9 @@ char *ebpf_kernel_suffix(int version, int isrh)
         else
             return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_5_10)
+        if (version >= NETDATA_EBPF_KERNEL_5_11)
+            return "5.11";
+        else if (version >= NETDATA_EBPF_KERNEL_5_10)
             return "5.10";
         else if (version >= NETDATA_EBPF_KERNEL_4_17)
             return "5.4";
@@ -295,7 +297,9 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
 
     snprintf(lpath, 4096, "%s/%s", plugins_dir, lname);
-    if (bpf_prog_load(lpath, BPF_PROG_TYPE_KPROBE, obj, &prog_fd)) {
+    // We are using BPF_PROG_TYPE_UNSPEC instead a specific type for bpf_prog_load to define the type
+    // according the eBPF program loaded
+    if (bpf_prog_load(lpath, BPF_PROG_TYPE_UNSPEC, obj, &prog_fd)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         info("Cannot load program: %s", lpath);
         return NULL;

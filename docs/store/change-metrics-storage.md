@@ -54,7 +54,8 @@ multihost disk space` setting. Change it to the value recommended above. For exa
     dbengine multihost disk space = 1024
 ```
 
-Save the file and restart the Agent with `service netdata restart` to change the database engine's size.
+Save the file and restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to change the database engine's size.
 
 ## What's next?
 

@@ -26,8 +26,6 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-#ifdef HAVE_FREEIPMI
-
 #define IPMI_PARSE_DEVICE_LAN_STR       "lan"
 #define IPMI_PARSE_DEVICE_LAN_2_0_STR   "lan_2_0"
 #define IPMI_PARSE_DEVICE_LAN_2_0_STR2  "lan20"
@@ -1621,6 +1619,14 @@ int parse_outofband_driver_type (const char *str)
     return (-1);
 }
 
+int host_is_local(const char *host)
+{
+    if (host && (!strcmp(host, "localhost") || !strcmp(host, "127.0.0.1") || !strcmp(host, "::1")))
+        return (1);
+
+    return (0);
+}
+
 int main (int argc, char **argv) {
 
     // ------------------------------------------------------------------------
@@ -1690,6 +1696,8 @@ int main (int argc, char **argv) {
                     "  username USER\n"
                     "  password PASS           connect to remote IPMI host\n"
                     "                          default: local IPMI processor\n"
+                    "\n"
+                    "  noauthcodecheck         don't check the authentication codes returned\n"
                     "\n"
                     " driver-type IPMIDRIVER\n"
                     "                          Specify the driver type to use instead of doing an auto selection. \n"
@@ -1763,6 +1771,23 @@ int main (int argc, char **argv) {
             else {
                 driver_type=parse_inband_driver_type(argv[++i]);
                 if(debug) fprintf(stderr, "freeipmi.plugin: inband driver type set to '%d'\n", driver_type);
+            }
+            continue;
+        } else if (i < argc && strcmp("noauthcodecheck", argv[i]) == 0) {
+            if (!hostname || host_is_local(hostname)) {
+                if (debug)
+                    fprintf(
+                        stderr,
+                        "freeipmi.plugin: noauthcodecheck workaround flag is ignored for inband configuration\n");
+            } else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
+                workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
+                if (debug)
+                    fprintf(stderr, "freeipmi.plugin: noauthcodecheck workaround flag enabled\n");
+            } else {
+                if (debug)
+                    fprintf(
+                        stderr,
+                        "freeipmi.plugin: noauthcodecheck workaround flag is ignored for protocol version 2.0\n");
             }
             continue;
         }
@@ -1861,11 +1886,3 @@ int main (int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) exit(0);
     }
 }
-
-#else // !HAVE_FREEIPMI
-
-int main(int argc, char **argv) {
-    fatal("freeipmi.plugin is not compiled.");
-}
-
-#endif // !HAVE_FREEIPMI

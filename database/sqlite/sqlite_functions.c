@@ -530,11 +530,12 @@ int sql_store_chart(
         goto bind_fail;
 
     param++;
-    if (name) {
+    if (name && *name)
         rc = sqlite3_bind_text(res, 5, name, -1, SQLITE_STATIC);
-        if (unlikely(rc != SQLITE_OK))
-            goto bind_fail;
-    }
+    else
+        rc = sqlite3_bind_null(res, 5);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
 
     param++;
     rc = sqlite3_bind_text(res, 6, family, -1, SQLITE_STATIC);

@@ -255,9 +255,8 @@ errors while accessing the dashboard.
 DOSPageCount 30
 ```
 
-Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
+Restart Apache with `sudo systemctl restart apache2`, or the appropriate method to restart services on your system, to
 reload its configuration with your new values.
-
 
 ### Virtual host
 
