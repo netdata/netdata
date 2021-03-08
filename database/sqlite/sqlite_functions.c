@@ -1041,31 +1041,32 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
     rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_id parameter to store label information");
-        return;
+        goto failed;
     }
 
     rc = sqlite3_bind_int(res, 2, source_type);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind type parameter to store label information");
-        return;
+        goto failed;
     }
 
     rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind label parameter to store label information");
-        return;
+        goto failed;
     }
 
     rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind value parameter to store label information");
-        return;
+        goto failed;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store chart label entry, rc = %d", rc);
 
+failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing chart label information");
 
