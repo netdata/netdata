@@ -254,7 +254,6 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
 static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
     int idx;
-    char *ptr;
     char rc[4];
 
     do {
@@ -282,7 +281,7 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                     return PARSE_ERROR;
                 }
 
-                ptr = rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
+                rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
 
                 rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
 
@@ -296,7 +295,7 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                 }
                 if (parse_http_hdr(buf, parse_ctx))
                     return PARSE_ERROR;
-                ptr = rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
+                rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx);
                 rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
                 break;
             case HTTP_PARSE_CONTENT:
