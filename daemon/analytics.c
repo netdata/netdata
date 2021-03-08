@@ -48,7 +48,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE     : [%s]", analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
     debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_ACLK_ENABLED        : [%s]", analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.NETDATA_HOST_CLOUD_AVAILABLE);
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
@@ -77,7 +77,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_PAGE_CACHE_SIZE",    analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE, 1);
     setenv ( "NETDATA_CONFIG_MULTIDB_DISK_QUOTA", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, 1);
     setenv ( "NETDATA_CONFIG_HOSTS_AVAILABLE",    analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE, 1);
-    setenv ( "NETDATA_CONFIG_ACLK_ENABLED",       analytics_data.NETDATA_CONFIG_ACLK_ENABLED, 1);
+    setenv ( "NETDATA_HOST_CLOUD_AVAILABLE",      analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, 1);
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_RELEASE_CHANNEL",    analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, 1);
@@ -105,7 +105,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE);
     freez(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
     freez(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
-    freez(analytics_data.NETDATA_CONFIG_ACLK_ENABLED);
+    freez(analytics_data.NETDATA_HOST_CLOUD_AVAILABLE);
     freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
@@ -273,9 +273,9 @@ void analytics_misc(void) {
     }
 
 #ifdef ENABLE_ACLK
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED, "true");
+    analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, "true");
 #else
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED, "false");
+    analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, "false");
 #endif
     if (is_agent_claimed())
         analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED, "true");
@@ -616,7 +616,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE,    "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE,    "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_ACLK_ENABLED,       "N/A");
+    analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
