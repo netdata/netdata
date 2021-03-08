@@ -9,14 +9,14 @@ static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
 
-static char *sync_counter_dimension_name[NETDATA_SYNC_END] = { "sync", "sync_return" };
-static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_END];
-static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_END];
+static char *sync_counter_dimension_name[NETDATA_SYNC_END] = { "sync" };
+static netdata_syscall_stat_t sync_counter_aggregated_data;
+static netdata_publish_syscall_t sync_counter_publish_aggregated;
 
 static int read_thread_closed = 1;
 
 static int *map_fd = NULL;
-static netdata_idx_t sync_hash_values[NETDATA_SYNC_END] = {0, 0};
+static netdata_idx_t sync_hash_values = 0;
 
 struct netdata_static_thread sync_threads = {"SYNC KERNEL",
                                                   NULL, NULL, 1, NULL,
@@ -35,15 +35,12 @@ struct netdata_static_thread sync_threads = {"SYNC KERNEL",
  */
 static void read_global_table()
 {
-    uint32_t idx;
-    netdata_idx_t *val = sync_hash_values;
+    uint32_t idx = NETDATA_SYNC_CALL;
     netdata_idx_t stored;
     int fd = map_fd[NETDATA_SYNC_GLOBLAL_TABLE];
 
-    for (idx = NETDATA_SYNC_CALL; idx < NETDATA_SYNC_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-            val[idx] = stored;
-        }
+    if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
+        sync_hash_values = stored;
     }
 }
 
@@ -81,15 +78,10 @@ void *ebpf_sync_read_hash(void *ptr)
  *
  * Send global charts to Netdata
  */
-static void sync_send_global(int mode)
+static void sync_send_global()
 {
-    netdata_publish_syscall_t *ptr = sync_counter_publish_aggregated;
     ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
-                                    ptr[NETDATA_SYNC_CALL].dimension, sync_hash_values[NETDATA_SYNC_CALL]);
-
-    if (mode == MODE_RETURN)
-        ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_ERROR_CHART,
-                                    ptr[NETDATA_SYNC_ERROR].dimension, sync_hash_values[NETDATA_SYNC_ERROR]);
+                                    sync_counter_publish_aggregated.dimension, sync_hash_values);
 }
 
 /**
@@ -105,14 +97,13 @@ static void sync_collector(ebpf_module_t *em)
     netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_sync_read_hash, em);
 
-    int mode = em->mode;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
-        sync_send_global(mode);
+        sync_send_global();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -167,18 +158,12 @@ static void ebpf_sync_cleanup(void *ptr)
  *
  * Call ebpf_create_chart to create the charts for the collector.
  */
-static void ebpf_create_sync_charts(ebpf_module_t *em)
+static void ebpf_create_sync_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
                       "Monitor calls for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL, 21300,
                       ebpf_create_global_dimension, &sync_counter_publish_aggregated, 1);
-
-    if (em->mode == MODE_RETURN)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_ERROR_CHART,
-                          "Monitor return valor for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL, 21301,
-                          ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_ERROR], 1);
 }
 
 /**
@@ -211,13 +196,13 @@ void *ebpf_sync_thread(void *ptr)
         goto endsync;
     }
 
-    int algorithms[NETDATA_SYNC_END] =  { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX};
-    ebpf_global_labels(sync_counter_aggregated_data, sync_counter_publish_aggregated,
+    int algorithm =  NETDATA_EBPF_INCREMENTAL_IDX;
+    ebpf_global_labels(&sync_counter_aggregated_data, &sync_counter_publish_aggregated,
                        sync_counter_dimension_name, sync_counter_dimension_name,
-                       algorithms, NETDATA_SYNC_END);
+                       &algorithm, NETDATA_SYNC_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_sync_charts(em);
+    ebpf_create_sync_charts();
     pthread_mutex_unlock(&lock);
 
     sync_collector(em);
