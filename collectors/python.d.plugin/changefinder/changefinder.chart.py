@@ -99,7 +99,7 @@ class Service(UrlService):
         return score, flag
 
     def update_chart(self, chart, data, algo='absolute', multiplier=1, divisor=1):
-        """Add dimensions found in data to chart if needed.
+        """Add dimensions found in data to chart if needed. Delete those not found in `data`.
         """
         if not self.charts:
             return
@@ -107,6 +107,10 @@ class Service(UrlService):
         for dim in data:
             if dim not in self.charts[chart]:
                 self.charts[chart].add_dimension([dim, dim, algo, multiplier, divisor])
+
+        for dim in self.charts[chart].dimensions:
+            if dim not in data:
+                self.charts[chart].del_dimension(dim, hide=False)
 
     def diff(self, x, model):
         """Take difference of data.
