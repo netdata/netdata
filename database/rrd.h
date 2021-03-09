@@ -336,6 +336,18 @@ union rrddim_collect_handle {
 
 // ----------------------------------------------------------------------------
 // iterator state for RRD dimension data queries
+
+#ifdef ENABLE_DBENGINE
+struct rrdeng_query_handle {
+    struct rrdeng_page_descr *descr;
+    struct rrdengine_instance *ctx;
+    struct pg_cache_page_index *page_index;
+    time_t next_page_time;
+    time_t now;
+    unsigned position;
+};
+#endif
+
 struct rrddim_query_handle {
     RRDDIM *rd;
     time_t start_time;
@@ -347,14 +359,7 @@ struct rrddim_query_handle {
             uint8_t finished;
         } slotted;                         // state the legacy code uses
 #ifdef ENABLE_DBENGINE
-        struct rrdeng_query_handle {
-            struct rrdeng_page_descr *descr;
-            struct rrdengine_instance *ctx;
-            struct pg_cache_page_index *page_index;
-            time_t next_page_time;
-            time_t now;
-            unsigned position;
-        } rrdeng; // state the database engine uses
+        struct rrdeng_query_handle rrdeng; // state the database engine uses
 #endif
     };
 };
