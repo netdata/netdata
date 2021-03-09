@@ -38,6 +38,7 @@ struct array_printer {
 extern int aclk_connected;
 extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
 extern void analytics_build_info(BUFFER *b);
+extern void analytics_exporting_connectors (BUFFER *b);
 
 void analytics_log_data (void) {
 
@@ -69,6 +70,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.NETDATA_MIRRORED_HOST_COUNT);
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE);
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE);
+    debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.NETDATA_EXPORTING_CONNECTORS);
 }
 
 void analytics_setenv_data (void) {
@@ -101,6 +103,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_MIRRORED_HOST_COUNT",       analytics_data.NETDATA_MIRRORED_HOST_COUNT, 1);
     setenv ( "NETDATA_MIRRORED_HOSTS_REACHABLE",  analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE, 1);
     setenv ( "NETDATA_MIRRORED_HOSTS_UNREACHABLE",analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE, 1);
+    setenv ( "NETDATA_EXPORTING_CONNECTORS",      analytics_data.NETDATA_EXPORTING_CONNECTORS, 1);
 
 }
 
@@ -133,6 +136,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_MIRRORED_HOST_COUNT);
     freez(analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE);
     freez(analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE);
+    freez(analytics_data.NETDATA_EXPORTING_CONNECTORS);
 }
 
 
@@ -328,8 +332,18 @@ void analytics_misc(void) {
 #endif
         analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE, "false");
 
+}
+
+void analytics_exporters (void) {
+
     //dont do it like this.... it should be already loaded somewhere...
     analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
+
+    //check for nothing
+    BUFFER *bi = buffer_create(1000);
+    analytics_exporting_connectors(bi);
+    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS, (char *)buffer_tostring(bi));
+    buffer_free(bi);
 
 }
 
@@ -428,6 +442,7 @@ void analytics_gather_meta_data (void) {
     analytics_mirrored_hosts(); //needs complete lock ?
 
     analytics_misc();
+    analytics_exporters();
     analytics_alarms_notifications();
 
     {
@@ -678,6 +693,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOST_COUNT,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE,  "N/A");
     analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE,"N/A");
+    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS,      "N/A");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
