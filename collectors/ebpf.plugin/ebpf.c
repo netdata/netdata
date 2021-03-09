@@ -1726,7 +1726,7 @@ static void read_collector_values(int *disable_apps)
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
-                                    CONFIG_BOOLEAN_NO);
+                                    CONFIG_BOOLEAN_YES);
 
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_apps);
