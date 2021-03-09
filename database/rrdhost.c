@@ -335,6 +335,11 @@ RRDHOST *rrdhost_create(const char *hostname,
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
     }
+    else {
+#ifdef ENABLE_DBENGINE
+        host->rrdeng_ctx = &multidb_ctx;
+#endif
+    }
 
     // ------------------------------------------------------------------------
     // link it and add it to the index
