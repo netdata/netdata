@@ -1075,7 +1075,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                 arl_expect(mem->arl_base, "total_pgpgout", &mem->total_pgpgout);
                 arl_expect(mem->arl_base, "total_pgfault", &mem->total_pgfault);
                 arl_expect(mem->arl_base, "total_pgmajfault", &mem->total_pgmajfault);
-                arl_expect(mem->arl_base, "total_inactive_files", &mem->total_inactive_file);
+                arl_expect(mem->arl_base, "total_inactive_file", &mem->total_inactive_file);
             } else {
                 mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
@@ -2748,7 +2748,11 @@ void update_systemd_services_charts(
             if(unlikely(!cg->rd_mem_detailed_working_set))
                 cg->rd_mem_detailed_working_set = rrddim_add(st_mem_detailed_working_set, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_working_set, cg->rd_mem_detailed_working_set, cg->memory.usage_in_bytes - cg->memory.total_inactive_file);
+            rrddim_set_by_pointer(
+                st_mem_detailed_working_set,
+                cg->rd_mem_detailed_working_set,
+                (cg->memory.usage_in_bytes > cg->memory.total_inactive_file) ?
+                    (cg->memory.usage_in_bytes - cg->memory.total_inactive_file) : 0);
 
             if(unlikely(!cg->rd_mem_detailed_mapped))
                 cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3383,7 +3387,11 @@ void update_cgroup_charts(int update_every) {
             } else
                 rrdset_next(cg->st_mem_working_set);
 
-                rrddim_set(cg->st_mem_working_set, "working_set", cg->memory.usage_in_bytes - cg->memory.total_inactive_file);
+            rrddim_set(
+                cg->st_mem_working_set,
+                "working_set",
+                (cg->memory.usage_in_bytes > cg->memory.total_inactive_file) ?
+                    (cg->memory.usage_in_bytes - cg->memory.total_inactive_file) : 0);
             rrdset_done(cg->st_mem_working_set);
 
             if(unlikely(!cg->st_writeback)) {
