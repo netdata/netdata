@@ -55,9 +55,9 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                    , ae->name
                    , ae->chart
                    , ae->family
-                   , ae->class?ae->class:"Other"
-                   , ae->component?ae->component:"Other"
-                   , ae->type?ae->type:"Other"
+                   , ae->class?ae->class:"Unknown"
+                   , ae->component?ae->component:"Unknown"
+                   , ae->type?ae->type:"Unknown"
                    , (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false"
                    , (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false"
                    , (unsigned long)ae->exec_run_timestamp
@@ -179,9 +179,9 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->name
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
-                   , rc->class?rc->class:"Other"
-                   , rc->component?rc->component:"Other"
-                   , rc->type?rc->type:"Other"
+                   , rc->class?rc->class:"Unknown"
+                   , rc->component?rc->component:"Unknown"
+                   , rc->type?rc->type:"Unknown"
                    , (rc->rrdset)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
