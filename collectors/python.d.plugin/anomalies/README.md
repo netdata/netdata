@@ -35,18 +35,26 @@ Then, as the issue passes, the anomaly probabilities should settle back down int
 ## Requirements
 
 - This collector will only work with Python 3 and requires the packages below be installed.
+- Typically you will not need to do this, but, if needed, to ensure Python 3 is used you can add the below line to the `[plugin:python.d]` section of `netdata.conf`
+
+```yaml
+[plugin:python.d]
+	# update every = 1
+	command options = -ppython3
+```
+
+Install the required python libraries.
 
 ```bash
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.35 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Configuration
 
-Install the Python requirements above, enable the collector and [restart
-Netdata](/docs/configure/start-stop-restart.md).
+Install the Python requirements above, enable the collector and restart Netdata.
 
 ```bash
 cd /etc/netdata/
