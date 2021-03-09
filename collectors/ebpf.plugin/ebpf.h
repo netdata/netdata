@@ -175,6 +175,7 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *title,
                                        char *units,
                                        char *family,
+                                       char *charttype,
                                        int order,
                                        char *algorithm,
                                        struct target *root);

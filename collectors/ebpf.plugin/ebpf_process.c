@@ -646,6 +646,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Number of open files",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_FILE_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20061,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -655,6 +656,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    "Fails to open files",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_FILE_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20062,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root);
@@ -664,6 +666,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Files closed",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_FILE_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20063,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -673,6 +676,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    "Fails to close files",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_FILE_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20064,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root);
@@ -682,6 +686,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Files deleted",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20065,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -690,6 +695,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Write to disk",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20066,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                apps_groups_root_target);
@@ -699,6 +705,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    "Fails to write",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20067,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root);
@@ -708,6 +715,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Read from disk",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20068,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -717,6 +725,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    "Fails to read",
                                    EBPF_COMMON_DIMENSION_CALL,
                                    NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20069,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                    root);
@@ -725,6 +734,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
                                "Bytes written on disk", EBPF_COMMON_DIMENSION_BYTES,
                                NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20070,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -732,6 +742,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
                                NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20071,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -740,6 +751,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Process started",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20072,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -748,6 +760,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Threads started",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20073,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -756,6 +769,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Tasks closed",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20074,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
