@@ -372,7 +372,7 @@ case ${ERROR_KEY} in
         *) EXIT_CODE=7 ;;
 esac
 
-HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
+HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | tail -1 | awk -F " " '{print $2}')
 if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
         EXIT_CODE=0
 fi
