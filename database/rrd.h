@@ -856,8 +856,8 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-    uuid_t  host_uuid;                              // Global GUID for this host
 #endif
+    uuid_t  host_uuid;                              // Global GUID for this host
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
@@ -1317,7 +1317,7 @@ extern void set_host_properties(
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
-#include "sqlite/sqlite_functions.h"
 #endif
+#include "sqlite/sqlite_functions.h"
 
 #endif /* NETDATA_RRD_H */
