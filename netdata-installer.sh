@@ -1617,11 +1617,17 @@ remove_old_ebpf() {
 
   # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
-    echo >&2 "Removing old eBPF programs"
+    echo >&2 "Removing old eBPF programs with patch."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
   fi
 
+  # Remove old eBPF program to store new eBPF program inside subdirectory
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.o" ]; then
+    echo >&2 "Removing old eBPF programs installed in old directory."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
+  fi
 }
 
 install_ebpf() {
@@ -1658,7 +1664,16 @@ install_ebpf() {
   # chown everything to root:netdata before we start copying out of our package
   run chown -R root:netdata "${tmp}"
 
-  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  if [ ! -d "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d ]; then
+    mkdir "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
+    RET=$?
+    if [ "${RET}" != "0" ]; then
+      rm -rf "${tmp}"
+      return 1
+    fi
+  fi
+
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
 
   rm -rf "${tmp}"
 

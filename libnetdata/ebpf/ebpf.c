@@ -296,7 +296,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     if (test < 0 || test > 127)
         return NULL;
 
-    snprintf(lpath, 4096, "%s/%s", plugins_dir, lname);
+    snprintf(lpath, 4096, "%s/ebpf.d/%s", plugins_dir, lname);
     // We are using BPF_PROG_TYPE_UNSPEC instead a specific type for bpf_prog_load to define the type
     // according the eBPF program loaded
     if (bpf_prog_load(lpath, BPF_PROG_TYPE_UNSPEC, obj, &prog_fd)) {
