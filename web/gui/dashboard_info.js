@@ -1030,10 +1030,6 @@ netdataDashboard.context = {
         info: 'System calls for <code>sync()</code> which flushes file system buffers to storage devices. These calls can cause performance perturbations, and it can be useful to know if they are happening and how frequently. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/syncsnoop.py" target="_blank">syncsnoop</a> from BCC tools.'
     },
 
-    'mem.sync_return': {
-        info: 'Monitor return from <code>sync()</code>, on success this function returns 0, on error a negative value is returned and the chart shows a peak for each one of these events.'
-    },
-
     // ------------------------------------------------------------------------
     // network interfaces
 
