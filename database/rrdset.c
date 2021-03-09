@@ -1932,6 +1932,18 @@ void rrdset_finalize_labels(RRDSET *st)
     } else {
         replace_label_list(labels, new_labels);
     }
+#ifdef ENABLE_DBENGINE
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        netdata_rwlock_wrlock(&labels->labels_rwlock);
+        struct label *lbl = labels->head;
+        while (lbl) {
+            sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
+            lbl = lbl->next;
+        }
+        netdata_rwlock_unlock(&labels->labels_rwlock);
+    }
+#endif
+
     st->state->new_labels = NULL;
 }
 

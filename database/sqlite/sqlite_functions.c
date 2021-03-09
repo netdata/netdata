@@ -17,12 +17,14 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
     "CREATE INDEX IF NOT EXISTS ind_d1 on dimension (chart_id, id, name);",
     "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
+    "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
+    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
 
     "delete from chart_active;",
     "delete from dimension_active;",
-
     "delete from chart where chart_id not in (select chart_id from dimension);",
     "delete from host where host_id not in (select host_id from chart);",
+    "delete from chart_label where chart_id not in (select chart_id from chart);",
     NULL
 };
 
@@ -1018,6 +1020,56 @@ void add_migrated_file(char *path, uint64_t file_size)
 
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when checking if metadata file is migrated");
+
+    return;
+}
+
+#define SQL_INS_CHART_LABEL "insert or replace into chart_label " \
+    "(chart_id, source_type, label_key, label_value, date_created) " \
+    "values (@chart, @source, @label, @value, strftime('%s'));"
+
+void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_INS_CHART_LABEL, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart_id parameter to store label information");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 2, source_type);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind type parameter to store label information");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_text(res, 3, label, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind label parameter to store label information");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_text(res, 4, value, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind value parameter to store label information");
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store chart label entry, rc = %d", rc);
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing chart label information");
 
     return;
 }
