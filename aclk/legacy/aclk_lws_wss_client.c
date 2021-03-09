@@ -348,6 +348,7 @@ static inline int received_data_to_ringbuff(struct lws_ring *buffer, void *data,
     return 1;
 }
 
+#ifdef ACLK_TRP_DEBUG_VERBOSE
 static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
 {
     switch (reason) {
@@ -377,12 +378,11 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "LWS_CALLBACK_EVENT_WAIT_CANCELLED";
         default:
             // Not using an internal buffer here for thread-safety with unknown calling context.
-#ifdef ACLK_TRP_DEBUG_VERBOSE
             error("Unknown LWS callback %u", reason);
-#endif
             return "unknown";
     }
 }
+#endif
 
 void aclk_lws_wss_fail_report()
 {
