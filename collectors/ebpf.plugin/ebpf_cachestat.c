@@ -533,6 +533,7 @@ static void ebpf_create_memory_charts()
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
                       cachestat_counter_publish_aggregated, 1);
@@ -541,6 +542,7 @@ static void ebpf_create_memory_charts()
                       "Number of dirty pages added to the page cache.",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21101,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1);
@@ -549,6 +551,7 @@ static void ebpf_create_memory_charts()
                       "Hits are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21102,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1);
@@ -557,6 +560,7 @@ static void ebpf_create_memory_charts()
                       "Misses are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21103,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1);
