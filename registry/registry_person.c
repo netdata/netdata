@@ -32,7 +32,7 @@ inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, c
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
     debug(D_REGISTRY, "Registry: registry_person_url_index_add('%s', '%s')", p->guid, pu->url->url);
-    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_insert(&(p->person_urls), (avl *)(pu));
+    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_insert(&(p->person_urls), (avl_t *)(pu));
     if(tpu != pu)
         error("Registry: registry_person_url_index_add('%s', '%s') already exists as '%s'", p->guid, pu->url->url, tpu->url->url);
 
@@ -41,7 +41,7 @@ inline REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, RE
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
     debug(D_REGISTRY, "Registry: registry_person_url_index_del('%s', '%s')", p->guid, pu->url->url);
-    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_remove(&(p->person_urls), (avl *)(pu));
+    REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_remove(&(p->person_urls), (avl_t *)(pu));
     if(!tpu)
         error("Registry: registry_person_url_index_del('%s', '%s') deleted nothing", p->guid, pu->url->url);
     else if(tpu != pu)

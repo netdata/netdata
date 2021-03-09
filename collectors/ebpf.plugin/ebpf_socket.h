@@ -232,7 +232,7 @@ typedef struct netdata_socket_idx {
  */
 typedef struct netdata_socket_plot {
     // Search
-    avl avl;
+    avl_t avl;
     netdata_socket_idx_t index;
 
     // Current data

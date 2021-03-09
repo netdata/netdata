@@ -38,15 +38,15 @@ int rrddim_compare(void* a, void* b) {
     else return strcmp(((RRDDIM *)a)->id, ((RRDDIM *)b)->id);
 }
 
-#define rrddim_index_add(st, rd) (RRDDIM *)avl_insert_lock(&((st)->dimensions_index), (avl *)(rd))
-#define rrddim_index_del(st,rd ) (RRDDIM *)avl_remove_lock(&((st)->dimensions_index), (avl *)(rd))
+#define rrddim_index_add(st, rd) (RRDDIM *)avl_insert_lock(&((st)->dimensions_index), (avl_t *)(rd))
+#define rrddim_index_del(st,rd ) (RRDDIM *)avl_remove_lock(&((st)->dimensions_index), (avl_t *)(rd))
 
 static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
     RRDDIM tmp = {
             .id = id,
             .hash = (hash)?hash:simple_hash(id)
     };
-    return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl *) &tmp);
+    return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl_t *) &tmp);
 }
 
 
@@ -197,7 +197,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
                     RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, usename, rd->name);
                     if (child) {
                         rrdcalc_add_to_host(host, child);
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)child);
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)child);
                         if (rdcmp != child) {
                             error("Cannot insert the alarm index ID %s",child->name);
                         }
@@ -277,7 +277,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         if(likely(rd)) {
             // we have a file mapped for rd
 
-            memset(&rd->avl, 0, sizeof(avl));
+            memset(&rd->avl, 0, sizeof(avl_t));
             rd->id = NULL;
             rd->name = NULL;
             rd->cache_filename = NULL;

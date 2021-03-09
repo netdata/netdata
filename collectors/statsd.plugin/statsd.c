@@ -107,7 +107,7 @@ typedef enum statsd_metric_type {
 
 
 typedef struct statsd_metric {
-    avl avl;                        // indexing - has to be first
+    avl_t avl;                      // indexing - has to be first
 
     const char *name;               // the name of the metric
     uint32_t hash;                  // hash of the name
@@ -376,7 +376,7 @@ static inline STATSD_METRIC *statsd_metric_index_find(STATSD_INDEX *index, const
     tmp.name = name;
     tmp.hash = (hash)?hash:simple_hash(tmp.name);
 
-    return (STATSD_METRIC *)STATSD_AVL_SEARCH(&index->index, (avl *)&tmp);
+    return (STATSD_METRIC *)STATSD_AVL_SEARCH(&index->index, (avl_t *)&tmp);
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, STATSD_METRIC_TYPE type) {
@@ -398,7 +398,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
             m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
             netdata_mutex_init(&m->histogram.ext->mutex);
         }
-        STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl *)m);
+        STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl_t *)m);
         if(unlikely(n != m)) {
             freez((void *)m->histogram.ext);
             freez((void *)m->name);
