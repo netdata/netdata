@@ -582,8 +582,8 @@ RRDHOST *rrdhost_find_or_create(
 
     return host;
 }
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
-    if(host != protected
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now) {
+    if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && host->receiver
@@ -594,14 +594,14 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t n
     return 0;
 }
 
-void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected) {
+void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
     time_t now = now_realtime_sec();
 
     RRDHOST *host;
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected, now)) {
+        if(rrdhost_should_be_removed(host, protected_host, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
