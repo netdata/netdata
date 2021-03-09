@@ -657,15 +657,12 @@ RRDSET *rrdset_create_custom(
                 sched_yield();
             }
         }
-#ifdef ENABLE_DBENGINE
-        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
+        if (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
             debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
             int rc = update_chart_metadata(st->chart_uuid, st, id, name);
             if (unlikely(rc))
                 error_report("Failed to update chart metadata in the database");
         }
-#endif
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active)
             return st;
