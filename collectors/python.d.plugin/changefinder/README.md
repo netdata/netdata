@@ -16,8 +16,19 @@ Instead of this collector just _collecting_ data, it also does some computation 
 
 Two charts are available:
 
-- **ChangeFinder Scores** (`changefinder.scores`): This chart shows the percentile of the score that is output from the ChangeFinder library (it is turned off by default but available with `show_scores: true`). A high observed score is more likley to be a valid changepoint worth exploring, even more so when multiple charts or dimensions have high changepoint scores at the same time or very close together.
-- **ChangeFinder Flags** (`changefinder.flags`): This chart shows `1` or `0` if the latest score has a percentile value that exceeds the `cf_threshold` threshold. By default, any scores that are in the 99th or above percentile will raise a flag on this chart. The raw changefinder score itself can be a little noisey and so limiting ourselves to just periods where it surpasses the 99th percentile can help manage the "[signal to noise ratio](https://en.wikipedia.org/wiki/Signal-to-noise_ratio)" better. The `cf_threshold` paramater might be one you want to play around with to tune things a little more specifically for the workloads on your node and the specific charts you want to monitor. For example, maybe the 95th percentile might work better for you than the 99th percentile (likley at the cost of a little more noise on the chart over time).
+### ChangeFinder Scores (`changefinder.scores`) 
+
+This chart shows the percentile of the score that is output from the ChangeFinder library (it is turned off by default but available with `show_scores: true`). 
+
+A high observed score is more likley to be a valid changepoint worth exploring, even more so when multiple charts or dimensions have high changepoint scores at the same time or very close together.
+
+### ChangeFinder Flags (`changefinder.flags`)
+
+This chart shows `1` or `0` if the latest score has a percentile value that exceeds the `cf_threshold` threshold. By default, any scores that are in the 99th or above percentile will raise a flag on this chart. 
+
+The raw changefinder score itself can be a little noisey and so limiting ourselves to just periods where it surpasses the 99th percentile can help manage the "[signal to noise ratio](https://en.wikipedia.org/wiki/Signal-to-noise_ratio)" better. 
+
+The `cf_threshold` paramater might be one you want to play around with to tune things specifically for the workloads on your node and the specific charts you want to monitor. For example, maybe the 95th percentile might work better for you than the 99th percentile.
 
 Below is an example of the chart produced by this collector. The first 3/4 of the period looks normal in that we see a few individual changes being picked up somewhat randomly over time. But then at around 14:59 towards the end of the chart we see two periods with 'spikes' of multiple changes for a small period of time. This is the sort of pattern that might be a sign something on the system that has changed sufficiently enough to merit some investigation.
 
