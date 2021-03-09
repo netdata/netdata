@@ -49,7 +49,7 @@ Install the required python libraries.
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.35 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Configuration
@@ -94,6 +94,9 @@ local:
 
     # Use http or https to pull data
     protocol: 'http'
+
+    # SSL verify parameter for requests.get() calls
+    verify: true
 
     # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
     charts_regex: 'system\..*'

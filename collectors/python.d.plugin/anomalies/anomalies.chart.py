@@ -74,6 +74,7 @@ class Service(SimpleService):
         self.host = self.configuration.get('host', '127.0.0.1:19999')
         self.username = self.configuration.get('username', None)
         self.password = self.configuration.get('password', None)
+        self.verify = self.configuration.get('verify', True)
         self.fitted_at = {}
         self.df_allmetrics = pd.DataFrame()
         self.last_train_at = 0
@@ -84,7 +85,7 @@ class Service(SimpleService):
         """Do some initialisation of charts in scope related variables.
         """
         self.charts_regex = re.compile(self.configuration.get('charts_regex','None'))
-        self.charts_available = [c for c in list(requests.get(f'{self.protocol}://{self.host}/api/v1/charts').json().get('charts', {}).keys())]
+        self.charts_available = [c for c in list(requests.get(f'{self.protocol}://{self.host}/api/v1/charts', verify=self.verify).json().get('charts', {}).keys())]
         self.charts_in_scope = list(filter(self.charts_regex.match, self.charts_available))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         if len(self.charts_to_exclude) > 0:
@@ -297,8 +298,9 @@ class Service(SimpleService):
         # get training data
         df_train = get_data(
             host_charts_dict=self.host_charts_dict, host_prefix=True, host_sep='::', after=after, before=before,
-            sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password
-            ).ffill()
+            sort_cols=True, numeric_only=True, protocol=self.protocol, float_size='float32', user=self.username, pwd=self.password,
+            verify=self.verify
+        ).ffill()
         if self.custom_models:
             df_train = self.add_custom_models_dims(df_train)
 
