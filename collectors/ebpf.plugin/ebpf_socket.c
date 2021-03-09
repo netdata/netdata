@@ -603,7 +603,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          title,
                          units,
                          family,
-                         "stacked",
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
                          NULL,
                          order);
 
@@ -640,7 +640,7 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
                          title,
                          units,
                          family,
-                         "stacked",
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
                          NULL,
                          order);
 
