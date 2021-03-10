@@ -524,15 +524,16 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
         if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf)) {
+            json_object_put(lwt);
             freez(aclk_hostname);
             info("MQTTWSS connection succeeded");
             mqtt_connected_actions(client);
             return 0;
         }
 
+        json_object_put(lwt);
         error("Connect failed\n");
     }
-    json_object_put(lwt);
 
     freez(aclk_hostname);
     return 1;
