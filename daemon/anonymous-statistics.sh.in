@@ -30,7 +30,7 @@ NETDATA_VERSION=$(echo "${NETDATA_VERSION}" | sed 's/-.*//g' | tr -d 'v')
 if [ -n "$(command -v curl 2> /dev/null)" ]; then
   curl -X POST --header "Content-Type: application/json" -d '{
     "api_key": "mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y",
-    "event": "'"${ACTION}"'" "'"${ACTION_RESULT}"'",
+    "event": "'${ACTION}' '${ACTION_RESULT}'",
     "properties": {
         "distinct_id": "'"${NETDATA_REGISTRY_UNIQUE_ID}"'",
         "$current_url": "agent backend",
@@ -81,7 +81,7 @@ else
   --header 'Content-Type: application/json' \
   --body-data '{
     "api_key": "mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y",
-    "event": "'"${ACTION}"'" "'"${ACTION_RESULT}"'",
+    "event": "'${ACTION}' '${ACTION_RESULT}'",
     "properties": {
         "distinct_id": "'"${NETDATA_REGISTRY_UNIQUE_ID}"'",
         "$current_url": "agent backend",
