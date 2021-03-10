@@ -7,8 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-s
 
 # Anonymous statistics
 
-Netdata collects anonymous usage information by default using the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog). We self-host our PostHog instance, which means your data is never sent or processed by any third parties outside of the Netdata infrastructure. We use
-the statistics gathered from this information for two purposes:
+Netdata collects anonymous usage information by default using the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog). We self-host our PostHog instance, which means your data is never sent or processed by any third parties outside of the Netdata infrastructure. We use the statistics gathered from this information for two purposes:
 
 1.  **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
      issues with certain distributions or environments.
@@ -107,7 +106,7 @@ Each of these opt-out processes does the following:
 
 ## Migration from Google Analytics and Google Tag Manager.
 
-Prior to vX.XX we used Google Analytics to capture this information. This led to discomfot with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
+Prior to v1.29.4 we used Google Analytics to capture this information. This led to discomfot with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
 
 While we migrate fully away from Google Analytics to PostHog there maybe be a small period of time where we run both in parallel before we remove all Google Analytics related code. This is to ensure we can fully test and validate the Netdata PostHog implementation before fully defaulting to it.
 
