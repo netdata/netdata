@@ -41,10 +41,19 @@ struct pg_cache_page_index;
 #include "aclk/aclk.h"
 #endif
 
+enum {
+    CONTEXT_FLAGS_ARCHIVE = 0x01,
+    CONTEXT_FLAGS_CHART   = 0x02,
+    CONTEXT_FLAGS_CONTEXT = 0x04
+};
+
 struct context_param {
     RRDDIM *rd;
     time_t first_entry_t;
     time_t last_entry_t;
+    uint8_t flags;
+//    uint8_t archive_mode;
+//    uint8_t context_mode;
 };
 
 #define META_CHART_UPDATED 1

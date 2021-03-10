@@ -214,8 +214,11 @@ int rrdset2anything_api_v1(
         , struct context_param *context_param_list
         , char *chart_label_key
 ) {
-    time_t last_accessed_time = now_realtime_sec();
-    st->last_accessed_time = last_accessed_time;
+
+    if (!(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
+        time_t last_accessed_time = now_realtime_sec();
+        st->last_accessed_time = last_accessed_time;
+    }
 
 
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL, context_param_list);
