@@ -1662,6 +1662,20 @@ static void parse_service_name_section()
 }
 
 /**
+ * Update interval
+ *
+ * Update default interval with value from user
+ */
+static void ebpf_update_interval()
+{
+    int i;
+    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, "update every", 1);
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].update_time = value;
+    }
+}
+
+/**
  * Read collector values
  *
  * @param disable_apps variable to store information related to apps.
@@ -1676,6 +1690,8 @@ static void read_collector_values(int *disable_apps)
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
 
     how_to_load(value);
+
+    ebpf_update_interval();
 
     // This is kept to keep compatibility
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
