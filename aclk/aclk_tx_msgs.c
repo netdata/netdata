@@ -260,6 +260,7 @@ void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
 
     aclk_send_message_subtopic(client, msg, ACLK_TOPICID_ALARMS);
 
+    json_object_put(msg);
     freez(msg_id);
     buffer_free(local_buffer);
 }
@@ -293,6 +294,7 @@ void aclk_hello_msg(mqtt_wss_client client)
 
     aclk_send_message_subtopic(client, msg, ACLK_TOPICID_METADATA);
 
+    json_object_put(msg);
     freez(msg_id);
 }
 
