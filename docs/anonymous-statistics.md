@@ -29,23 +29,13 @@ When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Ne
 _Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.  
 
 ```JavaScript
-const injectPosthog = (machineGuid: string) => {
-  if (window.posthog) {
-    return
-  }
-  /* eslint-disable */
-  // @ts-ignore
-  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-  /* eslint-enable */
-  window.posthog.init("zR4pStMtxgP3wJ27vIjQJvZNXwMWqZlzP0x4dKbHOHg", { api_host: "https://app.posthog.com" })
-  window.posthog.register({
+window.posthog.register({
     distinct_id: machineGuid,
     $ip: "127.0.0.1",
     $current_url: "agent dashboard",
     $pathname: "netdata-dashboard",
     $host: "dashboard.netdata.io",
-  })
-}
+})
 ```
 
 In the above snippet a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname` and `host` attributes are set to constant values for all events that may be sent during the session. This way, information like the IP or hostname of the Agent will not be sent as part of the product usage event data.
