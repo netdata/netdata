@@ -10,7 +10,6 @@
 
 // Internal constants
 #define NETDATA_GLOBAL_VECTOR 24
-#define NETDATA_MAX_MONITOR_VECTOR 9
 #define NETDATA_VFS_ERRORS 3
 
 // Map index

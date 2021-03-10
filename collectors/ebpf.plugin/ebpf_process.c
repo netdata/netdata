@@ -19,8 +19,8 @@ static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open"
 static char *status[] = { "process", "zombie" };
 
 static netdata_idx_t *process_hash_values = NULL;
-static netdata_syscall_stat_t *process_aggregated_data = NULL;
-static netdata_publish_syscall_t *process_publish_aggregated = NULL;
+static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
+static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
 static ebpf_data_t process_data;
 
@@ -936,9 +936,7 @@ static void ebpf_process_cleanup(void *ptr)
         UNUSED(dt);
     }
 
-    freez(process_aggregated_data);
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
-    freez(process_publish_aggregated);
     freez(process_hash_values);
 
     clean_global_memory();
@@ -972,8 +970,8 @@ static void ebpf_process_cleanup(void *ptr)
  */
 static void ebpf_process_allocate_global_vectors(size_t length)
 {
-    process_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
-    process_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
+    memset(process_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
+    memset(process_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
@@ -1050,7 +1048,7 @@ void *ebpf_process_thread(void *ptr)
     fill_ebpf_data(&process_data);
 
     pthread_mutex_lock(&lock);
-    ebpf_process_allocate_global_vectors(NETDATA_MAX_MONITOR_VECTOR);
+    ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
 
     if (ebpf_update_kernel(&process_data)) {
         pthread_mutex_unlock(&lock);
@@ -1072,7 +1070,7 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_global_labels(
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
-        algorithms, NETDATA_MAX_MONITOR_VECTOR);
+        algorithms, NETDATA_KEY_PUBLISH_PROCESS_END);
 
     if (process_enabled) {
         ebpf_create_global_charts(em);
