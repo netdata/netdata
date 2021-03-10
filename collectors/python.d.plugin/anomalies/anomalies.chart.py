@@ -405,7 +405,6 @@ class Service(SimpleService):
 
         # roll forward previous predictions around a training step to avoid the possibility of having the training itself trigger an anomaly
         if (self.runs_counter - self.last_train_at) <= self.train_no_prediction_n:
-            data = self.data_latest
             data_probability = self.data_probability_latest
             data_anomaly = self.data_anomaly_latest
         else:
