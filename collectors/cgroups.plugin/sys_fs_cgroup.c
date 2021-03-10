@@ -3319,7 +3319,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 210
+                        , cgroup_containers_chart_priority + 225
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -3379,7 +3379,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 220
+                        , cgroup_containers_chart_priority + 205
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -3504,7 +3504,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 200
+                        , cgroup_containers_chart_priority + 220
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -3567,7 +3567,7 @@ void update_cgroup_charts(int update_every) {
                                 , "MiB"
                                 , PLUGIN_CGROUPS_NAME
                                 , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                                , cgroup_containers_chart_priority + 199
+                                , cgroup_containers_chart_priority + 210
                                 , update_every
                                 , RRDSET_TYPE_STACKED
                         );
@@ -3600,7 +3600,7 @@ void update_cgroup_charts(int update_every) {
                                     , "percentage"
                                     , PLUGIN_CGROUPS_NAME
                                     , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                                    , cgroup_containers_chart_priority + 215
+                                    , cgroup_containers_chart_priority + 200
                                     , update_every
                                     , RRDSET_TYPE_AREA
                             );
