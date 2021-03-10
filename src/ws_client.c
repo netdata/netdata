@@ -652,8 +652,9 @@ int ws_client_process(ws_client *client)
     int ret;
     switch(client->state) {
         case WS_RAW:
-            ws_client_start_handshake(client);
-            break;
+            if (ws_client_start_handshake(client))
+                return WS_CLIENT_INTERNAL_ERROR;
+            return WS_CLIENT_NEED_MORE_BYTES;
         case WS_HANDSHAKE:
             do {
                 ret = ws_client_parse_handshake_resp(client);
