@@ -26,7 +26,7 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initialiszes a PostHog session and masks various event attributes.
 
-_Note_: You can see the relevant code in the [dashboard repository here](https://github.com/netdata/dashboard/blob/posthog-test/src/domains/global/sagas.ts#L77).  
+_Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.  
 
 ```JavaScript
 const injectPosthog = (machineGuid: string) => {
@@ -106,7 +106,7 @@ Each of these opt-out processes does the following:
 
 ## Migration from Google Analytics and Google Tag Manager.
 
-Prior to v1.29.4 we used Google Analytics to capture this information. This led to discomfot with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
+Prior to v1.29.4 we used Google Analytics to capture this information. This led to discomfort with some of our users in sending any product usage data to a third party like Google. It was also not even that useful in terms of generating the insights we needed to help catch bugs early and find opportunities for product improvement as Google Analytics does not allow its users access to the raw underlying data without paying a significant amount of money which would be infeasible for a project like Netdata.
 
 While we migrate fully away from Google Analytics to PostHog there maybe be a small period of time where we run both in parallel before we remove all Google Analytics related code. This is to ensure we can fully test and validate the Netdata PostHog implementation before fully defaulting to it.
 
