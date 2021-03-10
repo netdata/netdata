@@ -399,7 +399,8 @@ static int https_request(http_req_type method, char *host, int port, char *url, 
         goto exit_FULL;
     }
 
-    rbuf_pop(buffer, b, b_size);
+    len = rbuf_pop(buffer, b, b_size);
+    b[MIN(len, b_size-1)] = 0;
 
     rc = 0;
 exit_FULL:
