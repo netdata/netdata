@@ -3,6 +3,8 @@
 AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
+BUILT_SOURCES=$(NULL)
+
 MAINTAINERCLEANFILES = \
     config.log config.status \
     $(srcdir)/Makefile.in \
@@ -569,7 +571,35 @@ ACLK_FILES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
     mqtt_websockets/MQTT-C/include/mqtt.h \
+    aclk/schema-wrappers/connection.cc \
+    aclk/schema-wrappers/connection.h \
+    aclk/schema-wrappers/node_connection.cc \
+    aclk/schema-wrappers/node_connection.h \
+    aclk/schema-wrappers/node_creation.cc \
+    aclk/schema-wrappers/node_creation.h \
+    aclk/schema-wrappers/schema_wrappers.h \
     $(NULL)
+
+BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
+    $(NULL)
+
+aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
+	$(PROTOC) --cpp_out=$(builddir) $^
+
+aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
+aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+	$(PROTOC) --cpp_out=$(builddir) $^
+
+aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
+aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+	$(PROTOC) --cpp_out=$(builddir) $^
+
 else #ACLK_NG
 ACLK_FILES = \
     aclk/legacy/aclk_rrdhost_state.h \
@@ -885,7 +915,7 @@ endif
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
-    BUILT_SOURCES = \
+    BUILT_SOURCES += \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
