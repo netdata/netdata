@@ -15,6 +15,15 @@ In this guide, we'll go through a scenario of visualizing our data in Netdata in
 
 Although we'll use k6 as the use-case, the same principles can be applied to every application that supports the StatsD protocol. Simply enable the StatsD output and point it to the node that runs Netdata, which is `localhost` in this case.
 
+In general, the process for creating a StatsD collector can be summarized in 2 steps:
+
+- Run an experiment by sending StatsD metrics to Netdata, without any prior configuration. This will create a chart per metric (called private charts) and will help you verify that everything works as expected from the application side of things.
+    - Make sure to reload the dashboard tab **after** you start sending data to Netdata.
+- Create a configuration file for your app using [edit-config](https://learn.netdata.cloud/guides/step-by-step/step-04): `sudo ./edit-config statsd.d/myapp.conf`
+    - Each app will have it's own section in the right-hand menu.
+
+Now, let's see the above process in detail.
+
 ## Prerequisites
 
 - A node with the [Netdata Agent](https://learn.netdata.cloud/docs/get#install-the-netdata-agent) installed.
@@ -271,15 +280,6 @@ dist_statsdconfig_DATA = \
     k6.conf \
     $(NULL)
 ```
-
-## ???
-
-- Run an experiment and output raw metrics to Netdata. This will create a chart per metric (called private charts) and verify that everything works as expected.
-    - Make sure to reload the dashboard tab **after** you start sending data to Netdata.
-- Create a configuration file for your app using [edit-config](https://learn.netdata.cloud/guides/step-by-step/step-04): `sudo ./edit-config statsd.d/myapp.conf`
-    - Each app will have it's own section in the right-hand menu.
-- 
-
 
 ## What's next?
 
