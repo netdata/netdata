@@ -291,7 +291,8 @@ extern char *read_by_filename(char *filename, long *file_size);
 #endif
 #endif
 
-#define BITS_IN_A_KILOBIT 1000
+#define BITS_IN_A_KILOBIT     1000
+#define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
 #define UNUSED(x) (void)(x)
