@@ -308,17 +308,34 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     int n_warn=0, n_crit=0;
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
+    BUFFER *warn_alarms, *crit_alarms;
+    static char buf[11];
+
+    warn_alarms = buffer_create(1000); //enough?
+    crit_alarms = buffer_create(1000); //enough?
 
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
+            if (n_warn) buffer_strcat(warn_alarms, "|");
             n_warn++;
+            buffer_strcat(warn_alarms, rc->name);
+            buffer_strcat(warn_alarms, "=");
+            snprintfz(buf, 10, "%ld", rc->last_status_change);
+            buffer_strcat(warn_alarms, buf);
+                        
             if (ae->alarm_id == rc->id)
                 expr=rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
+            if (n_crit) buffer_strcat(crit_alarms, "|");
             n_crit++;
+            buffer_strcat(crit_alarms, rc->name);
+            buffer_strcat(crit_alarms, "=");
+            snprintfz(buf, 10, "%ld", rc->last_status_change);
+            buffer_strcat(crit_alarms, buf);
+            
             if (ae->alarm_id == rc->id)
                 expr=rc->critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
@@ -327,7 +344,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -352,7 +369,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               (expr && expr->source)?expr->source:"NOSOURCE",
               (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
               n_warn,
-              n_crit
+              n_crit,
+              buffer_tostring(warn_alarms),
+              buffer_tostring(crit_alarms)
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
@@ -362,6 +381,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
+
+    buffer_free(warn_alarms);
+    buffer_free(crit_alarms);
 
     return; //health_alarm_wait_for_execution
 done:
