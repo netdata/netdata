@@ -80,7 +80,7 @@ class Service(UrlService):
         try:
             score = self.models[model].update(x)
             self.scores_latest[model] = score
-        except:
+        except Exception as e:
             score = self.scores_latest.get(model, 0)        
         score = 0 if np.isnan(score) else score
 
