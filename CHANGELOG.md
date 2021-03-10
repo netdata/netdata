@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Use of out-of-line struct definitions. [\#10739](https://github.com/netdata/netdata/pull/10739) ([vkalintiris](https://github.com/vkalintiris))
+- Use a parameter name that is not a reserved keyword in C++ [\#10738](https://github.com/netdata/netdata/pull/10738) ([vkalintiris](https://github.com/vkalintiris))
+- Fix claim behind squid proxy [\#10734](https://github.com/netdata/netdata/pull/10734) ([underhood](https://github.com/underhood))
+- Always configure multihost database context [\#10732](https://github.com/netdata/netdata/pull/10732) ([stelfrag](https://github.com/stelfrag))
+- Removes unused fnc warning in ACLK Legacy [\#10731](https://github.com/netdata/netdata/pull/10731) ([underhood](https://github.com/underhood))
+- Update chart's metadata in database when it already exists during creation [\#10728](https://github.com/netdata/netdata/pull/10728) ([stelfrag](https://github.com/stelfrag))
+- Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
 - Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
 - Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
 - python.d/smartd\_log: collect attribute 233 \(Media Wearout Indicator \(SSD\)\). [\#10711](https://github.com/netdata/netdata/pull/10711) ([aazedo](https://github.com/aazedo))
@@ -19,6 +26,7 @@
 - Log ACLK cloud commands to access.log [\#10697](https://github.com/netdata/netdata/pull/10697) ([stelfrag](https://github.com/stelfrag))
 - Add Linux page cache metrics to eBPF [\#10693](https://github.com/netdata/netdata/pull/10693) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update guide: Kubernetes monitoring with Netdata: Overview and visualizations [\#10691](https://github.com/netdata/netdata/pull/10691) ([joelhans](https://github.com/joelhans))
+- health: make alarms less sensitive [\#10688](https://github.com/netdata/netdata/pull/10688) ([ilyam8](https://github.com/ilyam8))
 - Ebpf support new collectors [\#10680](https://github.com/netdata/netdata/pull/10680) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix broken links in active alarms doc [\#10678](https://github.com/netdata/netdata/pull/10678) ([joelhans](https://github.com/joelhans))
 - Add new cookie to fix 8094 [\#10676](https://github.com/netdata/netdata/pull/10676) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -38,7 +46,6 @@
 - Try to keep all pages from extents read from disk in the cache. [\#10558](https://github.com/netdata/netdata/pull/10558) ([mfundul](https://github.com/mfundul))
 - Remove unreachable \#else directives in plugins. [\#10523](https://github.com/netdata/netdata/pull/10523) ([vkalintiris](https://github.com/vkalintiris))
 - increases ACLK TBEB randomness [\#10373](https://github.com/netdata/netdata/pull/10373) ([underhood](https://github.com/underhood))
-- Added support for claiming nodes as part of installation. [\#10084](https://github.com/netdata/netdata/pull/10084) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
@@ -272,10 +279,6 @@
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/before_rebase...v1.26.0)
-
-**Merged pull requests:**
-
-- Fix systemd comment syntax [\#10066](https://github.com/netdata/netdata/pull/10066) ([HolgerHees](https://github.com/HolgerHees))
 
 ## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
 
