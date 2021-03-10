@@ -27,7 +27,7 @@ class Service(SimpleService):
             self.charts_to_agg[n]['name']: {
                 'agg_func': self.charts_to_agg[n].get('agg_func','mean'),
                 'exclude_dims': self.charts_to_agg[n].get('exclude_dims','').split(',')
-                } 
+                }
                 for n in range(0,len(self.charts_to_agg))
         }
         self.refresh_children_every_n = self.configuration.get('refresh_children_every_n', 60)
@@ -75,7 +75,7 @@ class Service(SimpleService):
 
     def get_children_to_agg(self):
         """Define the list of children to aggregate over.
-        """        
+        """
         self.children = self.get_children()
         if self.child_contains:
             self.children = [child for child in self.children if any(c in child for c in self.child_contains.split(','))]
