@@ -801,36 +801,36 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     }
                     else {
                         rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (calculated_number) d->speed * KILOBITS_IN_A_MEGABIT);
+
+                        if(d->do_speed != CONFIG_BOOLEAN_NO) {
+                            if(unlikely(!d->st_speed)) {
+                                d->st_speed = rrdset_create_localhost(
+                                        d->chart_type_net_speed
+                                        , d->chart_id_net_speed
+                                        , NULL
+                                        , d->chart_family
+                                        , "net.speed"
+                                        , "Interface Speed"
+                                        , "kilobits/s"
+                                        , PLUGIN_PROC_NAME
+                                        , PLUGIN_PROC_MODULE_NETDEV_NAME
+                                        , d->priority + 7
+                                        , update_every
+                                        , RRDSET_TYPE_LINE
+                                );
+
+                                rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
+
+                                rrdset_update_labels(d->st_speed, d->chart_labels);
+
+                                d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                            }
+                            else rrdset_next(d->st_speed);
+
+                            rrddim_set_by_pointer(d->st_speed, d->rd_speed, (collected_number)d->speed * KILOBITS_IN_A_MEGABIT);
+                            rrdset_done(d->st_speed);
+                        }
                     }
-                }
-
-                if(d->do_speed != CONFIG_BOOLEAN_NO) {
-                    if(unlikely(!d->st_speed)) {
-                        d->st_speed = rrdset_create_localhost(
-                                d->chart_type_net_speed
-                                , d->chart_id_net_speed
-                                , NULL
-                                , d->chart_family
-                                , "net.speed"
-                                , "Interface Speed"
-                                , "kilobits/s"
-                                , PLUGIN_PROC_NAME
-                                , PLUGIN_PROC_MODULE_NETDEV_NAME
-                                , d->priority + 7
-                                , update_every
-                                , RRDSET_TYPE_LINE
-                        );
-
-                        rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
-
-                        rrdset_update_labels(d->st_speed, d->chart_labels);
-
-                        d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    }
-                    else rrdset_next(d->st_speed);
-
-                    rrddim_set_by_pointer(d->st_speed, d->rd_speed, (collected_number)d->speed * KILOBITS_IN_A_MEGABIT);
-                    rrdset_done(d->st_speed);
                 }
             }
         }
