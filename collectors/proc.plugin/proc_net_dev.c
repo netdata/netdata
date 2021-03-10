@@ -5,6 +5,8 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
+#define STATE_LENGTH_MAX 32
+
 // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
 const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up" };
 
@@ -694,9 +696,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if (d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
-            char buffer[32 + 1];
+            char buffer[STATE_LENGTH_MAX + 1];
 
-            if (read_file(d->filename_duplex, buffer, 32)) {
+            if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
                 error("Cannot refresh interface %s duplex state by reading '%s'. I will stop updating it.", d->name, d->filename_duplex);
                 freez(d->filename_duplex);
                 d->filename_duplex = NULL;
@@ -712,9 +714,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
-            char buffer[32 + 1], *trimmed_buffer;
+            char buffer[STATE_LENGTH_MAX + 1], *trimmed_buffer;
 
-            if (read_file(d->filename_operstate, buffer, 32)) {
+            if (read_file(d->filename_operstate, buffer, STATE_LENGTH_MAX)) {
                 error(
                     "Cannot refresh %s operstate by reading '%s'. Will not update its status anymore.",
                     d->name, d->filename_operstate);
