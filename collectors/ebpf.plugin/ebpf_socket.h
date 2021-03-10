@@ -5,7 +5,6 @@
 #include "libnetdata/avl/avl.h"
 
 // Vector indexes
-#define NETDATA_MAX_SOCKET_VECTOR 6
 #define NETDATA_UDP_START 3
 #define NETDATA_RETRANSMIT_START 5
 
@@ -16,6 +15,18 @@
 #define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
+
+enum ebpf_socket_publish_index {
+    NETDATA_IDX_TCP_SENDMSG,
+    NETDATA_IDX_TCP_CLEANUP_RBUF,
+    NETDATA_IDX_TCP_CLOSE,
+    NETDATA_IDX_UDP_RECVBUF,
+    NETDATA_IDX_UDP_SENDMSG,
+    NETDATA_IDX_TCP_RETRANSMIT,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_MAX_SOCKET_VECTOR
+};
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -38,6 +49,7 @@ typedef enum ebpf_socket_idx {
 
     NETDATA_KEY_TCP_RETRANSMIT,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
