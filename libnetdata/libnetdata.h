@@ -320,7 +320,7 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
-#ifdef HAVE_LIBBPF
+#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
 #include "eval/eval.h"
