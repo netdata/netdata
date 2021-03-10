@@ -26,7 +26,7 @@ delete_files_for_version() {
 		pkg=${pkg/\"/}
 		pkg=${pkg/\"/}
 		echo "Attempting yank on ${pkg}.."
-		.travis/package_management/package_cloud_wrapper.sh yank "${PACKAGING_USER}/${DEPLOY_REPO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
+		.github/scripts/package_cloud_wrapper.sh yank "${REPO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
 	done
 }
 
@@ -34,18 +34,13 @@ delete_files_for_version() {
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 CWD=$(git rev-parse --show-cdup)
 if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
-    echo "Run as .travis/package_management/$(basename "$0") from top level directory of netdata git repository"
+    echo "Run as .github/scripts/$(basename "$0") from top level directory of netdata git repository"
     echo "Old packages yanking cancelled"
     exit 1
 fi
 
-if [ -z "${PACKAGING_USER}" ]; then
-	echo "No PACKAGING_USER variable found"
-	exit 1
-fi
-
-if [ -z "${DEPLOY_REPO}" ]; then
-	echo "No DEPLOY_REPO variable found"
+if [ -z "${REPO}" ]; then
+	echo "No REPO variable found"
 	exit 1
 fi
 
@@ -68,8 +63,8 @@ DATE_UNTIL_TO_DELETE=$(date --date="${PACKAGE_CLOUD_RETENTION_DAYS} day ago" +%Y
 echo "Created temp directory: ${TMP_DIR}"
 echo "We will be purging contents up until ${DATE_UNTIL_TO_DELETE}"
 
-echo "Calling package could to retrieve all available packages on ${PACKAGING_USER}/${DEPLOY_REPO}"
-curl -sS "https://${PKG_CLOUD_TOKEN}:@packagecloud.io/api/v1/repos/${PACKAGING_USER}/${DEPLOY_REPO}/packages.json" > "${PKG_LIST_FILE}"
+echo "Calling package could to retrieve all available packages on ${REPO}"
+curl -sS "https://${PKG_CLOUD_TOKEN}:@packagecloud.io/api/v1/repos/${REPO}/packages.json" > "${PKG_LIST_FILE}"
 
 # Get versions within the desired duration
 #
