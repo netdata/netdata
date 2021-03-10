@@ -11,8 +11,8 @@ static struct bpf_object *objects = NULL;
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
-static netdata_syscall_stat_t *cachestat_counter_aggregated_data = NULL;
-static netdata_publish_syscall_t *cachestat_counter_publish_aggregated = NULL;
+static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
+static netdata_publish_syscall_t cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_END];
 
 netdata_cachestat_pid_t *cachestat_vector = NULL;
 
@@ -68,9 +68,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
     clean_pid_structures();
     freez(cachestat_pid);
 
-    freez(cachestat_counter_aggregated_data);
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
-    freez(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_hash_values);
@@ -587,8 +585,8 @@ static void ebpf_cachestat_allocate_global_vectors(size_t length)
 
     cachestat_hash_values = callocz(length, sizeof(netdata_idx_t));
 
-    cachestat_counter_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
-    cachestat_counter_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
+    memset(cachestat_counter_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
+    memset(cachestat_counter_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
 }
 
 /*****************************************************************
