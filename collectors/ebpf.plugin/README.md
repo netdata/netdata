@@ -190,6 +190,8 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
+-   `cachestat`: This eBPF program creates charts to demonstrate the page cache usage, it gives information for the 
+    whole host and also per application when the integration with `apps.plugin` is enabled.
 -   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
