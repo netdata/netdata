@@ -143,7 +143,9 @@ int sql_init_database(void)
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
-        error_report("Failed to initialize database at %s", sqlite_database);
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_meta);
+        db_meta = NULL;
         return 1;
     }
 
