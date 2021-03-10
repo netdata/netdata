@@ -182,20 +182,26 @@ static int kernel_is_rejected()
     }
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+    snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
     FILE *kernel_reject_list = fopen(filename, "r");
 
     if (!kernel_reject_list) {
-        config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-        if (config_dir == NULL) {
-            config_dir = LIBCONFIG_DIR;
-        }
-
+        // Keep this to have compatibility with old versions
         snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
         kernel_reject_list = fopen(filename, "r");
 
-        if (!kernel_reject_list)
-            return 0;
+        if (!kernel_reject_list) {
+            config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+            if (config_dir == NULL) {
+                config_dir = LIBCONFIG_DIR;
+            }
+
+            snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+            kernel_reject_list = fopen(filename, "r");
+
+            if (!kernel_reject_list)
+                return 0;
+        }
     }
 
     // Find if the kernel is in the reject list

@@ -1628,6 +1628,12 @@ remove_old_ebpf() {
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
   fi
+
+  # Remove old reject list from previous directory
+  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
+    echo >&2 "Removing old ebpf_kernel_reject_list.txt."
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
+  fi
 }
 
 install_ebpf() {
