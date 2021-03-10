@@ -1148,7 +1148,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
     memcpy(&test.index, lindex, sizeof(netdata_socket_idx_t));
     test.flags = flags;
 
-    ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
+    ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
         if (lvalues->ct > ret->plot.last_time) {
             update_socket_data(&ret->sock, lvalues);
@@ -1186,7 +1186,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         w->flags = flags;
         netdata_socket_plot_t *check ;
-        check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl *)w);
+        check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl_t *)w);
         if (check != w)
             error("Internal error, cannot insert the AVL tree.");
 

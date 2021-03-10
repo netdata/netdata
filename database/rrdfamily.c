@@ -12,15 +12,15 @@ int rrdfamily_compare(void *a, void *b) {
     else return strcmp(((RRDFAMILY *)a)->family, ((RRDFAMILY *)b)->family);
 }
 
-#define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl *)(rc))
-#define rrdfamily_index_del(host, rc) (RRDFAMILY *)avl_remove_lock(&((host)->rrdfamily_root_index), (avl *)(rc))
+#define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
+#define rrdfamily_index_del(host, rc) (RRDFAMILY *)avl_remove_lock(&((host)->rrdfamily_root_index), (avl_t *)(rc))
 
 static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id, uint32_t hash) {
     RRDFAMILY tmp;
     tmp.family = id;
     tmp.hash_family = (hash)?hash:simple_hash(tmp.family);
 
-    return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl *) &tmp);
+    return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl_t *) &tmp);
 }
 
 RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {

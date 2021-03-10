@@ -130,7 +130,7 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 // RRD FAMILY
 
 struct rrdfamily {
-    avl avl;
+    avl_t avl;
 
     const char *family;
     uint32_t hash_family;
@@ -235,7 +235,7 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // binary indexing structures
 
-    avl avl;                                        // the binary index - this has to be first member!
+    avl_t avl;                                      // the binary index - this has to be first member!
 
     // ------------------------------------------------------------------------
     // the dimension definition
@@ -474,8 +474,8 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // binary indexing structures
 
-    avl avl;                                        // the index, with key the id - this has to be first!
-    avl avlname;                                    // the index, with key the name
+    avl_t avl;                                      // the index, with key the id - this has to be first!
+    avl_t avlname;                                  // the index, with key the name
 
     // ------------------------------------------------------------------------
     // the set configuration
@@ -727,7 +727,7 @@ struct rrdhost_system_info {
 };
 
 struct rrdhost {
-    avl avl;                                        // the index of hosts
+    avl_t avl;                                      // the index of hosts
 
     // ------------------------------------------------------------------------
     // host information
@@ -1286,8 +1286,8 @@ extern int rrdfamily_compare(void *a, void *b);
 extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
 extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
 
-#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
-#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
+#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl_t *)(st))
+#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl_t *)(st))
 extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 
 extern void rrdset_free(RRDSET *st);

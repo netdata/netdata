@@ -35,7 +35,7 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id, uint32_t hash) {
     strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
     tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-    return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl *) &tmp);
+    return (RRDSET *)avl_search_lock(&(host->rrdset_root_index), (avl_t *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
@@ -57,7 +57,7 @@ int rrdset_compare_name(void* a, void* b) {
 RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
     void *result;
     // fprintf(stderr, "ADDING: %s (name: %s)\n", st->id, st->name);
-    result = avl_insert_lock(&host->rrdset_root_index_name, (avl *) (&st->avlname));
+    result = avl_insert_lock(&host->rrdset_root_index_name, (avl_t *) (&st->avlname));
     if(result) return rrdset_from_avlname(result);
     return NULL;
 }
@@ -65,7 +65,7 @@ RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
 RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
     void *result;
     // fprintf(stderr, "DELETING: %s (name: %s)\n", st->id, st->name);
-    result = (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl *)(&st->avlname));
+    result = (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index_name), (avl_t *)(&st->avlname));
     if(result) return rrdset_from_avlname(result);
     return NULL;
 }
@@ -81,7 +81,7 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, ui
     tmp.hash_name = (hash)?hash:simple_hash(tmp.name);
 
     // fprintf(stderr, "SEARCHING: %s\n", name);
-    result = avl_search_lock(&host->rrdset_root_index_name, (avl *) (&(tmp.avlname)));
+    result = avl_search_lock(&host->rrdset_root_index_name, (avl_t *) (&(tmp.avlname)));
     if(result) {
         RRDSET *st = rrdset_from_avlname(result);
         if(strcmp(st->magic, RRDSET_MAGIC) != 0)
@@ -744,8 +744,8 @@ RRDSET *rrdset_create_custom(
         );
 
         if(st) {
-            memset(&st->avl, 0, sizeof(avl));
-            memset(&st->avlname, 0, sizeof(avl));
+            memset(&st->avl, 0, sizeof(avl_t));
+            memset(&st->avlname, 0, sizeof(avl_t));
             memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));

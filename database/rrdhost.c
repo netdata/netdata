@@ -31,7 +31,7 @@ RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
     strncpyz(tmp.machine_guid, guid, GUID_LEN);
     tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
 
-    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl *) &tmp);
+    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl_t *) &tmp);
 }
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
@@ -53,8 +53,8 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
     return NULL;
 }
 
-#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl *)(rrdhost))
-#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl *)(rrdhost))
+#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
+#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
 
 
 // ----------------------------------------------------------------------------

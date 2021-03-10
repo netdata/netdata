@@ -10,7 +10,7 @@
 
 // for each PERSON-URL pair we keep this
 struct registry_person_url {
-    avl avl;                    // binary tree node
+    avl_t avl;                  // binary tree node
 
     REGISTRY_URL *url;          // de-duplicated URL
     REGISTRY_MACHINE *machine;  // link the MACHINE of this URL

@@ -12,7 +12,7 @@
 #define TC_LINE_MAX 1024
 
 struct tc_class {
-    avl avl;
+    avl_t avl;
 
     char *id;
     uint32_t hash;
@@ -56,7 +56,7 @@ struct tc_class {
 };
 
 struct tc_device {
-    avl avl;
+    avl_t avl;
 
     char *id;
     uint32_t hash;
@@ -107,15 +107,15 @@ avl_tree_type tc_device_root_index = {
         tc_device_compare
 };
 
-#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl *)(st))
-#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl *)(st))
+#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl_t *)(st))
+#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl_t *)(st))
 
 static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
     struct tc_device tmp;
     tmp.id = (char *)id;
     tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-    return (struct tc_device *)avl_search(&(tc_device_root_index), (avl *)&tmp);
+    return (struct tc_device *)avl_search(&(tc_device_root_index), (avl_t *)&tmp);
 }
 
 
@@ -128,15 +128,15 @@ static int tc_class_compare(void* a, void* b) {
     else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
 }
 
-#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl *)(rd))
-#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl *)(rd))
+#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl_t *)(rd))
+#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl_t *)(rd))
 
 static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
     struct tc_class tmp;
     tmp.id = (char *)id;
     tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-    return (struct tc_class *)avl_search(&(st->classes_index), (avl *) &tmp);
+    return (struct tc_class *)avl_search(&(st->classes_index), (avl_t *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
