@@ -122,12 +122,18 @@ int ws_client_want_write(ws_client *client)
     return rbuf_bytes_available(client->buf_write);
 }
 
-static int ws_client_get_nonce(char *dest, unsigned int size)
+#define RAND_SRC "/dev/urandom"
+static int ws_client_get_nonce(ws_client *client, char *dest, unsigned int size)
 {
     // we do not need crypto secure random here
     // it's just used for protocol negotiation
     int rd;
-    int f = open("/dev/urandom", O_RDONLY);
+    int f = open(RAND_SRC, O_RDONLY);
+    if (f < 0) {
+        ERROR("Error opening \"%s\". Err: \"%s\"", RAND_SRC, strerror(errno));
+        return -2;
+    }
+
     if ((rd = read(f, dest, size)) > 0) {
         close(f);
         return rd;
@@ -153,7 +159,7 @@ int ws_client_start_handshake(ws_client *client)
         return 1;
     }
 
-    ws_client_get_nonce(nonce, WEBSOCKET_NONCE_SIZE);
+    ws_client_get_nonce(client, nonce, WEBSOCKET_NONCE_SIZE);
     EVP_EncodeBlock((unsigned char *)nonce_b64, (const unsigned char *)nonce, WEBSOCKET_NONCE_SIZE);
     snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr,
         *client->host,
