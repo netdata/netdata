@@ -148,6 +148,7 @@ accepts the following values: ​
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
+-   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
     
 #### Integration with `apps.plugin`
 
@@ -186,7 +187,7 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
    apps = yes
 ```
 
-### `[ebpf programs]`
+#### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
@@ -198,7 +199,32 @@ The eBPF collector enables and runs the following eBPF programs by default:
     bandwidth consumed by each.
 -   `sync`: Montitor calls for syscall sync(2).
 
-### `[network connections]`
+## Thread configuration
+
+Sometimes the global configuration is not enough for all collectors. The eBPF plugin allow users to configure each 
+thread passing as argument to `edit-config` the filename of the thread, for example, to configure the `process` thread
+run the following command
+
+```bash
+cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf.d/process.conf
+```
+
+### Configuration files
+
+The following configuration files are available with eBPF plugin
+
+-   `cachestat.conf`: Configuration for `cachestat` collector.
+-   `process.conf`:  Configuration for `process` collector.
+-   `network.conf`:  Configuration for `network viewer` collector. This config file overwrites the global options and
+     also give option to specify the the network that eBPF plugin will monitor.
+
+### Network configuration
+
+The network configuration has specific options to configure the networks that eBPF will monitor, these options are 
+divided in the following sections:
+
+#### `[network connections]`
 
 You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
