@@ -1550,32 +1550,31 @@ static void read_max_dimension()
 /**
  * Parse network viewer section
  */
-static void parse_network_viewer_section()
+static void parse_network_viewer_section(struct config *cfg)
 {
     read_max_dimension();
 
-    network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(&collector_config,
+    network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(cfg,
                                                                        EBPF_NETWORK_VIEWER_SECTION,
-                                                                       "resolve hostnames",
+                                                                       EBPF_CONFIG_RESOLVE_HOSTNAME,
                                                                        CONFIG_BOOLEAN_NO);
 
-    network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(&collector_config,
-                                                                           EBPF_NETWORK_VIEWER_SECTION,
-                                                                           "resolve service names",
-                                                                           CONFIG_BOOLEAN_NO);
+    network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(cfg,
+                                                                          EBPF_NETWORK_VIEWER_SECTION,
+                                                                          EBPF_CONFIG_RESOLVE_SERVICE,
+                                                                          CONFIG_BOOLEAN_NO);
 
-    char *value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
-                                "ports", NULL);
+    char *value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL);
     parse_ports(value);
 
     if (network_viewer_opt.hostname_resolution_enabled) {
-        value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "hostnames", NULL);
+        value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_HOSTNAMES, NULL);
         link_hostnames(value);
     } else {
         info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
     }
 
-    value = appconfig_get(&collector_config, EBPF_NETWORK_VIEWER_SECTION,
+    value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION,
                           "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
     parse_ips(value);
 }
@@ -1724,7 +1723,7 @@ static void read_collector_values(int *disable_apps)
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps);
         // Read network viewer section if network viewer is enabled
-        parse_network_viewer_section();
+        parse_network_viewer_section(&collector_config);
         parse_service_name_section();
         started++;
     }
@@ -1756,7 +1755,7 @@ static void read_collector_values(int *disable_apps)
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
-        parse_network_viewer_section();
+        parse_network_viewer_section(&collector_config);
         parse_service_name_section();
     }
 }

@@ -40,6 +40,12 @@ static int *map_fd = NULL;
 static struct bpf_object *objects = NULL;
 static struct bpf_link **probe_links = NULL;
 
+struct config socket_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -1924,6 +1930,8 @@ void *ebpf_socket_thread(void *ptr)
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
+
+    ebpf_load_config_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
 
     int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,

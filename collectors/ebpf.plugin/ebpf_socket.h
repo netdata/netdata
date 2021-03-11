@@ -16,6 +16,15 @@
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
 
+// config file
+#define NETDATA_NETWORK_CONFIG_FILE "network.conf"
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
+#define EBPF_SERVICE_NAME_SECTION "service name"
+#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
+#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
+#define EBPF_CONFIG_PORTS "ports"
+#define EBPF_CONFIG_HOSTNAMES "hostnames"
+
 enum ebpf_socket_publish_index {
     NETDATA_IDX_TCP_SENDMSG,
     NETDATA_IDX_TCP_CLEANUP_RBUF,

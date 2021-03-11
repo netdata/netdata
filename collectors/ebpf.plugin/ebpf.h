@@ -185,8 +185,6 @@ extern void write_end_chart();
 extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
-#define EBPF_NETWORK_VIEWER_SECTION "network connections"
-#define EBPF_SERVICE_NAME_SECTION "service name"
 
 #define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
 #define EBPF_COMMON_DIMENSION_CALL "calls/s"
