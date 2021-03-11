@@ -346,7 +346,7 @@ static int https_request(http_req_type method, char *host, int port, char *url, 
 
     if (unlikely(sock == -1)) {
         error("Handshake failed");
-        return 1;
+        goto exit_buf;
     }
 
     SSL_CTX *ctx = security_initialize_openssl_client();
@@ -410,6 +410,7 @@ exit_CTX:
     SSL_CTX_free(ctx);
 exit_sock:
     close(sock);
+exit_buf:
     rbuf_free(buffer);
     return rc;
 }
