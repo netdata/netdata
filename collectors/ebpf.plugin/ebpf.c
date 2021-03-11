@@ -876,9 +876,9 @@ void fill_ebpf_data(ebpf_data_t *ef)
  */
 static inline void how_to_load(char *ptr)
 {
-    if (!strcasecmp(ptr, "return"))
+    if (!strcasecmp(ptr, EBPF_CFG_LOAD_MODE_RETURN))
         ebpf_set_thread_mode(MODE_RETURN);
-    else if (!strcasecmp(ptr, "entry"))
+    else if (!strcasecmp(ptr, EBPF_CFG_LOAD_MODE_DEFAULT))
         ebpf_set_thread_mode(MODE_ENTRY);
     else
         error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
@@ -1669,7 +1669,7 @@ static void parse_service_name_section()
 static void ebpf_update_interval()
 {
     int i;
-    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, "update every", 1);
+    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].update_time = value;
     }
@@ -1685,9 +1685,11 @@ static void read_collector_values(int *disable_apps)
     // Read global section
     char *value;
     if (appconfig_exists(&collector_config, EBPF_GLOBAL_SECTION, "load")) // Backward compatibility
-        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load", "entry");
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "load",
+                              EBPF_CFG_LOAD_MODE_DEFAULT);
     else
-        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, "ebpf load mode", "entry");
+        value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE,
+                              EBPF_CFG_LOAD_MODE_DEFAULT);
 
     how_to_load(value);
 
@@ -1698,7 +1700,7 @@ static void read_collector_values(int *disable_apps)
                                              CONFIG_BOOLEAN_NO);
     if (!enabled) {
         // Apps is a positive sentence, so we need to invert the values to disable apps.
-        enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "apps",
+        enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                         CONFIG_BOOLEAN_YES);
         enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
     }

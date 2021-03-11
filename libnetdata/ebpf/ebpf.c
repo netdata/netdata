@@ -332,3 +332,26 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
 
     return links;
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+static netdata_run_mode_t ebpf_select_mode(char *mode)
+{
+    if (!strcasecmp(mode, "return"))
+        return MODE_RETURN;
+    else if  (!strcasecmp(mode, "dev"))
+        return MODE_DEVMODE;
+
+    return MODE_ENTRY;
+}
+
+void ebpf_update_modules_using_config(ebpf_module_t *modules, struct config *cfg)
+{
+    char *mode = appconfig_get(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
+    modules->mode = ebpf_select_mode(mode);
+
+    modules->update_time = (int)appconfig_get_number(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
+
+    modules->apps_charts = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
+                                                 CONFIG_BOOLEAN_YES);
+}
