@@ -1461,7 +1461,7 @@ void *ebpf_socket_read_hash(void *ptr)
     read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
+    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS*em->update_time;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
     int network_connection = em->optional;
