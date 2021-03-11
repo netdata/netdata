@@ -494,7 +494,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             return 1;
 
         info("Attempting connection now");
-        freez(aclk_hostname);
         if (aclk_decode_base_url(cloud_base_url, &aclk_hostname, &aclk_port)) {
             error("ACLK base URL configuration key could not be parsed. Will retry in %d seconds.", CLOUD_BASE_URL_READ_RETRY);
             sleep(CLOUD_BASE_URL_READ_RETRY);
@@ -528,16 +527,18 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         if (!mqtt_wss_connect(client, aclk_hostname, aclk_port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf)) {
             json_object_put(lwt);
             freez(aclk_hostname);
+            aclk_hostname = NULL;
             info("MQTTWSS connection succeeded");
             mqtt_connected_actions(client);
             return 0;
         }
 
+        freez(aclk_hostname);
+        aclk_hostname = NULL;
         json_object_put(lwt);
         error("Connect failed\n");
     }
 
-    freez(aclk_hostname);
     return 1;
 }
 
