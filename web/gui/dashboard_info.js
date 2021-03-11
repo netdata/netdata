@@ -582,11 +582,19 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-bell"></i>',
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
+
     'statsd': { 
         title: 'StatsD',
         icon: '<i class="fas fa-chart-line"></i>',
         info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
-    }
+    },
+
+    'supervisord': {
+        title: 'Supervisord',
+        icon: '<i class="fas fa-tasks"></i>',
+        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
+        'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
+    },
 };
 
 
@@ -3806,5 +3814,14 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // Supervisor
+
+    'supervisord.process_state_code': {
+        info: '<a href="http://supervisord.org/subprocess.html#process-states" target="_blank">Process states map</a>: ' +
+        '<code>0</code> - stopped, <code>10</code> - starting, <code>20</code> - running, <code>30</code> - backoff,' +
+        '<code>40</code> - stopping, <code>100</code> - exited, <code>200</code> - fatal, <code>1000</code> - unknown.'
     },
 };
