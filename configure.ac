@@ -732,6 +732,10 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
     AC_MSG_RESULT([${enable_aclk}])
 fi
 
+if test "$enable_cloud" = "no" -a "$aclk_ng" = "yes"; then
+    AC_MSG_ERROR([--disable-cloud && --aclk-ng not allowed together (such configuration is self contradicting)])
+fi
+
 if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
     if test "$enable_jsonc" != "yes"; then
