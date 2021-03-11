@@ -196,8 +196,6 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 
 // Common variables
-extern char *ebpf_user_config_dir;
-extern char *ebpf_stock_config_dir;
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
 extern char *ebpf_algorithms[];

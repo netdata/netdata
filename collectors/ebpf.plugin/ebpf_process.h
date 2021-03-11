@@ -51,6 +51,9 @@
 #define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR "vfs_write_error"
 #define NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR "vfs_read_error"
 
+// Process configuration name
+#define NETDATA_PROCESS_CONFIG_FILE "process.conf"
+
 // Index from kernel
 typedef enum ebpf_process_index {
     NETDATA_KEY_CALLS_DO_SYS_OPEN,

@@ -8,6 +8,9 @@
 
 #include "../libnetdata.h"
 
+char *ebpf_user_config_dir = CONFIG_DIR;
+char *ebpf_stock_config_dir = LIBCONFIG_DIR;
+
 /*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
@@ -354,4 +357,32 @@ void ebpf_update_modules_using_config(ebpf_module_t *modules, struct config *cfg
 
     modules->apps_charts = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  CONFIG_BOOLEAN_YES);
+}
+
+
+/**
+ * Load process config and update module
+ *
+ * When this function is called, it will load the configuration file and after this
+ * it updates the global information of ebpf_module.
+ * If the module has specific configuration, this function will load it, but it will not
+ * update the variables.
+ *
+ * @param em       the module structure
+ * @param cfg      the configuration structure
+ * @param cfg_file the filename to load
+ */
+void ebpf_load_config_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file)
+{
+    char filename[FILENAME_MAX+1];
+    ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, cfg_file);
+    if (ebpf_load_config(cfg, filename)) {
+        ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, cfg_file);
+        if (ebpf_load_config(cfg, filename)) {
+            error("Cannot load the ebpf configuration file %s", cfg_file);
+            return;
+        }
+    }
+
+    ebpf_update_modules_using_config(em, cfg);
 }

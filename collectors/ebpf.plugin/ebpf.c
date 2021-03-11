@@ -52,8 +52,6 @@ void netdata_cleanup_and_exit(int ret)
  *****************************************************************/
 
 char *ebpf_plugin_dir = PLUGINS_DIR;
-char *ebpf_user_config_dir = CONFIG_DIR;
-char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = {"absolute", "incremental"};
