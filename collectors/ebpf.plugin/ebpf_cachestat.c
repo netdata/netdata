@@ -26,6 +26,12 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
 
 static int *map_fd = NULL;
 
+struct config cachestat_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -626,6 +632,8 @@ void *ebpf_cachestat_thread(void *ptr)
         pthread_mutex_unlock(&lock);
         goto endcachestat;
     }
+
+    ebpf_load_config_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX

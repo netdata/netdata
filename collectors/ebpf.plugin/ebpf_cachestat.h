@@ -17,6 +17,10 @@
 
 #define NETDATA_LATENCY_CACHESTAT_SLEEP_MS 600000ULL
 
+// configuration file
+#define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
+
+
 // variables
 enum cachestat_counters {
     NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,

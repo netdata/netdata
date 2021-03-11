@@ -33,4 +33,5 @@ dist_libconfig_DATA = \
 dist_ebpfconfig_DATA = \
     ebpf.d/ebpf_kernel_reject_list.txt \
     ebpf.d/process.conf \
+    ebpf.d/cachestat.conf \
     $(NULL)
