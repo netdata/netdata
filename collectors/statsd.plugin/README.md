@@ -253,8 +253,8 @@ For example, if you want to monitor the application `myapp` using StatsD and Net
 	metrics = myapp.*
 	private charts = no
 	gaps when not collected = no
-	memory mode = ram
 	history = 60
+# 	memory mode = ram	
 
 [dictionary]
     m1 = metric1
@@ -282,7 +282,7 @@ Using the above configuration `myapp` should get its own section on the dashboar
 -   `metrics` is a Netdata [simple pattern](/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
--   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts).
+-   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts). We suggest not to use this (we have commented it out in the example) and let your app use the global default for Netdata, which is our dbengine.
 
 -   `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
 
