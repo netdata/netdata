@@ -1820,16 +1820,17 @@ netdataDashboard.context = {
         ]
     },
 
-    'cgroup.mem_working_set_utilization': {
+    'cgroup.mem_usage_limit': {
         mainheads: [
             function (os, id) {
                 void (os);
                 cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="utilization"'
+                    + ' data-dimensions="used"'
+                    + ' data-append-options="percentage"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
-                    + ' data-title="Memory Working Set"'
+                    + ' data-title="Memory"'
                     + ' data-units="%"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
@@ -1837,34 +1838,7 @@ netdataDashboard.context = {
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
                     + ' data-colors="' + NETDATA.colors[1] + '"'
-                    + ' data-decimal-digits="1"'
                     + ' role="application"></div>';
-            }
-        ]
-    },
-
-    'cgroup.mem_usage_limit': {
-        mainheads: [
-            function (os, id) {
-                void (os);
-                if (cgroupMemLimitIsSet === 0) {
-                    cgroupMemLimitIsSet = 1;
-                    return '<div data-netdata="' + id + '"'
-                        + ' data-dimensions="used"'
-                        + ' data-append-options="percentage"'
-                        + ' data-gauge-max-value="100"'
-                        + ' data-chart-library="gauge"'
-                        + ' data-title="Memory"'
-                        + ' data-units="%"'
-                        + ' data-gauge-adjust="width"'
-                        + ' data-width="12%"'
-                        + ' data-before="0"'
-                        + ' data-after="-CHART_DURATION"'
-                        + ' data-points="CHART_DURATION"'
-                        + ' data-colors="' + NETDATA.colors[1] + '"'
-                        + ' role="application"></div>';
-                } else
-                    return '';
             }
         ]
     },
