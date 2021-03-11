@@ -309,7 +309,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
     BUFFER *warn_alarms, *crit_alarms;
-    static char buf[11];
+    static char buf[12];
 
     warn_alarms = buffer_create(1000); //enough?
     crit_alarms = buffer_create(1000); //enough?
@@ -319,21 +319,21 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             continue;
 
         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            if (n_warn) buffer_strcat(warn_alarms, "|");
+            if (n_warn) buffer_strcat(warn_alarms, ",");
             n_warn++;
             buffer_strcat(warn_alarms, rc->name);
             buffer_strcat(warn_alarms, "=");
-            snprintfz(buf, 10, "%ld", rc->last_status_change);
+            snprintfz(buf, 11, "%ld", rc->last_status_change);
             buffer_strcat(warn_alarms, buf);
                         
             if (ae->alarm_id == rc->id)
                 expr=rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            if (n_crit) buffer_strcat(crit_alarms, "|");
+            if (n_crit) buffer_strcat(crit_alarms, ",");
             n_crit++;
             buffer_strcat(crit_alarms, rc->name);
             buffer_strcat(crit_alarms, "=");
-            snprintfz(buf, 10, "%ld", rc->last_status_change);
+            snprintfz(buf, 11, "%ld", rc->last_status_change);
             buffer_strcat(crit_alarms, buf);
             
             if (ae->alarm_id == rc->id)
