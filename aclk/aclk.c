@@ -154,20 +154,22 @@ static int wait_till_agent_claim_ready()
 
         // We just check configuration is valid here
         // TODO make it without malloc/free
-        freez(hostname);
         if (aclk_decode_base_url(cloud_base_url, &hostname, &port)) {
             error("Agent is claimed but the configuration is invalid, please fix");
+            freez(hostname);
+            hostname = NULL;
             sleep(5);
             continue;
         }
+        freez(hostname);
+        hostname = NULL;
 
-        if (!load_private_key() /* TODO && !_mqtt_lib_init() */) {
+        if (!load_private_key()) {
             sleep(5);
             break;
         }
     }
 
-    freez(hostname);
     return 0;
 }
 
