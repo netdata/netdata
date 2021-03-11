@@ -1527,6 +1527,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
     if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
     if(cg->st_mem_usage_limit)       rrdset_is_obsolete(cg->st_mem_usage_limit);
+    if(cg->st_mem_utilization)       rrdset_is_obsolete(cg->st_mem_utilization);
     if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
     if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
     if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
@@ -3555,6 +3556,8 @@ void update_cgroup_charts(int update_every) {
                         rrdset_next(cg->st_mem_utilization);
 
                     if (memory_limit) {
+                        rrdset_isnot_obsolete(cg->st_mem_utilization);
+
                         rrddim_set(
                             cg->st_mem_utilization, "utilization", cg->memory.usage_in_bytes * 100 / memory_limit);
                         rrdset_done(cg->st_mem_utilization);
