@@ -197,6 +197,12 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
 extern char *ebpf_algorithms[];
+extern struct config collector_config;
+extern struct pid_stat *root_of_pids;
+extern ebpf_process_stat_t *global_process_stat;
+extern size_t all_pids_count;
+extern int update_every;
+extern uint32_t finalized_threads;
 
 // Socket functions and variables
 // Common functions
@@ -205,11 +211,6 @@ extern void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 extern void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
 extern collected_number get_value_from_structure(char *basis, size_t offset);
-extern struct pid_stat *root_of_pids;
-extern ebpf_process_stat_t *global_process_stat;
-extern size_t all_pids_count;
-extern int update_every;
-extern uint32_t finalized_threads;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
