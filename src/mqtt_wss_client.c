@@ -538,7 +538,10 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
     client->poll_fds[POLLFD_SOCKET].fd = client->sockfd;
 
-    fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK);
+    if (fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK) == -1) {
+        mws_error(client->log, "Error setting O_NONBLOCK to TCP socket. \"%s\"", strerror(errno));
+        return -8;
+    }
 
     if (client->proxy_type != MQTT_WSS_DIRECT)
         if (http_proxy_connect(client))
