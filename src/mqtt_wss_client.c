@@ -226,7 +226,10 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                     (msg_callback ? mqtt_rx_msg_callback : NULL)
           );
     if (ret != MQTT_OK) {
-        mws_error(log, "Error initializing MQTT \"%s\"", mqtt_error_str(ret));
+//        mws_error(log, "Error initializing MQTT \"%s\"", mqtt_error_str(ret));
+// TODO coverity reported bug in mqtt library here function mqtt_init can return
+// -2 acording to coverity resulting in out of bounds access in mqtt_error_str
+        mws_error(log, "Error initializing MQTT");
         goto fail_6;
     }
 
@@ -715,7 +718,7 @@ static inline void mqtt_wss_wakeup(mqtt_wss_client client)
 char throwaway[THROWAWAY_BUF_SIZE];
 static inline void util_clear_pipe(int fd)
 {
-    read(fd, throwaway, THROWAWAY_BUF_SIZE);
+    (void)read(fd, throwaway, THROWAWAY_BUF_SIZE);
 }
 
 static inline void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
@@ -734,7 +737,10 @@ static int handle_mqtt(mqtt_wss_client client)
         // message ensuring we wake up from poll
         enum MQTTErrors mqtt_ret = mqtt_sync(client->mqtt_client);
         if (mqtt_ret != MQTT_OK) {
-            mws_error(client->log, "Error mqtt_sync MQTT \"%s\"", mqtt_error_str(mqtt_ret));
+//            mws_error(client->log, "Error mqtt_sync MQTT \"%s\"", mqtt_error_str(mqtt_ret));
+// TODO coverity reported bug in mqtt library here function mqtt_sync can return
+// -2 acording to coverity resulting in out of bounds access in mqtt_error_str
+            mws_error(client->log, "Error mqtt_sync");
             client->mqtt_connected = 0;
             return 1;
         }

@@ -619,7 +619,7 @@ int ws_client_process_rx_ws(ws_client *client)
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
-                ERROR("Ping arrived with payload of %d. That is too big!", client->rx.payload_length);
+                ERROR("Ping arrived with payload which is too big!");
                 return WS_CLIENT_INTERNAL_ERROR;
             }
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
