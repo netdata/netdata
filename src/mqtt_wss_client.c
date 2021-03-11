@@ -579,7 +579,19 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     }
     SSL_set_fd(client->ssl, client->sockfd);
     SSL_set_connect_state(client->ssl);
-    SSL_connect(client->ssl);
+
+    result = SSL_connect(client->ssl);
+    if (result != -1 && result != 1) {
+        mws_error(client->log, "SSL could not connect");
+        return -5;
+    }
+    if (result == -1) {
+        int ec = SSL_get_error(client->ssl, result);
+        if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
+            mws_error(client->log, "Failed to start SSL connection");
+            return -6;
+        }
+    }
 
     uint8_t mqtt_flags = (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK) << 3;
     if (mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN)
