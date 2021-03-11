@@ -1033,6 +1033,14 @@ netdataDashboard.context = {
         info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintented VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
     },
 
+    'net.duplex': {
+        info: 'State map: 0 - unknown, 1 - half duplex, 2 - full duplex'
+    },
+
+    'net.operstate': {
+        info: 'State map: 0 - unknown, 1 = notpresent, 2 = down, 3 = lowerlayerdown, 4 = testing, 5 = dormant, 6 = up'
+    },
+
     // ------------------------------------------------------------------------
     // IP
 
