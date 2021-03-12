@@ -64,7 +64,7 @@ extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *
 extern void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
-extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
+extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
