@@ -651,6 +651,10 @@ struct alarm_entry {
 
     char *family;
 
+    char *class;
+    char *component;
+    char *type;
+
     char *exec;
     char *recipient;
     time_t exec_run_timestamp;

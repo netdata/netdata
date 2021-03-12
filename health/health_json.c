@@ -23,6 +23,9 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                     "\t\t\"name\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
+                    "\t\t\"class\": \"%s\",\n"
+                    "\t\t\"component\": \"%s\",\n"
+                    "\t\t\"type\": \"%s\",\n"
                     "\t\t\"processed\": %s,\n"
                     "\t\t\"updated\": %s,\n"
                     "\t\t\"exec_run\": %lu,\n"
@@ -52,6 +55,9 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                    , ae->name
                    , ae->chart
                    , ae->family
+                   , ae->class?ae->class:"Unknown"
+                   , ae->component?ae->component:"Unknown"
+                   , ae->type?ae->type:"Unknown"
                    , (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false"
                    , (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false"
                    , (unsigned long)ae->exec_run_timestamp
@@ -142,6 +148,9 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"name\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
+                    "\t\t\t\"class\": \"%s\",\n"
+                    "\t\t\t\"component\": \"%s\",\n"
+                    "\t\t\t\"type\": \"%s\",\n"
                     "\t\t\t\"active\": %s,\n"
                     "\t\t\t\"disabled\": %s,\n"
                     "\t\t\t\"silenced\": %s,\n"
@@ -170,6 +179,9 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->name
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
+                   , rc->class?rc->class:"Unknown"
+                   , rc->component?rc->component:"Unknown"
+                   , rc->type?rc->type:"Unknown"
                    , (rc->rrdset)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
