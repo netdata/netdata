@@ -442,6 +442,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         const char *name,
         const char *chart,
         const char *family,
+        const char *class,
+        const char *component,
+        const char *type,
         const char *exec,
         const char *recipient,
         time_t duration,
@@ -468,6 +471,15 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     if(family)
         ae->family = strdupz(family);
+
+    if (class)
+        ae->class = strdupz(class);
+
+    if (component)
+        ae->component = strdupz(component);
+
+    if (type)
+        ae->type = strdupz(type);
 
     if(exec) ae->exec = strdupz(exec);
     if(recipient) ae->recipient = strdupz(recipient);
@@ -548,6 +560,9 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
     freez(ae->family);
+    freez(ae->class);
+    freez(ae->component);
+    freez(ae->type);
     freez(ae->exec);
     freez(ae->recipient);
     freez(ae->source);
