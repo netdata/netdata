@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- web/gui: add supervisord to the dashboard\_info.js [\#10754](https://github.com/netdata/netdata/pull/10754) ([ilyam8](https://github.com/ilyam8))
+- Add state map to duplex and operstate charts [\#10752](https://github.com/netdata/netdata/pull/10752) ([vlvkobal](https://github.com/vlvkobal))
 - collectors/apps.plugin: Add wireguard to vpn [\#10743](https://github.com/netdata/netdata/pull/10743) ([liepumartins](https://github.com/liepumartins))
 - Move network interface speed, duplex, and operstate variables to charts [\#10740](https://github.com/netdata/netdata/pull/10740) ([vlvkobal](https://github.com/vlvkobal))
 - Use of out-of-line struct definitions. [\#10739](https://github.com/netdata/netdata/pull/10739) ([vkalintiris](https://github.com/vkalintiris))
