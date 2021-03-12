@@ -910,6 +910,26 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
+ * Cleanup variable from other threads
+ *
+ * @param pid current pid.
+ */
+void cleanup_variables_from_other_threads(uint32_t pid)
+{
+    // Clean socket structures
+    if (socket_bandwidth_curr) {
+        freez(socket_bandwidth_curr[pid]);
+        socket_bandwidth_curr[pid] = NULL;
+    }
+
+    // Clean cachestat strcture
+    if (cachestat_pid) {
+        freez(cachestat_pid[pid]);
+        cachestat_pid[pid] = NULL;
+    }
+}
+
+/**
  * Remove PIDs when they are not running more.
  */
 void cleanup_exited_pids()
@@ -931,14 +951,8 @@ void cleanup_exited_pids()
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-            prev_apps_data[r] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[r]);
-                socket_bandwidth_curr[r] = NULL;
-                socket_bandwidth_prev[r] = NULL;
-            }
+            cleanup_variables_from_other_threads(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1055,14 +1069,8 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
-            prev_apps_data[key] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[key]);
-                socket_bandwidth_curr[key] = NULL;
-                socket_bandwidth_prev[key] = NULL;
-            }
+            cleanup_variables_from_other_threads(key);
 
             pids = pids->next;
             continue;

@@ -243,7 +243,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
                 if (!rc) {
                     for(rc = host->alarms; rc ; rc = rc->next) {
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl *)rc);
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
                         if(rdcmp != rc) {
                             error("Cannot insert the alarm index ID using log %s", rc->name);
                         }

@@ -1258,6 +1258,10 @@ int main(int argc, char **argv) {
                             print_build_info();
                             return 0;
                         }
+                        else if(strcmp(optarg, "buildinfojson") == 0) {
+                            print_build_info_json();
+                            return 0;
+                        }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);

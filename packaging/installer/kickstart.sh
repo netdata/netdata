@@ -16,6 +16,10 @@
 #  --local-files              set the full path of the desired tarball to run install with
 #  --allow-duplicate-install  do not bail if we detect a duplicate install
 #  --reinstall                if an existing install would be updated, reinstall instead
+#  --claim-token              specify a token to use for claiming the newly installed instance
+#  --claim-url                specify a URL to use for claiming the newly installed isntance
+#  --claim-rooms              specify a list of rooms to claim the newly installed instance to
+#  --claim-proxy              specify a proxy to use while claiming the newly installed instance
 #
 # Environment options:
 #
@@ -317,71 +321,105 @@ NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
 RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
-  if [ "${1}" = "all" ]; then
-    PACKAGES_INSTALLER_OPTIONS="netdata-all"
-    shift 1
-  elif [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ]; then
-    INTERACTIVE=0
-    shift 1
-  elif [ "${1}" = "--no-updates" ]; then
-    # echo >&2 "netdata will not auto-update"
-    NETDATA_UPDATES=
-    shift 1
-  elif [ "${1}" = "--stable-channel" ]; then
-    RELEASE_CHANNEL="stable"
-    NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
-    shift 1
-  elif [ "${1}" = "--allow-duplicate-install" ]; then
-    NETDATA_ALLOW_DUPLICATE_INSTALL=1
-    shift 1
-  elif [ "${1}" = "--reinstall" ]; then
-    NETDATA_REINSTALL=1
-    shift 1
-  elif [ "${1}" = "--local-files" ]; then
-    shift 1
-    if [ -z "${1}" ]; then
-      fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
-    fi
+  case "${1}" in
+    "all") PACKAGES_INSTALLER_OPTIONS="netdata-all" ;;
+    "--dont-wait") INTERACTIVE=0 ;;
+    "--non-interactive") INTERACTIVE=0 ;;
+    "--no-updates") NETDATA_UPDATES= ;;
+    "--stable-channel")
+      RELEASE_CHANNEL="stable"
+      NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
+      ;;
+    "--allow-duplicate-install") NETDATA_ALLOW_DUPLICATE_INSTALL=1 ;;
+    "--reinstall") NETDATA_REINSTALL=1 ;;
+    "--claim-token")
+      NETDATA_CLAIM_TOKEN="${2}"
+      shift 1
+      ;;
+    "--claim-rooms")
+      NETDATA_CLAIM_ROOMS="${2}"
+      shift 1
+      ;;
+    "--claim-url")
+      NETDATA_CLAIM_URL="${2}"
+      shift 1
+      ;;
+    "--claim-proxy")
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -proxy ${2}"
+      shift 1
+      ;;
+    "--dont-start-it")
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+      ;;
+    "--install")
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install ${2}"
+      NETDATA_PREFIX="${2}"
+      shift 1
+      ;;
+    "--disable-cloud")
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-cloud"
+      NETDATA_DISABLE_CLOUD=1
+      ;;
+    "--local-files")
+      if [ -z "${2}" ]; then
+        fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+      fi
 
-    export NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
-    shift 1
+      export NETDATA_LOCAL_TARBALL_OVERRIDE="${2}"
 
-    if [ -z "${1}" ]; then
-      fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
-    fi
+      if [ -z "${3}" ]; then
+        fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+      fi
 
-    export NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
-    shift 1
+      export NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${3}"
 
-    if [ -z "${1}" ]; then
-      fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
-    fi
+      if [ -z "${4}" ]; then
+        fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+      fi
 
-    export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN="${1}"
-    shift 1
+      export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN="${4}"
 
-    if [ -z "${1}" ]; then
-      fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
-    fi
+      if [ -z "${5}" ]; then
+        fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+      fi
 
-    export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG="${1}"
-    shift 1
+      export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG="${5}"
 
-    if [ -z "${1}" ]; then
-      fatal "Missing dependencies management scriptlet: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
-    fi
+      if [ -z "${6}" ]; then
+        fatal "Missing dependencies management scriptlet: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+      fi
 
-    export NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT="${1}"
-    shift 1
-  else
-    NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS ${1}"
-    shift 1
-  fi
+      export NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT="${6}"
+      shift 5
+      ;;
+    *)
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+      ;;
+  esac
+  shift 1
 done
 
 if [ "${INTERACTIVE}" = "0" ]; then
   PACKAGES_INSTALLER_OPTIONS="--dont-wait --non-interactive ${PACKAGES_INSTALLER_OPTIONS}"
   NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --dont-wait"
+fi
+
+if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_CLAIM_TOKEN}" ] || [ -n "${NETDATA_CLAIM_ROOMS}" ] || [ -n "${NETDATA_CLAIM_URL}" ]; then
+    run_failed "Cloud explicitly disabled but automatic claiming requested."
+    run_failed "Either enable Netdata Cloud, or remove the --claim-* options."
+    exit 1
+  fi
+fi
+
+# shellcheck disable=SC2235,SC2030
+if ( [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_URL}" ] ) || ( [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ -z "${NETDATA_CLAIM_URL}" ] ); then
+  run_failed "Invalid claiming options, both a claiming token and URL must be specified."
+  exit 1
+elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+  run_failed "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -487,5 +525,23 @@ else
     cd "$(find . -mindepth 1 -maxdepth 1 -type d)" && install "$@"
   else
     fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${ndtmpdir}"
+    exit 1
+  fi
+fi
+
+# --------------------------------------------------------------------------------------------------------------------
+
+if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  if [ -z "${NETDATA_PREFIX}" ] ; then
+    NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
+  else
+    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/bin/netdata-claim.sh"
+  fi
+
+  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
+    progress "Successfully claimed node"
+  else
+    run_failed "Unable to claim node, you must do so manually."
   fi
 fi

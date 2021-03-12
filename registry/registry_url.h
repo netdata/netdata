@@ -12,7 +12,7 @@
 // we store them here and we keep pointers elsewhere
 
 struct registry_url {
-    avl avl;
+    avl_t avl;
     uint32_t hash;  // the index hash
 
     uint32_t links; // the number of links to this URL - when none is left, we free it

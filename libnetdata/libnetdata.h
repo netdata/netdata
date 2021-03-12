@@ -291,7 +291,8 @@ extern char *read_by_filename(char *filename, long *file_size);
 #endif
 #endif
 
-#define BITS_IN_A_KILOBIT 1000
+#define BITS_IN_A_KILOBIT     1000
+#define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
 #define UNUSED(x) (void)(x)
@@ -319,7 +320,7 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
-#ifdef HAVE_LIBBPF
+#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
 #include "eval/eval.h"

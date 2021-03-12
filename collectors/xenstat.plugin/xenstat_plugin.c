@@ -2,6 +2,9 @@
 
 #include "../../libnetdata/libnetdata.h"
 
+#include <xenstat.h>
+#include <libxl.h>
+
 #define PLUGIN_XENSTAT_NAME "xenstat.plugin"
 
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS              30001
@@ -62,14 +65,8 @@ int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *
 char *netdata_configured_host_prefix = "";
 
 // Variables
-
 static int debug = 0;
-
 static int netdata_update_every = 1;
-
-#ifdef HAVE_LIBXENSTAT
-#include <xenstat.h>
-#include <libxl.h>
 
 struct vcpu_metrics {
     unsigned int id;
@@ -1093,14 +1090,3 @@ int main(int argc, char **argv) {
     xenstat_uninit(xhandle);
     info("XENSTAT process exiting");
 }
-
-#else // !HAVE_LIBXENSTAT
-
-int main(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-
-    fatal("xenstat.plugin is not compiled.");
-}
-
-#endif // !HAVE_LIBXENSTAT

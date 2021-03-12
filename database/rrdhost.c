@@ -31,7 +31,7 @@ RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
     strncpyz(tmp.machine_guid, guid, GUID_LEN);
     tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
 
-    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl *) &tmp);
+    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl_t *) &tmp);
 }
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
@@ -53,8 +53,8 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
     return NULL;
 }
 
-#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl *)(rrdhost))
-#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl *)(rrdhost))
+#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
+#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
 
 
 // ----------------------------------------------------------------------------
@@ -335,6 +335,11 @@ RRDHOST *rrdhost_create(const char *hostname,
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
     }
+    else {
+#ifdef ENABLE_DBENGINE
+        host->rrdeng_ctx = &multidb_ctx;
+#endif
+    }
 
     // ------------------------------------------------------------------------
     // link it and add it to the index
@@ -582,8 +587,8 @@ RRDHOST *rrdhost_find_or_create(
 
     return host;
 }
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
-    if(host != protected
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now) {
+    if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && host->receiver
@@ -594,14 +599,14 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t n
     return 0;
 }
 
-void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected) {
+void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
     time_t now = now_realtime_sec();
 
     RRDHOST *host;
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected, now)) {
+        if(rrdhost_should_be_removed(host, protected_host, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
@@ -985,6 +990,8 @@ static struct label *rrdhost_load_auto_labels(void)
     if (localhost->system_info->is_k8s_node)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
+
+    label_list = add_aclk_host_labels(label_list);
 
     label_list = add_label_to_list(
         label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);

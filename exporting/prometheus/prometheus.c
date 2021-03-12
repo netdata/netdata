@@ -660,7 +660,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
                             p.type = "counter";
                             p.relation = "delta gives";
-                            p.suffix = "_total";
+                            if (!prometheus_collector)
+                                p.suffix = "_total";
                         }
 
                         if (homogeneous) {

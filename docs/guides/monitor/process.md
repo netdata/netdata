@@ -169,8 +169,9 @@ postgres: postgres*
 sql: mariad* postmaster* oracle_* ora_* sqlservr
 ```
 
-Restart Netdata with `service netdata restart`, or the appropriate method for your system, to start collecting
-utilization metrics from your application. Time to [visualize your process metrics](#visualize-process-metrics).
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to start collecting utilization metrics from your
+application. Time to [visualize your process metrics](#visualize-process-metrics).
 
 ### Custom applications
 
@@ -194,8 +195,9 @@ custom-app: custom-app
 ...
 ```
 
-Restart Netdata with `service netdata restart`, or the appropriate method for your system, to start collecting
-utilization metrics from your application.
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to start collecting utilization metrics from your
+application.
 
 ## Visualize process metrics
 

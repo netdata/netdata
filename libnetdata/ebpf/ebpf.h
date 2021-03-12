@@ -32,6 +32,13 @@
 #define NETDATA_RH_8 2048
 
 /**
+ *  Kernel 5.11
+ *
+ *  330240 = 5*65536 + 11*256
+ */
+#define NETDATA_EBPF_KERNEL_5_11 330496
+
+/**
  *  Kernel 5.10
  *
  *  330240 = 5*65536 + 10*256
@@ -87,6 +94,7 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;
+    void (*apps_routine)(struct ebpf_module *em, void *ptr);
 } ebpf_module_t;
 
 #define NETDATA_MAX_PROBES 64

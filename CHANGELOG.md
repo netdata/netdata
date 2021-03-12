@@ -2,10 +2,116 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.28.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...HEAD)
 
 **Merged pull requests:**
 
+- web/gui: add supervisord to the dashboard\_info.js [\#10754](https://github.com/netdata/netdata/pull/10754) ([ilyam8](https://github.com/ilyam8))
+- Add state map to duplex and operstate charts [\#10752](https://github.com/netdata/netdata/pull/10752) ([vlvkobal](https://github.com/vlvkobal))
+- collectors/apps.plugin: Add wireguard to vpn [\#10743](https://github.com/netdata/netdata/pull/10743) ([liepumartins](https://github.com/liepumartins))
+- Move network interface speed, duplex, and operstate variables to charts [\#10740](https://github.com/netdata/netdata/pull/10740) ([vlvkobal](https://github.com/vlvkobal))
+- Use of out-of-line struct definitions. [\#10739](https://github.com/netdata/netdata/pull/10739) ([vkalintiris](https://github.com/vkalintiris))
+- Use a parameter name that is not a reserved keyword in C++ [\#10738](https://github.com/netdata/netdata/pull/10738) ([vkalintiris](https://github.com/vkalintiris))
+- Skip C++ incompatible header in main libnetdata header [\#10737](https://github.com/netdata/netdata/pull/10737) ([vkalintiris](https://github.com/vkalintiris))
+- Rename struct avl to avl\_element and the typedef to avl\_t [\#10735](https://github.com/netdata/netdata/pull/10735) ([vkalintiris](https://github.com/vkalintiris))
+- Fix claim behind squid proxy [\#10734](https://github.com/netdata/netdata/pull/10734) ([underhood](https://github.com/underhood))
+- Always configure multihost database context [\#10732](https://github.com/netdata/netdata/pull/10732) ([stelfrag](https://github.com/stelfrag))
+- Removes unused fnc warning in ACLK Legacy [\#10731](https://github.com/netdata/netdata/pull/10731) ([underhood](https://github.com/underhood))
+- Update chart's metadata in database when it already exists during creation [\#10728](https://github.com/netdata/netdata/pull/10728) ([stelfrag](https://github.com/stelfrag))
+- Fixed detection of already claimed node in Docker images. [\#10720](https://github.com/netdata/netdata/pull/10720) ([Ferroin](https://github.com/Ferroin))
+- Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
+- Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
+- Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
+- python.d/smartd\_log: collect attribute 233 \(Media Wearout Indicator \(SSD\)\). [\#10711](https://github.com/netdata/netdata/pull/10711) ([aazedo](https://github.com/aazedo))
+- New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add JSON output option for buildinfo. [\#10706](https://github.com/netdata/netdata/pull/10706) ([Ferroin](https://github.com/Ferroin))
+- Fix disk utilization and backlog charts [\#10705](https://github.com/netdata/netdata/pull/10705) ([vlvkobal](https://github.com/vlvkobal))
+- update\_kernel\_version: Fix overflow on Centos and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
+- Docs: Convert references to `service` to `systemctl` [\#10703](https://github.com/netdata/netdata/pull/10703) ([joelhans](https://github.com/joelhans))
+- Add noauthcodecheck workaround flag to the freeipmi plugin [\#10701](https://github.com/netdata/netdata/pull/10701) ([vlvkobal](https://github.com/vlvkobal))
+- Add guide: LAMP stack monitoring [\#10698](https://github.com/netdata/netdata/pull/10698) ([joelhans](https://github.com/joelhans))
+- Log ACLK cloud commands to access.log [\#10697](https://github.com/netdata/netdata/pull/10697) ([stelfrag](https://github.com/stelfrag))
+- Add Linux page cache metrics to eBPF [\#10693](https://github.com/netdata/netdata/pull/10693) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update guide: Kubernetes monitoring with Netdata: Overview and visualizations [\#10691](https://github.com/netdata/netdata/pull/10691) ([joelhans](https://github.com/joelhans))
+- health: make alarms less sensitive [\#10688](https://github.com/netdata/netdata/pull/10688) ([ilyam8](https://github.com/ilyam8))
+- Ebpf support new collectors [\#10680](https://github.com/netdata/netdata/pull/10680) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix broken links in active alarms doc [\#10678](https://github.com/netdata/netdata/pull/10678) ([joelhans](https://github.com/joelhans))
+- Add new cookie to fix 8094 [\#10676](https://github.com/netdata/netdata/pull/10676) ([thiagoftsm](https://github.com/thiagoftsm))
+- Alarms collector add alarm values [\#10675](https://github.com/netdata/netdata/pull/10675) ([andrewm4894](https://github.com/andrewm4894))
+- Don't add duplicate \_total suffixes for the prometheus go.d module [\#10674](https://github.com/netdata/netdata/pull/10674) ([vlvkobal](https://github.com/vlvkobal))
+- fix a typo in the email notifications readme [\#10668](https://github.com/netdata/netdata/pull/10668) ([ossimantylahti](https://github.com/ossimantylahti))
+- Update screenshots and text for new Cloud nav [\#10664](https://github.com/netdata/netdata/pull/10664) ([joelhans](https://github.com/joelhans))
+- Improve the Kubernetes deployment documentation [\#10662](https://github.com/netdata/netdata/pull/10662) ([joelhans](https://github.com/joelhans))
+- installer: update go.d.plugin version to v0.28.0 [\#10660](https://github.com/netdata/netdata/pull/10660) ([ilyam8](https://github.com/ilyam8))
+- Changed Docker image tagging to use semver tags for releases. [\#10648](https://github.com/netdata/netdata/pull/10648) ([Ferroin](https://github.com/Ferroin))
+- Revamp statsd docs [\#10637](https://github.com/netdata/netdata/pull/10637) ([OdysLam](https://github.com/OdysLam))
+- replace GA with PostHog for backend telemetry events. [\#10636](https://github.com/netdata/netdata/pull/10636) ([andrewm4894](https://github.com/andrewm4894))
+- cpu stats per query thread [\#10634](https://github.com/netdata/netdata/pull/10634) ([MrZammler](https://github.com/MrZammler))
+- add stats per cloud query type [\#10602](https://github.com/netdata/netdata/pull/10602) ([underhood](https://github.com/underhood))
+- Add a new workflow to test that updater works as expected [\#10599](https://github.com/netdata/netdata/pull/10599) ([kaskavel](https://github.com/kaskavel))
+- Add support for changing the number of pages per extent [\#10593](https://github.com/netdata/netdata/pull/10593) ([mfundul](https://github.com/mfundul))
+- web/gui: Fix broken external links [\#10586](https://github.com/netdata/netdata/pull/10586) ([Habetdin](https://github.com/Habetdin))
+- Try to keep all pages from extents read from disk in the cache. [\#10558](https://github.com/netdata/netdata/pull/10558) ([mfundul](https://github.com/mfundul))
+- Remove unreachable \#else directives in plugins. [\#10523](https://github.com/netdata/netdata/pull/10523) ([vkalintiris](https://github.com/vkalintiris))
+- increases ACLK TBEB randomness [\#10373](https://github.com/netdata/netdata/pull/10373) ([underhood](https://github.com/underhood))
+
+## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.2...v1.29.3)
+
+**Merged pull requests:**
+
+- Invalidate RRDSETVAR pointers on obsoletion. [\#10667](https://github.com/netdata/netdata/pull/10667) ([mfundul](https://github.com/mfundul))
+- Fixed condition controlling use of static LWS in RPM builds. [\#10661](https://github.com/netdata/netdata/pull/10661) ([Ferroin](https://github.com/Ferroin))
+- fix wrong link on docs Netdata Agent Daemon [\#10659](https://github.com/netdata/netdata/pull/10659) ([OdysLam](https://github.com/OdysLam))
+- Fix broken links in docs and add collectors to list [\#10651](https://github.com/netdata/netdata/pull/10651) ([joelhans](https://github.com/joelhans))
+- Statsd dashboard [\#10640](https://github.com/netdata/netdata/pull/10640) ([OdysLam](https://github.com/OdysLam))
+
+## [v1.29.2](https://github.com/netdata/netdata/tree/v1.29.2) (2021-02-18)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.1...v1.29.2)
+
+**Merged pull requests:**
+
+- Fix the context filtering on the data query endpoint [\#10652](https://github.com/netdata/netdata/pull/10652) ([stelfrag](https://github.com/stelfrag))
+- fix container/host detection in system-info script [\#10647](https://github.com/netdata/netdata/pull/10647) ([ilyam8](https://github.com/ilyam8))
+- Enable apps.plugin aggregation debug messages [\#10645](https://github.com/netdata/netdata/pull/10645) ([vlvkobal](https://github.com/vlvkobal))
+- add small delay to the ipv4\_tcp\_resets alarms [\#10644](https://github.com/netdata/netdata/pull/10644) ([ilyam8](https://github.com/ilyam8))
+- collectors/proc: fix collecting operstate for virtual network interfaces [\#10633](https://github.com/netdata/netdata/pull/10633) ([ilyam8](https://github.com/ilyam8))
+- fix sendmail unrecognized option F error [\#10631](https://github.com/netdata/netdata/pull/10631) ([ilyam8](https://github.com/ilyam8))
+- Fix typo in web/gui/readme.md [\#10623](https://github.com/netdata/netdata/pull/10623) ([OdysLam](https://github.com/OdysLam))
+- add freeswitch to apps\_groups [\#10621](https://github.com/netdata/netdata/pull/10621) ([fayak](https://github.com/fayak))
+- Add ACLK proxy setting as host label [\#10619](https://github.com/netdata/netdata/pull/10619) ([underhood](https://github.com/underhood))
+- dashboard@v2.13.6 [\#10618](https://github.com/netdata/netdata/pull/10618) ([jacekkolasa](https://github.com/jacekkolasa))
+- Disable stock alarms [\#10617](https://github.com/netdata/netdata/pull/10617) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fixes \#10597 raw binary data should never be printed [\#10603](https://github.com/netdata/netdata/pull/10603) ([rda0](https://github.com/rda0))
+- collectors/proc: change ksm mem chart type to stacked [\#10598](https://github.com/netdata/netdata/pull/10598) ([ilyam8](https://github.com/ilyam8))
+- ACLK reduce excessive logging [\#10596](https://github.com/netdata/netdata/pull/10596) ([underhood](https://github.com/underhood))
+- add k8s\_cluster\_id host label [\#10588](https://github.com/netdata/netdata/pull/10588) ([ilyam8](https://github.com/ilyam8))
+- add resetting CapabilityBoundingSet workaround to the python.d collectors \(that use `sudo`\) readmes [\#10587](https://github.com/netdata/netdata/pull/10587) ([ilyam8](https://github.com/ilyam8))
+- collectors/elasticsearch: document `scheme` option [\#10572](https://github.com/netdata/netdata/pull/10572) ([vjt](https://github.com/vjt))
+- Update claiming docs for Docker containers. [\#10570](https://github.com/netdata/netdata/pull/10570) ([Ferroin](https://github.com/Ferroin))
+- health: make Opsgenie API URL configurable [\#10561](https://github.com/netdata/netdata/pull/10561) ([tinyhammers](https://github.com/tinyhammers))
+- Allow the REMOVED alarm status via ACLK if the previous status was WARN/CRIT [\#10533](https://github.com/netdata/netdata/pull/10533) ([stelfrag](https://github.com/stelfrag))
+- Change eBPF plugin internal [\#10442](https://github.com/netdata/netdata/pull/10442) ([thiagoftsm](https://github.com/thiagoftsm))
+
+## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.0...v1.29.1)
+
+**Merged pull requests:**
+
+- Fix crash during shutdown of cgroups internal plugin. [\#10614](https://github.com/netdata/netdata/pull/10614) ([mfundul](https://github.com/mfundul))
+- Update latest release on main README [\#10590](https://github.com/netdata/netdata/pull/10590) ([joelhans](https://github.com/joelhans))
+
+## [v1.29.0](https://github.com/netdata/netdata/tree/v1.29.0) (2021-02-03)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.28.0...v1.29.0)
+
+**Merged pull requests:**
+
+- Fixed Netdata Cloud support in RPM packages. [\#10578](https://github.com/netdata/netdata/pull/10578) ([Ferroin](https://github.com/Ferroin))
+- Fix container detection from systemd-detect-virt [\#10569](https://github.com/netdata/netdata/pull/10569) ([cakrit](https://github.com/cakrit))
 - dashboard v2.13.0 [\#10565](https://github.com/netdata/netdata/pull/10565) ([jacekkolasa](https://github.com/jacekkolasa))
 - bytes after last '}' trip JSON parser [\#10563](https://github.com/netdata/netdata/pull/10563) ([underhood](https://github.com/underhood))
 - Fix prometheus remote write header [\#10560](https://github.com/netdata/netdata/pull/10560) ([vlvkobal](https://github.com/vlvkobal))
@@ -177,66 +283,14 @@
 - Migrate metadata log to SQLite [\#10139](https://github.com/netdata/netdata/pull/10139) ([stelfrag](https://github.com/stelfrag))
 - Kubernetes labels [\#10107](https://github.com/netdata/netdata/pull/10107) ([ilyam8](https://github.com/ilyam8))
 - Remove Docker example from update docs and add section to claim troubleshooting [\#10103](https://github.com/netdata/netdata/pull/10103) ([joelhans](https://github.com/joelhans))
-- Anomalies collector [\#10060](https://github.com/netdata/netdata/pull/10060) ([andrewm4894](https://github.com/andrewm4894))
-- Alarms collector [\#10042](https://github.com/netdata/netdata/pull/10042) ([andrewm4894](https://github.com/andrewm4894))
-- ACLK allow child query [\#10030](https://github.com/netdata/netdata/pull/10030) ([underhood](https://github.com/underhood))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/before_rebase...v1.26.0)
 
-**Merged pull requests:**
-
-- Fix systemd comment syntax [\#10066](https://github.com/netdata/netdata/pull/10066) ([HolgerHees](https://github.com/HolgerHees))
-- health/portcheck: add `failed` dim to the `connection\_fails` alarm [\#10048](https://github.com/netdata/netdata/pull/10048) ([ilyam8](https://github.com/ilyam8))
-- installer: update go.d.plugin version to v0.23.0 [\#10046](https://github.com/netdata/netdata/pull/10046) ([ilyam8](https://github.com/ilyam8))
-- Rename NETDATA\_PORT to NETDATA\_LISTENER\_PORT [\#10045](https://github.com/netdata/netdata/pull/10045) ([knatsakis](https://github.com/knatsakis))
-- small docs update - adding note about using `nolock` when debugging [\#10036](https://github.com/netdata/netdata/pull/10036) ([andrewm4894](https://github.com/andrewm4894))
-- Fixed the data endpoint to prioritize chart over context if both are present [\#10032](https://github.com/netdata/netdata/pull/10032) ([stelfrag](https://github.com/stelfrag))
-- python.d/rabbitmq: Add chart for churn rates [\#10031](https://github.com/netdata/netdata/pull/10031) ([chadknutson](https://github.com/chadknutson))
-- Fixed gauges for go web\_log module [\#10029](https://github.com/netdata/netdata/pull/10029) ([hamedbrd](https://github.com/hamedbrd))
-- Fixed incorrect condition in updater type detection. [\#10028](https://github.com/netdata/netdata/pull/10028) ([Ferroin](https://github.com/Ferroin))
-- Fix README exporting link [\#10020](https://github.com/netdata/netdata/pull/10020) ([Dim-P](https://github.com/Dim-P))
-- Clean up and better cross-link new docsv2 documents [\#10015](https://github.com/netdata/netdata/pull/10015) ([joelhans](https://github.com/joelhans))
-- collector infiniband: fix file descriptor leak [\#10013](https://github.com/netdata/netdata/pull/10013) ([Saruspete](https://github.com/Saruspete))
-- changes default query thread count [\#10009](https://github.com/netdata/netdata/pull/10009) ([underhood](https://github.com/underhood))
-- Add missing tests to the web server [\#10008](https://github.com/netdata/netdata/pull/10008) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update freebsd.md [\#10005](https://github.com/netdata/netdata/pull/10005) ([disko](https://github.com/disko))
-- Add documentation for claiming k8s parent pods and Prometheus service discovery [\#10001](https://github.com/netdata/netdata/pull/10001) ([joelhans](https://github.com/joelhans))
-- Add docsv2 project to master branch [\#10000](https://github.com/netdata/netdata/pull/10000) ([joelhans](https://github.com/joelhans))
-- Allow connecting to arbitrary MQTT WSS broker for devs [\#9999](https://github.com/netdata/netdata/pull/9999) ([underhood](https://github.com/underhood))
-- minor - removes leading whitespace before JSON in ACLK [\#9998](https://github.com/netdata/netdata/pull/9998) ([underhood](https://github.com/underhood))
-- Fixed typos in installer functions. [\#9992](https://github.com/netdata/netdata/pull/9992) ([Ferroin](https://github.com/Ferroin))
-- Fixed locking order to address CID\_362348 [\#9991](https://github.com/netdata/netdata/pull/9991) ([stelfrag](https://github.com/stelfrag))
-- Switched to our installer's bundling code for libJudy in static installs. [\#9988](https://github.com/netdata/netdata/pull/9988) ([Ferroin](https://github.com/Ferroin))
-- Fix cleanup of obsolete charts [\#9985](https://github.com/netdata/netdata/pull/9985) ([mfundul](https://github.com/mfundul))
-- Added more stringent check for C99 support in configure script. [\#9982](https://github.com/netdata/netdata/pull/9982) ([Ferroin](https://github.com/Ferroin))
-- Improved the data query when using the context parameter [\#9978](https://github.com/netdata/netdata/pull/9978) ([stelfrag](https://github.com/stelfrag))
-- Fix missing libelf-dev dependency. [\#9974](https://github.com/netdata/netdata/pull/9974) ([roedie](https://github.com/roedie))
-- allow using LWS without SOCKS5 [\#9973](https://github.com/netdata/netdata/pull/9973) ([underhood](https://github.com/underhood))
-- Cleanup CODEOWNERS [\#9971](https://github.com/netdata/netdata/pull/9971) ([prologic](https://github.com/prologic))
-- Fix Stackpulse doc [\#9968](https://github.com/netdata/netdata/pull/9968) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix setting for disabling eBPF-apps.plugin integration [\#9967](https://github.com/netdata/netdata/pull/9967) ([joelhans](https://github.com/joelhans))
-- Added improved auto-update support. [\#9966](https://github.com/netdata/netdata/pull/9966) ([Ferroin](https://github.com/Ferroin))
-- Stackpulse integration [\#9965](https://github.com/netdata/netdata/pull/9965) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix typo inside netdata-installer.sh [\#9962](https://github.com/netdata/netdata/pull/9962) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add missing period in netdata dashboard [\#9960](https://github.com/netdata/netdata/pull/9960) ([hydrogen-mvm](https://github.com/hydrogen-mvm))
-- Fixed chart's last accessed time during context queries [\#9952](https://github.com/netdata/netdata/pull/9952) ([stelfrag](https://github.com/stelfrag))
-- adds missing file netdata.crontab to gitignore [\#9946](https://github.com/netdata/netdata/pull/9946) ([underhood](https://github.com/underhood))
-- Updated RPM spec file to use automatic dependency list generation. [\#9937](https://github.com/netdata/netdata/pull/9937) ([Ferroin](https://github.com/Ferroin))
-- Add information about Cloud disabled status to `-W buildinfo`. [\#9936](https://github.com/netdata/netdata/pull/9936) ([underhood](https://github.com/underhood))
-- Fix resource leak in case of malformed cloud request [\#9934](https://github.com/netdata/netdata/pull/9934) ([underhood](https://github.com/underhood))
-- Added context parameter to the data endpoint [\#9931](https://github.com/netdata/netdata/pull/9931) ([stelfrag](https://github.com/stelfrag))
-- Add persistent configuration details to Docker docs [\#9926](https://github.com/netdata/netdata/pull/9926) ([joelhans](https://github.com/joelhans))
-- Update claiming document to instruct users to install `uuidgen`. [\#9925](https://github.com/netdata/netdata/pull/9925) ([OdysLam](https://github.com/OdysLam))
-
 ## [before_rebase](https://github.com/netdata/netdata/tree/before_rebase) (2020-09-24)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.25.0...before_rebase)
-
-**Merged pull requests:**
-
-- Add notice to Docker docs about systemd volumes [\#9927](https://github.com/netdata/netdata/pull/9927) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.25.0](https://github.com/netdata/netdata/tree/v1.25.0) (2020-09-15)
 

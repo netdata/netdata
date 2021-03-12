@@ -39,8 +39,9 @@ SEND_STACKPULSE="YES"
 STACKPULSE_WEBHOOK="https://hooks.stackpulse.io/v1/webhooks/YOUR_UNIQUE_ID"
 ```
 
-4.  Now [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata). When your node creates an alarm, you
-    can see the associated notification on your StackPulse Administration Portal 
+4.  Now restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+    method](/docs/configure/start-stop-restart.md) for your system. When your node creates an alarm, you can see the
+    associated notification on your StackPulse Administration Portal 
 
 ## React to alarms with playbooks
 

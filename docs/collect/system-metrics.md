@@ -48,8 +48,9 @@ windows_exporter-0.14.0-amd64.exe --collectors.enabled="cpu,memory,net,logical_d
 
 Next, [configure the WMI
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi#configuration) to point to the URL
-and port of your exposed endpoint. Restart Netdata with `service netdata restart` and you'll start seeing Windows system
-metrics, such as CPU utilization, memory, bandwidth per NIC, number of processes, and much more.
+and port of your exposed endpoint. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system. You'll start seeing Windows system metrics, such as CPU
+utilization, memory, bandwidth per NIC, number of processes, and much more.
 
 For information about collecting metrics from applications _running on Windows systems_, see the [application metrics
 doc](/docs/collect/application-metrics.md#collect-metrics-from-applications-running-on-windows).

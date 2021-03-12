@@ -56,6 +56,7 @@ char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
+char *ebpf_algorithms[] = {"absolute", "incremental"};
 int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
@@ -78,13 +79,16 @@ pthread_cond_t collect_data_cond_var;
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0 },
+      .optional = 0, .apps_routine = ebpf_process_create_apps_charts },
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0  },
+      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
+    { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
+        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+        .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0 },
+      .optional = 0, .apps_routine = NULL },
 };
 
 // Link with apps.plugin
@@ -98,6 +102,19 @@ ebpf_network_viewer_options_t network_viewer_opt;
  *  FUNCTIONS USED TO CLEAN MEMORY AND OPERATE SYSTEM FILES
  *
  *****************************************************************/
+
+/**
+ * Cleanup publish syscall
+ *
+ * @param nps list of structures to clean
+ */
+void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
+{
+    while (nps) {
+        freez(nps->algorithm);
+        nps = nps->next;
+    }
+}
 
 /**
  * Clean port Structure
@@ -307,17 +324,21 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 /**
  * Call the necessary functions to create a chart.
  *
+ * @param chart  the chart name
  * @param family  the chart family
- * @param move    the pointer with the values that will be published
+ * @param dwrite the dimension name
+ * @param vwrite the value for previous dimension
+ * @param dread the dimension name
+ * @param vread the value for previous dimension
  *
  * @return It returns a variable tha maps the charts that did not have zero values.
  */
-void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdata_publish_vfs_common_t *pvc)
+void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread)
 {
     write_begin_chart(family, chart);
 
-    write_chart_dimension(dwrite, (long long)pvc->write);
-    write_chart_dimension(dread, (long long)pvc->read);
+    write_chart_dimension(dwrite, vwrite);
+    write_chart_dimension(dread, vread);
 
     write_end_chart();
 }
@@ -325,23 +346,26 @@ void write_io_chart(char *chart, char *family, char *dwrite, char *dread, netdat
 /**
  * Write chart cmd on standard output
  *
- * @param type      the chart type
- * @param id        the chart id
- * @param title     the chart title
- * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
- * @param charttype the chart type
- * @param order     the chart order
+ * @param type      chart type
+ * @param id        chart id
+ * @param title     chart title
+ * @param units     units label
+ * @param family    group name used to attach the chart on dashaboard
+ * @param charttype chart type
+ * @param context   chart context
+ * @param order     chart order
  */
-void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family, char *charttype, int order)
+void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+                          char *charttype, char *context, int order)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '' %s %d %d\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
            type,
            id,
            title,
            units,
-           family,
-           charttype,
+           (family)?family:"",
+           (context)?context:"",
+           (charttype)?charttype:"",
            order,
            update_every);
 }
@@ -349,12 +373,13 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
 /**
  * Write the dimension command on standard output
  *
- * @param n the dimension name
- * @param d the dimension information
+ * @param name the dimension name
+ * @param id the dimension id
+ * @param algo the dimension algorithm
  */
-void ebpf_write_global_dimension(char *n, char *d)
+void ebpf_write_global_dimension(char *name, char *id, char *algorithm)
 {
-    printf("DIMENSION %s %s absolute 1 1\n", n, d);
+    printf("DIMENSION %s %s %s 1 1\n", name, id, algorithm);
 }
 
 /**
@@ -369,7 +394,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
 
     int i = 0;
     while (move && i < end) {
-        ebpf_write_global_dimension(move->name, move->dimension);
+        ebpf_write_global_dimension(move->name, move->dimension, move->algorithm);
 
         move = move->next;
         i++;
@@ -379,26 +404,28 @@ void ebpf_create_global_dimension(void *ptr, int end)
 /**
  *  Call write_chart_cmd to create the charts
  *
- * @param type   the chart type
- * @param id     the chart id
- * @param units   the axis label
- * @param family the group name used to attach the chart on dashaboard
- * @param order  the order number of the specified chart
- * @param ncd    a pointer to a function called to create dimensions
- * @param move   a pointer for a structure that has the dimensions
- * @param end    number of dimensions for the chart created
+ * @param type    chart type
+ * @param id      chart id
+ * @param units   axis label
+ * @param family  group name used to attach the chart on dashaboard
+ * @param order   order number of the specified chart
+ * @param context chart context
+ * @param ncd     a pointer to a function called to create dimensions
+ * @param move    a pointer for a structure that has the dimensions
+ * @param end     number of dimensions for the chart created
  */
 void ebpf_create_chart(char *type,
                        char *id,
                        char *title,
                        char *units,
                        char *family,
+                       char *context,
                        int order,
                        void (*ncd)(void *, int),
                        void *move,
                        int end)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, "line", order);
+    ebpf_write_chart_cmd(type, id, title, units, family, "line", context, order);
 
     ncd(move, end);
 }
@@ -411,16 +438,18 @@ void ebpf_create_chart(char *type,
  * @param units  the value displayed on vertical axis.
  * @param family Submenu that the chart will be attached on dashboard.
  * @param order  the chart order
+ * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
  */
-void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order, struct target *root)
+void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, int order,
+                                char *algorithm, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, "stacked", NULL, order);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }
 
@@ -437,9 +466,11 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  * @param pio  structure used to generate charts.
  * @param dim  a pointer for the dimensions name
  * @param name a pointer for the tensor with the name of the functions.
+ * @param algorithm a vector with the algorithms used to make the charts
  * @param end  the number of elements in the previous 4 arguments.
  */
-void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim, char **name, int end)
+void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *pio, char **dim,
+                        char **name, int *algorithm, int end)
 {
     int i;
 
@@ -453,6 +484,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 
         pio[i].dimension = dim[i];
         pio[i].name = name[i];
+        pio[i].algorithm = strdupz(ebpf_algorithms[algorithm[i]]);
         if (publish_prev) {
             publish_prev->next = &pio[i];
         }
@@ -556,21 +588,23 @@ void ebpf_print_help()
             "\n"
             " Available command line options:\n"
             "\n"
-            " SECONDS           set the data collection frequency.\n"
+            " SECONDS             Set the data collection frequency.\n"
             "\n"
-            " --help or -h      show this help.\n"
+            " --help or -h        Show this help.\n"
             "\n"
-            " --version or -v   show software version.\n"
+            " --version or -v     Show software version.\n"
             "\n"
-            " --global or -g    disable charts per application.\n"
+            " --global or -g      Disable charts per application.\n"
             "\n"
-            " --all or -a       Enable all chart groups (global and apps), unless -g is also given.\n"
+            " --all or -a         Enable all chart groups (global and apps), unless -g is also given.\n"
             "\n"
-            " --net or -n       Enable network viewer charts.\n"
+            " --cachestat or -c   Enable charts related to process run time.\n"
             "\n"
-            " --process or -p   Enable charts related to process run time.\n"
+            " --net or -n         Enable network viewer charts.\n"
             "\n"
-            " --return or -r    Run the collector in return mode.\n"
+            " --process or -p     Enable charts related to process run time.\n"
+            "\n"
+            " --return or -r      Run the collector in return mode.\n"
             "\n",
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
@@ -1628,7 +1662,7 @@ static void read_collector_values(int *disable_apps)
 
     // Read ebpf programs section
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
-                                    ebpf_modules[0].config_name, CONFIG_BOOLEAN_YES);
+                                    ebpf_modules[EBPF_MODULE_PROCESS_IDX].config_name, CONFIG_BOOLEAN_YES);
     int started = 0;
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps);
@@ -1639,7 +1673,8 @@ static void read_collector_values(int *disable_apps)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer",
                                     CONFIG_BOOLEAN_NO);
     if (!enabled)
-        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, ebpf_modules[1].config_name,
+        enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
+                                        ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
 
     if (enabled) {
@@ -1656,7 +1691,15 @@ static void read_collector_values(int *disable_apps)
     if (!enabled)
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                                         CONFIG_BOOLEAN_NO);
-    ebpf_modules[1].optional = enabled;
+    ebpf_modules[EBPF_MODULE_SOCKET_IDX].optional = enabled;
+
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
+                                    CONFIG_BOOLEAN_NO);
+
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_apps);
+        started++;
+    }
 
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
@@ -1732,13 +1775,14 @@ static void parse_args(int argc, char **argv)
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
-        {"help",     no_argument,    0,  'h' },
-        {"version",  no_argument,    0,  'v' },
-        {"global",   no_argument,    0,  'g' },
-        {"all",      no_argument,    0,  'a' },
-        {"net",      no_argument,    0,  'n' },
-        {"process",  no_argument,    0,  'p' },
-        {"return",   no_argument,    0,  'r' },
+        {"help",      no_argument,    0,  'h' },
+        {"version",   no_argument,    0,  'v' },
+        {"global",    no_argument,    0,  'g' },
+        {"all",       no_argument,    0,  'a' },
+        {"cachestat", no_argument,    0,  'c' },
+        {"net",       no_argument,    0,  'n' },
+        {"process",   no_argument,    0,  'p' },
+        {"return",    no_argument,    0,  'r' },
         {0, 0, 0, 0}
     };
 
@@ -1753,7 +1797,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvganpr", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgcanpr", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1779,6 +1823,15 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_all_charts(disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with all chart groups, because it was started with the option \"--all\" or \"-a\".");
+#endif
+                break;
+            }
+            case 'c': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info(
+                    "EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"--cachestat\" or \"-c\".");
 #endif
                 break;
             }
@@ -1924,9 +1977,14 @@ int main(int argc, char **argv)
     read_local_ports("/proc/net/udp6", IPPROTO_UDP);
 
     struct netdata_static_thread ebpf_threads[] = {
-        {"EBPF PROCESS", NULL, NULL, 1, NULL, NULL, ebpf_modules[0].start_routine},
-        {"EBPF SOCKET" , NULL, NULL, 1, NULL, NULL, ebpf_modules[1].start_routine},
-        {NULL          , NULL, NULL, 0, NULL, NULL, NULL}
+        {"EBPF PROCESS", NULL, NULL, 1,
+          NULL, NULL, ebpf_modules[EBPF_MODULE_PROCESS_IDX].start_routine},
+        {"EBPF SOCKET" , NULL, NULL, 1,
+          NULL, NULL, ebpf_modules[EBPF_MODULE_SOCKET_IDX].start_routine},
+        {"EBPF CACHESTAT" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].start_routine},
+        {NULL          , NULL, NULL, 0,
+          NULL, NULL, NULL}
     };
 
     //clean_loaded_events();

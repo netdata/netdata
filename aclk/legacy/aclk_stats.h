@@ -55,6 +55,11 @@ extern struct aclk_mat_metrics {
 
 void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement);
 
+#define ACLK_STATS_CLOUD_REQ_TYPE_CNT 7
+// if you change update cloud_req_type_names
+
+int aclk_cloud_req_type_to_idx(const char *name);
+
 // reset to 0 on every sample
 extern struct aclk_metrics_per_sample {
     /* in the unlikely event of ACLK disconnecting
@@ -72,8 +77,13 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t read_q_added;
     volatile uint32_t read_q_consumed;
 
-    volatile uint32_t cloud_req_recvd;
+    volatile uint32_t cloud_req_ok;
     volatile uint32_t cloud_req_err;
+
+    volatile uint16_t cloud_req_v1;
+    volatile uint16_t cloud_req_v2;
+
+    volatile uint16_t cloud_req_by_type[ACLK_STATS_CLOUD_REQ_TYPE_CNT];
 
 #ifdef NETDATA_INTERNAL_CHECKS
     struct aclk_metric_mat_data latency;
@@ -83,6 +93,7 @@ extern struct aclk_metrics_per_sample {
 } aclk_metrics_per_sample;
 
 extern uint32_t *aclk_queries_per_thread;
+extern struct rusage *rusage_per_thread;
 
 void *aclk_stats_main_thread(void *ptr);
 void aclk_stats_thread_cleanup();

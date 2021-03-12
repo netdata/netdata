@@ -45,7 +45,8 @@ pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 py
 
 ## Configuration
 
-Install the Python requirements above, enable the collector and restart Netdata.
+Install the Python requirements above, enable the collector and [restart
+Netdata](/docs/configure/start-stop-restart.md).
 
 ```bash
 cd /etc/netdata/

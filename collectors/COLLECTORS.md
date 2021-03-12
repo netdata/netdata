@@ -259,8 +259,10 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
     tool.
 -   [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
--   [Energi Core](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and unspent
-    transactions statistics.
+-   [Energi Core (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
+    blockchain indexes, memory usage, network usage, and transactions of wallet instances.
+-   [Energi Core (Python)](/collectors/python.d.plugin/energid/README.md): Monitor blockchain, memory, network, and
+    unspent transactions statistics.
 -   [Fronius Symo](/collectors/node.d.plugin/fronius/): Collect power, consumption, autonomy, energy, and inverter
     statistics.
 -   [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
@@ -313,6 +315,9 @@ configure any of these collectors according to your setup and infrastructure.
     metrics via `ngx_http_stub_status_module`.
 -   [Nginx Plus](/collectors/python.d.plugin/nginx_plus/README.md): Collect global and per-server zone, upstream, and
     cache metrics.
+-   [Nginx VTS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginxvts/): Gathers metrics from
+    any Nginx deployment with the _virtual host traffic status module_ enabled, including metrics on uptime, memory
+    usage, and cache, and more.
 -   [PHP-FPM (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
     summary and processes health metrics by scraping the status page (`/status?full`).
 -   [PHP-FPM (Python)](/collectors/python.d.plugin/phpfpm/README.md): Collect application summary and processes health
@@ -484,8 +489,8 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 These collectors are recursive in nature, in that they monitor some function of the Netdata Agent itself. Some
 collectors are described only in code and associated charts in Netdata dashboards.
 
--   [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/aclk_stats.c): View whether a Netdata Agent
-    is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
+-   [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
+    Agent is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
 -   [Alarms](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/alarms): This collector creates an
     <strong>Alarms</strong> menu with one line plot showing the alarm states of a Netdata Agent over time.
 -   [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the

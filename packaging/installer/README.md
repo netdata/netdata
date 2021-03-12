@@ -232,8 +232,8 @@ the lines to match the output from `ls -la` above and uncomment them if necessar
     web files group = netdata
 ```
 
-Save the file, [restart the Netdata Agent](/docs/getting-started.md#start-stop-and-restart-netdata), and try accessing
-the dashboard again.
+Save the file, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and try accessing the dashboard again.
 
 ### Multiple versions of OpenSSL
 

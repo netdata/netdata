@@ -583,6 +583,18 @@ netdataDashboard.menu = {
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
 
+    'statsd': { 
+        title: 'StatsD',
+        icon: '<i class="fas fa-chart-line"></i>',
+        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
+    },
+
+    'supervisord': {
+        title: 'Supervisord',
+        icon: '<i class="fas fa-tasks"></i>',
+        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
+        'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
+    },
 };
 
 
@@ -1006,11 +1018,35 @@ netdataDashboard.context = {
         info: 'Transparent HugePages (THP) is backing virtual memory with huge pages, supporting automatic promotion and demotion of page sizes. It works for all applications for anonymous memory mappings and tmpfs/shmem.'
     },
 
+    'mem.cachestat_ratio': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. If the entry is not there, a page cache miss has occurred and the kernel allocates a new entry and copies in data from the disk. Netdata calculates the percentage of accessed files that are cached on memory. <a href="https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138" target="_blank">The ratio</a> is calculated counting the accessed cached pages (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages. The algorithm will not plot data when ratio is zero and our dashboard will interpolate the plot. '
+    },
+
+    'mem.cachestat_dirties': {
+        info: 'Number of <a href="https://en.wikipedia.org/wiki/Page_cache#Memory_conservation" target="_blank">dirty(modified) pages</a> cache. Pages in the page cache modified after being brought in are called dirty pages. Since non-dirty pages in the page cache have identical copies in <a href="https://en.wikipedia.org/wiki/Secondary_storage" target="_blank">secondary storage</a> (e.g. hard disk drive or solid-state drive), discarding and reusing their space is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage and reusing their space.'
+    },
+
+    'mem.cachestat_hits': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. Hits show pages accessed that were not modified (we are excluding dirty pages), this counting also excludes the recent pages inserted for read.'
+    },
+
+    'mem.cachestat_misses': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
+    },
+
     // ------------------------------------------------------------------------
     // network interfaces
 
     'net.drops': {
         info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintented VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
+    },
+
+    'net.duplex': {
+        info: 'State map: 0 - unknown, 1 - half duplex, 2 - full duplex'
+    },
+
+    'net.operstate': {
+        info: 'State map: 0 - unknown, 1 = notpresent, 2 = down, 3 = lowerlayerdown, 4 = testing, 5 = dormant, 6 = up'
     },
 
     // ------------------------------------------------------------------------
@@ -1115,12 +1151,12 @@ netdataDashboard.context = {
     },
 
     'apps.file_closed': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>, which is called from' +
+        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'apps.file_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>.'
+        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
     },
 
     'apps.file_deleted': {
@@ -1338,6 +1374,11 @@ netdataDashboard.context = {
         info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the system always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
     },
 
+    'disk.busy': {
+        colors: '#FF5588',
+        info: 'Disk Busy Time measures the amount of time the disk was busy with something.'
+    },
+    
     'disk.backlog': {
         colors: '#0099CC',
         info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the system is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
@@ -3300,7 +3341,7 @@ netdataDashboard.context = {
         info: 'Calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
@@ -3309,7 +3350,7 @@ netdataDashboard.context = {
         info: 'Failed calls to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
@@ -3773,5 +3814,14 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // Supervisor
+
+    'supervisord.process_state_code': {
+        info: '<a href="http://supervisord.org/subprocess.html#process-states" target="_blank">Process states map</a>: ' +
+        '<code>0</code> - stopped, <code>10</code> - starting, <code>20</code> - running, <code>30</code> - backoff,' +
+        '<code>40</code> - stopping, <code>100</code> - exited, <code>200</code> - fatal, <code>1000</code> - unknown.'
     },
 };

@@ -28,10 +28,11 @@ The configuration file is a `name = value` dictionary. Netdata will not complain
 
 ## Applying changes
 
-After `netdata.conf` has been modified, Netdata needs to be restarted for changes to apply:
+After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/configure/start-stop-restart.md) for
+changes to apply:
 
 ```bash
-sudo service netdata restart
+sudo systemctl restart netdata
 ```
 
 If the above does not work, try the following:

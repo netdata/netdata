@@ -348,6 +348,7 @@ static inline int received_data_to_ringbuff(struct lws_ring *buffer, void *data,
     return 1;
 }
 
+#ifdef ACLK_TRP_DEBUG_VERBOSE
 static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
 {
     switch (reason) {
@@ -381,6 +382,7 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "unknown";
     }
 }
+#endif
 
 void aclk_lws_wss_fail_report()
 {
@@ -489,7 +491,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
         case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
             // Expected and safe to ignore.
+#ifdef ACLK_TRP_DEBUG_VERBOSE
             debug(D_ACLK, "Ignoring expected callback from LWS: %s", aclk_lws_callback_name(reason));
+#endif
             return retval;
 
         default:
@@ -497,7 +501,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
     }
     // Log to info - volume is proportional to connection attempts.
+#ifdef ACLK_TRP_DEBUG_VERBOSE
     info("Processing callback %s", aclk_lws_callback_name(reason));
+#endif
     switch (reason) {
         case LWS_CALLBACK_PROTOCOL_INIT:
             aclk_lws_wss_connect(engine_instance->host, engine_instance->port); // Makes the outgoing connection
@@ -531,7 +537,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
 
         default:
+#ifdef ACLK_TRP_DEBUG_VERBOSE
             error("Unexpected callback from libwebsockets %s", aclk_lws_callback_name(reason));
+#endif
             break;
     }
     return retval; //0-OK, other connection should be closed!
