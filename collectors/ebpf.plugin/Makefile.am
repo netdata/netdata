@@ -27,7 +27,7 @@ dist_noinst_DATA = \
 
 ebpfconfigdir=$(libconfigdir)/ebpf.d
 dist_libconfig_DATA = \
-    ebpf.conf \
+    ebpf.d.conf \
     $(NULL)
 
 dist_ebpfconfig_DATA = \

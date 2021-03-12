@@ -31,6 +31,9 @@
 
 #include "ebpf_apps.h"
 
+#define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
+#define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
+
 typedef struct netdata_syscall_stat {
     unsigned long bytes;               // total number of bytes
     uint64_t call;                     // total number of calls

@@ -865,10 +865,13 @@ static int load_collector_config(char *path, int *disable_apps)
 {
     char lpath[4096];
 
-    snprintf(lpath, 4095, "%s/%s", path, "ebpf.conf");
-
-    if (!appconfig_load(&collector_config, lpath, 0, NULL))
-        return -1;
+    snprintf(lpath, 4095, "%s/%s", path, NETDATA_EBPF_CONFIG_FILE);
+    if (!appconfig_load(&collector_config, lpath, 0, NULL)) {
+        snprintf(lpath, 4095, "%s/%s", path, NETDATA_EBPF_OLD_CONFIG_FILE);
+        if (!appconfig_load(&collector_config, lpath, 0, NULL)) {
+            return -1;
+        }
+    }
 
     read_collector_values(disable_apps);
 
