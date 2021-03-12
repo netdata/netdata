@@ -2948,15 +2948,15 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
                 // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
                 while(*s) {
                     unsigned long long n = cpuset_str2ull(&s);
+                    ncpus++;
                     if(*s == ',') {
                         s++;
-                        ncpus++;
                         continue;
                     }
                     if(*s == '-') {
                         s++;
                         unsigned long long m = cpuset_str2ull(&s);
-                        ncpus += m - n + 1; // calculate the number of cpus in the region
+                        ncpus += m - n; // calculate the number of cpus in the region
                     }
                     s++;
                 }
