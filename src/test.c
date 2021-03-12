@@ -82,11 +82,15 @@ int main(int argc, char **argv)
         port = atoi(argv[1]);
     if (!port)
         port = 9002;
-    printf("Using port %d", port);
+    printf("Using port %d\n", port);
 
     mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
+    if (!client) {
+        printf("Couldn't initialize mqtt_wss\n");
+        return 1;
+    }
     while (!test_exit) {
-        printf("client_handle = %d", client_handle(client));
+        printf("client_handle = %d\n", client_handle(client));
     }
     if (test_exit) {
         mqtt_wss_disconnect(client, 2000);
