@@ -2579,7 +2579,7 @@ EOF
 
 else
 
-if [ ! -z "$total_warn_alarms" ]; then
+if [ -n "$total_warn_alarms" ]; then
    while read -d, -r pair; do
        IFS='=' read -r key val <<<"$pair"
 
@@ -2589,9 +2589,8 @@ if [ ! -z "$total_warn_alarms" ]; then
        [ -z "${date}" ] && date=$(date 2>/dev/null)
 
        now=$(date "+%s")
-       elapsed=$(( $now - $val))
-       for_min=$(( $elapsed / 60 ))
-       #echo ${for_min}
+       elapsed=$(( now - val))
+       for_min=$(( elapsed / 60 ))
 
        WARN_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
                   <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #CCCC00; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
@@ -2603,7 +2602,7 @@ if [ ! -z "$total_warn_alarms" ]; then
    done <<<"$total_warn_alarms,"
 fi
 
-if [ ! -z "$total_warn_alarms" ]; then
+if [ -n "$total_crit_alarms" ]; then
    while read -d, -r pair; do
        IFS='=' read -r key val <<<"$pair"
 
@@ -2613,9 +2612,8 @@ if [ ! -z "$total_warn_alarms" ]; then
        [ -z "${date}" ] && date=$(date 2>/dev/null)
 
        now=$(date "+%s")
-       elapsed=$(( $now - $val))
-       for_min=$(( $elapsed / 60 ))
-       #echo ${for_min}
+       elapsed=$(( now - val))
+       for_min=$(( elapsed / 60 ))
 
        CRIT_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
                   <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: red; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
