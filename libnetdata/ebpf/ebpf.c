@@ -376,9 +376,9 @@ void ebpf_load_config_update_module(ebpf_module_t *em, struct config *cfg, char 
 {
     char filename[FILENAME_MAX+1];
     ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, cfg_file);
-    if (ebpf_load_config(cfg, filename)) {
+    if (!ebpf_load_config(cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, cfg_file);
-        if (ebpf_load_config(cfg, filename)) {
+        if (!ebpf_load_config(cfg, filename)) {
             error("Cannot load the ebpf configuration file %s", cfg_file);
             return;
         }
