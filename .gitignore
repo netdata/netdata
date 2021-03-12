@@ -3,3 +3,6 @@ build/*
 libringbuffer.*
 test
 .vscode
+*.o
+.deps
+.dirstamp

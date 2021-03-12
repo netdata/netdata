@@ -20,3 +20,5 @@ clean:
 	rm -f libringbuffer.a
 	rm -f libringbuffer.so
 	rm -f test
+
+distclean: clean
