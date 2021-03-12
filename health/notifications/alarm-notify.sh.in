@@ -236,6 +236,8 @@ else
   calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
   total_warnings="${23}"     # Total number of alarms in WARNING state
   total_critical="${24}"     # Total number of alarms in CRITICAL state
+  total_warn_alarms="${25}"  # List of alarms in warning state
+  total_crit_alarms="${26}"  # List of alarms in critical state
 fi
 
 # -----------------------------------------------------------------------------
@@ -2577,6 +2579,52 @@ EOF
 
 else
 
+if [ -n "$total_warn_alarms" ]; then
+   while read -d, -r pair; do
+       IFS='=' read -r key val <<<"$pair"
+
+       date=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date}" ] && date=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date}" ] && date=$(date 2>/dev/null)
+
+       now=$(date "+%s")
+       elapsed=$(( now - val))
+       for_min=$(( elapsed / 60 ))
+
+       WARN_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
+                  <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #CCCC00; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
+                  <span>${key}</span>
+                  <span style=\"display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;\">${date} (Warning for ${for_min} minutes)</span>
+                  </td>
+                  </tr>"
+
+   done <<<"$total_warn_alarms,"
+fi
+
+if [ -n "$total_crit_alarms" ]; then
+   while read -d, -r pair; do
+       IFS='=' read -r key val <<<"$pair"
+
+       date=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date}" ] && date=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date}" ] && date=$(date 2>/dev/null)
+
+       now=$(date "+%s")
+       elapsed=$(( now - val))
+       for_min=$(( elapsed / 60 ))
+
+       CRIT_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
+                  <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: red; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
+                  <span>${key}</span>
+                  <span style=\"display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;\">${date} (Critical for ${for_min} minutes)</span>
+                  </td>
+                  </tr>"
+
+   done <<<"$total_crit_alarms,"
+fi
+
 IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
@@ -2651,9 +2699,12 @@ Content-Transfer-Encoding: 8bit
                                     </tr>
                                      <tr style="margin: 0; padding: 0;">
                                         <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
-                                            The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
+                                            The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised:
                                          </td>
                                     </tr>
+                                            ${WARN_ALARMS}
+
+                                            ${CRIT_ALARMS}
 
                                     <tr style="margin: 0; padding: 0;">
                                         <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;">
