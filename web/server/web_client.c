@@ -1382,6 +1382,8 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             host = sql_create_host_by_uuid(tok);
             if (likely(host)) {
                 rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+                host->rrdeng_ctx = &multidb_ctx;
+                host->system_info = callocz(1, sizeof(*host->system_info));
                 release_host = 1;
             }
         }
@@ -1395,6 +1397,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
                 freez(host->program_name);
                 freez(host->program_version);
                 freez(host->registry_hostname);
+                freez(host->system_info);
                 freez(host);
             }
             return rc;
