@@ -1823,6 +1823,7 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
     ebpf_network_viewer_ip_list_t *move = *clean;
     while (move) {
         ebpf_network_viewer_ip_list_t *next = move->next;
+        freez(move->value);
         freez(move);
 
         move = next;
@@ -2411,7 +2412,7 @@ static void parse_ip_list(void **out, char *ip)
     fill_ip_list(list, store, "socket");
     return;
 
-    cleanipdup:
+cleanipdup:
     freez(ipdup);
 }
 
