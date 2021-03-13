@@ -617,6 +617,8 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&cachestat_data);
 
+    ebpf_load_config_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
+
     if (!em->enabled)
         goto endcachestat;
 
@@ -632,8 +634,6 @@ void *ebpf_cachestat_thread(void *ptr)
         pthread_mutex_unlock(&lock);
         goto endcachestat;
     }
-
-    ebpf_load_config_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX

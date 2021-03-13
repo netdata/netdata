@@ -2822,6 +2822,10 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);
 
+    ebpf_load_config_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
+    parse_network_viewer_section(&socket_config);
+    parse_service_name_section(&socket_config);
+
     if (!em->enabled)
         goto endsocket;
 
@@ -2845,10 +2849,6 @@ void *ebpf_socket_thread(void *ptr)
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
-
-    ebpf_load_config_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
-    parse_network_viewer_section(&socket_config);
-    parse_service_name_section(&socket_config);
 
     int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,

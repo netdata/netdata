@@ -1061,14 +1061,14 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
+    ebpf_load_config_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
+
     set_local_pointers();
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;
     }
-
-    ebpf_load_config_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX, //open, close, unlink
