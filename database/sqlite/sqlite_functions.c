@@ -962,7 +962,9 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
 
     host->system_info = callocz(1, sizeof(*host->system_info));;
     rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+#ifdef ENABLE_DBENGINE
     host->rrdeng_ctx = &multidb_ctx;
+#endif
 
     failed:
     rc = sqlite3_finalize(res);
@@ -1282,7 +1284,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         error_report("Failed to finalize the prepared statement when reading archived charts");
 #else
     UNUSED(param_list);
-    UNUSED(host_uuid);
+    UNUSED(host);
     UNUSED(context);
     UNUSED(chart);
 #endif
