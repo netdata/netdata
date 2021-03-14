@@ -52,8 +52,6 @@ struct context_param {
     time_t first_entry_t;
     time_t last_entry_t;
     uint8_t flags;
-//    uint8_t archive_mode;
-//    uint8_t context_mode;
 };
 
 #define META_CHART_UPDATED 1
@@ -542,7 +540,10 @@ struct rrdset {
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    union {
+        time_t last_accessed_time;                  // the last time this RRDSET has been accessed
+        time_t last_entry_t;                        // the last_entry_t computed for transient RRDSET
+    };
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
     char *plugin_name;                              // the name of the plugin that generated this

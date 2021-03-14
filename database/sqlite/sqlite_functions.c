@@ -1224,27 +1224,15 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
                 st->name = strdupz(chart);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
-
-#ifdef NETDATA_INTERNAL_CHECKS
-            char  uuid_str[GUID_LEN + 1];
-            uuid_unparse_lower(chart_id, uuid_str);
-            debug(D_METADATALOG, "Creating chart %s with UUID = %s", st->name, uuid_str);
-#endif
-
-            st->last_accessed_time = 0;       // This will hold the last_entry_t
+            st->last_entry_t = 0;       // This will hold the last_entry_t
             st->rrdhost = host;
         }
         st->counter++;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        char  uuid_str[GUID_LEN + 1];
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 0)), uuid_str);
-        debug(D_METADATALOG, " Adding dimension %s with UUID = %s", (char *) sqlite3_column_text(res, 1), uuid_str);
-#endif
         find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
                                     (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
 
-        st->last_accessed_time = MAX(st->last_accessed_time, (*param_list)->last_entry_t);
+        st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
         RRDDIM *rd = callocz(1, sizeof(*rd));
         rd->rrdset = st;

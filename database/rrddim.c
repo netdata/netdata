@@ -390,16 +390,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         uuid_t *dim_uuid = find_dimension_uuid(st, rd);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        char uuid_str[GUID_LEN + 1];
-        if (dim_uuid) {
-            uuid_unparse_lower(*dim_uuid, uuid_str);
-            debug(D_METADATALOG, " Adding dimension %s with UUID = %s", rd->name, uuid_str);
-        }
-        else
-            debug(D_METADATALOG, " Adding dimension %s with UUID = new", rd->name);
-#endif
         rrdeng_metric_init(rd, dim_uuid);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;

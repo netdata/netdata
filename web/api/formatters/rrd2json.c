@@ -65,6 +65,7 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         *param_list = mallocz(sizeof(struct context_param));
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
+        (*param_list)->flags = 0;
         (*param_list)->rd = NULL;
     }
 
@@ -356,7 +357,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 1, temp_rd);
+        rrdr2json(r, wb, options, 1, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -368,7 +369,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 1, temp_rd);
+        rrdr2json(r, wb, options, 1, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -379,7 +380,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 0, temp_rd);
+        rrdr2json(r, wb, options, 0, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
@@ -392,7 +393,7 @@ int rrdset2anything_api_v1(
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_begin(r, wb, format, options, 0, context_param_list, chart_label_key);
 
-        rrdr2json(r, wb, options, 0, temp_rd);
+        rrdr2json(r, wb, options, 0, context_param_list);
 
         if(options & RRDR_OPTION_JSON_WRAP)
             rrdr_json_wrapper_end(r, wb, format, options, 0);
