@@ -1224,14 +1224,16 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
                 st->name = strdupz(chart);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
-            st->last_entry_t = 0;       // This will hold the last_entry_t
+            st->last_entry_t = 0;
             st->rrdhost = host;
         }
+
+        if (unlikely(find_dimension_first_last_t(machine_guid, (char *)st->name, (char *)sqlite3_column_text(res, 1),
+                (uuid_t *)sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t,
+                &rrdeng_uuid)))
+            continue;
+
         st->counter++;
-
-        find_dimension_first_last_t(machine_guid, (char *) st->name, (char *) sqlite3_column_text(res, 1),
-                                    (uuid_t *) sqlite3_column_blob(res, 0), &(*param_list)->first_entry_t, &(*param_list)->last_entry_t, &rrdeng_uuid);
-
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
         RRDDIM *rd = callocz(1, sizeof(*rd));
@@ -1255,7 +1257,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         (*param_list)->rd = rd;
     }
     if (likely(st && context && !st->context))
-            st->context = strdupz(context);
+        st->context = strdupz(context);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
