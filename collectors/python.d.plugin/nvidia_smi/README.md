@@ -39,6 +39,17 @@ It produces the following charts:
 
 ## Configuration
 
+Turn on the plugin by editing configuration file python.d.conf
+
+```bash
+./edit-config python.d.conf
+```
+Find this line and uncomment it:
+
+```yaml
+nvidia_smi: yes
+```
+
 Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
