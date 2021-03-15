@@ -56,8 +56,6 @@ stages:
 
   - name: Nightly release
     if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
-  - name: Trigger deb and rpm package build (nightly release)
-    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
 
     # Scheduled releases
   - name: Support activities on main branch
@@ -71,21 +69,6 @@ stages:
       AND type != cron
       AND tag !~ /(-rc)/
       AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
-  - name: Trigger deb and rpm package build (release)
-    if: >-
-      branch = master
-      AND type != pull_request
-      AND type != cron
-      AND tag !~ /(-rc)/
-      AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
-
-    # Build DEB packages under special conditions
-  - name: Package ubuntu/* and debian/*
-    if: type != cron AND type != pull_request AND branch = master
-
-    # Build RPM packages under special conditions
-  - name: Package centos, fedora and opensuse
-    if: type != cron AND type != pull_request AND branch = master
 
 
 # Define stage implementation details
@@ -111,49 +94,6 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
 
-    - name: DEB package test
-      git:
-        depth: false
-      before_install:
-        - sudo apt-get install -y wget lxc python3-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
-      before_script:
-        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
-        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-        - sudo chown -R root:travis "/var/lib/lxc"
-        - sudo chmod -R 750 "/var/lib/lxc"
-        - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata DEB package build check failed."
-
-    - name: RPM package test
-      git:
-        depth: false
-      before_install:
-        - sudo apt-get install -y wget lxc lxc-templates python3-lxc
-      before_script:
-        - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
-        - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-        - sudo chmod -R 755 "/var/lib/lxc"
-        - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="32" BUILD_STRING="fedora/32"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata RPM package build check failed."
-
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
       before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
@@ -168,172 +108,6 @@ jobs:
       git:
         depth: false
       if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
-
-    # ###### Packaging workflow section ######
-    # References:
-    # https://us.images.linuxcontainers.org
-    # https://packagecloud.io/docs#install_repo
-
-    # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
-    - stage: Package ubuntu/* and debian/*
-      _template: &DEB_TEMPLATE
-        git:
-          depth: false
-        before_install:
-          - sudo apt-get install -y wget lxc python3-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
-          - source tests/installer/slack.sh
-        before_script:
-          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
-        script:
-          - echo "GIT Branch:" && git branch
-          - echo "Last commit:" && git log -1
-          - echo "GIT Describe:" && git describe
-          - echo "packaging/version:" && cat packaging/version
-          - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
-          - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-          - sudo chown -R root:travis "/var/lib/lxc"
-          - sudo chmod -R 750 "/var/lib/lxc"
-          - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-        after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
-        before_deploy:
-          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
-        deploy:
-          - provider: packagecloud
-            repository: "${DEPLOY_REPO}"
-            username: "${PACKAGING_USER}"
-            token: "${PKG_CLOUD_TOKEN}"
-            dist: "${BUILD_STRING}"
-            local_dir: "${PACKAGES_DIRECTORY}"
-            skip_cleanup: true
-            on:
-              # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
-              repo: ${TRAVIS_REPO_SLUG}
-              branch: "master"
-              condition: -d "${PACKAGES_DIRECTORY}"
-        after_deploy:
-          - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
-          - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
-
-      name: "Build & Publish DEB package for ubuntu/bionic"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for ubuntu/xenial"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="xenial" BUILD_STRING="ubuntu/xenial"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for ubuntu/focal"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="focal" BUILD_STRING="ubuntu/focal"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for ubuntu/groovy"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="groovy" BUILD_STRING="ubuntu/groovy"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for debian/buster"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for debian/stretch"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - stage: Package centos, fedora and opensuse
-      _template: &RPM_TEMPLATE
-        git:
-          depth: false
-        before_install:
-          - sudo apt-get install -y wget lxc lxc-templates python3-lxc
-          - source tests/installer/slack.sh
-        before_script:
-          - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
-        script:
-          - echo "GIT Branch:" && git branch
-          - echo "Last commit:" && git log -1
-          - echo "GIT Describe:" && git describe
-          - echo "packaging/version:" && cat packaging/version
-          - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
-          - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-          - sudo chmod -R 755 "/var/lib/lxc"
-          - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-        after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
-        before_deploy:
-          - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
-        deploy:
-          - provider: packagecloud
-            repository: "${DEPLOY_REPO}"
-            username: "${PACKAGING_USER}"
-            token: "${PKG_CLOUD_TOKEN}"
-            dist: "${BUILD_STRING}"
-            local_dir: "${PACKAGES_DIRECTORY}"
-            skip_cleanup: true
-            on:
-              # Only deploy on ${USER}/netdata, master branch, when packages directory is created
-              repo: ${TRAVIS_REPO_SLUG}
-              branch: "master"
-              condition: -d "${PACKAGES_DIRECTORY}"
-        after_deploy:
-          - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
-          - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
-
-      name: "Build & Publish RPM package for Enterprise Linux 7"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Fedora 32"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="32" BUILD_STRING="fedora/32"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Fedora 33"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="33" BUILD_STRING="fedora/33"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for openSUSE 15.2"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( openSUSE)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.2" BUILD_STRING="opensuse/15.2"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
-        - ALLOW_SOFT_FAILURE_HERE=true
-    # ###### End of packaging workflow section ###### #
-    # ############################################### #
-
 
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
@@ -358,9 +132,10 @@ jobs:
         - .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
 
-    - stage: Trigger deb and rpm package build (release)
-      name: Trigger deb and rpm package build
-      script: .travis/trigger_package_generation.sh
+    - name: Trigger deb and rpm package build
+      script:
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+        - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during release" "${NOTIF_CHANNEL}"
 
 
@@ -454,7 +229,7 @@ jobs:
       script: .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "nightly"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during nightly release" "${NOTIF_CHANNEL}"
 
-    - stage: Trigger deb and rpm package build (nightly release)
-      name: Trigger deb and rpm package build
-      script: .travis/trigger_package_generation.sh "[Build latest]"
+    - name: Trigger DEB and RPM package build
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version)"
+        - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"

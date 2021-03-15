@@ -27,6 +27,22 @@ install_fedora_like() {
   "$PKGMGR" install -y curl nc jq
 }
 
+install_centos() {
+  # Using a glob pattern here because I can't reliably determine what the
+  # resulting package name will be (TODO: There must be a better way!)
+
+  PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
+
+  # Install EPEL (needed for `jq`
+  "$PKGMGR" install -y epel-release
+
+  # Install NetData
+  "$PKGMGR" install -y /artifacts/netdata-"${VERSION}"-*.rpm
+
+  # Install testing tools
+  "$PKGMGR" install -y curl nc jq
+}
+
 install_suse_like() {
   # Using a glob pattern here because I can't reliably determine what the
   # resulting package name will be (TODO: There must be a better way!)
@@ -38,15 +54,18 @@ install_suse_like() {
 
   # Install testing tools
   zypper install -y --no-recommends \
-    curl netcat jq
+    curl gnu-netcat jq
 }
 
 case "${DISTRO}" in
   debian | ubuntu)
     install_debian_like
     ;;
-  fedora | centos)
+  fedora)
     install_fedora_like
+    ;;
+  centos)
+    install_centos
     ;;
   opensuse)
     install_suse_like

@@ -21,7 +21,7 @@ PKG_CLOUD_CONFIG="$HOME/.package_cloud_configuration.cfg"
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 CWD=$(git rev-parse --show-cdup)
 if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
-    echo "Run as .travis/package_management/$(basename "$0") from top level directory of netdata git repository"
+    echo "Run as .github/scripts/$(basename "$0") from top level directory of netdata git repository"
     echo "Docker build process aborted"
     exit 1
 fi
