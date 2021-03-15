@@ -479,7 +479,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 
 # perf plugin
-%caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+# This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
+# %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # perf plugin
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
