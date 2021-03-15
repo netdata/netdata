@@ -232,9 +232,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rc += rrddim_set_multiplier(st, rd, multiplier);
         rc += rrddim_set_divisor(st, rd, divisor);
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-#ifdef ENABLE_DBENGINE
             store_active_dimension(rd->state->metric_uuid);
-#endif
             rd->state->collect_ops.init(rd);
             rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
             rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
@@ -242,14 +240,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
             calc_link_to_rrddim(rd);
         }
-        // DBENGINE available and activated?
-#ifdef ENABLE_DBENGINE
-        if (likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && unlikely(rc)) {
+        if (unlikely(rc)) {
             debug(D_METADATALOG, "DIMENSION [%s] metadata updated", rd->id);
             (void)sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                                       rd->algorithm);
         }
-#endif
         rrdset_unlock(st);
         return rd;
     }
@@ -396,7 +391,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_DBENGINE
         uuid_t *dim_uuid = find_dimension_uuid(st, rd);
         rrdeng_metric_init(rd, dim_uuid);
-        store_active_dimension(rd->state->metric_uuid);
         rd->state->collect_ops.init = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
         rd->state->collect_ops.finalize = rrdeng_store_metric_finalize;
@@ -408,6 +402,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
 #endif
     } else {
+        rd->state->metric_uuid = find_dimension_uuid(st, rd);
+        if (unlikely(!rd->state->metric_uuid))
+            rd->state->metric_uuid = create_dimension_uuid(rd->rrdset, rd);
         rd->state->collect_ops.init         = rrddim_collect_init;
         rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
         rd->state->collect_ops.finalize     = rrddim_collect_finalize;
@@ -418,6 +415,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
+    store_active_dimension(rd->state->metric_uuid);
     rd->state->collect_ops.init(rd);
     // append this dimension
     if(!st->dimensions)
@@ -476,10 +474,8 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
         if (can_delete_metric && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-#ifdef ENABLE_DBENGINE
             /* This metric has no data and no references */
             delete_dimension_uuid(rd->state->metric_uuid);
-#endif
         }
     }
 
@@ -503,6 +499,7 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
+    freez(rd->state->metric_uuid);
 
     RRD_MEMORY_MODE rrd_memory_mode = rd->rrd_memory_mode;
     switch(rrd_memory_mode) {
@@ -522,11 +519,6 @@ void rrddim_free_custom(RRDSET *st, RRDDIM *rd, int db_rotated)
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
-#ifdef ENABLE_DBENGINE
-            if (rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                freez(rd->state->metric_uuid);
-            }
-#endif
             freez(rd->state);
             freez(rd);
             break;

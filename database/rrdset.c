@@ -385,6 +385,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->state->old_context);
     free_label_list(st->state->labels.head);
     freez(st->state);
+    freez(st->chart_uuid);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -397,10 +398,6 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_DBENGINE:
-#ifdef ENABLE_DBENGINE
-            if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-                freez(st->chart_uuid);
-#endif
             freez(st);
             break;
     }
@@ -660,15 +657,12 @@ RRDSET *rrdset_create_custom(
                 sched_yield();
             }
         }
-#ifdef ENABLE_DBENGINE
-        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-            (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED))) {
+        if (mark_rebuild & (META_CHART_UPDATED | META_PLUGIN_UPDATED | META_MODULE_UPDATED)) {
             debug(D_METADATALOG, "CHART [%s] metadata updated", st->id);
             int rc = update_chart_metadata(st->chart_uuid, st, id, name);
             if (unlikely(rc))
                 error_report("Failed to update chart metadata in the database");
         }
-#endif
         /* Fall-through during switch from archived to active so that the host lock is taken and health is linked */
         if (!changed_from_archived_to_active)
             return st;
@@ -925,17 +919,14 @@ RRDSET *rrdset_create_custom(
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
-#ifdef ENABLE_DBENGINE
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        st->chart_uuid = find_chart_uuid(host, type, id, name);
-        if (unlikely(!st->chart_uuid))
-            st->chart_uuid = create_chart_uuid(st, id, name);
-        else
-            update_chart_metadata(st->chart_uuid, st, id, name);
 
-        store_active_chart(st->chart_uuid);
-    }
-#endif
+    st->chart_uuid = find_chart_uuid(host, type, id, name);
+    if (unlikely(!st->chart_uuid))
+        st->chart_uuid = create_chart_uuid(st, id, name);
+    else
+        update_chart_metadata(st->chart_uuid, st, id, name);
+
+    store_active_chart(st->chart_uuid);
 
     rrdhost_cleanup_obsolete_charts(host);
 
@@ -1934,17 +1925,14 @@ void rrdset_finalize_labels(RRDSET *st)
     } else {
         replace_label_list(labels, new_labels);
     }
-#ifdef ENABLE_DBENGINE
-    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        netdata_rwlock_wrlock(&labels->labels_rwlock);
-        struct label *lbl = labels->head;
-        while (lbl) {
-            sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
-            lbl = lbl->next;
-        }
-        netdata_rwlock_unlock(&labels->labels_rwlock);
+
+    netdata_rwlock_wrlock(&labels->labels_rwlock);
+    struct label *lbl = labels->head;
+    while (lbl) {
+        sql_store_chart_label(st->chart_uuid, (int)lbl->label_source, lbl->key, lbl->value);
+        lbl = lbl->next;
     }
-#endif
+    netdata_rwlock_unlock(&labels->labels_rwlock);
 
     st->state->new_labels = NULL;
 }

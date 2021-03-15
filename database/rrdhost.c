@@ -298,15 +298,16 @@ RRDHOST *rrdhost_create(const char *hostname,
         return NULL;
     }
 
+    if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
+        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        if (unlikely(rc))
+            error_report("Failed to store machine GUID to the database");
+    }
+    else
+        error_report("Host machine GUID %s is not valid", host->machine_guid);
+
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-            int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
-            if (unlikely(rc))
-                error_report("Failed to store machine GUID to the database");
-        }
-        else
-            error_report("Host machine GUID %s is not valid", host->machine_guid);
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
@@ -634,11 +635,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
-#ifdef ENABLE_DBENGINE
     if (unlikely(sql_init_database())) {
-        return 1;
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            return 1;
+        info("Skipping SQLITE metadata initialization since memory mode is not db engine");
     }
-#endif
 
     health_init();
 

@@ -376,14 +376,14 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/sqlite/sqlite_functions.c \
+    database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
     $(NULL)
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
-        database/sqlite/sqlite_functions.c \
-        database/sqlite/sqlite_functions.h \
-        database/sqlite/sqlite3.c \
-        database/sqlite/sqlite3.h \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
         database/engine/rrddiskprotocol.h \

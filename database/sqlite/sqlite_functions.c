@@ -84,7 +84,8 @@ void store_active_chart(uuid_t *chart_uuid)
     int rc;
 
     if (unlikely(!db_meta)) {
-        error_report("Database has not been initialized");
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
         return;
     }
 
@@ -111,7 +112,8 @@ void store_active_dimension(uuid_t *dimension_uuid)
     int rc;
 
     if (unlikely(!db_meta)) {
-        error_report("Database has not been initialized");
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
         return;
     }
 
@@ -143,7 +145,9 @@ int sql_init_database(void)
     snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
-        error_report("Failed to initialize database at %s", sqlite_database);
+        error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        sqlite3_close(db_meta);
+        db_meta = NULL;
         return 1;
     }
 
@@ -219,6 +223,9 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
     static __thread sqlite3_stmt *res = NULL;
     uuid_t *uuid = NULL;
     int rc;
+
+    if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return NULL;
 
     if (unlikely(!res)) {
         rc = sqlite3_prepare_v2(db_meta, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
@@ -333,6 +340,9 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
     uuid_t *uuid = NULL;
     int rc;
 
+    if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return NULL;
+
     if (unlikely(!res)) {
         rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
         if (rc != SQLITE_OK) {
@@ -390,6 +400,9 @@ int update_chart_metadata(uuid_t *chart_uuid, RRDSET *st, const char *id, const 
 {
     int rc;
 
+    if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return 0;
+
     rc = sql_store_chart(
         chart_uuid, &st->rrdhost->host_uuid, st->type, id, name, st->family, st->context, st->title, st->units, st->plugin_name,
         st->module_name, st->priority, st->update_every, st->chart_type, st->rrd_memory_mode, st->entries);
@@ -429,6 +442,8 @@ int sql_store_host(
     int rc;
 
     if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
         error_report("Database has not been initialized");
         return 1;
     }
@@ -499,6 +514,8 @@ int sql_store_chart(
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
         error_report("Database has not been initialized");
         return 1;
     }
@@ -623,6 +640,8 @@ int sql_store_dimension(
     int rc;
 
     if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
         error_report("Database has not been initialized");
         return 1;
     }
@@ -1032,6 +1051,12 @@ void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, cha
 {
     sqlite3_stmt *res = NULL;
     int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_INS_CHART_LABEL, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {

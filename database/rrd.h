@@ -370,9 +370,9 @@ struct rrddim_query_handle {
 struct rrddim_volatile {
 #ifdef ENABLE_DBENGINE
     uuid_t *rrdeng_uuid;                 // database engine metric UUID
-    uuid_t *metric_uuid;                 // global UUID for this metric (unique_across hosts)
     struct pg_cache_page_index *page_index;
 #endif
+    uuid_t *metric_uuid;                 // global UUID for this metric (unique_across hosts)
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
     // function pointers that handle data collection
@@ -856,8 +856,8 @@ struct rrdhost {
 
 #ifdef ENABLE_DBENGINE
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
-    uuid_t  host_uuid;                              // Global GUID for this host
 #endif
+    uuid_t  host_uuid;                              // Global GUID for this host
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
@@ -1317,7 +1317,7 @@ extern void set_host_properties(
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
-#include "sqlite/sqlite_functions.h"
 #endif
+#include "sqlite/sqlite_functions.h"
 
 #endif /* NETDATA_RRD_H */
