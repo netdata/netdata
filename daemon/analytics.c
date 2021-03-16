@@ -38,7 +38,6 @@ struct array_printer {
 };
 
 extern int aclk_connected;
-extern ACLK_POPCORNING_STATE aclk_host_popcorn_check(RRDHOST *host);
 extern void analytics_build_info(BUFFER *b);
 extern void analytics_exporting_connectors (BUFFER *b);
 
