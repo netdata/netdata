@@ -34,7 +34,12 @@ struct pg_cache_page_index;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 #include "../streaming/rrdpush.h"
+
+#ifndef ACLK_NG
 #include "../aclk/legacy/aclk_rrdhost_state.h"
+#else
+#include "aclk/aclk.h"
+#endif
 
 struct context_param {
     RRDDIM *rd;

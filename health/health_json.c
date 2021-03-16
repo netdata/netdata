@@ -2,7 +2,7 @@
 
 #include "health.h"
 
-static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
+void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
     if(value && *value) {
         buffer_sprintf(wb, "%s\"%s\":\"", prefix, label);
         buffer_strcat_htmlescape(wb, value);
@@ -13,7 +13,7 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"

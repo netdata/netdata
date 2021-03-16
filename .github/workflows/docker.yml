@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Determine if we should push changes and which tags to use
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
         run: |

@@ -123,7 +123,7 @@ if [ "@enable_cloud_POST@" = "no" ]; then
     exit 3
 fi
 # shellcheck disable=SC2050
-if [ "@can_enable_aclk_POST@" != "yes" ]; then
+if [ "@enable_aclk_POST@" != "yes" ]; then
     echo >&2 "This agent was built without the dependencies for Cloud and cannot be claimed"
     exit 3
 fi

@@ -116,10 +116,18 @@ SUBDIRS += \
     web \
     claim \
     parser \
-    aclk/legacy \
     spawn \
     $(NULL)
 
+if ACLK_NG
+SUBDIRS += \
+    mqtt_websockets \
+    $(NULL)
+else
+SUBDIRS += \
+    aclk/legacy \
+    $(NULL)
+endif
 
 AM_CFLAGS = \
     $(OPTIONAL_MATH_CFLAGS) \
@@ -525,6 +533,28 @@ PARSER_FILES = \
     parser/parser.h \
     $(NULL)
 
+if ACLK_NG
+ACLK_FILES = \
+    aclk/aclk.c \
+    aclk/aclk.h \
+    aclk/aclk_util.c \
+    aclk/aclk_util.h \
+    aclk/aclk_stats.c \
+    aclk/aclk_stats.h \
+    aclk/aclk_query.c \
+    aclk/aclk_query.h \
+    aclk/aclk_query_queue.c \
+    aclk/aclk_query_queue.h \
+    aclk/aclk_collector_list.c \
+    aclk/aclk_collector_list.h \
+    aclk/aclk_otp.c \
+    aclk/aclk_otp.h \
+    aclk/aclk_tx_msgs.c \
+    aclk/aclk_tx_msgs.h \
+    aclk/aclk_rx_msgs.c \
+    aclk/aclk_rx_msgs.h \
+    $(NULL)
+else #ACLK_NG
 ACLK_FILES = \
     aclk/legacy/aclk_rrdhost_state.h \
     aclk/legacy/aclk_common.c \
@@ -548,9 +578,8 @@ ACLK_FILES += \
     aclk/legacy/aclk_lws_https_client.c \
     aclk/legacy/aclk_lws_https_client.h \
     $(NULL)
-endif
-
-
+endif #ENABLE_ACLK
+endif #ACLK_NG
 
 SPAWN_PLUGIN_FILES = \
     spawn/spawn.c \
@@ -714,6 +743,12 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
+if ACLK_NG
+netdata_LDADD = \
+    mqtt_websockets/libmqttwebsockets.a \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+else #ACLK_NG
 if ENABLE_ACLK
 netdata_LDADD = \
     externaldeps/mosquitto/libmosquitto.a \
@@ -721,11 +756,12 @@ netdata_LDADD = \
     $(OPTIONAL_LWS_LIBS) \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-else
+else #ENABLE_ACLK
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-endif
+endif #ENABLE_ACLK
+endif #ACLK_NG
 
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@

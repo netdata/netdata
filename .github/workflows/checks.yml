@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Run checksum checks on kickstart files
         env:
           LOCAL_ONLY: "true"
@@ -23,6 +25,8 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Install required packages
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
@@ -43,6 +47,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Build
         run: >
           docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
@@ -68,6 +74,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: |
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
@@ -98,6 +106,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Prepare environment
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
