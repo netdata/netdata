@@ -1461,7 +1461,7 @@ void *ebpf_socket_read_hash(void *ptr)
     read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS*em->update_time;
+    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_time;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
     int network_connection = em->optional;
@@ -1902,8 +1902,8 @@ static void ebpf_socket_cleanup(void *ptr)
  */
 static void ebpf_socket_allocate_global_vectors(size_t length)
 {
-    memset(socket_aggregated_data, 0 ,length*sizeof(netdata_syscall_stat_t));
-    memset(socket_publish_aggregated, 0 ,length*sizeof(netdata_publish_syscall_t));
+    memset(socket_aggregated_data, 0 ,length * sizeof(netdata_syscall_stat_t));
+    memset(socket_publish_aggregated, 0 ,length * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
@@ -2461,9 +2461,9 @@ static void parse_ips(char *ptr)
 
 
 /**
- * Fill port list
+ * Parse port list
  *
- * Fill an allocated port list with the range given
+ * Parse an allocated port list with the range given
  *
  * @param out a pointer to store the link list
  * @param range the informed range for the user.
@@ -2522,7 +2522,7 @@ static void parse_port_list(void **out, char *range)
     }
 
     ebpf_network_viewer_port_list_t *w;
-    fillenvpl:
+fillenvpl:
     w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
     w->value = copied;
     w->hash = simple_hash(copied);
