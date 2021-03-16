@@ -127,3 +127,19 @@ jobs:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_TOKEN }}
           PACKAGE_CLOUD_RETENTION_DAYS: ${{ env.pkg_retention_days }}
         run: .github/scripts/old_package_purging.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER:
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Package Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master'
+          }}
