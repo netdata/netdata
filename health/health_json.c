@@ -100,9 +100,11 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
 
     unsigned int max = host->health_log.max;
     unsigned int count = 0;
+    uint32_t hash_chart = 0;
+    if (chart) hash_chart = simple_hash(chart);
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
-        if( (ae->unique_id > after && !chart) || (ae->unique_id > after && chart && !strcmp(chart, ae->chart)) ) {
+        if( (ae->unique_id > after && !chart) || (ae->unique_id > after && chart && ae->hash_chart==hash_chart) ) {
             if(likely(count)) buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
             count++;
