@@ -209,6 +209,9 @@ if [[ ${1} = "unittest" ]]; then
   cfgfile="${3}"    # the location of the config file to use for unit testing
   status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+elif [[ ${1} = "dump_methods" ]]; then
+    dump_methods=1
+    status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
   args_host="${2}"           # the host generated this event
@@ -549,6 +552,15 @@ filter_recipient_by_criticality() {
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
+# check msteam
+[ -z "${MSTEAM_WEBHOOK_URL}" ] && SEND_MSTEAM="NO"
+
+# check pd
+[ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
+
+# check prowl
+[ -z "${DEFAULT_RECIPIENT_PROWL}" ] && SEND_PROWL="NO"
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_SLACK}" = "YES" ] ||
   [ "${SEND_ROCKETCHAT}" = "YES" ] ||
@@ -637,6 +649,15 @@ if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
     debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
     SEND_AWSSNS="NO"
   fi
+fi
+
+if [ ${dump_methods} ]; then
+    for name in "${!SEND_@}"; do
+        if [ "${!name}" = "YES" ]; then
+            echo "$name"
+        fi
+    done
+    exit
 fi
 
 # -----------------------------------------------------------------------------
