@@ -52,6 +52,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.NETDATA_HOST_CLOUD_AVAILABLE);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION);
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
@@ -85,6 +86,7 @@ void analytics_setenv_data (void) {
     setenv ( "NETDATA_CONFIG_MULTIDB_DISK_QUOTA", analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, 1);
     setenv ( "NETDATA_CONFIG_HOSTS_AVAILABLE",    analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE, 1);
     setenv ( "NETDATA_HOST_CLOUD_AVAILABLE",      analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, 1);
+    setenv ( "NETDATA_HOST_ACLK_IMPLEMENTATION",  analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION, 1);
     setenv ( "NETDATA_CONFIG_WEB_ENABLED",        analytics_data.NETDATA_CONFIG_WEB_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_EXPORTING_ENABLED",  analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, 1);
     setenv ( "NETDATA_CONFIG_RELEASE_CHANNEL",    analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, 1);
@@ -118,6 +120,7 @@ void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA);
     freez(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE);
     freez(analytics_data.NETDATA_HOST_CLOUD_AVAILABLE);
+    freez(analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION);
     freez(analytics_data.NETDATA_CONFIG_WEB_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL);
@@ -146,6 +149,14 @@ void analytics_set_data (char **name, char *value) {
 
     if (*name) freez(*name);
     *name = strdupz(value);
+
+}
+
+void analytics_set_data_str (char **name, char *value) {
+
+    if (*name) freez(*name);
+    *name = mallocz(sizeof(char) * strlen(value) + 3);
+    sprintf(*name, "\"%s\"", value);
 
 }
 
@@ -319,6 +330,11 @@ void analytics_misc(void) {
 
 #ifdef ENABLE_ACLK
     analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, "true");
+#ifdef ACLK_NG
+    analytics_set_data_str (&analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION, "Next Generation");
+#else
+    analytics_set_data_str (&analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION, "legacy");
+#endif
 #else
     analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE, "false");
 #endif
@@ -344,7 +360,7 @@ void analytics_exporters (void) {
     //check for nothing
     BUFFER *bi = buffer_create(1000);
     analytics_exporting_connectors(bi);
-    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS, (char *)buffer_tostring(bi));
+    analytics_set_data_str (&analytics_data.NETDATA_EXPORTING_CONNECTORS, (char *)buffer_tostring(bi));
     buffer_free(bi);
 
 }
@@ -423,7 +439,7 @@ void analytics_alarms_notifications (void) {
     freez(script);
 
     //check there is something to set
-    analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS, (char *)buffer_tostring(b));
+    analytics_set_data_str (&analytics_data.NETDATA_NOTIFICATION_METHODS, (char *)buffer_tostring(b));
 
     //TODO Destroy buffer
 
@@ -511,7 +527,7 @@ void *analytics_main(void *ptr) {
 void set_late_global_environment() {
 
     analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+    analytics_set_data_str (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
 
 #ifdef ENABLE_DBENGINE
     {
@@ -536,12 +552,12 @@ void set_late_global_environment() {
         analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED, "true");
 
     //get release channel //web/api/formatters/charts2json.c
-    analytics_set_data(&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, (char *)get_release_channel());
+    analytics_set_data_str (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, (char *)get_release_channel());
 
     {
         BUFFER *bi = buffer_create(1000);
         analytics_build_info(bi);
-        analytics_set_data (&analytics_data.NETDATA_BUILDINFO, (char *)buffer_tostring(bi));
+        analytics_set_data_str (&analytics_data.NETDATA_BUILDINFO, (char *)buffer_tostring(bi));
         buffer_free(bi);
     }
 
@@ -666,36 +682,37 @@ void set_global_environment() {
     setenv("NETDATA_HOST_CLOUD_ENABLED"    , appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false", 1);
 #endif
 
-    /* Initialize values we'll get from late global and the thread to N/A */
-    analytics_set_data (&analytics_data.NETDATA_BUILDINFO,                 "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,     "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT,          "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,        "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE,    "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE,    "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE,      "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
+    /* Initialize values we'll get from late global and the thread to null */
+    analytics_set_data (&analytics_data.NETDATA_BUILDINFO,                 "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,     "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_IS_PARENT,          "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,        "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE,    "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE,    "null");
+    analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE,      "null");
+    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_IMPLEMENTATION,  "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "null");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "null");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE,       "N/A");
-    analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED,        "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "null");
+    analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE,       "null");
+    analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED,        "null");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"null");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "null");
     analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "null");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS,                "\"N/A\""); //must, because this is an array
-    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALARMS_NORMAL,             "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALARMS_WARNING,            "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALARMS_CRITICAL,           "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "N/A");
-    analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "N/A");
-    analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS,      "N/A");
-    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOST_COUNT,       "N/A");
-    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE,  "N/A");
-    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE,"N/A");
-    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS,      "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "null");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS,                "null");
+    analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "null");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_NORMAL,             "null");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_WARNING,            "null");
+    analytics_set_data (&analytics_data.NETDATA_ALARMS_CRITICAL,           "null");
+    analytics_set_data (&analytics_data.NETDATA_CHARTS_COUNT,              "null");
+    analytics_set_data (&analytics_data.NETDATA_METRICS_COUNT,             "null");
+    analytics_set_data (&analytics_data.NETDATA_NOTIFICATION_METHODS,      "null");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOST_COUNT,       "null");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_REACHABLE,  "null");
+    analytics_set_data (&analytics_data.NETDATA_MIRRORED_HOSTS_UNREACHABLE,"null");
+    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS,      "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

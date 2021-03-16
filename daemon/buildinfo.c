@@ -315,45 +315,46 @@ void print_build_info_json(void) {
 };
 
 //return a list of enabled features for use in analytics
+//find a way to have proper |
 void analytics_build_info(BUFFER *b) {
-    if(!strncmp(FEAT_DBENGINE,"YES",3))        buffer_strcat (b, "dbengine");
-    if(!strncmp(FEAT_NATIVE_HTTPS,"YES",3))    buffer_strcat (b, "|Native HTTPS");
-    if(!strncmp(FEAT_CLOUD,"YES",3))           buffer_strcat (b, "|Netdata Cloud");
-    if(!strncmp(FEAT_TLS_HOST_VERIFY,"YES",3)) buffer_strcat (b, "|TLS Host Verification");
+    if(FEAT_DBENGINE)        buffer_strcat (b, "dbengine");
+    if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
+    if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
+    if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
 
-    if(!strncmp(FEAT_JEMALLOC,"YES",3))        buffer_strcat (b, "|jemalloc");
-    if(!strncmp(FEAT_JSONC,"YES",3))           buffer_strcat (b, "|JSON-C");
-    if(!strncmp(FEAT_LIBCAP,"YES",3))          buffer_strcat (b, "|libcap");
-    if(!strncmp(FEAT_CRYPTO,"YES",3))          buffer_strcat (b, "|libcrypto");
-    if(!strncmp(FEAT_LIBM,"YES",3))            buffer_strcat (b, "|libm");
+    if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
+    if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
+    if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");
+    if(FEAT_CRYPTO)          buffer_strcat (b, "|libcrypto");
+    if(FEAT_LIBM)            buffer_strcat (b, "|libm");
 
 #if defined(ENABLE_ACLK)
     {
         char buf[20];
         snprintfz(buf, 19, "|LWS v%d.%d.%d", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-        if(!strncmp(FEAT_LWS, "YES",3))            buffer_strcat(b, buf);
+        if(FEAT_LWS)         buffer_strcat(b, buf);
     }
 #else
-    if(!strncmp(FEAT_LWS, "YES",3))            buffer_strcat(b, "|LWS");
+    if(FEAT_LWS, "YES")      buffer_strcat(b, "|LWS");
 #endif
 
-    if(!strncmp(FEAT_MOSQUITTO, "YES",3))      buffer_strcat(b, "|mosquitto");
-    if(!strncmp(FEAT_TCMALLOC, "YES",3))       buffer_strcat(b, "|tcalloc");
-    if(!strncmp(FEAT_ZLIB, "YES",3))           buffer_strcat(b, "|zlib");
+    if(FEAT_MOSQUITTO)      buffer_strcat(b, "|mosquitto");
+    if(FEAT_TCMALLOC)       buffer_strcat(b, "|tcalloc");
+    if(FEAT_ZLIB)           buffer_strcat(b, "|zlib");
 
-    if(!strncmp(FEAT_APPS_PLUGIN, "YES",3))    buffer_strcat(b, "|apps");
-    if(!strncmp(FEAT_CGROUP_NET, "YES",3))     buffer_strcat(b, "|cgroup Network Tracking");
-    if(!strncmp(FEAT_CUPS, "YES",3))           buffer_strcat(b, "|CUPS");
-    if(!strncmp(FEAT_EBPF, "YES",3))           buffer_strcat(b, "|EBPF");
-    if(!strncmp(FEAT_IPMI, "YES",3))           buffer_strcat(b, "|IPMI");
-    if(!strncmp(FEAT_NFACCT, "YES",3))         buffer_strcat(b, "|NFACCT");
-    if(!strncmp(FEAT_PERF, "YES",3))           buffer_strcat(b, "|perf");
-    if(!strncmp(FEAT_SLABINFO, "YES",3))       buffer_strcat(b, "|slabinfo");
-    if(!strncmp(FEAT_XEN, "YES",3))            buffer_strcat(b, "|Xen");
-    if(!strncmp(FEAT_XEN_VBD_ERROR, "YES",3))  buffer_strcat(b, "|Xen VBD Error Tracking");
+    if(FEAT_APPS_PLUGIN)    buffer_strcat(b, "|apps");
+    if(FEAT_CGROUP_NET)     buffer_strcat(b, "|cgroup Network Tracking");
+    if(FEAT_CUPS)           buffer_strcat(b, "|CUPS");
+    if(FEAT_EBPF)           buffer_strcat(b, "|EBPF");
+    if(FEAT_IPMI)           buffer_strcat(b, "|IPMI");
+    if(FEAT_NFACCT)         buffer_strcat(b, "|NFACCT");
+    if(FEAT_PERF)           buffer_strcat(b, "|perf");
+    if(FEAT_SLABINFO)       buffer_strcat(b, "|slabinfo");
+    if(FEAT_XEN)            buffer_strcat(b, "|Xen");
+    if(FEAT_XEN_VBD_ERROR)  buffer_strcat(b, "|Xen VBD Error Tracking");
 
-    if(!strncmp(FEAT_KINESIS, "YES",3))        buffer_strcat(b, "|AWS Kinesis");
-    if(!strncmp(FEAT_PUBSUB, "YES",3))         buffer_strcat(b, "|GCP PubSub");
-    if(!strncmp(FEAT_MONGO, "YES",3))          buffer_strcat(b, "|MongoDB");
-    if(!strncmp(FEAT_REMOTE_WRITE, "YES",3))   buffer_strcat(b, "|Prometheus Remote Write");
+    if(FEAT_KINESIS)        buffer_strcat(b, "|AWS Kinesis");
+    if(FEAT_PUBSUB)         buffer_strcat(b, "|GCP PubSub");
+    if(FEAT_MONGO)          buffer_strcat(b, "|MongoDB");
+    if(FEAT_REMOTE_WRITE)   buffer_strcat(b, "|Prometheus Remote Write");
 }

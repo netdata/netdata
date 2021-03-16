@@ -997,12 +997,60 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED, wb);
     buffer_strcat(wb, ",\n");
 
-    buffer_strcat(wb, "\t\"notification-methods\":\"");
+    buffer_strcat(wb, "\t\"notification-methods\": ");
     analytics_get_data(analytics_data.NETDATA_NOTIFICATION_METHODS, wb);
-    buffer_strcat(wb, "\",\n");
+    buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"exporting-enabled\": ");
     analytics_get_data(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"hosts-available\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"https-enabled\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_HTTPS_ENABLED, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"memory-mode\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_MEMORY_MODE, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"multidb-disk-quota\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_MULTIDB_DISK_QUOTA, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"page-cache-size\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_PAGE_CACHE_SIZE, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"stream-enabled\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_STREAM_ENABLED, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"web-enabled\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_WEB_ENABLED, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"charts-count\": ");
+    analytics_get_data(analytics_data.NETDATA_CHARTS_COUNT, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"metrics-count\": ");
+    analytics_get_data(analytics_data.NETDATA_METRICS_COUNT, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"buildinfo\": ");
+    analytics_get_data(analytics_data.NETDATA_BUILDINFO, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"release-channel\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"exporting-connectors\": ");
+    analytics_get_data(analytics_data.NETDATA_EXPORTING_CONNECTORS, wb);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
