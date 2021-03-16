@@ -3744,6 +3744,7 @@ netdataDashboard.context = {
                     + ' data-chart-library="easypiechart"'
                     + ' data-title="Fan Speed"'
                     + ' data-units="percentage"'
+                    + ' data-easypiechart-max-value="100"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
