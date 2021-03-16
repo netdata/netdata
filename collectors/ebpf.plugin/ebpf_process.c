@@ -976,8 +976,8 @@ static void ebpf_process_cleanup(void *ptr)
  */
 static void ebpf_process_allocate_global_vectors(size_t length)
 {
-    memset(process_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
-    memset(process_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
+    memset(process_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
+    memset(process_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
