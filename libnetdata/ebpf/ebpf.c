@@ -348,7 +348,7 @@ static netdata_run_mode_t ebpf_select_mode(char *mode)
     return MODE_ENTRY;
 }
 
-void ebpf_update_modules_using_config(ebpf_module_t *modules, struct config *cfg)
+void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
 {
     char *mode = appconfig_get(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
     modules->mode = ebpf_select_mode(mode);
@@ -384,5 +384,5 @@ void ebpf_load_config_update_module(ebpf_module_t *em, struct config *cfg, char 
         }
     }
 
-    ebpf_update_modules_using_config(em, cfg);
+    ebpf_update_module_using_config(em, cfg);
 }
