@@ -5,8 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-#include "legacy/aclk_lws_https_client.h"
-
 #include "../daemon/common.h"
 
 #include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
