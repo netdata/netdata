@@ -1815,7 +1815,7 @@ static void parse_args(int argc, char **argv)
         {"net",       no_argument,    0,  'n' },
         {"process",   no_argument,    0,  'p' },
         {"return",    no_argument,    0,  'r' },
-        {"sync", no_argument,    0,  's' },
+        {"sync",      no_argument,    0,  's' },
         {0, 0, 0, 0}
     };
 

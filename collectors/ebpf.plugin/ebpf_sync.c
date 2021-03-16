@@ -8,7 +8,6 @@ static ebpf_data_t sync_data;
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
-
 static char *sync_counter_dimension_name[NETDATA_SYNC_END] = { "sync" };
 static netdata_syscall_stat_t sync_counter_aggregated_data;
 static netdata_publish_syscall_t sync_counter_publish_aggregated;
@@ -18,9 +17,8 @@ static int read_thread_closed = 1;
 static int *map_fd = NULL;
 static netdata_idx_t sync_hash_values = 0;
 
-struct netdata_static_thread sync_threads = {"SYNC KERNEL",
-                                                  NULL, NULL, 1, NULL,
-                                                  NULL,  NULL};
+struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
+                                              NULL, NULL,  NULL};
 
 /*****************************************************************
  *
@@ -29,7 +27,7 @@ struct netdata_static_thread sync_threads = {"SYNC KERNEL",
  *****************************************************************/
 
 /**
- * Read global counter
+ * Read global table
  *
  * Read the table with number of calls for all functions
  */

@@ -22,4 +22,4 @@ enum netdata_sync_table {
 
 extern void *ebpf_sync_thread(void *ptr);
 
-#endif
+#endif /* NETDATA_EBPF_SYNC_H */
