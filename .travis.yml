@@ -132,7 +132,7 @@ jobs:
         - .travis/trigger_docker_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during release" "${NOTIF_CHANNEL}"
 
-    - name: Trigger deb and rpm package build
+    - name: Trigger DEB and RPM package build
       script:
         - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
         - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
@@ -152,11 +152,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly changelog generation failed"
       git:
         depth: false
-
-    - name: Clean up package cloud nightly repository from old versions
-      script:
-        - DEPLOY_REPO="netdata-edge" .travis/package_management/old_package_purging.sh
-        - DEPLOY_REPO="netdata-devel" .travis/package_management/old_package_purging.sh
 
     # This is the nightly execution step
     #
@@ -230,6 +225,7 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger docker build during nightly release" "${NOTIF_CHANNEL}"
 
     - name: Trigger DEB and RPM package build
+      script:
         - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version)"
         - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"
