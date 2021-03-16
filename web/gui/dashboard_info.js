@@ -2343,7 +2343,7 @@ netdataDashboard.context = {
     },
 
     'web_log.squid_transport_errors': {
-        info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
+        info: 'These tags are optional and describe some error conditions which occurred during response delivery (if any). ' +
             '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
             '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
@@ -3100,7 +3100,7 @@ netdataDashboard.context = {
     },
 
     'squidlog.cache_code_error_tag_requests': {
-        info: 'These tags are optional and describe some error conditions which occured during response delivery.<br>' +
+        info: 'These tags are optional and describe some error conditions which occurred during response delivery.<br>' +
             '<ul>' +
             ' <li><code>ABORTED</code> the response was not completed due to the connection being aborted (usually by the client).</li>' +
             ' <li><code>TIMEOUT</code> the response was not completed due to a connection timeout.</li>' +
