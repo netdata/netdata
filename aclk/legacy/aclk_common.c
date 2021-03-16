@@ -252,6 +252,7 @@ struct label *add_aclk_host_labels(struct label *label) {
             proxy_str = "none";
             break;
     }
+    label = add_label_to_list(label, "_aclk_impl", "Legacy", LABEL_SOURCE_AUTO);
     return add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
 #else
     return label;
