@@ -58,7 +58,7 @@ struct analytics_data {
     uint8_t prometheus_hits;
     uint8_t shell_hits;
     uint8_t json_hits;
-} analytics_data;
+};
 
 extern void *analytics_main(void *ptr);
 extern void set_late_global_environment();

@@ -74,6 +74,8 @@ static struct {
         , {           NULL, 0, 0}
 };
 
+extern struct analytics_data analytics_data;
+
 void web_client_api_v1_init(void) {
     int i;
 
@@ -983,21 +985,25 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #endif
         buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
 
-    buffer_strcat(wb, "\t\"allmetrics-prometheus-used\":\"");
+    buffer_strcat(wb, "\t\"allmetrics-prometheus-used\": ");
     analytics_get_data(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, wb);
-    buffer_strcat(wb, "\",\n");
+    buffer_strcat(wb, ",\n");
 
-    buffer_strcat(wb, "\t\"allmetrics-shell-used\":\"");
+    buffer_strcat(wb, "\t\"allmetrics-shell-used\": ");
     analytics_get_data(analytics_data.NETDATA_ALLMETRICS_SHELL_USED, wb);
-    buffer_strcat(wb, "\",\n");
+    buffer_strcat(wb, ",\n");
 
-    buffer_strcat(wb, "\t\"allmetrics-json-used\":\"");
+    buffer_strcat(wb, "\t\"allmetrics-json-used\": ");
     analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED, wb);
-    buffer_strcat(wb, "\",\n");
+    buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"notification-methods\":\"");
     analytics_get_data(analytics_data.NETDATA_NOTIFICATION_METHODS, wb);
-    buffer_strcat(wb, "\"\n");
+    buffer_strcat(wb, "\",\n");
+
+    buffer_strcat(wb, "\t\"exporting-enabled\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, wb);
+    buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
     return 0;

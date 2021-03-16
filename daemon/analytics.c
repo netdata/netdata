@@ -25,6 +25,8 @@
 
 #include "common.h"
 
+struct analytics_data analytics_data;
+
 struct collector {
     char *plugin;
     char *module;
@@ -674,13 +676,13 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HOSTS_AVAILABLE,    "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_CLOUD_AVAILABLE,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_WEB_ENABLED,        "N/A");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "N/A");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,  "null");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_RELEASE_CHANNEL,    "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_ACLK_AVAILABLE,       "N/A");
     analytics_set_data (&analytics_data.NETDATA_HOST_AGENT_CLAIMED,        "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "N/A");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "N/A");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED,"null");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,     "null");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,      "null");
     analytics_set_data (&analytics_data.NETDATA_CONFIG_HTTPS_ENABLED,      "N/A");
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS,                "\"N/A\""); //must, because this is an array
     analytics_set_data (&analytics_data.NETDATA_COLLECTORS_COUNT,          "N/A");

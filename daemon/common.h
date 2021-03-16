@@ -32,8 +32,6 @@
 
 #include "global_statistics.h"
 
-#include "analytics.h"
-
 // the netdata database
 #include "database/rrd.h"
 
@@ -84,6 +82,8 @@
 #include "main.h"
 #include "signals.h"
 #include "commands.h"
+
+#include "analytics.h"
 
 // global netdata daemon variables
 extern char *netdata_configured_hostname;
