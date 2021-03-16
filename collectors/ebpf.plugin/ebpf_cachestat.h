@@ -20,7 +20,6 @@
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 
-
 // variables
 enum cachestat_counters {
     NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,
