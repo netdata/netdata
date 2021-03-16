@@ -328,6 +328,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_CRYPTO)          buffer_strcat (b, "|libcrypto");
     if(FEAT_LIBM)            buffer_strcat (b, "|libm");
 
+#ifndef ACLK_NG
 #if defined(ENABLE_ACLK)
     {
         char buf[20];
@@ -335,10 +336,10 @@ void analytics_build_info(BUFFER *b) {
         if(FEAT_LWS)         buffer_strcat(b, buf);
     }
 #else
-    if(FEAT_LWS, "YES")      buffer_strcat(b, "|LWS");
+    if(FEAT_LWS)            buffer_strcat(b, "|LWS");
 #endif
-
     if(FEAT_MOSQUITTO)      buffer_strcat(b, "|mosquitto");
+#endif
     if(FEAT_TCMALLOC)       buffer_strcat(b, "|tcalloc");
     if(FEAT_ZLIB)           buffer_strcat(b, "|zlib");
 
