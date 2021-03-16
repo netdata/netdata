@@ -359,7 +359,7 @@ void *ebpf_cachestat_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS*em->update_time;
+    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_time;
     int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -591,8 +591,8 @@ static void ebpf_cachestat_allocate_global_vectors(size_t length)
 
     cachestat_hash_values = callocz(length, sizeof(netdata_idx_t));
 
-    memset(cachestat_counter_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
-    memset(cachestat_counter_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
+    memset(cachestat_counter_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
+    memset(cachestat_counter_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
 }
 
 /*****************************************************************
