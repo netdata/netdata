@@ -1,4 +1,4 @@
-#include "libnetdata/libnetdata.h"
+#include "../libnetdata/libnetdata.h"
 
 #include "https_client.h"
 
@@ -17,6 +17,11 @@ typedef struct {
 } http_parse_ctx;
 
 #define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
+static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
+    ctx->state = HTTP_PARSE_INITIAL;
+    ctx->content_length = -1;
+    ctx->http_code = 0;
+}
 
 #define NEED_MORE_DATA  0
 #define PARSE_SUCCESS   1
@@ -129,10 +134,10 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                 rbuf_bump_tail(buf, idx + strlen(HTTP_LINE_TERM));
                 break;
             case HTTP_PARSE_CONTENT:
-                if (parse_ctx->content_length < 0) {
-                    error("content-length missing and http headers ended");
-                    return PARSE_ERROR;
-                }
+                // replies like CONNECT etc. do not have content
+                if (parse_ctx->content_length < 0)
+                    return PARSE_SUCCESS;
+
                 if (rbuf_bytes_available(buf) >= (size_t)parse_ctx->content_length)
                     return PARSE_SUCCESS;
                 return NEED_MORE_DATA;
@@ -140,107 +145,379 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
     } while(1);
 }
 
-int https_request(http_req_type_t method, char *host, int port, char *url, char *b, size_t b_size, char *payload)
+typedef struct https_req_ctx {
+    int sock;
+    rbuf_t buf_rx;
+
+    struct pollfd poll_fd;
+
+    SSL_CTX *ssl_ctx;
+    SSL *ssl;
+
+    size_t written;
+
+    int self_signed_allowed;
+
+    http_parse_ctx parse_ctx;
+} https_req_ctx_t;
+
+static char *_ssl_err_tos(int err)
 {
-    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-    char sport[PORT_STR_MAX_BYTES];
-    size_t len = 0;
-    int rc = 1;
+    switch(err){
+        case SSL_ERROR_SSL:
+            return "SSL_ERROR_SSL";
+        case SSL_ERROR_WANT_READ:
+            return "SSL_ERROR_WANT_READ";
+        case SSL_ERROR_WANT_WRITE:
+            return "SSL_ERROR_WANT_WRITE";
+        case SSL_ERROR_NONE:
+            return "SSL_ERROR_NONE";
+        case SSL_ERROR_ZERO_RETURN:
+            return "SSL_ERROR_ZERO_RETURN";
+        case SSL_ERROR_WANT_CONNECT:
+            return "SSL_ERROR_WANT_CONNECT";
+        case SSL_ERROR_WANT_ACCEPT:
+            return "SSL_ERROR_WANT_ACCEPT";
+    }
+    return "Unknown!!!";
+}
+
+static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     int ret;
-    char *ptr;
-    http_parse_ctx parse_ctx = HTTP_PARSE_CTX_INITIALIZER;
-
-    rbuf_t buffer = rbuf_create(b_size);
-    if (!buffer)
-        return 1;
-
-    snprintf(sport, PORT_STR_MAX_BYTES, "%d", port);
-
-    if (payload != NULL)
-        len = strlen(payload);
-
-    snprintf(
-        b,
-        b_size,
-        "%s %s HTTP/1.1\r\nHost: %s\r\nAccept: application/json\r\nContent-length: %zu\r\nAccept-Language: en-us\r\n"
-        "User-Agent: Netdata/rocks\r\n\r\n",
-        (method == HTTP_REQ_GET ? "GET" : "POST"), url, host, len);
-
-    if (payload != NULL)
-        strncat(b, payload, b_size - len);
-
-    len = strlen(b);
-
-    debug(D_ACLK, "Sending HTTPS req (%zu bytes): '%s'", len, b);
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, sport, &timeout);
-
-    if (unlikely(sock == -1)) {
-        error("Handshake failed");
-        goto exit_buf;
-    }
-
-    SSL_CTX *ctx = security_initialize_openssl_client();
-    if (ctx==NULL) {
-        error("Cannot allocate SSL context");
-        goto exit_sock;
-    }
-    // Certificate chain: not updating the stores - do we need private CA roots?
-    // Calls to SSL_CTX_load_verify_locations would go here.
-    SSL *ssl = SSL_new(ctx);
-    if (ssl==NULL) {
-        error("Cannot allocate SSL");
-        goto exit_CTX;
-    }
-    SSL_set_fd(ssl, sock);
-    ret = SSL_connect(ssl);
-    if (ret != 1) {
-        error("SSL_connect() failed with err=%d", ret);
-        goto exit_SSL;
-    }
-
-    ret = SSL_write(ssl, b, len);
-    if (ret <= 0)
-    {
-        error("SSL_write() failed with err=%d", ret);
-        goto exit_SSL;
-    }
-
-    b[0] = 0;
+    ctx->written = 0;
+    ctx->poll_fd.events = POLLOUT;
 
     do {
-        ptr = rbuf_get_linear_insert_range(buffer, &len);
-        ret = SSL_read(ssl, ptr, len - 1);
-        if (ret)
-            rbuf_bump_head(buffer, ret);
-        if (ret <= 0)
-        {
-            error("No response available - SSL_read()=%d", ret);
-            goto exit_FULL;
+        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
+        ctx->poll_fd.events = 0;
+        if (ret < 0) {
+            error("poll error");
+            return 1;
         }
-    } while (!(ret = parse_http_response(buffer, &parse_ctx)));
+        if (ret == 0) {
+            error("Poll timed out");
+            return 2;
+        }
+
+        ret = write(ctx->sock, &data[ctx->written], data_len - ctx->written);
+        if (ret > 0) {
+            ctx->written += ret;
+        } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            error("Error writing to socket");
+            return 3;
+        }
+    } while (ctx->written < data_len);
+
+    return 0;
+}
+
+static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
+    int ret;
+    ctx->written = 0;
+    ctx->poll_fd.events |= POLLOUT;
+
+    do {
+        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
+        ctx->poll_fd.events = 0;
+        if (ret < 0) {
+            error("poll error");
+            return 1;
+        }
+        if (ret == 0) {
+            error("Poll timed out");
+            return 2;
+        }
+
+        ret = SSL_write(ctx->ssl, &data[ctx->written], data_len - ctx->written);
+        if (ret > 0) {
+            ctx->written += ret;
+        } else {
+            ret = SSL_get_error(ctx->ssl, ret);
+            switch (ret) {
+                case SSL_ERROR_WANT_READ:
+                    ctx->poll_fd.events |= POLLIN;
+                    break;
+                case SSL_ERROR_WANT_WRITE:
+                    ctx->poll_fd.events |= POLLOUT;
+                    break;
+                default:
+                    error("SSL_write Err: %s", _ssl_err_tos(ret));
+                    return 3;
+            }
+        }
+    } while (ctx->written < data_len);
+
+    return 0;
+}
+
+static inline int https_client_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
+    if (ctx->ssl_ctx)
+        return ssl_write_all(ctx, data, data_len);
+    return socket_write_all(ctx, data, data_len);
+}
+
+static int read_parse_response(https_req_ctx_t *ctx) {
+    int ret;
+    char *ptr;
+    size_t size;
+
+    ctx->poll_fd.events = POLLIN;
+    do {
+        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
+        if (ret < 0) {
+            error("poll error");
+            return 1;
+        }
+        if (ret == 0) {
+            error("Poll timed out");
+            return 2;
+        }
+        ctx->poll_fd.events = 0;
+
+        ptr = rbuf_get_linear_insert_range(ctx->buf_rx, &size);
+
+        if (ctx->ssl_ctx)
+            ret = SSL_read(ctx->ssl, ptr, size);
+        else
+            ret = read(ctx->sock, ptr, size);
+
+        if (ret > 0) {
+            rbuf_bump_head(ctx->buf_rx, ret);
+        } else {
+            if (ctx->ssl_ctx) {
+                ret = SSL_get_error(ctx->ssl, ret);
+                switch (ret) {
+                    case SSL_ERROR_WANT_READ:
+                        ctx->poll_fd.events |= POLLIN;
+                        break;
+                    case SSL_ERROR_WANT_WRITE:
+                        ctx->poll_fd.events |= POLLOUT;
+                        break;
+                    default:
+                        error("SSL_read Err: %s", _ssl_err_tos(ret));
+                        return 3;
+                }
+            } else {
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    error("write error");
+                    return 3;
+                }
+                ctx->poll_fd.events |= POLLIN;
+            }
+        }
+    } while (!(ret = parse_http_response(ctx->buf_rx, &ctx->parse_ctx)));
 
     if (ret != PARSE_SUCCESS) {
         error("Error parsing HTTP response");
-        goto exit_FULL;
+        return 1;
     }
 
-    if (parse_ctx.http_code < 200 || parse_ctx.http_code >= 300) {
-        error("HTTP Response not Success (got %d)", parse_ctx.http_code);
-        goto exit_FULL;
+    return 0;
+}
+
+#define TX_BUFFER_SIZE 8192
+#define RX_BUFFER_SIZE (TX_BUFFER_SIZE*2)
+static int handle_http_request(https_req_t *req, https_req_ctx_t *ctx) {
+    BUFFER *hdr = buffer_create(TX_BUFFER_SIZE);
+    int rc = 0;
+
+    http_parse_ctx_clear(&ctx->parse_ctx);
+
+    // Prepare data to send
+    switch (req->request_type) {
+        case HTTP_REQ_CONNECT:
+            buffer_strcat(hdr, "CONNECT ");
+            break;
+        case HTTP_REQ_GET:
+            buffer_strcat(hdr, "GET ");
+            break;
+        case HTTP_REQ_POST:
+            buffer_strcat(hdr, "POST ");
+            break;
+        default:
+            error("Unknown HTTPS request type!");
+            rc = 1;
+            goto err_exit;
     }
 
-    len = rbuf_pop(buffer, b, b_size);
-    b[MIN(len, b_size-1)] = 0;
+    if (req->request_type == HTTP_REQ_CONNECT) {
+        buffer_strcat(hdr, req->host);
+        buffer_sprintf(hdr, ":%d", req->port);
+    } else {
+        buffer_strcat(hdr, req->url);
+    }
 
-    rc = 0;
-exit_FULL:
-exit_SSL:
-    SSL_free(ssl);
-exit_CTX:
-    SSL_CTX_free(ctx);
-exit_sock:
-    close(sock);
-exit_buf:
-    rbuf_free(buffer);
+    buffer_strcat(hdr, " HTTP/1.1\x0D\x0A");
+
+    //TODO Headers!
+    if (req->request_type != HTTP_REQ_CONNECT) {
+        buffer_sprintf(hdr, "Host: %s\x0D\x0A", req->host);
+    }
+    buffer_strcat(hdr, "User-Agent: Netdata/rocks newhttpclient\x0D\x0A");
+
+    if (req->request_type == HTTP_REQ_POST && req->payload && req->payload_size) {
+        buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", req->payload_size);
+    }
+
+    buffer_strcat(hdr, "\x0D\x0A");
+
+    // Send the request
+    if (https_client_write_all(ctx, hdr->buffer, hdr->len)) {
+        error("Couldn't write HTTP request header into SSL connection");
+        rc = 2;
+        goto err_exit;
+    }
+
+    if (req->request_type == HTTP_REQ_POST && req->payload && req->payload_size) {
+        if (https_client_write_all(ctx, req->payload, req->payload_size)) {
+            error("Couldn't write payload into SSL connection");
+            rc = 3;
+            goto err_exit;
+        }
+    }
+
+    // Read The Response
+    if (read_parse_response(ctx)) {
+        error("Error reading or parsing response from server");
+        rc = 4;
+        goto err_exit;
+    }
+
+err_exit:
+    buffer_free(hdr);
     return rc;
+}
+
+// TODO remove
+int https_request(http_req_type_t method, char *host, int port, char *url, char *b, size_t b_size, char *payload) {
+    UNUSED(method);
+    UNUSED(host);
+    UNUSED(port);
+    UNUSED(url);
+    UNUSED(b);
+    UNUSED(b_size);
+    UNUSED(payload);
+    return 0;
+}
+
+int https_request_v2(https_req_t *request, https_req_response_t *response) {
+    int rc = 0,ret;
+    char connect_port_str[PORT_STR_MAX_BYTES];
+
+    const char *connect_host = request->proxy_host ? request->proxy_host : request->host;
+    int connect_port = request->proxy_host ? request->proxy_port : request->port;
+    struct timeval timeout = { .tv_sec = request->timeout_s, .tv_usec = 0 };
+
+    https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
+
+    ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
+    if (!ctx->buf_rx) {
+        error("Couldn't allocate buffer for RX data");
+        rc = 20;
+        goto exit_req_ctx;
+    }
+
+    snprintf(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
+
+    ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
+    if (ctx->sock < 0) {
+        error("Error connecting TCP socket to \"%s\"", connect_host);
+        rc = 30;
+        goto exit_buf_rx;
+    }
+
+    if (fcntl(ctx->sock, F_SETFL, fcntl(ctx->sock, F_GETFL, 0) | O_NONBLOCK) == -1) {
+        error("Error setting O_NONBLOCK to TCP socket.");
+        rc = 40;
+        goto exit_sock;
+    }
+
+    ctx->poll_fd.fd = ctx->sock;
+
+    if (request->proxy_host) {
+        https_req_t req = HTTPS_REQ_T_INITIALIZER;
+        req.request_type = HTTP_REQ_CONNECT;
+        req.timeout_s = request->timeout_s; // TODO substract elapsed time
+        req.host = request->host;
+        req.port = request->port;
+        req.url = request->url;
+        if (handle_http_request(&req, ctx)) {
+            error("Failed to CONNECT with proxy");
+            rc = 45;
+            goto exit_sock;
+        }
+        if (ctx->parse_ctx.http_code != 200) {
+            error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
+            rc = 46;
+            goto exit_sock;
+        }
+        //TODO change to debug
+        error("Proxy connection accepted!!!!!!!!!!!");
+    }
+
+    ctx->ssl_ctx = security_initialize_openssl_client();
+    if (ctx->ssl_ctx==NULL) {
+        error("Cannot allocate SSL context");
+        rc = 50;
+        goto exit_sock;
+    }
+
+    ctx->ssl = SSL_new(ctx->ssl_ctx);
+    if (ctx->ssl==NULL) {
+        error("Cannot allocate SSL");
+        rc = 60;
+        goto exit_CTX;
+    }
+
+    SSL_set_fd(ctx->ssl, ctx->sock);
+    ret = SSL_connect(ctx->ssl);
+    if (ret != -1 && ret != 1) {
+        error("SSL could not connect");
+        rc = 70;
+        goto exit_SSL;
+    }
+    if (ret == -1) {
+        // expected as underlying socket is non blocking!
+        // consult SSL_connect documentation for details
+        int ec = SSL_get_error(ctx->ssl, ret);
+        if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
+            error("Failed to start SSL connection");
+            rc = 75;
+            goto exit_SSL;
+        }
+    }
+
+
+    // TODO actual request here
+    if (handle_http_request(request, ctx)) {
+        error("Couldn't process request");
+        rc = 90;
+        goto exit_SSL;
+    }
+    response->http_code = ctx->parse_ctx.http_code;
+    if (ctx->parse_ctx.content_length > 0) {
+        response->payload_size = ctx->parse_ctx.content_length;
+        response->payload = mallocz(response->payload_size);
+        ret = rbuf_pop(ctx->buf_rx, response->payload, response->payload_size);
+        if (ret != (int)response->payload_size) {
+            error("Payload size doesn't match remaining data on the buffer!");
+            response->payload_size = ret;
+        }
+    }
+
+exit_SSL:
+    SSL_free(ctx->ssl);
+exit_CTX:
+    SSL_CTX_free(ctx->ssl_ctx);
+exit_sock:
+    close(ctx->sock);
+exit_buf_rx:
+    rbuf_free(ctx->buf_rx);
+exit_req_ctx:
+    freez(ctx);
+    return rc;
+}
+
+void https_req_response_free(https_req_response_t *res) {
+    freez(res->payload);
 }
