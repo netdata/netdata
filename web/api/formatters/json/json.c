@@ -9,7 +9,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
 {
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
 
-    int should_lock = (!context_param_list || (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)));
+    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
 
     if (should_lock)
         rrdset_check_rdlock(r->st);

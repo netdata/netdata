@@ -285,7 +285,7 @@ static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, 
                                                  struct context_param *context_param_list)
 {
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-    int should_lock = (!context_param_list || (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)));
+    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
 
     if (should_lock)
         rrdset_check_rdlock(r->st);

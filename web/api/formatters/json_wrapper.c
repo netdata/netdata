@@ -7,8 +7,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 {
 
     RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-    int should_lock = (!context_param_list || (context_param_list && !context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
-    uint8_t context_mode = (!context_param_list || (context_param_list && context_param_list->flags & CONTEXT_FLAGS_CONTEXT));
+    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
+    uint8_t context_mode = (!context_param_list || (context_param_list->flags & CONTEXT_FLAGS_CONTEXT));
 
     if (should_lock)
         rrdset_check_rdlock(r->st);
