@@ -570,7 +570,7 @@ void reopen_all_log_files() {
         stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 
     if(healthlog_filename)
-        healthlog = open_log_file(healthlog_fd, healthlog, healthlog_filename, &health_log_syslog, 1, &heathlog_fd);
+        healthlog = open_log_file(healthlog_fd, healthlog, healthlog_filename, &health_log_syslog, 1, &healthlog_fd);
 }
 
 void open_all_log_files() {
