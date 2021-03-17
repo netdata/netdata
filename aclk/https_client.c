@@ -10,6 +10,19 @@ enum http_parse_state {
     HTTP_PARSE_CONTENT
 };
 
+static const char *http_req_type_to_str(http_req_type_t req) {
+    switch (req) {
+        case HTTP_REQ_GET:
+            return "GET";
+        case HTTP_REQ_POST:
+            return "POST";
+        case HTTP_REQ_CONNECT:
+            return "CONNECT";
+        default:
+            return "unknown";
+    }
+}
+
 typedef struct {
     enum http_parse_state state;
     int content_length;
@@ -528,6 +541,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
             response->payload_size = ret;
         }
     }
+    info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
 
 exit_SSL:
     SSL_free(ctx->ssl);
