@@ -2592,12 +2592,94 @@ if [ -n "$total_warn_alarms" ]; then
        elapsed=$(( now - val))
        for_min=$(( elapsed / 60 ))
 
-       WARN_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
-                  <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #CCCC00; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
-                  <span>${key}</span>
-                  <span style=\"display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;\">${date} (Warning for ${for_min} minutes)</span>
-                  </td>
-                  </tr>"
+       WARN_ALARMS+="
+       <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
+
+            <table
+              align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\"
+            >
+              <tbody>
+              <tr>
+                <td
+                  style=\"border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;\"
+                >
+                  <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+
+                  <div
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                  >
+
+                    <table
+                      border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\"
+                    >
+                      <tbody>
+
+                      <tr>
+                        <td
+                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
+                          >${key}</div>
+
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td
+                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
+                          >${date}</div>
+
+                        </td>
+                      </tr>
+
+                      </tbody>
+                    </table>
+
+                  </div>
+
+                  <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+
+                  <div
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                  >
+
+                    <table
+                      border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\"
+                    >
+                      <tbody>
+
+                      <tr>
+                        <td
+                          align=\"center\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
+                          ><mj-raw style=\"background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;\">
+                            Warning for ${for_min} minutes
+                          </mj-raw></div>
+
+                        </td>
+                      </tr>
+
+                      </tbody>
+                    </table>
+
+                  </div>
+
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+       "
 
    done <<<"$total_warn_alarms,"
 fi
@@ -2615,12 +2697,95 @@ if [ -n "$total_crit_alarms" ]; then
        elapsed=$(( now - val))
        for_min=$(( elapsed / 60 ))
 
-       CRIT_ALARMS+="<tr style=\"margin: 0; padding: 0;\">
-                  <td style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: red; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;\" align=\"center\" valign=\"top\">
-                  <span>${key}</span>
-                  <span style=\"display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;\">${date} (Critical for ${for_min} minutes)</span>
-                  </td>
-                  </tr>"
+       CRIT_ALARMS+="
+       <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
+
+            <table
+              align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\"
+            >
+              <tbody>
+              <tr>
+                <td
+                  style=\"border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;\"
+                >
+                  <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+
+                  <div
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                  >
+
+                    <table
+                      border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\"
+                    >
+                      <tbody>
+
+                      <tr>
+                        <td
+                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
+                          >${key}</div>
+
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td
+                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
+                          >${date}</div>
+
+                        </td>
+                      </tr>
+
+                      </tbody>
+                    </table>
+
+                  </div>
+
+                  <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
+
+                  <div
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                  >
+
+                    <table
+                      border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\"
+                    >
+                      <tbody>
+
+                      <tr>
+                        <td
+                          align=\"center\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
+                        >
+
+                          <div
+                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
+                          ><mj-raw style=\"background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;\">
+                            Critical for ${for_min} minutes
+                          </mj-raw></div>
+
+                        </td>
+                      </tr>
+
+                      </tbody>
+                    </table>
+
+                  </div>
+
+                  <!--[if mso | IE]></td></tr></table><![endif]-->
+                </td>
+              </tr>
+              </tbody>
+            </table>
+
+          </div>
+       "
 
    done <<<"$total_crit_alarms,"
 fi
@@ -2813,7 +2978,7 @@ Content-Transfer-Encoding: 8bit
 
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#555555;"
-                          >10min_disk_utilization</div>
+                          >${name}</div>
 
                         </td>
                       </tr>
@@ -2903,7 +3068,7 @@ Content-Transfer-Encoding: 8bit
 
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
-                          >on debian-2gb-nbdg1-1</div>
+                          >on ${host}</div>
 
                         </td>
                       </tr>
@@ -2954,7 +3119,7 @@ Content-Transfer-Encoding: 8bit
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"
                           ><mr-raw>
-              <span style="color: #FF4136; font-size:26px; background: #FFEBEF; 100%; padding:4px 24px; border-radius: 36px">98%
+              <span style="color: #FF4136; font-size:26px; background: #FFEBEF; 100%; padding:4px 24px; border-radius: 36px">${value_string}
               </span>
                           </mr-raw></div>
 
@@ -3006,7 +3171,7 @@ Content-Transfer-Encoding: 8bit
 
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
-                          >Details: the percentage of time the disk was busy, during the last 10 minutes</div>
+                          >${info}</div>
 
                         </td>
                       </tr>
@@ -3152,7 +3317,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Chart:
-                    <mj-raw style="font-weight:700">disk.util</mj-raw></div>
+                    <mj-raw style="font-weight:700">${chart}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3165,7 +3330,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Family:
-                    <mj-raw style="font-weight:700">8tb</mj-raw></div>
+                    <mj-raw style="font-weight:700">${family}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3177,7 +3342,7 @@ Content-Transfer-Encoding: 8bit
 
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
-                  >Escalated from Warning, raised for 5 minutes</div>
+                  >${severity} ${raised_for}</div>
 
                 </td>
               </tr>
@@ -3207,7 +3372,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >On
-                    <mj-raw style="font-weight:500">Sat Nov 10 2021, 04:28:23 EET</mj-raw></div>
+                    <mj-raw style="font-weight:500">${date}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3220,7 +3385,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >By:
-                    <mj-raw style="font-weight:500">{host name}</mj-raw></div>
+                    <mj-raw style="font-weight:500">${host}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3263,7 +3428,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Classification:
-                    <mj-raw style="font-weight:500">OS disk</mj-raw></div>
+                    <mj-raw style="font-weight:500"></mj-raw></div>
 
                 </td>
               </tr>
@@ -3276,7 +3441,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Role:
-                    <mj-raw style="font-weight:500">sysadmin</mj-raw></div>
+                    <mj-raw style="font-weight:500">${recipient}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3557,9 +3722,9 @@ Content-Transfer-Encoding: 8bit
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;"
                           >The node has
-                            <mj-raw style="font-weight:600">3 warnings</mj-raw>
+                            <mj-raw style="font-weight:600">${total_warnings} warning</mj-raw>
                             and
-                            <mj-raw style="font-weight:600">0 critical</mj-raw>
+                            <mj-raw style="font-weight:600">${total_critical} critical</mj-raw>
                             alert(s)</div>
 
                         </td>
@@ -3578,190 +3743,9 @@ Content-Transfer-Encoding: 8bit
 
           </div>
 
+          ${CRIT_ALARMS}
 
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
-
-
-          <div  style="background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;">
-
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;"
-            >
-              <tbody>
-              <tr>
-                <td
-                  style="border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-                >
-                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
-
-                  <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
-
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
-                      <tbody>
-
-                      <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;"
-                          >10_m_response_time</div>
-
-                        </td>
-                      </tr>
-
-                      <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;"
-                          >Sat Nov 10 2021, 16:04:08 UTC</div>
-
-                        </td>
-                      </tr>
-
-                      </tbody>
-                    </table>
-
-                  </div>
-
-                  <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
-
-                  <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
-
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
-                      <tbody>
-
-                      <tr>
-                        <td
-                          align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;"
-                          ><mj-raw style="background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;">
-                            Warning for 10m
-                          </mj-raw></div>
-
-                        </td>
-                      </tr>
-
-                      </tbody>
-                    </table>
-
-                  </div>
-
-                  <!--[if mso | IE]></td></tr></table><![endif]-->
-                </td>
-              </tr>
-              </tbody>
-            </table>
-
-          </div>
-
-
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
-
-
-          <div  style="background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;">
-
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFFFFF;background-color:#FFFFFF;width:100%;"
-            >
-              <tbody>
-              <tr>
-                <td
-                  style="border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-                >
-                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
-
-                  <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
-
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
-                      <tbody>
-
-                      <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;"
-                          >10_m_response_time</div>
-
-                        </td>
-                      </tr>
-
-                      <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;"
-                          >Sat Nov 10 2021, 16:04:08 UTC</div>
-
-                        </td>
-                      </tr>
-
-                      </tbody>
-                    </table>
-
-                  </div>
-
-                  <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
-
-                  <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
-
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
-                      <tbody>
-
-                      <tr>
-                        <td
-                          align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
-
-                          <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;"
-                          ><mj-raw style="background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;">
-                            Warning for 10m
-                          </mj-raw></div>
-
-                        </td>
-                      </tr>
-
-                      </tbody>
-                    </table>
-
-                  </div>
-
-                  <!--[if mso | IE]></td></tr></table><![endif]-->
-                </td>
-              </tr>
-              </tbody>
-            </table>
-
-          </div>
-
+          ${WARN_ALARMS}
 
           <!--[if mso | IE]></td></tr></table></td></tr></table><![endif]-->
         </td>
@@ -3829,7 +3813,6 @@ Content-Transfer-Encoding: 8bit
 
 </body>
 </html>
-
 EOF
 
 send_email <<EOF
