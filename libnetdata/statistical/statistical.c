@@ -10,7 +10,7 @@ void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number
     fprintf(stderr, "%s of %zu entries [ ", msg, entries);
     for(value = series; value < end ;value++) {
         if(value != series) fprintf(stderr, ", ");
-        fprintf(stderr, "%" LONG_DOUBLE_MODIFIER, *value);
+        fprintf(stderr, "%" CALCULATED_NUMBER_MODIFIER, *value);
     }
     fprintf(stderr, " ] results in " CALCULATED_NUMBER_FORMAT "\n", result);
 }

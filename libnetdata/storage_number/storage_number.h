@@ -20,7 +20,7 @@ typedef double calculated_number;
 #define CALCULATED_NUMBER_FORMAT_ZERO "%0.0f"
 #define CALCULATED_NUMBER_FORMAT_AUTO "%f"
 
-#define LONG_DOUBLE_MODIFIER "f"
+#define CALCULATED_NUMBER_MODIFIER "f"
 typedef double LONG_DOUBLE;
 
 #else // NETDATA_WITHOUT_LONG_DOUBLE
@@ -30,7 +30,7 @@ typedef long double calculated_number;
 #define CALCULATED_NUMBER_FORMAT_ZERO "%0.0Lf"
 #define CALCULATED_NUMBER_FORMAT_AUTO "%Lf"
 
-#define LONG_DOUBLE_MODIFIER "Lf"
+#define CALCULATED_NUMBER_MODIFIER "Lf"
 typedef long double LONG_DOUBLE;
 
 #endif // NETDATA_WITHOUT_LONG_DOUBLE
