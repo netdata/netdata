@@ -758,8 +758,8 @@ static int rrdr_convert_before_after_to_absolute(
     }
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
-    if(abs(before_requested) <= API_RELATIVE_TIME_MAX) {
-        if(abs(before_requested) % update_every) {
+    if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
+        if(ABS(before_requested) % update_every) {
             // make sure it is multiple of st->update_every
             if(before_requested < 0) before_requested = before_requested - update_every -
                                                         before_requested % update_every;
@@ -772,9 +772,9 @@ static int rrdr_convert_before_after_to_absolute(
     }
 
     // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
-    if(abs(after_requested) <= API_RELATIVE_TIME_MAX) {
+    if(ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
         if(after_requested == 0) after_requested = -update_every;
-        if(abs(after_requested) % update_every) {
+        if(ABS(after_requested) % update_every) {
             // make sure it is multiple of st->update_every
             if(after_requested < 0) after_requested = after_requested - update_every - after_requested % update_every;
             else after_requested = after_requested + update_every - after_requested % update_every;

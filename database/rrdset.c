@@ -219,11 +219,11 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
     rrdset_flag_clear(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
 
     RRD_ALGORITHM algorithm = st->dimensions->algorithm;
-    collected_number multiplier = abs(st->dimensions->multiplier);
-    collected_number divisor = abs(st->dimensions->divisor);
+    collected_number multiplier = ABS(st->dimensions->multiplier);
+    collected_number divisor = ABS(st->dimensions->divisor);
 
     rrddim_foreach_read(rd, st) {
-        if(algorithm != rd->algorithm || multiplier != abs(rd->multiplier) || divisor != abs(rd->divisor)) {
+        if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",

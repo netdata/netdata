@@ -371,7 +371,7 @@ int unit_test_str2ld() {
                 return -1;
             }
         }
-        else if(mine != sys && abs(mine-sys) > 0.000001) {
+        else if(mine != sys && ABS(mine-sys) > 0.000001) {
             fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ", delta %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
             return -1;
         }
