@@ -43,7 +43,7 @@ NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_VALUE=51
 
 # let's get the current status of the alarm 'used swap'
 echo ${NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS}
-CRITICAL
+CLEAR
 
 # is it fast?
 time curl -s 'http://localhost:19999/api/v1/allmetrics' >/dev/null
