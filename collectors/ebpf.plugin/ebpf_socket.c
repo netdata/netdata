@@ -2558,6 +2558,7 @@ static void read_max_dimension(struct config *cfg)
     if (!maxdim) {
         info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
         network_viewer_opt.max_dim = 1;
+        return;
     }
 
     network_viewer_opt.max_dim = (uint32_t)maxdim;
