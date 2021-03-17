@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- health: add `wmi\_` prefix to the wmi collector network alarms [\#10782](https://github.com/netdata/netdata/pull/10782) ([ilyam8](https://github.com/ilyam8))
+- web/gui: add max value to the nvidia\_smi.fan\_speed gauge [\#10780](https://github.com/netdata/netdata/pull/10780) ([ilyam8](https://github.com/ilyam8))
+- health/: fix various alarms critical and warning thresholds hysteresis [\#10779](https://github.com/netdata/netdata/pull/10779) ([ilyam8](https://github.com/ilyam8))
+- Fix typo in dashboard\_info.js [\#10775](https://github.com/netdata/netdata/pull/10775) ([eltociear](https://github.com/eltociear))
+- Fixed Travis config issues related to new packaging workflows. [\#10774](https://github.com/netdata/netdata/pull/10774) ([Ferroin](https://github.com/Ferroin))
+- health: make vernemq alarms less sensitive [\#10770](https://github.com/netdata/netdata/pull/10770) ([ilyam8](https://github.com/ilyam8))
 - Fixed handling of perf.plugin capabilities. [\#10766](https://github.com/netdata/netdata/pull/10766) ([Ferroin](https://github.com/Ferroin))
 - dashboard@v2.13.28 [\#10761](https://github.com/netdata/netdata/pull/10761) ([jacekkolasa](https://github.com/jacekkolasa))
 - collectors/cgroups: fix cpuset.cpus count [\#10757](https://github.com/netdata/netdata/pull/10757) ([ilyam8](https://github.com/ilyam8))
@@ -20,6 +26,7 @@
 - Skip C++ incompatible header in main libnetdata header [\#10737](https://github.com/netdata/netdata/pull/10737) ([vkalintiris](https://github.com/vkalintiris))
 - Rename struct avl to avl\_element and the typedef to avl\_t [\#10735](https://github.com/netdata/netdata/pull/10735) ([vkalintiris](https://github.com/vkalintiris))
 - Fix claim behind squid proxy [\#10734](https://github.com/netdata/netdata/pull/10734) ([underhood](https://github.com/underhood))
+- add k6.conf [\#10733](https://github.com/netdata/netdata/pull/10733) ([OdysLam](https://github.com/OdysLam))
 - Always configure multihost database context [\#10732](https://github.com/netdata/netdata/pull/10732) ([stelfrag](https://github.com/stelfrag))
 - Removes unused fnc warning in ACLK Legacy [\#10731](https://github.com/netdata/netdata/pull/10731) ([underhood](https://github.com/underhood))
 - Update chart's metadata in database when it already exists during creation [\#10728](https://github.com/netdata/netdata/pull/10728) ([stelfrag](https://github.com/stelfrag))
@@ -28,6 +35,7 @@
 - Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
 - Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
 - Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
+- Add guide: Unsupervised anomaly detection for Raspberry Pi monitoring [\#10713](https://github.com/netdata/netdata/pull/10713) ([joelhans](https://github.com/joelhans))
 - Add Working Set charts to the cgroups plugin [\#10712](https://github.com/netdata/netdata/pull/10712) ([vlvkobal](https://github.com/vlvkobal))
 - python.d/smartd\_log: collect attribute 233 \(Media Wearout Indicator \(SSD\)\). [\#10711](https://github.com/netdata/netdata/pull/10711) ([aazedo](https://github.com/aazedo))
 - New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -63,6 +71,7 @@
 - Remove unreachable \#else directives in plugins. [\#10523](https://github.com/netdata/netdata/pull/10523) ([vkalintiris](https://github.com/vkalintiris))
 - Fixed handling of permissions for some plugins. [\#10490](https://github.com/netdata/netdata/pull/10490) ([Ferroin](https://github.com/Ferroin))
 - increases ACLK TBEB randomness [\#10373](https://github.com/netdata/netdata/pull/10373) ([underhood](https://github.com/underhood))
+- ACLK-NG [\#10315](https://github.com/netdata/netdata/pull/10315) ([underhood](https://github.com/underhood))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
