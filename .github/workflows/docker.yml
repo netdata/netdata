@@ -59,3 +59,19 @@ jobs:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64
           push: ${{ env.publish }}
           tags: ${{ env.tags }}
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER:
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Docker image build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master'
+          }}
