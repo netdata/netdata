@@ -134,7 +134,7 @@ jobs:
 
     - name: Trigger DEB and RPM package build
       script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//' | cut -d'-' -f1)"
         - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during release" "${NOTIF_CHANNEL}"
 
@@ -226,6 +226,6 @@ jobs:
 
     - name: Trigger DEB and RPM package build
       script:
-        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version)"
+        - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
         - .travis/trigger_package_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"
