@@ -451,8 +451,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
             rc = 46;
             goto exit_sock;
         }
-        //TODO change to debug
-        error("Proxy connection accepted!!!!!!!!!!!");
+        info("Proxy accepted CONNECT upgrade");
     }
 
     ctx->ssl_ctx = security_initialize_openssl_client();
