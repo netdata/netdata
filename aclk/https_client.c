@@ -23,6 +23,8 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
     ctx->http_code = 0;
 }
 
+#define POLL_TO_MS 100
+
 #define NEED_MORE_DATA  0
 #define PARSE_SUCCESS   1
 #define PARSE_ERROR    -1
@@ -161,7 +163,17 @@ typedef struct https_req_ctx {
     int self_signed_allowed;
 
     http_parse_ctx parse_ctx;
+
+    time_t req_start_time;
 } https_req_ctx_t;
+
+static int https_req_check_timedout(https_req_ctx_t *ctx) {
+    if (now_realtime_sec() > ctx->req_start_time + ctx->request->timeout_s) {
+        error("request timed out");
+        return 1;
+    }
+    return 0;
+}
 
 static char *_ssl_err_tos(int err)
 {
@@ -190,15 +202,17 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     ctx->poll_fd.events = POLLOUT;
 
     do {
-        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
-        ctx->poll_fd.events = 0;
+        ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             error("poll error");
             return 1;
         }
         if (ret == 0) {
-            error("Poll timed out");
-            return 2;
+            if (https_req_check_timedout(ctx)) {
+                error("Poll timed out");
+                return 2;
+            }
+            continue;
         }
 
         ret = write(ctx->sock, &data[ctx->written], data_len - ctx->written);
@@ -219,16 +233,19 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     ctx->poll_fd.events |= POLLOUT;
 
     do {
-        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
-        ctx->poll_fd.events = 0;
+        ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             error("poll error");
             return 1;
         }
         if (ret == 0) {
-            error("Poll timed out");
-            return 2;
+            if (https_req_check_timedout(ctx)) {
+                error("Poll timed out");
+                return 2;
+            }
+            continue;
         }
+        ctx->poll_fd.events = 0;
 
         ret = SSL_write(ctx->ssl, &data[ctx->written], data_len - ctx->written);
         if (ret > 0) {
@@ -265,14 +282,17 @@ static int read_parse_response(https_req_ctx_t *ctx) {
 
     ctx->poll_fd.events = POLLIN;
     do {
-        ret = poll(&ctx->poll_fd, 1, -1 /* TODO */);
+        ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             error("poll error");
             return 1;
         }
         if (ret == 0) {
-            error("Poll timed out");
-            return 2;
+            if (https_req_check_timedout(ctx)) {
+                error("Poll timed out");
+                return 2;
+            }
+            continue;
         }
         ctx->poll_fd.events = 0;
 
@@ -411,6 +431,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
     struct timeval timeout = { .tv_sec = request->timeout_s, .tv_usec = 0 };
 
     https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
+    ctx->req_start_time = now_realtime_sec();
 
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
@@ -439,7 +460,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
     if (request->proxy_host) {
         https_req_t req = HTTPS_REQ_T_INITIALIZER;
         req.request_type = HTTP_REQ_CONNECT;
-        req.timeout_s = request->timeout_s; // TODO substract elapsed time
+        req.timeout_s = request->timeout_s;
         req.host = request->host;
         req.port = request->port;
         req.url = request->url;
