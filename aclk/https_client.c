@@ -146,6 +146,8 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 }
 
 typedef struct https_req_ctx {
+    https_req_t *request;
+
     int sock;
     rbuf_t buf_rx;
 
@@ -317,14 +319,14 @@ static int read_parse_response(https_req_ctx_t *ctx) {
 
 #define TX_BUFFER_SIZE 8192
 #define RX_BUFFER_SIZE (TX_BUFFER_SIZE*2)
-static int handle_http_request(https_req_t *req, https_req_ctx_t *ctx) {
+static int handle_http_request(https_req_ctx_t *ctx) {
     BUFFER *hdr = buffer_create(TX_BUFFER_SIZE);
     int rc = 0;
 
     http_parse_ctx_clear(&ctx->parse_ctx);
 
     // Prepare data to send
-    switch (req->request_type) {
+    switch (ctx->request->request_type) {
         case HTTP_REQ_CONNECT:
             buffer_strcat(hdr, "CONNECT ");
             break;
@@ -340,23 +342,23 @@ static int handle_http_request(https_req_t *req, https_req_ctx_t *ctx) {
             goto err_exit;
     }
 
-    if (req->request_type == HTTP_REQ_CONNECT) {
-        buffer_strcat(hdr, req->host);
-        buffer_sprintf(hdr, ":%d", req->port);
+    if (ctx->request->request_type == HTTP_REQ_CONNECT) {
+        buffer_strcat(hdr, ctx->request->host);
+        buffer_sprintf(hdr, ":%d", ctx->request->port);
     } else {
-        buffer_strcat(hdr, req->url);
+        buffer_strcat(hdr, ctx->request->url);
     }
 
     buffer_strcat(hdr, " HTTP/1.1\x0D\x0A");
 
     //TODO Headers!
-    if (req->request_type != HTTP_REQ_CONNECT) {
-        buffer_sprintf(hdr, "Host: %s\x0D\x0A", req->host);
+    if (ctx->request->request_type != HTTP_REQ_CONNECT) {
+        buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
     }
     buffer_strcat(hdr, "User-Agent: Netdata/rocks newhttpclient\x0D\x0A");
 
-    if (req->request_type == HTTP_REQ_POST && req->payload && req->payload_size) {
-        buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", req->payload_size);
+    if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
+        buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", ctx->request->payload_size);
     }
 
     buffer_strcat(hdr, "\x0D\x0A");
@@ -368,8 +370,8 @@ static int handle_http_request(https_req_t *req, https_req_ctx_t *ctx) {
         goto err_exit;
     }
 
-    if (req->request_type == HTTP_REQ_POST && req->payload && req->payload_size) {
-        if (https_client_write_all(ctx, req->payload, req->payload_size)) {
+    if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
+        if (https_client_write_all(ctx, ctx->request->payload, ctx->request->payload_size)) {
             error("Couldn't write payload into SSL connection");
             rc = 3;
             goto err_exit;
@@ -441,7 +443,8 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
         req.host = request->host;
         req.port = request->port;
         req.url = request->url;
-        if (handle_http_request(&req, ctx)) {
+        ctx->request = &req;
+        if (handle_http_request(ctx)) {
             error("Failed to CONNECT with proxy");
             rc = 45;
             goto exit_sock;
@@ -453,6 +456,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
         }
         info("Proxy accepted CONNECT upgrade");
     }
+    ctx->request = request;
 
     ctx->ssl_ctx = security_initialize_openssl_client();
     if (ctx->ssl_ctx==NULL) {
@@ -488,7 +492,7 @@ int https_request_v2(https_req_t *request, https_req_response_t *response) {
 
 
     // TODO actual request here
-    if (handle_http_request(request, ctx)) {
+    if (handle_http_request(ctx)) {
         error("Couldn't process request");
         rc = 90;
         goto exit_SSL;
