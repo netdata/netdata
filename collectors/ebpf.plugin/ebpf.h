@@ -93,6 +93,7 @@ enum ebpf_module_indexes {
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
+#define NETDATA_EBPF_MEMORY_GROUP "mem"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"

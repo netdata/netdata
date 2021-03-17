@@ -160,7 +160,8 @@ static void ebpf_create_sync_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
                       "Monitor calls for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL, 21300,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE, 21300,
                       ebpf_create_global_dimension, &sync_counter_publish_aggregated, 1);
 }
 
