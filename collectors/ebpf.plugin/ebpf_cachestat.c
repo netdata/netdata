@@ -617,7 +617,7 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&cachestat_data);
 
-    ebpf_load_config_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
+    ebpf_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
 
     if (!em->enabled)
         goto endcachestat;

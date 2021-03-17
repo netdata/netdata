@@ -2824,7 +2824,7 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);
 
-    ebpf_load_config_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
+    ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
 

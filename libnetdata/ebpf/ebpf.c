@@ -361,7 +361,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
 
 
 /**
- * Load process config and update module
+ * Update module
  *
  * When this function is called, it will load the configuration file and after this
  * it updates the global information of ebpf_module.
@@ -372,7 +372,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
  * @param cfg      the configuration structure
  * @param cfg_file the filename to load
  */
-void ebpf_load_config_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file)
+void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file)
 {
     char filename[FILENAME_MAX+1];
     ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, cfg_file);

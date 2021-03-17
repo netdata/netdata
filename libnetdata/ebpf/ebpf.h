@@ -133,6 +133,6 @@ inline int ebpf_load_config(struct config *config, char *filename)
 }
 
 extern void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg);
-extern void ebpf_load_config_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file);
+extern void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file);
 
 #endif /* NETDATA_EBPF_H */
