@@ -1297,3 +1297,43 @@ failed:
 #endif
     return;
 }
+
+#define SELECT_ARCHIVED_HOSTS "select host_id from host;"
+
+void sql_archived_database_hosts(BUFFER *wb, int count)
+{
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_ARCHIVED_HOSTS, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch archived hosts");
+        return;
+    }
+
+    char machine_guid[GUID_LEN + 1];
+
+    RRDHOST *host;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 0), machine_guid);
+
+        host = rrdhost_find_by_guid(machine_guid, 0);
+
+        if (unlikely(host && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)))
+            continue;
+
+        if (count > 0)
+            buffer_strcat(wb, ",\n");
+        buffer_sprintf(
+            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": false, \"claim_id\": null }", machine_guid);
+        count++;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived hosts");
+
+    return;
+}

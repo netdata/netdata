@@ -875,6 +875,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         count++;
     }
+    sql_archived_database_hosts(wb, count);
     rrd_unlock();
 
     buffer_strcat(wb, "\n\t],\n");
