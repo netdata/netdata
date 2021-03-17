@@ -59,12 +59,12 @@ static void read_global_table()
  */
 void *ebpf_sync_read_hash(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     read_thread_closed = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS;
+    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_time;
 
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
