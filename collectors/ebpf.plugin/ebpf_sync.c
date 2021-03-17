@@ -20,6 +20,12 @@ static netdata_idx_t sync_hash_values = 0;
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
                                               NULL, NULL,  NULL};
 
+struct config sync_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
+
 /*****************************************************************
  *
  *  DATA THREAD
@@ -180,6 +186,8 @@ void *ebpf_sync_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&sync_data);
+
+    ebpf_update_module(em, &sync_config, NETDATA_SYNC_CONFIG_FILE);
 
     if (!em->enabled)
         goto endsync;
