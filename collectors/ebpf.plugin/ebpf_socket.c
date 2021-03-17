@@ -2804,10 +2804,8 @@ void parse_service_name_section(struct config *cfg)
     if (port_string) {
         // if variable has an invalid value, we assume netdata is using 19999
         int default_port = str2i(port_string);
-        if (default_port < 0 || default_port > 65535)
-            port_string = "19999";
-
-        link_dimension_name(port_string, simple_hash(port_string), "Netdata");
+        if (default_port > 0 && default_port < 65536)
+            link_dimension_name(port_string, simple_hash(port_string), "Netdata");
     }
 }
 
