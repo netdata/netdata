@@ -10,14 +10,14 @@ struct grouping_median {
     size_t series_size;
     size_t next_pos;
 
-    LONG_DOUBLE series[];
+    calculated_number series[];
 };
 
 void *grouping_create_median(RRDR *r) {
     long entries = r->group;
     if(entries < 0) entries = 0;
 
-    struct grouping_median *g = (struct grouping_median *)callocz(1, sizeof(struct grouping_median) + entries * sizeof(LONG_DOUBLE));
+    struct grouping_median *g = (struct grouping_median *)callocz(1, sizeof(struct grouping_median) + entries * sizeof(calculated_number));
     g->series_size = (size_t)entries;
 
     return g;
@@ -43,7 +43,7 @@ void grouping_add_median(RRDR *r, calculated_number value) {
     }
     else {
         if(calculated_number_isnumber(value))
-            g->series[g->next_pos++] = (LONG_DOUBLE)value;
+            g->series[g->next_pos++] = (calculated_number)value;
     }
 }
 

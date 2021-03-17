@@ -23,7 +23,7 @@ static int check_number_printing(void) {
     int i, failed = 0;
     for(i = 0; values[i].correct ; i++) {
         print_calculated_number(netdata, values[i].n);
-        snprintfz(system, 49, "%0.12" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE)values[i].n);
+        snprintfz(system, 49, "%0.12" CALCULATED_NUMBER_MODIFIER, (calculated_number)values[i].n);
 
         int ok = 1;
         if(strcmp(netdata, values[i].correct) != 0) {
@@ -181,10 +181,10 @@ void benchmark_storage_number(int loop, int multiplier) {
     their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
 
     if(mine > their) {
-        fprintf(stderr, "\nNETDATA NEEDS %0.2" CALCULATED_NUMBER_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (LONG_DOUBLE)(mine / their));
+        fprintf(stderr, "\nNETDATA NEEDS %0.2" CALCULATED_NUMBER_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (calculated_number)(mine / their));
     }
     else {
-        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" CALCULATED_NUMBER_MODIFIER " TIMES LESS MEMORY.\n", (LONG_DOUBLE)(their / mine));
+        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" CALCULATED_NUMBER_MODIFIER " TIMES LESS MEMORY.\n", (calculated_number)(their / mine));
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
@@ -217,7 +217,7 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (calculated_number)(user / 1000000.0), (calculated_number)(system / 1000000.0), (calculated_number)(total / 1000000.0));
 
     // ------------------------------------------------------------------------
 
@@ -241,13 +241,13 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     their = total;
 
-    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER ", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER ", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (calculated_number)(user / 1000000.0), (calculated_number)(system / 1000000.0), (calculated_number)(total / 1000000.0));
 
     if(mine > total) {
-        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (calculated_number)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (calculated_number)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -275,13 +275,13 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER ", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" CALCULATED_NUMBER_MODIFIER ", system %0.5" CALCULATED_NUMBER_MODIFIER ", total %0.5" CALCULATED_NUMBER_MODIFIER "\n", (calculated_number)(user / 1000000.0), (calculated_number)(system / 1000000.0), (calculated_number)(total / 1000000.0));
 
     if(mine > their) {
-        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (calculated_number)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" CALCULATED_NUMBER_MODIFIER " %%\n", (calculated_number)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -356,8 +356,8 @@ int unit_test_str2ld() {
     int i;
     for(i = 0; values[i] ; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
-        LONG_DOUBLE sys = strtold(values[i], &e_sys);
+        calculated_number mine = str2ld(values[i], &e_mine);
+        calculated_number sys = strtold(values[i], &e_sys);
 
         if(isnan(mine)) {
             if(!isnan(sys)) {

@@ -994,7 +994,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
-            info("RRD database for chart '%s' on host '%s' is %0.5" CALCULATED_NUMBER_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" CALCULATED_NUMBER_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (calculated_number)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
             st->last_collected_time.tv_usec = now.tv_usec;
@@ -1011,7 +1011,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         }
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
-            info("RRD database for chart '%s' on host '%s' is %0.5" CALCULATED_NUMBER_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
+            info("RRD database for chart '%s' on host '%s' is %0.5" CALCULATED_NUMBER_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (calculated_number)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             microseconds = (usec_t)since_last_usec;
             #ifdef NETDATA_INTERNAL_CHECKS
@@ -1067,7 +1067,7 @@ static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
     usec_t last_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last collected time to %0.3" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last collected time to %0.3" CALCULATED_NUMBER_MODIFIER, (calculated_number)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1080,7 +1080,7 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
     st->last_collected_time.tv_usec = (suseconds_t) (ut % USEC_PER_SEC);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "updated last collected time to %0.3" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "updated last collected time to %0.3" CALCULATED_NUMBER_MODIFIER, (calculated_number)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -1099,7 +1099,7 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     usec_t last_updated_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last updated time to %0.3" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE)last_updated_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last updated time to %0.3" CALCULATED_NUMBER_MODIFIER, (calculated_number)last_updated_ut / USEC_PER_SEC);
     #endif
 
     return last_updated_ut;
@@ -1132,8 +1132,8 @@ static inline size_t rrdset_done_interpolate(
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-        rrdset_debug(st, "last_stored_ut = %0.3" CALCULATED_NUMBER_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-        rrdset_debug(st, "next_store_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+        rrdset_debug(st, "last_stored_ut = %0.3" CALCULATED_NUMBER_MODIFIER " (last updated time)", (calculated_number)last_stored_ut/USEC_PER_SEC);
+        rrdset_debug(st, "next_store_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (next interpolation point)", (calculated_number)next_store_ut/USEC_PER_SEC);
         #endif
 
         last_ut = next_store_ut;
@@ -1385,7 +1385,7 @@ void rrdset_done(RRDSET *st) {
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
                 st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
-        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" CALCULATED_NUMBER_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (LONG_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
+        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" CALCULATED_NUMBER_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (calculated_number)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1507,10 +1507,10 @@ after_first_database_work:
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "last_collect_ut = %0.3" CALCULATED_NUMBER_MODIFIER " (last collection time)", (LONG_DOUBLE)last_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "now_collect_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (current collection time)", (LONG_DOUBLE)now_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "last_stored_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
-    rrdset_debug(st, "next_store_ut   = %0.3" CALCULATED_NUMBER_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_collect_ut = %0.3" CALCULATED_NUMBER_MODIFIER " (last collection time)", (calculated_number)last_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "now_collect_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (current collection time)", (calculated_number)now_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_stored_ut  = %0.3" CALCULATED_NUMBER_MODIFIER " (last updated time)", (calculated_number)last_stored_ut/USEC_PER_SEC);
+    rrdset_debug(st, "next_store_ut   = %0.3" CALCULATED_NUMBER_MODIFIER " (next interpolation point)", (calculated_number)next_store_ut/USEC_PER_SEC);
     #endif
 
     // calculate totals and count the dimensions

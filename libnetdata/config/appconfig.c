@@ -389,7 +389,7 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
-LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+calculated_number appconfig_get_float(struct config *root, const char *section, const char *name, calculated_number value)
 {
     char buffer[100], *s;
     sprintf(buffer, "%0.5" CALCULATED_NUMBER_MODIFIER, value);
@@ -515,7 +515,7 @@ long long appconfig_set_number(struct config *root, const char *section, const c
     return value;
 }
 
-LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
+calculated_number appconfig_set_float(struct config *root, const char *section, const char *name, calculated_number value)
 {
     char buffer[100];
     sprintf(buffer, "%0.5" CALCULATED_NUMBER_MODIFIER, value);

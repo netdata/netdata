@@ -267,16 +267,16 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         }
 
         if(isgreaterequal(abs, 1000)) {
-            len = snprintfz(value_string, value_string_len, "%0.0" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
+            len = snprintfz(value_string, value_string_len, "%0.0" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
             trim_zeros = 0;
         }
-        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
-        else                                 len = snprintfz(value_string, value_string_len, "%0.7" CALCULATED_NUMBER_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
+        else                                 len = snprintfz(value_string, value_string_len, "%0.7" CALCULATED_NUMBER_MODIFIER, (calculated_number) value);
 
         if(unlikely(trim_zeros)) {
             int l;
@@ -303,7 +303,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, value_string_len, "%0.*" CALCULATED_NUMBER_MODIFIER "%s%s", precision, (LONG_DOUBLE) value, separator, units);
+        snprintfz(value_string, value_string_len, "%0.*" CALCULATED_NUMBER_MODIFIER "%s%s", precision, (calculated_number) value, separator, units);
     }
 
     return value_string;

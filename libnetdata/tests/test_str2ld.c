@@ -24,8 +24,8 @@ static void test_str2ld(void **state)
 
     for (int i = 0; values[i]; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
-        LONG_DOUBLE sys = strtold(values[i], &e_sys);
+        calculated_number mine = str2ld(values[i], &e_mine);
+        calculated_number sys = strtold(values[i], &e_sys);
 
         if (isnan(mine))
             assert_true(isnan(sys));

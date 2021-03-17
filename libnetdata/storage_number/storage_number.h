@@ -21,7 +21,6 @@ typedef double calculated_number;
 #define CALCULATED_NUMBER_FORMAT_AUTO "%f"
 
 #define CALCULATED_NUMBER_MODIFIER "f"
-typedef double LONG_DOUBLE;
 
 #else // NETDATA_WITHOUT_LONG_DOUBLE
 
@@ -31,7 +30,6 @@ typedef long double calculated_number;
 #define CALCULATED_NUMBER_FORMAT_AUTO "%Lf"
 
 #define CALCULATED_NUMBER_MODIFIER "Lf"
-typedef long double LONG_DOUBLE;
 
 #endif // NETDATA_WITHOUT_LONG_DOUBLE
 

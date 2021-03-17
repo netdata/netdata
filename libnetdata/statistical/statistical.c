@@ -2,10 +2,10 @@
 
 #include "../libnetdata.h"
 
-LONG_DOUBLE default_single_exponential_smoothing_alpha = 0.1;
+calculated_number default_single_exponential_smoothing_alpha = 0.1;
 
-void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg) {
-    const LONG_DOUBLE *value, *end = &series[entries];
+void log_series_to_stderr(calculated_number *series, size_t entries, calculated_number result, const char *msg) {
+    const calculated_number *value, *end = &series[entries];
 
     fprintf(stderr, "%s of %zu entries [ ", msg, entries);
     for(value = series; value < end ;value++) {
@@ -17,9 +17,9 @@ void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number
 
 // --------------------------------------------------------------------------------------------------------------------
 
-inline LONG_DOUBLE sum_and_count(const LONG_DOUBLE *series, size_t entries, size_t *count) {
-    const LONG_DOUBLE *value, *end = &series[entries];
-    LONG_DOUBLE sum = 0;
+inline calculated_number sum_and_count(const calculated_number *series, size_t entries, size_t *count) {
+    const calculated_number *value, *end = &series[entries];
+    calculated_number sum = 0;
     size_t c = 0;
 
     for(value = series; value < end ; value++) {
@@ -35,42 +35,42 @@ inline LONG_DOUBLE sum_and_count(const LONG_DOUBLE *series, size_t entries, size
     return sum;
 }
 
-inline LONG_DOUBLE sum(const LONG_DOUBLE *series, size_t entries) {
+inline calculated_number sum(const calculated_number *series, size_t entries) {
     return sum_and_count(series, entries, NULL);
 }
 
-inline LONG_DOUBLE average(const LONG_DOUBLE *series, size_t entries) {
+inline calculated_number average(const calculated_number *series, size_t entries) {
     size_t count = 0;
-    LONG_DOUBLE sum = sum_and_count(series, entries, &count);
+    calculated_number sum = sum_and_count(series, entries, &count);
 
     if(unlikely(!count)) return NAN;
-    return sum / (LONG_DOUBLE)count;
+    return sum / (calculated_number)count;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t period) {
+calculated_number moving_average(const calculated_number *series, size_t entries, size_t period) {
     if(unlikely(period <= 0))
         return 0.0;
 
     size_t i, count;
-    LONG_DOUBLE sum = 0, avg = 0;
-    LONG_DOUBLE p[period];
+    calculated_number sum = 0, avg = 0;
+    calculated_number p[period];
 
     for(count = 0; count < period ; count++)
         p[count] = 0.0;
 
     for(i = 0, count = 0; i < entries; i++) {
-        LONG_DOUBLE value = series[i];
+        calculated_number value = series[i];
         if(unlikely(!calculated_number_isnumber(value))) continue;
 
         if(unlikely(count < period)) {
             sum += value;
-            avg = (count == period - 1) ? sum / (LONG_DOUBLE)period : 0;
+            avg = (count == period - 1) ? sum / (calculated_number)period : 0;
         }
         else {
             sum = sum - p[count % period] + value;
-            avg = sum / (LONG_DOUBLE)period;
+            avg = sum / (calculated_number)period;
         }
 
         p[count % period] = value;
@@ -83,8 +83,8 @@ LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t per
 // --------------------------------------------------------------------------------------------------------------------
 
 static int qsort_compare(const void *a, const void *b) {
-    LONG_DOUBLE *p1 = (LONG_DOUBLE *)a, *p2 = (LONG_DOUBLE *)b;
-    LONG_DOUBLE n1 = *p1, n2 = *p2;
+    calculated_number *p1 = (calculated_number *)a, *p2 = (calculated_number *)b;
+    calculated_number n1 = *p1, n2 = *p2;
 
     if(unlikely(isnan(n1) || isnan(n2))) {
         if(isnan(n1) && !isnan(n2)) return -1;
@@ -102,22 +102,22 @@ static int qsort_compare(const void *a, const void *b) {
     return 0;
 }
 
-inline void sort_series(LONG_DOUBLE *series, size_t entries) {
-    qsort(series, entries, sizeof(LONG_DOUBLE), qsort_compare);
+inline void sort_series(calculated_number *series, size_t entries) {
+    qsort(series, entries, sizeof(calculated_number), qsort_compare);
 }
 
-inline LONG_DOUBLE *copy_series(const LONG_DOUBLE *series, size_t entries) {
-    LONG_DOUBLE *copy = mallocz(sizeof(LONG_DOUBLE) * entries);
-    memcpy(copy, series, sizeof(LONG_DOUBLE) * entries);
+inline calculated_number *copy_series(const calculated_number *series, size_t entries) {
+    calculated_number *copy = mallocz(sizeof(calculated_number) * entries);
+    memcpy(copy, series, sizeof(calculated_number) * entries);
     return copy;
 }
 
-LONG_DOUBLE median_on_sorted_series(const LONG_DOUBLE *series, size_t entries) {
+calculated_number median_on_sorted_series(const calculated_number *series, size_t entries) {
     if(unlikely(entries == 0)) return NAN;
     if(unlikely(entries == 1)) return series[0];
     if(unlikely(entries == 2)) return (series[0] + series[1]) / 2;
 
-    LONG_DOUBLE average;
+    calculated_number average;
     if(entries % 2 == 0) {
         size_t m = entries / 2;
         average = (series[m] + series[m + 1]) / 2;
@@ -129,17 +129,17 @@ LONG_DOUBLE median_on_sorted_series(const LONG_DOUBLE *series, size_t entries) {
     return average;
 }
 
-LONG_DOUBLE median(const LONG_DOUBLE *series, size_t entries) {
+calculated_number median(const calculated_number *series, size_t entries) {
     if(unlikely(entries == 0)) return NAN;
     if(unlikely(entries == 1)) return series[0];
 
     if(unlikely(entries == 2))
         return (series[0] + series[1]) / 2;
 
-    LONG_DOUBLE *copy = copy_series(series, entries);
+    calculated_number *copy = copy_series(series, entries);
     sort_series(copy, entries);
 
-    LONG_DOUBLE avg = median_on_sorted_series(copy, entries);
+    calculated_number avg = median_on_sorted_series(copy, entries);
 
     freez(copy);
     return avg;
@@ -147,18 +147,18 @@ LONG_DOUBLE median(const LONG_DOUBLE *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-LONG_DOUBLE moving_median(const LONG_DOUBLE *series, size_t entries, size_t period) {
+calculated_number moving_median(const calculated_number *series, size_t entries, size_t period) {
     if(entries <= period)
         return median(series, entries);
 
-    LONG_DOUBLE *data = copy_series(series, entries);
+    calculated_number *data = copy_series(series, entries);
 
     size_t i;
     for(i = period; i < entries; i++) {
         data[i - period] = median(&series[i - period], period);
     }
 
-    LONG_DOUBLE avg = median(data, entries - period);
+    calculated_number avg = median(data, entries - period);
     freez(data);
     return avg;
 }
@@ -166,13 +166,13 @@ LONG_DOUBLE moving_median(const LONG_DOUBLE *series, size_t entries, size_t peri
 // --------------------------------------------------------------------------------------------------------------------
 
 // http://stackoverflow.com/a/15150143/4525767
-LONG_DOUBLE running_median_estimate(const LONG_DOUBLE *series, size_t entries) {
-    LONG_DOUBLE median = 0.0f;
-    LONG_DOUBLE average = 0.0f;
+calculated_number running_median_estimate(const calculated_number *series, size_t entries) {
+    calculated_number median = 0.0f;
+    calculated_number average = 0.0f;
     size_t i;
 
     for(i = 0; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
+        calculated_number value = series[i];
         if(unlikely(!calculated_number_isnumber(value))) continue;
 
         average += ( value - average ) * 0.1f; // rough running average.
@@ -184,13 +184,13 @@ LONG_DOUBLE running_median_estimate(const LONG_DOUBLE *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
+calculated_number standard_deviation(const calculated_number *series, size_t entries) {
     if(unlikely(entries == 0)) return NAN;
     if(unlikely(entries == 1)) return series[0];
 
-    const LONG_DOUBLE *value, *end = &series[entries];
+    const calculated_number *value, *end = &series[entries];
     size_t count;
-    LONG_DOUBLE sum;
+    calculated_number sum;
 
     for(count = 0, sum = 0, value = series ; value < end ;value++) {
         if(likely(calculated_number_isnumber(*value))) {
@@ -202,7 +202,7 @@ LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
     if(unlikely(count == 0)) return NAN;
     if(unlikely(count == 1)) return sum;
 
-    LONG_DOUBLE average = sum / (LONG_DOUBLE)count;
+    calculated_number average = sum / (calculated_number)count;
 
     for(count = 0, sum = 0, value = series ; value < end ;value++) {
         if(calculated_number_isnumber(*value)) {
@@ -214,22 +214,22 @@ LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
     if(unlikely(count == 0)) return NAN;
     if(unlikely(count == 1)) return average;
 
-    LONG_DOUBLE variance = sum / (LONG_DOUBLE)(count); // remove -1 from count to have a population stddev
-    LONG_DOUBLE stddev = sqrtl(variance);
+    calculated_number variance = sum / (calculated_number)(count); // remove -1 from count to have a population stddev
+    calculated_number stddev = sqrtl(variance);
     return stddev;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha) {
+calculated_number single_exponential_smoothing(const calculated_number *series, size_t entries, calculated_number alpha) {
     if(unlikely(entries == 0))
         return NAN;
 
     if(unlikely(isnan(alpha)))
         alpha = default_single_exponential_smoothing_alpha;
 
-    const LONG_DOUBLE *value = series, *end = &series[entries];
-    LONG_DOUBLE level = (1.0 - alpha) * (*value);
+    const calculated_number *value = series, *end = &series[entries];
+    calculated_number level = (1.0 - alpha) * (*value);
 
     for(value++ ; value < end; value++) {
         if(likely(calculated_number_isnumber(*value)))
@@ -239,15 +239,15 @@ LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     return level;
 }
 
-LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha) {
+calculated_number single_exponential_smoothing_reverse(const calculated_number *series, size_t entries, calculated_number alpha) {
     if(unlikely(entries == 0))
         return NAN;
 
     if(unlikely(isnan(alpha)))
         alpha = default_single_exponential_smoothing_alpha;
 
-    const LONG_DOUBLE *value = &series[entries -1];
-    LONG_DOUBLE level = (1.0 - alpha) * (*value);
+    const calculated_number *value = &series[entries -1];
+    calculated_number level = (1.0 - alpha) * (*value);
 
     for(value++ ; value >= series; value--) {
         if(likely(calculated_number_isnumber(*value)))
@@ -260,11 +260,11 @@ LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size
 // --------------------------------------------------------------------------------------------------------------------
 
 // http://grisha.org/blog/2016/02/16/triple-exponential-smoothing-forecasting-part-ii/
-LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha, LONG_DOUBLE beta, LONG_DOUBLE *forecast) {
+calculated_number double_exponential_smoothing(const calculated_number *series, size_t entries, calculated_number alpha, calculated_number beta, calculated_number *forecast) {
     if(unlikely(entries == 0))
         return NAN;
 
-    LONG_DOUBLE level, trend;
+    calculated_number level, trend;
 
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
@@ -279,11 +279,11 @@ LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     else
         trend = 0;
 
-    const LONG_DOUBLE *value = series;
+    const calculated_number *value = series;
     for(value++ ; value >= series; value--) {
         if(likely(calculated_number_isnumber(*value))) {
 
-            LONG_DOUBLE last_level = level;
+            calculated_number last_level = level;
             level = alpha * *value + (1.0 - alpha) * (level + trend);
             trend = beta * (level - last_level) + (1.0 - beta) * trend;
 
@@ -320,24 +320,24 @@ LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
  *   s[t] = γ (Y[t] / a[t]) + (1-γ) s[t-p]
  */
 static int __HoltWinters(
-        const LONG_DOUBLE *series,
+        const calculated_number *series,
         int          entries,      // start_time + h
 
-        LONG_DOUBLE alpha,        // alpha parameter of Holt-Winters Filter.
-        LONG_DOUBLE beta,         // beta  parameter of Holt-Winters Filter. If set to 0, the function will do exponential smoothing.
-        LONG_DOUBLE gamma,        // gamma parameter used for the seasonal component. If set to 0, an non-seasonal model is fitted.
+        calculated_number alpha,        // alpha parameter of Holt-Winters Filter.
+        calculated_number beta,         // beta  parameter of Holt-Winters Filter. If set to 0, the function will do exponential smoothing.
+        calculated_number gamma,        // gamma parameter used for the seasonal component. If set to 0, an non-seasonal model is fitted.
 
         const int *seasonal,
         const int *period,
-        const LONG_DOUBLE *a,      // Start value for level (a[0]).
-        const LONG_DOUBLE *b,      // Start value for trend (b[0]).
-        LONG_DOUBLE *s,            // Vector of start values for the seasonal component (s_1[0] ... s_p[0])
+        const calculated_number *a,      // Start value for level (a[0]).
+        const calculated_number *b,      // Start value for trend (b[0]).
+        calculated_number *s,            // Vector of start values for the seasonal component (s_1[0] ... s_p[0])
 
         /* return values */
-        LONG_DOUBLE *SSE,          // The final sum of squared errors achieved in optimizing
-        LONG_DOUBLE *level,        // Estimated values for the level component (size entries - t + 2)
-        LONG_DOUBLE *trend,        // Estimated values for the trend component (size entries - t + 2)
-        LONG_DOUBLE *season        // Estimated values for the seasonal component (size entries - t + 2)
+        calculated_number *SSE,          // The final sum of squared errors achieved in optimizing
+        calculated_number *level,        // Estimated values for the level component (size entries - t + 2)
+        calculated_number *trend,        // Estimated values for the trend component (size entries - t + 2)
+        calculated_number *season        // Estimated values for the seasonal component (size entries - t + 2)
 )
 {
     if(unlikely(entries < 4))
@@ -345,13 +345,13 @@ static int __HoltWinters(
 
     int start_time = 2;
 
-    LONG_DOUBLE res = 0, xhat = 0, stmp = 0;
+    calculated_number res = 0, xhat = 0, stmp = 0;
     int i, i0, s0;
 
     /* copy start values to the beginning of the vectors */
     level[0] = *a;
     if(beta > 0) trend[0] = *b;
-    if(gamma > 0) memcpy(season, s, *period * sizeof(LONG_DOUBLE));
+    if(gamma > 0) memcpy(season, s, *period * sizeof(calculated_number));
 
     for(i = start_time - 1; i < entries; i++) {
         /* indices for period i */
@@ -397,7 +397,7 @@ static int __HoltWinters(
     return 1;
 }
 
-LONG_DOUBLE holtwinters(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha, LONG_DOUBLE beta, LONG_DOUBLE gamma, LONG_DOUBLE *forecast) {
+calculated_number holtwinters(const calculated_number *series, size_t entries, calculated_number alpha, calculated_number beta, calculated_number gamma, calculated_number *forecast) {
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
 
@@ -409,15 +409,15 @@ LONG_DOUBLE holtwinters(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE a
 
     int seasonal = 0;
     int period = 0;
-    LONG_DOUBLE a0 = series[0];
-    LONG_DOUBLE b0 = 0;
-    LONG_DOUBLE s[] = {};
+    calculated_number a0 = series[0];
+    calculated_number b0 = 0;
+    calculated_number s[] = {};
 
-    LONG_DOUBLE errors = 0.0;
+    calculated_number errors = 0.0;
     size_t nb_computations = entries;
-    LONG_DOUBLE *estimated_level  = callocz(nb_computations, sizeof(LONG_DOUBLE));
-    LONG_DOUBLE *estimated_trend  = callocz(nb_computations, sizeof(LONG_DOUBLE));
-    LONG_DOUBLE *estimated_season = callocz(nb_computations, sizeof(LONG_DOUBLE));
+    calculated_number *estimated_level  = callocz(nb_computations, sizeof(calculated_number));
+    calculated_number *estimated_trend  = callocz(nb_computations, sizeof(calculated_number));
+    calculated_number *estimated_season = callocz(nb_computations, sizeof(calculated_number));
 
     int ret = __HoltWinters(
             series,
@@ -436,7 +436,7 @@ LONG_DOUBLE holtwinters(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE a
             estimated_season
     );
 
-    LONG_DOUBLE value = estimated_level[nb_computations - 1];
+    calculated_number value = estimated_level[nb_computations - 1];
 
     if(forecast)
         *forecast = 0.0;
