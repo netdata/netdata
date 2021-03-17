@@ -295,6 +295,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_process.h \
     collectors/ebpf.plugin/ebpf_socket.c \
     collectors/ebpf.plugin/ebpf_socket.h \
+    collectors/ebpf.plugin/ebpf_sync.c \
+    collectors/ebpf.plugin/ebpf_sync.h \
     collectors/ebpf.plugin/ebpf.h \
     collectors/ebpf.plugin/ebpf_apps.c \
     collectors/ebpf.plugin/ebpf_apps.h \

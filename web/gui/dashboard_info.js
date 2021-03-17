@@ -1034,6 +1034,10 @@ netdataDashboard.context = {
         info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
     },
 
+    'mem.sync': {
+        info: 'System calls for <code>sync()</code> which flushes file system buffers to storage devices. These calls can cause performance perturbations, and it can be useful to know if they are happening and how frequently. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/syncsnoop.py" target="_blank">syncsnoop</a> from BCC tools.'
+    },
+
     // ------------------------------------------------------------------------
     // network interfaces
 

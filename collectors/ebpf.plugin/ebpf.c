@@ -86,6 +86,9 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
         .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
         .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
+    { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
+        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+        .optional = 0, .apps_routine = NULL  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL },
@@ -317,6 +320,25 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
         move = move->next;
         i++;
     }
+
+    write_end_chart();
+}
+
+/**
+ * Write charts
+ *
+ * Write the current information to publish the charts.
+ *
+ * @param family chart family
+ * @param chart  chart id
+ * @param dim    dimension name
+ * @param v1     value.
+ */
+void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1)
+{
+    write_begin_chart(family, chart);
+
+    write_chart_dimension(dim, v1);
 
     write_end_chart();
 }
@@ -606,6 +628,8 @@ void ebpf_print_help()
             "\n"
             " --return or -r      Run the collector in return mode.\n"
             "\n",
+            " --sync or -s        Enable chart related to sync run time.\n"
+            "\n"
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
 }
@@ -1701,6 +1725,14 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
+                                    CONFIG_BOOLEAN_YES);
+
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1783,6 +1815,7 @@ static void parse_args(int argc, char **argv)
         {"net",       no_argument,    0,  'n' },
         {"process",   no_argument,    0,  'p' },
         {"return",    no_argument,    0,  'r' },
+        {"sync",      no_argument,    0,  's' },
         {0, 0, 0, 0}
     };
 
@@ -1797,7 +1830,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvgcanpr", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgcanprs", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1856,6 +1889,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
+#endif
+                break;
+            }
+            case 's': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"sync\" chart, because it was started with the option \"--sync\" or \"-s\".");
 #endif
                 break;
             }
@@ -1983,6 +2024,8 @@ int main(int argc, char **argv)
           NULL, NULL, ebpf_modules[EBPF_MODULE_SOCKET_IDX].start_routine},
         {"EBPF CACHESTAT" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].start_routine},
+        {"EBPF SYNC" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_SYNC_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };

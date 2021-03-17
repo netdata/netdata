@@ -3,8 +3,6 @@
 #ifndef NETDATA_EBPF_CACHESTAT_H
 #define NETDATA_EBPF_CACHESTAT_H 1
 
-#define NETDATA_EBPF_MEMORY_GROUP "mem"
-
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"
 #define NETDATA_CACHESTAT_DIRTY_CHART "cachestat_dirties"
