@@ -409,6 +409,57 @@ min/max/average temperature chart with multiple dimensions:
 
 ![A snapshot of the modified chart](https://i.imgur.com/g7E8lnG.png)
 
+## Add a configuration file
+
+The last piece of the puzzle to create a fully robust Python collector is the configuration file. Python.d uses
+configuration in [YAML](https://www.tutorialspoint.com/yaml/yaml_basics.htm) format and is used as follows:
+
+- Create a configuration file in the same directory as the `<plugin_name>.chart.py`. Name it `<plugin_name>.conf`.
+- Define a `job`, which is an instance of the collector. It is useful when you want to collect data from different
+  sources with different attributes. For example, we could gather data from 2 different weather stations, which use
+  different temperature measures: Fahrenheit and Celcius.
+- You can define many different jobs with the same name, but with different attributes. Netdata will try each job
+  serially and will stop at the first job that returns data. If multiple jobs have the same name, only one of them can
+  run. This enables you to define different "ways" to fetch data from a particular data source so that the collector has
+  more chances to work out-of-the-box. For example, if the data source supports both `HTTP` and `linux socket`, you can
+  define 2 jobs named `local`, with each using a different method. 
+- Check the `postgresql` collector configuration file on
+  [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf) to get a
+  sense of the structure.
+
+```yaml
+weather_station_1:
+    name: 'Greece'
+    endpoint: 'https://endpoint_1.com'
+    port: 67
+    type: 'celcius'
+weather_station_2:
+    name: 'Florida: USA'
+    endpoint: 'https://endpoint_2.com'
+    port: 67 
+    type: 'fahrenheit'
+```
+
+Next, access the above configuration variables in the `__init__` function:
+
+```python
+def __init__(self, configuration=None, name=None):
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        self.endpoint = self.configuration.get('endpoint', <default_endpoint>)
+```
+
+Because you initiate the `framework class` (e.g `SimpleService.__init__`)q, the configuration will be
+available throughout the whole `Service` class of your module, as `self.configuration`. Finally, note that the
+`configuration.get` function takes 2 arguments, one with the name of the configuration field and one with a default
+value in case it doesn't find the configuration field. This allows you to define sane defaults for your collector.
+
+Moreover, when creating the configuration file, create a large comment section that describes the configuration
+variables and inform the user about the defaults. For example, take a look at the `postgresql` collector on
+[GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf).
+
+You can read more about the confqiguration file on the [`python.d.plugin`
+documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin). 
+
 ## What's next?
 
 Find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
