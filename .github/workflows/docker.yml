@@ -73,5 +73,5 @@ jobs:
           ${{
             failure()
             && github.event_name != 'pull_request'
-            && startsWith(github.ref, 'refs/heads/master'
+            && startsWith(github.ref, 'refs/heads/master')
           }}
