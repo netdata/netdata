@@ -345,3 +345,43 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *type)
     *type = proxy_type;
     return proxy;
 }
+
+#define HTTP_PROXY_PREFIX "http://"
+void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type)
+{
+    ACLK_PROXY_TYPE pt;
+    const char *ptr = aclk_get_proxy(&pt);
+    char *tmp;
+    char *host;
+    if (pt != PROXY_TYPE_HTTP)
+        return;
+
+    *port = 0;
+
+    if (!strncmp(ptr, HTTP_PROXY_PREFIX, strlen(HTTP_PROXY_PREFIX)))
+        ptr += strlen(HTTP_PROXY_PREFIX);
+
+    if ((tmp = strchr(ptr, '@')))
+        ptr = tmp;
+
+    if ((tmp = strchr(ptr, '/'))) {
+        host = mallocz((tmp - ptr) + 1);
+        memcpy(host, ptr, (tmp - ptr));
+        host[tmp - ptr] = 0;
+    } else
+        host = strdupz(ptr);
+
+    if ((tmp = strchr(host, ':'))) {
+        *tmp = 0;
+        tmp++;
+        *port = atoi(tmp);
+    }
+
+    if (*port <= 0 || *port > 65535)
+        *port = 8080;
+
+    *ohost = host;
+
+    if (type)
+        *type = MQTT_WSS_PROXY_HTTP;
+}

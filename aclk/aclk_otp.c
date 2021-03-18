@@ -167,6 +167,20 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
+static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
+    // wrapper for ACLK only which loads ACLK specific proxy settings
+    // then only calls https_request
+    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .type = MQTT_WSS_DIRECT };
+    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+
+    if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
+        request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
+        request->proxy_port = proxy_conf.port;
+    }
+
+    return https_request_v2(request, response);
+}
+
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
 void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass) {
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
@@ -187,7 +201,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     buffer_sprintf(url, "%s%s/challenge", OTP_URL_PREFIX, agent_id);
     req.url = url->buffer;
 
-    https_request_v2(&req, &resp);
+    aclk_https_request(&req, &resp);
     if (resp.http_code != 200) {
         error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
         goto cleanup_resp;
@@ -233,7 +247,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     req.url = url->buffer;
     req.payload = response_json;
     req.payload_size = strlen(response_json);
-    https_request_v2(&req, &resp);
+    aclk_https_request(&req, &resp);
         if (resp.http_code != 201) {
         error ("ACLK_OTP Challenge HTTP code not 201 Created (got %d)", resp.http_code);
         goto cleanup_resp;
