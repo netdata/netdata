@@ -2215,8 +2215,11 @@ urlencode "${family}" >/dev/null
 url_family="${REPLY}"
 urlencode "${name}" >/dev/null
 url_name="${REPLY}"
+urlencode "${value_string}" >/dev/null
+url_value_string="${REPLY}"
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}"
+
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${context}&alarm_value=${url_value_string}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
@@ -2234,8 +2237,7 @@ if [ ${GOTOCLOUD} -eq 0 ]; then
   goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
   # Temporarily disable alarm redirection, as the cloud endpoint no longer exists. This functionality will be restored after discussion on #9487. For now, just lead to netdata.cloud
-  #goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
-  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}"
+  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
 fi
 
 # the severity of the alarm
@@ -3237,7 +3239,7 @@ Content-Transfer-Encoding: 8bit
                                 <p
                                   style="display:inline-block;background:#FF4136;color:#ffffff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;font-weight:normal;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:10px 25px;mso-padding-alt:0px;border-radius:3px;"
                                 >
-                                  Go to Chart
+                                  <a href="${goto_url}">Go to Chart</a>
                                 </p>
                               </td>
                             </tr>
