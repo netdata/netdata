@@ -111,6 +111,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%d\t%d\t%d\t%d"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\t%016lx"
+                        "\t%s\t%s\t%s"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -145,6 +146,10 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
+
+                            , (ae->class)?ae->class:"Unknown"
+                            , (ae->component)?ae->component:"Unknown"
+                            , (ae->type)?ae->type:"Unknown"
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
