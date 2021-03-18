@@ -168,6 +168,7 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
 }
 
 static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
+    int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
     struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .type = MQTT_WSS_DIRECT };
@@ -178,7 +179,9 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
         request->proxy_port = proxy_conf.port;
     }
 
-    return https_request(request, response);
+    rc = https_request(request, response);
+    freez((char*)proxy_conf.host);
+    return rc;
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
