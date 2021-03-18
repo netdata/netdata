@@ -2671,7 +2671,7 @@ if [ -n "$total_warn_alarms" ]; then
 
                           <div
                             style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
-                          ><mj-raw style=\"background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;\">
+                          ><mj-raw style=\"background-color:#FFEDB3; border: 1px solid #FFC300; border-radius:36px; padding: 4px 12px;\">
                             Warning for ${for_min} minutes
                           </mj-raw></div>
 
@@ -2776,7 +2776,7 @@ if [ -n "$total_crit_alarms" ]; then
 
                           <div
                             style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
-                          ><mj-raw style=\"background-color:#FFEDB3; border-radius:36px; padding: 2px 12px;\">
+                          ><mj-raw style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 4px 12px;\">
                             Critical for ${for_min} minutes
                           </mj-raw></div>
 
@@ -2848,13 +2848,13 @@ Content-Transfer-Encoding: 8bit
 
 
   <style type="text/css">
-      @media only screen and (min-width:200px) {
+      @media only screen and (min-width:100px) {
           .mj-column-per-100 { width:100% !important; max-width: 100%; }
           .mj-column-per-70 { width:70% !important; max-width: 70%; }
           .mj-column-per-30 { width:30% !important; max-width: 30%; }
+          .mj-column-px-100 { width:100px !important; max-width: 100px; }
+          .mj-column-per-80 { width:80% !important; max-width: 80%; }
           .mj-column-per-50 { width:50% !important; max-width: 50%; }
-          .mj-column-per-20 { width:20% !important; max-width: 20%; }
-          .mj-column-per-60 { width:60% !important; max-width: 60%; }
       }
   </style>
 
@@ -2863,7 +2863,7 @@ Content-Transfer-Encoding: 8bit
 
 
 
-      @media only screen and (max-width:200px) {
+      @media only screen and (max-width:100px) {
           table.mj-full-width-mobile { width: 100% !important; }
           td.mj-full-width-mobile { width: auto !important; }
       }
@@ -2968,7 +2968,7 @@ Content-Transfer-Encoding: 8bit
               <tbody>
               <tr>
                 <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;text-align:center;"
+                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;"
                 >
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:418.6px;" ><![endif]-->
 
@@ -3211,12 +3211,12 @@ Content-Transfer-Encoding: 8bit
               <tbody>
               <tr>
                 <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;padding-top:0;text-align:center;"
+                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;"
                 >
-                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:299px;" ><![endif]-->
+                  <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
 
                   <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
                   >
 
                     <table
@@ -3239,7 +3239,7 @@ Content-Transfer-Encoding: 8bit
                                 <p
                                   style="display:inline-block;background:#FF4136;color:#ffffff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;font-weight:normal;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:10px 25px;mso-padding-alt:0px;border-radius:3px;"
                                 >
-                                  <a href="${goto_url}">Go to Chart</a>
+                                  <a href="${goto_url}" style="color: #FFFFFF; text-decoration: none;">Go to Chart</a>
                                 </p>
                               </td>
                             </tr>
@@ -3247,22 +3247,6 @@ Content-Transfer-Encoding: 8bit
 
                         </td>
                       </tr>
-
-                      </tbody>
-                    </table>
-
-                  </div>
-
-                  <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:299px;" ><![endif]-->
-
-                  <div
-                    class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
-
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
-                      <tbody>
 
                       </tbody>
                     </table>
@@ -3408,7 +3392,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
                   >Global time:
-                    <mj-raw style="font-weight:500">${date_utc}</mj-raw></div>
+                    <my-raw style="font-weight:500">Sat Nov 10 2021, 16:28:23 UTC</my-raw></div>
 
                 </td>
               </tr>
@@ -3481,52 +3465,64 @@ Content-Transfer-Encoding: 8bit
       <tbody>
       <tr>
         <td
-          style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
+          style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;"
         >
-          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td align="left" class="" style="vertical-align:top;width:120px;" ><![endif]-->
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
 
           <div
-            class="mj-column-per-20 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+            class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
           >
 
             <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
+              border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
             >
               <tbody>
-
               <tr>
-                <td
-                  align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td  style="vertical-align:top;padding:0;">
 
                   <table
-                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
                   >
                     <tbody>
-                    <tr>
-                      <td  style="width:70px;">
 
-                        <img
-                          height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="70"
-                        />
+                    <tr>
+                      <td
+                        align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
+                      >
+
+                        <table
+                          border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+                        >
+                          <tbody>
+                          <tr>
+                            <td  style="width:50px;">
+
+                              <img
+                                height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
+                              />
+
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
 
                       </td>
                     </tr>
+
                     </tbody>
                   </table>
 
                 </td>
               </tr>
-
               </tbody>
             </table>
 
           </div>
 
-          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:360px;" ><![endif]-->
+          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:480px;" ><![endif]-->
 
           <div
-            class="mj-column-per-60 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+            class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
           >
 
             <table
@@ -3583,52 +3579,64 @@ Content-Transfer-Encoding: 8bit
       <tbody>
       <tr>
         <td
-          style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
+          style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;"
         >
-          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td align="left" class="" style="vertical-align:top;width:120px;" ><![endif]-->
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
 
           <div
-            class="mj-column-per-20 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+            class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
           >
 
             <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
+              border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
             >
               <tbody>
-
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td  style="vertical-align:top;padding:0;">
 
                   <table
-                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
                   >
                     <tbody>
-                    <tr>
-                      <td  style="width:70px;">
 
-                        <img
-                          height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="70"
-                        />
+                    <tr>
+                      <td
+                        align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
+                      >
+
+                        <table
+                          border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+                        >
+                          <tbody>
+                          <tr>
+                            <td  style="width:50px;">
+
+                              <img
+                                height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
+                              />
+
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
 
                       </td>
                     </tr>
+
                     </tbody>
                   </table>
 
                 </td>
               </tr>
-
               </tbody>
             </table>
 
           </div>
 
-          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:360px;" ><![endif]-->
+          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:480px;" ><![endif]-->
 
           <div
-            class="mj-column-per-60 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+            class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
           >
 
             <table
@@ -3698,7 +3706,7 @@ Content-Transfer-Encoding: 8bit
       <tbody>
       <tr>
         <td
-          style="direction:ltr;font-size:0px;padding:0;text-align:center;"
+          style="direction:ltr;font-size:0px;padding:0;padding-bottom:24px;text-align:center;"
         >
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
