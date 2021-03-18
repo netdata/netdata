@@ -33,7 +33,7 @@ Place the output from the command in the code section below.
 <!--
 Provide output of `netdata -W buildinfo`.
 
-In case your agent is older and doesn't support buildinfo do following:
+If your Netdata Agent is older, and doesn't support buildinfo, do the following:
 Provide output of `netdata -V`.
  
 If Netdata is running, execute: $(ps aux | grep -E -o "[a-zA-Z/]+netdata ") -V
