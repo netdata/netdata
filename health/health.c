@@ -344,7 +344,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -371,7 +371,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               n_warn,
               n_crit,
               buffer_tostring(warn_alarms),
-              buffer_tostring(crit_alarms)
+              buffer_tostring(crit_alarms),
+              ae->class?ae->class:"Unknown"
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
