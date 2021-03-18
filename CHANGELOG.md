@@ -6,11 +6,15 @@
 
 **Merged pull requests:**
 
+- health: remove ram\_in\_swap alarm [\#10789](https://github.com/netdata/netdata/pull/10789) ([ilyam8](https://github.com/ilyam8))
+- health: use separate packets\_dropped\_ratio alarms for wifi network interfaces [\#10785](https://github.com/netdata/netdata/pull/10785) ([ilyam8](https://github.com/ilyam8))
 - health: add `wmi\_` prefix to the wmi collector network alarms [\#10782](https://github.com/netdata/netdata/pull/10782) ([ilyam8](https://github.com/ilyam8))
 - web/gui: add max value to the nvidia\_smi.fan\_speed gauge [\#10780](https://github.com/netdata/netdata/pull/10780) ([ilyam8](https://github.com/ilyam8))
 - health/: fix various alarms critical and warning thresholds hysteresis [\#10779](https://github.com/netdata/netdata/pull/10779) ([ilyam8](https://github.com/ilyam8))
+- Adds \_aclk\_impl label [\#10778](https://github.com/netdata/netdata/pull/10778) ([underhood](https://github.com/underhood))
 - Fix typo in dashboard\_info.js [\#10775](https://github.com/netdata/netdata/pull/10775) ([eltociear](https://github.com/eltociear))
 - Fixed Travis config issues related to new packaging workflows. [\#10774](https://github.com/netdata/netdata/pull/10774) ([Ferroin](https://github.com/Ferroin))
+- add a dump\_methods parameter to alarm-notify.sh.in [\#10772](https://github.com/netdata/netdata/pull/10772) ([MrZammler](https://github.com/MrZammler))
 - health: make vernemq alarms less sensitive [\#10770](https://github.com/netdata/netdata/pull/10770) ([ilyam8](https://github.com/ilyam8))
 - Fixed handling of perf.plugin capabilities. [\#10766](https://github.com/netdata/netdata/pull/10766) ([Ferroin](https://github.com/Ferroin))
 - dashboard@v2.13.28 [\#10761](https://github.com/netdata/netdata/pull/10761) ([jacekkolasa](https://github.com/jacekkolasa))
@@ -30,8 +34,10 @@
 - Always configure multihost database context [\#10732](https://github.com/netdata/netdata/pull/10732) ([stelfrag](https://github.com/stelfrag))
 - Removes unused fnc warning in ACLK Legacy [\#10731](https://github.com/netdata/netdata/pull/10731) ([underhood](https://github.com/underhood))
 - Update chart's metadata in database when it already exists during creation [\#10728](https://github.com/netdata/netdata/pull/10728) ([stelfrag](https://github.com/stelfrag))
+- New thread for ebpf.plugin [\#10726](https://github.com/netdata/netdata/pull/10726) ([thiagoftsm](https://github.com/thiagoftsm))
 - Support VS Code container devenv [\#10723](https://github.com/netdata/netdata/pull/10723) ([OdysLam](https://github.com/OdysLam))
 - Fixed detection of already claimed node in Docker images. [\#10720](https://github.com/netdata/netdata/pull/10720) ([Ferroin](https://github.com/Ferroin))
+- Add statsd guide [\#10719](https://github.com/netdata/netdata/pull/10719) ([OdysLam](https://github.com/OdysLam))
 - Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
 - Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
 - Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
@@ -71,6 +77,7 @@
 - Remove unreachable \#else directives in plugins. [\#10523](https://github.com/netdata/netdata/pull/10523) ([vkalintiris](https://github.com/vkalintiris))
 - Fixed handling of permissions for some plugins. [\#10490](https://github.com/netdata/netdata/pull/10490) ([Ferroin](https://github.com/Ferroin))
 - increases ACLK TBEB randomness [\#10373](https://github.com/netdata/netdata/pull/10373) ([underhood](https://github.com/underhood))
+- Rename abs to ABS to avoid clash with standard definitions. Fixes \#10353. [\#10354](https://github.com/netdata/netdata/pull/10354) ([KickerTom](https://github.com/KickerTom))
 - ACLK-NG [\#10315](https://github.com/netdata/netdata/pull/10315) ([underhood](https://github.com/underhood))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
@@ -298,7 +305,6 @@
 - Add allocated space metrics to oracledb charts [\#10197](https://github.com/netdata/netdata/pull/10197) ([jurgenhaas](https://github.com/jurgenhaas))
 - File descr alarm v01 [\#10192](https://github.com/netdata/netdata/pull/10192) ([Ancairon](https://github.com/Ancairon))
 - Update CoC and widen scope to community [\#10186](https://github.com/netdata/netdata/pull/10186) ([OdysLam](https://github.com/OdysLam))
-- Migrate metadata log to SQLite [\#10139](https://github.com/netdata/netdata/pull/10139) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
