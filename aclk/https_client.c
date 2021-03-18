@@ -423,19 +423,7 @@ err_exit:
     return rc;
 }
 
-// TODO remove
-int https_request(http_req_type_t method, char *host, int port, char *url, char *b, size_t b_size, char *payload) {
-    UNUSED(method);
-    UNUSED(host);
-    UNUSED(port);
-    UNUSED(url);
-    UNUSED(b);
-    UNUSED(b_size);
-    UNUSED(payload);
-    return 0;
-}
-
-int https_request_v2(https_req_t *request, https_req_response_t *response) {
+int https_request(https_req_t *request, https_req_response_t *response) {
     int rc = 0,ret;
     char connect_port_str[PORT_STR_MAX_BYTES];
 

@@ -178,7 +178,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
         request->proxy_port = proxy_conf.port;
     }
 
-    return https_request_v2(request, response);
+    return https_request(request, response);
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"

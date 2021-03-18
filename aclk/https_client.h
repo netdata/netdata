@@ -7,8 +7,6 @@ typedef enum http_req_type {
     HTTP_REQ_CONNECT
 } http_req_type_t;
 
-int https_request(http_req_type_t method, char *host, int port, char *url, char *b, size_t b_size, char *payload);
-
 typedef struct {
     http_req_type_t request_type;
 
@@ -55,6 +53,6 @@ void https_req_response_free(https_req_response_t *res);
         .proxy_port = 8080                          \
     }
 
-int https_request_v2(https_req_t *request, https_req_response_t *response);
+int https_request(https_req_t *request, https_req_response_t *response);
 
 #endif /* NETDATA_HTTPS_CLIENT_H */
