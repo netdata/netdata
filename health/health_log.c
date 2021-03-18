@@ -485,7 +485,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(recipient) ae->recipient = strdupz(recipient);
     if(source) ae->source = strdupz(source);
     if(units) ae->units = strdupz(units);
-    if(info) ae->info = strdupz(info);
 
     ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
@@ -497,6 +496,32 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     char value_string[100 + 1];
     ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
     ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+
+    if (likely(info)) {
+
+        ae->info = strdupz(info);
+
+        if ( strstr (ae->info, "$this") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "$this", ae->new_value_string);
+            ae->info = strdupz(buf);
+            free(buf);
+        }
+
+        if ( strstr (ae->info, "$family") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "$family", ae->family?ae->family:"Unknown");
+            ae->info = strdupz(buf);
+            free(buf);
+        }
+
+        if ( strstr (ae->info, "$units") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "$units", ae->units?ae->units:"Unkown");
+            ae->info = strdupz(buf);
+            free(buf);
+        }
+    }
 
     ae->old_status = old_status;
     ae->new_status = new_status;

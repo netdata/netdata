@@ -1491,3 +1491,41 @@ char *read_by_filename(char *filename, long *file_size)
         *file_size = size;
     return contents;
 }
+
+//https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word/
+char *find_and_replace(const char* s, const char* find, const char* replace)
+{
+    char* result;
+    int i, cnt = 0;
+    int replace_len = strlen(replace);
+    int find_len = strlen(find);
+
+    // Counting the number of times old word
+    // occur in the string
+    for (i = 0; s[i] != '\0'; i++) {
+        if (strstr(&s[i], find) == &s[i]) {
+            cnt++;
+
+            // Jumping to index after the old word.
+            i += find_len - 1;
+        }
+    }
+
+    // Making new string of enough length
+    result = (char*)malloc(i + cnt * (replace_len - find_len) + 1);
+
+    i = 0;
+    while (*s) {
+        // compare the substring with the result
+        if (strstr(s, find) == s) {
+            memcpy(&result[i], replace, replace_len + 1);
+            i += replace_len;
+            s += find_len;
+        }
+        else
+            result[i++] = *s++;
+    }
+
+    result[i] = '\0';
+    return result;
+}
