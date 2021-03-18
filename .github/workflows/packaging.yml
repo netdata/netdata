@@ -34,10 +34,12 @@ jobs:
           - {distro: ubuntu, version: "18.04", pkgclouddistro: Ubuntu, pkgcloudversion: "18.04", format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: Ubuntu, pkgcloudversion: "20.04", format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "20.10", pkgclouddistro: Ubuntu, pkgcloudversion: "20.10", format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "21.04", pkgclouddistro: Ubuntu, pkgcloudversion: "20.10", format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "7", pkgclouddistro: Enterprise Linux, pkgcloudversion: "7.0", format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "8", pkgclouddistro: Enterprise Linux, pkgcloudversion: "8.0", format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "32", pkgclouddistro: Fedora, pkgcloudversion: "32.0", format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "33", pkgclouddistro: Fedora, pkgcloudversion: "33.0", format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "34", pkgclouddistro: Fedora, pkgcloudversion: "33.0", format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: opensuse, version: "15.2", pkgclouddistro: openSUSE, pkgcloudversion: "15.2", format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
