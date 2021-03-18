@@ -920,25 +920,25 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     if (!rc) {
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_BY_UUID, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to fetch host");
+            error_report("Failed to prepare statement to fetch host by uuid");
             return NULL;
         }
         rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to bind host_id parameter to fetch host information");
-            return NULL;
+            goto failed;
         }
     }
     else {
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST, -1, &res, 0);
         if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to fetch host");
+            error_report("Failed to prepare statement to fetch host by hostname");
             return NULL;
         }
         rc = sqlite3_bind_text(res, 1, hostname, -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to bind hostname parameter to fetch host information");
-            return NULL;
+            goto failed;
         }
     }
 
@@ -966,7 +966,7 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     host->rrdeng_ctx = &multidb_ctx;
 #endif
 
-    failed:
+failed:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host information");
@@ -1206,7 +1206,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
-        return;
+        goto failed;
     }
 
     if (context)
@@ -1215,7 +1215,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         rc = sqlite3_bind_text(res, 2, chart, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
-        return;
+        goto failed;
     }
 
     RRDSET *st = NULL;
@@ -1279,6 +1279,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
     if (likely(st && context && !st->context))
         st->context = strdupz(context);
 
+failed:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading archived charts");
