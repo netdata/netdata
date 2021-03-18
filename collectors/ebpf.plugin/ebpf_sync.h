@@ -12,6 +12,28 @@
 // configuration file
 #define NETDATA_SYNC_CONFIG_FILE "sync.conf"
 
+enum sync_syscalls_index {
+    NETDATA_SYNC_SYNC_IDX,
+    NETDATA_SYNC_SYNCFS_IDX,
+    NETDATA_SYNC_MSYNC_IDX,
+    NETDATA_SYNC_FSYNC_IDX,
+    NETDATA_SYNC_FDATASYNC_IDX,
+    NETDATA_SYNC_SYNC_FILE_RANGE_IDX,
+
+    NETDATA_SYNC_IDX_END
+};
+
+typedef struct ebpf_sync_syscalls {
+    char *syscall;
+    int enabled;
+    uint32_t flags;
+
+    struct bpf_object *objects;
+    struct bpf_link **probe_links;
+
+    ebpf_data_t kernel_info;
+} ebpf_sync_syscalls_t;
+
 enum netdata_sync_charts {
     NETDATA_SYNC_CALL,
 

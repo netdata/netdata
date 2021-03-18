@@ -26,6 +26,16 @@ struct config sync_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+ebpf_sync_syscalls_t local_syscalls[] = {
+    {.syscall = "sync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = "syncfs", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = "msync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = "fsync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = "fdatasync", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = "sync_file_range", .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL},
+    {.syscall = NULL, .enabled = CONFIG_BOOLEAN_NO, .objects = NULL, .probe_links = NULL}
+};
+
 /*****************************************************************
  *
  *  DATA THREAD
