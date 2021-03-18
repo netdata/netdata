@@ -182,6 +182,20 @@ static void ebpf_create_sync_charts()
 }
 
 /**
+ * Parse Syscalls
+ *
+ * Parse syscall options available inside ebpf.d/sync.conf
+ */
+static void ebpf_sync_parse_syscalls()
+{
+    int i;
+    for (i = 0; local_syscalls[i].syscall; i++) {
+        local_syscalls[i].enabled = appconfig_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME,
+                                                          local_syscalls[i].syscall, CONFIG_BOOLEAN_YES);
+    }
+}
+
+/**
  * Sync thread
  *
  * Thread used to make sync thread
@@ -196,6 +210,7 @@ void *ebpf_sync_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&sync_data);
+    ebpf_sync_parse_syscalls();
 
     ebpf_update_module(em, &sync_config, NETDATA_SYNC_CONFIG_FILE);
 

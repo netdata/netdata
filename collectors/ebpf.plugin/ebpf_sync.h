@@ -11,6 +11,7 @@
 
 // configuration file
 #define NETDATA_SYNC_CONFIG_FILE "sync.conf"
+#define NETDATA_SYNC_CONFIG_NAME "syscalls"
 
 enum sync_syscalls_index {
     NETDATA_SYNC_SYNC_IDX,
