@@ -21,10 +21,10 @@ if [ -n "${PGID}" ]; then
 fi
 
 if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/cloud.d/claimed_id ]; then
-  /usr/sbin/netdata-claim.sh -token "${NETDATA_CLAIM_TOKEN}" \
-                             -url "${NETDATA_CLAIM_URL}" \
-                             ${NETDATA_CLAIM_ROOMS:+-rooms "${NETDATA_CLAIM_ROOMS}"} \
-                             ${NETDATA_CLAIM_PROXY:+-proxy "${NETDATA_CLAIM_PROXY}"}
+  /usr/sbin/netdata-claim.sh -token="${NETDATA_CLAIM_TOKEN}" \
+                             -url="${NETDATA_CLAIM_URL}" \
+                             ${NETDATA_CLAIM_ROOMS:+-rooms="${NETDATA_CLAIM_ROOMS}"} \
+                             ${NETDATA_CLAIM_PROXY:+-proxy="${NETDATA_CLAIM_PROXY}"} \
                              -daemon-not-running
 fi
 
