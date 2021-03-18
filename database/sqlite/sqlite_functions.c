@@ -1161,6 +1161,27 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
 #endif
 }
 
+static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
+{
+    RRDDIM *rd = callocz(1, sizeof(*rd));
+    rd->rrdset = st;
+    rd->last_stored_value = NAN;
+    rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
+    rd->state = mallocz(sizeof(*rd->state));
+    rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    rd->state->query_ops.init = rrdeng_load_metric_init;
+    rd->state->query_ops.next_metric = rrdeng_load_metric_next;
+    rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
+    rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
+    rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
+    rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
+    rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
+    uuid_copy(*rd->state->rrdeng_uuid, *metric_uuid);
+    rd->state->metric_uuid = rd->state->rrdeng_uuid;
+    rd->id = strdupz(id);
+    rd->name = strdupz(name);
+    return rd;
+}
 
 #define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id from chart c, " \
     "dimension d, host h " \
@@ -1241,7 +1262,6 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
             if (chart) {
                 st->context = strdupz((char *)sqlite3_column_text(res, 8));
                 strncpyz(st->id, chart, RRD_ID_LENGTH_MAX);
-                st->name = strdupz(chart);
             }
             uuid_copy(chart_id, *(uuid_t *)sqlite3_column_blob(res, 7));
             st->last_entry_t = 0;
@@ -1256,23 +1276,7 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         st->counter++;
         st->last_entry_t = MAX(st->last_entry_t, (*param_list)->last_entry_t);
 
-        RRDDIM *rd = callocz(1, sizeof(*rd));
-        rd->rrdset = st;
-        rd->last_stored_value = NAN;
-        rrddim_flag_set(rd, RRDDIM_FLAG_NONE);
-        rd->id = strdupz((char *)sqlite3_column_text(res, 1));
-        rd->name = strdupz((char *)sqlite3_column_text(res, 2));
-        rd->state = mallocz(sizeof(*rd->state));
-        rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-        rd->state->query_ops.init = rrdeng_load_metric_init;
-        rd->state->query_ops.next_metric = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished = rrdeng_load_metric_is_finished;
-        rd->state->query_ops.finalize = rrdeng_load_metric_finalize;
-        rd->state->query_ops.latest_time = rrdeng_metric_latest_time;
-        rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
-        rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
-        uuid_copy(*rd->state->rrdeng_uuid, rrdeng_uuid);
-        rd->state->metric_uuid = rd->state->rrdeng_uuid;
+        RRDDIM *rd = create_rrdim_entry(st, (char *)sqlite3_column_text(res, 1), (char *)sqlite3_column_text(res, 2), &rrdeng_uuid);
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
