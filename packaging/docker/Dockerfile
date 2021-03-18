@@ -75,7 +75,7 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     chmod 4755 /usr/local/bin/fping && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /var/lib/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
 
 # Long-term this should leverage BuildKit’s mount option.
 COPY --from=builder /wheels /wheels
