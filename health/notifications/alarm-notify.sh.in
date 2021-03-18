@@ -3392,7 +3392,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
                   >Global time:
-                    <my-raw style="font-weight:500">Sat Nov 10 2021, 16:28:23 UTC</my-raw></div>
+                    <mj-raw style="font-weight:500">${date_utc}</mj-raw></div>
 
                 </td>
               </tr>
