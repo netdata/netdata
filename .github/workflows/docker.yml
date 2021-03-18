@@ -4,15 +4,7 @@ on:
   push:
     branches:
       - master
-    paths:
-      - '.github/workflows/docker.yml'
-      - 'netdata-installer.sh'
-      - 'packaging/**'
   pull_request:
-    paths:
-      - '.github/workflows/docker.yml'
-      - 'netdata-installer.sh'
-      - 'packaging/**'
   workflow_dispatch:
     inputs:
       version:
