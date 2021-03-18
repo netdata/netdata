@@ -755,7 +755,7 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
     rc = sqlite3_bind_blob(res_chart, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch archived charts");
-        return;
+        goto failed;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_DIMENSION, -1, &res_dim, 0);
