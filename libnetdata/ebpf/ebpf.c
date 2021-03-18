@@ -8,6 +8,9 @@
 
 #include "../libnetdata.h"
 
+char *ebpf_user_config_dir = CONFIG_DIR;
+char *ebpf_stock_config_dir = LIBCONFIG_DIR;
+
 /*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
@@ -182,20 +185,26 @@ static int kernel_is_rejected()
     }
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+    snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
     FILE *kernel_reject_list = fopen(filename, "r");
 
     if (!kernel_reject_list) {
-        config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-        if (config_dir == NULL) {
-            config_dir = LIBCONFIG_DIR;
-        }
-
+        // Keep this to have compatibility with old versions
         snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
         kernel_reject_list = fopen(filename, "r");
 
-        if (!kernel_reject_list)
-            return 0;
+        if (!kernel_reject_list) {
+            config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+            if (config_dir == NULL) {
+                config_dir = LIBCONFIG_DIR;
+            }
+
+            snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+            kernel_reject_list = fopen(filename, "r");
+
+            if (!kernel_reject_list)
+                return 0;
+        }
     }
 
     // Find if the kernel is in the reject list
@@ -296,7 +305,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     if (test < 0 || test > 127)
         return NULL;
 
-    snprintf(lpath, 4096, "%s/%s", plugins_dir, lname);
+    snprintf(lpath, 4096, "%s/ebpf.d/%s", plugins_dir, lname);
     // We are using BPF_PROG_TYPE_UNSPEC instead a specific type for bpf_prog_load to define the type
     // according the eBPF program loaded
     if (bpf_prog_load(lpath, BPF_PROG_TYPE_UNSPEC, obj, &prog_fd)) {
@@ -325,4 +334,55 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     }
 
     return links;
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+static netdata_run_mode_t ebpf_select_mode(char *mode)
+{
+    if (!strcasecmp(mode, "return"))
+        return MODE_RETURN;
+    else if  (!strcasecmp(mode, "dev"))
+        return MODE_DEVMODE;
+
+    return MODE_ENTRY;
+}
+
+void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
+{
+    char *mode = appconfig_get(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
+    modules->mode = ebpf_select_mode(mode);
+
+    modules->update_time = (int)appconfig_get_number(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
+
+    modules->apps_charts = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
+                                                 CONFIG_BOOLEAN_YES);
+}
+
+
+/**
+ * Update module
+ *
+ * When this function is called, it will load the configuration file and after this
+ * it updates the global information of ebpf_module.
+ * If the module has specific configuration, this function will load it, but it will not
+ * update the variables.
+ *
+ * @param em       the module structure
+ * @param cfg      the configuration structure
+ * @param cfg_file the filename to load
+ */
+void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file)
+{
+    char filename[FILENAME_MAX+1];
+    ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, cfg_file);
+    if (!ebpf_load_config(cfg, filename)) {
+        ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, cfg_file);
+        if (!ebpf_load_config(cfg, filename)) {
+            error("Cannot load the ebpf configuration file %s", cfg_file);
+            return;
+        }
+    }
+
+    ebpf_update_module_using_config(em, cfg);
 }

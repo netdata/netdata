@@ -10,6 +10,12 @@ CLEANFILES = \
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
+userebpfconfigdir=$(configdir)/ebpf.d
+
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userebpfconfigdir)
+
 dist_plugins_SCRIPTS = \
     reset_netdata_trace.sh \
     $(NULL)
@@ -19,7 +25,15 @@ dist_noinst_DATA = \
     README.md \
     $(NULL)
 
+ebpfconfigdir=$(libconfigdir)/ebpf.d
 dist_libconfig_DATA = \
-    ebpf.conf \
-    ebpf_kernel_reject_list.txt \
+    ebpf.d.conf \
+    $(NULL)
+
+dist_ebpfconfig_DATA = \
+    ebpf.d/ebpf_kernel_reject_list.txt \
+    ebpf.d/cachestat.conf \
+    ebpf.d/network.conf \
+    ebpf.d/process.conf \
+    ebpf.d/sync.conf \
     $(NULL)

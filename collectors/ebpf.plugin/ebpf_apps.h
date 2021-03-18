@@ -11,11 +11,11 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
-#define NETDATA_APPS_FILE_GROUP "ebpf file"
-#define NETDATA_APPS_VFS_GROUP "ebpf vfs"
-#define NETDATA_APPS_PROCESS_GROUP "ebpf process"
-#define NETDATA_APPS_NET_GROUP "ebpf net"
-#define NETDATA_APPS_CACHESTAT_GROUP "ebpf cachestat"
+#define NETDATA_APPS_FILE_GROUP "file (eBPF)"
+#define NETDATA_APPS_VFS_GROUP "vfs (eBPF)"
+#define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
+#define NETDATA_APPS_NET_GROUP "net (eBPF)"
+#define NETDATA_APPS_CACHESTAT_GROUP "page cache (eBPF)"
 
 #include "ebpf_process.h"
 #include "ebpf_cachestat.h"

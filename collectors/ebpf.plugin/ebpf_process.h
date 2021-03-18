@@ -10,7 +10,6 @@
 
 // Internal constants
 #define NETDATA_GLOBAL_VECTOR 24
-#define NETDATA_MAX_MONITOR_VECTOR 9
 #define NETDATA_VFS_ERRORS 3
 
 // Map index
@@ -51,6 +50,9 @@
 #define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
 #define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR "vfs_write_error"
 #define NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR "vfs_read_error"
+
+// Process configuration name
+#define NETDATA_PROCESS_CONFIG_FILE "process.conf"
 
 // Index from kernel
 typedef enum ebpf_process_index {

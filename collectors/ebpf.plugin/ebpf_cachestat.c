@@ -11,8 +11,8 @@ static struct bpf_object *objects = NULL;
 
 static char *cachestat_counter_dimension_name[NETDATA_CACHESTAT_END] = { "ratio", "dirty", "hit",
                                                                          "miss" };
-static netdata_syscall_stat_t *cachestat_counter_aggregated_data = NULL;
-static netdata_publish_syscall_t *cachestat_counter_publish_aggregated = NULL;
+static netdata_syscall_stat_t cachestat_counter_aggregated_data[NETDATA_CACHESTAT_END];
+static netdata_publish_syscall_t cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_END];
 
 netdata_cachestat_pid_t *cachestat_vector = NULL;
 
@@ -25,6 +25,12 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL,  NULL};
 
 static int *map_fd = NULL;
+
+struct config cachestat_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
 
 /*****************************************************************
  *
@@ -68,9 +74,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
     clean_pid_structures();
     freez(cachestat_pid);
 
-    freez(cachestat_counter_aggregated_data);
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
-    freez(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
     freez(cachestat_hash_values);
@@ -278,6 +282,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "The ratio is calculated dividing the Hit pages per total cache accesses without counting dirties.",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_APPS_CACHESTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20090,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -286,6 +291,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
                                EBPF_CACHESTAT_DIMENSION_PAGE,
                                NETDATA_APPS_CACHESTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20091,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
@@ -294,6 +300,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Number of cache access without counting dirty pages and page additions.",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_APPS_CACHESTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20092,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -302,6 +309,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Page caches added without counting dirty pages",
                                EBPF_CACHESTAT_DIMENSION_MISSES,
                                NETDATA_APPS_CACHESTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20093,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -348,10 +356,10 @@ void *ebpf_cachestat_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS;
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_time;
     int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -533,6 +541,7 @@ static void ebpf_create_memory_charts()
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
                       cachestat_counter_publish_aggregated, 1);
@@ -541,6 +550,7 @@ static void ebpf_create_memory_charts()
                       "Number of dirty pages added to the page cache.",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21101,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1);
@@ -549,6 +559,7 @@ static void ebpf_create_memory_charts()
                       "Hits are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21102,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1);
@@ -557,6 +568,7 @@ static void ebpf_create_memory_charts()
                       "Misses are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21103,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1);
@@ -579,8 +591,8 @@ static void ebpf_cachestat_allocate_global_vectors(size_t length)
 
     cachestat_hash_values = callocz(length, sizeof(netdata_idx_t));
 
-    cachestat_counter_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
-    cachestat_counter_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
+    memset(cachestat_counter_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
+    memset(cachestat_counter_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
 }
 
 /*****************************************************************
@@ -604,6 +616,8 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&cachestat_data);
+
+    ebpf_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
 
     if (!em->enabled)
         goto endcachestat;

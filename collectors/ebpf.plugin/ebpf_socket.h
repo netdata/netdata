@@ -5,7 +5,6 @@
 #include "libnetdata/avl/avl.h"
 
 // Vector indexes
-#define NETDATA_MAX_SOCKET_VECTOR 6
 #define NETDATA_UDP_START 3
 #define NETDATA_RETRANSMIT_START 5
 
@@ -16,6 +15,28 @@
 #define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
+
+// config file
+#define NETDATA_NETWORK_CONFIG_FILE "network.conf"
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
+#define EBPF_SERVICE_NAME_SECTION "service name"
+#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
+#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
+#define EBPF_CONFIG_PORTS "ports"
+#define EBPF_CONFIG_HOSTNAMES "hostnames"
+#define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
+
+enum ebpf_socket_publish_index {
+    NETDATA_IDX_TCP_SENDMSG,
+    NETDATA_IDX_TCP_CLEANUP_RBUF,
+    NETDATA_IDX_TCP_CLOSE,
+    NETDATA_IDX_UDP_RECVBUF,
+    NETDATA_IDX_UDP_SENDMSG,
+    NETDATA_IDX_TCP_RETRANSMIT,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_MAX_SOCKET_VECTOR
+};
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -38,6 +59,7 @@ typedef enum ebpf_socket_idx {
 
     NETDATA_KEY_TCP_RETRANSMIT,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
@@ -269,6 +291,9 @@ typedef struct netdata_vector_plot {
 extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 extern void update_listen_table(uint16_t value, uint8_t proto);
+extern void parse_network_viewer_section(struct config *cfg);
+extern void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
+extern void parse_service_name_section(struct config *cfg);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 

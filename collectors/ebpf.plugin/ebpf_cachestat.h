@@ -9,13 +9,16 @@
 #define NETDATA_CACHESTAT_HIT_CHART "cachestat_hits"
 #define NETDATA_CACHESTAT_MISSES_CHART "cachestat_misses"
 
-#define NETDATA_CACHESTAT_SUBMENU "page cache"
+#define NETDATA_CACHESTAT_SUBMENU "page cache (eBPF)"
 
 #define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
 #define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
 
 #define NETDATA_LATENCY_CACHESTAT_SLEEP_MS 600000ULL
+
+// configuration file
+#define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 
 // variables
 enum cachestat_counters {

@@ -5,9 +5,12 @@
 
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"
-#define NETDATA_EBPF_SYNC_SUBMENU "synchronization"
+#define NETDATA_EBPF_SYNC_SUBMENU "synchronization (eBPF)"
 
 #define NETDATA_EBPF_SYNC_SLEEP_MS 800000ULL
+
+// configuration file
+#define NETDATA_SYNC_CONFIG_FILE "sync.conf"
 
 enum netdata_sync_charts {
     NETDATA_SYNC_CALL,

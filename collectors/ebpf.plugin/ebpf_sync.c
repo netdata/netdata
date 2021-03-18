@@ -20,6 +20,12 @@ static netdata_idx_t sync_hash_values = 0;
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
                                               NULL, NULL,  NULL};
 
+struct config sync_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
+
 /*****************************************************************
  *
  *  DATA THREAD
@@ -53,12 +59,12 @@ static void read_global_table()
  */
 void *ebpf_sync_read_hash(void *ptr)
 {
-    UNUSED(ptr);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
     read_thread_closed = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS;
+    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_time;
 
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -160,7 +166,8 @@ static void ebpf_create_sync_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
                       "Monitor calls for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL, 21300,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE, 21300,
                       ebpf_create_global_dimension, &sync_counter_publish_aggregated, 1);
 }
 
@@ -179,6 +186,8 @@ void *ebpf_sync_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&sync_data);
+
+    ebpf_update_module(em, &sync_config, NETDATA_SYNC_CONFIG_FILE);
 
     if (!em->enabled)
         goto endsync;
