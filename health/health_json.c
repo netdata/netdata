@@ -298,6 +298,9 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
+        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+            continue;
+
         if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
             continue;
 
