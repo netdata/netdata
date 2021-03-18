@@ -282,7 +282,7 @@ fi
 
 
 if [ "${URLTOOL}" = "curl" ] ; then
-        URLCOMMAND="curl --connect-timeout 5 --retry 0 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+        URLCOMMAND="curl --connect-timeout 30 --retry 0 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
         if [ "${NOPROXY}" = "yes" ] ; then
                 URLCOMMAND="${URLCOMMAND} -x \"\""
         elif [ -n "${PROXY}" ] ; then
@@ -341,7 +341,7 @@ attempt_contact () {
         return 0
 }
 
-for i in {1..5}
+for i in {1..3}
 do
         if attempt_contact ; then
                 echo "Connection attempt $i successful"
