@@ -87,17 +87,21 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  * Read global table
  *
  * Read the table with number of calls for all functions
+ */
 static void read_global_table()
 {
-    uint32_t idx = NETDATA_SYNC_CALL;
     netdata_idx_t stored;
-    int fd = map_fd[NETDATA_SYNC_GLOBLAL_TABLE];
-
-    if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-        sync_hash_values = stored;
+    uint32_t idx = NETDATA_SYNC_CALL;
+    int i;
+    for (i = 0; local_syscalls[i].syscall; i++) {
+        if (local_syscalls[i].enabled) {
+            int fd = local_syscalls[i].kernel_info.map_fd[NETDATA_SYNC_GLOBLAL_TABLE];
+            if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
+                sync_hash_values[i] = stored;
+            }
+        }
     }
 }
- */
 
 /**
  * Sync read hash
@@ -121,7 +125,7 @@ void *ebpf_sync_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        //read_global_table();
+        read_global_table();
     }
     read_thread_closed = 1;
 
