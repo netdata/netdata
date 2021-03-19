@@ -20,8 +20,10 @@ install_fedora_like() {
 
   PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
 
+  pkg_version="$(echo "${VERSION}" | tr - .)"
+
   # Install NetData
-  "$PKGMGR" install -y /artifacts/netdata-"${VERSION}"-*.rpm
+  "$PKGMGR" install -y /artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
   "$PKGMGR" install -y curl nc jq
@@ -33,11 +35,13 @@ install_centos() {
 
   PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
 
+  pkg_version="$(echo "${VERSION}" | tr - .)"
+
   # Install EPEL (needed for `jq`
   "$PKGMGR" install -y epel-release
 
   # Install NetData
-  "$PKGMGR" install -y /artifacts/netdata-"${VERSION}"-*.rpm
+  "$PKGMGR" install -y /artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
   "$PKGMGR" install -y curl nc jq
@@ -47,10 +51,12 @@ install_suse_like() {
   # Using a glob pattern here because I can't reliably determine what the
   # resulting package name will be (TODO: There must be a better way!)
 
+  pkg_version="$(echo "${VERSION}" | tr - .)"
+
   # Install NetData
   # FIXME: Allow unsigned packages (for now) #7773
   zypper install -y --allow-unsigned-rpm \
-    /artifacts/netdata-"${VERSION}"-*.rpm
+    /artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
   zypper install -y --no-recommends \
