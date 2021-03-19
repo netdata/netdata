@@ -31,6 +31,9 @@ Place the output from the command in the code section below.
 
 ##### Netdata version
 <!--
+Provide output of `netdata -W buildinfo`.
+
+If your Netdata Agent is older, and doesn't support buildinfo, do the following:
 Provide output of `netdata -V`.
  
 If Netdata is running, execute: $(ps aux | grep -E -o "[a-zA-Z/]+netdata ") -V
