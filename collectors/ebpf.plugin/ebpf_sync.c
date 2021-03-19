@@ -12,7 +12,7 @@ static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_ID
 
 static int read_thread_closed = 1;
 
-static netdata_idx_t sync_hash_values = 0;
+static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
                                               NULL, NULL,  NULL};
@@ -72,6 +72,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 
     memset(sync_counter_aggregated_data, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_syscall_stat_t));
     memset(sync_counter_publish_aggregated, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
+    memset(sync_hash_values, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_idx_t));
 
     return 0;
 }
@@ -128,16 +129,35 @@ void *ebpf_sync_read_hash(void *ptr)
 }
 
 /**
- * Send global
+ * Send data
  *
  * Send global charts to Netdata
  */
-static void sync_send_global()
+static void sync_send_data()
 {
-    /*
-    ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
-                                    sync_counter_publish_aggregated.dimension, sync_hash_values);
-                                    */
+    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled) {
+        sync_counter_publish_aggregated[NETDATA_SYNC_FDATASYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_FDATASYNC_IDX];
+        sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_FSYNC_IDX];
+        write_count_chart(NETDATA_EBPF_FILE_SYNC_CHART, NETDATA_EBPF_MEMORY_GROUP,
+                          &sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX], 2);
+    }
+
+    if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
+        ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_MSYNC_CHART,
+                                        sync_counter_publish_aggregated[NETDATA_SYNC_MSYNC_IDX].dimension,
+                                        sync_hash_values[NETDATA_SYNC_MSYNC_IDX]);
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled) {
+        sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_SYNC_IDX];
+        sync_counter_publish_aggregated[NETDATA_SYNC_SYNCFS_IDX].ncall = sync_hash_values[NETDATA_SYNC_SYNCFS_IDX];
+        write_count_chart(NETDATA_EBPF_SYNC_CHART, NETDATA_EBPF_MEMORY_GROUP,
+                          &sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_IDX], 2);
+    }
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
+        ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_FILE_SEGMENT_CHART,
+                                        sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].dimension,
+                                        sync_hash_values[NETDATA_SYNC_SYNC_FILE_RANGE_IDX]);
 }
 
 /**
@@ -157,7 +177,7 @@ static void sync_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
 
-        sync_send_global();
+        sync_send_data();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -231,11 +251,36 @@ static void ebpf_sync_cleanup(void *ptr)
  */
 static void ebpf_create_sync_charts()
 {
-    ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
-                      "Monitor calls for <a href=\"https://linux.die.net/man/2/sync\">sync(2)</a> syscall.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
-                      NETDATA_EBPF_CHART_TYPE_LINE, 21300,
-                      ebpf_create_global_dimension, &sync_counter_publish_aggregated, 1);
+    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
+        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_FILE_SYNC_CHART,
+                          "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.",
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE, 21300,
+                          ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX],
+                          2);
+
+    if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
+        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_MSYNC_CHART,
+                          "Monitor calls for <code>msync(2)</code>.",
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE, 21301,
+                          ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_MSYNC_IDX],
+                          1);
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
+        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
+                          "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.",
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE, 21302,
+                          ebpf_create_global_dimension, sync_counter_publish_aggregated, 2);
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
+        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_FILE_SEGMENT_CHART,
+                          "Monitor calls for <code>sync_file_range(2)</code>.",
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE, 21303,
+                          ebpf_create_global_dimension,
+                          &sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_FILE_RANGE_IDX], 1);
 }
 
 /**
