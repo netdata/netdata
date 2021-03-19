@@ -1492,40 +1492,43 @@ char *read_by_filename(char *filename, long *file_size)
     return contents;
 }
 
-//https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word/
-char *find_and_replace(const char* s, const char* find, const char* replace)
+char *find_and_replace(const char *src, const char *find, const char *replace)
 {
-    char* result;
-    int i, cnt = 0;
-    int replace_len = strlen(replace);
-    int find_len = strlen(find);
+   size_t size        = strlen(src) + 1;
+   size_t find_len    = strlen(find);
+   size_t repl_len    = strlen(replace);
+   char *value, *dst, *temp, *match;
 
-    // Counting the number of times old word
-    // occur in the string
-    for (i = 0; s[i] != '\0'; i++) {
-        if (strstr(&s[i], find) == &s[i]) {
-            cnt++;
+   value = (char *)mallocz(size); //use mallocz
+   dst = value;
 
-            // Jumping to index after the old word.
-            i += find_len - 1;
-        }
-    }
+   if ( value != NULL ) {
+      for ( ;; ) {
+         match = strstr(src, find);
+         if ( match != NULL ) {
 
-    // Making new string of enough length
-    result = (char*)malloc(i + cnt * (replace_len - find_len) + 1);
+            size_t count = match - src;
 
-    i = 0;
-    while (*s) {
-        // compare the substring with the result
-        if (strstr(s, find) == s) {
-            memcpy(&result[i], replace, replace_len + 1);
-            i += replace_len;
-            s += find_len;
-        }
-        else
-            result[i++] = *s++;
-    }
+            size += repl_len - find_len;
 
-    result[i] = '\0';
-    return result;
+            temp = (char *)reallocz(value, size);
+
+            dst = temp + (dst - value);
+            value = temp;
+
+            memmove(dst, src, count);
+            src += count;
+            dst += count;
+
+            memmove(dst, replace, repl_len);
+            src += find_len;
+            dst += repl_len;
+         }
+         else {
+            strcpy(dst, src);
+            break;
+         }
+      }
+   }
+   return value;
 }

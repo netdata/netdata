@@ -505,21 +505,21 @@ inline ALARM_ENTRY* health_create_alarm_entry(
             char *buf=NULL;
             buf = find_and_replace(ae->info, "$this", ae->new_value_string);
             ae->info = strdupz(buf);
-            free(buf);
+            freez(buf);
         }
 
         if ( strstr (ae->info, "$family") ) {
             char *buf=NULL;
-            buf = find_and_replace(ae->info, "$family", ae->family?ae->family:"Unknown");
+            buf = find_and_replace(ae->info, "$family", (ae->family)?ae->family:"Unknown");
             ae->info = strdupz(buf);
-            free(buf);
+            freez(buf);
         }
 
         if ( strstr (ae->info, "$units") ) {
             char *buf=NULL;
-            buf = find_and_replace(ae->info, "$units", ae->units?ae->units:"Unkown");
+            buf = find_and_replace(ae->info, "$units", (ae->units)?ae->units:"Unkown");
             ae->info = strdupz(buf);
-            free(buf);
+            freez(buf);
         }
     }
 
