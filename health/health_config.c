@@ -472,12 +472,12 @@ static inline char *health_source_file(size_t line, const char *file) {
 }
 
 static inline char *health_edit_command(size_t line, const char *file) {
-    char temp[FILENAME_MAX + 1];
     char buffer[FILENAME_MAX + 1];
-    snprintfz(temp, FILENAME_MAX, "%s", file);
-    snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, basename(temp), line);
+    char *file_no_path = strrchr(file, '/');
+
+    snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, file_no_path+1, line);
     return strdupz(buffer);
-    //debug(D_HEALTH, "GREPME line: [%zu] - file [%s] - base [%s] [%s]", line, file, basename(buffer), netdata_configured_user_config_dir);
+
 }
 
 static inline void strip_quotes(char *s) {
@@ -621,8 +621,6 @@ static int health_readfile(const char *filename, void *data) {
                 rt = NULL;
             }
 
-            //health_edit_command(line, filename);
-            
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
             rc->name = strdupz(value);

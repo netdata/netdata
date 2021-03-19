@@ -34,6 +34,7 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                     "\t\t\"recipient\": \"%s\",\n"
                     "\t\t\"exec_code\": %d,\n"
                     "\t\t\"source\": \"%s\",\n"
+                    "\t\t\"command\": \"%s\",\n"
                     "\t\t\"units\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                     "\t\t\"duration\": %lu,\n"
@@ -66,6 +67,7 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
+                   , ae->edit_command?ae->edit_command:""
                    , ae->units?ae->units:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
@@ -160,6 +162,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"exec\": \"%s\",\n"
                     "\t\t\t\"recipient\": \"%s\",\n"
                     "\t\t\t\"source\": \"%s\",\n"
+                    "\t\t\t\"command\": \"%s\",\n"
                     "\t\t\t\"units\": \"%s\",\n"
                     "\t\t\t\"info\": \"%s\",\n"
                     "\t\t\t\"status\": \"%s\",\n"
@@ -191,6 +194,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->exec?rc->exec:host->health_default_exec
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source
+                   , rc->edit_command?rc->edit_command:""
                    , rc->units?rc->units:""
                    , rc->info?rc->info:""
                    , rrdcalc_status2string(rc->status)

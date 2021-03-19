@@ -485,6 +485,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(exec) ae->exec = strdupz(exec);
     if(recipient) ae->recipient = strdupz(recipient);
     if(source) ae->source = strdupz(source);
+    if(edit_command) ae->edit_command = strdupz(edit_command);
+
     if(units) ae->units = strdupz(units);
     if(info) ae->info = strdupz(info);
 
@@ -567,6 +569,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->exec);
     freez(ae->recipient);
     freez(ae->source);
+    freez(ae->edit_command);
     freez(ae->units);
     freez(ae->info);
     freez(ae->old_value_string);

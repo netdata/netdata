@@ -142,8 +142,6 @@ static void health_reload_host(RRDHOST *host) {
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
-    debug(D_HEALTH, "GREPME [%s] [%s]", user_path, stock_path);
-
     // free all running alarms
     rrdhost_wrlock(host);
 
@@ -346,7 +344,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -374,7 +372,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               n_crit,
               buffer_tostring(warn_alarms),
               buffer_tostring(crit_alarms),
-              ae->class?ae->class:"Unknown"
+              ae->class?ae->class:"Unknown",
+              ae->edit_command?ae->edit_command:""
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
