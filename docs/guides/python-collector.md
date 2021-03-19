@@ -448,16 +448,16 @@ def __init__(self, configuration=None, name=None):
         self.endpoint = self.configuration.get('endpoint', <default_endpoint>)
 ```
 
-Because you initiate the `framework class` (e.g `SimpleService.__init__`)q, the configuration will be
-available throughout the whole `Service` class of your module, as `self.configuration`. Finally, note that the
-`configuration.get` function takes 2 arguments, one with the name of the configuration field and one with a default
-value in case it doesn't find the configuration field. This allows you to define sane defaults for your collector.
+Because you initiate the `framework class` (e.g `SimpleService.__init__`), the configuration will be available
+throughout the whole `Service` class of your module, as `self.configuration`. Finally, note that the `configuration.get`
+function takes 2 arguments, one with the name of the configuration field and one with a default value in case it doesn't
+find the configuration field. This allows you to define sane defaults for your collector.
 
 Moreover, when creating the configuration file, create a large comment section that describes the configuration
 variables and inform the user about the defaults. For example, take a look at the `postgresql` collector on
 [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf).
 
-You can read more about the confqiguration file on the [`python.d.plugin`
+You can read more about the configuration file on the [`python.d.plugin`
 documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin). 
 
 ## What's next?
