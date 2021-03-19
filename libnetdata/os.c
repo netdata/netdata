@@ -9,7 +9,7 @@
 int processors = 1;
 long get_system_cpus(void) {
     processors = 1;
-
+   
 #ifdef __APPLE__
     int32_t tmp_processors;
 
