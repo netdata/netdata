@@ -555,6 +555,8 @@ ACLK_FILES = \
     aclk/aclk_tx_msgs.h \
     aclk/aclk_rx_msgs.c \
     aclk/aclk_rx_msgs.h \
+    aclk/https_client.c \
+    aclk/https_client.h \
     $(NULL)
 else #ACLK_NG
 ACLK_FILES = \
