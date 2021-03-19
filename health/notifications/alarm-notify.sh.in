@@ -885,14 +885,15 @@ send_email() {
       echo >&2 "--- END sendmail command ---"
     fi
 
-    "${sendmail}" -t "${opts[@]}"
+    local cmd_output
+    cmd_output=$("${sendmail}" -t "${opts[@]}" 2>&1)
     ret=$?
 
     if [ ${ret} -eq 0 ]; then
       info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
       return 0
     else
-      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret} (${cmd_output})."
       return 1
     fi
   fi
