@@ -142,6 +142,24 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
+    char *replaced_info = NULL;
+    if (likely(rc->info)) {
+
+        replaced_info = strdupz(rc->info);
+
+        if ( strstr (replaced_info, "$this") ) {
+            replaced_info = find_and_replace(replaced_info, "$this", value_string);
+        }
+
+        if ( strstr (replaced_info, "$family") ) {
+            replaced_info = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"");
+        }
+
+        if ( strstr (replaced_info, "$units") ) {
+            replaced_info = find_and_replace(replaced_info, "$units", rc->units?rc->units:"");
+        }
+    }
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
@@ -189,7 +207,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source
                    , rc->units?rc->units:""
-                   , rc->info?rc->info:""
+                   , replaced_info?replaced_info:""
                    , rrdcalc_status2string(rc->status)
                    , (unsigned long)rc->last_status_change
                    , (unsigned long)rc->last_updated
@@ -260,6 +278,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t\t}");
+
+    if (likely(replaced_info)) freez(replaced_info);
 }
 
 //void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
