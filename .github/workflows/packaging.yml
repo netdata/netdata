@@ -110,7 +110,7 @@ jobs:
           mkdir -p artifacts
           docker run --platform ${{ matrix.platform }} -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
       - name: Upload
-        if: github.env.runtype == 'release' || github.env.runtype == 'nightly' || github.env.runtype == 'devel'
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           # This figures out the distribution ID for the upload.
@@ -120,7 +120,7 @@ jobs:
                  -F "package[package_file]=@${pkgfile}" \
                  https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/repos/${{ env.repo }}/packages.json || exit 1
       - name: Clean
-        if: github.env.runtype == 'release' || github.env.runtype == 'nightly' || github.env.runtype == 'devel'
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           REPO: ${{ env.repo }}
