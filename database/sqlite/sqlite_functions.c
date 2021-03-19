@@ -1161,6 +1161,7 @@ int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id
 #endif
 }
 
+#ifdef ENABLE_DBENGINE
 static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metric_uuid)
 {
     RRDDIM *rd = callocz(1, sizeof(*rd));
@@ -1182,6 +1183,7 @@ static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metr
     rd->name = strdupz(name);
     return rd;
 }
+#endif
 
 #define SELECT_CHART_CONTEXT  "select d.dim_id, d.id, d.name, c.id, c.type, c.name, c.update_every, c.chart_id from chart c, " \
     "dimension d, host h " \
