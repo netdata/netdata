@@ -522,12 +522,19 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     response->http_code = ctx->parse_ctx.http_code;
     if (ctx->parse_ctx.content_length > 0) {
         response->payload_size = ctx->parse_ctx.content_length;
-        response->payload = mallocz(response->payload_size);
+        response->payload = mallocz(response->payload_size + 1);
         ret = rbuf_pop(ctx->buf_rx, response->payload, response->payload_size);
         if (ret != (int)response->payload_size) {
             error("Payload size doesn't match remaining data on the buffer!");
             response->payload_size = ret;
         }
+        // normally we take payload as it is and copy it
+        // but for convenience in cases where payload is sth. like
+        // json we add terminating zero so that user of the data
+        // doesn't have to convert to C string (0 terminated)
+        // other uses still have correct payload_size and can copy
+        // only exact data without affixed 0x00
+        ((char*)response->payload)[response->payload_size] = 0; // mallocz(response->payload_size + 1);
     }
     info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
 
