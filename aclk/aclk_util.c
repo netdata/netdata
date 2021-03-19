@@ -10,6 +10,48 @@
 #define UUID_STR_LEN 37
 #endif
 
+aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str) {
+    if (!strcmp(str, "json")) {
+        return ACLK_ENC_JSON;
+    }
+    if (!strcmp(str, "proto")) {
+        return ACLK_ENC_PROTO;
+    }
+    return ACLK_ENC_UNKNOWN;
+}
+
+aclk_transport_type_t aclk_transport_type_t_from_str(const char *str) {
+    if (!strcmp(str, "MQTTv3")) {
+        return ACLK_TRP_MQTT_3_1_1;
+    }
+    if (!strcmp(str, "MQTTv5")) {
+        return ACLK_TRP_MQTT_5;
+    }
+    return ACLK_TRP_UNKNOWN;
+}
+
+void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc) {
+    freez(trp_desc->endpoint);
+}
+
+void aclk_env_t_destroy(aclk_env_t *env) {
+    freez(env->auth_endpoint);
+    if (env->transports) {
+        for (size_t i = 0; i < env->transport_count; i++) {
+            if(env->transports[i]) {
+                aclk_transport_desc_t_destroy(env->transports[i]);
+                env->transports[i] = NULL;
+            }
+        }
+        freez(env->transports);
+    }
+    if (env->capabilities) {
+        for (size_t i = 0; i < env->capability_count; i++)
+            freez(env->capabilities[i]);
+        freez(env->capabilities);
+    }
+}
+
 #ifdef ACLK_LOG_CONVERSATION_DIR
 volatile int aclk_conversation_log_counter = 0;
 #if !defined(HAVE_C___ATOMIC) || defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)

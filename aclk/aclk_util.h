@@ -8,6 +8,48 @@
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
 
+typedef enum {
+    ACLK_ENC_UNKNOWN = 0,
+    ACLK_ENC_JSON,
+    ACLK_ENC_PROTO
+} aclk_encoding_type_t;
+
+typedef enum {
+    ACLK_TRP_UNKNOWN = 0,
+    ACLK_TRP_MQTT_3_1_1,
+    ACLK_TRP_MQTT_5
+} aclk_transport_type_t;
+
+typedef struct {
+    char *endpoint;
+    aclk_transport_type_t type;
+} aclk_transport_desc_t;
+
+typedef struct {
+    int base;
+    int max_s;
+    int min_s;
+} aclk_backoff_t;
+
+typedef struct {
+    char *auth_endpoint;
+    aclk_encoding_type_t encoding;
+
+    aclk_transport_desc_t **transports;
+    size_t transport_count;
+
+    char **capabilities;
+    size_t capability_count;
+
+    aclk_backoff_t backoff;
+} aclk_env_t;
+
+aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str);
+aclk_transport_type_t aclk_transport_type_t_from_str(const char *str);
+
+void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc);
+void aclk_env_t_destroy(aclk_env_t *env);
+
 int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
 
 enum aclk_topics {
