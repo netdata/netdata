@@ -5,16 +5,13 @@
 
 static ebpf_data_t sync_data;
 
-static struct bpf_link **probe_links = NULL;
-static struct bpf_object *objects = NULL;
-
-static char *sync_counter_dimension_name[NETDATA_SYNC_END] = { "sync" };
-static netdata_syscall_stat_t sync_counter_aggregated_data;
-static netdata_publish_syscall_t sync_counter_publish_aggregated;
+static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] = { "sync", "syncfs",  "msync", "fsync", "fdatasync",
+                                                               "sync_file_range" };
+static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END];
+static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_IDX_END];
 
 static int read_thread_closed = 1;
 
-static int *map_fd = NULL;
 static netdata_idx_t sync_hash_values = 0;
 
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
@@ -38,6 +35,49 @@ ebpf_sync_syscalls_t local_syscalls[] = {
 
 /*****************************************************************
  *
+ *  INITIALIZE THREAD
+ *
+ *****************************************************************/
+
+/*
+ * Initialize Syscalls
+ *
+ * Load the eBPF programs to monitor syscalls
+ *
+ * @return 0 on success and -1 otherwise.
+ */
+static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
+{
+    int i;
+    const char *saved_name = em->thread_name;
+    for (i = 0; local_syscalls[i].syscall; i++) {
+        ebpf_sync_syscalls_t *w = &local_syscalls[i];
+        if (!w->probe_links && w->enabled) {
+            fill_ebpf_data(&w->kernel_info);
+            if (ebpf_update_kernel(&w->kernel_info)) {
+                em->thread_name = saved_name;
+                error("Cannot update the kernel for eBPF module %s", w->syscall);
+                return -1;
+            }
+
+            em->thread_name = w->syscall;
+            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects, w->kernel_info.map_fd);
+            if (!w->probe_links) {
+                em->thread_name = saved_name;
+                return -1;
+            }
+        }
+    }
+    em->thread_name = saved_name;
+
+    memset(sync_counter_aggregated_data, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_syscall_stat_t));
+    memset(sync_counter_publish_aggregated, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
+
+    return 0;
+}
+
+/*****************************************************************
+ *
  *  DATA THREAD
  *
  *****************************************************************/
@@ -46,7 +86,6 @@ ebpf_sync_syscalls_t local_syscalls[] = {
  * Read global table
  *
  * Read the table with number of calls for all functions
- */
 static void read_global_table()
 {
     uint32_t idx = NETDATA_SYNC_CALL;
@@ -57,6 +96,7 @@ static void read_global_table()
         sync_hash_values = stored;
     }
 }
+ */
 
 /**
  * Sync read hash
@@ -80,7 +120,7 @@ void *ebpf_sync_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        read_global_table();
+        //read_global_table();
     }
     read_thread_closed = 1;
 
@@ -94,8 +134,10 @@ void *ebpf_sync_read_hash(void *ptr)
  */
 static void sync_send_global()
 {
+    /*
     ebpf_one_dimension_write_charts(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
                                     sync_counter_publish_aggregated.dimension, sync_hash_values);
+                                    */
 }
 
 /**
@@ -105,8 +147,6 @@ static void sync_collector(ebpf_module_t *em)
 {
     sync_threads.thread = mallocz(sizeof(netdata_thread_t));
     sync_threads.start_routine = ebpf_sync_read_hash;
-
-    map_fd = sync_data.map_fd;
 
     netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_sync_read_hash, em);
@@ -132,6 +172,30 @@ static void sync_collector(ebpf_module_t *em)
  *****************************************************************/
 
 /**
+ * Cleanup Objects
+ *
+ * Cleanup loaded objects when thread was initialized.
+ */
+void ebpf_sync_cleanup_objects()
+{
+    int i;
+    for (i = 0; local_syscalls[i].syscall; i++) {
+        ebpf_sync_syscalls_t *w = &local_syscalls[i];
+        if (w->probe_links) {
+            freez(w->kernel_info.map_fd);
+
+            struct bpf_program *prog;
+            size_t j = 0 ;
+            bpf_object__for_each_program(prog, w->objects) {
+                bpf_link__destroy(w->probe_links[j]);
+                j++;
+            }
+            bpf_object__close(w->objects);
+        }
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -150,15 +214,8 @@ static void ebpf_sync_cleanup(void *ptr)
         UNUSED(dt);
     }
 
+    ebpf_sync_cleanup_objects();
     freez(sync_threads.thread);
-
-    struct bpf_program *prog;
-    size_t i = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[i]);
-        i++;
-    }
-    bpf_object__close(objects);
 }
 
 /*****************************************************************
@@ -217,21 +274,17 @@ void *ebpf_sync_thread(void *ptr)
     if (!em->enabled)
         goto endsync;
 
-    if (ebpf_update_kernel(&sync_data)) {
+    if (ebpf_sync_initialize_syscall(em)) {
         pthread_mutex_unlock(&lock);
         goto endsync;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, sync_data.map_fd);
-    if (!probe_links) {
-        pthread_mutex_unlock(&lock);
-        goto endsync;
-    }
-
-    int algorithm =  NETDATA_EBPF_INCREMENTAL_IDX;
-    ebpf_global_labels(&sync_counter_aggregated_data, &sync_counter_publish_aggregated,
+    int algorithms[NETDATA_SYNC_IDX_END] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,
+                                             NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,
+                                             NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
+    ebpf_global_labels(sync_counter_aggregated_data, sync_counter_publish_aggregated,
                        sync_counter_dimension_name, sync_counter_dimension_name,
-                       &algorithm, NETDATA_SYNC_END);
+                       algorithms, NETDATA_SYNC_IDX_END);
 
     pthread_mutex_lock(&lock);
     ebpf_create_sync_charts();
