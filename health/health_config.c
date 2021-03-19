@@ -475,9 +475,12 @@ static inline char *health_edit_command(size_t line, const char *file) {
     char buffer[FILENAME_MAX + 1];
     char *file_no_path = strrchr(file, '/');
 
-    snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, file_no_path+1, line);
-    return strdupz(buffer);
+    if (likely(file_no_path))
+        snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, file_no_path+1, line);
+    else
+        buffer[0]='\0';
 
+    return strdupz(buffer);
 }
 
 static inline void strip_quotes(char *s) {
@@ -636,8 +639,6 @@ static int health_readfile(const char *filename, void *data) {
             rc->warn_repeat_every = host->health_default_warn_repeat_every;
             rc->crit_repeat_every = host->health_default_crit_repeat_every;
 
-            debug(D_HEALTH, "GREPME [%s]", rc->edit_command);
-
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
 
@@ -668,8 +669,6 @@ static int health_readfile(const char *filename, void *data) {
             rt->delay_multiplier = 1.0;
             rt->warn_repeat_every = host->health_default_warn_repeat_every;
             rt->crit_repeat_every = host->health_default_crit_repeat_every;
-
-            debug(D_HEALTH, "GREPME [%s]", rt->edit_command);
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
