@@ -453,6 +453,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         RRDCALC_STATUS old_status,
         RRDCALC_STATUS new_status,
         const char *source,
+        const char *edit_command,
         const char *units,
         const char *info,
         int delay,

@@ -471,6 +471,15 @@ static inline char *health_source_file(size_t line, const char *file) {
     return strdupz(buffer);
 }
 
+static inline char *health_edit_command(size_t line, const char *file) {
+    char temp[FILENAME_MAX + 1];
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(temp, FILENAME_MAX, "%s", file);
+    snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, basename(temp), line);
+    return strdupz(buffer);
+    //debug(D_HEALTH, "GREPME line: [%zu] - file [%s] - base [%s] [%s]", line, file, basename(buffer), netdata_configured_user_config_dir);
+}
+
 static inline void strip_quotes(char *s) {
     while(*s) {
         if(*s == '\'' || *s == '"') *s = ' ';
@@ -612,11 +621,14 @@ static int health_readfile(const char *filename, void *data) {
                 rt = NULL;
             }
 
+            //health_edit_command(line, filename);
+            
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, filename);
+            rc->edit_command = health_edit_command(line, filename);
             rc->green = NAN;
             rc->red = NAN;
             rc->value = NAN;
@@ -625,6 +637,8 @@ static int health_readfile(const char *filename, void *data) {
             rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
             rc->warn_repeat_every = host->health_default_warn_repeat_every;
             rc->crit_repeat_every = host->health_default_crit_repeat_every;
+
+            debug(D_HEALTH, "GREPME [%s]", rc->edit_command);
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -650,11 +664,14 @@ static int health_readfile(const char *filename, void *data) {
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, filename);
+            rt->edit_command = health_edit_command(line, filename);
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
             rt->warn_repeat_every = host->health_default_warn_repeat_every;
             rt->crit_repeat_every = host->health_default_crit_repeat_every;
+
+            debug(D_HEALTH, "GREPME [%s]", rt->edit_command);
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -1107,4 +1124,5 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     }
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
+
 }

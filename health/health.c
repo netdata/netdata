@@ -142,6 +142,8 @@ static void health_reload_host(RRDHOST *host) {
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
+    debug(D_HEALTH, "GREPME [%s] [%s]", user_path, stock_path);
+
     // free all running alarms
     rrdhost_wrlock(host);
 
@@ -954,7 +956,7 @@ void *health_main(void *ptr) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
+                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->edit_command, rc->units, rc->info,
                                     rc->delay_last,
                                     (
                                             ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
@@ -1002,7 +1004,7 @@ void *health_main(void *ptr) {
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                 rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
+                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->edit_command, rc->units, rc->info,
                                 rc->delay_last,
                                 (
                                         ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
