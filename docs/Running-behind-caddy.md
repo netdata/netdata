@@ -5,11 +5,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-beh
 
 # Netdata via Caddy
 
-To run Netdata via [Caddy's proxying,](https://caddyserver.com/docs/proxy) set your Caddyfile up like this:
+To run Netdata via [Caddy v2 proxying,](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy) set your Caddyfile up like this:
 
 ```caddyfile
 netdata.domain.tld {
-    proxy / localhost:19999
+    reverse_proxy localhost:19999
 }
 ```
 
@@ -19,8 +19,8 @@ To run Netdata in a subfolder:
 
 ```caddyfile
 netdata.domain.tld {
-    proxy /netdata/ localhost:19999 {
-        without /netdata
+    handle_path /netdata/* {
+        reverse_proxy localhost:19999
     }
 }
 ```
