@@ -6,7 +6,7 @@
 static ebpf_data_t sync_data;
 
 static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] = { "sync", "syncfs",  "msync", "fsync", "fdatasync",
-                                                               "sync_file_range" };
+                                                                   "sync_file_range" };
 static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END];
 static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_IDX_END];
 
