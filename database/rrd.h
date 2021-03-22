@@ -41,10 +41,17 @@ struct pg_cache_page_index;
 #include "aclk/aclk.h"
 #endif
 
+enum {
+    CONTEXT_FLAGS_ARCHIVE = 0x01,
+    CONTEXT_FLAGS_CHART   = 0x02,
+    CONTEXT_FLAGS_CONTEXT = 0x04
+};
+
 struct context_param {
     RRDDIM *rd;
     time_t first_entry_t;
     time_t last_entry_t;
+    uint8_t flags;
 };
 
 #define META_CHART_UPDATED 1
@@ -533,7 +540,10 @@ struct rrdset {
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    union {
+        time_t last_accessed_time;                  // the last time this RRDSET has been accessed
+        time_t last_entry_t;                        // the last_entry_t computed for transient RRDSET
+    };
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
 
     char *plugin_name;                              // the name of the plugin that generated this

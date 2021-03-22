@@ -281,8 +281,14 @@ RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPI
 
 // ----------------------------------------------------------------------------
 
-static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims, RRDDIM *temp_rd) {
-    rrdset_check_rdlock(r->st);
+static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims,
+                                                 struct context_param *context_param_list)
+{
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
+
+    if (should_lock)
+        rrdset_check_rdlock(r->st);
 
     if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
 
@@ -1060,10 +1066,11 @@ static RRDR *rrd2rrdr_fixedstep(
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
 
-    rrdset_check_rdlock(st);
+    if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
+        rrdset_check_rdlock(st);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
+        rrdr_disable_not_selected_dimensions(r, options, dimensions, context_param_list);
 
 
     // -------------------------------------------------------------------------
@@ -1435,11 +1442,11 @@ static RRDR *rrd2rrdr_variablestep(
 
     // -------------------------------------------------------------------------
     // disable the not-wanted dimensions
-
-    rrdset_check_rdlock(st);
+    if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))
+        rrdset_check_rdlock(st);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions, temp_rd);
+        rrdr_disable_not_selected_dimensions(r, options, dimensions, context_param_list);
 
 
     // -------------------------------------------------------------------------
@@ -1591,8 +1598,12 @@ RRDR *rrd2rrdr(
         if (first_entry_t > after_requested)
             first_entry_t = after_requested;
 
-    if (context_param_list)
+    if (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rebuild_context_param_list(context_param_list, after_requested);
+        st = context_param_list->rd ? context_param_list->rd->rrdset : NULL;
+        if (unlikely(!st))
+            return NULL;
+    }
 
 #ifdef ENABLE_DBENGINE
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
