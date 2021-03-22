@@ -103,6 +103,7 @@ REQ_BODY="$(cat << EOF
         "host_allmetrics_prometheus_used": ${NETDATA_ALLMETRICS_PROMETHEUS_USED},
         "host_allmetrics_shell_used": ${NETDATA_ALLMETRICS_SHELL_USED},
         "host_allmetrics_json_used": ${NETDATA_ALLMETRICS_JSON_USED},
+        "host_dashboard_used": ${NETDATA_DASHBOARD_USED},
         "mirrored_host_count": ${NETDATA_MIRRORED_HOST_COUNT},
         "mirrored_hosts_reachable": ${NETDATA_MIRRORED_HOSTS_REACHABLE},
         "mirrored_hosts_unreachable": ${NETDATA_MIRRORED_HOSTS_UNREACHABLE},

@@ -9,6 +9,7 @@
 #define ANALYTICS_MAX_PROMETHEUS_HITS 255
 #define ANALYTICS_MAX_SHELL_HITS 255
 #define ANALYTICS_MAX_JSON_HITS 255
+#define ANALYTICS_MAX_DASHBOARD_HITS 255
 
 /* Max number of seconds before the META analytics is sent */
 #define ANALYTICS_MAX_SLEEP_SEC 20
@@ -42,6 +43,7 @@ struct analytics_data {
     char *NETDATA_ALLMETRICS_PROMETHEUS_USED;
     char *NETDATA_ALLMETRICS_SHELL_USED;
     char *NETDATA_ALLMETRICS_JSON_USED;
+    char *NETDATA_DASHBOARD_USED;
     char *NETDATA_CONFIG_HTTPS_ENABLED;
     char *NETDATA_ALARMS_NORMAL;
     char *NETDATA_ALARMS_WARNING;
@@ -59,6 +61,7 @@ struct analytics_data {
     uint8_t prometheus_hits;
     uint8_t shell_hits;
     uint8_t json_hits;
+    uint8_t dashboard_hits;
 };
 
 extern void *analytics_main(void *ptr);

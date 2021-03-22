@@ -735,6 +735,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
+        analytics_log_dashboard();
         if(unlikely(!web_client_can_access_dashboard(w)))
             return web_client_permission_denied(w);
     }
