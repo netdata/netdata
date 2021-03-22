@@ -92,6 +92,7 @@ enum ebpf_module_indexes {
 
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
+#define NETDATA_FILESYSTEM_FAMILY "filesystem"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
@@ -197,6 +198,7 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 #define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
+#define EBPF_COMMON_DIMENSION_FILES "files"
 
 // Common variables
 extern int debug_enabled;
