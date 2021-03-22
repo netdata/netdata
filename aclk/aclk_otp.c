@@ -3,8 +3,6 @@
 
 #include "aclk_otp.h"
 
-#include "https_client.h"
-
 #include "../daemon/common.h"
 
 #include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
@@ -191,7 +189,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
-void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass) {
+void aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target) {
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
@@ -205,9 +203,9 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     }
 
     // GET Challenge
-    req.host = aclk_hostname;
-    req.port = port;
-    buffer_sprintf(url, "%s%s/challenge", OTP_URL_PREFIX, agent_id);
+    req.host = target->host;
+    req.port = target->port;
+    buffer_sprintf(url, "%s/node/%s/challenge", target->path, agent_id);
     req.url = url->buffer;
 
     if (aclk_https_request(&req, &resp)) {
@@ -256,7 +254,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     // POST password
     req.request_type = HTTP_REQ_POST;
     buffer_flush(url);
-    buffer_sprintf(url, "%s%s/password", OTP_URL_PREFIX, agent_id);
+    buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
     req.url = url->buffer;
     req.payload = response_json;
     req.payload_size = strlen(response_json);
@@ -597,14 +595,11 @@ exit:
     return 1;
 }
 
-int aclk_get_env(const char* aclk_hostname, int aclk_port) {
+int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     BUFFER *buf = buffer_create(1024);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp;
-
-    aclk_env_t aclk_env;
-    memset(&aclk_env, 0, sizeof(aclk_env_t));
 
     req.request_type = HTTP_REQ_GET;
 
@@ -635,7 +630,7 @@ int aclk_get_env(const char* aclk_hostname, int aclk_port) {
         return 3;
     }
 
-    if (parse_json_env(resp.payload, &aclk_env)) {
+    if (parse_json_env(resp.payload, env)) {
         error ("error parsing /env message");
         https_req_response_free(&resp);
         buffer_flush(buf);

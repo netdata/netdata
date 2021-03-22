@@ -9,6 +9,7 @@
 #include "aclk_util.h"
 #include "aclk_rx_msgs.h"
 #include "aclk_collector_list.h"
+#include "https_client.h"
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
 #include <sys/types.h>
@@ -28,6 +29,8 @@ int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
+
+aclk_env_t *aclk_env = NULL;
 
 mqtt_wss_client mqttwss_client;
 
@@ -474,7 +477,19 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .keep_alive = 60
         };
 #ifndef ACLK_DISABLE_CHALLENGE
-        aclk_get_mqtt_otp(aclk_private_key, aclk_hostname, aclk_port, &mqtt_otp_user, &mqtt_otp_pass);
+        if (aclk_env) {
+            aclk_env_t_destroy(aclk_env);
+            freez(aclk_env);
+        }
+        aclk_env = callocz(1, sizeof(aclk_env_t));
+        aclk_get_env(aclk_env, aclk_hostname, aclk_port);
+        url_t url;
+        memset(&url, 0, sizeof(url_t));
+        url_parse(aclk_env->auth_endpoint, &url);
+
+        aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &url);
+
+        url_t_destroy(&url);
         mqtt_conn_params.clientid = mqtt_otp_user;
         mqtt_conn_params.username = mqtt_otp_user;
         mqtt_conn_params.password = mqtt_otp_pass;
@@ -597,6 +612,10 @@ exit_full:
     free_topic_cache();
     mqtt_wss_destroy(mqttwss_client);
 exit:
+    if (aclk_env) {
+        aclk_env_t_destroy(aclk_env);
+        freez(aclk_env);
+    }
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
     return NULL;
 }
