@@ -116,17 +116,17 @@ jobs:
         shell: bash
         run: |
           # This figures out the distribution ID for the upload.
-          DIST_ID="$(curl https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/distributions.json | python3 .github/scripts/parse_packagecloud_dist_id.py ${{ matrix.format }} ${{ matrix.pkgclouddistro }} ${{ matrix.pkgcloudversion }})"
+          DIST_ID="$(curl https://${{ secrets.PACKAGE_CLOUD_API_KEY }}:@packagecloud.io/api/v1/distributions.json | python3 .github/scripts/parse_packagecloud_dist_id.py ${{ matrix.format }} ${{ matrix.pkgclouddistro }} ${{ matrix.pkgcloudversion }})"
           for pkgfile in artifacts/*.${FORMAT} ; do
             curl -F "package[distro_version_id]=${BUILD_ID}" \
                  -F "package[package_file]=@${pkgfile}" \
-                 https://${{ secrets.PACKAGE_CLOUD_API_TOKEN }}:@packagecloud.io/api/v1/repos/${{ env.repo }}/packages.json || exit 1
+                 https://${{ secrets.PACKAGE_CLOUD_API_KEY }}:@packagecloud.io/api/v1/repos/${{ env.repo }}/packages.json || exit 1
       - name: Clean
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           REPO: ${{ env.repo }}
-          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_TOKEN }}
+          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
           PACKAGE_CLOUD_RETENTION_DAYS: ${{ env.pkg_retention_days }}
         run: .github/scripts/old_package_purging.sh
       - name: Failure Notification
