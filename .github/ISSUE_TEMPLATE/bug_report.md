@@ -47,8 +47,6 @@ If Netdata is running, execute: $(ps aux | grep -E -o "[a-zA-Z/]+netdata ") -V
 
 <!--
 Tell us which installation method you used (https://learn.netdata.cloud/docs/agent/packaging/installer#alternative-methods).
-
-If you built Netdata Agent from source, provide a list of build time configure options.
  -->
 
 ##### Component Name
