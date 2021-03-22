@@ -1406,45 +1406,46 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     if (!dir) {
         error("CONFIG cannot open stock config directory '%s'.", sdir);
     }
-    else if (strcmp(udir, sdir)) {
-        struct dirent *de = NULL;
-        while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
-                if( !de->d_name[0] ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+    else {
+        if (strcmp(udir, sdir)) {
+            struct dirent *de = NULL;
+            while((de = readdir(dir))) {
+                if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+                    if( !de->d_name[0] ||
+                        (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                        (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                         ) {
-                    debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
-                    continue;
+                        debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
+                        continue;
+                    }
+
+                    if(path_is_dir(sdir, de->d_name)) {
+                        // we recurse in stock subdirectory, only when there is no corresponding
+                        // user subdirectory - to avoid reading the files twice
+
+                        if(!path_is_dir(udir, de->d_name))
+                            recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
+
+                        continue;
+                    }
                 }
 
-                if(path_is_dir(sdir, de->d_name)) {
-                    // we recurse in stock subdirectory, only when there is no corresponding
-                    // user subdirectory - to avoid reading the files twice
+                if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+                    size_t len = strlen(de->d_name);
+                    if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
+                        len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                        char *filename = strdupz_path_subpath(sdir, de->d_name);
+                        debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
+                        callback(filename, data);
+                        freez(filename);
+                        continue;
+                    }
 
-                    if(!path_is_dir(udir, de->d_name))
-                        recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
-
-                    continue;
                 }
+
+                debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
             }
-
-            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
-                size_t len = strlen(de->d_name);
-                if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
-                   len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-                    char *filename = strdupz_path_subpath(sdir, de->d_name);
-                    debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                    callback(filename, data);
-                    freez(filename);
-                    continue;
-                }
-
-            }
-
-            debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
         }
-
         closedir(dir);
     }
 
