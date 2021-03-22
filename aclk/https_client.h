@@ -34,6 +34,22 @@ typedef struct {
     size_t payload_size;
 } https_req_response_t;
 
+
+// Non feature complete URL parser
+// feel free to extend when needed
+// currently implements only what ACLK
+// needs
+// proto://host[:port]/path
+typedef struct {
+    char *proto;
+    char *host;
+    int port;
+    char* path;
+} url_t;
+
+int url_parse(const char *url, url_t *parsed);
+void url_t_destroy(url_t *url);
+
 void https_req_response_free(https_req_response_t *res);
 void https_req_response_init(https_req_response_t *res);
 
