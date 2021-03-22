@@ -147,9 +147,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
 
-                            , (ae->class)?ae->class:"Unknown"
-                            , (ae->component)?ae->component:"Unknown"
-                            , (ae->type)?ae->type:"Unknown"
+                            , (ae->class)?ae->class:"UnknownS"
+                            , (ae->component)?ae->component:"UnknownS"
+                            , (ae->type)?ae->type:"UnknownS"
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -196,7 +196,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 30, entries = 0;
+        int max_entries = 32, entries = 0; //why was it 30 ? There should have been 28 entries
         char *pointers[max_entries];
 
         pointers[entries++] = s++;
@@ -366,6 +366,14 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
+
+            freez(ae->class);
+            ae->class       = strdupz(pointers[28]);
+            if(!*ae->class) { freez(ae->class); ae->class = NULL; }
+            ae->component   = strdupz(pointers[29]);
+            if(!*ae->component) { freez(ae->component); ae->component = NULL; }
+            ae->type        = strdupz(pointers[30]);
+            if(!*ae->type) { freez(ae->type); ae->type = NULL; }
 
             ae->last_repeat = last_repeat;
 
