@@ -133,6 +133,34 @@ void *ebpf_sync_read_hash(void *ptr)
 }
 
 /**
+ * Create Sync charts
+ *
+ * Create charts and dimensions according user input.
+ *
+ * @param id        chart id
+ * @param idx       the first index with data.
+ * @param end       the last index with data.
+ */
+static void ebpf_send_sync_chart(char *id,
+                                   int idx,
+                                   int end)
+{
+    write_begin_chart(NETDATA_EBPF_MEMORY_GROUP, id);
+
+    netdata_publish_syscall_t *move = &sync_counter_publish_aggregated[idx];
+
+    while (move && idx <= end) {
+        if (local_syscalls[idx].enabled)
+            write_chart_dimension(move->name, sync_hash_values[idx]);
+
+        move = move->next;
+        idx++;
+    }
+
+    write_end_chart();
+}
+
+/**
  * Send data
  *
  * Send global charts to Netdata
@@ -140,10 +168,7 @@ void *ebpf_sync_read_hash(void *ptr)
 static void sync_send_data()
 {
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled) {
-        sync_counter_publish_aggregated[NETDATA_SYNC_FDATASYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_FDATASYNC_IDX];
-        sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_FSYNC_IDX];
-        write_count_chart(NETDATA_EBPF_FILE_SYNC_CHART, NETDATA_EBPF_MEMORY_GROUP,
-                          &sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX], 2);
+        ebpf_send_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART, NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX);
     }
 
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
@@ -152,10 +177,7 @@ static void sync_send_data()
                                         sync_hash_values[NETDATA_SYNC_MSYNC_IDX]);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled) {
-        sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_IDX].ncall = sync_hash_values[NETDATA_SYNC_SYNC_IDX];
-        sync_counter_publish_aggregated[NETDATA_SYNC_SYNCFS_IDX].ncall = sync_hash_values[NETDATA_SYNC_SYNCFS_IDX];
-        write_count_chart(NETDATA_EBPF_SYNC_CHART, NETDATA_EBPF_MEMORY_GROUP,
-                          &sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_IDX], 2);
+        ebpf_send_sync_chart(NETDATA_EBPF_SYNC_CHART, NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX);
     }
 
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
@@ -314,6 +336,13 @@ static void ebpf_create_sync_charts()
  */
 static void ebpf_sync_parse_syscalls()
 {
+    struct section *co = appconfig_get_section(&sync_config, NETDATA_SYNC_CONFIG_NAME);
+    if (co) {
+        struct config_option *cv;
+        for (cv = co->values; cv ; cv = cv->next) {
+        }
+    }
+
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
         local_syscalls[i].enabled = appconfig_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME,
@@ -336,9 +365,9 @@ void *ebpf_sync_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&sync_data);
-    ebpf_sync_parse_syscalls();
 
     ebpf_update_module(em, &sync_config, NETDATA_SYNC_CONFIG_FILE);
+    ebpf_sync_parse_syscalls();
 
     if (!em->enabled)
         goto endsync;
