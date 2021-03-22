@@ -249,6 +249,37 @@ static void ebpf_sync_cleanup(void *ptr)
  *****************************************************************/
 
 /**
+ * Create Sync charts
+ *
+ * Create charts and dimensions according user input.
+ *
+ * @param id        chart id
+ * @param title     chart title
+ * @param order     order number of the specified chart
+ * @param idx       the first index with data.
+ * @param end       the last index with data.
+ */
+static void ebpf_create_sync_chart(char *id,
+                                   char *title,
+                                   int order,
+                                   int idx,
+                                   int end)
+{
+    ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
+                         NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order);
+
+    netdata_publish_syscall_t *move = &sync_counter_publish_aggregated[idx];
+
+    while (move && idx <= end) {
+        if (local_syscalls[idx].enabled)
+            ebpf_write_global_dimension(move->name, move->dimension, move->algorithm);
+
+        move = move->next;
+        idx++;
+    }
+}
+
+/**
  * Create global charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
@@ -256,35 +287,24 @@ static void ebpf_sync_cleanup(void *ptr)
 static void ebpf_create_sync_charts()
 {
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_FILE_SYNC_CHART,
-                          "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
-                          NETDATA_EBPF_CHART_TYPE_LINE, 21300,
-                          ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_FSYNC_IDX],
-                          2);
+        ebpf_create_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART,
+                               "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.", 21300,
+                               NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX);
 
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_MSYNC_CHART,
-                          "Monitor calls for <code>msync(2)</code>.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
-                          NETDATA_EBPF_CHART_TYPE_LINE, 21301,
-                          ebpf_create_global_dimension, &sync_counter_publish_aggregated[NETDATA_SYNC_MSYNC_IDX],
-                          1);
+        ebpf_create_sync_chart(NETDATA_EBPF_MSYNC_CHART,
+                               "Monitor calls for <code>msync(2)</code>.", 21301,
+                               NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_SYNC_CHART,
-                          "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
-                          NETDATA_EBPF_CHART_TYPE_LINE, 21302,
-                          ebpf_create_global_dimension, sync_counter_publish_aggregated, 2);
+        ebpf_create_sync_chart(NETDATA_EBPF_SYNC_CHART,
+                               "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.", 21302,
+                               NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
-        ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_EBPF_FILE_SEGMENT_CHART,
-                          "Monitor calls for <code>sync_file_range(2)</code>.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_SYNC_SUBMENU, NULL,
-                          NETDATA_EBPF_CHART_TYPE_LINE, 21303,
-                          ebpf_create_global_dimension,
-                          &sync_counter_publish_aggregated[NETDATA_SYNC_SYNC_FILE_RANGE_IDX], 1);
+        ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
+                               "Monitor calls for <code>sync_file_range(2)</code>.", 21303,
+                               NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX);
 }
 
 /**
