@@ -18,6 +18,7 @@
 #define NETDATA_APPS_CACHESTAT_GROUP "page cache (eBPF)"
 
 #include "ebpf_process.h"
+#include "ebpf_dcstat.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_sync.h"
 
