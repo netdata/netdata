@@ -483,13 +483,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
         aclk_env = callocz(1, sizeof(aclk_env_t));
         aclk_get_env(aclk_env, aclk_hostname, aclk_port);
-        url_t url;
-        memset(&url, 0, sizeof(url_t));
-        url_parse(aclk_env->auth_endpoint, &url);
+        url_t auth_url;
+        memset(&auth_url, 0, sizeof(url_t));
+        url_parse(aclk_env->auth_endpoint, &auth_url);
 
-        aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &url);
+        aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &auth_url);
 
-        url_t_destroy(&url);
+        url_t_destroy(&auth_url);
         mqtt_conn_params.clientid = mqtt_otp_user;
         mqtt_conn_params.username = mqtt_otp_user;
         mqtt_conn_params.password = mqtt_otp_pass;
