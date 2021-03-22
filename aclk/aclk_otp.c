@@ -437,7 +437,7 @@ static int parse_json_backoff(json_object *json, aclk_backoff_t *backoff) {
             continue;
         }
 
-        if ( (ret = parse_json_backoff_int(&it, &backoff->max_s, JSON_KEY_BACKOFF_MAX, 3600, INT_MAX)) ) {
+        if ( (ret = parse_json_backoff_int(&it, &backoff->max_s, JSON_KEY_BACKOFF_MAX, 500, INT_MAX)) ) {
             if (ret == MATCHED_ERROR) {
                 return 1;
             }
