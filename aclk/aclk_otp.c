@@ -570,6 +570,24 @@ static int parse_json_env(const char *json_str, aclk_env_t *env) {
         json_object_iter_next(&it);
     }
 
+    // Check all compulsory keys have been set
+    if (env->transport_count < 1) {
+        error("env has to return at least one transport");
+        goto exit;
+    }
+    if (!env->auth_endpoint) {
+        error(JSON_KEY_AUTH_ENDPOINT " is compulsory");
+        goto exit;
+    }
+    if (env->encoding == ACLK_ENC_UNKNOWN) {
+        error(JSON_KEY_ENC " is compulsory");
+        goto exit;
+    }
+    if (!env->backoff.base) {
+        error(JSON_KEY_BACKOFF " is compulsory");
+        goto exit;
+    }
+
     json_object_put(json);
     return 0;
 
