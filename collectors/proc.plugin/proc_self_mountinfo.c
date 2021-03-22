@@ -47,11 +47,17 @@
 
 // find the mount info with the given major:minor
 // in the supplied linked list of mountinfo structures
-struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor) {
+struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor, char *device) {
     struct mountinfo *mi;
 
+    uint32_t hash = simple_hash(device);
+
     for(mi = root; mi ; mi = mi->next)
-        if(unlikely(mi->major == major && mi->minor == minor))
+        if (unlikely(
+                mi->major == major &&
+                mi->minor == minor &&
+                mi->mount_source_name_hash == hash &&
+                !strcmp(mi->mount_source_name, device)))
             return mi;
 
     return NULL;
@@ -120,6 +126,7 @@ static void mountinfo_free(struct mountinfo *mi) {
 */
     freez(mi->filesystem);
     freez(mi->mount_source);
+    freez(mi->mount_source_name);
     freez(mi->super_options);
     freez(mi);
 }
@@ -273,6 +280,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             mi->mount_source = strdupz_decoding_octal(procfile_lineword(ff, l, w)); w++;
             mi->mount_source_hash = simple_hash(mi->mount_source);
 
+            mi->mount_source_name = strdupz(basename(mi->mount_source));
+            mi->mount_source_name_hash = simple_hash(mi->mount_source_name);
+
             mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
             if(unlikely(is_read_only(mi->super_options)))
@@ -315,6 +325,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             mi->mount_source = NULL;
             mi->mount_source_hash = 0;
+
+            mi->mount_source_name = NULL;
+            mi->mount_source_name_hash = 0;
 
             mi->super_options = NULL;
 
