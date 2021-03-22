@@ -307,7 +307,7 @@ cleanup:
 
 #define JSON_KEY_ENC "encoding"
 #define JSON_KEY_AUTH_ENDPOINT "authEndpoint"
-#define JSON_KEY_TRP "transport"
+#define JSON_KEY_TRP "transports"
 #define JSON_KEY_TRP_TYPE "type"
 #define JSON_KEY_TRP_ENDPOINT "endpoint"
 #define JSON_KEY_BACKOFF "backoff"
