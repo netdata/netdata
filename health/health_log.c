@@ -461,6 +461,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
+
     ae->name = strdupz(name);
     ae->hash_name = simple_hash(ae->name);
 
@@ -503,22 +504,25 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
         if ( strstr (ae->info, "$this") ) {
             char *buf=NULL;
-            buf = find_and_replace(ae->info, "$this", ae->new_value_string);
-            ae->info = strdupz(buf);
+            BUFFER *helper = buffer_create (100);
+            buffer_rrd_value(helper, new_value);
+            buf = find_and_replace(ae->info, "$this", buffer_tostring(helper)); //sometimes it will be null
+            freez(ae->info); ae->info = strdupz(buf);
             freez(buf);
+            buffer_free(helper);
         }
 
         if ( strstr (ae->info, "$family") ) {
             char *buf=NULL;
             buf = find_and_replace(ae->info, "$family", (ae->family)?ae->family:"Unknown");
-            ae->info = strdupz(buf);
+            freez(ae->info); ae->info = strdupz(buf);
             freez(buf);
         }
 
         if ( strstr (ae->info, "$units") ) {
             char *buf=NULL;
             buf = find_and_replace(ae->info, "$units", (ae->units)?ae->units:"Unkown");
-            ae->info = strdupz(buf);
+            freez(ae->info); ae->info = strdupz(buf);
             freez(buf);
         }
     }

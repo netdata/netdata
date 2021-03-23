@@ -143,20 +143,30 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
     char *replaced_info = NULL;
+
     if (likely(rc->info)) {
 
         replaced_info = strdupz(rc->info);
 
         if ( strstr (replaced_info, "$this") ) {
-            replaced_info = find_and_replace(replaced_info, "$this", value_string);
+            char *buf=NULL;
+            BUFFER *helper = buffer_create(100);
+            buffer_rrd_value(helper, rc->value);
+            buf = find_and_replace(replaced_info, "$this", buffer_tostring(helper));
+            freez(replaced_info); replaced_info = strdupz(buf);
+            buffer_free (helper);
         }
 
         if ( strstr (replaced_info, "$family") ) {
-            replaced_info = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"");
+            char *buf=NULL;
+            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"");
+            freez(replaced_info); replaced_info = strdupz(buf);
         }
 
         if ( strstr (replaced_info, "$units") ) {
-            replaced_info = find_and_replace(replaced_info, "$units", rc->units?rc->units:"");
+            char *buf=NULL;
+            buf = find_and_replace(replaced_info, "$units", rc->units?rc->units:"");
+            freez(replaced_info); replaced_info = strdupz(buf);
         }
     }
 
