@@ -905,6 +905,9 @@ void log_health( const char *fmt, ... ) {
     }
 
     if(healthlog) {
+        static netdata_mutex_t health_mutex = NETDATA_MUTEX_INITIALIZER;
+        netdata_mutex_lock(&health_mutex);
+
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH);
         fprintf(healthlog, "%s: ", date);
@@ -913,5 +916,7 @@ void log_health( const char *fmt, ... ) {
         vfprintf( healthlog, fmt, args );
         va_end( args );
         fputc('\n', healthlog);
+
+        netdata_mutex_unlock(&health_mutex);
     }
 }
