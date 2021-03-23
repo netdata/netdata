@@ -50,8 +50,6 @@ aclk_transport_type_t aclk_transport_type_t_from_str(const char *str);
 void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc);
 void aclk_env_t_destroy(aclk_env_t *env);
 
-int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
-
 enum aclk_topics {
     ACLK_TOPICID_CHART    = 0,
     ACLK_TOPICID_ALARMS   = 1,
@@ -89,7 +87,6 @@ const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
 ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
-int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
 void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type);

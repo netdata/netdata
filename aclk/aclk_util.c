@@ -130,47 +130,6 @@ const char *aclk_get_topic(enum aclk_topics topic)
     return aclk_topic_cache[topic].topic;
 }
 
-int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
-{
-    int pos = 0;
-    if (!strncmp("https://", url, 8)) {
-        pos = 8;
-    } else if (!strncmp("http://", url, 7)) {
-        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
-        return 1;
-    }
-    int host_end = pos;
-    while (url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':')
-        host_end++;
-    if (url[host_end] == 0) {
-        *aclk_hostname = strdupz(url + pos);
-        *aclk_port = 443;
-        info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
-        return 0;
-    }
-    if (url[host_end] == ':') {
-        *aclk_hostname = callocz(host_end - pos + 1, 1);
-        strncpy(*aclk_hostname, url + pos, host_end - pos);
-        int port_end = host_end + 1;
-        while (url[port_end] >= '0' && url[port_end] <= '9')
-            port_end++;
-        if (port_end - host_end > 6) {
-            error("Port specified in %s is invalid", url);
-            freez(*aclk_hostname);
-            *aclk_hostname = NULL;
-            return 1;
-        }
-        *aclk_port = atoi(&url[host_end+1]);
-    }
-    if (url[host_end] == '/') {
-        *aclk_port = 443;
-        *aclk_hostname = callocz(1, host_end - pos + 1);
-        strncpy(*aclk_hostname, url+pos, host_end - pos);
-    }
-    info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
-    return 0;
-}
-
 /*
  * TBEB with randomness
  *

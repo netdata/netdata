@@ -141,8 +141,7 @@ static int wait_till_agent_claimed(void)
  */
 static int wait_till_agent_claim_ready()
 {
-    int port;
-    char *hostname = NULL;
+    url_t url;
     while (!netdata_exit) {
         if (wait_till_agent_claimed())
             return 1;
@@ -157,15 +156,14 @@ static int wait_till_agent_claim_ready()
 
         // We just check configuration is valid here
         // TODO make it without malloc/free
-        if (aclk_decode_base_url(cloud_base_url, &hostname, &port)) {
+        memset(&url, 0, sizeof(url_t));
+        if (url_parse(cloud_base_url, &url)) {
             error("Agent is claimed but the configuration is invalid, please fix");
-            freez(hostname);
-            hostname = NULL;
+            url_t_destroy(&url);
             sleep(5);
             continue;
         }
-        freez(hostname);
-        hostname = NULL;
+        url_t_destroy(&url);
 
         if (!load_private_key()) {
             sleep(5);
