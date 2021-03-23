@@ -472,6 +472,7 @@ Now we you ready to start developing our Netdata python Collector and share it w
 - Follow the
   [checklist](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#pull-request-checklist-for-python-plugins)
   to contribute the collector to the Netdata Agent [repository](https://github.com/netdata/netdata).
+- Check out the [example](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/example) python collector which is a minimal example collector you could also use as a starting point. Once comfortable with that then browse other [existing collectors](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin) that might have similarities to what you want to do.  
 - If you're developing a proof of concept (PoC), consider migrating the collector in Golang
   ([go.d.plugin](https://github.com/netdata/go.d.plugin)) once you validate its value in production. Golang is more
   performant, easier to maintain, and simpler for users since it doesn't require a particular runtime on the node to
