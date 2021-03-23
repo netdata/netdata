@@ -15,11 +15,62 @@ netdata_publish_dcstat_t **dcstat_pid = NULL;
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
+static int *map_fd = NULL;
+static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
+
+static int read_thread_closed = 1;
+
 struct config dcstat_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
+
+struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
+                                               NULL, NULL, 1, NULL,
+                                               NULL,  NULL};
+
+/*****************************************************************
+ *
+ *  COMMON FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Write charts
+ *
+ * Write the current information to publish the charts.
+ *
+ * @param family chart family
+ * @param chart  chart id
+ * @param dim    dimension name
+ * @param v1     value.
+ */
+static inline void dcstat_write_charts(char *family, char *chart, char *dim, long long v1)
+{
+    write_begin_chart(family, chart);
+
+    write_chart_dimension(dim, v1);
+
+    write_end_chart();
+}
+
+/**
+ * Update publish
+ *
+ * Update publish values before to write dimension.
+ *
+ * @param out   strcuture that will receive data.
+ * @param hit   calls to search a specific file
+ * @param miss  calls that did not find files
+ */
+void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t hit, uint64_t miss)
+{
+    calculated_number found = (calculated_number) (((long long)hit) - ((long long)miss));
+    calculated_number ratio = (hit != 0) ? found/(calculated_number)hit : 0;
+
+    out->ratio = (long long )(ratio*100);
+}
 
 /*****************************************************************
  *
@@ -51,6 +102,14 @@ static void ebpf_dcstat_cleanup(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled)
         return;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 2 * USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
 
     clean_pid_structures();
     freez(dcstat_pid);
@@ -84,6 +143,107 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     UNUSED(em);
     UNUSED(ptr);
+}
+
+/*****************************************************************
+ *
+ *  MAIN LOOP
+ *
+ *****************************************************************/
+
+/**
+ * Read global counter
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_global_table()
+{
+    uint32_t idx;
+    netdata_idx_t *val = dcstat_hash_values;
+    netdata_idx_t stored;
+    int fd = map_fd[NETDATA_DCSTAT_GLOBAL_STATS];
+
+    for (idx = NETDATA_KEY_DC_REFERENCE; idx < NETDATA_DIRECTORY_CACHE_END; idx++) {
+        if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
+            val[idx] = stored;
+        }
+    }
+}
+
+/**
+ * Socket read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_dcstat_read_hash(void *ptr)
+{
+    read_thread_closed = 0;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_time;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        read_global_table();
+    }
+    read_thread_closed = 1;
+
+    return NULL;
+}
+
+/**
+ * Send global
+ *
+ * Send global charts to Netdata
+ */
+static void dcstat_send_global(netdata_publish_dcstat_t *publish)
+{
+    dcstat_update_publish(publish, dcstat_hash_values[NETDATA_DCSTAT_IDX_REFERENCE],
+                          dcstat_hash_values[NETDATA_DCSTAT_IDX_MISS]);
+
+    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_REFERENCE];
+    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_SLOW];
+    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_MISS];
+
+    netdata_publish_syscall_t *ptr = dcstat_counter_publish_aggregated;
+    dcstat_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
+                        ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
+
+    write_count_chart(NETDATA_DC_REQUEST_CHART, NETDATA_FILESYSTEM_FAMILY,
+                      &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3);
+}
+
+/**
+* Main loop for this collector.
+*/
+static void dcstat_collector(ebpf_module_t *em)
+{
+    dcstat_threads.thread = mallocz(sizeof(netdata_thread_t));
+    dcstat_threads.start_routine = ebpf_dcstat_read_hash;
+
+    netdata_publish_dcstat_t publish;
+    memset(&publish, 0, sizeof(publish));
+    while (!close_ebpf_plugin) {
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        pthread_mutex_lock(&lock);
+
+        dcstat_send_global(&publish);
+
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&collect_data_mutex);
+    }
 }
 
 /*****************************************************************
@@ -183,9 +343,10 @@ void *ebpf_dcstat_thread(void *ptr)
                        dcstat_counter_dimension_name, dcstat_counter_dimension_name,
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
-
     ebpf_create_memory_charts();
     pthread_mutex_unlock(&lock);
+
+    dcstat_collector(em);
 
 enddcstat:
     netdata_thread_cleanup_pop(1);

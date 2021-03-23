@@ -15,6 +15,8 @@
 // configuration file
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
 
+#define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
+
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,
@@ -23,6 +25,21 @@ enum directory_cache_indexes {
 
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_DCSTAT_IDX_END
+};
+
+enum directory_cache_tables {
+    NETDATA_DCSTAT_GLOBAL_STATS,
+    NETDATA_DCSTAT_PID_STATS
+};
+
+// variables
+enum directory_cache_counters {
+    NETDATA_KEY_DC_REFERENCE,
+    NETDATA_KEY_DC_SLOW,
+    NETDATA_KEY_DC_MISS,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_DIRECTORY_CACHE_END
 };
 
 typedef struct netdata_publish_dcstat_pid {
