@@ -50,6 +50,7 @@ void netdata_cleanup_and_exit(int ret) {
         rrdeng_exit(&multidb_ctx);
 #endif
     }
+    sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
