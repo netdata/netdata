@@ -73,6 +73,7 @@ typedef struct rrdresult {
     time_t after;
 
     int has_st_lock;        // if st is read locked by us
+    uint8_t st_needs_lock;  // if ST should be locked
 
     // internal rrd2rrdr() members below this point
     struct {
