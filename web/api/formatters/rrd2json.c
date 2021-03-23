@@ -75,7 +75,7 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         *param_list = mallocz(sizeof(struct context_param));
         (*param_list)->first_entry_t = LONG_MAX;
         (*param_list)->last_entry_t = 0;
-        (*param_list)->flags = 0;
+        (*param_list)->flags = CONTEXT_FLAGS_CONTEXT;
         (*param_list)->rd = NULL;
     }
 
