@@ -66,6 +66,12 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     statements[idx++] = res;
 }
 
+static int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement) {
+    int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
+    if (likely(rc == SQLITE_OK))
+        add_stmt_to_list(*statement);
+    return rc;
+}
 
 /*
  * Store a chart or dimension UUID in  chart_active or dimension_active
@@ -215,12 +221,11 @@ int find_uuid_type(uuid_t *uuid)
     int uuid_type = 3;
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, FIND_UUID_TYPE, -1, &res, 0);
+        rc = prepare_statement(db_meta, FIND_UUID_TYPE, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to bind prepare statement to find UUID type in the database");
             return 0;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
@@ -251,12 +256,11 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
         return NULL;
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_DIMENSION_UUID, -1, &res, 0);
+        rc = prepare_statement(db_meta, SQL_FIND_DIMENSION_UUID, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
             return NULL;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
@@ -332,12 +336,11 @@ void delete_dimension_uuid(uuid_t *dimension_uuid)
 #endif
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, DELETE_DIMENSION_UUID, -1, &res, 0);
+        rc = prepare_statement(db_meta, DELETE_DIMENSION_UUID, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to delete a dimension uuid");
             return;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, dimension_uuid,  sizeof(*dimension_uuid), SQLITE_STATIC);
@@ -369,12 +372,11 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
         return NULL;
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_FIND_CHART_UUID, -1, &res, 0);
+        rc = prepare_statement(db_meta, SQL_FIND_CHART_UUID, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to lookup chart UUID in the database");
             return NULL;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
@@ -475,12 +477,11 @@ int sql_store_host(
     }
 
     if (unlikely((!res))) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_STORE_HOST, -1, &res, 0);
+        rc = prepare_statement(db_meta, SQL_STORE_HOST, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store host, rc = %d", rc);
             return 1;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
@@ -548,12 +549,11 @@ int sql_store_chart(
     }
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_STORE_CHART, -1, &res, 0);
+        rc = prepare_statement(db_meta, SQL_STORE_CHART, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store chart, rc = %d", rc);
             return 1;
         }
-        add_stmt_to_list(res);
     }
 
     param++;
@@ -675,12 +675,11 @@ int sql_store_dimension(
     }
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db_meta, SQL_STORE_DIMENSION, -1, &res, 0);
+        rc = prepare_statement(db_meta, SQL_STORE_DIMENSION, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store dimension, rc = %d", rc);
             return 1;
         }
-        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
