@@ -258,10 +258,10 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     req.payload_size = strlen(response_json);
     aclk_https_request(&req, &resp);
         if (resp.http_code != 201) {
-        error ("ACLK_OTP Challenge HTTP code not 201 Created (got %d)", resp.http_code);
+        error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
         goto cleanup_resp;
     }
-    info ("ACLK_OTP Got Challenge from Cloud");
+    info ("ACLK_OTP Got Password from Cloud");
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
     if (json_parse(resp.payload, &password, json_extract_singleton) != JSON_OK)
