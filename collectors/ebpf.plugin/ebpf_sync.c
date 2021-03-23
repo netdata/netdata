@@ -336,13 +336,6 @@ static void ebpf_create_sync_charts()
  */
 static void ebpf_sync_parse_syscalls()
 {
-    struct section *co = appconfig_get_section(&sync_config, NETDATA_SYNC_CONFIG_NAME);
-    if (co) {
-        struct config_option *cv;
-        for (cv = co->values; cv ; cv = cv->next) {
-        }
-    }
-
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
         local_syscalls[i].enabled = appconfig_get_boolean(&sync_config, NETDATA_SYNC_CONFIG_NAME,
