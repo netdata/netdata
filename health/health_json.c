@@ -145,28 +145,31 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char *replaced_info = NULL;
 
     if (likely(rc->info)) {
-
+        char *m;
         replaced_info = strdupz(rc->info);
 
-        if ( strstr (replaced_info, "$this") ) {
+        while ( m = strstr (replaced_info, "$this") ) {
             char *buf=NULL;
             BUFFER *helper = buffer_create(100);
             buffer_rrd_value(helper, rc->value);
-            buf = find_and_replace(replaced_info, "$this", buffer_tostring(helper));
+            buf = find_and_replace(replaced_info, "$this", buffer_tostring(helper), m);
             freez(replaced_info); replaced_info = strdupz(buf);
             buffer_free (helper);
+            freez(buf);
         }
 
-        if ( strstr (replaced_info, "$family") ) {
+        while ( m = strstr (replaced_info, "$family") ) {
             char *buf=NULL;
-            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"");
+            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
             freez(replaced_info); replaced_info = strdupz(buf);
+            freez(buf);
         }
 
-        if ( strstr (replaced_info, "$units") ) {
+        while ( m = strstr (replaced_info, "$units") ) {
             char *buf=NULL;
-            buf = find_and_replace(replaced_info, "$units", rc->units?rc->units:"");
+            buf = find_and_replace(replaced_info, "$units", rc->units?rc->units:"", m);
             freez(replaced_info); replaced_info = strdupz(buf);
+            freez(buf);
         }
     }
 

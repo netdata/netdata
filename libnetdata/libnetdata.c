@@ -1492,43 +1492,36 @@ char *read_by_filename(char *filename, long *file_size)
     return contents;
 }
 
-char *find_and_replace(const char *src, const char *find, const char *replace)
+char *find_and_replace(const char *src, const char *find, const char *replace, const char *where)
 {
    size_t size        = strlen(src) + 1;
    size_t find_len    = strlen(find);
    size_t repl_len    = strlen(replace);
-   char *value, *dst, *temp, *match;
+   char *value, *dst, *temp;
 
-   value = (char *)mallocz(size); //use mallocz
+   value = mallocz(size);
    dst = value;
+   if ( likely(where) ) {
 
-   if ( value != NULL ) {
-      for ( ;; ) {
-         match = strstr(src, find);
-         if ( match != NULL ) {
+       size_t count = where - src;
 
-            size_t count = match - src;
+       size += repl_len - find_len;
 
-            size += repl_len - find_len;
+       temp = reallocz(value, size);
 
-            temp = (char *)reallocz(value, size);
+       dst = temp + (dst - value);
+       value = temp;
 
-            dst = temp + (dst - value);
-            value = temp;
+       memmove(dst, src, count);
+       src += count;
+       dst += count;
 
-            memmove(dst, src, count);
-            src += count;
-            dst += count;
-
-            memmove(dst, replace, repl_len);
-            src += find_len;
-            dst += repl_len;
-         }
-         else {
-            strcpy(dst, src);
-            break;
-         }
-      }
+       memmove(dst, replace, repl_len);
+       src += find_len;
+       dst += repl_len;
    }
+
+   strcpy(dst, src);
+
    return value;
 }
