@@ -189,7 +189,10 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
-void aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target) {
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target) {
+    // TODO this fnc will be rewritten and simplified in following PRs
+    // still carries lot of baggage from ACLK Legacy
+    int rc = 1;
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
@@ -289,12 +292,15 @@ void aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *tar
     *mqtt_usr = agent_id;
     agent_id = NULL;
 
+    rc = 0;
+
 cleanup_resp:
     https_req_response_free(&resp);
 cleanup:
     if (agent_id != NULL)
         freez(agent_id);
     buffer_free(url);
+    return rc;
 }
 
 #define PARSE_ENV_JSON_CHK_TYPE(it, type, name)                                                                        \
