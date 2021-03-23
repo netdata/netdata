@@ -1281,6 +1281,11 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         sprintf(id, "%s.%s", sqlite3_column_text(res, 3), sqlite3_column_text(res, 1));
 
         if (!st || uuid_compare(*(uuid_t *)sqlite3_column_blob(res, 7), chart_id)) {
+            if (unlikely(st && !st->counter)) {
+                freez(st->context);
+                freez((char *) st->name);
+                freez(st);
+            }
             st = callocz(1, sizeof(*st));
             char n[RRD_ID_LENGTH_MAX + 1];
 
@@ -1311,8 +1316,16 @@ void sql_build_context_param_list(struct context_param **param_list, RRDHOST *ho
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }
-    if (likely(st && context && !st->context))
-        st->context = strdupz(context);
+    if (st) {
+        if (!st->counter) {
+            freez(st->context);
+            freez((char *)st->name);
+            freez(st);
+        }
+        else
+            if (!st->context && context)
+                st->context = strdupz(context);
+    }
 
 failed:
     rc = sqlite3_finalize(res);
