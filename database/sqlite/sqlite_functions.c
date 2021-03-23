@@ -48,6 +48,25 @@ static int execute_insert(sqlite3_stmt *res)
     return rc;
 }
 
+#define MAX_OPEN_STATEMENTS (512)
+
+static void add_stmt_to_list(sqlite3_stmt *res)
+{
+    static int idx = 0;
+    static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
+
+    if (unlikely(!res)) {
+        while (idx > 0)
+            sqlite3_finalize(statements[--idx]);
+        return;
+    }
+
+    if (unlikely(idx == MAX_OPEN_STATEMENTS))
+        return;
+    statements[idx++] = res;
+}
+
+
 /*
  * Store a chart or dimension UUID in  chart_active or dimension_active
  * The statement that will be prepared determines that
@@ -178,9 +197,12 @@ void sql_close_database(void)
         return;
 
     info("Closing SQLite database");
-    rc = sqlite3_close(db_meta);
+
+    add_stmt_to_list(NULL);
+
+    rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Error %d while closing the SQLite database", rc);
+        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
     return;
 }
 
@@ -198,6 +220,7 @@ int find_uuid_type(uuid_t *uuid)
             error_report("Failed to bind prepare statement to find UUID type in the database");
             return 0;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
@@ -233,6 +256,7 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
             error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
             return NULL;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
@@ -313,6 +337,7 @@ void delete_dimension_uuid(uuid_t *dimension_uuid)
             error_report("Failed to prepare statement to delete a dimension uuid");
             return;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, dimension_uuid,  sizeof(*dimension_uuid), SQLITE_STATIC);
@@ -349,6 +374,7 @@ uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const c
             error_report("Failed to prepare statement to lookup chart UUID in the database");
             return NULL;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
@@ -454,6 +480,7 @@ int sql_store_host(
             error_report("Failed to prepare statement to store host, rc = %d", rc);
             return 1;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
@@ -510,7 +537,7 @@ int sql_store_chart(
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
     int update_every, int chart_type, int memory_mode, long history_entries)
 {
-    static __thread sqlite3_stmt *res;
+    static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
@@ -526,6 +553,7 @@ int sql_store_chart(
             error_report("Failed to prepare statement to store chart, rc = %d", rc);
             return 1;
         }
+        add_stmt_to_list(res);
     }
 
     param++;
@@ -652,6 +680,7 @@ int sql_store_dimension(
             error_report("Failed to prepare statement to store dimension, rc = %d", rc);
             return 1;
         }
+        add_stmt_to_list(res);
     }
 
     rc = sqlite3_bind_blob(res, 1, dim_uuid, sizeof(*dim_uuid), SQLITE_STATIC);
