@@ -108,7 +108,7 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
     RRDR *r = callocz(1, sizeof(RRDR));
     r->st = st;
 
-    if (!context_param_list || (context_param_list && !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE))) {
+    if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
         rrdr_lock_rrdset(r);
         r->st_needs_lock = 1;
     }
