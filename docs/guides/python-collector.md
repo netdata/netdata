@@ -1,5 +1,5 @@
-<!--
-title: "Develop a custom data collector for Netdata in Python"
+F<!--
+title: "Develop a custom data collector in Python"
 description: "Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box."
 image: /img/seo/guides/python-collector.png
 author: "Panagiotis Papaioannou"
@@ -8,7 +8,7 @@ author_img: "/img/authors/panagiotis-papaioannou.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md
 -->
 
-# Develop a custom data collector for Netdata in Python
+# Develop a custom data collector in Python
 
 The Netdata Agent uses [data collectors](/docs/collect/how-collectors-work.md) to fetch metrics from hundreds of system,
 container, and service endpoints. While the Netdata team and community has built [powerful
@@ -86,7 +86,8 @@ context, charttype]`, where:
 - `title` : The title to be displayed in the chart.
 - `units` : The units for this chart.
 - `family`: An identifier used to group charts together (can be null).
-- `context`: An identifier used to group contextually similar charts together (can be null).
+- `context`: An identifier used to group contextually similar charts together. The best practice is to provide a context
+  that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
 - `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
 
 You can read more about `family` and `context` in the [web dashboard](/web/README.md#families) doc.
@@ -185,7 +186,7 @@ First, create a single chart that shows the latest temperature metric:
 ```python
 CHARTS = {
     "temp_current": {
-         "options": ["my_temp", "Temperature", "Celsius", "TEMP", "weather_station", "line"],
+        "options": ["my_temp", "Temperature", "Celsius", "TEMP", "weather_station.temperature", "line"],
         "lines": [
             ["current_temp_id","current_temperature"]
         ]
@@ -261,7 +262,7 @@ ORDER = [
 
 CHARTS = {
     "temp_current": {
-        "options": ["my_temp", "Temperature", "Celsius", "TEMP", "weather_station", "line"],
+        "options": ["my_temp", "Temperature", "Celsius", "TEMP", "weather_station.temperature", "line"],
         "lines": [
             ["current_temperature"]
         ]
@@ -316,13 +317,13 @@ Add a new entry in the `CHARTS` dictionary with the definition for the new chart
 ```python
 CHARTS = {
     'temp_current': {
-        'options': ['my_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station', 'line'],
+        'options': ['my_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station.temperature', 'line'],
         'lines': [
             ['current_temperature']
         ]
      },
     'humid_current': {
-        'options': ['my_humid', 'Humidity', '%', 'HUMIDITY', 'weather_station', 'line'],
+        'options': ['my_humid', 'Humidity', '%', 'HUMIDITY', 'weather_station.humidity', 'line'],
         'lines': [
             ['current_humidity']
         ]
@@ -361,13 +362,13 @@ so that those two charts are grouped together.
 ```python
 CHARTS = {
     'temp_current': {
-        'options': ['my_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station', 'line'],
+        'options': ['my_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station.temperature', 'line'],
         'lines': [
             ['current_temperature']
         ]
      },
     'temp_stats': {
-        'options': ['stats_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station', 'line'],
+        'options': ['stats_temp', 'Temperature', 'Celsius', 'TEMP', 'weather_station.temperature_stats', 'line'],
         'lines': [
             ['min_temperature'],
             ['max_temperature'],
@@ -375,7 +376,7 @@ CHARTS = {
         ]
     },
     'humid_current': {
-        'options': ['my_humid', 'Humidity', '%', 'HUMIDITY', 'weather_station', 'line'],
+        'options': ['my_humid', 'Humidity', '%', 'HUMIDITY', 'weather_station.humidity', 'line'],
         'lines': [
             ['current_humidity']
         ]
@@ -434,7 +435,7 @@ weather_station_1:
     port: 67
     type: 'celcius'
 weather_station_2:
-    name: 'Florida: USA'
+    name: 'Florida USA'
     endpoint: 'https://endpoint_2.com'
     port: 67 
     type: 'fahrenheit'
