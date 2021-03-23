@@ -394,7 +394,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 continue;
             }
 
-            if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor) {
+            if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor || strcmp(basename(filename), disk)) {
                 //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
                 continue;
             }
