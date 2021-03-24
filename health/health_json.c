@@ -17,6 +17,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
+                    "\t\t\"timezone\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
                     "\t\t\"alarm_id\": %u,\n"
                     "\t\t\"alarm_event_id\": %u,\n"
@@ -49,6 +50,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
                    , host->hostname
+                   , host->timezone
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
