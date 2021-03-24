@@ -1062,7 +1062,7 @@ netdataDashboard.context = {
     },
 
     'net.operstate': {
-        info: 'State map: 0 - unknown, 1 = notpresent, 2 = down, 3 = lowerlayerdown, 4 = testing, 5 = dormant, 6 = up'
+        info: 'State map: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up'
     },
 
     // ------------------------------------------------------------------------
