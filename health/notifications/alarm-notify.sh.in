@@ -2271,6 +2271,11 @@ CRITICAL)
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_critical.png"
   status_message="is critical"
   color="#ca414b"
+
+  background_color="#FFEBEF"
+  border_color="#FF4136"
+  text_color="#FF4136"
+  action_text_color="#FFFFFF"
   ;;
 
 WARNING)
@@ -2278,6 +2283,11 @@ WARNING)
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_warning.png"
   status_message="needs attention"
   color="#ffc107"
+
+  background_color="#FFF8E1"
+  border_color="#FFC300"
+  text_color="#536775"
+  action_text_color="#35414A"
   ;;
 
 CLEAR)
@@ -2285,6 +2295,12 @@ CLEAR)
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_recovered.png"
   status_message="recovered"
   color="#77ca6d"
+
+  background_color="#E5F5E8"
+  border_color="#68C47D"
+  text_color="#00AB44"
+  action_text_color="#FFFFFF"
+
   ;;
 esac
 
@@ -2992,7 +3008,7 @@ Content-Transfer-Encoding: 8bit
       <tbody>
       <tr>
         <td
-          style="border:1px solid #FF4136;direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
+          style="border:1px solid ${border_color};direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
         >
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
@@ -3319,10 +3335,10 @@ Content-Transfer-Encoding: 8bit
   <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="background:#FFEBEF;background-color:#FFEBEF;margin:0px auto;max-width:600px;">
+  <div  style="background:${background_color};background-color:${background_color};margin:0px auto;max-width:600px;">
 
     <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#FFEBEF;background-color:#FFEBEF;width:100%;"
+      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:${background_color};background-color:${background_color};width:100%;"
     >
       <tbody>
       <tr>
