@@ -91,8 +91,6 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     rbuf_pop(buf, buf_val, idx_end);
     buf_val[idx_end] = 0;
 
-    rbuf_bump_tail(buf, strlen(HTTP_KEYVAL_SEPARATOR));
-
     for (ptr = buf_key; *ptr; ptr++)
         *ptr = tolower(*ptr);
 
