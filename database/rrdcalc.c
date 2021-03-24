@@ -102,7 +102,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->status,
                 RRDCALC_STATUS_UNINITIALIZED,
                 rc->source,
-                rc->edit_command,
+                //rc->edit_command,
                 rc->units,
                 rc->info,
                 0,
@@ -180,7 +180,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->status,
                 RRDCALC_STATUS_REMOVED,
                 rc->source,
-                rc->edit_command,
+                //rc->edit_command,
                 rc->units,
                 rc->info,
                 0,
@@ -433,7 +433,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     if(rt->exec) rc->exec = strdupz(rt->exec);
     if(rt->recipient) rc->recipient = strdupz(rt->recipient);
     if(rt->source) rc->source = strdupz(rt->source);
-    if(rt->edit_command) rc->edit_command = strdupz(rt->edit_command);
+    //if(rt->edit_command) rc->edit_command = strdupz(rt->edit_command);
     if(rt->units) rc->units = strdupz(rt->units);
     if(rt->info) rc->info = strdupz(rt->info);
 
@@ -541,7 +541,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     if(rc->exec) newrc->exec = strdupz(rc->exec);
     if(rc->recipient) newrc->recipient = strdupz(rc->recipient);
     if(rc->source) newrc->source = strdupz(rc->source);
-    if(rc->edit_command) newrc->edit_command = strdupz(rc->edit_command);
+    //if(rc->edit_command) newrc->edit_command = strdupz(rc->edit_command);
     if(rc->units) newrc->units = strdupz(rc->units);
     if(rc->info) newrc->info = strdupz(rc->info);
 
@@ -581,7 +581,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->exec);
     freez(rc->recipient);
     freez(rc->source);
-    freez(rc->edit_command);
+    //freez(rc->edit_command);
     freez(rc->units);
     freez(rc->info);
     simple_pattern_free(rc->spdim);
