@@ -14,7 +14,7 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
 }
 
 inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
-    char *edit_command = health_edit_command_from_source(ae->source?ae->source:"UNKNOWN");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
 
     buffer_sprintf(wb,
             "\n\t{\n"
@@ -151,7 +151,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
-    char *edit_command = health_edit_command_from_source(rc->source?rc->source:"UNKNOWN");
+    char *edit_command = rc->source ? health_edit_command_from_source(rc->source) : strdupz("UNKNOWN=0");
 
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"

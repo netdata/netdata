@@ -344,7 +344,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
-    char *edit_command = health_edit_command_from_source(ae->source?ae->source:"UNKNOWN");
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
 
     snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s'",
               exec,
@@ -398,25 +398,20 @@ done:
 char *health_edit_command_from_source(const char *source)
 {
     char buffer[FILENAME_MAX + 1];
+    char *temp = NULL;
+    temp = strdupz(source);
+    char *line_num     = strchr (temp, '@');
+    char *file_no_path = strrchr(temp, '/');
 
-    if (unlikely(!strcmp(source, "UNKNOWN"))) {
-        snprintfz(buffer, FILENAME_MAX, "UNKNOWN=0");
+    if (likely(file_no_path && line_num)) {
+        *line_num='\0';
+        snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%s", netdata_configured_user_config_dir, file_no_path+1, temp);
     }
-    else {
-        char *temp = NULL;
-        temp = strdupz(source);
-        char *line_num     = strchr (temp, '@');
-        char *file_no_path = strrchr(temp, '/');
+    else
+        buffer[0]='\0';
 
-        if (likely(file_no_path && line_num)) {
-            *line_num='\0';
-            snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%s", netdata_configured_user_config_dir, file_no_path+1, temp);
-        }
-        else
-            buffer[0]='\0';
+    freez(temp);
 
-        freez(temp);
-    }
     return strdupz(buffer);
 }
 
