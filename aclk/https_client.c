@@ -453,6 +453,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->poll_fd.fd = ctx->sock;
 
+    // Do the CONNECT if proxy is used
     if (request->proxy_host) {
         https_req_t req = HTTPS_REQ_T_INITIALIZER;
         req.request_type = HTTP_REQ_CONNECT;
@@ -501,8 +502,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         }
     }
 
-
-    // TODO actual request here
+    // The actual request here
     if (handle_http_request(ctx)) {
         error("Couldn't process request");
         goto exit_SSL;
