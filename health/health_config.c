@@ -471,18 +471,6 @@ static inline char *health_source_file(size_t line, const char *file) {
     return strdupz(buffer);
 }
 
-static inline char *health_edit_command(size_t line, const char *file) {
-    char buffer[FILENAME_MAX + 1];
-    char *file_no_path = strrchr(file, '/');
-
-    if (likely(file_no_path))
-        snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%zu", netdata_configured_user_config_dir, file_no_path+1, line);
-    else
-        buffer[0]='\0';
-
-    return strdupz(buffer);
-}
-
 static inline void strip_quotes(char *s) {
     while(*s) {
         if(*s == '\'' || *s == '"') *s = ' ';
@@ -629,7 +617,6 @@ static int health_readfile(const char *filename, void *data) {
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, filename);
-            rc->edit_command = health_edit_command(line, filename);
             rc->green = NAN;
             rc->red = NAN;
             rc->value = NAN;
@@ -663,7 +650,6 @@ static int health_readfile(const char *filename, void *data) {
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, filename);
-            rt->edit_command = health_edit_command(line, filename);
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;

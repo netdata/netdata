@@ -14,6 +14,8 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
 }
 
 inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char *edit_command = health_edit_command_from_source(ae->source?ae->source:"UNKNOWN");
+
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
@@ -67,7 +69,7 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
-                   , ae->edit_command?ae->edit_command:""
+                   , edit_command
                    , ae->units?ae->units:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
@@ -83,6 +85,8 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
                    , (unsigned long)ae->last_repeat
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
+
+    freez(edit_command);
 
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
 
@@ -147,6 +151,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
+    char *edit_command = health_edit_command_from_source(rc->source?rc->source:"UNKNOWN");
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
@@ -194,7 +200,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->exec?rc->exec:host->health_default_exec
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source
-                   , rc->edit_command?rc->edit_command:""
+                   , edit_command
                    , rc->units?rc->units:""
                    , rc->info?rc->info:""
                    , rrdcalc_status2string(rc->status)
@@ -213,6 +219,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , value_string
                    , (unsigned long)rc->last_repeat
     );
+
+    freez(edit_command);
 
     if(unlikely(rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\t\"no_clear_notification\": true,\n");

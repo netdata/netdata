@@ -662,7 +662,6 @@ struct alarm_entry {
     uint64_t exec_spawn_serial;
 
     char *source;
-    //char *edit_command;
     char *units;
     char *info;
 

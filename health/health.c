@@ -344,6 +344,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
+    char *edit_command = health_edit_command_from_source(ae->source?ae->source:"UNKNOWN");
+
     snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
@@ -373,7 +375,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               buffer_tostring(warn_alarms),
               buffer_tostring(crit_alarms),
               ae->class?ae->class:"Unknown",
-              ae->edit_command?ae->edit_command:""
+              edit_command
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
@@ -384,12 +386,38 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
 
+    freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
 
     return; //health_alarm_wait_for_execution
 done:
     health_alarm_log_save(host, ae);
+}
+
+char *health_edit_command_from_source(const char *source)
+{
+    char buffer[FILENAME_MAX + 1];
+
+    if (unlikely(!strcmp(source, "UNKNOWN"))) {
+        snprintfz(buffer, FILENAME_MAX, "UNKNOWN=0");
+    }
+    else {
+        char *temp = NULL;
+        temp = strdupz(source);
+        char *line_num     = strchr (temp, '@');
+        char *file_no_path = strrchr(temp, '/');
+
+        if (likely(file_no_path && line_num)) {
+            *line_num='\0';
+            snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%s", netdata_configured_user_config_dir, file_no_path+1, temp);
+        }
+        else
+            buffer[0]='\0';
+
+        freez(temp);
+    }
+    return strdupz(buffer);
 }
 
 static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
@@ -955,7 +983,7 @@ void *health_main(void *ptr) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->edit_command, rc->units, rc->info,
+                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                     rc->delay_last,
                                     (
                                             ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
@@ -1003,7 +1031,7 @@ void *health_main(void *ptr) {
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                 rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
-                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->edit_command, rc->units, rc->info,
+                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
                                 (
                                         ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |

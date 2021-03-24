@@ -32,7 +32,6 @@ struct rrdcalctemplate {
     char *type;
 
     char *source;                   // the source of this alarm
-    //char *edit_command;             // the command to edit this alarm
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
 

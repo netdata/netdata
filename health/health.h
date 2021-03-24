@@ -95,7 +95,6 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         RRDCALC_STATUS old_status,
         RRDCALC_STATUS new_status,
         const char *source,
-        //const char *edit_command,
         const char *units,
         const char *info,
         int delay,
@@ -113,6 +112,8 @@ extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 extern void *health_cmdapi_thread(void *ptr);
 
 extern void health_label_log_save(RRDHOST *host);
+
+extern char *health_edit_command_from_source(const char *source);
 
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 
