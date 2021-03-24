@@ -966,12 +966,14 @@ void *health_main(void *ptr) {
                         } else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
                             if(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE)) {
                                 if(rc->old_status == RRDCALC_STATUS_CRITICAL) {
-                                    repeat_every = rc->crit_repeat_every;
+                                    repeat_every = 1;
                                 } else if (rc->old_status == RRDCALC_STATUS_WARNING) {
-                                    repeat_every = rc->warn_repeat_every;
+                                    repeat_every = 1;
                                 }
                             }
                         }
+                    } else {
+                        continue;
                     }
 
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
