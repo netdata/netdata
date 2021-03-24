@@ -198,7 +198,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
--   `sync`: Montitor calls for syscall sync(2).
+-   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
 
 ## Thread configuration
 
@@ -218,6 +218,7 @@ The following configuration files are available:
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
   also lets you specify which network the eBPF collector monitors.
+- `sync.conf`: Configuration for the `sync` thread.
 
 ### Network configuration
 
@@ -261,7 +262,7 @@ The dimensions for the traffic charts are created using the destination IPs of t
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
 the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
-### `[service name]`
+#### `[service name]`
 
 Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
@@ -272,6 +273,21 @@ service in network connection charts, and thus see the name of the service inste
 ```conf
 [service name]
     19999 = Netdata
+```
+
+### Sync configuration
+
+The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are 
+monitored.
+
+```conf
+[syscalls]
+    sync = yes
+    msync = yes
+    fsync = yes
+    fdatasync = yes
+    syncfs = yes
+    sync_file_range = yes
 ```
 
 ## Troubleshooting
