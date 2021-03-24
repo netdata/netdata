@@ -1107,4 +1107,5 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     }
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
+
 }

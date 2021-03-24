@@ -113,6 +113,8 @@ extern void *health_cmdapi_thread(void *ptr);
 
 extern void health_label_log_save(RRDHOST *host);
 
+extern char *health_edit_command_from_source(const char *source);
+
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 
 #endif //NETDATA_HEALTH_H
