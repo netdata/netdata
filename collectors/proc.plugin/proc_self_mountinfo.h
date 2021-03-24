@@ -38,6 +38,9 @@ struct mountinfo {
     char *mount_source;     // mount source: filesystem-specific information or "none".
     uint32_t mount_source_hash;
 
+    char *mount_source_name;
+    uint32_t mount_source_name_hash;
+
     char *super_options;    // super options: per-superblock options.
 
     uint32_t flags;
@@ -47,7 +50,7 @@ struct mountinfo {
     struct mountinfo *next;
 };
 
-extern struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor);
+extern struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, unsigned long minor, char *device);
 extern struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *root, const char *filesystem, const char *mount_source);
 extern struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *root, const char *filesystem, const char *super_options);
 

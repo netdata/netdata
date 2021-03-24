@@ -17,6 +17,7 @@
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
     char *device;           // the device of the disk (before being looked up)
+    uint32_t hash;
     unsigned long major;
     unsigned long minor;
     int sector_size;
@@ -393,7 +394,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 continue;
             }
 
-            if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor) {
+            if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor || strcmp(basename(filename), disk)) {
                 //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
                 continue;
             }
@@ -547,13 +548,17 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     struct disk *d;
 
+    uint32_t hash = simple_hash(disk);
+
     // search for it in our RAM list.
     // this is sequential, but since we just walk through
     // and the number of disks / partitions in a system
     // should not be that many, it should be acceptable
-    for(d = disk_root; d ; d = d->next)
-        if(unlikely(d->major == major && d->minor == minor))
+    for(d = disk_root; d ; d = d->next){
+        if (unlikely(
+                d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk)))
             return d;
+    }
 
     // not found
     // create a new disk structure
@@ -561,6 +566,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     d->disk = get_disk_name(major, minor, disk);
     d->device = strdupz(disk);
+    d->hash = simple_hash(d->device);
     d->major = major;
     d->minor = minor;
     d->type = DISK_TYPE_UNKNOWN; // Default type. Changed later if not correct.
@@ -627,12 +633,12 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // check if we can find its mount point
 
     // mountinfo_find() can be called with NULL disk_mountinfo_root
-    struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
+    struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor, d->device);
     if(unlikely(!mi)) {
         // mountinfo_free_all can be called with NULL
         mountinfo_free_all(disk_mountinfo_root);
         disk_mountinfo_root = mountinfo_read(0);
-        mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
+        mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor, d->device);
     }
 
     if(unlikely(mi))
@@ -944,13 +950,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // last update of this field.  This can provide an easy measure of both
         // I/O completion time and the backlog that may be accumulating.
         backlog_ms      = str2ull(procfile_lineword(ff, l, 13)); // rq_ticks
-
-
-        // --------------------------------------------------------------------------
-        // remove slashes from disk names
-        char *s;
-        for(s = disk; *s ;s++)
-            if(*s == '/') *s = '_';
 
         // --------------------------------------------------------------------------
         // get a disk structure for the disk
