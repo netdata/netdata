@@ -208,14 +208,14 @@ void *ebpf_dcstat_read_hash(void *ptr)
  */
 static void dcstat_send_global(netdata_publish_dcstat_t *publish)
 {
-    dcstat_update_publish(publish, dcstat_hash_values[NETDATA_DCSTAT_IDX_REFERENCE],
-                          dcstat_hash_values[NETDATA_DCSTAT_IDX_MISS]);
-
-    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_REFERENCE];
-    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_SLOW];
-    dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS].ncall = dcstat_hash_values[NETDATA_DCSTAT_IDX_MISS];
+    dcstat_update_publish(publish, dcstat_hash_values[NETDATA_KEY_DC_REFERENCE],
+                          dcstat_hash_values[NETDATA_KEY_DC_MISS]);
 
     netdata_publish_syscall_t *ptr = dcstat_counter_publish_aggregated;
+    ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
+    ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
+    ptr[NETDATA_DCSTAT_IDX_MISS].ncall = dcstat_hash_values[NETDATA_KEY_DC_MISS];
+
     dcstat_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                         ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
 
@@ -230,6 +230,11 @@ static void dcstat_collector(ebpf_module_t *em)
 {
     dcstat_threads.thread = mallocz(sizeof(netdata_thread_t));
     dcstat_threads.start_routine = ebpf_dcstat_read_hash;
+
+    map_fd = dcstat_data.map_fd;
+
+    netdata_thread_create(dcstat_threads.thread, dcstat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+                          ebpf_dcstat_read_hash, em);
 
     netdata_publish_dcstat_t publish;
     memset(&publish, 0, sizeof(publish));
