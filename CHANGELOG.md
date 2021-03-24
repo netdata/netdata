@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix memory leak when archived data is requested [\#10837](https://github.com/netdata/netdata/pull/10837) ([stelfrag](https://github.com/stelfrag))
+- add Installation method to the bug template [\#10836](https://github.com/netdata/netdata/pull/10836) ([ilyam8](https://github.com/ilyam8))
+- Add lock check to avoid shutdown when compiled with internal and locking checks [\#10835](https://github.com/netdata/netdata/pull/10835) ([stelfrag](https://github.com/stelfrag))
+- health: apply megacli alarms for all adapters/physical disks [\#10834](https://github.com/netdata/netdata/pull/10834) ([ilyam8](https://github.com/ilyam8))
 - Fix broken link in StatsD guide [\#10831](https://github.com/netdata/netdata/pull/10831) ([joelhans](https://github.com/joelhans))
 - health: add collector prefix to the external collectors alarms/templates [\#10830](https://github.com/netdata/netdata/pull/10830) ([ilyam8](https://github.com/ilyam8))
 - health: remove exporting\_metrics\_lost template [\#10829](https://github.com/netdata/netdata/pull/10829) ([ilyam8](https://github.com/ilyam8))
@@ -30,6 +34,7 @@
 - web/gui: add max value to the nvidia\_smi.fan\_speed gauge [\#10780](https://github.com/netdata/netdata/pull/10780) ([ilyam8](https://github.com/ilyam8))
 - health/: fix various alarms critical and warning thresholds hysteresis [\#10779](https://github.com/netdata/netdata/pull/10779) ([ilyam8](https://github.com/ilyam8))
 - Adds \_aclk\_impl label [\#10778](https://github.com/netdata/netdata/pull/10778) ([underhood](https://github.com/underhood))
+- adding a default job with some params and example of additional job. [\#10777](https://github.com/netdata/netdata/pull/10777) ([andrewm4894](https://github.com/andrewm4894))
 - Fix typo in dashboard\_info.js [\#10775](https://github.com/netdata/netdata/pull/10775) ([eltociear](https://github.com/eltociear))
 - Fixed Travis config issues related to new packaging workflows. [\#10774](https://github.com/netdata/netdata/pull/10774) ([Ferroin](https://github.com/Ferroin))
 - add a dump\_methods parameter to alarm-notify.sh.in [\#10772](https://github.com/netdata/netdata/pull/10772) ([MrZammler](https://github.com/MrZammler))
@@ -88,6 +93,7 @@
 - Revamp statsd docs [\#10637](https://github.com/netdata/netdata/pull/10637) ([OdysLam](https://github.com/OdysLam))
 - replace GA with PostHog for backend telemetry events. [\#10636](https://github.com/netdata/netdata/pull/10636) ([andrewm4894](https://github.com/andrewm4894))
 - cpu stats per query thread [\#10634](https://github.com/netdata/netdata/pull/10634) ([MrZammler](https://github.com/MrZammler))
+- Assorted updater fixes. [\#10613](https://github.com/netdata/netdata/pull/10613) ([Ferroin](https://github.com/Ferroin))
 - add stats per cloud query type [\#10602](https://github.com/netdata/netdata/pull/10602) ([underhood](https://github.com/underhood))
 - Add a new workflow to test that updater works as expected [\#10599](https://github.com/netdata/netdata/pull/10599) ([kaskavel](https://github.com/kaskavel))
 - Add support for changing the number of pages per extent [\#10593](https://github.com/netdata/netdata/pull/10593) ([mfundul](https://github.com/mfundul))
@@ -319,11 +325,6 @@
 - Fix chart filtering [\#10218](https://github.com/netdata/netdata/pull/10218) ([vlvkobal](https://github.com/vlvkobal))
 - Don't stop Prometheus remote write collector when data is not available for dimension formatting [\#10217](https://github.com/netdata/netdata/pull/10217) ([vlvkobal](https://github.com/vlvkobal))
 - Fix coverity issues [\#10216](https://github.com/netdata/netdata/pull/10216) ([vlvkobal](https://github.com/vlvkobal))
-- Fixed bug in auto-updater for FreeBSD \(\#10198\) [\#10204](https://github.com/netdata/netdata/pull/10204) ([abrbon](https://github.com/abrbon))
-- New ebpf release [\#10202](https://github.com/netdata/netdata/pull/10202) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add guide: Deploy Netdata with Ansible [\#10199](https://github.com/netdata/netdata/pull/10199) ([joelhans](https://github.com/joelhans))
-- Add allocated space metrics to oracledb charts [\#10197](https://github.com/netdata/netdata/pull/10197) ([jurgenhaas](https://github.com/jurgenhaas))
-- File descr alarm v01 [\#10192](https://github.com/netdata/netdata/pull/10192) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
