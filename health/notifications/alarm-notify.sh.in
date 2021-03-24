@@ -241,6 +241,8 @@ else
   total_critical="${24}"     # Total number of alarms in CRITICAL state
   total_warn_alarms="${25}"  # List of alarms in warning state
   total_crit_alarms="${26}"  # List of alarms in critical state
+  classification="${27}"     # The class field from .conf files
+  edit_command_line="${28}"  # The command to edit the alarm, with the line number
 fi
 
 # -----------------------------------------------------------------------------
@@ -2623,7 +2625,9 @@ if [ -n "$total_warn_alarms" ]; then
 
        now=$(date "+%s")
        elapsed=$(( now - val))
-       for_min=$(( elapsed / 60 ))
+
+       duration4human ${elapsed} >/dev/null
+       elapsed_txt="${REPLY}"
 
        WARN_ALARMS+="
        <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
@@ -2695,7 +2699,7 @@ if [ -n "$total_warn_alarms" ]; then
                           <div
                             style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
                           ><mj-raw style=\"background-color:#FFEDB3; border: 1px solid #FFC300; border-radius:36px; padding: 4px 12px;\">
-                            Warning for ${for_min} minutes
+                            Warning for ${elapsed_txt}
                           </mj-raw></div>
 
                         </td>
@@ -2728,7 +2732,9 @@ if [ -n "$total_crit_alarms" ]; then
 
        now=$(date "+%s")
        elapsed=$(( now - val))
-       for_min=$(( elapsed / 60 ))
+
+       duration4human ${elapsed} >/dev/null
+       elapsed_txt="${REPLY}"
 
        CRIT_ALARMS+="
        <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
@@ -2800,7 +2806,7 @@ if [ -n "$total_crit_alarms" ]; then
                           <div
                             style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"
                           ><mj-raw style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 4px 12px;\">
-                            Critical for ${for_min} minutes
+                            Critical for ${elapsed_txt}
                           </mj-raw></div>
 
                         </td>
@@ -2821,6 +2827,10 @@ if [ -n "$total_crit_alarms" ]; then
        "
 
    done <<<"$total_crit_alarms,"
+fi
+
+if [ -n "$edit_command_line" ]; then
+    IFS='=' read -r edit_command line <<<"$edit_command_line"
 fi
 
 IFS='' read -r -d '' email_html_part <<EOF
@@ -3445,7 +3455,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Classification:
-                    <mj-raw style="font-weight:500"></mj-raw></div>
+                    <mj-raw style="font-weight:500">${classification}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3458,7 +3468,7 @@ Content-Transfer-Encoding: 8bit
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Role:
-                    <mj-raw style="font-weight:500">${recipient}</mj-raw></div>
+                    <mj-raw style="font-weight:500">${roles}</mj-raw></div>
 
                 </td>
               </tr>
@@ -3686,7 +3696,7 @@ Content-Transfer-Encoding: 8bit
 
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
-                  ><mj-raw style="color: #00AB44">Edit</mj-raw> this alert's configuration file by logging into {node} and running the following command:</div>
+                  ><mj-raw style="color: #00AB44">Edit</mj-raw> this alert's configuration file by logging into $host and running the following command:</div>
 
                 </td>
               </tr>
@@ -3698,8 +3708,8 @@ Content-Transfer-Encoding: 8bit
 
                   <div
                     style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#555555;"
-                  >sudo {/etc/netdata}/edit-config health.d/{disks.conf} <br />
-                    The alarm to edit is at line {160}</div>
+                  >${edit_command} <br />
+                    The alarm to edit is at line {${line}}</div>
 
                 </td>
               </tr>

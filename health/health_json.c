@@ -2,7 +2,7 @@
 
 #include "health.h"
 
-void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
+static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
     if(value && *value) {
         buffer_sprintf(wb, "%s\"%s\":\"", prefix, label);
         buffer_strcat_htmlescape(wb, value);
@@ -12,6 +12,9 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
     else
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
+
+inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb,
@@ -35,6 +38,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"recipient\": \"%s\",\n"
                     "\t\t\"exec_code\": %d,\n"
                     "\t\t\"source\": \"%s\",\n"
+                    "\t\t\"command\": \"%s\",\n"
                     "\t\t\"units\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                     "\t\t\"duration\": %lu,\n"
@@ -68,6 +72,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
+                   , edit_command
                    , ae->units?ae->units:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
@@ -83,6 +88,8 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (unsigned long)ae->last_repeat
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
+
+    freez(edit_command);
 
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
 

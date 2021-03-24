@@ -484,6 +484,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(exec) ae->exec = strdupz(exec);
     if(recipient) ae->recipient = strdupz(recipient);
     if(source) ae->source = strdupz(source);
+
     if(units) ae->units = strdupz(units);
     if(info) ae->info = strdupz(info);
 

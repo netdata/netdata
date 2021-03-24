@@ -344,7 +344,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s'",
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
+
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -371,7 +373,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               n_warn,
               n_crit,
               buffer_tostring(warn_alarms),
-              buffer_tostring(crit_alarms)
+              buffer_tostring(crit_alarms),
+              ae->class?ae->class:"Unknown",
+              edit_command
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
@@ -382,12 +386,33 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
 
+    freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
 
     return; //health_alarm_wait_for_execution
 done:
     health_alarm_log_save(host, ae);
+}
+
+char *health_edit_command_from_source(const char *source)
+{
+    char buffer[FILENAME_MAX + 1];
+    char *temp = NULL;
+    temp = strdupz(source);
+    char *line_num     = strchr (temp, '@');
+    char *file_no_path = strrchr(temp, '/');
+
+    if (likely(file_no_path && line_num)) {
+        *line_num='\0';
+        snprintfz(buffer, FILENAME_MAX, "sudo %s/edit-config health.d/%s=%s", netdata_configured_user_config_dir, file_no_path+1, temp);
+    }
+    else
+        buffer[0]='\0';
+
+    freez(temp);
+
+    return strdupz(buffer);
 }
 
 static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
