@@ -16,6 +16,7 @@
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net (eBPF)"
 #define NETDATA_APPS_CACHESTAT_GROUP "page cache (eBPF)"
+#define NETDATA_APPS_DCSTAT_GROUP "directory cache (eBPF)"
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
@@ -109,8 +110,9 @@ struct target {
     uid_t uid;
     gid_t gid;
 
-    // Page cache statistic per process
+    // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
+    netdata_publish_dcstat_t dcstat;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;

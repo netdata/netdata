@@ -142,7 +142,42 @@ static void ebpf_dcstat_cleanup(void *ptr)
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     UNUSED(em);
-    UNUSED(ptr);
+    struct target *root = ptr;
+    ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
+                               NULL,
+                               EBPF_COMMON_DIMENSION_PERCENTAGE,
+                               NETDATA_APPS_DCSTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20100,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_CHART,
+                               NULL,
+                               EBPF_CACHESTAT_DIMENSION_HITS,
+                               NETDATA_APPS_DCSTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20101,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                               NULL,
+                               EBPF_COMMON_DIMENSION_FILES,
+                               NETDATA_APPS_DCSTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20102,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                               NULL,
+                               EBPF_COMMON_DIMENSION_FILES,
+                               NETDATA_APPS_DCSTAT_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20103,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
 }
 
 /*****************************************************************
@@ -150,6 +185,88 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *  MAIN LOOP
  *
  *****************************************************************/
+
+/**
+ * Apps Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ */
+static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out)
+{
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    netdata_dcstat_pid_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        netdata_dcstat_pid_t *w = &out[i];
+        total->reference += w->reference;
+        total->slow += w->slow;
+        total->miss += w->miss;
+    }
+}
+
+/**
+ * Save Pid values
+ *
+ * Save the current values inside the structure
+ *
+ * @param out     vector used to plot charts
+ * @param publish vector with values read from hash tables.
+ */
+static inline void dcstat_save_pid_values(netdata_publish_dcstat_t *out, netdata_dcstat_pid_t *publish)
+{
+    memcpy(&out->curr, &publish[0], sizeof(netdata_dcstat_pid_t));
+}
+
+/**
+ * Fill PID
+ *
+ * Fill PID structures
+ *
+ * @param current_pid pid that we are collecting data
+ * @param out         values read from hash tables;
+ */
+static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
+{
+    netdata_publish_dcstat_t *curr = dcstat_pid[current_pid];
+    if (!curr) {
+        curr = callocz(1, sizeof(netdata_publish_dcstat_t));
+        dcstat_pid[current_pid] = curr;
+    }
+
+    dcstat_save_pid_values(curr, publish);
+}
+
+/**
+ * Read APPS table
+ *
+ * Read the apps table and store data inside the structure.
+ */
+static void read_apps_table()
+{
+    netdata_dcstat_pid_t *cv = dcstat_vector;
+    uint32_t key;
+    struct pid_stat *pids = root_of_pids;
+    int fd = map_fd[NETDATA_DCSTAT_PID_STATS];
+    size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
+    while (pids) {
+        key = pids->pid;
+
+        if (bpf_map_lookup_elem(fd, &key, cv)) {
+            pids = pids->next;
+            continue;
+        }
+
+        dcstat_apps_accumulator(cv);
+
+        dcstat_fill_pid(key, cv);
+
+        // We are cleaning to avoid passing data read from one process to other.
+        memset(cv, 0, length);
+
+        pids = pids->next;
+    }
+}
 
 /**
  * Read global counter
@@ -190,15 +307,98 @@ void *ebpf_dcstat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_time;
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         read_global_table();
+
+        if (apps)
+            read_apps_table();
     }
     read_thread_closed = 1;
 
     return NULL;
+}
+
+/**
+ * Cachestat sum PIDs
+ *
+ * Sum values for all PIDs associated to a group
+ *
+ * @param publish  output structure.
+ * @param root     structure with listed IPs
+ */
+void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_target *root)
+{
+    memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
+    netdata_dcstat_pid_t *dst = &publish->curr;
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_publish_dcstat_t *w = dcstat_pid[pid];
+        if (w) {
+            netdata_dcstat_pid_t *src = &w->curr;
+            dst->reference += src->reference;
+            dst->slow += src->slow;
+            dst->miss += src->miss;
+        }
+
+        root = root->next;
+    }
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param root the target list.
+*/
+void ebpf_dcache_send_apps_data(struct target *root)
+{
+    struct target *w;
+    collected_number value;
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_dcstat_sum_pids(&w->dcstat, w->root_pid);
+
+            uint64_t references = w->dcstat.curr.reference;
+            uint64_t misses = w->dcstat.curr.miss;
+
+            dcstat_update_publish(&w->dcstat, references, misses);
+            value = (collected_number) w->dcstat.ratio;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->dcstat.curr.reference;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->dcstat.curr.slow;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = (collected_number) w->dcstat.curr.miss;
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
 }
 
 /**
@@ -238,6 +438,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
     netdata_publish_dcstat_t publish;
     memset(&publish, 0, sizeof(publish));
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -245,6 +446,9 @@ static void dcstat_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         dcstat_send_global(&publish);
+
+        if (apps)
+            ebpf_dcache_send_apps_data(apps_groups_root_target);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
