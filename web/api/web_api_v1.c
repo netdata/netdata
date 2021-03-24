@@ -511,8 +511,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
-        else
-            sql_build_context_param_list(&context_param_list, host, context, NULL);
+        else {
+            if (!chart_label_key)
+                sql_build_context_param_list(&context_param_list, host, context, NULL);
+        }
     }
     else {
         st = rrdset_find(host, chart);
