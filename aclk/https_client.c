@@ -422,7 +422,7 @@ err_exit:
 }
 
 int https_request(https_req_t *request, https_req_response_t *response) {
-    int rc = 0,ret;
+    int rc = 1, ret;
     char connect_port_str[PORT_STR_MAX_BYTES];
 
     const char *connect_host = request->proxy_host ? request->proxy_host : request->host;
@@ -435,7 +435,6 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
         error("Couldn't allocate buffer for RX data");
-        rc = 20;
         goto exit_req_ctx;
     }
 
@@ -444,13 +443,11 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
         error("Error connecting TCP socket to \"%s\"", connect_host);
-        rc = 30;
         goto exit_buf_rx;
     }
 
     if (fcntl(ctx->sock, F_SETFL, fcntl(ctx->sock, F_GETFL, 0) | O_NONBLOCK) == -1) {
         error("Error setting O_NONBLOCK to TCP socket.");
-        rc = 40;
         goto exit_sock;
     }
 
@@ -466,12 +463,10 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         ctx->request = &req;
         if (handle_http_request(ctx)) {
             error("Failed to CONNECT with proxy");
-            rc = 45;
             goto exit_sock;
         }
         if (ctx->parse_ctx.http_code != 200) {
             error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
-            rc = 46;
             goto exit_sock;
         }
         info("Proxy accepted CONNECT upgrade");
@@ -481,14 +476,12 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     ctx->ssl_ctx = security_initialize_openssl_client();
     if (ctx->ssl_ctx==NULL) {
         error("Cannot allocate SSL context");
-        rc = 50;
         goto exit_sock;
     }
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
     if (ctx->ssl==NULL) {
         error("Cannot allocate SSL");
-        rc = 60;
         goto exit_CTX;
     }
 
@@ -496,7 +489,6 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
         error("SSL could not connect");
-        rc = 70;
         goto exit_SSL;
     }
     if (ret == -1) {
@@ -505,7 +497,6 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         int ec = SSL_get_error(ctx->ssl, ret);
         if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
             error("Failed to start SSL connection");
-            rc = 75;
             goto exit_SSL;
         }
     }
@@ -514,7 +505,6 @@ int https_request(https_req_t *request, https_req_response_t *response) {
     // TODO actual request here
     if (handle_http_request(ctx)) {
         error("Couldn't process request");
-        rc = 90;
         goto exit_SSL;
     }
     response->http_code = ctx->parse_ctx.http_code;
@@ -535,6 +525,8 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         ((char*)response->payload)[response->payload_size] = 0; // mallocz(response->payload_size + 1);
     }
     info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
+
+    rc = 0;
 
 exit_SSL:
     SSL_free(ctx->ssl);
