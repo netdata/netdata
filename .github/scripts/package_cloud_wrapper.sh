@@ -29,7 +29,7 @@ fi
 # Install dependency if not there
 if ! command -v package_cloud > /dev/null 2>&1; then
 	echo "No package cloud gem found, installing"
-	gem install -V package_cloud || (echo "Package cloud installation failed. you might want to check if required dependencies are there (ruby gcc gcc-c++ ruby-devel)" && exit 1)
+	sudo gem install -V package_cloud || (echo "Package cloud installation failed. you might want to check if required dependencies are there (ruby gcc gcc-c++ ruby-devel)" && exit 1)
 else
 	echo "Found package_cloud gem, continuing"
 fi

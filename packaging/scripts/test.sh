@@ -39,3 +39,5 @@ cat ./response
 jq '.version' ./response || exit 1
 
 trap - EXIT
+
+cp -a /packages/* /artifacts
