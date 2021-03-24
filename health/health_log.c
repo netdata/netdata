@@ -147,9 +147,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
 
-                            , (ae->class)?ae->class:"UnknownS"
-                            , (ae->component)?ae->component:"UnknownS"
-                            , (ae->type)?ae->type:"UnknownS"
+                            , (ae->class)?ae->class:"Unknown"
+                            , (ae->component)?ae->component:"Unknown"
+                            , (ae->type)?ae->type:"Unknown"
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -266,6 +266,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                         continue;
                     }
                 }
+
             }
 
             if(unlikely(*pointers[0] == 'A')) {
@@ -367,15 +368,21 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
 
-            freez(ae->class);
-            ae->class       = strdupz(pointers[28]);
-            if(!*ae->class) { freez(ae->class); ae->class = NULL; }
-            ae->component   = strdupz(pointers[29]);
-            if(!*ae->component) { freez(ae->component); ae->component = NULL; }
-            ae->type        = strdupz(pointers[30]);
-            if(!*ae->type) { freez(ae->type); ae->type = NULL; }
-
             ae->last_repeat = last_repeat;
+
+            if (likely(entries > 28)) {
+                freez(ae->class);
+                ae->class       = strdupz(pointers[28]);
+                if(!*ae->class) { freez(ae->class); ae->class = NULL; }
+
+                freez(ae->component);
+                ae->component   = strdupz(pointers[29]);
+                if(!*ae->component) { freez(ae->component); ae->component = NULL; }
+
+                freez(ae->type);
+                ae->type        = strdupz(pointers[30]);
+                if(!*ae->type) { freez(ae->type); ae->type = NULL; }
+            }
 
             char value_string[100 + 1];
             freez(ae->old_value_string);
