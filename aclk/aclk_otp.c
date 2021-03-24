@@ -195,7 +195,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
-    https_req_response_t resp;
+    https_req_response_t resp = HTTPS_RES_RESPONSE_T_INITIALIZER;
 
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -210,7 +210,10 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     buffer_sprintf(url, "%s%s/challenge", OTP_URL_PREFIX, agent_id);
     req.url = url->buffer;
 
-    aclk_https_request(&req, &resp);
+    if (aclk_https_request(&req, &resp)) {
+        error ("ACLK_OTP Challenge failed");
+        goto cleanup;
+    }
     if (resp.http_code != 200) {
         error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
         goto cleanup_resp;
@@ -248,6 +251,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     debug(D_ACLK, "Password phase: %s",response_json);
 
     https_req_response_free(&resp);
+    memset(&resp, 0, sizeof(https_req_response_t));
 
     // POST password
     req.request_type = HTTP_REQ_POST;
@@ -256,8 +260,12 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     req.url = url->buffer;
     req.payload = response_json;
     req.payload_size = strlen(response_json);
-    aclk_https_request(&req, &resp);
-        if (resp.http_code != 201) {
+
+    if (aclk_https_request(&req, &resp)) {
+        error ("ACLK_OTP Password error trying to post result to password");
+        goto cleanup;
+    }
+    if (resp.http_code != 201) {
         error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
         goto cleanup_resp;
     }
