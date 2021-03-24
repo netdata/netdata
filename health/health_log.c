@@ -196,7 +196,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 32, entries = 0; //why was it 30 ? There should have been 28 entries
+        int max_entries = 33, entries = 0; //why was it 30 ? There should have been 28 entries
         char *pointers[max_entries];
 
         pointers[entries++] = s++;
