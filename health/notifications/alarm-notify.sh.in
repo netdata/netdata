@@ -3165,10 +3165,10 @@ Content-Transfer-Encoding: 8bit
 
                           <div
                             style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"
-                          ><mr-raw>
-              <span style="color: #FF4136; font-size:26px; background: #FFEBEF; 100%; padding:4px 24px; border-radius: 36px">${value_string}
+                          >
+              <span style="color: ${text_color}; font-size:26px; background: ${background_color}; padding:4px 24px; border-radius: 36px">${value_string}
               </span>
-                          </mr-raw></div>
+                          </div>
 
                         </td>
                       </tr>
@@ -3271,12 +3271,12 @@ Content-Transfer-Encoding: 8bit
                           >
                             <tr>
                               <td
-                                align="center" bgcolor="#FF4136" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;mso-padding-alt:10px 25px;background:#FF4136;" valign="middle"
+                                align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle"
                               >
                                 <p
-                                  style="display:inline-block;background:#FF4136;color:#ffffff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;font-weight:normal;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:10px 25px;mso-padding-alt:0px;border-radius:3px;"
+                                  style="display:block;background:${border_color};color:#ffffff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;font-weight:normal;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
                                 >
-                                  <a href="${goto_url}" style="color: #FFFFFF; text-decoration: none;">Go to Chart</a>
+                                  <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">Go to Chart</a>
                                 </p>
                               </td>
                             </tr>
