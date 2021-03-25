@@ -492,7 +492,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .clientid   = "anon",
             .username   = "anon",
             .password   = "anon",
-            .will_topic = aclk_get_topic(ACLK_TOPICID_METADATA),
+            .will_topic = NULL,
             .will_msg   = NULL,
             .will_flags = MQTT_WSS_PUB_QOS2,
             .keep_alive = 60
@@ -527,6 +527,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
+        // aclk_get_topic moved here as during OTP we
+        // generate the topic cache
+        mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_METADATA);
         mqtt_conn_params.clientid = mqtt_otp_user;
         mqtt_conn_params.username = mqtt_otp_user;
         mqtt_conn_params.password = mqtt_otp_pass;
