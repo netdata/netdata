@@ -125,7 +125,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
     UNUSED(em);
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
-                               NULL,
+                               "Percentage of files listed inside directory cache",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -134,7 +134,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_CHART,
-                               NULL,
+                               "Number of requestes for files present inside directory cache.",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -143,7 +143,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
-                               NULL,
+                               "Number of requests for files not present inside directory cache.",
                                EBPF_COMMON_DIMENSION_FILES,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -152,7 +152,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
-                               NULL,
+                               "Number of requests for files that were not found on filesystem.",
                                EBPF_COMMON_DIMENSION_FILES,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,

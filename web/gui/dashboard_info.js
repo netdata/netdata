@@ -1079,6 +1079,14 @@ netdataDashboard.context = {
         info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync_file_range.2.html" target="_blank">sync_file_range()</a> permits fine control when synchronizing the open file referred to by the file descriptor fd with disk. This system call is extremely dangerous and should not be used in portable programs.'
     },
 
+    'filesystem.dc_hit_ratio': {
+        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1)they are not present in the file system 2)the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'filesystem.dc_reference': {
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access and the file is present in the directory cache. <code>Miss</code> is when there is file access and the file is not found in the filesystem. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
     // ------------------------------------------------------------------------
     // network interfaces
 
@@ -1274,6 +1282,22 @@ netdataDashboard.context = {
 
     'apps.bandwidth_udp_recv': {
         info: 'Calls for function <code>udp_recvmsg</code>.'
+    },
+
+    'apps.dc_hit_ratio': {
+        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1)they are not present in the file system 2)the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_reference': {
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_not_cache': {
+        info: 'Counters of file accesses. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_not_found': {
+        info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
     },
 
     // ------------------------------------------------------------------------
