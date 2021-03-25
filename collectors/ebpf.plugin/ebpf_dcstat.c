@@ -134,7 +134,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_CHART,
-                               "Number of requestes for files present inside directory cache.",
+                               "Number of requests for files present inside directory cache.",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -500,7 +500,7 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
- * @return It always return NULL
+ * @return It always returns NULL
  */
 void *ebpf_dcstat_thread(void *ptr)
 {
