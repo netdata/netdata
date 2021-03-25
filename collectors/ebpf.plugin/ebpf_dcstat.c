@@ -42,13 +42,13 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
  * Update publish values before to write dimension.
  *
  * @param out   strcuture that will receive data.
- * @param hit   calls to search a specific file
+ * @param calls   calls to search a specific file
  * @param miss  calls that did not find files
  */
-void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t hit, uint64_t miss)
+void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t calls, uint64_t miss)
 {
-    calculated_number found = (calculated_number) (((long long)hit) - ((long long)miss));
-    calculated_number ratio = (hit != 0) ? found/(calculated_number)hit : 0;
+    calculated_number found = (calculated_number) (((long long)calls) - ((long long)miss));
+    calculated_number ratio = (calls != 0) ? found/(calculated_number)calls : 0;
 
     out->ratio = (long long )(ratio*100);
 }
