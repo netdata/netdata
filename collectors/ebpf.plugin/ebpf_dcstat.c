@@ -37,25 +37,6 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
  *****************************************************************/
 
 /**
- * Write charts
- *
- * Write the current information to publish the charts.
- *
- * @param family chart family
- * @param chart  chart id
- * @param dim    dimension name
- * @param v1     value.
- */
-static inline void dcstat_write_charts(char *family, char *chart, char *dim, long long v1)
-{
-    write_begin_chart(family, chart);
-
-    write_chart_dimension(dim, v1);
-
-    write_end_chart();
-}
-
-/**
  * Update publish
  *
  * Update publish values before to write dimension.
@@ -206,7 +187,7 @@ static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out)
 }
 
 /**
- * Save Pid values
+ * Save PID values
  *
  * Save the current values inside the structure
  *
@@ -269,7 +250,7 @@ static void read_apps_table()
 }
 
 /**
- * Read global counter
+ * Read global table
  *
  * Read the table with number of calls for all functions
  */
@@ -288,10 +269,10 @@ static void read_global_table()
 }
 
 /**
- * Socket read hash
+ * DCstat read hash
  *
  * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data.
  *
  * @param ptr It is a NULL value for this thread.
  *
@@ -416,8 +397,8 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
     ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
     ptr[NETDATA_DCSTAT_IDX_MISS].ncall = dcstat_hash_values[NETDATA_KEY_DC_MISS];
 
-    dcstat_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
-                        ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
+    ebpf_one_dimension_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
+                                    ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
 
     write_count_chart(NETDATA_DC_REQUEST_CHART, NETDATA_FILESYSTEM_FAMILY,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3);
@@ -462,11 +443,11 @@ static void dcstat_collector(ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Create global charts
+ * Create filesystem charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
  */
-static void ebpf_create_memory_charts()
+static void ebpf_create_filesystem_charts()
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files listed inside directory cache",
@@ -513,7 +494,7 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
  *****************************************************************/
 
 /**
- * Cachestat thread
+ * Directory Cache thread
  *
  * Thread used to make dcstat thread
  *
@@ -552,7 +533,7 @@ void *ebpf_dcstat_thread(void *ptr)
                        dcstat_counter_dimension_name, dcstat_counter_dimension_name,
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
-    ebpf_create_memory_charts();
+    ebpf_create_filesystem_charts();
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);
