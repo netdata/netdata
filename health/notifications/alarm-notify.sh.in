@@ -2860,6 +2860,7 @@ Content-Transfer-Encoding: 8bit
 
 
 
+
 <!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -2925,9 +2926,7 @@ Content-Transfer-Encoding: 8bit
       }
 
   </style>
-  <style type="text/css">.value { background-color: pink; display: inline }
-  .link { color: #00AB44; text-decoration: none;  }
-  .history-wrapper { max-width: 100% !important; }</style>
+
 
 </head>
 <body style="word-spacing:normal;">
@@ -2960,9 +2959,7 @@ Content-Transfer-Encoding: 8bit
                     <tr>
                       <td style="width:575px;">
 
-                        <img
-                          height="auto" src="https://app.netdata.cloud/static/email/img/header.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="575"
-                        />
+                        <img height="auto" src="https://app.netdata.cloud/static/email/img/header.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="575">
 
                       </td>
                     </tr>
@@ -3086,11 +3083,9 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
 
                       <tr>
-                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                          <div
-                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
-                          >on ${host}</div>
+                          <div style="font-family:IBM Plex Sans, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;">on ${host}</div>
 
                         </td>
                       </tr>
@@ -3126,14 +3121,10 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
 
                       <tr>
-                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                          <div
-                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"
-                          >
-              <span style="color: ${text_color}; font-size:26px; background: ${background_color}; padding:4px 24px; border-radius: 36px">${value_string}
-              </span>
-                          </div>
+                          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"><span style="color: ${text_color}; font-size:26px; background: ${background_color}; padding:4px 24px; border-radius: 36px">${value_string}
+            </span></div>
 
                         </td>
                       </tr>
@@ -3169,11 +3160,9 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
 
                       <tr>
-                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                          <div
-                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
-                          >${info}</div>
+                          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:21px;text-align:left;color:#555555;">Details: the percentage of time the disk was busy, during the last 10 minutes</div>
 
                         </td>
                       </tr>
@@ -3217,7 +3206,7 @@ Content-Transfer-Encoding: 8bit
                                 align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle"
                               >
                                 <p
-                                  style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:normal;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
+                                  style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:600;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
                                 >
                                   <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
                                 </p>
@@ -3274,11 +3263,9 @@ Content-Transfer-Encoding: 8bit
               <tbody>
 
               <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >Chart:
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;">Chart:
                     <span style="font-weight:700">${chart}</span></div>
 
                 </td>
@@ -3287,16 +3274,14 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >Family:
-                    <mj-raw style="font-weight:700">${family}</mj-raw></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;">Family:
+                    <span style="font-weight:700">${family}</span></div>
 
                 </td>
               </tr>
 
               <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:4px;word-break:break-word;">
 
                   <div
                     style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
@@ -3319,12 +3304,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >On
-                    <mj-raw style="font-weight:500">${date}</mj-raw></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">On
+                    <span style="font-weight:500">${date}</span></div>
 
                 </td>
               </tr>
@@ -3332,21 +3315,17 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >By:
-                    <mj-raw style="font-weight:500">${host}</mj-raw></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">By:
+                    <span style="font-weight:500">${host}</span></div>
 
                 </td>
               </tr>
 
               <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:4px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
-                  >Global time:
-                    <mj-raw style="font-weight:500">${date_utc}</mj-raw></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;">Global time:
+                    <span style="font-weight:500">${date_utc}</span></div>
 
                 </td>
               </tr>
@@ -3365,12 +3344,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >Classification:
-                    <mj-raw style="font-weight:500">${classification}</mj-raw></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">Classification:
+                    <span style="font-weight:500">${classification}</span></div>
 
                 </td>
               </tr>
@@ -3378,108 +3355,8 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
-                  >Role:
-                    <mj-raw style="font-weight:500">${roles}</mj-raw></div>
-
-                </td>
-              </tr>
-
-              </tbody>
-            </table>
-
-          </div>
-
-          <!--[if mso | IE]></td></tr></table><![endif]-->
-        </td>
-      </tr>
-      </tbody>
-    </table>
-
-  </div>
-
-
-  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
-
-
-  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
-
-    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
-      <tbody>
-      <tr>
-        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;">
-          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
-
-          <div
-            class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100px;"
-          >
-
-            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
-              <tbody>
-              <tr>
-                <td style="vertical-align:top;padding:0;">
-
-                  <table
-                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
-                  >
-                    <tbody>
-
-                    <tr>
-                      <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
-
-                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
-                          <tbody>
-                          <tr>
-                            <td style="width:50px;">
-
-                              <img
-                                height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
-                              />
-
-                            </td>
-                          </tr>
-                          </tbody>
-                        </table>
-
-                      </td>
-                    </tr>
-
-                    </tbody>
-                  </table>
-
-                </td>
-              </tr>
-              </tbody>
-            </table>
-
-          </div>
-
-          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:480px;" ><![endif]-->
-
-          <div
-            class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:80%;"
-          >
-
-            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
-              <tbody>
-
-              <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
-
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
-                  >Want to know more about this alert?</div>
-
-                </td>
-              </tr>
-
-              <tr>
-                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
-
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
-                  >Discuss and troubleshoot with others on the Netdata <a href="https://community.netdata.cloud/" class="link">community forums</a></div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">Role:
+                    <span style="font-weight:500">${roles}</span></div>
 
                 </td>
               </tr>
@@ -3529,9 +3406,7 @@ Content-Transfer-Encoding: 8bit
                           <tr>
                             <td style="width:50px;">
 
-                              <img
-                                height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
-                              />
+                              <img height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50">
 
                             </td>
                           </tr>
@@ -3563,9 +3438,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
-                  >Need to configure this alert?</div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;">Want to know more about this alert?</div>
 
                 </td>
               </tr>
@@ -3573,9 +3446,97 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
-                  ><mj-raw style="color: #00AB44">Edit</mj-raw> this alert's configuration file by logging into $host and running the following command:</div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;">Discuss and troubleshoot with others on the Netdata <a href="https://community.netdata.cloud/" class="link" style="color: #00AB44; text-decoration: none;">community forums</a></div>
+
+                </td>
+              </tr>
+
+              </tbody>
+            </table>
+
+          </div>
+
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+
+  </div>
+
+
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+
+
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
+
+          <div
+            class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100px;"
+          >
+
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding:0;">
+
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
+                          <tbody>
+                          <tr>
+                            <td style="width:50px;">
+
+                              <img height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50">
+
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+
+                    </tbody>
+                  </table>
+
+                </td>
+              </tr>
+              </tbody>
+            </table>
+
+          </div>
+
+          <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:480px;" ><![endif]-->
+
+          <div
+            class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:80%;"
+          >
+
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
+              <tbody>
+
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;">Need to configure this alert?</div>
+
+                </td>
+              </tr>
+
+              <tr>
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
+
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"><span style="color: #00AB44">Edit</span> this alert's configuration file by logging into $host and running the following command:</div>
 
                 </td>
               </tr>
@@ -3583,9 +3544,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:8px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#555555;"
-                  >${edit_command} <br />
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#555555;">${edit_command} <br>
                     The alarm to edit is at line {${line}}</div>
 
                 </td>
@@ -3608,7 +3567,7 @@ Content-Transfer-Encoding: 8bit
   <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="history-wrapper-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div class="history-wrapper" style="background:#F7F8F8;background-color:#F7F8F8;margin:0px auto;max-width:600px;">
+  <div class="history-wrapper" style="background: #F7F8F8; background-color: #F7F8F8; margin: 0px auto; max-width: 100%;">
 
     <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#F7F8F8;background-color:#F7F8F8;width:100%;">
       <tbody>
@@ -3633,12 +3592,10 @@ Content-Transfer-Encoding: 8bit
                       <tr>
                         <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                          <div
-                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;"
-                          >The node has
-                            <mj-raw style="font-weight:600">${total_warnings} warning</mj-raw>
+                          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">The node has
+                            <span style="font-weight:600">${total_warnings} warning</span>
                             and
-                            <mj-raw style="font-weight:600">${total_critical} critical</mj-raw>
+                            <span style="font-weight:600">${total_critical} critical</span>
                             alert(s)</div>
 
                         </td>
@@ -3689,9 +3646,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <div
-                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
-                  >© Netdata 2021 - The real-time performance and health monitoring</div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;">© Netdata 2021 - The real-time performance and health monitoring</div>
 
                 </td>
               </tr>
