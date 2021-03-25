@@ -30,6 +30,20 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
 
+/**
+ *  Algorithm description
+ *
+ *  The eBPF program adds one kprobe for `lookup_fast` and another kretprobe for `d_lookup`, with the following goals:
+ *
+ *  - Kprobe : When the operate system is searching a file it tries to find this file firstly inside the directory
+ *  cache, if there is success, the eBPF program reports a `reference` for the file inside the directory cache.
+ *
+ *  - kretprobe : When the operate system cannot find the file, it calls `d_lookup` to search the file system, this is
+ *  the `slow` road possible, because it is necessary to wait for device to find the files and return. When the return
+ *  is 0, we `miss` the file, or if you prefer the file was not found.
+ *
+ */
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
