@@ -2626,7 +2626,7 @@ if [ -n "$total_warn_alarms" ]; then
        elapsed_txt="${REPLY}"
 
        WARN_ALARMS+="
-       <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
+       <div class=\"set-font\" style=\"font-family: 'IBM Plex Sans', sans-serif; background: #FFFFFF; background-color: #FFFFFF; margin: 0px auto; max-width: 600px;\">
 
             <table
               align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\"
@@ -2660,9 +2660,7 @@ if [ -n "$total_warn_alarms" ]; then
                       </tr>
 
                       <tr>
-                        <td
-                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
-                        >
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
 
                           <div
                             style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
@@ -2689,9 +2687,7 @@ if [ -n "$total_warn_alarms" ]; then
                       <tr>
                         <td  style=\"vertical-align:top;padding-top:13px;\">
 
-                          <table
-                            border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"\" width=\"100%\"
-                          >
+                          <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style width=\"100%\">
                             <tbody>
 
                             <tr>
@@ -2745,7 +2741,7 @@ if [ -n "$total_crit_alarms" ]; then
        elapsed_txt="${REPLY}"
 
        CRIT_ALARMS+="
-       <div  style=\"background:#FFFFFF;background-color:#FFFFFF;margin:0px auto;max-width:600px;\">
+       <div class=\"set-font\" style=\"font-family: 'IBM Plex Sans', sans-serif; background: #FFFFFF; background-color: #FFFFFF; margin: 0px auto; max-width: 600px;\">
 
             <table
               align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"background:#FFFFFF;background-color:#FFFFFF;width:100%;\"
@@ -2779,9 +2775,7 @@ if [ -n "$total_crit_alarms" ]; then
                       </tr>
 
                       <tr>
-                        <td
-                          align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\"
-                        >
+                        <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
 
                           <div
                             style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
@@ -2808,9 +2802,7 @@ if [ -n "$total_crit_alarms" ]; then
                       <tr>
                         <td  style=\"vertical-align:top;padding-top:13px;\">
 
-                          <table
-                            border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"\" width=\"100%\"
-                          >
+                          <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style width=\"100%\">
                             <tbody>
 
                             <tr>
