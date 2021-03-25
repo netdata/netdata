@@ -2639,7 +2639,7 @@ if [ -n "$total_warn_alarms" ]; then
                   <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
 
                   <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
                   >
 
                     <table
@@ -2653,7 +2653,7 @@ if [ -n "$total_warn_alarms" ]; then
                         >
 
                           <div
-                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
+                            style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
                           >${key}</div>
 
                         </td>
@@ -2665,7 +2665,7 @@ if [ -n "$total_warn_alarms" ]; then
                         >
 
                           <div
-                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
+                            style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
                           >${date}</div>
 
                         </td>
@@ -2679,7 +2679,7 @@ if [ -n "$total_warn_alarms" ]; then
                   <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
 
                   <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
                   >
 
                     <table
@@ -2700,7 +2700,7 @@ if [ -n "$total_warn_alarms" ]; then
                               >
 
                                 <div
-                                  style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"
+                                  style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"
                                 ><span style=\"background-color:#FFEDB3; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px\">
               Warning for ${elapsed_txt}
            </span></div>
@@ -2758,7 +2758,7 @@ if [ -n "$total_crit_alarms" ]; then
                   <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
 
                   <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
                   >
 
                     <table
@@ -2772,7 +2772,7 @@ if [ -n "$total_crit_alarms" ]; then
                         >
 
                           <div
-                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
+                            style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#555555;\"
                           >${key}</div>
 
                         </td>
@@ -2784,7 +2784,7 @@ if [ -n "$total_crit_alarms" ]; then
                         >
 
                           <div
-                            style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
+                            style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
                           >${date}</div>
 
                         </td>
@@ -2798,7 +2798,7 @@ if [ -n "$total_crit_alarms" ]; then
                   <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
 
                   <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;\"
+                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
                   >
 
                     <table
@@ -2819,7 +2819,7 @@ if [ -n "$total_crit_alarms" ]; then
                               >
 
                                 <div
-                                  style=\"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"
+                                  style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"
                                 ><span style=\"background-color:#FFEDB3; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px\">
               Critical for ${elapsed_txt}
            </span></div>
@@ -2859,6 +2859,7 @@ Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
 
 
+
 <!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -2893,8 +2894,10 @@ Content-Transfer-Encoding: 8bit
 
   <!--[if !mso]><!-->
   <link href="https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" type="text/css">
   <style type="text/css">
       @import url(https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700);
+      @import url(https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap);
   </style>
   <!--<![endif]-->
 
@@ -2905,9 +2908,9 @@ Content-Transfer-Encoding: 8bit
           .mj-column-per-100 { width:100% !important; max-width: 100%; }
           .mj-column-per-70 { width:70% !important; max-width: 70%; }
           .mj-column-per-30 { width:30% !important; max-width: 30%; }
+          .mj-column-per-50 { width:50% !important; max-width: 50%; }
           .mj-column-px-100 { width:100px !important; max-width: 100px; }
           .mj-column-per-80 { width:80% !important; max-width: 80%; }
-          .mj-column-per-50 { width:50% !important; max-width: 50%; }
       }
   </style>
 
@@ -2930,46 +2933,32 @@ Content-Transfer-Encoding: 8bit
 <body style="word-spacing:normal;">
 
 
-<div
-  style=""
->
+<div style>
 
 
   <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="margin:0px auto;max-width:600px;">
+  <div style="margin:0px auto;max-width:600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:50px;text-align:center;"
-        >
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:50px;text-align:center;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
 
-          <div
-            class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-          >
+          <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
 
-                  <table
-                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
-                  >
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
                     <tbody>
                     <tr>
-                      <td  style="width:575px;">
+                      <td style="width:575px;">
 
                         <img
                           height="auto" src="https://app.netdata.cloud/static/email/img/header.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="575"
@@ -3000,47 +2989,35 @@ Content-Transfer-Encoding: 8bit
   <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="margin:0px auto;max-width:600px;">
+  <div style="margin:0px auto;max-width:600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
       <tr>
-        <td
-          style="border:1px solid ${border_color};direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-        >
-          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+        <td style="border:1px solid ${border_color};direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:598px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:418.6px;" ><![endif]-->
 
                   <div
                     class="mj-column-per-70 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:70%;"
                   >
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;"
-                        >
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
 
                           <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#555555;"
+                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#555555;"
                           >${name}</div>
 
                         </td>
@@ -3053,26 +3030,18 @@ Content-Transfer-Encoding: 8bit
 
                   <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:179.4px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-30 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:30%;"
-                  >
+                  <div class="mj-column-per-30 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:30%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
+                        <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                          <table
-                            border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
-                          >
+                          <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
                             <tbody>
                             <tr>
-                              <td  style="width:100px;">
+                              <td style="width:100px;">
 
                                 <img
                                   height="auto" src="${alarm_badge}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="100"
@@ -3100,37 +3069,27 @@ Content-Transfer-Encoding: 8bit
           </div>
 
 
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:598px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                           <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
+                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
                           >on ${host}</div>
 
                         </td>
@@ -3150,37 +3109,27 @@ Content-Transfer-Encoding: 8bit
           </div>
 
 
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:598px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;"
-                        >
+                        <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
 
                           <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"
+                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:26px;font-weight:700;line-height:1;text-align:left;color:#555555;"
                           >
               <span style="color: ${text_color}; font-size:26px; background: ${background_color}; padding:4px 24px; border-radius: 36px">${value_string}
               </span>
@@ -3203,37 +3152,27 @@ Content-Transfer-Encoding: 8bit
           </div>
 
 
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:598px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                           <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
+                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
                           >${info}</div>
 
                         </td>
@@ -3253,46 +3192,34 @@ Content-Transfer-Encoding: 8bit
           </div>
 
 
-          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+          <!--[if mso | IE]></td></tr></table></td></tr><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:598px;" width="598" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:598px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 598px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:598px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" vertical-align="middle" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
+                        <td align="center" vertical-align="middle" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                          <table
-                            border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;"
-                          >
+                          <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;">
                             <tr>
                               <td
                                 align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle"
                               >
                                 <p
-                                  style="display:block;background:${border_color};color:#ffffff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;font-weight:normal;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
+                                  style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:normal;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
                                 >
-                                  <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">Go to Chart</a>
+                                  <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
                                 </p>
                               </td>
                             </tr>
@@ -3327,55 +3254,41 @@ Content-Transfer-Encoding: 8bit
   <!--[if mso | IE]></td></tr></table><![endif]-->
 
 
-  <div
-    style="height:32px;line-height:32px;"
-  >&#8202;</div>
+  <div style="height:32px;line-height:32px;">&#8202;</div>
 
 
-  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="background:${background_color};background-color:${background_color};margin:0px auto;max-width:600px;">
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; background: ${background_color}; background-color: ${background_color}; margin: 0px auto; max-width: 600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:${background_color};background-color:${background_color};width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:${background_color};background-color:${background_color};width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-        >
+        <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
 
-          <div
-            class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-          >
+          <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Chart:
-                    <mj-raw style="font-weight:700">${chart}</mj-raw></div>
+                    <span style="font-weight:700">${chart}</span></div>
 
                 </td>
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Family:
                     <mj-raw style="font-weight:700">${family}</mj-raw></div>
 
@@ -3383,25 +3296,19 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
                   >${severity} ${raised_for}</div>
 
                 </td>
               </tr>
 
               <tr>
-                <td
-                  align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <p
-                    style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;"
-                  >
+                  <p style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;">
                   </p>
 
                   <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:550px;" role="presentation" width="550px" ><tr><td style="height:0;line-height:0;"> &nbsp;
@@ -3412,12 +3319,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >On
                     <mj-raw style="font-weight:500">${date}</mj-raw></div>
 
@@ -3425,12 +3330,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >By:
                     <mj-raw style="font-weight:500">${host}</mj-raw></div>
 
@@ -3438,12 +3341,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
                   >Global time:
                     <mj-raw style="font-weight:500">${date_utc}</mj-raw></div>
 
@@ -3451,13 +3352,9 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="center" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <p
-                    style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;"
-                  >
+                  <p style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:100%;">
                   </p>
 
                   <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" style="border-top:solid 1px lightgrey;font-size:1px;margin:0px auto;width:550px;" role="presentation" width="550px" ><tr><td style="height:0;line-height:0;"> &nbsp;
@@ -3468,12 +3365,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Classification:
                     <mj-raw style="font-weight:500">${classification}</mj-raw></div>
 
@@ -3481,12 +3376,10 @@ Content-Transfer-Encoding: 8bit
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:18px;line-height:1;text-align:left;color:#555555;"
                   >Role:
                     <mj-raw style="font-weight:500">${roles}</mj-raw></div>
 
@@ -3507,31 +3400,25 @@ Content-Transfer-Encoding: 8bit
   </div>
 
 
-  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="margin:0px auto;max-width:600px;">
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;"
-        >
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
 
           <div
             class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100px;"
           >
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
               <tr>
-                <td  style="vertical-align:top;padding:0;">
+                <td style="vertical-align:top;padding:0;">
 
                   <table
                     border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
@@ -3539,16 +3426,12 @@ Content-Transfer-Encoding: 8bit
                     <tbody>
 
                     <tr>
-                      <td
-                        align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                      >
+                      <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                        <table
-                          border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
-                        >
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
                           <tbody>
                           <tr>
-                            <td  style="width:50px;">
+                            <td style="width:50px;">
 
                               <img
                                 height="auto" src="https://app.netdata.cloud/static/email/img/community_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
@@ -3578,30 +3461,24 @@ Content-Transfer-Encoding: 8bit
             class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:80%;"
           >
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
                   >Want to know more about this alert?</div>
 
                 </td>
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
                   >Discuss and troubleshoot with others on the Netdata <a href="https://community.netdata.cloud/" class="link">community forums</a></div>
 
                 </td>
@@ -3621,48 +3498,36 @@ Content-Transfer-Encoding: 8bit
   </div>
 
 
-  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="margin:0px auto;max-width:600px;">
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;"
-        >
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:0;text-align:center;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:100px;" ><![endif]-->
 
           <div
             class="mj-column-px-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100px;"
           >
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
               <tr>
-                <td  style="vertical-align:top;padding:0;">
+                <td style="vertical-align:top;padding:0;">
 
-                  <table
-                    border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
-                  >
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
                     <tbody>
 
                     <tr>
-                      <td
-                        align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                      >
+                      <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                        <table
-                          border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
-                        >
+                        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;">
                           <tbody>
                           <tr>
-                            <td  style="width:50px;">
+                            <td style="width:50px;">
 
                               <img
                                 height="auto" src="https://app.netdata.cloud/static/email/img/configure_icon.png" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="50"
@@ -3692,42 +3557,34 @@ Content-Transfer-Encoding: 8bit
             class="mj-column-per-80 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:80%;"
           >
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#555555;"
                   >Need to configure this alert?</div>
 
                 </td>
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"
                   ><mj-raw style="color: #00AB44">Edit</mj-raw> this alert's configuration file by logging into $host and running the following command:</div>
 
                 </td>
               </tr>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;padding-top:8px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;padding-top:8px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.3;text-align:left;color:#555555;"
                   >${edit_command} <br />
                     The alarm to edit is at line {${line}}</div>
 
@@ -3751,47 +3608,33 @@ Content-Transfer-Encoding: 8bit
   <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="history-wrapper-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  class="history-wrapper" style="background:#F7F8F8;background-color:#F7F8F8;margin:0px auto;max-width:600px;">
+  <div class="history-wrapper" style="background:#F7F8F8;background-color:#F7F8F8;margin:0px auto;max-width:600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#F7F8F8;background-color:#F7F8F8;width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:#F7F8F8;background-color:#F7F8F8;width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:0;padding-bottom:24px;text-align:center;"
-        >
-          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+        <td style="direction:ltr;font-size:0px;padding:0;padding-bottom:24px;text-align:center;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="set-font-outlook" width="600px" ><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-          <div  style="margin:0px auto;max-width:600px;">
+          <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
 
-            <table
-              align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-            >
+            <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
               <tbody>
               <tr>
-                <td
-                  style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-                >
+                <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
 
-                  <div
-                    class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-                  >
+                  <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-                    <table
-                      border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-                    >
+                    <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
 
                       <tr>
-                        <td
-                          align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                        >
+                        <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                           <div
-                            style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;"
+                            style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;"
                           >The node has
                             <mj-raw style="font-weight:600">${total_warnings} warning</mj-raw>
                             and
@@ -3827,37 +3670,27 @@ Content-Transfer-Encoding: 8bit
   </div>
 
 
-  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div  style="margin:0px auto;max-width:600px;">
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
 
-    <table
-      align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
-    >
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
       <tr>
-        <td
-          style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;"
-        >
+        <td style="direction:ltr;font-size:0px;padding:20px 0;text-align:center;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:600px;" ><![endif]-->
 
-          <div
-            class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
-          >
+          <div class="mj-column-per-100 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
 
-            <table
-              border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%"
-            >
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
 
               <tr>
-                <td
-                  align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;"
-                >
+                <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
                   <div
-                    style="font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
+                    style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#555555;"
                   >© Netdata 2021 - The real-time performance and health monitoring</div>
 
                 </td>
