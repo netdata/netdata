@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- mqtt-c coverity fix [\#10851](https://github.com/netdata/netdata/pull/10851) ([underhood](https://github.com/underhood))
+- web/gui: make network state map sytanx consistent in the dashboard info [\#10849](https://github.com/netdata/netdata/pull/10849) ([ilyam8](https://github.com/ilyam8))
+- fix\_repeat: Update repeat\_every and avoid unecessary test [\#10846](https://github.com/netdata/netdata/pull/10846) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix agent crash when executing data query with context and non-existing chart\_label\_key [\#10844](https://github.com/netdata/netdata/pull/10844) ([stelfrag](https://github.com/stelfrag))
+- Check device names in diskstats plugin [\#10843](https://github.com/netdata/netdata/pull/10843) ([vlvkobal](https://github.com/vlvkobal))
 - Fix memory leak when archived data is requested [\#10837](https://github.com/netdata/netdata/pull/10837) ([stelfrag](https://github.com/stelfrag))
 - add Installation method to the bug template [\#10836](https://github.com/netdata/netdata/pull/10836) ([ilyam8](https://github.com/ilyam8))
 - Add lock check to avoid shutdown when compiled with internal and locking checks [\#10835](https://github.com/netdata/netdata/pull/10835) ([stelfrag](https://github.com/stelfrag))
@@ -18,6 +23,7 @@
 - health: apply adapter\_raid alarms for every logical/physical device [\#10820](https://github.com/netdata/netdata/pull/10820) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of nightly and release packages in GHA workflows. [\#10819](https://github.com/netdata/netdata/pull/10819) ([Ferroin](https://github.com/Ferroin))
 - health: log an error if any when send email notification [\#10818](https://github.com/netdata/netdata/pull/10818) ([ilyam8](https://github.com/ilyam8))
+- Ebpf extend sync [\#10814](https://github.com/netdata/netdata/pull/10814) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix coverity issue \(CID 367566\) [\#10813](https://github.com/netdata/netdata/pull/10813) ([stelfrag](https://github.com/stelfrag))
 - fix claiming via env vars in docker container [\#10811](https://github.com/netdata/netdata/pull/10811) ([ilyam8](https://github.com/ilyam8))
 - Fix eBPF compilation [\#10810](https://github.com/netdata/netdata/pull/10810) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -69,6 +75,7 @@
 - Add guide: Unsupervised anomaly detection for Raspberry Pi monitoring [\#10713](https://github.com/netdata/netdata/pull/10713) ([joelhans](https://github.com/joelhans))
 - Add Working Set charts to the cgroups plugin [\#10712](https://github.com/netdata/netdata/pull/10712) ([vlvkobal](https://github.com/vlvkobal))
 - python.d/smartd\_log: collect attribute 233 \(Media Wearout Indicator \(SSD\)\). [\#10711](https://github.com/netdata/netdata/pull/10711) ([aazedo](https://github.com/aazedo))
+- Add guide: Develop a custom data collector for Netdata in Python [\#10710](https://github.com/netdata/netdata/pull/10710) ([joelhans](https://github.com/joelhans))
 - New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add JSON output option for buildinfo. [\#10706](https://github.com/netdata/netdata/pull/10706) ([Ferroin](https://github.com/Ferroin))
 - Fix disk utilization and backlog charts [\#10705](https://github.com/netdata/netdata/pull/10705) ([vlvkobal](https://github.com/vlvkobal))
@@ -321,10 +328,6 @@
 - health: convert `elasticsearch\_last\_collected` alarm to template [\#10226](https://github.com/netdata/netdata/pull/10226) ([ilyam8](https://github.com/ilyam8))
 - streaming: fix a typo in the README.md [\#10225](https://github.com/netdata/netdata/pull/10225) ([ilyam8](https://github.com/ilyam8))
 - collectors/xenstat.plugin: recieved =\> received [\#10224](https://github.com/netdata/netdata/pull/10224) ([ilyam8](https://github.com/ilyam8))
-- dashboard\_info.js: fix a typo \(vernemq\) [\#10223](https://github.com/netdata/netdata/pull/10223) ([ilyam8](https://github.com/ilyam8))
-- Fix chart filtering [\#10218](https://github.com/netdata/netdata/pull/10218) ([vlvkobal](https://github.com/vlvkobal))
-- Don't stop Prometheus remote write collector when data is not available for dimension formatting [\#10217](https://github.com/netdata/netdata/pull/10217) ([vlvkobal](https://github.com/vlvkobal))
-- Fix coverity issues [\#10216](https://github.com/netdata/netdata/pull/10216) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
