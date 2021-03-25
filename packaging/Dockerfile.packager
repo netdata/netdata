@@ -36,7 +36,7 @@ ENV VERSION=$PKG_VERSION
 COPY ./packaging/scripts/install.sh /install.sh
 COPY ./packaging/scripts/test.sh /test.sh
 
-COPY --from=build /netdata/artifacts /artifacts
+COPY --from=build /netdata/artifacts /packages
 
 RUN /install.sh
 
