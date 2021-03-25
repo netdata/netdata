@@ -927,6 +927,12 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         freez(cachestat_pid[pid]);
         cachestat_pid[pid] = NULL;
     }
+
+    // Clean directory cache structure
+    if (dcstat_pid) {
+        freez(dcstat_pid[pid]);
+        dcstat_pid[pid] = NULL;
+    }
 }
 
 /**
