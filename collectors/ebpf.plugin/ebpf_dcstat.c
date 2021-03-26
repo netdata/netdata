@@ -30,20 +30,6 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
 
-/**
- *  Algorithm description
- *
- *  The eBPF program adds one kprobe for `lookup_fast` and another kretprobe for `d_lookup`, with the following goals:
- *
- *  - Kprobe : When the operate system is searching a file it tries to find this file firstly inside the directory
- *  cache, if there is success, the eBPF program reports a `reference` for the file inside the directory cache.
- *
- *  - kretprobe : When the operate system cannot find the file, it calls `d_lookup` to search the file system, this is
- *  the `slow` road possible, because it is necessary to wait for device to find the files and return. When the return
- *  is 0, we `miss` the file, or if you prefer the file was not found.
- *
- */
-
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
@@ -55,14 +41,14 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
  *
  * Update publish values before to write dimension.
  *
- * @param out   strcuture that will receive data.
- * @param calls   calls to search a specific file
- * @param miss  calls that did not find files
+ * @param out           strcuture that will receive data.
+ * @param cache_access  number of access to directory cache.
+ * @param not_found     number of files not found on the file system
  */
-void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t calls, uint64_t miss)
+void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
-    calculated_number found = (calculated_number) (((long long)calls) - ((long long)miss));
-    calculated_number ratio = (calls != 0) ? found/(calculated_number)calls : 0;
+    calculated_number in_cache = (calculated_number) (((long long)cache_access) - ((long long)not_found));
+    calculated_number ratio = (cache_access) ? in_cache/(calculated_number)cache_access : 0;
 
     out->ratio = (long long )(ratio*100);
 }
@@ -194,9 +180,9 @@ static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out)
     netdata_dcstat_pid_t *total = &out[0];
     for (i = 1; i < end; i++) {
         netdata_dcstat_pid_t *w = &out[i];
-        total->reference += w->reference;
-        total->slow += w->slow;
-        total->miss += w->miss;
+        total->cache_access += w->cache_access;
+        total->file_system += w->file_system;
+        total->not_found += w->not_found;
     }
 }
 
@@ -334,9 +320,9 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_targe
         netdata_publish_dcstat_t *w = dcstat_pid[pid];
         if (w) {
             netdata_dcstat_pid_t *src = &w->curr;
-            dst->reference += src->reference;
-            dst->slow += src->slow;
-            dst->miss += src->miss;
+            dst->cache_access += src->cache_access;
+            dst->file_system += src->file_system;
+            dst->not_found += src->not_found;
         }
 
         root = root->next;
@@ -358,10 +344,10 @@ void ebpf_dcache_send_apps_data(struct target *root)
         if (unlikely(w->exposed && w->processes)) {
             ebpf_dcstat_sum_pids(&w->dcstat, w->root_pid);
 
-            uint64_t references = w->dcstat.curr.reference;
-            uint64_t misses = w->dcstat.curr.miss;
+            uint64_t cache = w->dcstat.curr.cache_access;
+            uint64_t not_found = w->dcstat.curr.not_found;
 
-            dcstat_update_publish(&w->dcstat, references, misses);
+            dcstat_update_publish(&w->dcstat, cache, not_found);
             value = (collected_number) w->dcstat.ratio;
             write_chart_dimension(w->name, value);
         }
@@ -371,7 +357,7 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.reference;
+            value = (collected_number) w->dcstat.curr.cache_access;
             write_chart_dimension(w->name, value);
         }
     }
@@ -380,7 +366,7 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.slow;
+            value = (collected_number) w->dcstat.curr.file_system;
             write_chart_dimension(w->name, value);
         }
     }
@@ -389,7 +375,7 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.miss;
+            value = (collected_number) w->dcstat.curr.not_found;
             write_chart_dimension(w->name, value);
         }
     }

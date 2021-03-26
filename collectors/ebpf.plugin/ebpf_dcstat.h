@@ -43,9 +43,9 @@ enum directory_cache_counters {
 };
 
 typedef struct netdata_publish_dcstat_pid {
-    uint64_t reference;
-    uint64_t slow;
-    uint64_t miss;
+    uint64_t cache_access;
+    uint64_t file_system;
+    uint64_t not_found;
 } netdata_dcstat_pid_t;
 
 typedef struct netdata_publish_dcstat {
