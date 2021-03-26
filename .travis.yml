@@ -86,14 +86,6 @@ jobs:
       env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
-    - name: Build/Install for ubuntu 20.04 (not containerized)
-      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
-
-    - name: Build/install for CentOS 7 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
-
     - stage: Support activities on main branch
       name: Generate changelog for release (only on special and tagged commit msg)
       before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
