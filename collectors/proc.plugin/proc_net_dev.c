@@ -46,6 +46,8 @@ static struct netdev {
     int do_speed;
     int do_duplex;
     int do_operstate;
+    int do_carrier;
+    int do_mtu;
 
     const char *chart_type_net_bytes;
     const char *chart_type_net_packets;
@@ -57,6 +59,8 @@ static struct netdev {
     const char *chart_type_net_speed;
     const char *chart_type_net_duplex;
     const char *chart_type_net_operstate;
+    const char *chart_type_net_carrier;
+    const char *chart_type_net_mtu;
 
     const char *chart_id_net_bytes;
     const char *chart_id_net_packets;
@@ -68,6 +72,8 @@ static struct netdev {
     const char *chart_id_net_speed;
     const char *chart_id_net_duplex;
     const char *chart_id_net_operstate;
+    const char *chart_id_net_carrier;
+    const char *chart_id_net_mtu;
 
     const char *chart_family;
 
@@ -97,6 +103,8 @@ static struct netdev {
     kernel_uint_t speed;
     kernel_uint_t duplex;
     kernel_uint_t operstate;
+    unsigned long long carrier;
+    unsigned long long mtu;
 
     // charts
     RRDSET *st_bandwidth;
@@ -109,6 +117,8 @@ static struct netdev {
     RRDSET *st_speed;
     RRDSET *st_duplex;
     RRDSET *st_operstate;
+    RRDSET *st_carrier;
+    RRDSET *st_mtu;
 
     // dimensions
     RRDDIM *rd_rbytes;
@@ -132,13 +142,16 @@ static struct netdev {
     RRDDIM *rd_speed;
     RRDDIM *rd_duplex;
     RRDDIM *rd_operstate;
+    RRDDIM *rd_carrier;
+    RRDDIM *rd_mtu;
 
     char *filename_speed;
     RRDSETVAR *chart_var_speed;
 
     char *filename_duplex;
-
     char *filename_operstate;
+    char *filename_carrier;
+    char *filename_mtu;
 
     struct netdev *next;
 } *netdev_root = NULL, *netdev_last_used = NULL;
@@ -158,6 +171,8 @@ static void netdev_charts_release(struct netdev *d) {
     if(d->st_speed)      rrdset_is_obsolete(d->st_speed);
     if(d->st_duplex)     rrdset_is_obsolete(d->st_duplex);
     if(d->st_operstate)  rrdset_is_obsolete(d->st_operstate);
+    if(d->st_carrier)    rrdset_is_obsolete(d->st_carrier);
+    if(d->st_mtu)        rrdset_is_obsolete(d->st_mtu);
 
     d->st_bandwidth   = NULL;
     d->st_compressed  = NULL;
@@ -169,6 +184,8 @@ static void netdev_charts_release(struct netdev *d) {
     d->st_speed       = NULL;
     d->st_duplex      = NULL;
     d->st_operstate   = NULL;
+    d->st_carrier     = NULL;
+    d->st_mtu         = NULL;
 
     d->rd_rbytes      = NULL;
     d->rd_rpackets    = NULL;
@@ -191,6 +208,8 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_speed       = NULL;
     d->rd_duplex      = NULL;
     d->rd_operstate   = NULL;
+    d->rd_carrier     = NULL;
+    d->rd_mtu         = NULL;
 
     d->chart_var_speed     = NULL;
 }
@@ -206,6 +225,8 @@ static void netdev_free_chart_strings(struct netdev *d) {
     freez((void *)d->chart_type_net_speed);
     freez((void *)d->chart_type_net_duplex);
     freez((void *)d->chart_type_net_operstate);
+    freez((void *)d->chart_type_net_carrier);
+    freez((void *)d->chart_type_net_mtu);
 
     freez((void *)d->chart_id_net_bytes);
     freez((void *)d->chart_id_net_compressed);
@@ -217,6 +238,8 @@ static void netdev_free_chart_strings(struct netdev *d) {
     freez((void *)d->chart_id_net_speed);
     freez((void *)d->chart_id_net_duplex);
     freez((void *)d->chart_id_net_operstate);
+    freez((void *)d->chart_id_net_carrier);
+    freez((void *)d->chart_id_net_mtu);
 
     freez((void *)d->chart_family);
 }
@@ -230,6 +253,8 @@ static void netdev_free(struct netdev *d) {
     freez((void *)d->filename_speed);
     freez((void *)d->filename_duplex);
     freez((void *)d->filename_operstate);
+    freez((void *)d->filename_carrier);
+    freez((void *)d->filename_mtu);
     freez((void *)d);
     netdev_added--;
 }
@@ -354,6 +379,8 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     d->chart_type_net_speed      = strdupz(buffer);
     d->chart_type_net_duplex     = strdupz(buffer);
     d->chart_type_net_operstate  = strdupz(buffer);
+    d->chart_type_net_carrier    = strdupz(buffer);
+    d->chart_type_net_mtu        = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_%s", r->container_device);
     d->chart_id_net_bytes      = strdupz(buffer);
@@ -384,6 +411,12 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_operstate_%s", r->container_device);
     d->chart_id_net_operstate  = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_carrier_%s", r->container_device);
+    d->chart_id_net_carrier    = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_mtu_%s", r->container_device);
+    d->chart_id_net_mtu        = strdupz(buffer);
 
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);
@@ -492,6 +525,8 @@ static struct netdev *get_netdev(const char *name) {
     d->chart_type_net_speed      = strdupz("net_speed");
     d->chart_type_net_duplex     = strdupz("net_duplex");
     d->chart_type_net_operstate  = strdupz("net_operstate");
+    d->chart_type_net_carrier    = strdupz("net_carrier");
+    d->chart_type_net_mtu        = strdupz("net_mtu");
 
     d->chart_id_net_bytes      = strdupz(d->name);
     d->chart_id_net_compressed = strdupz(d->name);
@@ -503,6 +538,8 @@ static struct netdev *get_netdev(const char *name) {
     d->chart_id_net_speed      = strdupz(d->name);
     d->chart_id_net_duplex     = strdupz(d->name);
     d->chart_id_net_operstate  = strdupz(d->name);
+    d->chart_id_net_carrier    = strdupz(d->name);
+    d->chart_id_net_mtu        = strdupz(d->name);
 
     d->chart_family = strdupz(d->name);
     d->priority = NETDATA_CHART_PRIO_FIRST_NET_IFACE;
@@ -529,11 +566,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
-               do_events = -1, do_speed = -1, do_duplex = -1, do_operstate = -1;
+               do_events = -1, do_speed = -1, do_duplex = -1, do_operstate = -1, do_carrier = -1, do_mtu = -1;
     static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL,
                 *proc_net_dev_filename = NULL;
     static char *path_to_sys_class_net_duplex = NULL;
     static char *path_to_sys_class_net_operstate = NULL;
+    static char *path_to_sys_class_net_carrier = NULL;
+    static char *path_to_sys_class_net_mtu = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
@@ -553,6 +592,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
         path_to_sys_class_net_operstate = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device operstate", filename);
 
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/carrier");
+        path_to_sys_class_net_carrier = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device carrier", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/mtu");
+        path_to_sys_class_net_mtu = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device mtu", filename);
+
 
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
@@ -566,6 +611,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_speed        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "speed for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_duplex       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "duplex for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_operstate    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "operstate for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_carrier      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "carrier for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_mtu          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "mtu for all interfaces", CONFIG_BOOLEAN_AUTO);
 
         disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
     }
@@ -628,8 +675,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
                 d->filename_duplex = strdupz(buffer);
             }
+
             snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
             d->filename_operstate = strdupz(buffer);
+
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_carrier, d->name);
+            d->filename_carrier = strdupz(buffer);
+
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_mtu, d->name);
+            d->filename_mtu = strdupz(buffer);
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
@@ -648,6 +702,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->do_speed      = config_get_boolean_ondemand(buffer, "speed",      do_speed);
             d->do_duplex     = config_get_boolean_ondemand(buffer, "duplex",     do_duplex);
             d->do_operstate  = config_get_boolean_ondemand(buffer, "operstate",  do_operstate);
+            d->do_carrier    = config_get_boolean_ondemand(buffer, "carrier",    do_carrier);
+            d->do_mtu        = config_get_boolean_ondemand(buffer, "mtu",        do_mtu);
         }
 
         if(unlikely(!d->enabled))
@@ -725,6 +781,22 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             } else {
                 trimmed_buffer = trim(buffer);
                 d->operstate = get_operstate(trimmed_buffer);
+            }
+        }
+
+        if (d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
+            if (read_single_number_file(d->filename_carrier, &d->carrier)) {
+                error("Cannot refresh interface %s carrier state by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
+                freez(d->filename_carrier);
+                d->filename_carrier = NULL;
+            }
+        }
+
+        if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
+            if (read_single_number_file(d->filename_mtu, &d->mtu)) {
+                error("Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_carrier);
+                freez(d->filename_carrier);
+                d->filename_carrier = NULL;
             }
         }
 
@@ -895,6 +967,68 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             rrddim_set_by_pointer(d->st_operstate, d->rd_operstate, (collected_number)d->operstate);
             rrdset_done(d->st_operstate);
+        }
+
+        // --------------------------------------------------------------------
+
+        if(d->do_carrier != CONFIG_BOOLEAN_NO && d->filename_carrier) {
+            if(unlikely(!d->st_carrier)) {
+                d->st_carrier = rrdset_create_localhost(
+                        d->chart_type_net_carrier
+                        , d->chart_id_net_carrier
+                        , NULL
+                        , d->chart_family
+                        , "net.carrier"
+                        , "Inteface Physical Link State"
+                        , "state"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
+                        , d->priority + 10
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->st_carrier, RRDSET_FLAG_DETAIL);
+
+                rrdset_update_labels(d->st_carrier, d->chart_labels);
+
+                d->rd_carrier = rrddim_add(d->st_carrier, "carrier",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(d->st_carrier);
+
+            rrddim_set_by_pointer(d->st_carrier, d->rd_carrier, (collected_number)d->carrier);
+            rrdset_done(d->st_carrier);
+        }
+
+        // --------------------------------------------------------------------
+
+        if(d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
+            if(unlikely(!d->st_mtu)) {
+                d->st_mtu = rrdset_create_localhost(
+                        d->chart_type_net_mtu
+                        , d->chart_id_net_mtu
+                        , NULL
+                        , d->chart_family
+                        , "net.mtu"
+                        , "Interface MTU"
+                        , "octets"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
+                        , d->priority + 11
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->st_mtu, RRDSET_FLAG_DETAIL);
+
+                rrdset_update_labels(d->st_mtu, d->chart_labels);
+
+                d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(d->st_mtu);
+
+            rrddim_set_by_pointer(d->st_mtu, d->rd_mtu, (collected_number)d->mtu);
+            rrdset_done(d->st_mtu);
         }
 
         // --------------------------------------------------------------------
