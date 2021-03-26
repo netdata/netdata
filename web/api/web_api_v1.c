@@ -286,7 +286,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if      (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
         else if (!strcmp(name, "chart")) chart = value;
     }
 
