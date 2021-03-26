@@ -1065,6 +1065,10 @@ netdataDashboard.context = {
         info: 'State map: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up'
     },
 
+    'net.carrier': {
+        info: 'State map: 0 - down, 1 - up'
+    },
+
     // ------------------------------------------------------------------------
     // IP
 
