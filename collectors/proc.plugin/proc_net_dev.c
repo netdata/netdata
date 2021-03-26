@@ -1011,7 +1011,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , d->chart_family
                         , "net.mtu"
                         , "Interface MTU"
-                        , "bytes"
+                        , "octets"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 11
