@@ -13,10 +13,8 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
-    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
-
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
@@ -89,8 +87,6 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
-    freez(edit_command);
-
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
 
     if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
@@ -118,10 +114,9 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
     uint32_t hash_chart = 0;
     if (chart) hash_chart = simple_hash(chart);
     ALARM_ENTRY *ae;
-    for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
-        if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) {
-            if (likely(count))
-                buffer_strcat(wb, ",");
+    for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
+        if( (ae->unique_id > after && !chart) || (ae->unique_id > after && chart && ae->hash_chart==hash_chart && !strcmp(ae->chart, chart)) ) {
+            if(likely(count)) buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
             count++;
         }
@@ -321,9 +316,6 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
     int i;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
-
-        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
             continue;
 
         if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
