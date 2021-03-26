@@ -2244,7 +2244,7 @@ urlencode "${value_string}" >/dev/null
 url_value_string="${REPLY}"
 
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${context}&alarm_value=${url_value_string}"
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
