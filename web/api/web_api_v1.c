@@ -276,6 +276,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
+    char *chart = NULL;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -285,12 +286,13 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "chart")) chart = value;
     }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after);
+    health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 
