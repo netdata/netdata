@@ -29,6 +29,18 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     static unsigned long long pswpout = 0ULL;
     static unsigned long long oom_kill = 0ULL;
 
+    if(unlikely(!ff)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/vmstat");
+        ff = procfile_open(config_get("plugin:proc:/proc/vmstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) return 1;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+
+    size_t lines = procfile_lines(ff), l;
+
     if(unlikely(!arl_base)) {
         do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
         do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", CONFIG_BOOLEAN_YES);
@@ -68,18 +80,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             do_numa = CONFIG_BOOLEAN_NO;
         }
     }
-
-    if(unlikely(!ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/vmstat");
-        ff = procfile_open(config_get("plugin:proc:/proc/vmstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
-    }
-
-    ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
-
-    size_t lines = procfile_lines(ff), l;
 
     arl_begin(arl_base);
     for(l = 0; l < lines ;l++) {
