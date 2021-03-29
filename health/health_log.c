@@ -370,15 +370,15 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             if (likely(entries > 28)) {
                 freez(ae->class);
-                ae->class       = strdupz(pointers[28]);
+                ae->class = strdupz(pointers[28]);
                 if(!*ae->class) { freez(ae->class); ae->class = NULL; }
 
                 freez(ae->component);
-                ae->component   = strdupz(pointers[29]);
+                ae->component = strdupz(pointers[29]);
                 if(!*ae->component) { freez(ae->component); ae->component = NULL; }
 
                 freez(ae->type);
-                ae->type        = strdupz(pointers[30]);
+                ae->type = strdupz(pointers[30]);
                 if(!*ae->type) { freez(ae->type); ae->type = NULL; }
             }
 
