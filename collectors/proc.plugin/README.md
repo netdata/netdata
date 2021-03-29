@@ -291,6 +291,28 @@ each state.
 
 `schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
 
+## Monitoring memory
+
+### Monitored memory metrics
+
+-   **amount of memory swapped in/out**
+-   **amount of memory paged from/to disk**
+-   **number of memory page faults**
+-   **number of out of memory kills**
+-   **number of NUMA events**
+
+### Configuration
+
+```conf
+[plugin:proc:/proc/vmstat]
+	filename to monitor = /proc/vmstat
+	swap i/o = auto
+	disk i/o = yes
+	memory page faults = yes
+	out of memory kills = yes
+	system-wide numa metric summary = auto
+```
+
 ## Monitoring Network Interfaces
 
 ### Monitored network interface metrics
