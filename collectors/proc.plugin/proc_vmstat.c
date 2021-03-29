@@ -8,7 +8,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
-    static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_numa = -1;
+    static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_oom_kill = -1, do_numa = -1;
     static int has_numa = -1;
 
     static ARL_BASE *arl_base = NULL;
@@ -27,11 +27,13 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     static unsigned long long pgpgout = 0ULL;
     static unsigned long long pswpin = 0ULL;
     static unsigned long long pswpout = 0ULL;
+    static unsigned long long oom_kill = 0ULL;
 
     if(unlikely(!arl_base)) {
         do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
-        do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
-        do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
+        do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", CONFIG_BOOLEAN_YES);
+        do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", CONFIG_BOOLEAN_YES);
+        do_oom_kill = config_get_boolean("plugin:proc:/proc/vmstat", "out of memory kills", CONFIG_BOOLEAN_AUTO);
         do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
 
 
@@ -42,6 +44,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         arl_expect(arl_base, "pgpgout", &pgpgout);
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
+        arl_expect(arl_base, "oom_kill", &oom_kill);
 
         if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO &&
                                              (get_numa_node_count() >= 2 ||
@@ -191,6 +194,41 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_pgfaults, rd_minor, pgfault);
         rrddim_set_by_pointer(st_pgfaults, rd_major, pgmajfault);
         rrdset_done(st_pgfaults);
+    }
+
+        // --------------------------------------------------------------------
+
+    if (do_oom_kill == CONFIG_BOOLEAN_YES ||
+        (do_oom_kill == CONFIG_BOOLEAN_AUTO && (oom_kill || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        static RRDSET *st_oom_kill = NULL;
+        static RRDDIM *rd_oom_kill = NULL;
+
+        do_oom_kill = CONFIG_BOOLEAN_YES;
+
+        if(unlikely(!st_oom_kill)) {
+            st_oom_kill = rrdset_create_localhost(
+                    "mem"
+                    , "oom_kill"
+                    , NULL
+                    , "system"
+                    , NULL
+                    , "Out of Memory Kills"
+                    , "kills/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_SYSTEM_OOM_KILL
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_oom_kill, RRDSET_FLAG_DETAIL);
+
+            rd_oom_kill = rrddim_add(st_oom_kill, "kills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_oom_kill);
+
+        rrddim_set_by_pointer(st_oom_kill, rd_oom_kill, oom_kill);
+        rrdset_done(st_oom_kill);
     }
 
     // --------------------------------------------------------------------
