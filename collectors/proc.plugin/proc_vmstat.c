@@ -4,6 +4,8 @@
 
 #define PLUGIN_PROC_MODULE_VMSTAT_NAME "/proc/vmstat"
 
+#define OOM_KILL_STRING "oom_kill"
+
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -56,7 +58,21 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         arl_expect(arl_base, "pgpgout", &pgpgout);
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
-        arl_expect(arl_base, "oom_kill", &oom_kill);
+
+        int has_oom_kill = 0;
+        
+        for (l = 0; l < lines; l++) {
+            info ("OOM %s", procfile_lineword(ff, l, 0));
+            if (!strcmp(procfile_lineword(ff, l, 0), OOM_KILL_STRING)) {
+                has_oom_kill = 1;
+                break;
+            }
+        }
+
+        if (has_oom_kill)
+            arl_expect(arl_base, OOM_KILL_STRING, &oom_kill);
+        else
+            do_oom_kill = CONFIG_BOOLEAN_NO;
 
         if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO &&
                                              (get_numa_node_count() >= 2 ||
