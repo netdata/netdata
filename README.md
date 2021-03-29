@@ -34,11 +34,11 @@ People get addicted to Netdata. Once you use it on your systems, there's no goin
 ![Users who are addicted to
 Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11fd-11eb-85a3-53d3a84dcb29.png)
 
-> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.29.0, February 2, 2021**
+> **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.30.0, March 31, 2021**
 >
-> The v1.29.0 release of the Netdata Agent is a maintenance release that brings incremental but necessary improvements 
-> that make your monitoring experience more robust. We've pushed improvements and bug fixes to the installation and 
-> update scripts, enriched our library of collectors, and focused on fixing bugs reported by the community.
+> The v1.30.0 release of the Netdata Agent is a major release with major improvements to our packaging and how nodes
+> connect to Netdata Cloud when users opt-in to multi-node/infrastructure monitoring. We've also begun to push
+> improvements to the dashboard and our suite of preconfigured alarms, with much more to come.
 
 ## Menu
 
