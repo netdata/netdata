@@ -2244,7 +2244,7 @@ urlencode "${value_string}" >/dev/null
 url_value_string="${REPLY}"
 
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${context}&alarm_value=${url_value_string}"
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
@@ -2696,7 +2696,7 @@ if [ -n "$total_warn_alarms" ]; then
                             <tbody>
 
                             <tr>
-                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px 10px 0;word-break:break-word;\">
 
                                 <div style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"><span style=\"background-color:#FFF8E1; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px\">
               Warning for ${elapsed_txt}
@@ -2798,7 +2798,7 @@ if [ -n "$total_crit_alarms" ]; then
                             <tbody>
 
                             <tr>
-                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px 10px 0;word-break:break-word;\">
 
                                 <div style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"><span style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 2px 12px; margin-top: 20px\">
               Critical for ${elapsed_txt}
