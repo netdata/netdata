@@ -3142,7 +3142,7 @@ Content-Transfer-Encoding: 8bit
                       <tr>
                         <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
 
-                          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:21px;text-align:left;color:#555555;">Details: the percentage of time the disk was busy, during the last 10 minutes</div>
+                          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:21px;text-align:left;color:#555555;">Details: ${info}</div>
 
                         </td>
                       </tr>
@@ -3656,7 +3656,7 @@ EOF
 
 send_email <<EOF
 To: ${to_email}
-Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+Subject: ${status}: ${alarm}, on ${host}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
