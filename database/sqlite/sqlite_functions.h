@@ -61,4 +61,6 @@ extern void delete_dimension_uuid(uuid_t *dimension_uuid);
 extern void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value);
 extern void sql_build_context_param_list(struct context_param **param_list, RRDHOST *host, char *context, char *chart);
 extern void store_claim_id(uuid_t *host_id, uuid_t *claim_id);
+extern void update_node_id(uuid_t *host_id, uuid_t *node_id);
+extern int get_node_id(uuid_t *host_id, uuid_t *node_id);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
