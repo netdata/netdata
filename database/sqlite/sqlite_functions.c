@@ -1339,8 +1339,10 @@ failed:
     return;
 }
 
-#define SQL_STORE_CLAIM_ID  "insert or replace into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s'));"
+#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s')) " \
+    "on conflict(host_id) do update set node_id = null, claim_id = excluded.claim_id " \
+    "where claim_id <> excluded.claim_id;"
 
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
 {

@@ -164,6 +164,10 @@ void load_claiming_state(void)
         claimed_id = NULL;
     }
     localhost->aclk_state.claimed_id = claimed_id;
+
+    if (likely(claimed_id))
+        store_claim_id(&localhost->host_uuid, &uuid);
+
     rrdhost_aclk_state_unlock(localhost);
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);

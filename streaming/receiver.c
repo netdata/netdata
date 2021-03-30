@@ -130,6 +130,10 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
     host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+
+    if (likely(host->aclk_state.claimed_id))
+        store_claim_id(&host->host_uuid, &uuid);
+
     rrdhost_aclk_state_unlock(host);
 
     rrdpush_claimed_id(host);
