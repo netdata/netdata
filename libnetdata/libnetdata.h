@@ -279,6 +279,7 @@ extern void recursive_config_double_dir_load(
         , size_t depth
 );
 extern char *read_by_filename(char *filename, long *file_size);
+extern char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD

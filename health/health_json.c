@@ -87,6 +87,24 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
+    if (likely(ae->info)) {
+        char *m;
+
+        while ( m = strstr (ae->info, "$family") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "$family", ae->family, m);
+            freez(ae->info); ae->info = strdupz(buf);
+            freez(buf);
+        }
+
+        while ( m = strstr (ae->info, "${family}") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "${family}", ae->family, m);
+            freez(ae->info); ae->info = strdupz(buf);
+            freez(buf);
+        }
+    }
+
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
 
     if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
@@ -150,6 +168,27 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
+    char *replaced_info = NULL;
+
+    if (likely(rc->info)) {
+        char *m;
+        replaced_info = strdupz(rc->info);
+
+        while ( m = strstr (replaced_info, "$family") ) {
+            char *buf=NULL;
+            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
+            freez(replaced_info); replaced_info = strdupz(buf);
+            freez(buf);
+        }
+
+        while ( m = strstr (replaced_info, "${family}") ) {
+            char *buf=NULL;
+            buf = find_and_replace(replaced_info, "${family}", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
+            freez(replaced_info); replaced_info = strdupz(buf);
+            freez(buf);
+        }
+    }
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
@@ -197,7 +236,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source
                    , rc->units?rc->units:""
-                   , rc->info?rc->info:""
+                   , replaced_info?replaced_info:""
                    , rrdcalc_status2string(rc->status)
                    , (unsigned long)rc->last_status_change
                    , (unsigned long)rc->last_updated
@@ -268,6 +307,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t\t}");
+
+    freez(replaced_info);
 }
 
 //void health_rrdcalctemplate2json_nolock(BUFFER *wb, RRDCALCTEMPLATE *rt) {
