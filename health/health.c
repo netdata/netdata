@@ -306,35 +306,43 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = (ae->recipient) ? ae->recipient : host->health_default_recipient;
 
     int n_warn=0, n_crit=0;
+    int l_warn=0, l_crit=0;
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
     BUFFER *warn_alarms, *crit_alarms;
-    static char buf[12];
 
-    warn_alarms = buffer_create(1000); //enough?
-    crit_alarms = buffer_create(1000); //enough?
+    warn_alarms = buffer_create(1000);
+    crit_alarms = buffer_create(1000);
+
+    time_t now = now_realtime_sec();
 
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            if (n_warn) buffer_strcat(warn_alarms, ",");
             n_warn++;
-            buffer_strcat(warn_alarms, rc->name);
-            buffer_strcat(warn_alarms, "=");
-            snprintfz(buf, 11, "%ld", rc->last_status_change);
-            buffer_strcat(warn_alarms, buf);
+
+            if (now - rc->last_status_change <= 1800) {
+                if (l_warn) buffer_strcat(warn_alarms, ",");
+                buffer_strcat(warn_alarms, rc->name);
+                buffer_strcat(warn_alarms, "=");
+                buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
+                l_warn++;
+            }
                         
             if (ae->alarm_id == rc->id)
                 expr=rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            if (n_crit) buffer_strcat(crit_alarms, ",");
             n_crit++;
-            buffer_strcat(crit_alarms, rc->name);
-            buffer_strcat(crit_alarms, "=");
-            snprintfz(buf, 11, "%ld", rc->last_status_change);
-            buffer_strcat(crit_alarms, buf);
+
+            if (now - rc->last_status_change <= 1800) {
+                if (l_crit) buffer_strcat(crit_alarms, ",");
+                buffer_strcat(crit_alarms, rc->name);
+                buffer_strcat(crit_alarms, "=");
+                buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
+                l_crit++;
+            }
             
             if (ae->alarm_id == rc->id)
                 expr=rc->critical;
