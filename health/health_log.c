@@ -508,6 +508,13 @@ inline ALARM_ENTRY* health_create_alarm_entry(
             freez(ae->info); ae->info = strdupz(buf);
             freez(buf);
         }
+
+        while ( m = strstr (ae->info, "${family}") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "${family}", (ae->family)?ae->family:"Unknown", m);
+            freez(ae->info); ae->info = strdupz(buf);
+            freez(buf);
+        }
     }
 
     ae->old_status = old_status;

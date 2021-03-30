@@ -96,6 +96,13 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
             freez(ae->info); ae->info = strdupz(buf);
             freez(buf);
         }
+
+        while ( m = strstr (ae->info, "${family}") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "${family}", ae->family, m);
+            freez(ae->info); ae->info = strdupz(buf);
+            freez(buf);
+        }
     }
 
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
@@ -170,6 +177,13 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         while ( m = strstr (replaced_info, "$family") ) {
             char *buf=NULL;
             buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
+            freez(replaced_info); replaced_info = strdupz(buf);
+            freez(buf);
+        }
+
+        while ( m = strstr (replaced_info, "${family}") ) {
+            char *buf=NULL;
+            buf = find_and_replace(replaced_info, "${family}", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
             freez(replaced_info); replaced_info = strdupz(buf);
             freez(buf);
         }
