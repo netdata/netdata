@@ -12,12 +12,21 @@ wait_for() {
   name="${3}"
   timeout="30"
 
+  if command -v nc > /dev/null ; then
+    netcat="nc"
+  elif command -v netcat > /dev/null ; then
+    netcat="netcat"
+  else
+    printf "Unable to find a usable netcat command.\n"
+    return 1
+  fi
+
   printf "Waiting for %s on %s:%s ... " "${name}" "${host}" "${port}"
 
   sleep 30
 
   i=0
-  while ! nc -z "${host}" "${port}"; do
+  while ! ${netcat} -z "${host}" "${port}"; do
     sleep 1
     if [ "$i" -gt "$timeout" ]; then
       printf "Timed out!\n"
