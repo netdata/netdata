@@ -62,7 +62,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         int has_oom_kill = 0;
         
         for (l = 0; l < lines; l++) {
-            info ("OOM %s", procfile_lineword(ff, l, 0));
             if (!strcmp(procfile_lineword(ff, l, 0), OOM_KILL_STRING)) {
                 has_oom_kill = 1;
                 break;
