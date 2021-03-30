@@ -486,7 +486,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(source) ae->source = strdupz(source);
 
     if(units) ae->units = strdupz(units);
-    if(info) ae->info = strdupz(info);
 
     ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
@@ -498,6 +497,18 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     char value_string[100 + 1];
     ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
     ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+
+    if (likely(info)) {
+        char *m;
+        ae->info = strdupz(info);
+
+        while ( m = strstr (ae->info, "$family") ) {
+            char *buf=NULL;
+            buf = find_and_replace(ae->info, "$family", (ae->family)?ae->family:"Unknown", m);
+            freez(ae->info); ae->info = strdupz(buf);
+            freez(buf);
+        }
+    }
 
     ae->old_status = old_status;
     ae->new_status = new_status;
