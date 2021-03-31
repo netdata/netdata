@@ -148,10 +148,6 @@ void sqlite_worker(void* arg)
                 case SQLITEOP_CLEANUP:
                     sql_maint_database();
                     break;
-                case SQLITEOP_UPD_CHART:
-                    break;
-                case SQLITEOP_UPD_ALERT:
-                    break;
                 case SQLITEOP_SHUTDOWN:
                     shutdown = 1;
                     break;
