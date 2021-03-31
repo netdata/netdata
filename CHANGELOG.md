@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...v1.30.0)
 
 **Merged pull requests:**
 
+- Properly handle different netcat command names in binary package test code. [\#10883](https://github.com/netdata/netdata/pull/10883) ([Ferroin](https://github.com/Ferroin))
 - Add carrier and mtu charts for network interfaces [\#10866](https://github.com/netdata/netdata/pull/10866) ([vlvkobal](https://github.com/vlvkobal))
 - Fix typo in main.h [\#10858](https://github.com/netdata/netdata/pull/10858) ([eltociear](https://github.com/eltociear))
 - health: improve alarms infos [\#10853](https://github.com/netdata/netdata/pull/10853) ([ilyam8](https://github.com/ilyam8))
@@ -329,12 +330,6 @@
 - Add kernel to blacklist [\#10262](https://github.com/netdata/netdata/pull/10262) ([thiagoftsm](https://github.com/thiagoftsm))
 - Made the update script significantly more robust and user friendly. [\#10261](https://github.com/netdata/netdata/pull/10261) ([Ferroin](https://github.com/Ferroin))
 - new issue templates [\#10259](https://github.com/netdata/netdata/pull/10259) ([OdysLam](https://github.com/OdysLam))
-- Docs: Point users to proper configure doc [\#10254](https://github.com/netdata/netdata/pull/10254) ([joelhans](https://github.com/joelhans))
-- Docs: Cleanup and fix broken links [\#10253](https://github.com/netdata/netdata/pull/10253) ([joelhans](https://github.com/joelhans))
-- Update CONTRIBUTING.md [\#10252](https://github.com/netdata/netdata/pull/10252) ([joelhans](https://github.com/joelhans))
-- updated 3rd party static dependencies and use alpine 3.12 [\#10241](https://github.com/netdata/netdata/pull/10241) ([ktsaou](https://github.com/ktsaou))
-- Fix streaming buffer size [\#10240](https://github.com/netdata/netdata/pull/10240) ([vlvkobal](https://github.com/vlvkobal))
-- dashboard v2.9.2 [\#10239](https://github.com/netdata/netdata/pull/10239) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
