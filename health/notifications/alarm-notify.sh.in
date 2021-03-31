@@ -2835,6 +2835,14 @@ if [ -n "$edit_command_line" ]; then
     IFS='=' read -r edit_command line <<<"$edit_command_line"
 fi
 
+if [ -n "$total_warn_alarms" ] || [ -n "$total_crit_alarms" ]; then
+    ACTIVE_ALERTS_HEADER="Alerts raised during the last 30 minutes:"
+elif [ -z "$total_warn_alarms" ] && [ -z "$total_crit_alarms" ]; then
+    if [ "$total_warnings" -ne "0" ] || [ "$total_critical" -ne "0" ]; then
+        ACTIVE_ALERTS_HEADER="No alerts raised during the last 30 minutes"
+    fi
+fi
+
 IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
@@ -3596,7 +3604,7 @@ Content-Transfer-Encoding: 8bit
 
           </div>
 
-          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:center;color:#555555;">Alerts active for the last 30 minutes:</div>
+          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:center;color:#555555;">${ACTIVE_ALERTS_HEADER}</div>
 
           ${CRIT_ALARMS}
 
@@ -3675,6 +3683,8 @@ ${email_html_part}
 EOF
 
 fi
+
+echo $email_html_part > /home/evas/lala.html
 
 SENT_EMAIL=$?
 
