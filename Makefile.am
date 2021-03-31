@@ -389,6 +389,8 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/sqlite/sqlite_functions.c \
     database/sqlite/sqlite_functions.h \
+	database/sqlite/sqlite_event_loop.c \
+	database/sqlite/sqlite_event_loop.h \
     database/sqlite/sqlite3.c \
     database/sqlite/sqlite3.h \
     $(NULL)
