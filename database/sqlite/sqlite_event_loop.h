@@ -66,5 +66,5 @@ struct sqlite_worker_config {
 };
 
 extern void sqlite_worker(void* arg);
-
+extern void sqlite_enq_cmd(struct sqlite_worker_config *wc, struct sqlite_cmd *cmd);
 #endif //NETDATA_SQLITE_EVENT_LOOP_H
