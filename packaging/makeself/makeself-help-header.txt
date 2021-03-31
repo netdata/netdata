@@ -43,7 +43,7 @@
   Check its full license at:
   https://github.com/netdata/netdata/blob/master/LICENSE.md
 
-  Anonymous stat collection and reporting to Google Analytics is enabled
+  Anonymous stat collection and reporting to Netdata is enabled
   by default. To disable, pass --disable-telemetry option to the installer
   or export the environment variable DO_NOT_TRACK to a non-zero or non-empty
   value (e.g export DO_NOT_TRACK=1).
