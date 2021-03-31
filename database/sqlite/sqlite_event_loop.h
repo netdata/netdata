@@ -62,4 +62,6 @@ struct sqlite_worker_config {
     int error;
 };
 
+extern void sqlite_worker(void* arg);
+
 #endif //NETDATA_SQLITE_EVENT_LOOP_H
