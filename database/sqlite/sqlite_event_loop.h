@@ -10,7 +10,8 @@ enum sqlite_opcode {
     /* can be used to return empty status or flush the command queue */
     SQLITEOP_NOOP = 0,
     SQLITEOP_CLEANUP,
-    SQLITEOP_PAGE,
+    SQLITEOP_UPD_CHART,
+    SQLITEOP_UPD_ALERT,
     SQLITEOP_SHUTDOWN,
     SQLITEOP_MAX_OPCODE
 };
