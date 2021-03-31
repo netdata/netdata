@@ -12,7 +12,7 @@ void sqlite_init_cmd_queue(struct sqlite_worker_config* wc)
     fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
 }
 
-void sqlite_enq_cmd(struct sqlite_worker_config* wc, struct sqlite_cmd *cmd)
+void sqlite_enq_cmd(struct sqlite_worker_config *wc, struct sqlite_cmd *cmd)
 {
     unsigned queue_size;
 
@@ -73,11 +73,13 @@ static void async_cb(uv_async_t *handle)
 
 static void timer_cb(uv_timer_t* handle)
 {
-    struct sqlite_worker_config* wc = handle->data;
-    //struct sqlite_instance *ctx = wc->ctx;
-
+    struct sqlite_worker_config *wc = handle->data;
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+
+    struct sqlite_cmd cmd;
+    cmd.opcode = SQLITEOP_CLEANUP;
+    sqlite_enq_cmd(wc, &cmd);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -85,7 +87,6 @@ static void timer_cb(uv_timer_t* handle)
 void sqlite_worker(void* arg)
 {
     struct sqlite_worker_config* wc = arg;
-    //struct rrdengine_instance *ctx = wc->ctx;
     uv_loop_t* loop;
     int shutdown, ret;
     enum sqlite_opcode opcode;
@@ -110,14 +111,6 @@ void sqlite_worker(void* arg)
     }
     wc->async.data = wc;
 
-    //wc->now_deleting_files = NULL;
-    //wc->cleanup_thread_deleting_files = 0;
-
-    //wc->now_invalidating_dirty_pages = NULL;
-    //wc->cleanup_thread_invalidating_dirty_pages = 0;
-    //wc->inflight_dirty_pages = 0;
-
-    /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
     if (ret) {
         error("uv_timer_init(): %s", uv_strerror(ret));
@@ -151,6 +144,12 @@ void sqlite_worker(void* arg)
             switch (opcode) {
                 case SQLITEOP_NOOP:
                     /* the command queue was empty, do nothing */
+
+                    break;
+                case SQLITEOP_CLEANUP:
+                    info("Starting database cleanup");
+                    sql_maint_database();
+                    info("Ending database cleanup");
                     break;
                 case SQLITEOP_SHUTDOWN:
                     /* the command queue was empty, do nothing */
@@ -172,11 +171,6 @@ void sqlite_worker(void* arg)
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
-
-//    while (do_flush_pages(wc, 1, NULL)) {
-//        ; /* Force flushing of all committed pages. */
-//    }
-//    wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
     info("Shutting down SQLITE engine event loop complete.");

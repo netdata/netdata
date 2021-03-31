@@ -4,10 +4,12 @@
 #ifndef NETDATA_SQLITE_EVENT_LOOP_H
 #define NETDATA_SQLITE_EVENT_LOOP_H
 #include <uv.h>
+#include "sqlite_functions.h"
 
 enum sqlite_opcode {
     /* can be used to return empty status or flush the command queue */
     SQLITEOP_NOOP = 0,
+    SQLITEOP_CLEANUP,
     SQLITEOP_PAGE,
     SQLITEOP_SHUTDOWN,
     SQLITEOP_MAX_OPCODE
