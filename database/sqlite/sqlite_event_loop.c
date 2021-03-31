@@ -144,15 +144,15 @@ void sqlite_worker(void* arg)
             switch (opcode) {
                 case SQLITEOP_NOOP:
                     /* the command queue was empty, do nothing */
-
                     break;
                 case SQLITEOP_CLEANUP:
-                    info("Starting database cleanup");
                     sql_maint_database();
-                    info("Ending database cleanup");
+                    break;
+                case SQLITEOP_UPD_CHART:
+                    break;
+                case SQLITEOP_UPD_ALERT:
                     break;
                 case SQLITEOP_SHUTDOWN:
-                    /* the command queue was empty, do nothing */
                     shutdown = 1;
                     break;
                 default:
