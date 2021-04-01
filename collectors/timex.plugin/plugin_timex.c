@@ -76,6 +76,33 @@ void *timex_main(void *ptr)
             rrdset_done(st_sync_state);
         }
 
+        if (do_sync) {
+            static RRDSET *st_offset = NULL;
+            static RRDDIM *rd_offset;
+
+            if (unlikely(!st_offset)) {
+                st_offset = rrdset_create_localhost(
+                    "timex",
+                    "offset",
+                    NULL,
+                    "timex",
+                    NULL,
+                    "Time offset",
+                    "nanoseconds",
+                    PLUGIN_TIMEX_NAME,
+                    NULL,
+                    NETDATA_CHART_PRIO_TIMEX_OFFSET,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                rd_offset = rrddim_add(st_offset, "offset", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            } else
+                rrdset_next(st_offset);
+
+            rrddim_set_by_pointer(st_offset, rd_offset, timex_buf.offset);
+            rrdset_done(st_offset);
+        }
+
         if (unlikely(netdata_exit))
             break;
 

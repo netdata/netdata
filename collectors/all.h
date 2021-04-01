@@ -305,6 +305,7 @@
 
 // System Clock
 #define NETDATA_CHART_PRIO_TIMEX_STATE                8900
+#define NETDATA_CHART_PRIO_TIMEX_OFFSET               8910
 
 // MDSTAT
 
