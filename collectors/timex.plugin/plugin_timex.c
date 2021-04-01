@@ -166,11 +166,10 @@ void *timex_main(void *ptr)
 
             rrddim_set_by_pointer(st_duration, rd_duration, duration);
             rrdset_done(st_duration);
-
-            // ----------------------------------------------------------------
-
-            if(unlikely(netdata_exit)) break;
         }
+
+        if (unlikely(netdata_exit))
+            break;
     }
 
     netdata_thread_cleanup_pop(1);
