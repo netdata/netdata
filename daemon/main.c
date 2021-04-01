@@ -93,6 +93,7 @@ struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_PLUGINSD
     NETDATA_PLUGIN_HOOK_HEALTH
+    NETDATA_PLUGIN_HOOK_ANALYTICS
 
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };
@@ -1304,6 +1305,19 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+
+    //check if ANALYTICS needs to start
+    if (netdata_anonymous_statistics_enabled==1) {
+        for (i = 0; static_threads[i].name != NULL ; i++) {
+            if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
+                struct netdata_static_thread *st = &static_threads[i];
+                st->thread = mallocz(sizeof(netdata_thread_t));
+                st->enabled = 1;
+                debug(D_SYSTEM, "Starting thread %s.", st->name);
+                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            }
+        }
+    }
 
     // ------------------------------------------------------------------------
     // Report ACLK build failure

@@ -1,5 +1,41 @@
 #include "common.h"
 
+void analytics_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    debug(D_ANALYTICS, "Cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *analytics_main(void *ptr) {
+    netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
+    int sec = 0;
+
+    debug(D_ANALYTICS, "Analytics thread starts");
+
+    while(!netdata_exit) {
+        sleep(1);
+        ++sec;
+
+        if (unlikely(sec >= ANALYTICS_MAX_SLEEP_SEC))
+            break;
+
+        if (unlikely(netdata_exit))
+            goto cleanup;
+    }
+
+    if (unlikely(netdata_exit))
+        goto cleanup;
+
+    send_statistics("META", "-", "-");
+
+ cleanup:
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+
 static const char *verify_required_directory(const char *dir) {
     if(chdir(dir) == -1)
         fatal("Cannot change directory to '%s'", dir);
