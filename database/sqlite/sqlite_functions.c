@@ -19,6 +19,7 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
+    "CREATE TABLE IF NOT EXISTS agent_log (status, date_created);"
 
     "delete from chart_active;",
     "delete from dimension_active;",
@@ -205,6 +206,13 @@ void sql_close_database(void)
     info("Closing SQLite database");
 
     add_stmt_to_list(NULL);
+
+    char *err_msg = NULL;
+    rc = sqlite3_exec(db_meta, "delete from agent_log;", 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        info("Failed to record that the agent is shutting down properly, rc = %d (%s)", rc, err_msg);
+        sqlite3_free(err_msg);
+    }
 
     rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
@@ -1337,4 +1345,37 @@ failed:
     UNUSED(chart);
 #endif
     return;
+}
+
+
+#define SQL_CHECK_SHUTDOWN      "select status from agent_log;"
+#define SQL_RECORD_AGENT_START  "insert into agent_log (status, date_created) values ('STARTED',  strftime('%s'));"
+
+int is_restart_after_crash()
+{
+    int rc;
+    int crash_rc;
+    char *err_msg = NULL;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_CHECK_SHUTDOWN, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+       error_report("Failed to prepare statement to check crash status");
+       return 0;
+    }
+    crash_rc = sqlite3_step(res);
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when checking crash status");
+
+    // Try to insert only if it doesn't exist
+    if (likely(crash_rc != SQLITE_ROW)) {
+        rc = sqlite3_exec(db_meta, SQL_RECORD_AGENT_START, 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
+            sqlite3_free(err_msg);
+        }
+    }
+    return (crash_rc == SQLITE_ROW);
 }

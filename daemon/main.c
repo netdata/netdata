@@ -1455,6 +1455,8 @@ int main(int argc, char **argv) {
 
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+    int crash_detected = is_restart_after_crash();
+
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
@@ -1498,6 +1500,8 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+    if (crash_detected)
+        send_statistics("CRASH", "-", "-");
 
     // ------------------------------------------------------------------------
     // Report ACLK build failure
