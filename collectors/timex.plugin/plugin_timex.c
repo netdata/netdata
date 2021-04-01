@@ -156,7 +156,7 @@ void *timex_main(void *ptr)
                     "milliseconds/run",
                     PLUGIN_TIMEX_NAME,
                     NULL,
-                    132021,
+                    NETDATA_CHART_PRIO_NETDATA_TIMEX + 1,
                     update_every,
                     RRDSET_TYPE_AREA);
 
