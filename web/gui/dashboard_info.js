@@ -127,6 +127,12 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'timex': {
+        title: 'System Clock',
+        icon: '<i class="fas fa-clock"></i>',
+        info: 'Charts with information about the system clock synchronization state.'
+    },
+
     'sensors': {
         title: 'Sensors',
         icon: '<i class="fas fa-leaf"></i>',
@@ -1448,12 +1454,19 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
-    'mysql.net': {
-        info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
+    // ------------------------------------------------------------------------
+    // System Clock
+    
+    'timex.state': {
+        info: 'State map: 0 - not synchronized, 1 - synchronized'
     },
 
     // ------------------------------------------------------------------------
     // MYSQL
+
+    'mysql.net': {
+        info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
+    },
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +

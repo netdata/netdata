@@ -47,7 +47,37 @@ void *timex_main(void *ptr)
         int sync_state = 0;
         sync_state = adjtimex(&timex_buf);
 
-        if(unlikely(netdata_exit)) break;
+        // ----------------------------------------------------------------
+
+        if (do_sync) {
+            static RRDSET *st_sync_state = NULL;
+            static RRDDIM *rd_sync_state;
+
+            if (unlikely(!st_sync_state)) {
+                st_sync_state = rrdset_create_localhost(
+                    "timex",
+                    "state",
+                    NULL,
+                    "timex",
+                    NULL,
+                    "System Clock Synchronization State",
+                    "state",
+                    PLUGIN_TIMEX_NAME,
+                    NULL,
+                    NETDATA_CHART_PRIO_TIMEX_STATE,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                rd_sync_state = rrddim_add(st_sync_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            } else
+                rrdset_next(st_sync_state);
+
+            rrddim_set_by_pointer(st_sync_state, rd_sync_state, sync_state != TIME_ERROR ? 1 : 0);
+            rrdset_done(st_sync_state);
+        }
+
+        if (unlikely(netdata_exit))
+            break;
 
         if(vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
