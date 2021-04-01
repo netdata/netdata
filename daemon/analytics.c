@@ -2,7 +2,7 @@
 
 static const char *verify_required_directory(const char *dir) {
     if(chdir(dir) == -1)
-        fatal("Cannot cd to directory '%s'", dir);
+        fatal("Cannot change directory to '%s'", dir);
 
     DIR *d = opendir(dir);
     if(!d)
@@ -175,7 +175,7 @@ void send_statistics( const char *action, const char *action_result, const char 
         }
         freez(optout_file);
     }
-    if(!netdata_anonymous_statistics_enabled) return;
+    if (!netdata_anonymous_statistics_enabled) return;
     if (!action) return;
     if (!action_result) action_result="";
     if (!action_data) action_data="";
