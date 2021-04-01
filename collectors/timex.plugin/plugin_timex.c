@@ -69,8 +69,9 @@ void *timex_main(void *ptr)
                     RRDSET_TYPE_LINE);
 
                 rd_sync_state = rrddim_add(st_sync_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            } else
+            } else {
                 rrdset_next(st_sync_state);
+            }
 
             rrddim_set_by_pointer(st_sync_state, rd_sync_state, sync_state != TIME_ERROR ? 1 : 0);
             rrdset_done(st_sync_state);
@@ -96,8 +97,9 @@ void *timex_main(void *ptr)
                     RRDSET_TYPE_LINE);
 
                 rd_offset = rrddim_add(st_offset, "offset", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            } else
+            } else {
                 rrdset_next(st_offset);
+            }
 
             rrddim_set_by_pointer(st_offset, rd_offset, timex_buf.offset);
             rrdset_done(st_offset);
@@ -106,7 +108,7 @@ void *timex_main(void *ptr)
         if (unlikely(netdata_exit))
             break;
 
-        if(vdo_cpu_netdata) {
+        if (vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
             static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
 
@@ -115,54 +117,53 @@ void *timex_main(void *ptr)
             struct rusage thread;
             getrusage(RUSAGE_THREAD, &thread);
 
-            if(unlikely(!stcpu_thread)) {
+            if (unlikely(!stcpu_thread)) {
                 stcpu_thread = rrdset_create_localhost(
-                        "netdata"
-                        , "plugin_timex"
-                        , NULL
-                        , "timex"
-                        , NULL
-                        , "NetData Timex Plugin CPU usage"
-                        , "milliseconds/s"
-                        , PLUGIN_TIMEX_NAME
-                        , NULL
-                        , NETDATA_CHART_PRIO_NETDATA_TIMEX
-                        , update_every
-                        , RRDSET_TYPE_STACKED
-                );
+                    "netdata",
+                    "plugin_timex",
+                    NULL,
+                    "timex",
+                    NULL,
+                    "NetData Timex Plugin CPU usage",
+                    "milliseconds/s",
+                    PLUGIN_TIMEX_NAME,
+                    NULL,
+                    NETDATA_CHART_PRIO_NETDATA_TIMEX,
+                    update_every,
+                    RRDSET_TYPE_STACKED);
 
                 rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else
+            } else {
                 rrdset_next(stcpu_thread);
+            }
 
             rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-            rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+            rrddim_set_by_pointer(
+                stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
             rrdset_done(stcpu_thread);
 
             // ----------------------------------------------------------------
 
-            if(unlikely(!st_duration)) {
+            if (unlikely(!st_duration)) {
                 st_duration = rrdset_create_localhost(
-                        "netdata"
-                        , "plugin_timex_dt"
-                        , NULL
-                        , "timex"
-                        , NULL
-                        , "NetData Timex Plugin Duration"
-                        , "milliseconds/run"
-                        , PLUGIN_TIMEX_NAME
-                        , NULL
-                        , 132021
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
+                    "netdata",
+                    "plugin_timex_dt",
+                    NULL,
+                    "timex",
+                    NULL,
+                    "NetData Timex Plugin Duration",
+                    "milliseconds/run",
+                    PLUGIN_TIMEX_NAME,
+                    NULL,
+                    132021,
+                    update_every,
+                    RRDSET_TYPE_AREA);
 
                 rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else
+            } else {
                 rrdset_next(st_duration);
+            }
 
             rrddim_set_by_pointer(st_duration, rd_duration, duration);
             rrdset_done(st_duration);
