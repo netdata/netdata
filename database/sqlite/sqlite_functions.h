@@ -60,5 +60,4 @@ extern void db_lock(void);
 extern void delete_dimension_uuid(uuid_t *dimension_uuid);
 extern void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value);
 extern void sql_build_context_param_list(struct context_param **param_list, RRDHOST *host, char *context, char *chart);
-extern int is_restart_after_crash();
 #endif //NETDATA_SQLITE_FUNCTIONS_H
