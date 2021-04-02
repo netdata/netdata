@@ -89,13 +89,14 @@ void *timex_main(void *ptr)
                     "clock synchronization",
                     NULL,
                     "Time Offset Between Local System and Reference Clock",
+                    "milliseconds",
                     PLUGIN_TIMEX_NAME,
                     NULL,
                     NETDATA_CHART_PRIO_CLOCK_SYNC_OFFSET,
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                rd_offset = rrddim_add(st_offset, "offset", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_offset = rrddim_add(st_offset, "offset", NULL, 1, NSEC_PER_MSEC, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(st_offset);
             }
