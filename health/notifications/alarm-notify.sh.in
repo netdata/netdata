@@ -2287,12 +2287,16 @@ alarm="${name//_/ } = ${value_string}"
 # the image of the alarm
 image="${images_base_url}/images/banner-icon-144x144.png"
 
+# have a default email status, in case the following case does not catch it
+status_email_subject="${status}"
+
 # prepare the title based on status
 case "${status}" in
 CRITICAL)
   image="${images_base_url}/images/alert-128-red.png"
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_critical.png"
   status_message="is critical"
+  status_email_subject="Critical"
   color="#ca414b"
 
   background_color="#FFEBEF"
@@ -2305,6 +2309,7 @@ WARNING)
   image="${images_base_url}/images/alert-128-orange.png"
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_warning.png"
   status_message="needs attention"
+  status_email_subject="Warning"
   color="#ffc107"
 
   background_color="#FFF8E1"
@@ -2317,6 +2322,7 @@ CLEAR)
   image="${images_base_url}/images/check-mark-2-128-green.png"
   alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_recovered.png"
   status_message="recovered"
+  status_email_subject="Clear"
   color="#77ca6d"
 
   background_color="#E5F5E8"
@@ -2327,6 +2333,9 @@ CLEAR)
   ;;
 esac
 
+# the html email subject
+html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
+
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
@@ -2336,6 +2345,7 @@ if [ "${status}" = "CLEAR" ]; then
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
   alarm="${name//_/ } ${raised_for}"
+  html_email_subject="${status_email_subject}, ${name} ${raised_for}, on ${host}"
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
@@ -3518,7 +3528,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"><span style="color: #00AB44">Edit</span> this alert's configuration file by logging into $host and running the following command:</div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"><span style="color: #00AB44"><a href="https://learn.netdata.cloud/docs/agent/health/notifications#:~:text=To%20edit%20it%20on%20your,have%20one%20or%20more%20destinations" class="link" style="color: #00AB44; text-decoration: none;">Edit</span></a> this alert's configuration file by logging into $host and running the following command:</div>
 
                 </td>
               </tr>
@@ -3660,7 +3670,7 @@ EOF
 
 send_email <<EOF
 To: ${to_email}
-Subject: ${status}: ${alarm}, on ${host}
+Subject: ${html_email_subject}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
 ${email_thread_headers}
