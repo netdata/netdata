@@ -36,9 +36,9 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 
 > **[Latest release](https://github.com/netdata/netdata/releases/latest): v1.30.0, March 31, 2021**
 >
-> The v1.30.0 release of the Netdata Agent is a major release with major improvements to our packaging and how nodes
-> connect to Netdata Cloud when users opt-in to multi-node/infrastructure monitoring. We've also begun to push
-> improvements to the dashboard and our suite of preconfigured alarms, with much more to come.
+> The v1.30.0 release of Netdata brings major improvements to our packaging and completely replaces Google Analytics/GTM
+> for product telemetry. We're also releasing the first changes in an upcoming overhaul to both our dashboard UI/UX and
+> the suite of preconfigured alarms that comes with every installation.
 
 ## Menu
 
@@ -54,7 +54,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 ## Features
 
 ![Netdata in
-action](https://user-images.githubusercontent.com/1153921/101513938-fae28380-3939-11eb-9434-8ad86a39be62.gif)
+action](https://user-images.githubusercontent.com/1153921/113440964-449c2180-93a2-11eb-9664-663afa1257a8.gif)
 
 Here's what you can expect from Netdata:
 
