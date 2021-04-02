@@ -103,16 +103,9 @@ jobs:
             echo "runtype=test" >> $GITHUB_ENV
             echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> $GITHUB_ENV
           fi
-      - name: Setup QEMU ARM
-        if: matrix.platform == 'linux/arm/v7'
+      - name: Setup QEMU
+        if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
         uses: docker/setup-qemu-action@v1
-        with:
-          platforms: arm
-      - name: Setup QEMU AArch64
-        if: matrix.platform == 'linux/arm64/v8'
-        uses: docker/setup-qemu-action@v1
-        with:
-          platforms: arm64
       - name: Prepare Docker Environment
         shell: bash
         run: |
