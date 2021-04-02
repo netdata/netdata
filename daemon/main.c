@@ -707,9 +707,9 @@ static void get_system_timezone(void) {
 
         if (tmp != NULL) {
             if(strftime(helper, 6, "%z", tmp) == 0)
-                buffer[0] = '\0';
-
-            netdata_utc_offset = strdupz(helper);
+                netdata_utc_offset = strdupz("+0000");
+            else
+                netdata_utc_offset = strdupz(helper);
         }
     }
 }
