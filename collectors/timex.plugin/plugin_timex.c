@@ -48,7 +48,7 @@ void *timex_main(void *ptr)
         sync_state = adjtimex(&timex_buf);
 
         collected_number divisor = USEC_PER_MS;
-        if (timex_buf.status && STA_NANO)
+        if (timex_buf.status & STA_NANO)
             divisor = NSEC_PER_MSEC;
 
         // ----------------------------------------------------------------
