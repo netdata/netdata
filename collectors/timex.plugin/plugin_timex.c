@@ -30,8 +30,10 @@ void *timex_main(void *ptr)
     int do_sync = config_get_boolean(CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
     int do_offset = config_get_boolean(CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);
 
-    if (unlikely(do_sync == CONFIG_BOOLEAN_NO && do_offset == CONFIG_BOOLEAN_NO))
-        return NULL;
+    if (unlikely(do_sync == CONFIG_BOOLEAN_NO && do_offset == CONFIG_BOOLEAN_NO)) {
+        info("No charts to show");
+        goto exit;
+    }
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -177,6 +179,7 @@ void *timex_main(void *ptr)
             break;
     }
 
+exit:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
