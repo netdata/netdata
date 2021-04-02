@@ -96,7 +96,7 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# PYTHONPATH environment variable = 
 	# proc = yes
 	# diskspace = yes
-    # timex = yes
+	# timex = yes
 	# cgroups = yes
 	# tc = yes
 	# idlejitter = yes
