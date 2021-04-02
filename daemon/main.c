@@ -696,7 +696,7 @@ static void get_system_timezone(void) {
 
     //get the utc offset
     //could be merged with the above strftime call
-    //Stelios note: This will need an agent restart to get new offset on time change (dst, etc).
+    //Note: This will need an agent restart to get new offset on time change (dst, etc).
     {
         time_t t;
         struct tm *tmp, tmbuf;
