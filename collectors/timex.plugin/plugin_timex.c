@@ -47,6 +47,10 @@ void *timex_main(void *ptr)
         int sync_state = 0;
         sync_state = adjtimex(&timex_buf);
 
+        collected_number divisor = USEC_PER_MS;
+        if (timex_buf.status && STA_NANO)
+            divisor = NSEC_PER_MSEC;
+
         // ----------------------------------------------------------------
 
         if (do_sync) {
@@ -96,7 +100,7 @@ void *timex_main(void *ptr)
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                rd_offset = rrddim_add(st_offset, "offset", NULL, 1, NSEC_PER_MSEC, RRD_ALGORITHM_ABSOLUTE);
+                rd_offset = rrddim_add(st_offset, "offset", NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(st_offset);
             }
