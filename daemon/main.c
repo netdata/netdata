@@ -693,6 +693,25 @@ static void get_system_timezone(void) {
         timezone = "unknown";
 
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+
+    //get the utc offset
+    //could be merged with the above strftime call
+    //Stelios note: This will need an agent restart to get new offset on time change (dst, etc).
+    {
+        time_t t;
+        struct tm *tmp, tmbuf;
+        char helper[6];
+
+        t = now_realtime_sec();
+        tmp = localtime_r(&t, &tmbuf);
+
+        if (tmp != NULL) {
+            if(strftime(helper, 6, "%z", tmp) == 0)
+                buffer[0] = '\0';
+
+            netdata_utc_offset = strdupz(helper);
+        }
+    }
 }
 
 void set_global_environment() {

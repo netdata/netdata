@@ -96,6 +96,7 @@ extern char *netdata_configured_lock_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
+extern char *netdata_utc_offset;
 extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
