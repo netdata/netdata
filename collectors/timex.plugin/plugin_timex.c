@@ -55,16 +55,16 @@ void *timex_main(void *ptr)
 
             if (unlikely(!st_sync_state)) {
                 st_sync_state = rrdset_create_localhost(
-                    "timex",
-                    "state",
+                    "system",
+                    "clock_sync_state",
                     NULL,
-                    "timex",
+                    "clock synchronization",
                     NULL,
                     "System Clock Synchronization State",
                     "state",
                     PLUGIN_TIMEX_NAME,
                     NULL,
-                    NETDATA_CHART_PRIO_TIMEX_STATE,
+                    NETDATA_CHART_PRIO_CLOCK_SYNC_STATE,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -83,16 +83,15 @@ void *timex_main(void *ptr)
 
             if (unlikely(!st_offset)) {
                 st_offset = rrdset_create_localhost(
-                    "timex",
-                    "offset",
+                    "system",
+                    "clock_sync_offset",
                     NULL,
-                    "timex",
+                    "clock synchronization",
                     NULL,
-                    "Time offset",
-                    "nanoseconds",
+                    "Time Offset Between Local System and Reference Clock",
                     PLUGIN_TIMEX_NAME,
                     NULL,
-                    NETDATA_CHART_PRIO_TIMEX_OFFSET,
+                    NETDATA_CHART_PRIO_CLOCK_SYNC_OFFSET,
                     update_every,
                     RRDSET_TYPE_LINE);
 
