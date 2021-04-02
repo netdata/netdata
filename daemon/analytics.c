@@ -1,5 +1,39 @@
 #include "common.h"
 
+struct analytics_data analytics_data;
+
+void analytics_setenv_data (void) {
+    setenv( "NETDATA_CONFIG_STREAM_ENABLED", analytics_data.NETDATA_CONFIG_STREAM_ENABLED, 1);
+    setenv( "NETDATA_CONFIG_MEMORY_MODE",    analytics_data.NETDATA_CONFIG_MEMORY_MODE,    1);
+}
+
+void analytics_log_data (void) {
+    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+}
+
+void analytics_free_data (void) {
+    freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
+    freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+}
+
+void analytics_set_data (char **name, char *value) {
+    if (*name) freez(*name);
+    *name = strdupz(value);
+}
+
+void analytics_set_data_str (char **name, char *value) {
+    size_t value_string_len;
+    if (*name) freez(*name);
+    value_string_len = strlen(value) + 3;
+    *name = mallocz(sizeof(char) * value_string_len);
+    snprintfz(*name, value_string_len, "\"%s\"", value);
+}
+
+void analytics_get_data (char *name, BUFFER *wb) {
+    buffer_strcat(wb, name);
+}
+
 void analytics_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
@@ -34,6 +68,8 @@ void *analytics_main(void *ptr) {
 
     send_statistics("META", "-", "-");
 
+    analytics_log_data();
+
  cleanup:
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -49,6 +85,17 @@ static const char *verify_required_directory(const char *dir) {
     closedir(d);
 
     return dir;
+}
+
+/* This is called after the rrdinit */
+/* These values will be sent on the START event */
+void set_late_global_environment() {
+
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
+    analytics_set_data_str (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+
+    /* set what we have, to send the START event */
+    analytics_setenv_data();
 }
 
 static void get_system_timezone(void) {
@@ -160,6 +207,9 @@ void set_global_environment() {
     setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
+
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,    "null");
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;

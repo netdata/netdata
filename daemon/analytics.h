@@ -19,8 +19,18 @@
         .start_routine = analytics_main \
     },
 
+struct analytics_data {
+    char *NETDATA_CONFIG_STREAM_ENABLED;
+    char *NETDATA_CONFIG_MEMORY_MODE;
+};
+
 extern void *analytics_main(void *ptr);
+extern void analytics_get_data(char *name, BUFFER *wb);
+extern void set_late_global_environment();
+extern void analytics_free_data();
 extern void set_global_environment();
 extern void send_statistics( const char *action, const char *action_result, const char *action_data);
+
+extern struct analytics_data analytics_data;
 
 #endif //NETDATA_ANALYTICS_H

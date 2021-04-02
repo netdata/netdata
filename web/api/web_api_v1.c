@@ -995,10 +995,18 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        buffer_strcat(wb, "\t\"aclk-available\": true\n");
+        buffer_strcat(wb, "\t\"aclk-available\": true,\n");
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false\n");     // Intentionally valid with/without #ifdef above
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
+
+    buffer_strcat(wb, "\t\"memory-mode\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_MEMORY_MODE, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"stream-enabled\": ");
+    analytics_get_data(analytics_data.NETDATA_CONFIG_STREAM_ENABLED, wb);
+    buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
     return 0;

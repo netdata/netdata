@@ -28,6 +28,7 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
+    analytics_free_data();
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
@@ -1303,6 +1304,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+
+    set_late_global_environment();
 
     send_statistics("START", "-",  "-");
 
