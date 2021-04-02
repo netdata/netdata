@@ -52,15 +52,9 @@ void *analytics_main(void *ptr) {
 
     debug(D_ANALYTICS, "Analytics thread starts");
 
-    while(!netdata_exit) {
+    while(!netdata_exit && likely(sec <= ANALYTICS_MAX_SLEEP_SEC)) {
         heartbeat_next(&hb, step_ut);
         sec++;
-
-        if (unlikely(sec >= ANALYTICS_MAX_SLEEP_SEC))
-            break;
-
-        if (unlikely(netdata_exit))
-            goto cleanup;
     }
 
     if (unlikely(netdata_exit))
