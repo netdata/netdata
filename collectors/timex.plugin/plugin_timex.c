@@ -132,15 +132,15 @@ void *timex_main(void *ptr)
                     update_every,
                     RRDSET_TYPE_STACKED);
 
-                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
+                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
             } else {
                 rrdset_next(stcpu_thread);
             }
 
-            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
             rrddim_set_by_pointer(
-                stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+                stcpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
             rrdset_done(stcpu_thread);
 
             // ----------------------------------------------------------------
@@ -160,7 +160,7 @@ void *timex_main(void *ptr)
                     update_every,
                     RRDSET_TYPE_AREA);
 
-                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
             } else {
                 rrdset_next(st_duration);
             }
