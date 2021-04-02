@@ -12,12 +12,15 @@ void analytics_main_cleanup(void *ptr) {
 void *analytics_main(void *ptr) {
     netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
     int sec = 0;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step_ut = USEC_PER_SEC;
 
     debug(D_ANALYTICS, "Analytics thread starts");
 
     while(!netdata_exit) {
-        sleep(1);
-        ++sec;
+        heartbeat_next(&hb, step_ut);
+        sec++;
 
         if (unlikely(sec >= ANALYTICS_MAX_SLEEP_SEC))
             break;
