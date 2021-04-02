@@ -23,7 +23,7 @@ void *timex_main(void *ptr)
 
     int vdo_cpu_netdata = config_get_boolean(CONFIG_SECTION_TIMEX, "timex plugin resource charts", CONFIG_BOOLEAN_YES);
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", localhost->rrd_update_every);
+    int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", 10);
     if (update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
