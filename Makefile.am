@@ -55,37 +55,38 @@ dist_noinst_DATA = \
     cppcheck.sh \
     configs.signatures \
     contrib \
+    docs \
+    mqtt_websockets \
     netdata.cppcheck \
     netdata.spec \
     package.json \
-    docs \
-    packaging/version \
-    packaging/dashboard.version \
-    packaging/dashboard.checksums \
-    packaging/go.d.version \
-    packaging/go.d.checksums \
-    packaging/jsonc.version \
-    packaging/jsonc.checksums \
-    packaging/judy.version \
-    packaging/judy.checksums \
-    packaging/libwebsockets.version \
-    packaging/libwebsockets.checksums \
-    packaging/mosquitto.version \
-    packaging/mosquitto.checksums \
     packaging/bundle-dashboard.sh \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
+    packaging/bundle-lws.sh \
     packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
-    packaging/libbpf.checksums \
-    packaging/libbpf.version \
+    packaging/dashboard.checksums \
+    packaging/dashboard.version \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
-    packaging/bundle-lws.sh \
+    packaging/go.d.checksums \
+    packaging/go.d.version \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
+    packaging/jsonc.checksums \
+    packaging/jsonc.version \
+    packaging/judy.checksums \
+    packaging/judy.version \
+    packaging/libbpf.checksums \
+    packaging/libbpf.version \
+    packaging/libwebsockets.checksums \
+    packaging/libwebsockets.version \
+    packaging/mosquitto.checksums \
+    packaging/mosquitto.version \
+    packaging/version \
     $(NULL)
 
 # until integrated within build

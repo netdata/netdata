@@ -34,6 +34,7 @@ install:
   # These are release-related artifacts and have to be evaluated before we start doing conditional checks inside stages
   - source ".travis/tagger.sh"
   - export GIT_TAG="$(git tag --points-at)"
+  - git submodule update --init --recursive
 
 
 # Setup notification system
