@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.30.0...HEAD)
+
+**Merged pull requests:**
+
+- Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...v1.30.0)
@@ -240,7 +248,6 @@
 - Docs housekeeping for SEO and syntax, part 1 [\#10388](https://github.com/netdata/netdata/pull/10388) ([joelhans](https://github.com/joelhans))
 - Persist `$TMPDIR` from installer to updater. [\#10384](https://github.com/netdata/netdata/pull/10384) ([Ferroin](https://github.com/Ferroin))
 - Change linting standard for Markdown lists [\#10371](https://github.com/netdata/netdata/pull/10371) ([joelhans](https://github.com/joelhans))
-- Move ACLK Legacy into subfolder [\#10265](https://github.com/netdata/netdata/pull/10265) ([underhood](https://github.com/underhood))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
@@ -327,9 +334,6 @@
 - Document the Agent reinstallation process [\#10270](https://github.com/netdata/netdata/pull/10270) ([joelhans](https://github.com/joelhans))
 - fix bug\_report.md syntax error [\#10269](https://github.com/netdata/netdata/pull/10269) ([OdysLam](https://github.com/OdysLam))
 - python.d/nvidia\_smi: use `pwd` lib to get username if not inside a container [\#10268](https://github.com/netdata/netdata/pull/10268) ([ilyam8](https://github.com/ilyam8))
-- Add kernel to blacklist [\#10262](https://github.com/netdata/netdata/pull/10262) ([thiagoftsm](https://github.com/thiagoftsm))
-- Made the update script significantly more robust and user friendly. [\#10261](https://github.com/netdata/netdata/pull/10261) ([Ferroin](https://github.com/Ferroin))
-- new issue templates [\#10259](https://github.com/netdata/netdata/pull/10259) ([OdysLam](https://github.com/OdysLam))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
