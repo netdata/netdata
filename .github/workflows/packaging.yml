@@ -121,6 +121,7 @@ jobs:
         run: |
           echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
+            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile} || true
             .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile}
           done
       - name: Clean
