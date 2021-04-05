@@ -694,30 +694,44 @@ static void get_system_timezone(void) {
 
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
-    //get the utc offset
+    //get the utc offset, and the timezone as returned by strftime
     //could be merged with the above strftime call
     //Note: This will need an agent restart to get new offset on time change (dst, etc).
     {
         time_t t;
         struct tm *tmp, tmbuf;
-        char zone[FILENAME_MAX + 1]; //can be really less...
-        char utc_off[10]; //enough for 24 * 60 * 60 plus a sign
+        char zone[FILENAME_MAX + 1]; //can be really less, but %z could be abbriviated or long
+        char sign[2], hh[3], mm[3];
 
         t = now_realtime_sec();
         tmp = localtime_r(&t, &tmbuf);
 
         if (tmp != NULL) {
             if(strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
-                sprintf(zone, "UTC");
-                int str_len = strlen(zone) + strlen(utc_off) + 3;
-                netdata_utc_offset = mallocz(sizeof(char) * str_len);
-                snprintfz(netdata_utc_offset, str_len, "%s=0", zone );
+                netdata_tz = strdupz("UTC");
+            }
+            else
+                netdata_tz = strdupz(zone);
+
+            if(strftime(zone, FILENAME_MAX, "%z", tmp) == 0) {
+                netdata_utc_offset = 0;
             }
             else {
-                int str_len = strlen(zone) + strlen(utc_off) + 3;
-                netdata_utc_offset = mallocz(sizeof(char) * str_len);
-                snprintfz(netdata_utc_offset, str_len, "%s=%ld", zone, tmbuf.tm_gmtoff);
+                sign[0] = zone[0]=='-' || zone[0]=='+'?zone[0]:'0';
+                sign[1] = '\0';
+                hh[0] = isdigit(zone[1]) ? zone[1]:'0';
+                hh[1] = isdigit(zone[2]) ? zone[2]:'0';
+                hh[2] = '\0';
+                mm[0] = isdigit(zone[3]) ? zone[3]:'0';
+                mm[1] = isdigit(zone[4]) ? zone[4]:'0';
+                mm[2] = '\0';
+
+                netdata_utc_offset = (atoi(hh) * 60 * 60) + (atoi(mm) * 60);
+                netdata_utc_offset = sign[0]=='-'?-netdata_utc_offset:netdata_utc_offset;
             }
+        } else {
+            netdata_tz = strdupz("UTC");
+            netdata_utc_offset = 0;
         }
     }
 }
