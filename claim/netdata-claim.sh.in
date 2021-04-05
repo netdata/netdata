@@ -71,7 +71,7 @@ ERROR_MESSAGES[14]="processing claiming"
 ERROR_KEYS[15]="ErrInternalServerError"
 ERROR_MESSAGES[15]="Internal Server Error"
 
-# Error: There was a timout processing the claim.
+# Error: There was a timeout processing the claim.
 # HTTP Status code: 504
 # Exit code: 16
 ERROR_KEYS[16]="ErrGatewayTimeout"

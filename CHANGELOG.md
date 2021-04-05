@@ -95,7 +95,7 @@
 - New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add JSON output option for buildinfo. [\#10706](https://github.com/netdata/netdata/pull/10706) ([Ferroin](https://github.com/Ferroin))
 - Fix disk utilization and backlog charts [\#10705](https://github.com/netdata/netdata/pull/10705) ([vlvkobal](https://github.com/vlvkobal))
-- update\_kernel\_version: Fix overflow on Centos and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
+- update\_kernel\_version: Fix overflow on CentOS and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Convert references to `service` to `systemctl` [\#10703](https://github.com/netdata/netdata/pull/10703) ([joelhans](https://github.com/joelhans))
 - Add noauthcodecheck workaround flag to the freeipmi plugin [\#10701](https://github.com/netdata/netdata/pull/10701) ([vlvkobal](https://github.com/vlvkobal))
 - Add guide: LAMP stack monitoring [\#10698](https://github.com/netdata/netdata/pull/10698) ([joelhans](https://github.com/joelhans))

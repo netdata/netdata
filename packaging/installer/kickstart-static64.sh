@@ -151,7 +151,7 @@ create_tmp_directory() {
     if _cannot_use_tmpdir /tmp ; then
       if _cannot_use_tmpdir "${PWD}" ; then
         echo >&2
-        echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+        echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
         exit 1
       else
         TMPDIR="${PWD}"
@@ -283,7 +283,7 @@ while [ -n "${1}" ]; do
 done
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemtry"
+  NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemetry"
 fi
 
 if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then

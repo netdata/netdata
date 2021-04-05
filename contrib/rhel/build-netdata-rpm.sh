@@ -25,7 +25,7 @@ if [[ "${version//-/}" != "$version" ]]; then
 	# Append the current datetime fox a 'unique' build
 	versionfix+="_$(date '+%m%d%H%M%S')"
 	# And issue hints & details on why this failed, and how to fix it
-	run_failed "Current version contains '-' which is fobidden by rpm. You must create a git annotated tag and rerun this script. Exemple:"
+	run_failed "Current version contains '-' which is forbidden by rpm. You must create a git annotated tag and rerun this script. Example:"
 	run_failed "  git tag -a $versionfix -m 'Release by $(id -nu) on $(uname -n)' && $0"
 	exit 1
 fi

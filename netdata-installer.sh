@@ -68,7 +68,7 @@ if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
   if _cannot_use_tmpdir /tmp; then
     if _cannot_use_tmpdir "${PWD}"; then
       echo >&2
-      echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+      echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
       exit 1
     else
       TMPDIR="${PWD}"
@@ -209,7 +209,7 @@ USAGE: ${PROGRAM} [options]
                              are: systemd, interval, crontab
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
-  --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
+  --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
@@ -239,7 +239,7 @@ USAGE: ${PROGRAM} [options]
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -250,7 +250,7 @@ If you also need to provide different LDFLAGS, use something like this:
 
   LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
 
-or use the following if both LDFLAGS and CFLAGS need to be overriden:
+or use the following if both LDFLAGS and CFLAGS need to be overridden:
 
   CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
 

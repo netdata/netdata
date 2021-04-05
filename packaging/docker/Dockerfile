@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # author  : paulfantom
 
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 # hadolint ignore=DL3007
 FROM netdata/builder:latest as builder
 
@@ -52,7 +52,7 @@ RUN mkdir -p /app/usr/sbin/ \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 # hadolint ignore=DL3007
 FROM netdata/base:latest as base
 

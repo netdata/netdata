@@ -28,7 +28,7 @@
 
    - /lib/systemd/system/netdata.service
 
-   or, for older Centos, Debian/Ubuntu or OpenRC Gentoo:
+   or, for older CentOS, Debian/Ubuntu or OpenRC Gentoo:
 
    - /etc/init.d/netdata         will be created
 

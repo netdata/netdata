@@ -77,7 +77,7 @@ case "${DISTRO}" in
     install_suse_like
     ;;
   *)
-    printf "ERROR: unspported distro: %s_%s\n" "${DISTRO}" "${DISTRO_VERSION}"
+    printf "ERROR: unsupported distro: %s_%s\n" "${DISTRO}" "${DISTRO_VERSION}"
     exit 1
     ;;
 esac
