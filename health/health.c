@@ -331,10 +331,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
                     l_warn++;
                 }
-            } else if (ae->alarm_id == rc->id) {
+            } else if (ae->alarm_id == rc->id)
                 expr=rc->warning;
-                debug(D_SYSTEM, "WONT COUNT");
-            }
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
             if (likely(ae->alarm_id != rc->id) && likely(ae->alarm_event_id != rc->next_event_id - 1)) {
                 n_crit++;
@@ -346,10 +344,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                     buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
                     l_crit++;
                 }
-            } else if (ae->alarm_id == rc->id) {
+            } else if (ae->alarm_id == rc->id)
                 expr=rc->critical;
-                debug(D_SYSTEM, "WONT COUNT");
-            }
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
             if (ae->alarm_id == rc->id)
                 expr=rc->warning;
