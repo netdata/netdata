@@ -700,20 +700,25 @@ static void get_system_timezone(void) {
     {
         time_t t;
         struct tm *tmp, tmbuf;
-        char helper[6];
+        char zone[FILENAME_MAX + 1]; //can be really less...
+        char utc_off[10]; //enough for 24 * 60 * 60 plus a sign
 
         t = now_realtime_sec();
         tmp = localtime_r(&t, &tmbuf);
 
         if (tmp != NULL) {
-            if(strftime(helper, 6, "%z", tmp) == 0)
-                netdata_utc_offset = strdupz("+0000");
-            else
-                netdata_utc_offset = strdupz(helper);
+            if(strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
+                sprintf(zone, "UTC");
+                int str_len = strlen(zone) + strlen(utc_off) + 3;
+                netdata_utc_offset = mallocz(sizeof(char) * str_len);
+                snprintfz(netdata_utc_offset, str_len, "%s=0", zone );
+            }
+            else {
+                int str_len = strlen(zone) + strlen(utc_off) + 3;
+                netdata_utc_offset = mallocz(sizeof(char) * str_len);
+                snprintfz(netdata_utc_offset, str_len, "%s=%ld", zone, tmbuf.tm_gmtoff);
+            }
         }
-
-        info ("[%ld]", tmbuf.tm_gmtoff);
-
     }
 }
 
