@@ -711,6 +711,9 @@ static void get_system_timezone(void) {
             else
                 netdata_utc_offset = strdupz(helper);
         }
+
+        info ("[%ld]", tmbuf.tm_gmtoff);
+
     }
 }
 
