@@ -94,7 +94,7 @@ void *timex_main(void *ptr)
                     NULL,
                     "clock synchronization",
                     NULL,
-                    "Time Offset Between Local System and Reference Clock",
+                    "Computed Time Offset Between Local System and Reference Clock",
                     "milliseconds",
                     PLUGIN_TIMEX_NAME,
                     NULL,
