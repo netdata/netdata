@@ -106,13 +106,13 @@ static void get_system_timezone(void) {
     // use the TZ variable
     if(tz && *tz && *tz != ':') {
         timezone = tz;
-        // info("TIMEZONE: using TZ variable '%s'", timezone);
+        info("TIMEZONE: using TZ variable '%s'", timezone);
     }
 
     // use the contents of /etc/timezone
     if(!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        // info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+        info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
     }
 
     // read the link /etc/localtime
@@ -128,7 +128,7 @@ static void get_system_timezone(void) {
             char *s = strstr(buffer, cmp);
             if (s && s[cmp_len]) {
                 timezone = &s[cmp_len];
-                // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+                info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
             }
         }
         else
@@ -149,7 +149,7 @@ static void get_system_timezone(void) {
             else {
                 buffer[FILENAME_MAX] = '\0';
                 timezone = buffer;
-                // info("TIMEZONE: using strftime(): '%s'", timezone);
+                info("TIMEZONE: using strftime(): '%s'", timezone);
             }
         }
     }
