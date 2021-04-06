@@ -275,6 +275,70 @@ exit:
     return rc;
 }
 
+static const char *get_json_str_by_path(json_object *json, const char *path) {
+    json_object *ptr;
+    if (json_pointer_get(json, path, &ptr)) {
+        error("Missing compulsory key \"%s\" in error response", path);
+        return NULL;
+    }
+    if (json_object_get_type(ptr) != json_type_string) {
+        error("Value of Key \"%s\" in error response should be string", path);
+        return NULL;
+    }
+    return json_object_get_string(ptr);
+}
+
+#define JSON_KEY_ERTRY  "/errorNonRetryable"
+#define JSON_KEY_EDELAY "/errorRetryDelaySeconds"
+static int aclk_parse_otp_error(const char *json_str) {
+    int rc = 1;
+    json_object *json, *ptr;
+    const char *ec;
+    const char *ek;
+    const char *emsg;
+    int block_retry = -1, backoff = -1;
+
+
+    json = json_tokener_parse(json_str);
+    if (!json) {
+        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        return 1;
+    }
+
+    if ((ec = get_json_str_by_path(json, "/errorCode")) == NULL)
+        goto exit;
+
+    if ((ek = get_json_str_by_path(json, "/errorMsgKey")) == NULL)
+        goto exit;
+
+    if ((emsg = get_json_str_by_path(json, "/errorMessage")) == NULL)
+        goto exit;
+
+    // optional field
+    if (!json_pointer_get(json, JSON_KEY_ERTRY, &ptr)) {
+        if (json_object_get_type(ptr) != json_type_boolean) {
+            error ("Error response Key " JSON_KEY_ERTRY " should be of boolean type");
+            goto exit;
+        }
+        block_retry = json_object_get_boolean(ptr);
+    }
+
+    // optional field
+    if (!json_pointer_get(json, JSON_KEY_EDELAY, &ptr)) {
+        if (json_object_get_type(ptr) != json_type_int) {
+            error ("Error response Key " JSON_KEY_EDELAY " should be of integer type");
+            goto exit;
+        }
+        backoff = json_object_get_int(ptr);
+    }
+
+    error ("Cloud returned EC=\"%s\", Msg-Key:\"%s\", Msg:\"%s\", BlockRetry:%s (-1 unset by cloud), Backoff:%ds (-1 unset by cloud)", ec, ek, emsg, block_retry ? "true" : "false", backoff);
+    rc = 0;
+exit:
+    json_object_put(json);
+    return rc;
+}
+
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target) {
     // TODO this fnc will be rewritten and simplified in following PRs
@@ -304,6 +368,8 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     }
     if (resp.http_code != 200) {
         error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
+        if (resp.payload_size)
+            aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
     }
     info ("ACLK_OTP Got Challenge from Cloud");
@@ -355,6 +421,8 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     }
     if (resp.http_code != 201) {
         error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
+        if (resp.payload_size)
+            aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
     }
     info ("ACLK_OTP Got Password from Cloud");
