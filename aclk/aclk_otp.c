@@ -276,7 +276,7 @@ exit:
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
-int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target) {
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target) {
     // TODO this fnc will be rewritten and simplified in following PRs
     // still carries lot of baggage from ACLK Legacy
     int rc = 1;
@@ -359,7 +359,6 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *targ
     }
     info ("ACLK_OTP Got Password from Cloud");
 
-    struct dictionary_singleton password = { .key = "password", .result = NULL };
     struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
     
     if (parse_passwd_response(resp.payload, &data)){
@@ -367,21 +366,15 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *targ
         goto cleanup_resp;
     }
 
-    if (*mqtt_pass != NULL )
-        freez(*mqtt_pass);
-    *mqtt_pass = password.result;
-    if (*mqtt_usr != NULL)
-        freez(*mqtt_usr);
-    *mqtt_usr = agent_id;
-    agent_id = NULL;
+    *mqtt_pass = data.passwd;
+    *mqtt_usr = data.username;
+    *mqtt_id = data.client_id;
 
     rc = 0;
-
 cleanup_resp:
     https_req_response_free(&resp);
 cleanup:
-    if (agent_id != NULL)
-        freez(agent_id);
+    freez(agent_id);
     buffer_free(url);
     return rc;
 }

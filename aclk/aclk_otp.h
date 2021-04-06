@@ -7,7 +7,7 @@
 
 #include "https_client.h"
 
-int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target);
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target);
 int aclk_get_env(aclk_env_t *env, const char *aclk_hostname, int aclk_port);
 
 #endif /* ACLK_OTP_H */
