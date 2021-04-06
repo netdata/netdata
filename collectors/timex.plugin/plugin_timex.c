@@ -42,9 +42,6 @@ void *timex_main(void *ptr)
         usec_t duration = heartbeat_monotonic_dt_to_now_usec(&hb);
         heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
-            break;
-
         struct timex timex_buf = {};
         int sync_state = 0;
         sync_state = adjtimex(&timex_buf);
@@ -111,9 +108,6 @@ void *timex_main(void *ptr)
             rrdset_done(st_offset);
         }
 
-        if (unlikely(netdata_exit))
-            break;
-
         if (vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
             static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
@@ -174,9 +168,6 @@ void *timex_main(void *ptr)
             rrddim_set_by_pointer(st_duration, rd_duration, duration);
             rrdset_done(st_duration);
         }
-
-        if (unlikely(netdata_exit))
-            break;
     }
 
 exit:
