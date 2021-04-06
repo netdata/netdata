@@ -3868,7 +3868,7 @@ netdataDashboard.context = {
 
     'systemd.socket_unit_state': {
         info: 'Socket units encapsulate local IPC or network sockets in the system, useful for socket-based activation. ' +
-        'For details about socket units, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.socket.html#" target="_blank"> systemd.socket(5)</a>,' +
+        'For details about socket units, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.socket.html#" target="_blank"> systemd.socket(5)</a>, ' +
         'for details on socket-based activation and other forms of activation, see <a href="https://www.freedesktop.org/software/systemd/man/daemon.html#" target="_blank"> daemon(7)</a>.'
     },
 
