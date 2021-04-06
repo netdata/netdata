@@ -1,27 +1,58 @@
 #include "common.h"
 
 struct analytics_data analytics_data;
+extern void analytics_exporting_connectors (BUFFER *b);
 
+/*
+ * Set the env variables
+ */
 void analytics_setenv_data (void) {
-    setenv( "NETDATA_CONFIG_STREAM_ENABLED", analytics_data.NETDATA_CONFIG_STREAM_ENABLED, 1);
-    setenv( "NETDATA_CONFIG_MEMORY_MODE",    analytics_data.NETDATA_CONFIG_MEMORY_MODE,    1);
+    setenv( "NETDATA_CONFIG_STREAM_ENABLED",      analytics_data.NETDATA_CONFIG_STREAM_ENABLED,      1);
+    setenv( "NETDATA_CONFIG_MEMORY_MODE",         analytics_data.NETDATA_CONFIG_MEMORY_MODE,         1);
+    setenv( "NETDATA_CONFIG_EXPORTING_ENABLED",   analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,   1);
+    setenv( "NETDATA_EXPORTING_CONNECTORS",       analytics_data.NETDATA_EXPORTING_CONNECTORS,       1);
+    setenv( "NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
+    setenv( "NETDATA_ALLMETRICS_SHELL_USED",      analytics_data.NETDATA_ALLMETRICS_SHELL_USED,      1);
+    setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.NETDATA_ALLMETRICS_JSON_USED,       1);
 }
 
+/*
+ * Debug logging
+ */
 void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
     debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.NETDATA_EXPORTING_CONNECTORS);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
 }
 
+/*
+ * Free data
+ */
 void analytics_free_data (void) {
     freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
     freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
+    freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
+    freez(analytics_data.NETDATA_EXPORTING_CONNECTORS);
+    freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
+    freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
+    freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
 }
 
+/*
+ * Set a numeric/boolean data with a value
+ */
 void analytics_set_data (char **name, char *value) {
     if (*name) freez(*name);
     *name = strdupz(value);
 }
 
+/*
+ * Set a string data with a value
+ */
 void analytics_set_data_str (char **name, char *value) {
     size_t value_string_len;
     if (*name) freez(*name);
@@ -30,8 +61,57 @@ void analytics_set_data_str (char **name, char *value) {
     snprintfz(*name, value_string_len, "\"%s\"", value);
 }
 
+/*
+ * Get data, used by web api v1
+ */
 void analytics_get_data (char *name, BUFFER *wb) {
     buffer_strcat(wb, name);
+}
+
+void analytics_log_prometheus(void) {
+    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS))
+        analytics_data.prometheus_hits++;
+}
+
+void analytics_log_shell(void) {
+    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS))
+        analytics_data.shell_hits++;
+}
+
+void analytics_log_json(void) {
+    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS))
+        analytics_data.json_hits++;
+}
+
+void analytics_exporters (void) {
+    //when no exporters are available, an empty string will be sent
+    //decide if something else is more suitable (but propably not null)
+    BUFFER *bi = buffer_create(1000);
+    analytics_exporting_connectors(bi);
+    analytics_set_data_str (&analytics_data.NETDATA_EXPORTING_CONNECTORS, (char *)buffer_tostring(bi));
+    buffer_free(bi);
+}
+
+/*
+ * Get the meta data, called from the thread
+ */
+void analytics_gather_meta_data (void) {
+
+    analytics_exporters();
+
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, b);
+
+        snprintfz(b, 6, "%d", analytics_data.shell_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, b);
+
+        snprintfz(b, 6, "%d", analytics_data.json_hits);
+        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, b);
+    }
+
+    analytics_setenv_data();
 }
 
 void analytics_main_cleanup(void *ptr) {
@@ -43,6 +123,12 @@ void analytics_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+/*
+ * The analytics thread. Sleep for ANALYTICS_MAX_SLEEP_SEC,
+ * gather the data, and exit.
+ * In a later stage, if needed, the thread could stay up
+ * and send analytics every X hours
+ */
 void *analytics_main(void *ptr) {
     netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
     int sec = 0;
@@ -59,6 +145,8 @@ void *analytics_main(void *ptr) {
 
     if (unlikely(netdata_exit))
         goto cleanup;
+
+    analytics_gather_meta_data();
 
     send_statistics("META", "-", "-");
 
@@ -81,12 +169,15 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-/* This is called after the rrdinit */
-/* These values will be sent on the START event */
+/*
+ * This is called after the rrdinit
+ * These values will be sent on the START event
+ */
 void set_late_global_environment() {
 
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
+    analytics_set_data(&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+    analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
 
     /* set what we have, to send the START event */
     analytics_setenv_data();
@@ -208,8 +299,17 @@ void set_global_environment() {
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, "null");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,    "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,      "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,         "null");
+    analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,   "null");
+    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS,       "null");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "null");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,      "null");
+    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,       "null");
+
+    analytics_data.prometheus_hits = 0;
+    analytics_data.shell_hits = 0;
+    analytics_data.json_hits = 0;
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;

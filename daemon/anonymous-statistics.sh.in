@@ -74,7 +74,12 @@ REQ_BODY="$(cat << EOF
         "system_total_disk_size": "${NETDATA_SYSTEM_TOTAL_DISK_SIZE}",
         "system_total_ram": "${NETDATA_SYSTEM_TOTAL_RAM}",
         "config_stream_enabled": ${NETDATA_CONFIG_STREAM_ENABLED},
-        "config_memory_mode": ${NETDATA_CONFIG_MEMORY_MODE}
+        "config_memory_mode": ${NETDATA_CONFIG_MEMORY_MODE},
+        "config_exporting_enabled": ${NETDATA_CONFIG_EXPORTING_ENABLED},
+        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS},
+        "host_allmetrics_prometheus_used": ${NETDATA_ALLMETRICS_PROMETHEUS_USED},
+        "host_allmetrics_shell_used": ${NETDATA_ALLMETRICS_SHELL_USED},
+        "host_allmetrics_json_used": ${NETDATA_ALLMETRICS_JSON_USED}
   }
 }
 EOF

@@ -794,6 +794,8 @@ static inline time_t prometheus_preparation(
     time_t now,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
+    analytics_log_prometheus();
+
     if (!server || !*server)
         server = "default";
 
