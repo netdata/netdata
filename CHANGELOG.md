@@ -7,6 +7,8 @@
 **Merged pull requests:**
 
 - Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
+- Bumped version of OpenSSL bundled in static builds to 1.1.1k. [\#10884](https://github.com/netdata/netdata/pull/10884) ([Ferroin](https://github.com/Ferroin))
+- Spelling build [\#10428](https://github.com/netdata/netdata/pull/10428) ([jsoref](https://github.com/jsoref))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
@@ -95,7 +97,7 @@
 - New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add JSON output option for buildinfo. [\#10706](https://github.com/netdata/netdata/pull/10706) ([Ferroin](https://github.com/Ferroin))
 - Fix disk utilization and backlog charts [\#10705](https://github.com/netdata/netdata/pull/10705) ([vlvkobal](https://github.com/vlvkobal))
-- update\_kernel\_version: Fix overflow on CentOS and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
+- update\_kernel\_version: Fix overflow on Centos and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Convert references to `service` to `systemctl` [\#10703](https://github.com/netdata/netdata/pull/10703) ([joelhans](https://github.com/joelhans))
 - Add noauthcodecheck workaround flag to the freeipmi plugin [\#10701](https://github.com/netdata/netdata/pull/10701) ([vlvkobal](https://github.com/vlvkobal))
 - Add guide: LAMP stack monitoring [\#10698](https://github.com/netdata/netdata/pull/10698) ([joelhans](https://github.com/joelhans))
@@ -330,10 +332,6 @@
 - Fix compilation with https disabled. Fixes \#10278 [\#10279](https://github.com/netdata/netdata/pull/10279) ([KickerTom](https://github.com/KickerTom))
 - Fix race condition in rrdset\_first\_entry\_t\(\) and rrdset\_last\_entry\_t\(\) [\#10276](https://github.com/netdata/netdata/pull/10276) ([mfundul](https://github.com/mfundul))
 - Fix host name when syslog is used [\#10275](https://github.com/netdata/netdata/pull/10275) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add guide: How to optimize Netdata's performance [\#10271](https://github.com/netdata/netdata/pull/10271) ([joelhans](https://github.com/joelhans))
-- Document the Agent reinstallation process [\#10270](https://github.com/netdata/netdata/pull/10270) ([joelhans](https://github.com/joelhans))
-- fix bug\_report.md syntax error [\#10269](https://github.com/netdata/netdata/pull/10269) ([OdysLam](https://github.com/OdysLam))
-- python.d/nvidia\_smi: use `pwd` lib to get username if not inside a container [\#10268](https://github.com/netdata/netdata/pull/10268) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
