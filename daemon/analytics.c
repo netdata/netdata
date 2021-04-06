@@ -111,6 +111,12 @@ static void get_system_timezone(void) {
 
     // use the contents of /etc/timezone
     if(!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
+        char *c = buffer;
+        while(*c) {
+            if(unlikely(*c == '\n'))
+                *c = '\0';
+            c++;
+        }
         timezone = buffer;
         info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
     }
