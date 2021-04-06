@@ -3536,7 +3536,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
 
-                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"><span style="color: #00AB44"><a href="https://learn.netdata.cloud/docs/agent/health/notifications#:~:text=To%20edit%20it%20on%20your,have%20one%20or%20more%20destinations" class="link" style="color: #00AB44; text-decoration: none;">Edit</span></a> this alert's configuration file by logging into $host and running the following command:</div>
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1.3;text-align:left;color:#555555;"><span style="color: #00AB44"><a href="https://learn.netdata.cloud/docs/agent/health/notifications#:~:text=To%20edit%20it%20on%20your,have%20one%20or%20more%20destinations" class="link" style="color: #00AB44; text-decoration: none;">Edit</a></span> this alert's configuration file by logging into $host and running the following command:</div>
 
                 </td>
               </tr>
