@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update news and GIF in README, fix typo [\#10900](https://github.com/netdata/netdata/pull/10900) ([joelhans](https://github.com/joelhans))
+- Update README.md [\#10898](https://github.com/netdata/netdata/pull/10898) ([slimanio](https://github.com/slimanio))
 - Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
 - Bumped version of OpenSSL bundled in static builds to 1.1.1k. [\#10884](https://github.com/netdata/netdata/pull/10884) ([Ferroin](https://github.com/Ferroin))
 - Spelling build [\#10428](https://github.com/netdata/netdata/pull/10428) ([jsoref](https://github.com/jsoref))
@@ -327,11 +329,6 @@
 - Fixed the data endpoint so that the context param is correctly applied to children [\#10290](https://github.com/netdata/netdata/pull/10290) ([stelfrag](https://github.com/stelfrag))
 - installer: update go.d.plugin version to v0.26.0 [\#10284](https://github.com/netdata/netdata/pull/10284) ([ilyam8](https://github.com/ilyam8))
 - use new libmosquitto release \(with MacOS libMosq fix\) [\#10283](https://github.com/netdata/netdata/pull/10283) ([underhood](https://github.com/underhood))
-- Address coverity errors \(CID 364045,364046\) [\#10282](https://github.com/netdata/netdata/pull/10282) ([stelfrag](https://github.com/stelfrag))
-- health/web\_log: remove `crit` from unmatched alarms [\#10280](https://github.com/netdata/netdata/pull/10280) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation with https disabled. Fixes \#10278 [\#10279](https://github.com/netdata/netdata/pull/10279) ([KickerTom](https://github.com/KickerTom))
-- Fix race condition in rrdset\_first\_entry\_t\(\) and rrdset\_last\_entry\_t\(\) [\#10276](https://github.com/netdata/netdata/pull/10276) ([mfundul](https://github.com/mfundul))
-- Fix host name when syslog is used [\#10275](https://github.com/netdata/netdata/pull/10275) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
