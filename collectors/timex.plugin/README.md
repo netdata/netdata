@@ -13,7 +13,7 @@ This plugin creates two charts:
 -   System Clock Synchronization State
 -   Computed Time Offset Between Local System and Reference Clock
 
-## configuration
+## Configuration
 
 ```
 [plugin:timex]
