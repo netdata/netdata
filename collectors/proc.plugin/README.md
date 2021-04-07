@@ -295,11 +295,11 @@ each state.
 
 ### Monitored memory metrics
 
--   **amount of memory swapped in/out**
--   **amount of memory paged from/to disk**
--   **number of memory page faults**
--   **number of out of memory kills**
--   **number of NUMA events**
+-  Amount of memory swapped in/out
+-  Amount of memory paged from/to disk
+-  Number of memory page faults
+-  Number of out of memory kills
+-  Number of NUMA events
 
 ### Configuration
 
