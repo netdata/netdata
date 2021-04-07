@@ -8,7 +8,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/timex
 
 This plugin monitors the system clock synchronization state on Linux nodes.
 
-Two charts are available:
+This plugin creates two charts:
 
 -   System Clock Synchronization State
 -   Computed Time Offset Between Local System and Reference Clock
