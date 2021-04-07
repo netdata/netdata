@@ -10,8 +10,8 @@ This plugin monitors the system clock synchronization state on Linux nodes.
 
 This plugin creates two charts:
 
--   System Clock Synchronization State
--   Computed Time Offset Between Local System and Reference Clock
+-   System clock synchronization state
+-   Computed time offset between local system and reference clock
 
 ## Configuration
 
