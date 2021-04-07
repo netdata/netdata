@@ -150,29 +150,29 @@ Support per distribution:
 ### Monitored systemd service metrics
 
 - CPU utilization
-- Used Memory
-- RSS Memory
-- Mapped Memory
-- Cache Memory
-- Writeback Memory
-- Memory Minor Page Faults
-- Memory Major Page Faults
-- Memory Charging Activity
-- Memory Uncharging Activity
-- Memory Limit Failures
-- Swap Memory Used
-- Disk Read Bandwidth
-- Disk Write Bandwidth
-- Disk Read Operations
-- Disk Write Operations
-- Throttle Disk Read Bandwidth
-- Throttle Disk Write Bandwidth
-- Throttle Disk Read Operations
-- Throttle Disk Write Operations
-- Queued Disk Read Operations
-- Queued Disk Write Operations
-- Merged Disk Read Operations
-- Merged Disk Write Operations
+- Used memory
+- RSS memory
+- Mapped memory
+- Cache memory
+- Writeback memory
+- Memory minor page faults
+- Memory major page faults
+- Memory charging activity
+- Memory uncharging activity
+- Memory limit failures
+- Swap memory used
+- Disk read bandwidth
+- Disk write bandwidth
+- Disk read operations
+- Disk write operations
+- Throttle disk read bandwidth
+- Throttle disk write bandwidth
+- Throttle disk read operations
+- Throttle disk write operations
+- Queued disk read operations
+- Queued disk write operations
+- Merged disk read operations
+- Merged disk write operations
 
 ### how to enable cgroup accounting on systemd systems that is by default disabled
 
@@ -259,23 +259,23 @@ So, when a network interface or container stops, Netdata might log a few errors 
 
 ### Monitored container metrics
 
-- CPU Usage
-- CPU Usage within the limits
-- CPU Usage Per Core
-- Memory Usage
-- Writeback Memory
-- Memory Activity
-- Memory Page Faults
-- Used Memory
+- CPU usage
+- CPU usage within the limits
+- CPU usage per core
+- Memory usage
+- Writeback memory
+- Memory activity
+- Memory page faults
+- Used memory
 - Used RAM within the limits
-- Memory Utilization
-- Memory Limit Failures
-- I/O Bandwidth (all disks)
-- Serviced I/O Operations (all disks)
-- Throttle I/O Bandwidth (all disks)
-- Throttle Serviced I/O Operations (all disks)
-- Queued I/O Operations (all disks)
-- Merged I/O Operations (all disks)
+- Memory utilization
+- Memory limit failures
+- I/O bandwidth (all disks)
+- Serviced I/O operations (all disks)
+- Throttle I/O bandwidth (all disks)
+- Throttle serviced I/O operations (all disks)
+- Queued I/O operations (all disks)
+- Merged I/O operations (all disks)
 - CPU pressure
 - Memory pressure
 - Memory full pressure
