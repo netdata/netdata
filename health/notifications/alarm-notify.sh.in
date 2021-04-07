@@ -2357,11 +2357,10 @@ html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${hos
 
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
-  rich_status_raised_for="Recovered from ${pretty_old_status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm was raised for ${non_clear_duration_txt})"
   fi
-  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
+  rich_status_raised_for="Recovered from ${pretty_old_status}, ${raised_for}"
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
@@ -2370,19 +2369,17 @@ if [ "${status}" = "CLEAR" ]; then
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
-  rich_status_raised_for="Escalated to critical"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
-  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
+  rich_status_raised_for="Escalated to critical, ${raised_for}"
 
 elif { [ "${old_status}" = "CRITICAL" ] && [ "${status}" = "WARNING" ]; }; then
   severity="Demoted to ${status}"
-  rich_status_raised_for="Demoted to warning"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
-  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
+  rich_status_raised_for="Demoted to warning, ${raised_for}"
 
 else
   raised_for=
