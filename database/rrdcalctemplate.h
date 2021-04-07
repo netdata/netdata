@@ -15,6 +15,10 @@ struct rrdcalctemplate {
     char *exec;
     char *recipient;
 
+    char *class;
+    char *component;
+    char *type;
+
     char *context;
     uint32_t hash_context;
 

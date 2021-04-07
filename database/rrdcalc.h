@@ -42,9 +42,12 @@ struct rrdcalc {
     char *exec;                     // the command to execute when this alarm switches state
     char *recipient;                // the recipient of the alarm (the first parameter to exec)
 
+    char *class;                    // the class that this alarm belongs
+    char *component;                // the component that this alarm refers to
+    char *type;                     // type of the alarm
+
     char *chart;                    // the chart id this should be linked to
     uint32_t hash_chart;
-
 
     char *plugin_match;             //the plugin name that should be linked to
     SIMPLE_PATTERN *plugin_pattern;

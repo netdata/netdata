@@ -1492,3 +1492,37 @@ char *read_by_filename(char *filename, long *file_size)
         *file_size = size;
     return contents;
 }
+
+char *find_and_replace(const char *src, const char *find, const char *replace, const char *where)
+{
+   size_t size        = strlen(src) + 1;
+   size_t find_len    = strlen(find);
+   size_t repl_len    = strlen(replace);
+   char *value, *dst, *temp;
+
+   value = mallocz(size);
+   dst = value;
+   if ( likely(where) ) {
+
+       size_t count = where - src;
+
+       size += repl_len - find_len;
+
+       temp = reallocz(value, size);
+
+       dst = temp + (dst - value);
+       value = temp;
+
+       memmove(dst, src, count);
+       src += count;
+       dst += count;
+
+       memmove(dst, replace, repl_len);
+       src += find_len;
+       dst += repl_len;
+   }
+
+   strcpy(dst, src);
+
+   return value;
+}
