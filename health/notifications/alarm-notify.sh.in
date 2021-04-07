@@ -2298,6 +2298,7 @@ CRITICAL)
   status_message="is critical"
   status_email_subject="Critical"
   color="#ca414b"
+  rich_status_raised_for="Raised to critical, for ${non_clear_duration_txt}"
 
   background_color="#FFEBEF"
   border_color="#FF4136"
@@ -2311,6 +2312,7 @@ WARNING)
   status_message="needs attention"
   status_email_subject="Warning"
   color="#ffc107"
+  rich_status_raised_for="Raised to warning, for ${non_clear_duration_txt}"
 
   background_color="#FFF8E1"
   border_color="#FFC300"
@@ -2324,6 +2326,7 @@ CLEAR)
   status_message="recovered"
   status_email_subject="Clear"
   color="#77ca6d"
+  rich_status_raised_for=
 
   background_color="#E5F5E8"
   border_color="#68C47D"
@@ -2333,14 +2336,32 @@ CLEAR)
   ;;
 esac
 
+# make pretty old statuses
+case "${old_status}" in
+CRITICAL)
+  pretty_old_status="critical"
+  ;;
+
+WARNING)
+  pretty_old_status="warning"
+  ;;
+
+CLEAR)
+  pretty_old_status="Cleared"
+  ;;
+esac
+
+
 # the html email subject
 html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
 
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
+  rich_status_raised_for="Recovered from ${pretty_old_status}"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm was raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
@@ -2349,19 +2370,25 @@ if [ "${status}" = "CLEAR" ]; then
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
+  rich_status_raised_for="Escalated to critical"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
 
 elif { [ "${old_status}" = "CRITICAL" ] && [ "${status}" = "WARNING" ]; }; then
   severity="Demoted to ${status}"
+  rich_status_raised_for="Demoted to warning"
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm is raised for ${non_clear_duration_txt})"
   fi
+  rich_status_raised_for="${rich_status_raised_for}, ${raised_for}"
 
 else
   raised_for=
 fi
+
+
 
 # prepare HTML versions of elements
 info_html=
@@ -2845,14 +2872,6 @@ if [ -n "$edit_command_line" ]; then
     IFS='=' read -r edit_command line <<<"$edit_command_line"
 fi
 
-if [ -n "$total_warn_alarms" ] || [ -n "$total_crit_alarms" ]; then
-    ACTIVE_ALERTS_HEADER="Alerts raised during the last 30 minutes:"
-elif [ -z "$total_warn_alarms" ] && [ -z "$total_crit_alarms" ]; then
-    if [ "$total_warnings" -ne "0" ] || [ "$total_critical" -ne "0" ]; then
-        ACTIVE_ALERTS_HEADER="No alerts raised during the last 30 minutes"
-    fi
-fi
-
 IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
@@ -3285,7 +3304,7 @@ Content-Transfer-Encoding: 8bit
 
                   <div
                     style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:14px;line-height:1;text-align:left;color:#555555;"
-                  >${severity} ${raised_for}</div>
+                  >${rich_status_raised_for}</div>
 
                 </td>
               </tr>
@@ -3306,7 +3325,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
 
-                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">On
+                  <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:left;color:#555555;">On:
                     <span style="font-weight:500">${date}</span></div>
 
                 </td>
@@ -3596,7 +3615,7 @@ Content-Transfer-Encoding: 8bit
                             <span style="font-weight:600">${total_warnings} warning</span>
                             and
                             <span style="font-weight:600">${total_critical} critical</span>
-                            alert(s)</div>
+                            additional active alert(s)</div>
 
                         </td>
                       </tr>
@@ -3613,8 +3632,6 @@ Content-Transfer-Encoding: 8bit
             </table>
 
           </div>
-
-          <div style="font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:16px;line-height:1;text-align:center;color:#555555;">${ACTIVE_ALERTS_HEADER}</div>
 
           ${CRIT_ALARMS}
 
