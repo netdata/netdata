@@ -306,7 +306,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = (ae->recipient) ? ae->recipient : host->health_default_recipient;
 
     int n_warn=0, n_crit=0;
-    int l_warn=0, l_crit=0;
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
     BUFFER *warn_alarms, *crit_alarms;
@@ -322,28 +321,24 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
             if (likely(ae->alarm_id != rc->id) && likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+
+                if (n_warn) buffer_strcat(warn_alarms, ",");
+                buffer_strcat(warn_alarms, rc->name);
+                buffer_strcat(warn_alarms, "=");
+                buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
                 n_warn++;
 
-                if (now - rc->last_status_change <= 1800) {
-                    if (l_warn) buffer_strcat(warn_alarms, ",");
-                    buffer_strcat(warn_alarms, rc->name);
-                    buffer_strcat(warn_alarms, "=");
-                    buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
-                    l_warn++;
-                }
             } else if (ae->alarm_id == rc->id)
                 expr=rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
             if (likely(ae->alarm_id != rc->id) && likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+
+                if (n_crit) buffer_strcat(crit_alarms, ",");
+                buffer_strcat(crit_alarms, rc->name);
+                buffer_strcat(crit_alarms, "=");
+                buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
                 n_crit++;
 
-                if (now - rc->last_status_change <= 1800) {
-                    if (l_crit) buffer_strcat(crit_alarms, ",");
-                    buffer_strcat(crit_alarms, rc->name);
-                    buffer_strcat(crit_alarms, "=");
-                    buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
-                    l_crit++;
-                }
             } else if (ae->alarm_id == rc->id)
                 expr=rc->critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
