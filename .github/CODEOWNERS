@@ -5,16 +5,16 @@
 * @ktsaou @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @knatsakis @kaskavel @vkalintiris
-.github/ @Ferroin @knatsakis @kaskavel @vkalintiris
+.travis/ @Ferroin @kaskavel @vkalintiris
+.github/ @Ferroin @kaskavel @vkalintiris
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @Ferroin @knatsakis
-contrib/debian @Ferroin @knatsakis @vkalintiris
+build/ @Ferroin
+contrib/debian @Ferroin @vkalintiris
 collectors/ @vlvkobal @mfundul
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -34,11 +34,11 @@ health/ @thiagoftsm @vlvkobal
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm @mfundul
-packaging/ @Ferroin @knatsakis @vkalintiris
+packaging/ @Ferroin @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @knatsakis @vkalintiris
-tests/ @Ferroin @knatsakis @kaskavel
+system/ @Ferroin @vkalintiris
+tests/ @Ferroin @kaskavel
 web/ @thiagoftsm @mfundul @vlvkobal
 web/gui/ @jacekkolasa
 
