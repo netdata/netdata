@@ -2385,8 +2385,6 @@ else
   raised_for=
 fi
 
-
-
 # prepare HTML versions of elements
 info_html=
 [ -n "${info}" ] && info_html=" <small><br/>${info}</small>"
