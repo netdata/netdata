@@ -2336,21 +2336,6 @@ CLEAR)
   ;;
 esac
 
-# make pretty old statuses
-case "${old_status}" in
-CRITICAL)
-  pretty_old_status="critical"
-  ;;
-
-WARNING)
-  pretty_old_status="warning"
-  ;;
-
-CLEAR)
-  pretty_old_status="Cleared"
-  ;;
-esac
-
 
 # the html email subject
 html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
@@ -2360,7 +2345,7 @@ if [ "${status}" = "CLEAR" ]; then
   if [ ${non_clear_duration} -gt ${duration} ]; then
     raised_for="(alarm was raised for ${non_clear_duration_txt})"
   fi
-  rich_status_raised_for="Recovered from ${pretty_old_status}, ${raised_for}"
+  rich_status_raised_for="Recovered from ${old_status,,}, ${raised_for}"
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
@@ -2669,10 +2654,10 @@ if [ -n "$total_warn_alarms" ]; then
    while read -d, -r pair; do
        IFS='=' read -r key val <<<"$pair"
 
-       date=$(date --date=@${val} "${date_format}" 2>/dev/null)
-       [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
-       [ -z "${date}" ] && date=$(date --date=@${val} 2>/dev/null)
-       [ -z "${date}" ] && date=$(date 2>/dev/null)
+       date_w=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date_w}" ] && date_w=$(date 2>/dev/null)
 
        now=$(date "+%s")
        elapsed=$(( now - val))
@@ -2705,7 +2690,7 @@ if [ -n "$total_warn_alarms" ]; then
                       <tr>
                         <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
 
-                          <div style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\">${date}</div>
+                          <div style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\">${date_w}</div>
 
                         </td>
                       </tr>
@@ -2764,10 +2749,10 @@ if [ -n "$total_crit_alarms" ]; then
    while read -d, -r pair; do
        IFS='=' read -r key val <<<"$pair"
 
-       date=$(date --date=@${val} "${date_format}" 2>/dev/null)
-       [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
-       [ -z "${date}" ] && date=$(date --date=@${val} 2>/dev/null)
-       [ -z "${date}" ] && date=$(date 2>/dev/null)
+       date_c=$(date --date=@${val} "${date_format}" 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date "${date_format}" 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date --date=@${val} 2>/dev/null)
+       [ -z "${date_c}" ] && date_c=$(date 2>/dev/null)
 
        now=$(date "+%s")
        elapsed=$(( now - val))
@@ -2806,7 +2791,7 @@ if [ -n "$total_crit_alarms" ]; then
 
                           <div
                             style=\"font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif;font-size:12px;line-height:1;text-align:left;color:#555555;\"
-                          >${date}</div>
+                          >${date_c}</div>
 
                         </td>
                       </tr>
