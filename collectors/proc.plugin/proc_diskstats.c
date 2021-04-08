@@ -32,6 +32,7 @@ static struct disk {
     int do_iotime;
     int do_qops;
     int do_util;
+    int do_ext;
     int do_backlog;
     int do_bcache;
 
@@ -164,6 +165,7 @@ static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         global_do_iotime = CONFIG_BOOLEAN_AUTO,
         global_do_qops = CONFIG_BOOLEAN_AUTO,
         global_do_util = CONFIG_BOOLEAN_AUTO,
+        global_do_ext = CONFIG_BOOLEAN_AUTO,
         global_do_backlog = CONFIG_BOOLEAN_AUTO,
         global_do_bcache = CONFIG_BOOLEAN_AUTO,
         globals_initialized = 0,
@@ -463,6 +465,7 @@ static void get_disk_config(struct disk *d) {
         d->do_iotime = CONFIG_BOOLEAN_NO;
         d->do_qops = CONFIG_BOOLEAN_NO;
         d->do_util = CONFIG_BOOLEAN_NO;
+        d->do_ext = CONFIG_BOOLEAN_NO;
         d->do_backlog = CONFIG_BOOLEAN_NO;
         d->do_bcache = CONFIG_BOOLEAN_NO;
     }
@@ -513,6 +516,7 @@ static void get_disk_config(struct disk *d) {
                 ddo_iotime = CONFIG_BOOLEAN_NO,
                 ddo_qops = CONFIG_BOOLEAN_NO,
                 ddo_util = CONFIG_BOOLEAN_NO,
+                ddo_ext = CONFIG_BOOLEAN_NO,
                 ddo_backlog = CONFIG_BOOLEAN_NO,
                 ddo_bcache = CONFIG_BOOLEAN_NO;
 
@@ -524,6 +528,7 @@ static void get_disk_config(struct disk *d) {
             ddo_iotime = global_do_iotime,
             ddo_qops = global_do_qops,
             ddo_util = global_do_util,
+            ddo_ext = global_do_ext,
             ddo_backlog = global_do_backlog,
             ddo_bcache = global_do_bcache;
         }
@@ -534,6 +539,7 @@ static void get_disk_config(struct disk *d) {
         d->do_iotime  = config_get_boolean_ondemand(var_name, "i/o time", ddo_iotime);
         d->do_qops    = config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
         d->do_util    = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
+        d->do_ext     = config_get_boolean_ondemand(var_name, "extended operations", ddo_ext);
         d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
 
         if(d->device_is_bcache)
@@ -820,6 +826,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_iotime  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "i/o time for all disks", global_do_iotime);
         global_do_qops    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "queued operations for all disks", global_do_qops);
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "utilization percentage for all disks", global_do_util);
+        global_do_ext     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "extended operations for all disks", global_do_ext);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "backlog for all disks", global_do_backlog);
         global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache for all disks", global_do_bcache);
         global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
