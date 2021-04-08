@@ -234,13 +234,11 @@ parse_version() {
 }
 
 get_latest_version() {
-  local latest
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4
   else
-    latest="$(download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout)"
+    download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout
   fi
-  parse_version "$latest"
 }
 
 set_tarball_urls() {
@@ -272,7 +270,9 @@ update() {
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
 
   current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
-  latest_version="$(get_latest_version)"
+  latest_tag="$(get_latest_version)"
+  latest_version="$(parse_version "${latest_tag}")"
+  path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
 
   # If we can't get the current version for some reason assume `0`
   current_version="${current_version:-0}"
@@ -295,7 +295,7 @@ update() {
     NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
     tar -xf netdata-latest.tar.gz >&3 2>&3
     rm netdata-latest.tar.gz >&3 2>&3
-    cd netdata-* || exit 1
+    cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
     RUN_INSTALLER=1
     cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
