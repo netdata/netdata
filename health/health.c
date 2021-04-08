@@ -320,7 +320,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             continue;
 
         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            if (likely(ae->alarm_id != rc->id) && likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
 
                 if (n_warn) buffer_strcat(warn_alarms, ",");
                 buffer_strcat(warn_alarms, rc->name);
@@ -331,7 +331,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             } else if (ae->alarm_id == rc->id)
                 expr=rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            if (likely(ae->alarm_id != rc->id) && likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
 
                 if (n_crit) buffer_strcat(crit_alarms, ",");
                 buffer_strcat(crit_alarms, rc->name);
