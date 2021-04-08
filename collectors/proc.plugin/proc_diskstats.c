@@ -65,9 +65,16 @@ static struct disk {
     RRDDIM *rd_io_reads;
     RRDDIM *rd_io_writes;
 
+    RRDSET *st_ext_io;
+    RRDDIM *rd_io_discards;
+
     RRDSET *st_ops;
     RRDDIM *rd_ops_reads;
     RRDDIM *rd_ops_writes;
+
+    RRDSET *st_ext_ops;
+    RRDDIM *rd_ops_discards;
+    RRDDIM *rd_ops_flushes;
 
     RRDSET *st_qops;
     RRDDIM *rd_qops_operations;
@@ -85,17 +92,31 @@ static struct disk {
     RRDDIM *rd_mops_reads;
     RRDDIM *rd_mops_writes;
 
+    RRDSET *st_ext_mops;
+    RRDDIM *rd_mops_discards;
+
     RRDSET *st_iotime;
     RRDDIM *rd_iotime_reads;
     RRDDIM *rd_iotime_writes;
+
+    RRDSET *st_ext_iotime;
+    RRDDIM *rd_iotime_discards;
+    RRDDIM *rd_iotime_flushes;
 
     RRDSET *st_await;
     RRDDIM *rd_await_reads;
     RRDDIM *rd_await_writes;
 
+    RRDSET *st_ext_await;
+    RRDDIM *rd_await_discards;
+    RRDDIM *rd_await_flushes;
+
     RRDSET *st_avgsz;
     RRDDIM *rd_avgsz_reads;
     RRDDIM *rd_avgsz_writes;
+
+    RRDSET *st_ext_avgsz;
+    RRDDIM *rd_avgsz_discards;
 
     RRDSET *st_svctm;
     RRDDIM *rd_svctm_svctm;
@@ -915,7 +936,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         collected_number    last_reads = 0,  last_readsectors = 0,  last_readms = 0,
                             last_writes = 0, last_writesectors = 0, last_writems = 0,
                             last_busy_ms = 0,
-                            last_discards = 0, last_discard_sectors = 0, last_discardms = 0,
+                            last_discards = 0, last_discardsectors = 0, last_discardms = 0,
                             last_flushes = 0, last_flushms = 0;
 
         size_t words = procfile_linewords(ff, l);
@@ -1024,7 +1045,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // Do performance metrics
 
         if(d->do_io == CONFIG_BOOLEAN_YES || (d->do_io == CONFIG_BOOLEAN_AUTO &&
-                                              (readsectors || writesectors ||
+                                              (readsectors || writesectors || discardsectors ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
@@ -1056,8 +1077,37 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
+        if (do_dc_stats && d->do_io == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+            if (unlikely(!d->st_ext_io)) {
+                d->st_ext_io = rrdset_create_localhost(
+                        "disk_ext"
+                        , d->device
+                        , d->disk
+                        , family
+                        , "disk_ext.io"
+                        , "Amount of Discarded Data"
+                        , "KiB/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_IO + 1
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
+
+                d->rd_io_discards =
+                    rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+            } else
+                rrdset_next(d->st_ext_io);
+
+            last_discardsectors = rrddim_set_by_pointer(d->st_ext_io, d->rd_io_discards, discardsectors);
+            rrdset_done(d->st_ext_io);
+        }
+
+        // --------------------------------------------------------------------
+
         if(d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
-                                               (reads || writes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                               (reads || writes || discards || flushes ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_ops = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_ops)) {
@@ -1086,6 +1136,39 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             last_reads  = rrddim_set_by_pointer(d->st_ops, d->rd_ops_reads, reads);
             last_writes = rrddim_set_by_pointer(d->st_ops, d->rd_ops_writes, writes);
             rrdset_done(d->st_ops);
+        }
+
+        // --------------------------------------------------------------------
+
+        if (do_dc_stats && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+            if (unlikely(!d->st_ext_ops)) {
+                d->st_ext_ops = rrdset_create_localhost(
+                        "disk_ext_ops"
+                        , d->device
+                        , d->disk
+                        , family
+                        , "disk_ext.ops"
+                        , "Disk Completed Extended I/O Operations"
+                        , "operations/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_OPS + 1
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->st_ext_ops, RRDSET_FLAG_DETAIL);
+
+                d->rd_ops_discards = rrddim_add(d->st_ext_ops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                if (do_fl_stats)
+                    d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            } else
+                rrdset_next(d->st_ext_ops);
+
+            last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
+            if (do_fl_stats)
+                last_flushes = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_flushes, flushes);
+            rrdset_done(d->st_ext_ops);
         }
 
         // --------------------------------------------------------------------
@@ -1219,7 +1302,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
 
         if(d->do_mops == CONFIG_BOOLEAN_YES || (d->do_mops == CONFIG_BOOLEAN_AUTO &&
-                                                (mreads || mwrites || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                (mreads || mwrites || mdiscards ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_mops = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_mops)) {
@@ -1252,8 +1336,39 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
+        if(do_dc_stats && d->do_mops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+            d->do_mops = CONFIG_BOOLEAN_YES;
+
+            if(unlikely(!d->st_ext_mops)) {
+                d->st_ext_mops = rrdset_create_localhost(
+                        "disk_ext_mops"
+                        , d->device
+                        , d->disk
+                        , family
+                        , "disk_ext.mops"
+                        , "Disk Merged Discard Operations"
+                        , "merged operations/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_MOPS + 1
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->st_ext_mops, RRDSET_FLAG_DETAIL);
+
+                d->rd_mops_discards = rrddim_add(d->st_ext_mops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            } else
+                rrdset_next(d->st_ext_mops);
+
+            rrddim_set_by_pointer(d->st_ext_mops, d->rd_mops_discards, mdiscards);
+            rrdset_done(d->st_ext_mops);
+        }
+
+        // --------------------------------------------------------------------
+
         if(d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
-                                                  (readms || writems || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                  (readms || writems || discardms || flushms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_iotime = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_iotime)) {
@@ -1282,6 +1397,40 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             last_readms  = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_reads, readms);
             last_writems = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_writes, writems);
             rrdset_done(d->st_iotime);
+        }
+
+        // --------------------------------------------------------------------
+
+        if(do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+            if(unlikely(!d->st_ext_iotime)) {
+                d->st_ext_iotime = rrdset_create_localhost(
+                        "disk_ext_iotime"
+                        , d->device
+                        , d->disk
+                        , family
+                        , "disk_ext.iotime"
+                        , "Disk Total I/O Time for Extended Operations"
+                        , "milliseconds/s"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_IOTIME + 1 
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->st_ext_iotime, RRDSET_FLAG_DETAIL);
+
+                d->rd_iotime_discards = rrddim_add(d->st_ext_iotime, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                if (do_fl_stats)
+                    d->rd_iotime_flushes =
+                        rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            } else
+                rrdset_next(d->st_ext_iotime);
+
+            last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
+            if (do_fl_stats)
+                last_flushms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_flushes, flushms);
+            rrdset_done(d->st_ext_iotime);
         }
 
         // --------------------------------------------------------------------
@@ -1324,6 +1473,42 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_await);
             }
 
+            if (do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+                if(unlikely(!d->st_ext_await)) {
+                    d->st_ext_await = rrdset_create_localhost(
+                            "disk_ext_await"
+                            , d->device
+                            , d->disk
+                            , family
+                            , "disk_ext.await"
+                            , "Average Completed Extended I/O Operation Time"
+                            , "milliseconds/operation"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_DISK_AWAIT + 1
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_flag_set(d->st_ext_await, RRDSET_FLAG_DETAIL);
+
+                    d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    if (do_fl_stats)
+                        d->rd_await_flushes =
+                            rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(d->st_ext_await);
+
+                rrddim_set_by_pointer(
+                    d->st_ext_await, d->rd_await_discards,
+                    (discards - last_discards) ? (discardms - last_discardms) / (discards - last_discards) : 0);
+                if (do_fl_stats)
+                    rrddim_set_by_pointer(
+                        d->st_ext_await, d->rd_await_flushes,
+                        (flushes - last_flushes) ? (flushms - last_flushms) / (flushes - last_flushes) : 0);
+                rrdset_done(d->st_ext_await);
+            }
+
             if( (d->do_io  == CONFIG_BOOLEAN_YES || (d->do_io  == CONFIG_BOOLEAN_AUTO &&
                                                      (readsectors || writesectors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
                 (d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
@@ -1355,6 +1540,37 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (reads  - last_reads)  ? (readsectors  - last_readsectors)  / (reads  - last_reads)  : 0);
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
                 rrdset_done(d->st_avgsz);
+            }
+
+            if(do_dc_stats && d->do_io  == CONFIG_BOOLEAN_YES && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
+                if(unlikely(!d->st_ext_avgsz)) {
+                    d->st_ext_avgsz = rrdset_create_localhost(
+                            "disk_ext_avgsz"
+                            , d->device
+                            , d->disk
+                            , family
+                            , "disk_ext.avgsz"
+                            , "Average Amount of Discarded Data"
+                            , "KiB/operation"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_DISK_AVGSZ
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
+
+                    rrdset_flag_set(d->st_ext_avgsz, RRDSET_FLAG_DETAIL);
+
+                    d->rd_avgsz_discards =
+                        rrddim_add(d->st_ext_avgsz, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(d->st_ext_avgsz);
+
+                rrddim_set_by_pointer(
+                    d->st_ext_avgsz, d->rd_avgsz_discards,
+                    (discards - last_discards) ? (discardsectors - last_discardsectors) / (discards - last_discards) :
+                                                 0);
+                rrdset_done(d->st_ext_avgsz);
             }
 
             if( (d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
