@@ -1424,7 +1424,7 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
-    'disk.iotime': {
+    'disk_ext.iotime': {
         height: 0.5
     },
     'disk.mops': {
