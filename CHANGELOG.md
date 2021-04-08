@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix memory corruption issue when executing context queries in RAM/SAVE memory mode [\#10933](https://github.com/netdata/netdata/pull/10933) ([stelfrag](https://github.com/stelfrag))
+- Update CODEOWNERS [\#10928](https://github.com/netdata/netdata/pull/10928) ([knatsakis](https://github.com/knatsakis))
 - Update news and GIF in README, fix typo [\#10900](https://github.com/netdata/netdata/pull/10900) ([joelhans](https://github.com/joelhans))
 - Update README.md [\#10898](https://github.com/netdata/netdata/pull/10898) ([slimanio](https://github.com/slimanio))
 - Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
+- Add a CRASH event when the agent fails to properly shutdown [\#10893](https://github.com/netdata/netdata/pull/10893) ([stelfrag](https://github.com/stelfrag))
 - Bumped version of OpenSSL bundled in static builds to 1.1.1k. [\#10884](https://github.com/netdata/netdata/pull/10884) ([Ferroin](https://github.com/Ferroin))
+- Fix incorrect health log entries [\#10822](https://github.com/netdata/netdata/pull/10822) ([stelfrag](https://github.com/stelfrag))
 - Spelling build [\#10428](https://github.com/netdata/netdata/pull/10428) ([jsoref](https://github.com/jsoref))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
@@ -326,9 +330,6 @@
 - Update macOS instructions with cmake [\#10295](https://github.com/netdata/netdata/pull/10295) ([joelhans](https://github.com/joelhans))
 - dbengine extent cache [\#10293](https://github.com/netdata/netdata/pull/10293) ([mfundul](https://github.com/mfundul))
 - add privacy information about aclk connection [\#10292](https://github.com/netdata/netdata/pull/10292) ([OdysLam](https://github.com/OdysLam))
-- Fixed the data endpoint so that the context param is correctly applied to children [\#10290](https://github.com/netdata/netdata/pull/10290) ([stelfrag](https://github.com/stelfrag))
-- installer: update go.d.plugin version to v0.26.0 [\#10284](https://github.com/netdata/netdata/pull/10284) ([ilyam8](https://github.com/ilyam8))
-- use new libmosquitto release \(with MacOS libMosq fix\) [\#10283](https://github.com/netdata/netdata/pull/10283) ([underhood](https://github.com/underhood))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
