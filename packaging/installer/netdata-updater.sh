@@ -295,7 +295,7 @@ update() {
     NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
     tar -xf netdata-latest.tar.gz >&3 2>&3
     rm netdata-latest.tar.gz >&3 2>&3
-    cd netdata-* || exit 1
+    cd "netdata-"* || exit 1
     RUN_INSTALLER=1
     cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
