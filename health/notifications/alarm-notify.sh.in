@@ -2650,6 +2650,8 @@ EOF
 
 else
 
+now=$(date "+%s")
+
 if [ -n "$total_warn_alarms" ]; then
    while read -d, -r pair; do
        IFS='=' read -r key val <<<"$pair"
@@ -2659,8 +2661,7 @@ if [ -n "$total_warn_alarms" ]; then
        [ -z "${date_w}" ] && date_w=$(date --date=@${val} 2>/dev/null)
        [ -z "${date_w}" ] && date_w=$(date 2>/dev/null)
 
-       now=$(date "+%s")
-       elapsed=$(( now - val))
+       elapsed=$((now - val))
 
        duration4human ${elapsed} >/dev/null
        elapsed_txt="${REPLY}"
@@ -2754,8 +2755,7 @@ if [ -n "$total_crit_alarms" ]; then
        [ -z "${date_c}" ] && date_c=$(date --date=@${val} 2>/dev/null)
        [ -z "${date_c}" ] && date_c=$(date 2>/dev/null)
 
-       now=$(date "+%s")
-       elapsed=$(( now - val))
+       elapsed=$((now - val))
 
        duration4human ${elapsed} >/dev/null
        elapsed_txt="${REPLY}"
