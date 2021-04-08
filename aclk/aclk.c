@@ -243,7 +243,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 static void puback_callback(uint16_t packet_id)
 {
     if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
-        aclk_reconnect_delay(0);
+        aclk_reconnect_delay(0, 0, 0, 0);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
@@ -412,10 +412,12 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
  */
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
-    // Handle reconnect exponential backoff
-    // fnc aclk_reconnect_delay comes from ACLK Legacy @amoss
-    // but has been modifed slightly (more randomness)
-    unsigned long recon_delay = aclk_reconnect_delay(1);
+    unsigned long recon_delay;
+    if (!aclk_env || !aclk_env->backoff.base)
+        recon_delay = aclk_reconnect_delay(1, 2, 0, 1024);
+    else
+        recon_delay = aclk_reconnect_delay(1, aclk_env->backoff.base, aclk_env->backoff.min_s, aclk_env->backoff.max_s);
+
     info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
     // we want to wake up from time to time to check netdata_exit
     while (recon_delay)
