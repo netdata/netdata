@@ -2946,7 +2946,7 @@ Content-Transfer-Encoding: 8bit
         <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:50px;padding-left:0;text-align:left;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:130px;" ><![endif]-->
 
-          <div class="mj-column-px-130 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-px-130 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:130px;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
               <tbody>
@@ -2976,7 +2976,7 @@ Content-Transfer-Encoding: 8bit
 
           <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
 
-          <div class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
@@ -3413,7 +3413,7 @@ Content-Transfer-Encoding: 8bit
         <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:25px;text-align:left;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:66px;" ><![endif]-->
 
-          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:66px;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
@@ -3453,7 +3453,7 @@ Content-Transfer-Encoding: 8bit
 
           <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:400px;" ><![endif]-->
 
-          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:400px;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
@@ -3509,7 +3509,7 @@ Content-Transfer-Encoding: 8bit
         <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:25px;text-align:left;">
           <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:66px;" ><![endif]-->
 
-          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-px-66 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:66px;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
@@ -3549,7 +3549,7 @@ Content-Transfer-Encoding: 8bit
 
           <!--[if mso | IE]></td><td align="left" class="" style="vertical-align:top;width:400px;" ><![endif]-->
 
-          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;">
+          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:400px;">
 
             <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
               <tbody>
