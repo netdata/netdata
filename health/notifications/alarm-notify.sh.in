@@ -2714,9 +2714,9 @@ if [ -n "$total_warn_alarms" ]; then
 
                             <tr>
 
-                              <td align=\"right\" style=\"font-size:0px;padding:10px 2px 10px 0;word-break:break-word;\">
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
 
-                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#555555;\"><span style=\"background-color:#FFF8E1; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
+                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:right;color:#555555;\"><span style=\"background-color:#FFF8E1; border: 1px solid #FFC300; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
               Warning for ${elapsed_txt}
            </span></div>
 
@@ -2817,9 +2817,9 @@ if [ -n "$total_crit_alarms" ]; then
 
                             <tr>
 
-                              <td align=\"right\" style=\"font-size:0px;padding:10px 2px 10px 0;word-break:break-word;\">
+                              <td align=\"right\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
 
-                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;\"><span style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
+                                <div style=\"font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:right;color:#35414A;\"><span style=\"background-color:#FFEBEF; border: 1px solid #FF4136; border-radius:36px; padding: 2px 12px; margin-top: 20px; white-space: nowrap\">
               Critical for ${elapsed_txt}
            </span></div>
 
@@ -2932,13 +2932,13 @@ Content-Transfer-Encoding: 8bit
 <body style="word-spacing:normal;">
 
 
-<div>
+<div class="svgbg" style="background-image: url('https://staging.netdata.cloud/static/email/img/isotype_600.png'); background-repeat: no-repeat; background-position: top center; background-size: 600px 192px;">
 
 
   <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
 
 
-  <div style="margin:0px auto;max-width:600px; background-image: url('https://app.netdata.cloud/static/img/mail/isotype.png'); background-repeat: no-repeat; background-position: -10px -40px; background-size: 334px 265px; margin-bottom: -115px; padding-bottom: 115px;">
+  <div style="margin:0px auto;max-width:600px;">
 
     <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
       <tbody>
