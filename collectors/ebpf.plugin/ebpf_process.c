@@ -949,7 +949,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(global_process_stats);
     freez(current_apps_data);
 
-    clean_apps_structures(apps_groups_root_target);
     freez(process_data.map_fd);
 
     struct bpf_program *prog;
