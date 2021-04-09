@@ -1325,7 +1325,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         return;
 
     netdata_socket_idx_t key = {};
-    netdata_socket_idx_t next_key;
+    netdata_socket_idx_t next_key = {};
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
