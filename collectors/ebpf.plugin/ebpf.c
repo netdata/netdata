@@ -132,11 +132,15 @@ static void ebpf_exit(int sig)
 
     freez(global_process_stat);
 
-    clean_socket_apps_structures();
-    freez(socket_bandwidth_curr);
+    if (socket_bandwidth_curr) {
+        clean_socket_apps_structures();
+        freez(socket_bandwidth_curr);
+    }
 
-    clean_cachestat_pid_structures();
-    freez(cachestat_pid);
+    if (cachestat_pid) {
+        clean_cachestat_pid_structures();
+        freez(cachestat_pid);
+    }
 
     /*
     int ret = fork();
