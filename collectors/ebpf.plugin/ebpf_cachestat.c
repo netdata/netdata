@@ -43,7 +43,7 @@ struct config cachestat_config = { .first_section = NULL,
  *
  * Clean the allocated structures.
  */
-static void clean_pid_structures() {
+void clean_cachestat_pid_structures() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         freez(cachestat_pid[pids->pid]);
@@ -70,9 +70,6 @@ static void ebpf_cachestat_cleanup(void *ptr)
         usec_t dt = heartbeat_next(&hb, tick);
         UNUSED(dt);
     }
-
-    clean_pid_structures();
-    freez(cachestat_pid);
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
