@@ -132,6 +132,9 @@ static void ebpf_exit(int sig)
 
     freez(global_process_stat);
 
+    clean_socket_apps_structures();
+    freez(socket_bandwidth_curr);
+
     /*
     int ret = fork();
     if (ret < 0) // error
