@@ -1421,7 +1421,7 @@ void update_listen_table(uint16_t value, uint8_t proto)
 static void read_listen_table()
 {
     uint16_t key = 0;
-    uint16_t next_key;
+    uint16_t next_key = 0;
 
     int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
     uint8_t value;
