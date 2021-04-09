@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Don’t use glob expansion in argument to `cd` in updater. [\#10936](https://github.com/netdata/netdata/pull/10936) ([Ferroin](https://github.com/Ferroin))
 - Fix memory corruption issue when executing context queries in RAM/SAVE memory mode [\#10933](https://github.com/netdata/netdata/pull/10933) ([stelfrag](https://github.com/stelfrag))
 - Update CODEOWNERS [\#10928](https://github.com/netdata/netdata/pull/10928) ([knatsakis](https://github.com/knatsakis))
 - Update news and GIF in README, fix typo [\#10900](https://github.com/netdata/netdata/pull/10900) ([joelhans](https://github.com/joelhans))
@@ -325,11 +326,6 @@
 - Add optional info on how to also add some default alarms as part of s… [\#10302](https://github.com/netdata/netdata/pull/10302) ([andrewm4894](https://github.com/andrewm4894))
 - Update UPDATE.md [\#10301](https://github.com/netdata/netdata/pull/10301) ([ysamouhos](https://github.com/ysamouhos))
 - HAProxy spelling correction [\#10300](https://github.com/netdata/netdata/pull/10300) ([autoalan](https://github.com/autoalan))
-- eBPF synchronization [\#10299](https://github.com/netdata/netdata/pull/10299) ([thiagoftsm](https://github.com/thiagoftsm))
-- python.d: always create a runtime chart on `create` call [\#10296](https://github.com/netdata/netdata/pull/10296) ([ilyam8](https://github.com/ilyam8))
-- Update macOS instructions with cmake [\#10295](https://github.com/netdata/netdata/pull/10295) ([joelhans](https://github.com/joelhans))
-- dbengine extent cache [\#10293](https://github.com/netdata/netdata/pull/10293) ([mfundul](https://github.com/mfundul))
-- add privacy information about aclk connection [\#10292](https://github.com/netdata/netdata/pull/10292) ([OdysLam](https://github.com/OdysLam))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
