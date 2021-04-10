@@ -140,8 +140,6 @@ static void ebpf_exit(int sig)
         freez(cachestat_pid);
     }
 
-    clean_apps_structures(apps_groups_root_target);
-
     /*
     int ret = fork();
     if (ret < 0) // error

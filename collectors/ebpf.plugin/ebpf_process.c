@@ -905,26 +905,6 @@ void clean_global_memory() {
     }
 }
 
-void clean_pid_on_target(struct pid_on_target *ptr) {
-    while (ptr) {
-        struct pid_on_target *next = ptr->next;
-        freez(ptr);
-
-        ptr = next;
-    }
-}
-
-void clean_apps_structures(struct target *ptr) {
-    struct target *agdt = ptr;
-    while (agdt) {
-        struct target *next = agdt->next;
-        clean_pid_on_target(agdt->root_pid);
-        freez(agdt);
-
-        agdt = next;
-    }
-}
-
 /**
  * Clean up the main thread.
  *
