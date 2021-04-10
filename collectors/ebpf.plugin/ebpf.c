@@ -130,14 +130,12 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    freez(global_process_stat);
-
-    if (socket_bandwidth_curr) {
+    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
         clean_socket_apps_structures();
         freez(socket_bandwidth_curr);
     }
 
-    if (cachestat_pid) {
+    if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
         clean_cachestat_pid_structures();
         freez(cachestat_pid);
     }
