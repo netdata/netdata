@@ -2821,7 +2821,7 @@ void *ebpf_socket_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
     memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
-    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
