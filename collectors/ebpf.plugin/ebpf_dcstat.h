@@ -56,5 +56,6 @@ typedef struct netdata_publish_dcstat {
 
 extern void *ebpf_dcstat_thread(void *ptr);
 extern void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern void clean_dcstat_pid_structures();
 
 #endif // NETDATA_EBPF_DCSTAT_H

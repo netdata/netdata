@@ -149,6 +149,12 @@ static void ebpf_exit(int sig)
         freez(cachestat_pid);
     }
 
+    if (ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_DCSTAT_IDX].enabled = 0;
+        clean_dcstat_pid_structures();
+        freez(dcstat_pid);
+    }
+
     /*
     int ret = fork();
     if (ret < 0) // error
