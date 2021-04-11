@@ -299,7 +299,6 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
 {
     char lpath[4096];
     char lname[128];
-    int prog_fd;
 
     int test = select_file(lname, em->thread_name, (size_t)127, em->mode, kernel_string);
     if (test < 0 || test > 127)
@@ -308,12 +307,29 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     snprintf(lpath, 4096, "%s/ebpf.d/%s", plugins_dir, lname);
     // We are using BPF_PROG_TYPE_UNSPEC instead a specific type for bpf_prog_load to define the type
     // according the eBPF program loaded
+    /*
+    int prog_fd;
     if (bpf_prog_load(lpath, BPF_PROG_TYPE_UNSPEC, obj, &prog_fd)) {
         em->enabled = CONFIG_BOOLEAN_NO;
         info("Cannot load program: %s", lpath);
         return NULL;
     } else {
         info("The eBPF program %s was loaded with success.", em->thread_name);
+    }
+    */
+    *obj = bpf_object__open_file(lpath, NULL);
+    if (libbpf_get_error(obj)) {
+        error("Cannot open BPF object %s", lpath);
+        bpf_object__close(*obj);
+        return NULL;
+    }
+
+    // resize here
+
+    if (bpf_object__load(*obj)) {
+        error("ERROR: loading BPF object file failed %s\n", lpath);
+        bpf_object__close(*obj);
+        return NULL;
     }
 
     struct bpf_map *map;
