@@ -149,6 +149,7 @@ accepts the following values: ​
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
 -   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
+-   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
     
 #### Integration with `apps.plugin`
 
