@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.30.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.30.0...v1.30.1)
 
 **Merged pull requests:**
 
@@ -322,10 +322,6 @@
 - python.d/nvidia\_smi: fix gpu data filtering [\#10312](https://github.com/netdata/netdata/pull/10312) ([ilyam8](https://github.com/ilyam8))
 - Add new collectors to supported collectors list [\#10310](https://github.com/netdata/netdata/pull/10310) ([joelhans](https://github.com/joelhans))
 - Added numerous improvements to our Docker image. [\#10308](https://github.com/netdata/netdata/pull/10308) ([Ferroin](https://github.com/Ferroin))
-- Update README.md [\#10303](https://github.com/netdata/netdata/pull/10303) ([ktsaou](https://github.com/ktsaou))
-- Add optional info on how to also add some default alarms as part of s… [\#10302](https://github.com/netdata/netdata/pull/10302) ([andrewm4894](https://github.com/andrewm4894))
-- Update UPDATE.md [\#10301](https://github.com/netdata/netdata/pull/10301) ([ysamouhos](https://github.com/ysamouhos))
-- HAProxy spelling correction [\#10300](https://github.com/netdata/netdata/pull/10300) ([autoalan](https://github.com/autoalan))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
