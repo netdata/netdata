@@ -314,6 +314,9 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
         while (maps[i].name) {
             ebpf_local_maps_t *w = &maps[i];
             if (w->user_input != w->internal_input && !strcmp(w->name, map_name)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
+#endif
                 bpf_map__resize(map, w->user_input);
             }
             i++;
@@ -400,7 +403,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
                                                  CONFIG_BOOLEAN_YES);
 
     modules->pid_map_size = (uint32_t)appconfig_get_number(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
-                                                           ND_EBPF_DEFAULT_PID_SIZE);
+                                                           modules->pid_map_size);
 }
 
 

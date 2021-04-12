@@ -784,7 +784,8 @@ static void ebpf_update_interval()
 static void ebpf_update_table_size()
 {
     int i;
-    uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE, 1);
+    uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
+                                                    EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].pid_map_size = value;
     }
