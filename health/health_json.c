@@ -83,7 +83,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     );
 
     if (likely(ae->info)) {
-        char *m=NULL;;
+        char *m=NULL;
 
         while ( m = strstr (ae->info, "$family") ) {
             char *buf=NULL;
