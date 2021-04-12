@@ -16,12 +16,15 @@ static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "rece
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
                                                             "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
-static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_conn_ipv4", .internal_input = 65536,
-                                               .user_input = 0},
-                                          {.name = "tbl_conn_ipv6", .internal_input = 65536,
-                                              .user_input = 0},
-                                          {.name = "tbl_nv_udp_conn_stats", .internal_input = 8192,
-                                              .user_input = 0},
+static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_conn_ipv4",
+                                           .internal_input = NETDATA_MAXIMUM_TCP_CONNECTION_ALLOWED,
+                                           .user_input = 0},
+                                          {.name = "tbl_conn_ipv6",
+                                           .internal_input = NETDATA_MAXIMUM_TCP_CONNECTION_ALLOWED,
+                                           .user_input = 0},
+                                          {.name = "tbl_nv_udp_conn_stats",
+                                           .internal_input = NETDATA_MAXIMUM_UDP_CONNECTION_ALLOWED,
+                                           .user_input = 0},
                                            {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 static netdata_idx_t *socket_hash_values = NULL;
@@ -2815,6 +2818,24 @@ void parse_service_name_section(struct config *cfg)
     }
 }
 
+void parse_table_size_options(struct config *cfg)
+{
+    socket_maps[NETDATA_SOCKET_TABLE_IPV4].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                       EBPF_GLOBAL_SECTION,
+                                                                                       EBPF_CONFIG_IPV4_SIZE,
+                                                                                       NETDATA_MAXIMUM_TCP_CONNECTION_ALLOWED);
+
+    socket_maps[NETDATA_SOCKET_TABLE_IPV6].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                       EBPF_GLOBAL_SECTION,
+                                                                                       EBPF_CONFIG_IPV6_SIZE,
+                                                                                       NETDATA_MAXIMUM_TCP_CONNECTION_ALLOWED);
+
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                      EBPF_GLOBAL_SECTION,
+                                                                                      EBPF_CONFIG_UDP_SIZE,
+                                                                                      NETDATA_MAXIMUM_TCP_CONNECTION_ALLOWED);
+}
+
 /**
  * Socket thread
  *
@@ -2840,6 +2861,7 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
+    parse_table_size_options(&socket_config);
 
     if (!em->enabled)
         goto endsocket;
