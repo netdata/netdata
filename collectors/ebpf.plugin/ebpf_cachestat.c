@@ -24,6 +24,10 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
+static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                             .user_input = 0},
+                                             {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 static int *map_fd = NULL;
 
 struct config cachestat_config = { .first_section = NULL,
@@ -611,6 +615,7 @@ void *ebpf_cachestat_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = cachestat_maps;
     fill_ebpf_data(&cachestat_data);
 
     ebpf_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);

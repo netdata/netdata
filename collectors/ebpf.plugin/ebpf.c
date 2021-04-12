@@ -77,19 +77,19 @@ pthread_cond_t collect_data_cond_var;
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_process_create_apps_charts },
+      .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
+      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = NULL  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = NULL },
+      .optional = 0, .apps_routine = NULL, .maps = NULL },
 };
 
 // Link with apps.plugin

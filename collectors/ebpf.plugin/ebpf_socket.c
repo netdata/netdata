@@ -16,6 +16,14 @@ static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "rece
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
                                                             "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
+static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_conn_ipv4", .internal_input = 65536,
+                                               .user_input = 0},
+                                          {.name = "tbl_conn_ipv6", .internal_input = 65536,
+                                              .user_input = 0},
+                                          {.name = "tbl_nv_udp_conn_stats", .internal_input = 8192,
+                                              .user_input = 0},
+                                           {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
@@ -2826,6 +2834,7 @@ void *ebpf_socket_thread(void *ptr)
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = socket_maps;
     fill_ebpf_data(&socket_data);
 
     ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
