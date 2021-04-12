@@ -1046,6 +1046,7 @@ void *ebpf_process_thread(void *ptr)
     }
 
     ebpf_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
+    ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);

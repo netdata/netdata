@@ -295,6 +295,32 @@ static int select_file(char *name, const char *program, size_t length, int mode,
     return ret;
 }
 
+void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
+{
+    pid->user_input = em->pid_map_size;
+}
+
+void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
+{
+    struct bpf_map *map;
+    ebpf_local_maps_t *maps = em->maps;
+    if (!maps)
+        return;
+
+    bpf_map__for_each(map, program)
+    {
+        const char *map_name = bpf_map__name(map);
+        int i = 0; ;
+        while (maps[i].name) {
+            ebpf_local_maps_t *w = &maps[i];
+            if (w->user_input != w->internal_input && !strcmp(w->name, map_name)) {
+                bpf_map__resize(map, w->user_input);
+            }
+            i++;
+        }
+    }
+}
+
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string, struct bpf_object **obj, int *map_fd)
 {
     char lpath[4096];
@@ -305,18 +331,6 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
 
     snprintf(lpath, 4096, "%s/ebpf.d/%s", plugins_dir, lname);
-    // We are using BPF_PROG_TYPE_UNSPEC instead a specific type for bpf_prog_load to define the type
-    // according the eBPF program loaded
-    /*
-    int prog_fd;
-    if (bpf_prog_load(lpath, BPF_PROG_TYPE_UNSPEC, obj, &prog_fd)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
-        info("Cannot load program: %s", lpath);
-        return NULL;
-    } else {
-        info("The eBPF program %s was loaded with success.", em->thread_name);
-    }
-    */
     *obj = bpf_object__open_file(lpath, NULL);
     if (libbpf_get_error(obj)) {
         error("Cannot open BPF object %s", lpath);
@@ -324,7 +338,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
     }
 
-    // resize here
+    ebpf_update_map_sizes(*obj, em);
 
     if (bpf_object__load(*obj)) {
         error("ERROR: loading BPF object file failed %s\n", lpath);
@@ -385,8 +399,8 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
     modules->apps_charts = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  CONFIG_BOOLEAN_YES);
 
-    modules->pid_map_size = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
-                                                  CONFIG_BOOLEAN_YES);
+    modules->pid_map_size = (uint32_t)appconfig_get_number(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
+                                                           ND_EBPF_DEFAULT_PID_SIZE);
 }
 
 
