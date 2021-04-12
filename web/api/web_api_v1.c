@@ -1001,31 +1001,31 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
         buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
 
     buffer_strcat(wb, "\t\"memory-mode\": ");
-    analytics_get_data(analytics_data.NETDATA_CONFIG_MEMORY_MODE, wb);
+    analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"stream-enabled\": ");
-    analytics_get_data(analytics_data.NETDATA_CONFIG_STREAM_ENABLED, wb);
+    analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"exporting-enabled\": ");
-    analytics_get_data(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, wb);
+    analytics_get_data(analytics_data.netdata_config_exporting_enabled, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"exporting-connectors\": ");
-    analytics_get_data(analytics_data.NETDATA_EXPORTING_CONNECTORS, wb);
+    analytics_get_data(analytics_data.netdata_exporting_connectors, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"allmetrics-prometheus-used\": ");
-    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, wb);
+    analytics_get_data(analytics_data.netdata_allmetrics_prometheus_used, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"allmetrics-shell-used\": ");
-    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_SHELL_USED, wb);
+    analytics_get_data(analytics_data.netdata_allmetrics_shell_used, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"allmetrics-json-used\": ");
-    analytics_get_data(analytics_data.NETDATA_ALLMETRICS_JSON_USED, wb);
+    analytics_get_data(analytics_data.netdata_allmetrics_json_used, wb);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");

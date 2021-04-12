@@ -25,13 +25,13 @@
     },
 
 struct analytics_data {
-    char *NETDATA_CONFIG_STREAM_ENABLED;
-    char *NETDATA_CONFIG_MEMORY_MODE;
-    char *NETDATA_EXPORTING_CONNECTORS;
-    char *NETDATA_CONFIG_EXPORTING_ENABLED;
-    char *NETDATA_ALLMETRICS_PROMETHEUS_USED;
-    char *NETDATA_ALLMETRICS_SHELL_USED;
-    char *NETDATA_ALLMETRICS_JSON_USED;
+    char *netdata_config_stream_enabled;
+    char *netdata_config_memory_mode;
+    char *netdata_exporting_connectors;
+    char *netdata_config_exporting_enabled;
+    char *netdata_allmetrics_prometheus_used;
+    char *netdata_allmetrics_shell_used;
+    char *netdata_allmetrics_json_used;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;

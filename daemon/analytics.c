@@ -7,39 +7,39 @@ extern void analytics_exporting_connectors (BUFFER *b);
  * Set the env variables
  */
 void analytics_setenv_data (void) {
-    setenv( "NETDATA_CONFIG_STREAM_ENABLED",      analytics_data.NETDATA_CONFIG_STREAM_ENABLED,      1);
-    setenv( "NETDATA_CONFIG_MEMORY_MODE",         analytics_data.NETDATA_CONFIG_MEMORY_MODE,         1);
-    setenv( "NETDATA_CONFIG_EXPORTING_ENABLED",   analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,   1);
-    setenv( "NETDATA_EXPORTING_CONNECTORS",       analytics_data.NETDATA_EXPORTING_CONNECTORS,       1);
-    setenv( "NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, 1);
-    setenv( "NETDATA_ALLMETRICS_SHELL_USED",      analytics_data.NETDATA_ALLMETRICS_SHELL_USED,      1);
-    setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.NETDATA_ALLMETRICS_JSON_USED,       1);
+    setenv( "NETDATA_CONFIG_STREAM_ENABLED",      analytics_data.netdata_config_stream_enabled,      1);
+    setenv( "NETDATA_CONFIG_MEMORY_MODE",         analytics_data.netdata_config_memory_mode,         1);
+    setenv( "NETDATA_CONFIG_EXPORTING_ENABLED",   analytics_data.netdata_config_exporting_enabled,   1);
+    setenv( "NETDATA_EXPORTING_CONNECTORS",       analytics_data.netdata_exporting_connectors,       1);
+    setenv( "NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.netdata_allmetrics_prometheus_used, 1);
+    setenv( "NETDATA_ALLMETRICS_SHELL_USED",      analytics_data.netdata_allmetrics_shell_used,      1);
+    setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.netdata_allmetrics_json_used,       1);
 }
 
 /*
  * Debug logging
  */
 void analytics_log_data (void) {
-    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.NETDATA_CONFIG_MEMORY_MODE);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
-    debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.NETDATA_EXPORTING_CONNECTORS);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.NETDATA_ALLMETRICS_JSON_USED);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.netdata_config_stream_enabled);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_memory_mode);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.netdata_config_exporting_enabled);
+    debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.netdata_exporting_connectors);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.netdata_allmetrics_shell_used);
+    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
 }
 
 /*
  * Free data
  */
 void analytics_free_data (void) {
-    freez(analytics_data.NETDATA_CONFIG_STREAM_ENABLED);
-    freez(analytics_data.NETDATA_CONFIG_MEMORY_MODE);
-    freez(analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED);
-    freez(analytics_data.NETDATA_EXPORTING_CONNECTORS);
-    freez(analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED);
-    freez(analytics_data.NETDATA_ALLMETRICS_SHELL_USED);
-    freez(analytics_data.NETDATA_ALLMETRICS_JSON_USED);
+    freez(analytics_data.netdata_config_stream_enabled);
+    freez(analytics_data.netdata_config_memory_mode);
+    freez(analytics_data.netdata_config_exporting_enabled);
+    freez(analytics_data.netdata_exporting_connectors);
+    freez(analytics_data.netdata_allmetrics_prometheus_used);
+    freez(analytics_data.netdata_allmetrics_shell_used);
+    freez(analytics_data.netdata_allmetrics_json_used);
 }
 
 /*
@@ -88,7 +88,7 @@ void analytics_exporters (void) {
     //decide if something else is more suitable (but propably not null)
     BUFFER *bi = buffer_create(1000);
     analytics_exporting_connectors(bi);
-    analytics_set_data_str (&analytics_data.NETDATA_EXPORTING_CONNECTORS, (char *)buffer_tostring(bi));
+    analytics_set_data_str (&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
     buffer_free(bi);
 }
 
@@ -102,13 +102,13 @@ void analytics_gather_meta_data (void) {
     {
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, b);
+        analytics_set_data (&analytics_data.netdata_allmetrics_prometheus_used, b);
 
         snprintfz(b, 6, "%d", analytics_data.shell_hits);
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED, b);
+        analytics_set_data (&analytics_data.netdata_allmetrics_shell_used, b);
 
         snprintfz(b, 6, "%d", analytics_data.json_hits);
-        analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED, b);
+        analytics_set_data (&analytics_data.netdata_allmetrics_json_used, b);
     }
 
     analytics_setenv_data();
@@ -175,9 +175,9 @@ static const char *verify_required_directory(const char *dir) {
  */
 void set_late_global_environment() {
 
-    analytics_set_data(&analytics_data.NETDATA_CONFIG_STREAM_ENABLED, default_rrdpush_enabled ? "true" : "false");
-    analytics_set_data_str (&analytics_data.NETDATA_CONFIG_MEMORY_MODE, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
-    analytics_set_data(&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
+    analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
+    analytics_set_data_str (&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
 
     /* set what we have, to send the START event */
     analytics_setenv_data();
@@ -299,13 +299,13 @@ void set_global_environment() {
     setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
     setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_STREAM_ENABLED,      "null");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_MEMORY_MODE,         "null");
-    analytics_set_data (&analytics_data.NETDATA_CONFIG_EXPORTING_ENABLED,   "null");
-    analytics_set_data (&analytics_data.NETDATA_EXPORTING_CONNECTORS,       "null");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_PROMETHEUS_USED, "null");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_SHELL_USED,      "null");
-    analytics_set_data (&analytics_data.NETDATA_ALLMETRICS_JSON_USED,       "null");
+    analytics_set_data (&analytics_data.netdata_config_stream_enabled,      "null");
+    analytics_set_data (&analytics_data.netdata_config_memory_mode,         "null");
+    analytics_set_data (&analytics_data.netdata_config_exporting_enabled,   "null");
+    analytics_set_data (&analytics_data.netdata_exporting_connectors,       "null");
+    analytics_set_data (&analytics_data.netdata_allmetrics_prometheus_used, "null");
+    analytics_set_data (&analytics_data.netdata_allmetrics_shell_used,      "null");
+    analytics_set_data (&analytics_data.netdata_allmetrics_json_used,       "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
