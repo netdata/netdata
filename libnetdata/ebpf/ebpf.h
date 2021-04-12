@@ -15,6 +15,7 @@
 #define EBPF_CFG_LOAD_MODE_RETURN "return"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
+#define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
 
 /**
@@ -116,7 +117,7 @@ typedef struct ebpf_module {
     int optional;
     void (*apps_routine)(struct ebpf_module *em, void *ptr);
     ebpf_local_maps_t *maps;
-    uint32_t pid_map_length;
+    uint32_t pid_map_size;
 } ebpf_module_t;
 
 #define NETDATA_MAX_PROBES 64

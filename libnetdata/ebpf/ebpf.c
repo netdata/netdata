@@ -384,6 +384,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg)
 
     modules->apps_charts = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  CONFIG_BOOLEAN_YES);
+
+    modules->pid_map_size = appconfig_get_boolean(cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
+                                                  CONFIG_BOOLEAN_YES);
 }
 
 
