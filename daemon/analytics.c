@@ -37,6 +37,7 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_MIRRORED_HOST_COUNT",        analytics_data.netdata_mirrored_host_count,        1);
     setenv( "NETDATA_MIRRORED_HOSTS_REACHABLE",   analytics_data.netdata_mirrored_hosts_reachable,   1);
     setenv( "NETDATA_MIRRORED_HOSTS_UNREACHABLE", analytics_data.netdata_mirrored_hosts_unreachable, 1);
+    setenv( "NETDATA_NOTIFICATION_METHODS",       analytics_data.netdata_notification_methods,       1);
 }
 
 /*
@@ -62,6 +63,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.netdata_mirrored_host_count);
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.netdata_mirrored_hosts_reachable);
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.netdata_mirrored_hosts_unreachable);
+    debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.netdata_notification_methods);
 }
 
 /*
@@ -86,7 +88,8 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_config_release_channel);
     freez(analytics_data.netdata_mirrored_host_count);
     freez(analytics_data.netdata_mirrored_hosts_reachable);
-    freez(analytics_data.netdata_mirrored_hosts_unreachable);   
+    freez(analytics_data.netdata_mirrored_hosts_unreachable);
+    freez(analytics_data.netdata_notification_methods);
 }
 
 /*
@@ -248,6 +251,50 @@ void analytics_collectors(void) {
 
 }
 
+
+void analytics_alarms_notifications (void) {
+    char *script;
+    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
+    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
+    if (unlikely(access(script, R_OK) != 0)) {
+        info("Alarm notify script %s not found.",script);
+        freez(script);
+        return;
+    }
+
+    strcat(script, " dump_methods");
+
+    pid_t command_pid;
+
+    info("Executing %s", script);
+
+    BUFFER *b = buffer_create(1000);
+    int cnt = 0;
+    FILE *fp = mypopen(script, &command_pid);
+    if(fp) {
+        char line[200 + 1];
+
+        while (fgets(line, 200, fp) != NULL) {
+            char *end = line;
+            while (*end && *end != '\n') end++;
+            *end = '\0';
+
+            if (likely(cnt))
+                buffer_strcat(b, "|");
+
+            buffer_strcat(b, line);
+
+            cnt++;
+        }
+        mypclose(fp, command_pid);
+    }
+    freez(script);
+
+    analytics_set_data_str (&analytics_data.netdata_notification_methods, (char *)buffer_tostring(b));
+
+    buffer_free(b);
+}
+
 /*
  * Get the meta data, called from the thread
  */
@@ -257,6 +304,8 @@ void analytics_gather_meta_data (void) {
     analytics_collectors();
 
     analytics_mirrored_hosts(); //needs complete lock ?
+
+    analytics_alarms_notifications();
 
     {
         char b[7];
@@ -511,6 +560,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_mirrored_host_count,        "null");
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_reachable,   "null");
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_unreachable, "null");
+    analytics_set_data (&analytics_data.netdata_notification_methods,       "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

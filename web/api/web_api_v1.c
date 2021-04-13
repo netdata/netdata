@@ -1033,6 +1033,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.netdata_config_web_enabled, wb);
     buffer_strcat(wb, ",\n");
 
+    buffer_strcat(wb, "\t\"notification-methods\": ");
+    analytics_get_data(analytics_data.netdata_notification_methods, wb);
+    buffer_strcat(wb, ",\n");
+
     buffer_strcat(wb, "\t\"exporting-enabled\": ");
     analytics_get_data(analytics_data.netdata_config_exporting_enabled, wb);
     buffer_strcat(wb, ",\n");
