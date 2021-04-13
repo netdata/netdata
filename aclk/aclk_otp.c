@@ -599,7 +599,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     BUFFER *buf = buffer_create(1024);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
-    https_req_response_t resp;
+    https_req_response_t resp = HTTPS_RES_RESPONSE_T_INITIALIZER;
 
     req.request_type = HTTP_REQ_GET;
 
