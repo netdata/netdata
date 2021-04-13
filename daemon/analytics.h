@@ -12,6 +12,7 @@
 #define ANALYTICS_MAX_PROMETHEUS_HITS 255
 #define ANALYTICS_MAX_SHELL_HITS 255
 #define ANALYTICS_MAX_JSON_HITS 255
+#define ANALYTICS_MAX_DASHBOARD_HITS 255
 
 #define NETDATA_PLUGIN_HOOK_ANALYTICS \
     { \
@@ -32,6 +33,7 @@ struct analytics_data {
     char *netdata_allmetrics_prometheus_used;
     char *netdata_allmetrics_shell_used;
     char *netdata_allmetrics_json_used;
+    char *netdata_dashboard_used;
     char *netdata_collectors;
     char *netdata_collectors_count;
     char *netdata_buildinfo;
@@ -44,6 +46,7 @@ struct analytics_data {
     uint8_t prometheus_hits;
     uint8_t shell_hits;
     uint8_t json_hits;
+    uint8_t dashboard_hits;
 };
 
 extern void *analytics_main(void *ptr);
@@ -55,6 +58,7 @@ extern void send_statistics( const char *action, const char *action_result, cons
 extern void analytics_log_shell();
 extern void analytics_log_json();
 extern void analytics_log_prometheus();
+extern void analytics_log_dashboard();
 extern void analytics_gather_meta_data();
 
 extern struct analytics_data analytics_data;

@@ -25,6 +25,7 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.netdata_allmetrics_prometheus_used, 1);
     setenv( "NETDATA_ALLMETRICS_SHELL_USED",      analytics_data.netdata_allmetrics_shell_used,      1);
     setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.netdata_allmetrics_json_used,       1);
+    setenv( "NETDATA_DASHBOARD_USED",             analytics_data.netdata_dashboard_used,             1);
     setenv( "NETDATA_COLLECTORS",                 analytics_data.netdata_collectors,                 1);
     setenv( "NETDATA_COLLECTORS_COUNT",           analytics_data.netdata_collectors_count,           1);
     setenv( "NETDATA_BUILDINFO",                  analytics_data.netdata_buildinfo,                  1);
@@ -46,6 +47,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.netdata_allmetrics_shell_used);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
+    debug(D_ANALYTICS, "NETDATA_DASHBOARD_USED             : [%s]", analytics_data.netdata_dashboard_used);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
     debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.netdata_buildinfo);
@@ -67,6 +69,7 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_allmetrics_prometheus_used);
     freez(analytics_data.netdata_allmetrics_shell_used);
     freez(analytics_data.netdata_allmetrics_json_used);
+    freez(analytics_data.netdata_dashboard_used);
     freez(analytics_data.netdata_collectors);
     freez(analytics_data.netdata_collectors_count);
     freez(analytics_data.netdata_buildinfo);
@@ -127,6 +130,15 @@ void analytics_log_json(void) {
         char b[7];
         snprintfz(b, 6, "%d", analytics_data.json_hits);
         analytics_set_data (&analytics_data.netdata_allmetrics_json_used, b);
+    }
+}
+
+void analytics_log_dashboard(void) {
+    if (likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
+        analytics_data.dashboard_hits++;
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
+        analytics_set_data (&analytics_data.netdata_dashboard_used, b);
     }
 }
 
@@ -216,6 +228,9 @@ void analytics_gather_meta_data (void) {
 
         snprintfz(b, 6, "%d", analytics_data.json_hits);
         analytics_set_data (&analytics_data.netdata_allmetrics_json_used, b);
+
+        snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
+        analytics_set_data (&analytics_data.netdata_dashboard_used, b);
     }
 
     analytics_setenv_data();
@@ -444,6 +459,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_allmetrics_prometheus_used, "null");
     analytics_set_data (&analytics_data.netdata_allmetrics_shell_used,      "null");
     analytics_set_data (&analytics_data.netdata_allmetrics_json_used,       "null");
+    analytics_set_data (&analytics_data.netdata_dashboard_used,             "null");
     analytics_set_data (&analytics_data.netdata_collectors,                 "null");
     analytics_set_data (&analytics_data.netdata_collectors_count,           "null");
     analytics_set_data (&analytics_data.netdata_buildinfo,                  "null");
@@ -456,6 +472,7 @@ void set_global_environment() {
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
     analytics_data.json_hits = 0;
+    analytics_data.dashboard_hits = 0;
 
     char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;

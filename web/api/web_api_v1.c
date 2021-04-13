@@ -750,6 +750,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
+        analytics_log_dashboard();
         if(unlikely(!web_client_can_access_dashboard(w)))
             return web_client_permission_denied(w);
     }
@@ -1050,6 +1051,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"allmetrics-json-used\": ");
     analytics_get_data(analytics_data.netdata_allmetrics_json_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"dashboard-used\": ");
+    analytics_get_data(analytics_data.netdata_dashboard_used, wb);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
