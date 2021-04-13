@@ -275,6 +275,12 @@ exit:
     return rc;
 }
 
+#define JSON_KEY_ERTRY   "errorNonRetryable"
+#define JSON_KEY_EDELAY  "errorRetryDelaySeconds"
+#define JSON_KEY_EEC     "errorCode"
+#define JSON_KEY_EMSGKEY "errorMsgKey"
+#define JSON_KEY_EMSG    "errorMessage"
+#if JSON_C_MINOR_VERSION >= 13
 static const char *get_json_str_by_path(json_object *json, const char *path) {
     json_object *ptr;
     if (json_pointer_get(json, path, &ptr)) {
@@ -288,8 +294,6 @@ static const char *get_json_str_by_path(json_object *json, const char *path) {
     return json_object_get_string(ptr);
 }
 
-#define JSON_KEY_ERTRY  "/errorNonRetryable"
-#define JSON_KEY_EDELAY "/errorRetryDelaySeconds"
 static int aclk_parse_otp_error(const char *json_str) {
     int rc = 1;
     json_object *json, *ptr;
@@ -305,39 +309,114 @@ static int aclk_parse_otp_error(const char *json_str) {
         return 1;
     }
 
-    if ((ec = get_json_str_by_path(json, "/errorCode")) == NULL)
+    if ((ec = get_json_str_by_path(json, "/" JSON_KEY_EEC)) == NULL)
         goto exit;
 
-    if ((ek = get_json_str_by_path(json, "/errorMsgKey")) == NULL)
+    if ((ek = get_json_str_by_path(json, "/" JSON_KEY_EMSGKEY)) == NULL)
         goto exit;
 
-    if ((emsg = get_json_str_by_path(json, "/errorMessage")) == NULL)
+    if ((emsg = get_json_str_by_path(json, "/" JSON_KEY_EMSG)) == NULL)
         goto exit;
 
     // optional field
-    if (!json_pointer_get(json, JSON_KEY_ERTRY, &ptr)) {
+    if (!json_pointer_get(json, "/" JSON_KEY_ERTRY, &ptr)) {
         if (json_object_get_type(ptr) != json_type_boolean) {
-            error ("Error response Key " JSON_KEY_ERTRY " should be of boolean type");
+            error("Error response Key " "/" JSON_KEY_ERTRY " should be of boolean type");
             goto exit;
         }
         block_retry = json_object_get_boolean(ptr);
     }
 
     // optional field
-    if (!json_pointer_get(json, JSON_KEY_EDELAY, &ptr)) {
+    if (!json_pointer_get(json, "/" JSON_KEY_EDELAY, &ptr)) {
         if (json_object_get_type(ptr) != json_type_int) {
-            error ("Error response Key " JSON_KEY_EDELAY " should be of integer type");
+            error("Error response Key " "/" JSON_KEY_EDELAY " should be of integer type");
             goto exit;
         }
         backoff = json_object_get_int(ptr);
     }
 
-    error ("Cloud returned EC=\"%s\", Msg-Key:\"%s\", Msg:\"%s\", BlockRetry:%s (-1 unset by cloud), Backoff:%ds (-1 unset by cloud)", ec, ek, emsg, block_retry ? "true" : "false", backoff);
+    error("Cloud returned EC=\"%s\", Msg-Key:\"%s\", Msg:\"%s\", BlockRetry:%s, Backoff:%ds (-1 unset by cloud)", ec, ek, emsg, block_retry > 0 ? "true" : "false", backoff);
     rc = 0;
 exit:
     json_object_put(json);
     return rc;
 }
+#else
+static int aclk_parse_otp_error(const char *json_str) {
+    int rc = 1;
+    int block_retry = -1, backoff = -1;
+
+    const char *ec = NULL;
+    const char *ek = NULL;
+    const char *emsg = NULL;
+
+    json_object *json;
+    struct json_object_iterator it;
+    struct json_object_iterator itEnd;
+
+    json = json_tokener_parse(json_str);
+    if (!json) {
+        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        return 1;
+    }
+
+    it = json_object_iter_begin(json);
+    itEnd = json_object_iter_end(json);
+
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_EMSG)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_EMSG)
+
+            emsg = json_object_get_string(json_object_iter_peek_value(&it));
+            json_object_iter_next(&it);
+            continue;
+        }
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_EMSGKEY)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_EMSGKEY)
+
+            ek = json_object_get_string(json_object_iter_peek_value(&it));
+            json_object_iter_next(&it);
+            continue;
+        }
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_EEC)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_EEC)
+
+            ec = strdupz(json_object_get_string(json_object_iter_peek_value(&it)));
+            json_object_iter_next(&it);
+            continue;
+        }
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_EDELAY)) {
+            if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_int) {
+                error("value of key " JSON_KEY_EDELAY " should be integer");
+                goto exit;
+            }
+
+            backoff = json_object_get_int(json_object_iter_peek_value(&it));
+            json_object_iter_next(&it);
+            continue;
+        }
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_ERTRY)) {
+            if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_boolean) {
+                error("value of key " JSON_KEY_ERTRY " should be integer");
+                goto exit;
+            }
+
+            block_retry = json_object_get_boolean(json_object_iter_peek_value(&it));
+            json_object_iter_next(&it);
+            continue;
+        }
+        error("Unknown key \"%s\" in error response payload. Ignoring", json_object_iter_peek_name(&it));
+        json_object_iter_next(&it);
+    }
+
+    error("Cloud returned EC=\"%s\", Msg-Key:\"%s\", Msg:\"%s\", BlockRetry:%s, Backoff:%ds (-1 unset by cloud)", ec, ek, emsg, block_retry > 0 ? "true" : "false", backoff);
+    rc = 0;
+exit:
+    json_object_put(json);
+    return rc;
+}
+#endif
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
 int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target) {
