@@ -30,6 +30,7 @@
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_REPEAT_KEY "repeat"
 #define HEALTH_HOST_LABEL_KEY "host labels"
+#define HEALTH_FOREACH_KEY "foreach"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
