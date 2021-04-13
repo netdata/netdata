@@ -1004,8 +1004,32 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
     buffer_strcat(wb, ",\n");
 
+    buffer_strcat(wb, "\t\"multidb-disk-quota\": ");
+    analytics_get_data(analytics_data.netdata_config_multidb_disk_quota, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"page-cache-size\": ");
+    analytics_get_data(analytics_data.netdata_config_page_cache_size, wb);
+    buffer_strcat(wb, ",\n");
+
     buffer_strcat(wb, "\t\"stream-enabled\": ");
     analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"https-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_https_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"buildinfo\": ");
+    analytics_get_data(analytics_data.netdata_buildinfo, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"release-channel\": ");
+    analytics_get_data(analytics_data.netdata_config_release_channel, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"web-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_web_enabled, wb);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\"exporting-enabled\": ");
