@@ -146,7 +146,6 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
-
                             , (ae->class)?ae->class:"Unknown"
                             , (ae->component)?ae->component:"Unknown"
                             , (ae->type)?ae->type:"Unknown"
