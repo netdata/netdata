@@ -1498,20 +1498,18 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
    size_t size        = strlen(src) + 1;
    size_t find_len    = strlen(find);
    size_t repl_len    = strlen(replace);
-   char *value, *dst, *temp;
+   char *value, *dst;
+
+   if (likely(where))
+       size += (repl_len - find_len);
 
    value = mallocz(size);
    dst = value;
-   if ( likely(where) ) {
 
+   if (likely(where)) {
        size_t count = where - src;
 
-       size += repl_len - find_len;
-
-       temp = reallocz(value, size);
-
-       dst = temp + (dst - value);
-       value = temp;
+       dst = value + (dst - value);
 
        memmove(dst, src, count);
        src += count;
