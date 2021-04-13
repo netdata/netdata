@@ -35,6 +35,11 @@ struct analytics_data {
     char *netdata_collectors;
     char *netdata_collectors_count;
     char *netdata_buildinfo;
+    char *netdata_config_page_cache_size;
+    char *netdata_config_multidb_disk_quota;
+    char *netdata_config_https_enabled;
+    char *netdata_config_web_enabled;
+    char *netdata_config_release_channel;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;

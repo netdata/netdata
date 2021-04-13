@@ -28,6 +28,11 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_COLLECTORS",                 analytics_data.netdata_collectors,                 1);
     setenv( "NETDATA_COLLECTORS_COUNT",           analytics_data.netdata_collectors_count,           1);
     setenv( "NETDATA_BUILDINFO",                  analytics_data.netdata_buildinfo,                  1);
+    setenv( "NETDATA_CONFIG_PAGE_CACHE_SIZE",     analytics_data.netdata_config_page_cache_size,     1);
+    setenv( "NETDATA_CONFIG_MULTIDB_DISK_QUOTA",  analytics_data.netdata_config_multidb_disk_quota,  1);
+    setenv( "NETDATA_CONFIG_HTTPS_ENABLED",       analytics_data.netdata_config_https_enabled,       1);
+    setenv( "NETDATA_CONFIG_WEB_ENABLED",         analytics_data.netdata_config_web_enabled,         1);
+    setenv( "NETDATA_CONFIG_RELEASE_CHANNEL",     analytics_data.netdata_config_release_channel,     1);
 }
 
 /*
@@ -44,6 +49,11 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
     debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.netdata_buildinfo);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE     : [%s]", analytics_data.netdata_config_page_cache_size);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.netdata_config_multidb_disk_quota);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.netdata_config_https_enabled);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.netdata_config_web_enabled);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.netdata_config_release_channel);
 }
 
 /*
@@ -60,6 +70,11 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_collectors);
     freez(analytics_data.netdata_collectors_count);
     freez(analytics_data.netdata_buildinfo);
+    freez(analytics_data.netdata_config_page_cache_size);
+    freez(analytics_data.netdata_config_multidb_disk_quota);
+    freez(analytics_data.netdata_config_https_enabled);
+    freez(analytics_data.netdata_config_web_enabled);
+    freez(analytics_data.netdata_config_release_channel);
 }
 
 /*
@@ -259,6 +274,30 @@ void set_late_global_environment() {
     analytics_set_data_str (&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
 
+#ifdef ENABLE_DBENGINE
+    {
+        char b[16];
+        snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
+        analytics_set_data (&analytics_data.netdata_config_page_cache_size, b);
+
+        snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
+        analytics_set_data (&analytics_data.netdata_config_multidb_disk_quota, b);
+    }
+#endif
+
+#ifdef ENABLE_HTTPS
+    analytics_set_data (&analytics_data.netdata_config_https_enabled, "true");
+#else
+    analytics_set_data (&analytics_data.netdata_config_https_enabled, "false");
+#endif
+
+    if(web_server_mode == WEB_SERVER_MODE_NONE)
+        analytics_set_data (&analytics_data.netdata_config_web_enabled, "false");
+    else
+        analytics_set_data (&analytics_data.netdata_config_web_enabled, "true");
+
+    analytics_set_data_str (&analytics_data.netdata_config_release_channel, (char *)get_release_channel());
+
     {
         BUFFER *bi = buffer_create(1000);
         analytics_build_info(bi);
@@ -396,6 +435,11 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_collectors,                 "null");
     analytics_set_data (&analytics_data.netdata_collectors_count,           "null");
     analytics_set_data (&analytics_data.netdata_buildinfo,                  "null");
+    analytics_set_data (&analytics_data.netdata_config_page_cache_size,     "null");
+    analytics_set_data (&analytics_data.netdata_config_multidb_disk_quota,  "null");
+    analytics_set_data (&analytics_data.netdata_config_https_enabled,       "null");
+    analytics_set_data (&analytics_data.netdata_config_web_enabled,         "null");
+    analytics_set_data (&analytics_data.netdata_config_release_channel,     "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
