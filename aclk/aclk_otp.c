@@ -336,6 +336,12 @@ static int aclk_parse_otp_error(const char *json_str) {
         backoff = json_object_get_int(ptr);
     }
 
+    if (block_retry > 0)
+        aclk_disable_runtime = 1;
+
+    if (backoff > 0)
+        aclk_block_until = now_monotonic_sec() + backoff;
+
     error("Cloud returned EC=\"%s\", Msg-Key:\"%s\", Msg:\"%s\", BlockRetry:%s, Backoff:%ds (-1 unset by cloud)", ec, ek, emsg, block_retry > 0 ? "true" : "false", backoff);
     rc = 0;
 exit:

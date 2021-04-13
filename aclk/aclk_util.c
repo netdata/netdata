@@ -286,7 +286,7 @@ const char *aclk_get_topic(enum aclk_topics topic)
  *
  */
 
-unsigned long int aclk_reconnect_delay(int mode, int base, unsigned long int min, unsigned long int max) {
+unsigned long int aclk_tbeb_delay(int mode, int base, unsigned long int min, unsigned long int max) {
     static int attempt = -1;
 
     if (!mode) {
