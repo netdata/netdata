@@ -46,6 +46,11 @@ struct analytics_data {
     char *netdata_mirrored_hosts_reachable;
     char *netdata_mirrored_hosts_unreachable;
     char *netdata_notification_methods;
+    char *netdata_alarms_normal;
+    char *netdata_alarms_warning;
+    char *netdata_alarms_critical;
+    char *netdata_charts_count;
+    char *netdata_metrics_count;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;

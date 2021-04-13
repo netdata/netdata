@@ -38,6 +38,11 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_MIRRORED_HOSTS_REACHABLE",   analytics_data.netdata_mirrored_hosts_reachable,   1);
     setenv( "NETDATA_MIRRORED_HOSTS_UNREACHABLE", analytics_data.netdata_mirrored_hosts_unreachable, 1);
     setenv( "NETDATA_NOTIFICATION_METHODS",       analytics_data.netdata_notification_methods,       1);
+    setenv( "NETDATA_ALARMS_NORMAL",              analytics_data.netdata_alarms_normal,              1);
+    setenv( "NETDATA_ALARMS_WARNING",             analytics_data.netdata_alarms_warning,             1);
+    setenv( "NETDATA_ALARMS_CRITICAL",            analytics_data.netdata_alarms_critical,            1);
+    setenv( "NETDATA_CHARTS_COUNT",               analytics_data.netdata_charts_count,               1);
+    setenv( "NETDATA_METRICS_COUNT",              analytics_data.netdata_metrics_count,              1);
 }
 
 /*
@@ -64,6 +69,11 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.netdata_mirrored_hosts_reachable);
     debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.netdata_mirrored_hosts_unreachable);
     debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.netdata_notification_methods);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_NORMAL              : [%s]", analytics_data.netdata_alarms_normal);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_WARNING             : [%s]", analytics_data.netdata_alarms_warning);
+    debug(D_ANALYTICS, "NETDATA_ALARMS_CRITICAL            : [%s]", analytics_data.netdata_alarms_critical);
+    debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.netdata_charts_count);
+    debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.netdata_metrics_count);
 }
 
 /*
@@ -90,6 +100,11 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_mirrored_hosts_reachable);
     freez(analytics_data.netdata_mirrored_hosts_unreachable);
     freez(analytics_data.netdata_notification_methods);
+    freez(analytics_data.netdata_alarms_normal);
+    freez(analytics_data.netdata_alarms_warning);
+    freez(analytics_data.netdata_alarms_critical);
+    freez(analytics_data.netdata_charts_count);
+    freez(analytics_data.netdata_metrics_count);
 }
 
 /*
@@ -251,7 +266,6 @@ void analytics_collectors(void) {
 
 }
 
-
 void analytics_alarms_notifications (void) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
@@ -295,13 +309,85 @@ void analytics_alarms_notifications (void) {
     buffer_free(b);
 }
 
+void analytics_charts (void) {
+    RRDSET *st;
+    int c = 0;
+    int show_archived = 0;
+    rrdset_foreach_read(st, localhost) {
+        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
+            c++;
+        }
+    }
+    {
+        char b[7];
+        snprintfz(b, 6, "%d", c);
+        analytics_set_data (&analytics_data.netdata_charts_count, b);
+    }
+
+}
+
+void analytics_metrics (void) {
+    RRDSET *st;
+    long int dimensions = 0;
+    RRDDIM *rd;
+    rrdset_foreach_read(st, localhost) {
+        rrddim_foreach_read(rd, st) {
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+            dimensions++;
+        }
+    }
+    {
+        char b[7];
+        snprintfz(b, 6, "%ld", dimensions);
+        analytics_set_data (&analytics_data.netdata_metrics_count, b);
+    }
+}
+
+void analytics_alarms (void) {
+    int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
+    char b[10];
+    RRDCALC *rc;
+
+    for(rc = localhost->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        switch(rc->status) {
+        case RRDCALC_STATUS_WARNING:
+            alarm_warn++;
+            break;
+        case RRDCALC_STATUS_CRITICAL:
+            alarm_crit++;
+            break;
+        default:
+            alarm_normal++;
+        }
+
+    }
+
+    snprintfz(b, 9, "%d", alarm_normal);
+    analytics_set_data (&analytics_data.netdata_alarms_normal, b);
+    snprintfz(b, 9, "%d", alarm_warn);
+    analytics_set_data (&analytics_data.netdata_alarms_warning, b);
+    snprintfz(b, 9, "%d", alarm_crit);
+    analytics_set_data (&analytics_data.netdata_alarms_critical, b);
+}
+
 /*
  * Get the meta data, called from the thread
  */
 void analytics_gather_meta_data (void) {
 
     analytics_exporters();
+
+    rrdhost_rdlock(localhost); //can we avoid the lock?
+
     analytics_collectors();
+    analytics_alarms();
+    analytics_charts();
+    analytics_metrics();
+
+    rrdhost_unlock(localhost);
 
     analytics_mirrored_hosts(); //needs complete lock ?
 
@@ -561,6 +647,11 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_reachable,   "null");
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_unreachable, "null");
     analytics_set_data (&analytics_data.netdata_notification_methods,       "null");
+    analytics_set_data (&analytics_data.netdata_alarms_normal,              "null");
+    analytics_set_data (&analytics_data.netdata_alarms_warning,             "null");
+    analytics_set_data (&analytics_data.netdata_alarms_critical,            "null");
+    analytics_set_data (&analytics_data.netdata_charts_count,               "null");
+    analytics_set_data (&analytics_data.netdata_metrics_count,              "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

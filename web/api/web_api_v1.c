@@ -1059,6 +1059,14 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"dashboard-used\": ");
     analytics_get_data(analytics_data.netdata_dashboard_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"charts-count\": ");
+    analytics_get_data(analytics_data.netdata_charts_count, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"metrics-count\": ");
+    analytics_get_data(analytics_data.netdata_metrics_count, wb);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
