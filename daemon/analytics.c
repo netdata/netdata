@@ -34,6 +34,9 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_CONFIG_HTTPS_ENABLED",       analytics_data.netdata_config_https_enabled,       1);
     setenv( "NETDATA_CONFIG_WEB_ENABLED",         analytics_data.netdata_config_web_enabled,         1);
     setenv( "NETDATA_CONFIG_RELEASE_CHANNEL",     analytics_data.netdata_config_release_channel,     1);
+    setenv( "NETDATA_MIRRORED_HOST_COUNT",        analytics_data.netdata_mirrored_host_count,        1);
+    setenv( "NETDATA_MIRRORED_HOSTS_REACHABLE",   analytics_data.netdata_mirrored_hosts_reachable,   1);
+    setenv( "NETDATA_MIRRORED_HOSTS_UNREACHABLE", analytics_data.netdata_mirrored_hosts_unreachable, 1);
 }
 
 /*
@@ -56,6 +59,9 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.netdata_config_https_enabled);
     debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.netdata_config_web_enabled);
     debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.netdata_config_release_channel);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.netdata_mirrored_host_count);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.netdata_mirrored_hosts_reachable);
+    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.netdata_mirrored_hosts_unreachable);
 }
 
 /*
@@ -78,6 +84,9 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_config_https_enabled);
     freez(analytics_data.netdata_config_web_enabled);
     freez(analytics_data.netdata_config_release_channel);
+    freez(analytics_data.netdata_mirrored_host_count);
+    freez(analytics_data.netdata_mirrored_hosts_reachable);
+    freez(analytics_data.netdata_mirrored_hosts_unreachable);   
 }
 
 /*
@@ -140,6 +149,35 @@ void analytics_log_dashboard(void) {
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data (&analytics_data.netdata_dashboard_used, b);
     }
+}
+
+void analytics_mirrored_hosts( void ) {
+    RRDHOST *host;
+    int count = 0;
+    int reachable = 0;
+    int unreachable = 0;
+    char b[10];
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host)
+    {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
+            continue;
+
+        netdata_mutex_lock(&host->receiver_lock);
+        ((host->receiver || host == localhost) ? reachable++ : unreachable++);
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        count++;
+    }
+    rrd_unlock();
+
+    snprintfz(b, 9, "%d", count);
+    analytics_set_data (&analytics_data.netdata_mirrored_host_count, b);
+    snprintfz(b, 9, "%d", reachable);
+    analytics_set_data (&analytics_data.netdata_mirrored_hosts_reachable, b);
+    snprintfz(b, 9, "%d", unreachable);
+    analytics_set_data (&analytics_data.netdata_mirrored_hosts_unreachable, b);
 }
 
 void analytics_exporters (void) {
@@ -217,6 +255,8 @@ void analytics_gather_meta_data (void) {
 
     analytics_exporters();
     analytics_collectors();
+
+    analytics_mirrored_hosts(); //needs complete lock ?
 
     {
         char b[7];
@@ -468,6 +508,9 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_config_https_enabled,       "null");
     analytics_set_data (&analytics_data.netdata_config_web_enabled,         "null");
     analytics_set_data (&analytics_data.netdata_config_release_channel,     "null");
+    analytics_set_data (&analytics_data.netdata_mirrored_host_count,        "null");
+    analytics_set_data (&analytics_data.netdata_mirrored_hosts_reachable,   "null");
+    analytics_set_data (&analytics_data.netdata_mirrored_hosts_unreachable, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

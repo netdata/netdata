@@ -42,6 +42,9 @@ struct analytics_data {
     char *netdata_config_https_enabled;
     char *netdata_config_web_enabled;
     char *netdata_config_release_channel;
+    char *netdata_mirrored_host_count;
+    char *netdata_mirrored_hosts_reachable;
+    char *netdata_mirrored_hosts_unreachable;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;
