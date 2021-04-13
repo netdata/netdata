@@ -23,10 +23,10 @@ void analytics_exporting_connectors (BUFFER *b)
                 buffer_strcat(b, "GraphiteHTTP");
                 break;
             case EXPORTING_CONNECTOR_TYPE_JSON:
-                buffer_strcat(b, "Json");
+                buffer_strcat(b, "JSON");
                 break;
             case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
-                buffer_strcat(b, "JsonHTTP");
+                buffer_strcat(b, "JSONHTTP");
                 break;
             case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
                 buffer_strcat(b, "OpenTSDB");
