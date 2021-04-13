@@ -3,6 +3,16 @@
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 
+struct collector {
+    char *plugin;
+    char *module;
+};
+
+struct array_printer {
+    int c;
+    BUFFER *both;
+};
+
 /*
  * Set the env variables
  */
@@ -14,6 +24,8 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.netdata_allmetrics_prometheus_used, 1);
     setenv( "NETDATA_ALLMETRICS_SHELL_USED",      analytics_data.netdata_allmetrics_shell_used,      1);
     setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.netdata_allmetrics_json_used,       1);
+    setenv( "NETDATA_COLLECTORS",                 analytics_data.netdata_collectors,                 1);
+    setenv( "NETDATA_COLLECTORS_COUNT",           analytics_data.netdata_collectors_count,           1);
 }
 
 /*
@@ -27,6 +39,8 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.netdata_allmetrics_shell_used);
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
+    debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
 }
 
 /*
@@ -40,6 +54,8 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_allmetrics_prometheus_used);
     freez(analytics_data.netdata_allmetrics_shell_used);
     freez(analytics_data.netdata_allmetrics_json_used);
+    freez(analytics_data.netdata_collectors);
+    freez(analytics_data.netdata_collectors_count);
 }
 
 /*
@@ -92,12 +108,72 @@ void analytics_exporters (void) {
     buffer_free(bi);
 }
 
+int collector_counter_callb(void *entry, void *data) {
+
+    struct array_printer *ap = (struct array_printer *)data;
+    struct collector *col=(struct collector *) entry;
+
+    BUFFER *bt = ap->both;
+
+    if (likely(ap->c)) {
+        buffer_strcat(bt, ",");
+    }
+
+    buffer_strcat(bt, "{");
+    buffer_strcat(bt, " \"plugin\": \"");
+    buffer_strcat(bt, col->plugin);
+    buffer_strcat(bt, "\", \"module\":\"");
+    buffer_strcat(bt, col->module);
+    buffer_strcat(bt, "\" }");
+
+    (ap->c)++;
+
+    return 0;
+}
+
+void analytics_collectors(void) {
+    RRDSET *st;
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    char name[500];
+    BUFFER *bt = buffer_create(1000);
+
+    rrdset_foreach_read(st, localhost) {
+        if (rrdset_is_available_for_viewers(st)) {
+            struct collector col = {
+                    .plugin = st->plugin_name ? st->plugin_name : "",
+                    .module = st->module_name ? st->module_name : ""
+            };
+            snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+            dictionary_set(dict, name, &col, sizeof(struct collector));
+        }
+    }
+
+    struct array_printer ap;
+    ap.c = 0;
+    ap.both = bt;
+
+    dictionary_get_all(dict, collector_counter_callb, &ap);
+    dictionary_destroy(dict);
+
+    analytics_set_data (&analytics_data.netdata_collectors, (char *)buffer_tostring(ap.both));
+
+     {
+        char b[7];
+        snprintfz(b, 6, "%d", ap.c);
+        analytics_set_data (&analytics_data.netdata_collectors_count, b);
+    }
+
+    buffer_free(bt);
+
+}
+
 /*
  * Get the meta data, called from the thread
  */
 void analytics_gather_meta_data (void) {
 
     analytics_exporters();
+    analytics_collectors();
 
     {
         char b[7];
@@ -306,6 +382,8 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_allmetrics_prometheus_used, "null");
     analytics_set_data (&analytics_data.netdata_allmetrics_shell_used,      "null");
     analytics_set_data (&analytics_data.netdata_allmetrics_json_used,       "null");
+    analytics_set_data (&analytics_data.netdata_collectors,                 "null");
+    analytics_set_data (&analytics_data.netdata_collectors_count,           "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
