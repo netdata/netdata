@@ -2,6 +2,7 @@
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
+extern void analytics_build_info (BUFFER *b);
 
 struct collector {
     char *plugin;
@@ -26,6 +27,7 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_ALLMETRICS_JSON_USED",       analytics_data.netdata_allmetrics_json_used,       1);
     setenv( "NETDATA_COLLECTORS",                 analytics_data.netdata_collectors,                 1);
     setenv( "NETDATA_COLLECTORS_COUNT",           analytics_data.netdata_collectors_count,           1);
+    setenv( "NETDATA_BUILDINFO",                  analytics_data.netdata_buildinfo,                  1);
 }
 
 /*
@@ -41,6 +43,7 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
     debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
+    debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.netdata_buildinfo);
 }
 
 /*
@@ -56,6 +59,7 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_allmetrics_json_used);
     freez(analytics_data.netdata_collectors);
     freez(analytics_data.netdata_collectors_count);
+    freez(analytics_data.netdata_buildinfo);
 }
 
 /*
@@ -255,6 +259,13 @@ void set_late_global_environment() {
     analytics_set_data_str (&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
 
+    {
+        BUFFER *bi = buffer_create(1000);
+        analytics_build_info(bi);
+        analytics_set_data_str (&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
+        buffer_free(bi);
+    }
+
     /* set what we have, to send the START event */
     analytics_setenv_data();
 }
@@ -384,6 +395,7 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_allmetrics_json_used,       "null");
     analytics_set_data (&analytics_data.netdata_collectors,                 "null");
     analytics_set_data (&analytics_data.netdata_collectors_count,           "null");
+    analytics_set_data (&analytics_data.netdata_buildinfo,                  "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

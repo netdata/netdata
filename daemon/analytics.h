@@ -34,6 +34,7 @@ struct analytics_data {
     char *netdata_allmetrics_json_used;
     char *netdata_collectors;
     char *netdata_collectors_count;
+    char *netdata_buildinfo;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;
