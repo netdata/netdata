@@ -51,6 +51,12 @@ struct analytics_data {
     char *netdata_alarms_critical;
     char *netdata_charts_count;
     char *netdata_metrics_count;
+    char *netdata_config_is_parent;
+    char *netdata_config_hosts_available;
+    char *netdata_host_cloud_available;
+    char *netdata_host_aclk_available;
+    char *netdata_host_aclk_implementation;
+    char *netdata_host_agent_claimed;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;

@@ -3,6 +3,7 @@
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
+extern int aclk_connected;
 
 struct collector {
     char *plugin;
@@ -43,6 +44,12 @@ void analytics_setenv_data (void) {
     setenv( "NETDATA_ALARMS_CRITICAL",            analytics_data.netdata_alarms_critical,            1);
     setenv( "NETDATA_CHARTS_COUNT",               analytics_data.netdata_charts_count,               1);
     setenv( "NETDATA_METRICS_COUNT",              analytics_data.netdata_metrics_count,              1);
+    setenv( "NETDATA_CONFIG_IS_PARENT",           analytics_data.netdata_config_is_parent,           1);
+    setenv( "NETDATA_CONFIG_HOSTS_AVAILABLE",     analytics_data.netdata_config_hosts_available,     1);
+    setenv( "NETDATA_HOST_CLOUD_AVAILABLE",       analytics_data.netdata_host_cloud_available,       1);
+    setenv( "NETDATA_HOST_ACLK_AVAILABLE",        analytics_data.netdata_host_aclk_available,        1);
+    setenv( "NETDATA_HOST_ACLK_IMPLEMENTATION",   analytics_data.netdata_host_aclk_implementation,   1);
+    setenv( "NETDATA_HOST_AGENT_CLAIMED",         analytics_data.netdata_host_agent_claimed,         1);
 }
 
 /*
@@ -74,6 +81,12 @@ void analytics_log_data (void) {
     debug(D_ANALYTICS, "NETDATA_ALARMS_CRITICAL            : [%s]", analytics_data.netdata_alarms_critical);
     debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.netdata_charts_count);
     debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.netdata_metrics_count);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT           : [%s]", analytics_data.netdata_config_is_parent);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.netdata_config_hosts_available);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
+    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
+    debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
 }
 
 /*
@@ -105,6 +118,12 @@ void analytics_free_data (void) {
     freez(analytics_data.netdata_alarms_critical);
     freez(analytics_data.netdata_charts_count);
     freez(analytics_data.netdata_metrics_count);
+    freez(analytics_data.netdata_config_is_parent);
+    freez(analytics_data.netdata_config_hosts_available);
+    freez(analytics_data.netdata_host_cloud_available);
+    freez(analytics_data.netdata_host_aclk_available);
+    freez(analytics_data.netdata_host_aclk_implementation);
+    freez(analytics_data.netdata_host_agent_claimed);
 }
 
 /*
@@ -133,6 +152,9 @@ void analytics_get_data (char *name, BUFFER *wb) {
     buffer_strcat(wb, name);
 }
 
+/*
+ * Log hits on the allmetrics page, with prometheus parameter
+ */
 void analytics_log_prometheus(void) {
     if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
@@ -142,6 +164,9 @@ void analytics_log_prometheus(void) {
     }
 }
 
+/*
+ * Log hits on the allmetrics page, with shell parameter (or default)
+ */
 void analytics_log_shell(void) {
     if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
@@ -151,6 +176,9 @@ void analytics_log_shell(void) {
     }
 }
 
+/*
+ * Log hits on the allmetrics page, with json parameter
+ */
 void analytics_log_json(void) {
     if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
@@ -160,6 +188,9 @@ void analytics_log_json(void) {
     }
 }
 
+/*
+ * Log hits on the dashboard, (when calling HELLO).
+ */
 void analytics_log_dashboard(void) {
     if (likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
@@ -230,6 +261,9 @@ int collector_counter_callb(void *entry, void *data) {
     return 0;
 }
 
+/*
+ * Create a JSON array of available collectors, same as in api/v1/info
+ */
 void analytics_collectors(void) {
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
@@ -266,6 +300,10 @@ void analytics_collectors(void) {
 
 }
 
+/*
+ * Run alarm-notify.sh script using the dump_methods parameter
+ * SEND_CUSTOM is always available
+ */
 void analytics_alarms_notifications (void) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
@@ -374,11 +412,46 @@ void analytics_alarms (void) {
 }
 
 /*
- * Get the meta data, called from the thread
+ * Misc attributes to get (run from meta)
+ */
+void analytics_misc(void) {
+
+    analytics_set_data (&analytics_data.netdata_config_is_parent, (localhost->next || configured_as_parent()) ? "true" : "false");
+
+    {
+        char b[7];
+        snprintfz(b, 6, "%ld", rrd_hosts_available);
+        analytics_set_data (&analytics_data.netdata_config_hosts_available, b);
+    }
+
+#ifdef ENABLE_ACLK
+    analytics_set_data (&analytics_data.netdata_host_cloud_available, "true");
+#ifdef ACLK_NG
+    analytics_set_data_str (&analytics_data.netdata_host_aclk_implementation, "Next Generation");
+#else
+    analytics_set_data_str (&analytics_data.netdata_host_aclk_implementation, "legacy");
+#endif
+#else
+    analytics_set_data (&analytics_data.netdata_host_cloud_available, "false");
+#endif
+    if (is_agent_claimed())
+        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "true");
+    else {
+        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "false");
+    }
+#ifdef ENABLE_ACLK
+    if (aclk_connected)
+        analytics_set_data (&analytics_data.netdata_host_aclk_available, "true");
+    else
+#endif
+        analytics_set_data (&analytics_data.netdata_host_aclk_available, "false");
+
+}
+
+/*
+ * Get the meta data, called from the thread, and before the EXIT event
  */
 void analytics_gather_meta_data (void) {
-
-    analytics_exporters();
 
     rrdhost_rdlock(localhost); //can we avoid the lock?
 
@@ -390,7 +463,8 @@ void analytics_gather_meta_data (void) {
     rrdhost_unlock(localhost);
 
     analytics_mirrored_hosts(); //needs complete lock ?
-
+    analytics_misc();
+    analytics_exporters();
     analytics_alarms_notifications();
 
     {
@@ -652,6 +726,12 @@ void set_global_environment() {
     analytics_set_data (&analytics_data.netdata_alarms_critical,            "null");
     analytics_set_data (&analytics_data.netdata_charts_count,               "null");
     analytics_set_data (&analytics_data.netdata_metrics_count,              "null");
+    analytics_set_data (&analytics_data.netdata_config_is_parent,           "null");
+    analytics_set_data (&analytics_data.netdata_config_hosts_available,     "null");
+    analytics_set_data (&analytics_data.netdata_host_cloud_available,       "null");
+    analytics_set_data (&analytics_data.netdata_host_aclk_implementation,   "null");
+    analytics_set_data (&analytics_data.netdata_host_aclk_available,        "null");
+    analytics_set_data (&analytics_data.netdata_host_agent_claimed,         "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
