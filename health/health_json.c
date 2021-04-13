@@ -82,18 +82,21 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
+    char *replaced_info = NULL;
     if (likely(ae->info)) {
         char *m=NULL;
-
-        while ( m = strstr (ae->info, "$family") ) {
+        replaced_info = strdupz(ae->info);
+        size_t pos = 0;
+        while ( m = strstr (replaced_info+pos, "$family") ) {
             char *buf=NULL;
-            buf = find_and_replace(ae->info, "$family", ae->family, m);
-            freez(ae->info); ae->info = strdupz(buf);
+            pos = m - replaced_info;
+            buf = find_and_replace(replaced_info, "$family", ae->family, m);
+            freez(replaced_info); replaced_info = strdupz(buf);
             freez(buf);
         }
     }
 
-    health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
+    health_string2json(wb, "\t\t", "info", replaced_info?replaced_info:"", ",\n");
 
     if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
@@ -108,6 +111,8 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t}");
+
+    freez(replaced_info);
 }
 
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
@@ -157,13 +162,14 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
-    char *replaced_info = NULL; //discuss if the use of a helper variable is not required
+    char *replaced_info = NULL;
     if (likely(rc->info)) {
         char *m;
         replaced_info = strdupz(rc->info);
-
-        while ( m = strstr (replaced_info, "$family") ) {
+        size_t pos = 0;
+        while ( m = strstr (replaced_info+pos, "$family") ) {
             char *buf=NULL;
+            pos = m - replaced_info;
             buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
             freez(replaced_info); replaced_info = strdupz(buf);
             freez(buf);
