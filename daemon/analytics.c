@@ -104,18 +104,30 @@ void analytics_get_data (char *name, BUFFER *wb) {
 }
 
 void analytics_log_prometheus(void) {
-    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS))
+    if (likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.prometheus_hits);
+        analytics_set_data (&analytics_data.netdata_allmetrics_prometheus_used, b);
+    }
 }
 
 void analytics_log_shell(void) {
-    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS))
+    if (likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.shell_hits);
+        analytics_set_data (&analytics_data.netdata_allmetrics_shell_used, b);
+    }
 }
 
 void analytics_log_json(void) {
-    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS))
+    if (likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
+        char b[7];
+        snprintfz(b, 6, "%d", analytics_data.json_hits);
+        analytics_set_data (&analytics_data.netdata_allmetrics_json_used, b);
+    }
 }
 
 void analytics_exporters (void) {

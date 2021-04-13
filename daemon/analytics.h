@@ -55,6 +55,7 @@ extern void send_statistics( const char *action, const char *action_result, cons
 extern void analytics_log_shell();
 extern void analytics_log_json();
 extern void analytics_log_prometheus();
+extern void analytics_gather_meta_data();
 
 extern struct analytics_data analytics_data;
 
