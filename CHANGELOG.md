@@ -321,7 +321,6 @@
 - fix UUID\_STR\_LEN undefined on MacOS [\#10313](https://github.com/netdata/netdata/pull/10313) ([underhood](https://github.com/underhood))
 - python.d/nvidia\_smi: fix gpu data filtering [\#10312](https://github.com/netdata/netdata/pull/10312) ([ilyam8](https://github.com/ilyam8))
 - Add new collectors to supported collectors list [\#10310](https://github.com/netdata/netdata/pull/10310) ([joelhans](https://github.com/joelhans))
-- Added numerous improvements to our Docker image. [\#10308](https://github.com/netdata/netdata/pull/10308) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
