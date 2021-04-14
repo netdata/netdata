@@ -188,9 +188,9 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
    apps = yes
 ```
 
-When the integration is enabled eBPF collector will need to allocate memory for each process running. The total 
+When the integration is enabled, eBPF collector will need to allocate memory for each process running. The total 
  allocated memory has direct relationship with the kernel version, when eBPF plugin is running on kernels newer than `4.15`, 
- eBPF plugin will use per-cpu maps to speed up the update of hash tables. This also implies store  data for the same PID 
+ eBPF plugin will use per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
  for each processor it runs.
 
 #### `[ebpf programs]`
