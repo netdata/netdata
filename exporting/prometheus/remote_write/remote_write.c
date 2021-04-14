@@ -36,7 +36,7 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
 }
 
 /**
- * Process a responce received after Prometheus remote write connector had sent data
+ * Process a response received after Prometheus remote write connector had sent data
  *
  * @param buffer a response from a remote service.
  * @param instance an instance data structure.
