@@ -1522,11 +1522,12 @@ netdataDashboard.context = {
 
     'mysql.galera_cluster_state': {
         info:
-            '<code>0</code>: undefined, ' +
-            '<code>1</code>: joining, ' +
-            '<code>2</code>: donor/desynced, ' +
-            '<code>3</code>: joined, ' +
-            '<code>4</code>: synced.'
+            '<code>0</code>: Undefined, ' +
+            '<code>1</code>: Joining, ' +
+            '<code>2</code>: Donor/Desynced, ' +
+            '<code>3</code>: Joined, ' +
+            '<code>4</code>: Synced, ' +
+            '<code>5</code>: Inconsistent.'
     },
 
     'mysql.galera_cluster_weight': {
