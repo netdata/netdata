@@ -47,8 +47,8 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
  */
 void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
-    calculated_number in_cache = (calculated_number) (((long long)cache_access) - ((long long)not_found));
-    calculated_number ratio = (cache_access) ? in_cache/(calculated_number)cache_access : 0;
+    calculated_number successful_access = (calculated_number) (((long long)cache_access) - ((long long)not_found));
+    calculated_number ratio = (cache_access) ? successful_access/(calculated_number)cache_access : 0;
 
     out->ratio = (long long )(ratio*100);
 }
