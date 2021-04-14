@@ -842,6 +842,10 @@ netdataDashboard.context = {
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
     },
 
+    'system.clock_sync_state': {
+        info: 'State map: 0 - not synchronized, 1 - synchronized'
+    },
+
     'system.forks': {
         colors: '#5555DD',
         info: 'Number of new processes created.'
@@ -1461,12 +1465,12 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
+    // ------------------------------------------------------------------------
+    // MYSQL
+
     'mysql.net': {
         info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
     },
-
-    // ------------------------------------------------------------------------
-    // MYSQL
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +

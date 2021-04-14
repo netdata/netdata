@@ -458,6 +458,11 @@ set(DISKSPACE_PLUGIN_FILES
         collectors/diskspace.plugin/plugin_diskspace.c
         )
 
+set(TIMEX_PLUGIN_FILES
+        collectors/timex.plugin/plugin_timex.h
+        collectors/timex.plugin/plugin_timex.c
+        )
+
 set(FREEIPMI_PLUGIN_FILES
         collectors/freeipmi.plugin/freeipmi_plugin.c
         )
@@ -984,6 +989,7 @@ IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
+            ${TIMEX_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )

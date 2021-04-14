@@ -79,6 +79,7 @@ struct netdata_static_thread static_threads[] = {
     // linux internal plugins
     NETDATA_PLUGIN_HOOK_LINUX_PROC
     NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
+    NETDATA_PLUGIN_HOOK_LINUX_TIMEX
     NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
     NETDATA_PLUGIN_HOOK_LINUX_TC
 

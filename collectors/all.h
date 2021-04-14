@@ -12,6 +12,7 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
+#include "timex.plugin/plugin_timex.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -53,6 +54,8 @@
 #define NETDATA_CHART_PRIO_SYSTEM_SOFT_INTR           1100 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_ENTROPY             1000
 #define NETDATA_CHART_PRIO_SYSTEM_UPTIME              1000
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_STATE           1100
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_OFFSET          1110
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES      1200 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1201
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1202
@@ -339,6 +342,7 @@
 #define NETDATA_CHART_PRIO_CHECKS                    99999
 
 #define NETDATA_CHART_PRIO_NETDATA_DISKSPACE        132020
+#define NETDATA_CHART_PRIO_NETDATA_TIMEX            132030
 #define NETDATA_CHART_PRIO_NETDATA_TC_CPU           135000
 #define NETDATA_CHART_PRIO_NETDATA_TC_TIME          135001
 
