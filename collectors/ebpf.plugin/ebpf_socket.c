@@ -1325,7 +1325,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         return;
 
     netdata_socket_idx_t key = {};
-    netdata_socket_idx_t next_key;
+    netdata_socket_idx_t next_key = {};
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
@@ -1421,7 +1421,7 @@ void update_listen_table(uint16_t value, uint8_t proto)
 static void read_listen_table()
 {
     uint16_t key = 0;
-    uint16_t next_key;
+    uint16_t next_key = 0;
 
     int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
     uint8_t value;
@@ -1769,7 +1769,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
-void clean_thread_structures() {
+void clean_socket_apps_structures() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         freez(socket_bandwidth_curr[pids->pid]);
@@ -1853,8 +1853,6 @@ static void ebpf_socket_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    clean_thread_structures();
-    freez(socket_bandwidth_curr);
     freez(bandwidth_vector);
 
     freez(socket_values);
@@ -2822,6 +2820,8 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
+    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 

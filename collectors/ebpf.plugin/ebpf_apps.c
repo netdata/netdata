@@ -943,7 +943,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-            del_pid_entry(r);
 
             // Clean process structure
             freez(global_process_stats[r]);
@@ -953,6 +952,8 @@ void cleanup_exited_pids()
             current_apps_data[r] = NULL;
 
             cleanup_variables_from_other_threads(r);
+
+            del_pid_entry(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;

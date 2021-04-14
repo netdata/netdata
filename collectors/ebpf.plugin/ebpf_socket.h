@@ -294,6 +294,7 @@ extern void update_listen_table(uint16_t value, uint8_t proto);
 extern void parse_network_viewer_section(struct config *cfg);
 extern void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 extern void parse_service_name_section(struct config *cfg);
+extern void clean_socket_apps_structures();
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 
