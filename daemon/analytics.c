@@ -205,7 +205,7 @@ void analytics_mirrored_hosts( void ) {
     int count = 0;
     int reachable = 0;
     int unreachable = 0;
-    char b[10];
+    char b[11];
 
     rrd_rdlock();
     rrdhost_foreach_read(host)
@@ -221,11 +221,11 @@ void analytics_mirrored_hosts( void ) {
     }
     rrd_unlock();
 
-    snprintfz(b, 9, "%d", count);
+    snprintfz(b, 10, "%d", count);
     analytics_set_data (&analytics_data.netdata_mirrored_host_count, b);
-    snprintfz(b, 9, "%d", reachable);
+    snprintfz(b, 10, "%d", reachable);
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_reachable, b);
-    snprintfz(b, 9, "%d", unreachable);
+    snprintfz(b, 10, "%d", unreachable);
     analytics_set_data (&analytics_data.netdata_mirrored_hosts_unreachable, b);
 }
 
@@ -416,14 +416,6 @@ void analytics_alarms (void) {
  */
 void analytics_misc(void) {
 
-    analytics_set_data (&analytics_data.netdata_config_is_parent, (localhost->next || configured_as_parent()) ? "true" : "false");
-
-    {
-        char b[7];
-        snprintfz(b, 6, "%ld", rrd_hosts_available);
-        analytics_set_data (&analytics_data.netdata_config_hosts_available, b);
-    }
-
 #ifdef ENABLE_ACLK
     analytics_set_data (&analytics_data.netdata_host_cloud_available, "true");
 #ifdef ACLK_NG
@@ -434,11 +426,7 @@ void analytics_misc(void) {
 #else
     analytics_set_data (&analytics_data.netdata_host_cloud_available, "false");
 #endif
-    if (is_agent_claimed())
-        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "true");
-    else {
-        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "false");
-    }
+
 #ifdef ENABLE_ACLK
     if (aclk_connected)
         analytics_set_data (&analytics_data.netdata_host_aclk_available, "true");
@@ -449,9 +437,24 @@ void analytics_misc(void) {
 }
 
 /*
- * Get the meta data, called from the thread, and before the EXIT event
+ * Get the meta data, called from the thread once after the original delay
+ * These are values that won't change between agent restarts, and therefore
+ * don't try to read them on each META event send
  */
-void analytics_gather_meta_data (void) {
+void analytics_gather_immutable_meta_data (void) {
+
+    analytics_misc();
+    analytics_exporters();
+
+    analytics_setenv_data();
+}
+
+/*
+ * Get the meta data, called from the thread on every heartbeat, and right before the EXIT event
+ * These are values that can change between agent restarts, and therefore
+ * try to read them on each META event send
+ */
+void analytics_gather_mutable_meta_data (void) {
 
     rrdhost_rdlock(localhost); //can we avoid the lock?
 
@@ -463,9 +466,15 @@ void analytics_gather_meta_data (void) {
     rrdhost_unlock(localhost);
 
     analytics_mirrored_hosts(); //needs complete lock ?
-    analytics_misc();
-    analytics_exporters();
     analytics_alarms_notifications();
+
+    analytics_set_data (&analytics_data.netdata_config_is_parent, (localhost->next || configured_as_parent()) ? "true" : "false");
+
+    if (is_agent_claimed())
+        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "true");
+    else {
+        analytics_set_data (&analytics_data.netdata_host_agent_claimed, "false");
+    }
 
     {
         char b[7];
@@ -480,6 +489,9 @@ void analytics_gather_meta_data (void) {
 
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data (&analytics_data.netdata_dashboard_used, b);
+
+        snprintfz(b, 6, "%ld", rrd_hosts_available);
+        analytics_set_data (&analytics_data.netdata_config_hosts_available, b);
     }
 
     analytics_setenv_data();
@@ -495,21 +507,22 @@ void analytics_main_cleanup(void *ptr) {
 }
 
 /*
- * The analytics thread. Sleep for ANALYTICS_MAX_SLEEP_SEC,
- * gather the data, and exit.
- * In a later stage, if needed, the thread could stay up
- * and send analytics every X hours
+ * The analytics thread. Sleep for ANALYTICS_INIT_SLEEP_SEC,
+ * gather the data, and then go to a loop where every ANALYTICS_HEARTBEAT
+ * it will send a new META event after gathering data that could be changed
+ * while the agent is running
  */
 void *analytics_main(void *ptr) {
     netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
-    int sec = 0;
+    unsigned int sec = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = USEC_PER_SEC;
 
     debug(D_ANALYTICS, "Analytics thread starts");
 
-    while(!netdata_exit && likely(sec <= ANALYTICS_MAX_SLEEP_SEC)) {
+    //first delay after agent start
+    while(!netdata_exit && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
         heartbeat_next(&hb, step_ut);
         sec++;
     }
@@ -517,11 +530,27 @@ void *analytics_main(void *ptr) {
     if (unlikely(netdata_exit))
         goto cleanup;
 
-    analytics_gather_meta_data();
-
+    analytics_gather_immutable_meta_data();
+    analytics_gather_mutable_meta_data();
     send_statistics("META", "-", "-");
-
     analytics_log_data();
+
+    sec = 0;
+    while(1) {
+        heartbeat_next(&hb, step_ut * 2);
+        sec+=2;
+
+        if (unlikely(netdata_exit))
+            break;
+
+        if (likely(sec < ANALYTICS_HEARTBEAT))
+            continue;
+
+        analytics_gather_mutable_meta_data();
+        send_statistics("META", "-", "-");
+        analytics_log_data();
+        sec = 0;
+    }
 
  cleanup:
     netdata_thread_cleanup_pop(1);

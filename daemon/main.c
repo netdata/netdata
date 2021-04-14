@@ -29,7 +29,7 @@ void netdata_cleanup_and_exit(int ret) {
 
      //re-gather meta data
     if (netdata_anonymous_statistics_enabled == 1) {
-        analytics_gather_meta_data();
+        analytics_gather_mutable_meta_data();
         send_statistics("EXIT", ret?"ERROR":"OK","-");
         analytics_free_data();
     }

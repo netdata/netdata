@@ -5,8 +5,11 @@
 
 #include "../daemon/common.h"
 
-/* Max number of seconds before the META analytics is sent */
-#define ANALYTICS_MAX_SLEEP_SEC 20
+/* Max number of seconds before the first META analytics is sent */
+#define ANALYTICS_INIT_SLEEP_SEC 120
+
+/* Send a META event every X seconds */
+#define ANALYTICS_HEARTBEAT 7200
 
 /* Maximum number of hits to log */
 #define ANALYTICS_MAX_PROMETHEUS_HITS 255
@@ -74,7 +77,7 @@ extern void analytics_log_shell();
 extern void analytics_log_json();
 extern void analytics_log_prometheus();
 extern void analytics_log_dashboard();
-extern void analytics_gather_meta_data();
+extern void analytics_gather_mutable_meta_data();
 
 extern struct analytics_data analytics_data;
 
