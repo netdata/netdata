@@ -1558,7 +1558,7 @@ validate_tree_centos() {
     echo >&2 " > Checking for Okay ..."
     if ! rpm -qa | grep okay > /dev/null; then
       if prompt "okay not found, shall I install it?"; then
-        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
+        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-5.el8.noarch.rpm
       fi
     fi
 
