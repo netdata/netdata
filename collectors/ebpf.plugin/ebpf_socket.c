@@ -2823,6 +2823,11 @@ void parse_service_name_section(struct config *cfg)
 
 void parse_table_size_options(struct config *cfg)
 {
+    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                            EBPF_GLOBAL_SECTION,
+                                                                                            EBPF_CONFIG_BANDWIDTH_SIZE,
+                                                                                            NETDATA_MAXIMUM_CONNECTION_ALLOWED);
+
     socket_maps[NETDATA_SOCKET_TABLE_IPV4].user_input = (uint32_t) appconfig_get_number(cfg,
                                                                                        EBPF_GLOBAL_SECTION,
                                                                                        EBPF_CONFIG_IPV4_SIZE, NETDATA_MAXIMUM_CONNECTION_ALLOWED);
