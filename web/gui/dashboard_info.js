@@ -559,6 +559,11 @@ netdataDashboard.menu = {
         info: 'Monitor system calls, internal functions, bytes read, bytes written and errors using <code>eBPF</code>.'
     },
 
+    'filesystem': {
+        title: 'Filesystem',
+        icon: '<i class="fas fa-database"></i>',
+    },
+
     'vernemq': {
         title: 'VerneMQ',
         icon: '<i class="fas fa-comments"></i>',
