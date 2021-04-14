@@ -361,6 +361,17 @@ nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.m
 much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
 your complex applications at any load.
 
+eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin 
+significantly increases kernel memory usage by several hundred MB.
+
+If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, 
+consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next, 
+[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system 
+memory usage (see the `system.ram` chart) has dropped significantly.
+
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode) 
+in `ebpf.conf`.
+
 ## SELinux
 
 When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, it may prevent `ebpf.plugin` from
