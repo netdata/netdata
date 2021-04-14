@@ -215,7 +215,7 @@ To enable this StatsD configuration, [restart Netdata](/docs/configure/start-sto
 
 ## Final touches
 
-At this point, you have used StatsD to gather metrics for k6, creating a whole new section in your Netdata dashboard in the process. Uil can further customize the icon of the particular section, as well as the description for each chart.
+At this point, you have used StatsD to gather metrics for k6, creating a whole new section in your Netdata dashboard in the process. Moreover, you can further customize the icon of the particular section, as well as the description for each chart.
 
 To edit the section, please follow the Netdata [documentation](https://learn.netdata.cloud/docs/agent/web/gui#customizing-the-local-dashboard).
 
