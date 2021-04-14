@@ -84,14 +84,15 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
 
     char *replaced_info = NULL;
     if (likely(ae->info)) {
-        char *m=NULL;
+        char *m = NULL;
         replaced_info = strdupz(ae->info);
         size_t pos = 0;
-        while ( m = strstr (replaced_info+pos, "$family") ) {
-            char *buf=NULL;
+        while (m = strstr(replaced_info + pos, "$family")) {
+            char *buf = NULL;
             pos = m - replaced_info;
             buf = find_and_replace(replaced_info, "$family", ae->family, m);
-            freez(replaced_info); replaced_info = strdupz(buf);
+            freez(replaced_info);
+            replaced_info = strdupz(buf);
             freez(buf);
         }
     }
@@ -167,11 +168,12 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         char *m;
         replaced_info = strdupz(rc->info);
         size_t pos = 0;
-        while ( m = strstr (replaced_info+pos, "$family") ) {
-            char *buf=NULL;
+        while (m = strstr(replaced_info + pos, "$family")) {
+            char *buf = NULL;
             pos = m - replaced_info;
-            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:"", m);
-            freez(replaced_info); replaced_info = strdupz(buf);
+            buf = find_and_replace(replaced_info, "$family", (rc->rrdset && rc->rrdset->family) ? rc->rrdset->family : "", m);
+            freez(replaced_info);
+            replaced_info = strdupz(buf);
             freez(buf);
         }
     }

@@ -520,11 +520,12 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         char *m;
         replaced_info = strdupz(info);
         size_t pos = 0;
-        while ( m = strstr (replaced_info+pos, "$family") ) {
-            char *buf=NULL;
+        while (m = strstr(replaced_info + pos, "$family")) {
+            char *buf = NULL;
             pos = m - replaced_info;
-            buf = find_and_replace(replaced_info, "$family", (ae->family)?ae->family:"", m);
-            freez(replaced_info); replaced_info = strdupz(buf);
+            buf = find_and_replace(replaced_info, "$family", (ae->family) ? ae->family : "", m);
+            freez(replaced_info);
+            replaced_info = strdupz(buf);
             freez(buf);
         }
     }
