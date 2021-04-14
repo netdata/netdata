@@ -168,7 +168,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
-                rc->class, //should it be from rrdset ?
+                rc->class,
                 rc->component,
                 rc->type,
                 rc->exec,
