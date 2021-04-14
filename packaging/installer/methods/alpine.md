@@ -15,7 +15,7 @@ apk add alpine-sdk bash curl libuv-dev zlib-dev util-linux-dev libmnl-dev gcc ma
 apk add nodejs
 
 # download Netdata - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=100
+git clone https://github.com/netdata/netdata.git --depth=100 --recursive
 cd netdata
 
 # build it, install it, start it

@@ -93,7 +93,7 @@ have made to do your development on).
 
 ```bash
 # clone your fork (done once at the start but shown here for clarity)
-#git clone --branch my-example-collector https://github.com/mygithubusername/netdata.git --depth=100
+#git clone --branch my-example-collector https://github.com/mygithubusername/netdata.git --depth=100 --recursive
 # go into your netdata source folder
 cd netdata
 # git pull your latest changes (assuming you built from a fork you are using to develop on)
