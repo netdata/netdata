@@ -498,7 +498,7 @@ static int aclk_execute_query_v2(struct aclk_query *this_query)
             z_buffer->len += bytes_to_cpy;
         } while(z_ret != Z_STREAM_END);
         // so that web_client_build_http_header
-        // puts correct content lenght into header
+        // puts correct content length into header
         buffer_free(w->response.data);
         w->response.data = z_buffer;
         z_buffer = NULL;
