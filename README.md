@@ -211,7 +211,7 @@ You can also find Netdata on:
 
 ## Contribute
 
-Contributions are the lifeblood of OSS projects, such as Netdata Agent. While we are continuing to invest resources and improve the OSS Agent, we need every help we can get in our effort to democratize monitoring!
+Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
 - Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook). In there, you will find all the information you need to contribute to the Netdata Agent, from improving our documentation to engaging in the community and development. We have made efforts to make it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending the Netdata Agent on our [community forums](https://community.netdata.cloud/c/agent-development/9)
