@@ -1,6 +1,6 @@
 <!--
 title: "Kubernetes monitoring with Netdata: Overview and visualizations"
-description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granulrity."
+description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity."
 image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
 author: "Joel Hans"
 author_title: "Editorial Director, Technical & Educational Resources"
