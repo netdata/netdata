@@ -1424,9 +1424,15 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
+    'disk_ext.iotime': {
+        height: 0.5
+    },
     'disk.mops': {
         height: 0.5,
         info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
+    },
+    'disk_ext.mops': {
+        height: 0.5
     },
     'disk.svctm': {
         height: 0.5,
@@ -1436,9 +1442,16 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The average I/O operation size.'
     },
+    'disk_ext.avgsz': {
+        height: 0.5
+    },
     'disk.await': {
         height: 0.5,
         info: 'The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
+    },
+    'disk_ext.await': {
+        height: 0.5,
+        info: 'The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
     'disk.space': {

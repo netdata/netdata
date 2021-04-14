@@ -103,16 +103,16 @@
 // Disks
 
 #define NETDATA_CHART_PRIO_DISK_IO                    2000
-#define NETDATA_CHART_PRIO_DISK_OPS                   2001
-#define NETDATA_CHART_PRIO_DISK_QOPS                  2002
-#define NETDATA_CHART_PRIO_DISK_BACKLOG               2003
-#define NETDATA_CHART_PRIO_DISK_BUSY                  2004
-#define NETDATA_CHART_PRIO_DISK_UTIL                  2005
-#define NETDATA_CHART_PRIO_DISK_AWAIT                 2006
-#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2007
-#define NETDATA_CHART_PRIO_DISK_SVCTM                 2008
-#define NETDATA_CHART_PRIO_DISK_MOPS                  2021
-#define NETDATA_CHART_PRIO_DISK_IOTIME                2022
+#define NETDATA_CHART_PRIO_DISK_OPS                   2010
+#define NETDATA_CHART_PRIO_DISK_QOPS                  2015
+#define NETDATA_CHART_PRIO_DISK_BACKLOG               2020
+#define NETDATA_CHART_PRIO_DISK_BUSY                  2030
+#define NETDATA_CHART_PRIO_DISK_UTIL                  2040
+#define NETDATA_CHART_PRIO_DISK_AWAIT                 2050
+#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2060
+#define NETDATA_CHART_PRIO_DISK_SVCTM                 2070
+#define NETDATA_CHART_PRIO_DISK_MOPS                  2080
+#define NETDATA_CHART_PRIO_DISK_IOTIME                2090
 #define NETDATA_CHART_PRIO_BCACHE_CACHE_ALLOC         2120
 #define NETDATA_CHART_PRIO_BCACHE_HIT_RATIO           2120
 #define NETDATA_CHART_PRIO_BCACHE_RATES               2121
