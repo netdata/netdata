@@ -123,7 +123,6 @@ with this content:
 
 ```conf
 <VirtualHost *:80>
-	RewriteEngine On
 	ProxyRequests Off
 	ProxyPreserveHost On
 	
