@@ -131,8 +131,8 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
-    ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_CHART,
-                               "Number of requests for files present inside directory cache.",
+    ebpf_create_charts_on_apps(NETDATA_DC_REFERENCE_CHART,
+                               "Count file access.",
                                EBPF_CACHESTAT_DIMENSION_HITS,
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -348,7 +348,7 @@ void ebpf_dcache_send_apps_data(struct target *root)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_CHART);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REFERENCE_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = (collected_number) w->dcstat.curr.cache_access;
@@ -394,7 +394,8 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
     ebpf_one_dimension_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                                     ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
 
-    write_count_chart(NETDATA_DC_REQUEST_CHART, NETDATA_FILESYSTEM_FAMILY,
+    write_count_chart(
+        NETDATA_DC_REFERENCE_CHART, NETDATA_FILESYSTEM_FAMILY,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3);
 }
 
@@ -455,7 +456,7 @@ static void ebpf_create_filesystem_charts()
                       ebpf_create_global_dimension,
                       dcstat_counter_publish_aggregated, 1);
 
-    ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REQUEST_CHART,
+    ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
                       NULL,

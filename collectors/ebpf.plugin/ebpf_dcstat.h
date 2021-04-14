@@ -6,7 +6,7 @@
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"
-#define NETDATA_DC_REQUEST_CHART "dc_reference"
+#define NETDATA_DC_REFERENCE_CHART "dc_reference"
 #define NETDATA_DC_REQUEST_NOT_CACHE_CHART "dc_not_cache"
 #define NETDATA_DC_REQUEST_NOT_FOUND_CHART "dc_not_found"
 
