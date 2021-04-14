@@ -12,7 +12,7 @@
 #include "metadatalogapi.h"
 #include "compaction.h"
 
-/* Forward declerations */
+/* Forward declarations */
 struct metalog_instance;
 struct parser_user_object;
 
