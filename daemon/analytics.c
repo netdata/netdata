@@ -200,7 +200,7 @@ void analytics_log_dashboard(void) {
     }
 }
 
-void analytics_mirrored_hosts( void ) {
+void analytics_mirrored_hosts(void) {
     RRDHOST *host;
     int count = 0;
     int reachable = 0;
@@ -239,7 +239,6 @@ void analytics_exporters (void) {
 }
 
 int collector_counter_callb(void *entry, void *data) {
-
     struct array_printer *ap = (struct array_printer *)data;
     struct collector *col=(struct collector *) entry;
 
@@ -297,7 +296,6 @@ void analytics_collectors(void) {
     }
 
     buffer_free(bt);
-
 }
 
 /*
@@ -361,7 +359,6 @@ void analytics_charts (void) {
         snprintfz(b, 6, "%d", c);
         analytics_set_data (&analytics_data.netdata_charts_count, b);
     }
-
 }
 
 void analytics_metrics (void) {
@@ -415,25 +412,23 @@ void analytics_alarms (void) {
  * Misc attributes to get (run from meta)
  */
 void analytics_misc(void) {
-
 #ifdef ENABLE_ACLK
-    analytics_set_data (&analytics_data.netdata_host_cloud_available, "true");
+    analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
 #ifdef ACLK_NG
-    analytics_set_data_str (&analytics_data.netdata_host_aclk_implementation, "Next Generation");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 #else
-    analytics_set_data_str (&analytics_data.netdata_host_aclk_implementation, "legacy");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
 #endif
 #else
-    analytics_set_data (&analytics_data.netdata_host_cloud_available, "false");
+    analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
 #endif
 
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        analytics_set_data (&analytics_data.netdata_host_aclk_available, "true");
+        analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
     else
 #endif
-        analytics_set_data (&analytics_data.netdata_host_aclk_available, "false");
-
+        analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
 }
 
 /*
@@ -442,7 +437,6 @@ void analytics_misc(void) {
  * don't try to read them on each META event send
  */
 void analytics_gather_immutable_meta_data (void) {
-
     analytics_misc();
     analytics_exporters();
 
@@ -455,7 +449,6 @@ void analytics_gather_immutable_meta_data (void) {
  * try to read them on each META event send
  */
 void analytics_gather_mutable_meta_data (void) {
-
     rrdhost_rdlock(localhost); //can we avoid the lock?
 
     analytics_collectors();
@@ -490,7 +483,7 @@ void analytics_gather_mutable_meta_data (void) {
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data (&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 6, "%ld", rrd_hosts_available);
+        snprintfz(b, 6, "%zu", rrd_hosts_available);
         analytics_set_data (&analytics_data.netdata_config_hosts_available, b);
     }
 

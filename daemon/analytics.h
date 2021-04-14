@@ -69,15 +69,15 @@ struct analytics_data {
 
 extern void *analytics_main(void *ptr);
 extern void analytics_get_data(char *name, BUFFER *wb);
-extern void set_late_global_environment();
-extern void analytics_free_data();
-extern void set_global_environment();
-extern void send_statistics( const char *action, const char *action_result, const char *action_data);
-extern void analytics_log_shell();
-extern void analytics_log_json();
-extern void analytics_log_prometheus();
-extern void analytics_log_dashboard();
-extern void analytics_gather_mutable_meta_data();
+extern void set_late_global_environment(void);
+extern void analytics_free_data(void);
+extern void set_global_environment(void);
+extern void send_statistics(const char *action, const char *action_result, const char *action_data);
+extern void analytics_log_shell(void);
+extern void analytics_log_json(void);
+extern void analytics_log_prometheus(void);
+extern void analytics_log_dashboard(void);
+extern void analytics_gather_mutable_meta_data(void);
 
 extern struct analytics_data analytics_data;
 
