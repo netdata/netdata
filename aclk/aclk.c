@@ -121,7 +121,7 @@ static int wait_till_agent_claimed(void)
  * agent claimed, cloud url set and private key available
  * 
  * @param aclk_hostname points to location where string pointer to hostname will be set
- * @param ackl_port port to int where port will be saved
+ * @param aclk_port port to int where port will be saved
  * 
  * @return If non 0 returned irrecoverable error happened and ACLK should be terminated
  */
