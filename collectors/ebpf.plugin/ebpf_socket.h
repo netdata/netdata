@@ -24,9 +24,9 @@
 #define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
 #define EBPF_CONFIG_PORTS "ports"
 #define EBPF_CONFIG_HOSTNAMES "hostnames"
-#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection size"
-#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection size"
-#define EBPF_CONFIG_UDP_SIZE "udp connection size"
+#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
+#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_UDP_SIZE "udp connection table size"
 #define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
 
 enum ebpf_socket_table_list {
