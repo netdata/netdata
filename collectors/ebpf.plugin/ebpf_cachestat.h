@@ -52,7 +52,7 @@ enum cachestat_indexes {
     NETDATA_CACHESTAT_IDX_MISS
 };
 
-enum cachesta_tables {
+enum cachestat_tables {
     NETDATA_CACHESTAT_GLOBAL_STATS,
     NETDATA_CACHESTAT_PID_STATS
 };
