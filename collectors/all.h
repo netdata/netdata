@@ -284,8 +284,8 @@
 #define NETDATA_CHART_PRIO_TC_QOS                     7000
 #define NETDATA_CHART_PRIO_TC_QOS_PACKETS             7010
 #define NETDATA_CHART_PRIO_TC_QOS_DROPPED             7020
-#define NETDATA_CHART_PRIO_TC_QOS_TOCKENS             7030
-#define NETDATA_CHART_PRIO_TC_QOS_CTOCKENS            7040
+#define NETDATA_CHART_PRIO_TC_QOS_TOKENS              7030
+#define NETDATA_CHART_PRIO_TC_QOS_CTOKENS             7040
 
 // Infiniband
 #define NETDATA_CHART_PRIO_INFINIBAND                 7100

@@ -9,7 +9,7 @@
 // Hardware counters
 #define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8800
 #define NETDATA_CHART_PRIO_PERF_INSTRUCTIONS          8801
-#define NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS   8802
+#define NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUCTIONS   8802
 #define NETDATA_CHART_PRIO_PERF_CACHE                 8803
 #define NETDATA_CHART_PRIO_PERF_BUS_CYCLES            8804
 #define NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES     8805
@@ -443,7 +443,7 @@ static void perf_send_metrics() {
 
                // Software counters
                migrations_chart_generated = 0,
-               alighnment_chart_generated = 0,
+               alignment_chart_generated = 0,
                emulation_chart_generated = 0,
 
                // Hardware cache counters
@@ -535,7 +535,7 @@ static void perf_send_metrics() {
                    , RRD_TYPE_PERF
                    , "branch_instructions"
                    , RRD_FAMILY_HW
-                   , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS
+                   , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUCTIONS
                    , update_every
                    , PLUGIN_PERF_NAME
             );
@@ -708,12 +708,12 @@ static void perf_send_metrics() {
     // ------------------------------------------------------------------------
 
     if(likely(perf_events[EV_ID_ALIGNMENT_FAULTS].updated)) {
-        if(unlikely(!alighnment_chart_generated)) {
-            alighnment_chart_generated = 1;
+        if(unlikely(!alignment_chart_generated)) {
+            alignment_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Alighnment faults' 'faults' %s '' line %d %d %s\n"
+            printf("CHART %s.%s '' 'Alignment faults' 'faults' %s '' line %d %d %s\n"
                    , RRD_TYPE_PERF
-                   , "alighnment_faults"
+                   , "alignment_faults"
                    , RRD_FAMILY_SW
                    , NETDATA_CHART_PRIO_PERF_ALIGNMENT
                    , update_every
@@ -725,7 +725,7 @@ static void perf_send_metrics() {
         printf(
                "BEGIN %s.%s\n"
                , RRD_TYPE_PERF
-               , "alighnment_faults"
+               , "alignment_faults"
         );
         printf(
                "SET %s = %lld\n"
@@ -1140,7 +1140,7 @@ void parse_command_line(int argc, char **argv) {
             plugin_enabled = 1;
             continue;
         }
-        else if(strcmp("alighnment", argv[i]) == 0) {
+        else if(strcmp("alignment", argv[i]) == 0) {
             perf_events[EV_ID_ALIGNMENT_FAULTS].disabled = 0;
             plugin_enabled = 1;
             continue;
@@ -1231,7 +1231,7 @@ void parse_command_line(int argc, char **argv) {
                     "\n"
                     "  migrations              enable CPU migrations chart\n"
                     "\n"
-                    "  alighnment              enable Alignment faults chart\n"
+                    "  alignment               enable Alignment faults chart\n"
                     "\n"
                     "  emulation               enable Emulation faults chart\n"
                     "\n"

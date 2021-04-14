@@ -209,7 +209,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
             continue;
         }
 
-        // find the id in the linked list or create a new stucture
+        // find the id in the linked list or create a new structure
         int found = 0;
 
         unsigned long long id = str2ull(procfile_lineword(ff, l, 1));

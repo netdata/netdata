@@ -464,7 +464,7 @@ static void ebpf_process_update_apps_data()
  * @param family the chart family
  * @param name   the chart name
  * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashaboard
+ * @param web    the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  * @param algorithm the algorithm used to make the charts.
  */
@@ -494,7 +494,7 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
  * @param family the chart family
  * @param name   the chart name
  * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashaboard
+ * @param web    the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  */
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
