@@ -213,10 +213,10 @@ You can also find Netdata on:
 
 Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
-- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook). In there, you will find all the information you need to contribute to the Netdata Agent, from improving our documentation to engaging in the community and development. We have made efforts to make it as frictionless as possible, but if you need help, just ping us on our community forums!
-- We have a whole category dedicated to contributing and extending the Netdata Agent on our [community forums](https://community.netdata.cloud/c/agent-development/9)
-- You have found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2C+needs+triage&template=bug_report.md).
-- View our [Security Policy](https://github.com/netdata/netdata/security/policy)
+- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
+- We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2C+needs+triage&template=bug_report.md).
+- View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from source and preparing a package.
