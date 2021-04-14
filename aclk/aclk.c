@@ -303,7 +303,7 @@ static int read_query_thread_count()
 
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
-/* Keeps connection alive and handles all network comms.
+/* Keeps connection alive and handles all network communications.
  * Returns on error or when netdata is shutting down.
  * @param client instance of mqtt_wss_client
  * @returns  0 - Netdata Exits
