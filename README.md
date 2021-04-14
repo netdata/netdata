@@ -195,7 +195,7 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## Community
 
-Netdata is striving to be an all inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
 
 You can find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
 ask questions, find resources, and engage with passionate professionals.
@@ -235,4 +235,3 @@ _When people first hear about a new product, they frequently ask if it is any go
 
 > Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
 > the answer shall be “yes.".
-
