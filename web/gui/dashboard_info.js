@@ -595,6 +595,18 @@ netdataDashboard.menu = {
         info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
         'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
     },
+
+    'systemdunits': {
+        title: 'systemd units',
+        icon: '<i class="fas fa-cogs"></i>',
+        info: '<b>systemd</b> provides a dependency system between various entities called "units" of 11 different types. ' +
+        'Units encapsulate various objects that are relevant for system boot-up and maintenance. ' +
+        'Units may be <code>active</code> (meaning started, bound, plugged in, depending on the unit type), ' +
+        'or <code>inactive</code> (meaning stopped, unbound, unplugged), ' +
+        'as well as in the process of being activated or deactivated, i.e. between the two states (these states are called <code>activating</code>, <code>deactivating</code>). ' +
+        'A special <code>failed</code> state is available as well, which is very similar to <code>inactive</code> and is entered when the service failed in some way (process returned error code on exit, or crashed, an operation timed out, or after too many restarts). ' +
+        'For detailes, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.html" target="_blank"> systemd(1)</a>.'
+    },
 };
 
 
@@ -3863,4 +3875,65 @@ netdataDashboard.context = {
         '<code>0</code> - stopped, <code>10</code> - starting, <code>20</code> - running, <code>30</code> - backoff,' +
         '<code>40</code> - stopping, <code>100</code> - exited, <code>200</code> - fatal, <code>1000</code> - unknown.'
     },
+
+    // ------------------------------------------------------------------------
+    // Systemd units
+
+    'systemd.service_units_state': {
+        info: 'Service units start and control daemons and the processes they consist of. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html#" target="_blank"> systemd.service(5)</a>'
+    },
+
+    'systemd.socket_unit_state': {
+        info: 'Socket units encapsulate local IPC or network sockets in the system, useful for socket-based activation. ' +
+        'For details about socket units, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.socket.html#" target="_blank"> systemd.socket(5)</a>, ' +
+        'for details on socket-based activation and other forms of activation, see <a href="https://www.freedesktop.org/software/systemd/man/daemon.html#" target="_blank"> daemon(7)</a>.'
+    },
+
+    'systemd.target_unit_state': {
+        info: 'Target units are useful to group units, or provide well-known synchronization points during boot-up, ' +
+        'see <a href="https://www.freedesktop.org/software/systemd/man/systemd.target.html#" target="_blank"> systemd.target(5)</a>.'
+    },
+
+    'systemd.path_unit_state': {
+        info: 'Path units may be used to activate other services when file system objects change or are modified. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.path.html#" target="_blank"> systemd.path(5)</a>.'
+    },
+
+    'systemd.device_unit_state': {
+        info: 'Device units expose kernel devices in systemd and may be used to implement device-based activation. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.device.html#" target="_blank"> systemd.device(5)</a>.'
+    },
+
+    'systemd.mount_unit_state': {
+        info: 'Mount units control mount points in the file system. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.mount.html#" target="_blank"> systemd.mount(5)</a>.'
+    },
+
+    'systemd.automount_unit_state': {
+        info: 'Automount units provide automount capabilities, for on-demand mounting of file systems as well as parallelized boot-up. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.automount.html#" target="_blank"> systemd.automount(5)</a>.'
+    },
+
+    'systemd.swap_unit_state': {
+        info: 'Swap units are very similar to mount units and encapsulate memory swap partitions or files of the operating system. ' +
+        'They are described in <a href="https://www.freedesktop.org/software/systemd/man/systemd.swap.html#" target="_blank"> systemd.swap(5)</a>.'
+    },
+
+    'systemd.timer_unit_state': {
+        info: 'Timer units are useful for triggering activation of other units based on timers. ' +
+        'You may find details in <a href="https://www.freedesktop.org/software/systemd/man/systemd.timer.html#" target="_blank"> systemd.timer(5)</a>.'
+    },
+
+    'systemd.scope_unit_state': {
+        info: 'Slice units may be used to group units which manage system processes (such as service and scope units) ' +
+        'in a hierarchical tree for resource management purposes. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.scope.html#" target="_blank"> systemd.scope(5)</a>.'
+    },
+
+    'systemd.slice_unit_state': {
+        info: 'Scope units are similar to service units, but manage foreign processes instead of starting them as well. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.slice.html#" target="_blank"> systemd.slice(5)</a>.'
+    },
+
 };
