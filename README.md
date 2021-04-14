@@ -197,7 +197,7 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
 
-You can find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
+Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
 ask questions, find resources, and engage with passionate professionals.
 
 You can also find Netdata on:
