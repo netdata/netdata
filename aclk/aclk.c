@@ -212,7 +212,7 @@ static void msg_callback_old_protocol(const char *topic, const void *msg, size_t
     close(logfd);
 #endif
 
-    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d MSG: \"%s\"", topic, qos, cmsg);
+    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QoS %d MSG: \"%s\"", topic, qos, cmsg);
 
     if (strcmp(cmd_topic, topic))
         error("Received message on unexpected topic %s", topic);
