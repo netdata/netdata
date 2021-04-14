@@ -214,6 +214,10 @@ int is_legacy_child(const char *machine_guid)
     uuid_t uuid;
     char  dbengine_file[FILENAME_MAX+1];
 
+    if (unlikely(!strcmp(machine_guid, "unittest-dbengine") || !strcmp(machine_guid, "dbengine-dataset") ||
+                 !strcmp(machine_guid, "dbengine-stress-test"))) {
+        return 1;
+    }
     if (!uuid_parse(machine_guid, uuid)) {
         uv_fs_t stat_req;
         snprintfz(dbengine_file, FILENAME_MAX, "%s/%s/dbengine", netdata_configured_cache_dir, machine_guid);

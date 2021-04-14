@@ -1,8 +1,7 @@
 <!--
----
 title: "alerta.io"
+description: "Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md
----
 -->
 
 # alerta.io
@@ -30,7 +29,7 @@ The easiest way to install Alerta is to use the Docker image available
 on [Docker hub][1]. Alternatively, follow the ["getting started"][2]
 tutorial to deploy Alerta to an Ubuntu server. More advanced
 configurations are out os scope of this tutorial but information
-about different deployment scenaries can be found in the  [docs][3].
+about different deployment scenarios can be found in the  [docs][3].
 
 [1]: https://hub.docker.com/r/alerta/alerta-web/
 
@@ -87,7 +86,7 @@ We can test alarms using the standard approach:
 
 Note: Netdata will send 3 alarms, and because last alarm is "CLEAR"
 you will not see them in main Alerta page, you need to select to see
-"closed" alarma in top-right lookup. A little change in `alarm-notify.sh`
+"closed" alarm in top-right lookup. A little change in `alarm-notify.sh`
 that let us test each state one by one will be useful.
 
 For more information see <https://docs.alerta.io>

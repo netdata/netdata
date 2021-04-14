@@ -1,6 +1,6 @@
 <!--
 title: Export and visualize Netdata metrics in Graphite 
-description: Use Netdata to collect and export thousands of metrics to Graphite for long-term storage or further analysis.
+description: "Use Netdata to collect and export thousands of metrics to Graphite for long-term storage or further analysis."
 image: /img/seo/guides/export/export-netdata-metrics-graphite.png
 -->
 
@@ -14,7 +14,7 @@ anomalies and discover root causes faster.
 We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can [store metrics in the database engine](/docs/guides/longer-metrics-storage.md),
 or send them to another time series database for long-term storage or further analysis using Netdata's [exporting
-engine](/docs/export/README.md).
+engine](/docs/export/external-databases.md).
 
 In this guide, we'll show you how to export Netdata metrics to [Graphite](https://graphiteapp.org/) for long-term
 storage and further analysis. Graphite is a free open-source software (FOSS) tool that collects graphs numeric
@@ -115,8 +115,8 @@ the port accordingly.
     ...
 ```
 
-We'll not worry about the rest of the settings for now. Restart the Agent using `sudo service netdata restart`, or the
-appropriate method for your system, to spin up the exporting engine.
+We'll not worry about the rest of the settings for now. Restart the Agent using `sudo systemctl restart netdata`, or the
+[appropriate method](/docs/configure/start-stop-restart.md) for your system, to spin up the exporting engine.
 
 ## See and organize Netdata metrics in Graphite
 
@@ -165,9 +165,9 @@ You can also show these exporting engine metrics on Netdata Cloud. If you don't 
 in](https://app.netdata.cloud) and get started for free. If you need some help along the way, read the [get started with
 Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started).
 
-Add more metrics to the Nodes view by clicking on the **Add metric** button, then typing `exporting` into the context
-field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any others
-you've customized in Netdata Cloud.
+Add more metrics to a War Room's Nodes view by clicking on the **Add metric** button, then typing `exporting` into the
+context field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any
+others you've customized in Netdata Cloud.
 
 ![Exporting engine metrics in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/83902769-db139e00-a711-11ea-828e-aa7e32b04c75.png)

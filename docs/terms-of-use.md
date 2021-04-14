@@ -1,8 +1,6 @@
 <!--
----
 title: "Terms of Use"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/terms-of-use.md
----
 -->
 
 # Terms of Use

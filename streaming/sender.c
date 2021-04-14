@@ -116,8 +116,8 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 }
 
 static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
@@ -221,6 +221,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  "&NETDATA_SYSTEM_OS_VERSION=%s"
                  "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
                  "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                 "&NETDATA_HOST_IS_K8S_NODE=%s"
                  "&NETDATA_SYSTEM_KERNEL_NAME=%s"
                  "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
                  "&NETDATA_SYSTEM_ARCHITECTURE=%s"
@@ -257,6 +258,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , se.os_version
                  , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
                  , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
+                 , (host->system_info->is_k8s_node) ? host->system_info->is_k8s_node : ""
                  , se.kernel_name
                  , se.kernel_version
                  , (host->system_info->architecture) ? host->system_info->architecture : ""
@@ -354,8 +356,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
             answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
             if(!answer) {
                 version = 0;
-                host->labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
             }
         }
     }
@@ -448,7 +450,7 @@ void attempt_to_send(struct sender_state *s) {
         s->last_sent_t = now_monotonic_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        debug(D_STREAM, "STREAM %s [send to %s]: unavailable aftering polling POLLOUT", s->host->hostname,
+        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname,
               s->connected_to);
     else if (ret == -1) {
         debug(D_STREAM, "STREAM: Send failed - closing socket...");
@@ -515,7 +517,7 @@ void execute_commands(struct sender_state *s) {
         start = newline+1;
     }
     if (start<end) {
-        memcpy( s->read_buffer, start, end-start);
+        memmove(s->read_buffer, start, end-start);
         s->read_len = end-start;
     }
 }
@@ -584,10 +586,14 @@ void *rrdpush_sender_thread(void *ptr) {
 
     s->timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
     s->default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
-    s->max_size = (size_t)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "buffer size bytes",
-                                                  1024 * 1024);
-    s->reconnect_delay = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
-    remote_clock_resync_iterations = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+    s->buffer->max_size =
+        (size_t)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "buffer size bytes", 1024 * 1024);
+    s->reconnect_delay =
+        (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
+    remote_clock_resync_iterations = (unsigned int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM,
+        "initial clock resync iterations",
+        remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
     // initialize rrdpush globals
     s->host->rrdpush_sender_connected = 0;

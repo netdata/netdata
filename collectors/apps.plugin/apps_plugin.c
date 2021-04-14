@@ -491,7 +491,7 @@ typedef enum fd_filetype {
 } FD_FILETYPE;
 
 struct file_descriptor {
-    avl avl;
+    avl_t avl;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     uint32_t magic;
@@ -508,12 +508,13 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
+        long double currentmaxfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
 
 struct user_or_group_id {
-    avl avl;
+    avl_t avl;
 
     union {
         uid_t uid;
@@ -535,7 +536,7 @@ enum user_or_group_id_type {
 struct user_or_group_ids{
     enum user_or_group_id_type type;
 
-    avl_tree index;
+    avl_tree_type index;
     struct user_or_group_id *root;
 
     char filename[FILENAME_MAX + 1];
@@ -638,7 +639,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         struct user_or_group_id *existing_user_id = NULL;
 
         if(likely(ids->root))
-            existing_user_id = (struct user_or_group_id *)avl_search(&ids->index, (avl *) user_or_group_id);
+            existing_user_id = (struct user_or_group_id *)avl_search(&ids->index, (avl_t *) user_or_group_id);
 
         if(unlikely(existing_user_id)) {
             freez(existing_user_id->name);
@@ -647,7 +648,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
             freez(user_or_group_id);
         }
         else {
-            if(unlikely(avl_insert(&ids->index, (avl *) user_or_group_id) != (void *) user_or_group_id)) {
+            if(unlikely(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id)) {
                 error("INTERNAL ERROR: duplicate indexing of id during realloc");
             };
 
@@ -663,7 +664,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
 
     while(user_or_group_id) {
         if(unlikely(!user_or_group_id->updated)) {
-            if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl *) user_or_group_id) != user_or_group_id))
+            if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl_t *) user_or_group_id) != user_or_group_id))
                 error("INTERNAL ERROR: removal of unused id from index, removed a different id");
 
             if(prev_user_id)
@@ -715,7 +716,7 @@ static struct target *get_users_target(uid_t uid) {
         int ret = read_user_or_group_ids(&all_user_ids, &last_passwd_modification_time);
 
         if(likely(!ret && all_user_ids.index.root))
-                user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl *) &user_id_to_find);
+                user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl_t *) &user_id_to_find);
     }
 
     if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name) {
@@ -763,7 +764,7 @@ struct target *get_groups_target(gid_t gid)
         int ret = read_user_or_group_ids(&all_group_ids, &last_group_modification_time);
 
         if(likely(!ret && all_group_ids.index.root))
-                group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl *) &group_id_to_find);
+                group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl_t *) &group_id_to_find);
     }
 
     if(group_id && group_id->name && *group_id->name) {
@@ -1689,9 +1690,9 @@ int file_descriptor_compare(void* a, void* b) {
         return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
 }
 
-// int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
+// int file_descriptor_iterator(avl_t *a) { if(a) {}; return 0; }
 
-avl_tree all_files_index = {
+avl_tree_type all_files_index = {
         NULL,
         file_descriptor_compare
 };
@@ -1706,11 +1707,11 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
     tmp.magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-    return (struct file_descriptor *)avl_search(&all_files_index, (avl *) &tmp);
+    return (struct file_descriptor *)avl_search(&all_files_index, (avl_t *) &tmp);
 }
 
-#define file_descriptor_add(fd) avl_insert(&all_files_index, (avl *)(fd))
-#define file_descriptor_remove(fd) avl_remove(&all_files_index, (avl *)(fd))
+#define file_descriptor_add(fd) avl_insert(&all_files_index, (avl_t *)(fd))
+#define file_descriptor_remove(fd) avl_remove(&all_files_index, (avl_t *)(fd))
 
 // ----------------------------------------------------------------------------
 
@@ -2998,6 +2999,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
+    long double currentfds = 0;
     size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -3006,10 +3008,15 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
+        currentfds++;
+
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
     }
+
+    if (currentfds >= currentmaxfds)
+        currentmaxfds = currentfds;
 }
 
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
@@ -3607,6 +3614,10 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
+        if (!strcmp("apps", type)){
+            kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
+            fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
+        }
         send_END();
 
         send_BEGIN(type, "sockets", dt);
@@ -3656,13 +3667,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
                 debug_log_int("%s just added - regenerating charts.", w->name);
         }
     }
-
+ 
     // nothing more to show
     if(!newly_added && show_guest_time == show_guest_time_old) return;
 
     // we have something new to show
     // update the charts
-    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
@@ -3718,20 +3729,20 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 #endif
 
-    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (100%% = 1 core)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
-    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
-        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
+        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
@@ -3868,9 +3879,8 @@ static void parse_args(int argc, char **argv)
         }
 
         if(strcmp("debug", argv[i]) == 0) {
-#ifdef NETDATA_INTERNAL_CHECKS
             debug_enabled = 1;
-#else
+#ifndef NETDATA_INTERNAL_CHECKS
             fprintf(stderr, "apps.plugin has been compiled without debugging\n");
 #endif
             continue;
@@ -4184,6 +4194,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
+        currentmaxfds = 0;
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 

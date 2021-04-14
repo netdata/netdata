@@ -80,7 +80,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(unlikely(v->hash == this_hash && !strcmp(v->name, "this"))) {
-        n = (exp->this)?*exp->this:NAN;
+        n = (exp->myself)?*exp->myself:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
@@ -296,7 +296,7 @@ calculated_number eval_abs(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     calculated_number n1 = eval_value(exp, &op->ops[0], error);
     if(isnan(n1)) return NAN;
     if(isinf(n1)) return INFINITY;
-    return abs(n1);
+    return ABS(n1);
 }
 calculated_number eval_if_then_else(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     if(is_true(eval_value(exp, &op->ops[0], error)))

@@ -7,7 +7,7 @@
 
 set -e
 
-DOCKER_CONTAINER_NAME="netdata-package-x86_64-static-alpine37"
+DOCKER_CONTAINER_NAME="netdata-package-x86_64-static-alpine312"
 
 if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # To run interactively:
@@ -23,7 +23,7 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # inside the container and runs the script install-alpine-packages.sh
   # (also inside the container)
   #
-  run docker run -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.7 \
+  run docker run -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.12 \
     /bin/sh /usr/src/netdata.git/packaging/makeself/install-alpine-packages.sh
 
   # save the changes made permanently

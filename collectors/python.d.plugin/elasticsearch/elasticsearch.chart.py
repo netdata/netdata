@@ -245,7 +245,7 @@ CHARTS = {
                     'elastic.index_translog_operations', 'area'],
         'lines': [
             ['indices_translog_operations', 'total', 'absolute'],
-            ['indices_translog_uncommitted_operations', 'uncommited', 'absolute']
+            ['indices_translog_uncommitted_operations', 'uncommitted', 'absolute']
         ]
     },
     'index_translog_size': {
@@ -253,7 +253,7 @@ CHARTS = {
                     'elastic.index_translog_size', 'area'],
         'lines': [
             ['indices_translog_size_in_bytes', 'total', 'absolute', 1, 1048567],
-            ['indices_translog_uncommitted_size_in_bytes', 'uncommited', 'absolute', 1, 1048567]
+            ['indices_translog_uncommitted_size_in_bytes', 'uncommitted', 'absolute', 1, 1048567]
         ]
     },
     'index_segments_count': {
@@ -295,7 +295,7 @@ CHARTS = {
         'options': [None, 'JVM Heap Commit And Usage', 'MiB', 'memory usage and gc',
                     'elastic.jvm_heap_bytes', 'area'],
         'lines': [
-            ['jvm_mem_heap_committed_in_bytes', 'commited', 'absolute', 1, 1048576],
+            ['jvm_mem_heap_committed_in_bytes', 'committed', 'absolute', 1, 1048576],
             ['jvm_mem_heap_used_in_bytes', 'used', 'absolute', 1, 1048576]
         ]
     },

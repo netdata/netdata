@@ -1,8 +1,6 @@
 <!--
----
 title: "freeipmi.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/freeipmi.plugin/README.md
----
 -->
 
 # freeipmi.plugin
@@ -27,7 +25,7 @@ The plugin creates (up to) 8 charts, based on the information collected from IPM
 
 1.  number of sensors by state
 2.  number of events in SEL
-3.  Temperatures CELCIUS
+3.  Temperatures CELSIUS
 4.  Temperatures FAHRENHEIT
 5.  Voltages
 6.  Currents
@@ -47,7 +45,7 @@ The plugin does a speed test when it starts, to find out the duration needed by 
 
 The plugin supports a few options. To see them, run:
 
-```sh
+```text
 # /usr/libexec/netdata/plugins.d/freeipmi.plugin -h
 
  netdata freeipmi.plugin 1.8.0-546-g72ce5d6b_rolling
@@ -73,6 +71,8 @@ The plugin supports a few options. To see them, run:
   username USER
   password PASS           connect to remote IPMI host
                           default: local IPMI processor
+
+  noauthcodecheck         don't check the authentication codes returned
 
   driver-type IPMIDRIVER
                           Specify the driver type to use instead of doing an auto selection. 

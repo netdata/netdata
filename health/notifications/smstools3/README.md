@@ -1,8 +1,6 @@
 <!--
----
 title: "SMS Server Tools 3"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/smstools3/README.md
----
 -->
 
 # SMS Server Tools 3

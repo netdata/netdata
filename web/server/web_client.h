@@ -64,6 +64,8 @@ typedef enum web_client_flags {
     WEB_CLIENT_FLAG_UNIX_CLIENT = 1 << 8, // if set, the client is using a UNIX socket
 
     WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET = 1 << 9, // don't close the socket when cleaning up (static-threaded web server)
+
+    WEB_CLIENT_CHUNKED_TRANSFER = 1 << 10, // chunked transfer (used with zlib compression)
 } WEB_CLIENT_FLAGS;
 
 //#ifdef HAVE_C___ATOMIC
@@ -209,6 +211,7 @@ extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 extern int mysendfile(struct web_client *w, char *filename);
 
 extern void web_client_build_http_header(struct web_client *w);
+extern char *strip_control_characters(char *url);
 
 #include "daemon/common.h"
 

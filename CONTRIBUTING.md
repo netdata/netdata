@@ -1,8 +1,7 @@
 <!--
----
 title: "Contributing"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/CONTRIBUTING.md
----
+sidebar_label: "Contributing handbook"
 -->
 
 # Contributing
@@ -233,10 +232,10 @@ The body of the commit message should be a short description of the work, prefer
 
 ### PR approval process
 
-Each PR automatically [requires a review](https://help.github.com/articles/about-required-reviews-for-pull-requests/) from the code owners specified in `.github/CODEOWNERS`. Depending on the files contained in your PR, several people may be need to approve it.
+Each PR automatically [requires a review](https://help.github.com/articles/about-required-reviews-for-pull-requests/) from the code owners specified in `.github/CODEOWNERS`. Depending on the files contained in your PR, several people may be needed to approve it.
 
 We also have a series of automated checks running, such as linters to check code quality and QA tests. If you get an error or warning in any of those checks, you will need to click on the link included in the check to identify the root cause, so you can fix it.
 
-One special type of automated check is the "WIP" check. You may add "[WIP]" to the title of the PR, to tell us that the particular request is "Work In Progress" and should not be merged. You're still not done with it, you created it to get some feedback. When you're ready to get the final approvals and get it merged, just remove the "[WIP]" string from the title of your PR and the "WIP" check will pass.
+If you wish to open a PR but are not quite ready for the code to be reviewed, you can open it as a Draft PR (click the dropdown on the **Create PR** button and select **Draft PR**). This will prevent reviewers from being notified initially so that you can keep working on the PR. Once you're ready, you can click the **Ready for Review** button near the bottom of the PR to mark it ready and notify the relevant reviewers.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTING&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -161,10 +161,10 @@ jobs:
     address : 203.0.113.10:2182
 ```
 
-Finally, restart Netdata.
+Finally, [restart Netdata](/docs/configure/start-stop-restart.md).
 
 ```sh
-sudo service restart netdata
+sudo systemctl restart netdata
 ```
 
 Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the HDFS and Zookeeper modules, and begin

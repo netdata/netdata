@@ -23,20 +23,22 @@ ORDER = [
 
 CHARTS = {
     'ld_status': {
-        'options': [None, 'Status Is Not OK', 'bool', 'logical devices', 'adapter_raid.ld_status', 'line'],
+        'options': [None, 'Status of logical devices (1: Failed or Degraded)', 'bool', 'logical devices',
+                    'adaptec_raid.ld_status', 'line'],
         'lines': []
     },
     'pd_state': {
-        'options': [None, 'State Is Not OK', 'bool', 'physical devices', 'adapter_raid.pd_state', 'line'],
+        'options': [None, 'State of physical devices (1: not Online)', 'bool', 'physical devices',
+                    'adaptec_raid.pd_state', 'line'],
         'lines': []
     },
     'pd_smart_warnings': {
         'options': [None, 'S.M.A.R.T warnings', 'count', 'physical devices',
-                    'adapter_raid.smart_warnings', 'line'],
+                    'adaptec_raid.smart_warnings', 'line'],
         'lines': []
     },
     'pd_temperature': {
-        'options': [None, 'Temperature', 'celsius', 'physical devices', 'adapter_raid.temperature', 'line'],
+        'options': [None, 'Temperature', 'celsius', 'physical devices', 'adaptec_raid.temperature', 'line'],
         'lines': []
     },
 }

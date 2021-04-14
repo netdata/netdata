@@ -5,7 +5,7 @@
 
 #include "web/api/queries/rrdr.h"
 
-extern void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines);
+extern void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines, RRDDIM *temp_rd);
 
 #include "../rrd2json.h"
 

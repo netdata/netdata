@@ -45,7 +45,7 @@ This module will produce following charts (if data is available):
     -   cache hits
     -   replace
 
-4.  **Handlerse** in handlers/s
+4.  **Handlers** in handlers/s
 
     -   commit
     -   delete
@@ -67,7 +67,7 @@ This module will produce following charts (if data is available):
     -   immediate
     -   waited
 
-6.  **Table Select Join Issuess** in joins/s
+6.  **Table Select Join Issues** in joins/s
 
     -   full join
     -   full range join
@@ -75,7 +75,7 @@ This module will produce following charts (if data is available):
     -   range check
     -   scan
 
-7.  **Table Sort Issuess** in joins/s
+7.  **Table Sort Issues** in joins/s
 
     -   merge passes
     -   range
@@ -164,7 +164,7 @@ This module will produce following charts (if data is available):
     -   updated
     -   deleted
 
-24. **InnoDB Buffer Pool Pagess** in pages
+24. **InnoDB Buffer Pool Pages** in pages
 
     -   data
     -   dirty
@@ -336,8 +336,8 @@ This module will produce following charts (if data is available):
 
 ## Configuration
 
-Edit the `python.d/mysql.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/mysql.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

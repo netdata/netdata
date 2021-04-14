@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "buildinfo.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -28,6 +29,10 @@ void netdata_cleanup_and_exit(int ret) {
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
 
+    char agent_crash_file[FILENAME_MAX + 1];
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    (void) unlink(agent_crash_file);
+
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
@@ -49,6 +54,7 @@ void netdata_cleanup_and_exit(int ret) {
         rrdeng_exit(&multidb_ctx);
 #endif
     }
+    sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
@@ -59,9 +65,6 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_HTTPS
     security_clean_openssl();
-#endif
-#ifdef ENABLE_DBENGINE
-    free_global_guid_map();
 #endif
     info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
@@ -76,13 +79,14 @@ struct netdata_static_thread static_threads[] = {
     // linux internal plugins
     NETDATA_PLUGIN_HOOK_LINUX_PROC
     NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
+    NETDATA_PLUGIN_HOOK_LINUX_TIMEX
     NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
     NETDATA_PLUGIN_HOOK_LINUX_TC
 
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
-#ifdef ENABLE_ACLK
+#if defined(ENABLE_ACLK) || defined(ACLK_NG)
     NETDATA_ACLK_HOOK
 #endif
 
@@ -917,7 +921,7 @@ int main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
-    // parse depercated options
+    // parse deprecated options
     // TODO: Remove this block with the next major release.
     {
         i = 1;
@@ -1103,21 +1107,21 @@ int main(int argc, char **argv) {
                                 return 1;
                             }
 
-                            const char *heystack = argv[optind];
+                            const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
                             char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(heystack, NULL, SIMPLE_PATTERN_EXACT);
+                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT);
                             int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
                             if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {
-                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 1;
                             }
                         }
@@ -1254,6 +1258,15 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
                             /* will trigger a claiming attempt when the agent is initialized */
                             claiming_pending_arguments = optarg + strlen(claim_string);
+                        }
+                        else if(strcmp(optarg, "buildinfo") == 0) {
+                            printf("Version: %s %s\n", program_name, program_version);
+                            print_build_info();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "buildinfojson") == 0) {
+                            print_build_info_json();
+                            return 0;
                         }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
@@ -1425,7 +1438,7 @@ int main(int argc, char **argv) {
 
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
-    // initialyze internal registry
+    // initialize internal registry
     registry_init();
     // fork the spawn server
     spawn_init();
@@ -1445,11 +1458,16 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
-#ifdef ENABLE_DBENGINE
-    init_global_guid_map();
-#endif
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    char agent_crash_file[FILENAME_MAX + 1];
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    int crash_detected = (unlink(agent_crash_file) == 0);
+    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+    if (fd >= 0)
+        close(fd);
+
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
@@ -1465,10 +1483,6 @@ int main(int argc, char **argv) {
 
     // Load host labels
     reload_host_labels();
-#ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        metalog_commit_update_host(localhost);
-#endif
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -1497,6 +1511,8 @@ int main(int argc, char **argv) {
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
+    if (crash_detected)
+        send_statistics("CRASH", "-", "-");
 
     // ------------------------------------------------------------------------
     // Report ACLK build failure

@@ -12,7 +12,7 @@ struct engine *__wrap_read_exporting_config()
 struct engine *__mock_read_exporting_config()
 {
     struct engine *engine = calloc(1, sizeof(struct engine));
-    engine->config.hostname = strdupz("test-host");
+    engine->config.hostname = strdupz("test_engine_host");
     engine->config.update_every = 3;
 
 
@@ -23,6 +23,7 @@ struct engine *__mock_read_exporting_config()
     instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
     instance->config.prefix = strdupz("netdata");
+    instance->config.hostname = strdupz("test-host");
     instance->config.update_every = 1;
     instance->config.buffer_on_failures = 10;
     instance->config.timeoutms = 10000;
@@ -162,6 +163,13 @@ int __mock_end_host_formatting(struct instance *instance, RRDHOST *host)
 }
 
 int __mock_end_batch_formatting(struct instance *instance)
+{
+    function_called();
+    check_expected_ptr(instance);
+    return mock_type(int);
+}
+
+int __wrap_simple_connector_end_batch(struct instance *instance)
 {
     function_called();
     check_expected_ptr(instance);

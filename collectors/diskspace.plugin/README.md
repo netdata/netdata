@@ -1,8 +1,7 @@
 <!--
----
 title: "diskspace.plugin"
+description: "Monitor the disk usage space of mounted disks in real-time with the Netdata Agent, plus preconfigured alarms for disks at risk of filling up."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/diskspace.plugin/README.md
----
 -->
 
 # diskspace.plugin
@@ -26,7 +25,7 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
     # update every = 1
     # check for new mount points every = 15
     # exclude space metrics on paths = /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*
-    # exclude space metrics on filesystems = *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl
+    # exclude space metrics on filesystems = *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs
     # space usage for all disks = auto
     # inodes usage for all disks = auto
 ```

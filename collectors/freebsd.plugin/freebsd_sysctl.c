@@ -499,7 +499,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                 "temperature",
                 NULL,
                 "temperature",
-                "cpu.temperatute",
+                "cpu.temperature",
                 "Core temperature",
                 "Celsius",
                 "freebsd.plugin",

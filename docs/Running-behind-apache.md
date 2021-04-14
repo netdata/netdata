@@ -1,37 +1,35 @@
 <!--
----
 title: "Netdata via apache's mod_proxy"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md
----
 -->
 
 # Netdata via apache's mod_proxy
 
 Below you can find instructions for configuring an apache server to:
 
-1.  proxy a single Netdata via an HTTP and HTTPS virtual host
-2.  dynamically proxy any number of Netdata servers
-3.  add user authentication
-4.  adjust Netdata settings to get optimal results
+1. Proxy a single Netdata via an HTTP and HTTPS virtual host.
+2. Dynamically proxy any number of Netdata servers.
+3. Add user authentication.
+4. Adjust Netdata settings to get optimal results.
 
 ## Requirements
 
-Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
+Make sure your apache has `mod_proxy` and `mod_proxy_http` installed and enabled.
 
-On debian/ubuntu systems, install them with this: 
+On Debian/Ubuntu systems, install apache, which already includes the two modules, using:
 
 ```sh
 sudo apt-get install apache2
 ```
 
-Also make sure they are enabled:
+Enable them:
 
 ```sh
 sudo a2enmod proxy
 sudo a2enmod proxy_http
 ```
 
-Ensure your rewrite module is enabled:
+Also, enable the rewrite module:
 
 ```sh
 sudo a2enmod rewrite
@@ -125,7 +123,6 @@ with this content:
 
 ```conf
 <VirtualHost *:80>
-	RewriteEngine On
 	ProxyRequests Off
 	ProxyPreserveHost On
 	
@@ -169,7 +166,7 @@ Repeat the operation for as many servers as you need.
 
 If you wish to add an authentication (user/password) to access your Netdata, do these:
 
-Install the package `apache2-utils`. On debian / ubuntu run `sudo apt-get install apache2-utils`.
+Install the package `apache2-utils`. On Debian/Ubuntu run `sudo apt-get install apache2-utils`.
 
 Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htpasswd netdata`
 
@@ -257,9 +254,8 @@ errors while accessing the dashboard.
 DOSPageCount 30
 ```
 
-Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
+Restart Apache with `sudo systemctl restart apache2`, or the appropriate method to restart services on your system, to
 reload its configuration with your new values.
-
 
 ### Virtual host
 
@@ -367,7 +363,7 @@ apache logs accesses and Netdata logs them too. You can prevent Netdata from gen
 
 ## Troubleshooting mod_proxy
 
-Make sure the requests reach Netdata, by examing `/var/log/netdata/access.log`.
+Make sure the requests reach Netdata, by examining `/var/log/netdata/access.log`.
 
 1.  if the requests do not reach Netdata, your apache does not forward them.
 2.  if the requests reach Netdata but the URLs are wrong, you have not re-written them properly.

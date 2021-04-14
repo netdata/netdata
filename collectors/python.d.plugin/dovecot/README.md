@@ -38,8 +38,8 @@ Module gives information with following charts:
 
 5.  **Context Switches**
 
-    -   volountary
-    -   involountary
+    -   voluntary
+    -   involuntary
 
 6.  **disk** in bytes/s
 
@@ -77,11 +77,11 @@ Module gives information with following charts:
 
 ## Configuration
 
-Edit the `python.d/dovecot.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/dovecot.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d/dovecot.conf
 ```
 

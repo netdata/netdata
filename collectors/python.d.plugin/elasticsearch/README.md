@@ -66,11 +66,11 @@ It produces:
 
 ## Configuration
 
-Edit the `python.d/elasticsearch.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/elasticsearch.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory, if different, if different
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d/elasticsearch.conf
 ```
 
@@ -80,6 +80,7 @@ Sample:
 local:
   host               : 'ipaddress'    # Elasticsearch server ip address or hostname.
   port               : 'port'         # Port on which elasticsearch listens.
+  scheme             : 'http'         # URL scheme. Use 'https' if your elasticsearch uses TLS.
   node_status        :  yes/no        # Get metrics from "/_nodes/_local/stats". Enabled by default.
   cluster_health     :  yes/no        # Get metrics from "/_cluster/health". Enabled by default.
   cluster_stats      :  yes/no        # Get metrics from "'/_cluster/stats". Enabled by default.

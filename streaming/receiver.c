@@ -30,7 +30,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
-        // the host pointer as it is unpredicable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
+        // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
             rpt->exited = 1;
             return;
@@ -123,14 +123,14 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     if(strcmp(words[1], host->machine_guid)) {
         error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewehere else
+        return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
-    netdata_mutex_lock(&host->claimed_id_lock);
-    if (host->claimed_id)
-        freez(host->claimed_id);
-    host->claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
-    netdata_mutex_unlock(&host->claimed_id_lock);
+    rrdhost_aclk_state_lock(host);
+    if (host->aclk_state.claimed_id)
+        freez(host->aclk_state.claimed_id);
+    host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+    rrdhost_aclk_state_unlock(host);
 
     rrdpush_claimed_id(host);
 
@@ -181,7 +181,7 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
         r->read_buffer[scan] = 0;
         return &r->read_buffer[start];
     }
-    memcpy(r->read_buffer, &r->read_buffer[start], r->read_len - start);
+    memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
     r->read_len -= start;
     return NULL;
 }
@@ -261,6 +261,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(mode)));
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "memory mode", rrd_memory_mode_name(mode)));
 
+#ifndef ENABLE_DBENGINE
+    if (unlikely(mode == RRD_MEMORY_MODE_DBENGINE)) {
+        close(rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "REJECTED -- DBENGINE MEMORY MODE NOT SUPPORTED");
+        return 1;
+    }
+#endif
+
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->machine_guid, "health enabled", health_enabled);
 
@@ -279,8 +287,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rrdpush_send_charts_matching);
     rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
 
-    rpt->tags = (char*)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-    if(rpt->tags && !*rpt->tags) rpt->tags = NULL;
+    (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
@@ -422,7 +429,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 */
 
 //    rpt->host->connected_senders++;
-    rpt->host->labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
+    rpt->host->labels.labels_flag = (rpt->stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
@@ -441,6 +448,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
+#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+    // in case we have cloud connection we inform cloud
+    // new slave connected
+    if (netdata_cloud_setting)
+        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_CONNECT);
+#endif
 
     size_t count = streaming_parser(rpt, &cd, fp);
 
@@ -448,6 +461,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
                           "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
+
+#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+    // in case we have cloud connection we inform cloud
+    // new slave connected
+    if (netdata_cloud_setting)
+        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_DISCONNECT);
+#endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {

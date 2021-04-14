@@ -66,18 +66,18 @@
 #include "claim/claim.h"
 
 // netdata agent cloud link
-#include "aclk/agent_cloud_link.h"
+#ifndef ACLK_NG
+#include "aclk/legacy/agent_cloud_link.h"
+#else
+#include "aclk/aclk.h"
+#endif
 
 // global GUID map functions
 
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
-#ifdef ENABLE_DBENGINE
-#include "database/engine/global_uuid_map/global_uuid_map.h"
-#endif
-
-// the netdata deamon
+// the netdata daemon
 #include "daemon.h"
 #include "main.h"
 #include "signals.h"

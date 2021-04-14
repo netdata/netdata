@@ -1,8 +1,7 @@
 <!--
----
 title: "Install Netdata with kickstart.sh"
+description: "The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md
----
 -->
 
 # Install Netdata with kickstart.sh
@@ -57,19 +56,24 @@ installation. Here are a few important parameters:
 
 ## Verify script integrity
 
-To use `md5sum` to verify the intregity of the `kickstart.sh` script you will download using the one-line command above,
+To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
 run the following:
 
 ```bash
-[ "794498f7009012116aafe466d8f544ae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "a708de3790fa39188babe71eb1639c66" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
-a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](/docs/getting-started.md) for a quick overview.
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fkickstart&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

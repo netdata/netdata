@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata via lighttpd v1.4.x"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md
----
 -->
 
 # Netdata via lighttpd v1.4.x

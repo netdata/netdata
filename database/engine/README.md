@@ -44,9 +44,9 @@ section for details.
 
 The `dbengine multihost disk space` option determines the amount of disk space in **MiB** that is dedicated to storing
 Netdata metric values and all related metadata describing them. You can use the [**database engine
-calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) to correctly set `dbengine multihost disk
-space` based on your metrics retention policy. The calculator gives an accurate estimate based on how many child nodes
-you have, how many metrics your Agent collects, and more.
+calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+to correctly set `dbengine multihost disk space` based on your metrics retention policy. The calculator gives an
+accurate estimate based on how many child nodes you have, how many metrics your Agent collects, and more.
 
 ### Legacy configuration
 
@@ -62,9 +62,9 @@ Netdata metric values per legacy database engine instance (see [details on the l
 
 When using the multihost database engine, all parent and child nodes share the same `page cache size` and `dbengine
 multihost disk space` in a single dbengine instance. The [**database engine
-calculator**](https://learn.netdata.cloud/docs/agent/database/calculator) helps you properly set `page cache size` and
-`dbengine multihost disk space` on your parent node to allocate enough resources based on your metrics retention policy
-and how many child nodes you have.
+calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+helps you properly set `page cache size` and `dbengine multihost disk space` on your parent node to allocate enough
+resources based on your metrics retention policy and how many child nodes you have.
 
 #### Legacy mode
 
@@ -111,8 +111,9 @@ There are explicit memory requirements **per** DB engine **instance**:
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine multihost disk space`
 options.
 
-You can use our [database engine calculator](https://learn.netdata.cloud/docs/agent/database/calculator) to
-validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
+You can use our [database engine
+calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-RAM-disk-space-needed-to-store-metrics)
+to validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
 
 ### Disk space requirements
 

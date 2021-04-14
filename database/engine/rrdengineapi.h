@@ -43,7 +43,7 @@ extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_n
 extern int rrdeng_store_metric_finalize(RRDDIM *rd);
 extern unsigned
     rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
-                                    struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp);
+                                    struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp, struct context_param *context_param_list);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time);
 extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time);
@@ -59,5 +59,6 @@ extern int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *db
 
 extern int rrdeng_exit(struct rrdengine_instance *ctx);
 extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
+extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

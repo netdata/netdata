@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf.h"
+#include "ebpf_socket.h"
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
@@ -264,7 +265,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  * @param path the directory to search apps_%s.conf
  * @param file the word to complement the file name.
  *
- * @return It returns 0 on succcess and -1 otherwise
+ * @return It returns 0 on success and -1 otherwise
  */
 int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
 {
@@ -469,7 +470,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
 /**
  * Get PID entry
  *
- * Get or allocate the PID entry for the specifid pid.
+ * Get or allocate the PID entry for the specified pid.
  *
  * @param pid the pid to search the data.
  *
@@ -663,7 +664,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
  * @param pid the current pid that we are working
  * @param ptr a NULL value
  *
- * @return It returns 1 on succcess and 0 otherwise
+ * @return It returns 1 on success and 0 otherwise
  */
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
@@ -909,11 +910,29 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
- * Remove PIDs when they are not running more.
+ * Cleanup variable from other threads
  *
- * @param out is the structure where PIDs are stored.
+ * @param pid current pid.
  */
-void cleanup_exited_pids(ebpf_process_stat_t **out)
+void cleanup_variables_from_other_threads(uint32_t pid)
+{
+    // Clean socket structures
+    if (socket_bandwidth_curr) {
+        freez(socket_bandwidth_curr[pid]);
+        socket_bandwidth_curr[pid] = NULL;
+    }
+
+    // Clean cachestat strcture
+    if (cachestat_pid) {
+        freez(cachestat_pid[pid]);
+        cachestat_pid[pid] = NULL;
+    }
+}
+
+/**
+ * Remove PIDs when they are not running more.
+ */
+void cleanup_exited_pids()
 {
     struct pid_stat *p = NULL;
 
@@ -924,13 +943,17 @@ void cleanup_exited_pids(ebpf_process_stat_t **out)
 
             pid_t r = p->pid;
             p = p->next;
-            del_pid_entry(r);
 
-            ebpf_process_stat_t *w = out[r];
-            if (w) {
-                freez(w);
-                out[r] = NULL;
-            }
+            // Clean process structure
+            freez(global_process_stats[r]);
+            global_process_stats[r] = NULL;
+
+            freez(current_apps_data[r]);
+            current_apps_data[r] = NULL;
+
+            cleanup_variables_from_other_threads(r);
+
+            del_pid_entry(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1007,12 +1030,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
  * Read data from hash table and store it in appropriate vectors.
  * It also creates the link between targets and PIDs.
  *
- * @param out                   the output vector where we store data read from hash table.
- * @param index                 the vector to store the indexes read.
- * @param bpf_map_lookup_elem   A pointer to the function that reads the data.
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  */
-void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int tbl_pid_stats_fd)
+void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
     struct pid_stat *pids = root_of_pids; // global list of all processes running
     while (pids) {
@@ -1032,25 +1052,30 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
 
     read_proc_filesystem();
 
-    int counter = 0;
     uint32_t key;
     pids = root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
-        ebpf_process_stat_t *w = out[key];
+        ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
             w = mallocz(sizeof(ebpf_process_stat_t));
-            out[key] = w;
+            global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
+            // Clean Process structures
+            freez(w);
+            global_process_stats[key] = NULL;
+
+            freez(current_apps_data[key]);
+            current_apps_data[key] = NULL;
+
+            cleanup_variables_from_other_threads(key);
+
             pids = pids->next;
             continue;
         }
-
-        index[counter] = key;
-        counter++;
 
         pids = pids->next;
     }
@@ -1062,11 +1087,9 @@ void collect_data_for_all_processes(ebpf_process_stat_t **out, pid_t *index, int
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
-    struct pid_stat *p = NULL;
-
     // // concentrate everything on the targets
-    for (p = root_of_pids; p; p = p->next)
-        aggregate_pid_on_target(p->target, p, NULL);
+    for (pids = root_of_pids; pids; pids = pids->next)
+        aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);
 }

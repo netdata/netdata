@@ -1,8 +1,6 @@
 <!--
----
 title: "Data structures"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/diagrams/data_structures/README.md
----
 -->
 
 # Data structures

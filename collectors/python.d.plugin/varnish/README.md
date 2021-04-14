@@ -6,8 +6,9 @@ sidebar_label: "Varnish Cache"
 
 # Varnish Cache monitoring with Netdata
 
-Provides HTTP accelerator global, backends (VBE) and disks (SMF) statistics using `varnishstat` tool.
+Provides HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics using `varnishstat` tool.
 
+Note that both, Varnish-Cache (free and open source) and Varnish-Plus (Commercial/Enterprise version), are supported.
 
 ## Requirements
 
@@ -36,14 +37,15 @@ For every backend (VBE):
 
 -   Backend Response Statistics in `kilobits/s`
 
-For every disk (SMF):
+For every storage (SMF, SMA, or MSE):
 
--   Disk Usage in `KiB` 
+-   Storage Usage in `KiB` 
+-   Storage Allocated Objects
 
 ## Configuration
 
-Edit the `python.d/varnish.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/varnish.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

@@ -141,7 +141,7 @@ EOF
 
 release2lsb_release() {
   # loads the given /etc/x-release file
-  # this file is normaly a single line containing something like
+  # this file is normally a single line containing something like
   #
   # X Linux release 1.2.3 (release-name)
   #
@@ -322,8 +322,8 @@ user_picks_distribution() {
   echo >&2 "I found though that the following installers are available:"
   echo >&2
   [ -n "${apt_get}" ] && echo >&2 " - Debian/Ubuntu based (installer is: apt-get)" && opts="apt-get ${opts}"
-  [ -n "${yum}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: yum)" && opts="yum ${opts}"
-  [ -n "${dnf}" ] && echo >&2 " - Redhat/Fedora/Centos based (installer is: dnf)" && opts="dnf ${opts}"
+  [ -n "${yum}" ] && echo >&2 " - Red Hat/Fedora/CentOS based (installer is: yum)" && opts="yum ${opts}"
+  [ -n "${dnf}" ] && echo >&2 " - Red Hat/Fedora/CentOS based (installer is: dnf)" && opts="dnf ${opts}"
   [ -n "${zypper}" ] && echo >&2 " - SuSe based (installer is: zypper)" && opts="zypper ${opts}"
   [ -n "${pacman}" ] && echo >&2 " - Arch Linux based (installer is: pacman)" && opts="pacman ${opts}"
   [ -n "${emerge}" ] && echo >&2 " - Gentoo based (installer is: emerge)" && opts="emerge ${opts}"
@@ -900,7 +900,7 @@ declare -A pkg_pkg_config=(
   ['arch']="pkgconfig"
   ['centos']="pkgconfig"
   ['debian']="pkg-config"
-  ['gentoo']="dev-util/pkgconfig"
+  ['gentoo']="virtual/pkgconfig"
   ['sabayon']="virtual/pkgconfig"
   ['rhel']="pkgconfig"
   ['suse']="pkg-config"
@@ -1209,7 +1209,8 @@ declare -A pkg_zip=(
 declare -A pkg_libelf=(
   ['alpine']="elfutils-dev"
   ['arch']="libelf"
-  ['gentoo']="dev-libs/libelf"
+  ['gentoo']="virtual/libelf"
+  ['sabayon']="virtual/libelf"
   ['debian']="libelf-dev"
   ['ubuntu']="libelf-dev"
   ['fedora']="elfutils-libelf-devel"
@@ -1264,7 +1265,7 @@ suitable_package() {
     return 0
   elif [ -z "${p}" ]; then
     echo >&2 "WARNING"
-    echo >&2 "package ${1} is not availabe in this system."
+    echo >&2 "package ${1} is not available in this system."
     echo >&2
     return 1
   else
@@ -1491,7 +1492,7 @@ install_apt_get() {
 prompt() {
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode, assuming yes (y)"
-    echo >&2 " > Would have promptedfor ${1} ..."
+    echo >&2 " > Would have prompted for ${1} ..."
     return 0
   fi
 
@@ -1550,7 +1551,7 @@ validate_tree_centos() {
     echo >&2 " > Checking for PowerTools ..."
     if ! run yum ${sudo} repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
-        run ${sudo} yum ${opts} config-manager --set-enabled PowerTools
+        run ${sudo} yum ${opts} config-manager --set-enabled powertools
       fi
     fi
 

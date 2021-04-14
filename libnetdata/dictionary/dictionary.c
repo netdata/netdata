@@ -67,7 +67,7 @@ static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *di
     tmp.name = (char *)name;
 
     NETDATA_DICTIONARY_STATS_SEARCHES_PLUS1(dict);
-    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl *) &tmp);
+    return (NAME_VALUE *)avl_search(&(dict->values_index), (avl_t *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
@@ -95,7 +95,7 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 
     // index it
     NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict);
-    if(unlikely(avl_insert(&((dict)->values_index), (avl *)(nv)) != (avl *)nv))
+    if(unlikely(avl_insert(&((dict)->values_index), (avl_t *)(nv)) != (avl_t *)nv))
         error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
 
     NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(dict);
@@ -107,7 +107,7 @@ static void dictionary_name_value_destroy_nolock(DICTIONARY *dict, NAME_VALUE *n
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
     NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict);
-    if(unlikely(avl_remove(&(dict->values_index), (avl *)(nv)) != (avl *)nv))
+    if(unlikely(avl_remove(&(dict->values_index), (avl_t *)(nv)) != (avl_t *)nv))
         error("dictionary: INTERNAL ERROR: dictionary invalid removal of node.");
 
     NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(dict);
@@ -258,7 +258,7 @@ int dictionary_del(DICTIONARY *dict, const char *name) {
 // the dictionary is locked for reading while this happens
 // do not user other dictionary calls while walking the dictionary - deadlock!
 
-static int dictionary_walker(avl *a, int (*callback)(void *entry, void *data), void *data) {
+static int dictionary_walker(avl_t *a, int (*callback)(void *entry, void *data), void *data) {
     int total = 0, ret = 0;
 
     if(a->avl_link[0]) {
@@ -293,7 +293,7 @@ int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data
     return ret;
 }
 
-static int dictionary_walker_name_value(avl *a, int (*callback)(char *name, void *entry, void *data), void *data) {
+static int dictionary_walker_name_value(avl_t *a, int (*callback)(char *name, void *entry, void *data), void *data) {
     int total = 0, ret = 0;
 
     if(a->avl_link[0]) {

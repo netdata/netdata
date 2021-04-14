@@ -1,8 +1,6 @@
 <!--
----
 title: "proc.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.plugin/README.md
----
 -->
 
 # proc.plugin
@@ -13,6 +11,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 -   `/proc/net/snmp` (total IPv4, TCP and UDP usage)
 -   `/proc/net/snmp6` (total IPv6 usage)
 -   `/proc/net/netstat` (more IPv4 usage)
+-   `/proc/net/wireless` (wireless extension)
 -   `/proc/net/stat/nf_conntrack` (connection tracking performance)
 -   `/proc/net/stat/synproxy` (synproxy performance)
 -   `/proc/net/ip_vs/stats` (IPVS connection statistics)
@@ -47,8 +46,11 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 -   **I/O bandwidth/s (kb/s)**
     The amount of data transferred from and to the disk.
+-   **Amount of discarded data (kb/s)**
 -   **I/O operations/s**
     The number of I/O operations completed.
+-   **Extended I/O operations/s**
+    The number of extended I/O operations completed.
 -   **Queued I/O operations**
     The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
 -   **Backlog size (time in ms)**
@@ -58,12 +60,19 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
     Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
 -   **Average I/O operation time (ms)**
     The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+-   **Average I/O operation time for extended operations (ms)**
+    The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
 -   **Average I/O operation size (kb)**
     The average amount of data of the completed I/O operations.
+-   **Average amount of discarded data (kb)**
+    The average amount of data of the completed discard operations.
 -   **Average Service Time (ms)**
     The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
+-   **Average Service Time for extended I/O operations (ms)**
+    The average service time for completed extended I/O operations.
 -   **Merged I/O operations/s**
     The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
+-   **Merged discard operations/s**
 -   **Total I/O time**
     The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
 -   **Space usage**
@@ -117,6 +126,7 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
   # i/o time for all disks = auto
   # queued operations for all disks = auto
   # utilization percentage for all disks = auto
+  # extended operations for all disks = auto
   # backlog for all disks = auto
   # bcache for all disks = auto
   # bcache priority stats update every = 0
@@ -148,6 +158,7 @@ For each virtual disk, physical disk and partition you will have a section like 
 	# i/o time = auto
 	# queued operations = auto
 	# utilization percentage = auto
+    # extended operations = auto
 	# backlog = auto
 ```
 
@@ -292,6 +303,28 @@ each state.
 
 `schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
 
+## Monitoring memory
+
+### Monitored memory metrics
+
+-  Amount of memory swapped in/out
+-  Amount of memory paged from/to disk
+-  Number of memory page faults
+-  Number of out of memory kills
+-  Number of NUMA events
+
+### Configuration
+
+```conf
+[plugin:proc:/proc/vmstat]
+	filename to monitor = /proc/vmstat
+	swap i/o = auto
+	disk i/o = yes
+	memory page faults = yes
+	out of memory kills = yes
+	system-wide numa metric summary = auto
+```
+
 ## Monitoring Network Interfaces
 
 ### Monitored network interface metrics
@@ -321,6 +354,45 @@ each state.
     The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
 
 By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
+
+### Monitoring wireless network interfaces
+
+The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` section of your `netdata.conf` file.
+
+```conf
+    status for all interfaces = yes
+    quality for all interfaces = yes
+    discarded packets for all interfaces = yes
+    missed beacon for all interface = yes
+```
+
+You can set the following values for each configuration option:
+
+-   `auto` = enable monitoring if the collected values are not zero
+-   `yes` = enable monitoring
+-   `no` = disable monitoring
+
+#### Monitored wireless interface metrics
+
+-   **Status**
+    The current state of the interface. This is a device-dependent option.
+
+-   **Link**    
+    Overall quality of the link. 
+
+-   **Level**
+    Received signal strength (RSSI), which indicates how strong the received signal is.
+    
+-   **Noise**
+    Background noise level.    
+    
+-   **Discarded packets**
+    Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets lost in relation with specific wireless operations (`misc`). 
+    
+-   **Missed beacon**    
+     Number of periodic beacons from the cell or the access point the interface has missed.
+     
+#### Wireless configuration     
 
 #### alarms
 

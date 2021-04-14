@@ -1,8 +1,6 @@
 <!--
----
 title: "External plugins overview"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md
----
 -->
 
 # External plugins overview
@@ -81,7 +79,7 @@ Example:
 ```
 
 The setting `enable running new plugins` sets the default behavior for all external plugins. It can be 
-overriden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `no`.
+overridden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `no`.
 
 The setting `check for new plugins every` sets the interval between scans of the directory
 `/usr/libexec/netdata/plugins.d`. New plugins can be added any time, and Netdata will detect them in a timely manner.

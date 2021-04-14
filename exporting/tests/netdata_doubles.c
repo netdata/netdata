@@ -2,7 +2,7 @@
 
 #include "test_exporting_engine.h"
 
-// Use memomy allocation functions guarded by CMocka in strdupz
+// Use memory allocation functions guarded by CMocka in strdupz
 const char *__wrap_strdupz(const char *s)
 {
     char *duplicate = malloc(sizeof(char) * (strlen(s) + 1));
@@ -100,9 +100,7 @@ RRDSET *rrdset_create_custom(
     int update_every,
     RRDSET_TYPE chart_type,
     RRD_MEMORY_MODE memory_mode,
-    long history_entries,
-    int is_archived,
-    uuid_t *chart_uuid)
+    long history_entries)
 {
     check_expected_ptr(host);
     check_expected_ptr(type);
@@ -119,8 +117,6 @@ RRDSET *rrdset_create_custom(
     check_expected(chart_type);
     UNUSED(memory_mode);
     UNUSED(history_entries);
-    UNUSED(is_archived);
-    UNUSED(chart_uuid);
 
     function_called();
 
@@ -149,9 +145,7 @@ RRDDIM *rrddim_add_custom(
     collected_number multiplier,
     collected_number divisor,
     RRD_ALGORITHM algorithm,
-    RRD_MEMORY_MODE memory_mode,
-    int is_archived,
-    uuid_t *dim_uuid)
+    RRD_MEMORY_MODE memory_mode)
 {
     check_expected_ptr(st);
     UNUSED(id);
@@ -160,8 +154,6 @@ RRDDIM *rrddim_add_custom(
     check_expected(divisor);
     check_expected(algorithm);
     UNUSED(memory_mode);
-    UNUSED(is_archived);
-    UNUSED(dim_uuid);
 
     function_called();
 

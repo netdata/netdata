@@ -23,7 +23,7 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
-    char edate[100];
+    char edate[100], domain[512];
     time_t et = now_realtime_sec() + registry.persons_expiration;
     struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
     strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
@@ -31,7 +31,22 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     snprintfz(w->cookie1, NETDATA_WEB_REQUEST_COOKIE_SIZE, NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s", guid, edate);
 
     if(registry.registry_domain && registry.registry_domain[0])
-        snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", guid, registry.registry_domain, edate);
+        snprintfz(domain, 511, "Domain=%s", registry.registry_domain);
+    else
+        domain[0]='\0';
+
+    int length = snprintfz(w->cookie2, NETDATA_WEB_REQUEST_COOKIE_SIZE,
+                           NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; %s",
+                           guid, edate, domain);
+
+    size_t remaining_length = NETDATA_WEB_REQUEST_COOKIE_SIZE - length;
+    // 25 is the necessary length to add new cookies
+    if (registry.enable_cookies_samesite_secure) {
+        if (length > 0 && remaining_length > 25)
+            snprintfz(&w->cookie2[length], remaining_length, "; SameSite=None; Secure");
+        else
+            error("Netdata does not have enough space to store cookies SameSite and Secure");
+    }
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {

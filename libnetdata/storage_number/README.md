@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata storage number"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/storage_number/README.md
----
 -->
 
 # Netdata storage number

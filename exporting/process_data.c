@@ -363,14 +363,64 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 }
 
 /**
- * Update stats for buffered bytes
+ * End a batch for a simple connector
  *
  * @param instance an instance data structure.
- * @return Always returns 0.
+ * @return Returns 0 on success, 1 on failure.
  */
-int simple_connector_update_buffered_bytes(struct instance *instance)
+int simple_connector_end_batch(struct instance *instance)
 {
-    instance->stats.buffered_bytes = (collected_number)buffer_strlen((BUFFER *)(instance->buffer));
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+    struct stats *stats = &instance->stats;
+
+    BUFFER *instance_buffer = (BUFFER *)instance->buffer;
+    struct simple_connector_buffer *last_buffer = simple_connector_data->last_buffer;
+
+    if (!last_buffer->buffer) {
+        last_buffer->buffer = buffer_create(0);
+    }
+
+    if (last_buffer->used) {
+        // ring buffer is full, reuse the oldest element
+        simple_connector_data->first_buffer = simple_connector_data->first_buffer->next;
+
+        stats->data_lost_events++;
+        stats->lost_metrics += last_buffer->buffered_metrics;
+        stats->lost_bytes += last_buffer->buffered_bytes;
+    }
+
+    // swap buffers
+    BUFFER *tmp_buffer = last_buffer->buffer;
+    last_buffer->buffer = instance_buffer;
+    instance->buffer = instance_buffer = tmp_buffer;
+
+    buffer_flush(instance_buffer);
+
+    if (last_buffer->header)
+        buffer_flush(last_buffer->header);
+    else
+        last_buffer->header = buffer_create(0);
+
+    if (instance->prepare_header)
+        instance->prepare_header(instance);
+
+    // The stats->buffered_metrics is used in the simple connector batch formatting as a variable for the number
+    // of metrics, added in the current iteration, so we are clearing it here. We will use the
+    // simple_connector_data->total_buffered_metrics in the worker to show the statistics.
+    size_t buffered_metrics = (size_t)stats->buffered_metrics;
+    stats->buffered_metrics = 0;
+
+    size_t buffered_bytes = buffer_strlen(last_buffer->buffer);
+
+    last_buffer->buffered_metrics = buffered_metrics;
+    last_buffer->buffered_bytes = buffered_bytes;
+    last_buffer->used++;
+
+    simple_connector_data->total_buffered_metrics += buffered_metrics;
+    stats->buffered_bytes += buffered_bytes;
+
+    simple_connector_data->last_buffer = simple_connector_data->last_buffer->next;
 
     return 0;
 }

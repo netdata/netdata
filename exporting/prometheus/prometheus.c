@@ -8,7 +8,7 @@
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
 /**
- * Check if a chart can be sent to an external databese
+ * Check if a chart can be sent to Prometheus
  *
  * @param instance an instance data structure.
  * @param st a chart.
@@ -37,7 +37,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
         }
     }
 
-    if (unlikely(!rrdset_is_available_for_backends(st))) {
+    if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
         debug(
             D_BACKEND,
             "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
@@ -283,8 +283,8 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 
     int count = 0;
     rrdhost_check_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+    for (struct label *label = host->labels.head; label; label = label->next) {
         if (!should_send_label(instance, label))
             continue;
 
@@ -301,7 +301,7 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
             count++;
         }
     }
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
 }
 
 struct host_variables_callback_options {
@@ -380,6 +380,93 @@ static int print_host_variables(RRDVAR *rv, void *data)
     }
 
     return 0;
+}
+
+struct gen_parameters {
+    const char *prefix;
+    char *context;
+    char *suffix;
+
+    char *chart;
+    char *dimension;
+    char *family;
+    char *labels;
+
+    PROMETHEUS_OUTPUT_OPTIONS output_options;
+    RRDSET *st;
+    RRDDIM *rd;
+
+    const char *relation;
+    const char *type;
+};
+
+/**
+ * Write an as-collected help comment to a buffer.
+ *
+ * @param wb the buffer to write the comment to.
+ * @param p parameters for generating the comment string.
+ * @param homogeneous a flag for homogeneous charts.
+ * @param prometheus_collector a flag for metrics from prometheus collector.
+ */
+static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous, int prometheus_collector)
+{
+    buffer_sprintf(wb, "# COMMENT %s_%s", p->prefix, p->context);
+
+    if (!homogeneous)
+        buffer_sprintf(wb, "_%s", p->dimension);
+
+    buffer_sprintf(
+        wb,
+        "%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * ",
+        p->suffix,
+        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->st->name) ? p->st->name : p->st->id,
+        p->st->context,
+        p->st->family,
+        (p->output_options & PROMETHEUS_OUTPUT_NAMES && p->rd->name) ? p->rd->name : p->rd->id);
+
+    if (prometheus_collector)
+        buffer_sprintf(wb, "1 / 1");
+    else
+        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT, p->rd->multiplier, p->rd->divisor);
+
+    buffer_sprintf(wb, " %s %s (%s)\n", p->relation, p->st->units, p->type);
+}
+
+/**
+ * Write an as-collected metric to a buffer.
+ *
+ * @param wb the buffer to write the metric to.
+ * @param p parameters for generating the metric string.
+ * @param homogeneous a flag for homogeneous charts.
+ * @param prometheus_collector a flag for metrics from prometheus collector.
+ */
+static void generate_as_collected_prom_metric(BUFFER *wb, struct gen_parameters *p, int homogeneous, int prometheus_collector)
+{
+    buffer_sprintf(wb, "%s_%s", p->prefix, p->context);
+
+    if (!homogeneous)
+        buffer_sprintf(wb, "_%s", p->dimension);
+
+    buffer_sprintf(wb, "%s{chart=\"%s\",family=\"%s\"", p->suffix, p->chart, p->family);
+
+    if (homogeneous)
+        buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
+
+    buffer_sprintf(wb, "%s} ", p->labels);
+
+    if (prometheus_collector)
+        buffer_sprintf(
+            wb,
+            CALCULATED_NUMBER_FORMAT,
+            (calculated_number)p->rd->last_collected_value * (calculated_number)p->rd->multiplier /
+                (calculated_number)p->rd->divisor);
+    else
+        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, p->rd->last_collected_value);
+
+    if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(wb, " %llu\n", timeval_msec(&p->rd->last_collected_time));
+    else
+        buffer_sprintf(wb, "\n");
 }
 
 /**
@@ -514,12 +601,16 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
+            int prometheus_collector = 0;
             if (as_collected) {
                 if (rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if (rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
                     homogeneous = 0;
+
+                if (st->module_name && !strcmp(st->module_name, "prometheus"))
+                    prometheus_collector = 1;
             } else {
                 if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
                     !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
@@ -548,15 +639,29 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     if (as_collected) {
                         // we need as-collected / raw data
 
+                        struct gen_parameters p;
+                        p.prefix = prefix;
+                        p.context = context;
+                        p.suffix = suffix;
+                        p.chart = chart;
+                        p.dimension = dimension;
+                        p.family = family;
+                        p.labels = labels;
+                        p.output_options = output_options;
+                        p.st = st;
+                        p.rd = rd;
+
                         if (unlikely(rd->last_collected_time.tv_sec < instance->after))
                             continue;
 
-                        const char *t = "gauge", *h = "gives";
+                        p.type = "gauge";
+                        p.relation = "gives";
                         if (rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
                             rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
-                            t = "counter";
-                            h = "delta gives";
-                            suffix = "_total";
+                            p.type = "counter";
+                            p.relation = "delta gives";
+                            if (!prometheus_collector)
+                                p.suffix = "_total";
                         }
 
                         if (homogeneous) {
@@ -569,53 +674,12 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(
-                                    wb,
-                                    "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
-                                    " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
-                                    st->context,
-                                    st->family,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
-                                    rd->multiplier,
-                                    rd->divisor,
-                                    h,
-                                    st->units,
-                                    t);
+                                generate_as_collected_prom_help(wb, &p, homogeneous, prometheus_collector);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, t);
+                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
 
-                            if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
-                                    " %llu\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    dimension,
-                                    labels,
-                                    rd->last_collected_value,
-                                    timeval_msec(&rd->last_collected_time));
-                            else
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT
-                                    "\n",
-                                    prefix,
-                                    context,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    dimension,
-                                    labels,
-                                    rd->last_collected_value);
+                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
                         } else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
@@ -626,53 +690,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(
-                                    wb,
-                                    "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT
-                                    " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id,
-                                    st->context,
-                                    st->family,
-                                    (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id,
-                                    rd->multiplier,
-                                    rd->divisor,
-                                    h,
-                                    st->units,
-                                    t);
+                                generate_as_collected_prom_help(wb, &p, homogeneous, prometheus_collector);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
-                                    wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, t);
+                                    wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, p.type);
 
-                            if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    labels,
-                                    rd->last_collected_value,
-                                    timeval_msec(&rd->last_collected_time));
-                            else
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT "\n",
-                                    prefix,
-                                    context,
-                                    dimension,
-                                    suffix,
-                                    chart,
-                                    family,
-                                    labels,
-                                    rd->last_collected_value);
+                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector);
                         }
                     } else {
                         // we need average or sum of the data

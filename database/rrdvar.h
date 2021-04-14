@@ -32,7 +32,7 @@ typedef enum rrdvar_options {
 // 2. at each context (RRDFAMILY.rrdvar_root_index)
 // 3. at each host    (RRDHOST.rrdvar_root_index)
 struct rrdvar {
-    avl avl;
+    avl_t avl;
 
     char *name;
     uint32_t hash;

@@ -10,7 +10,6 @@
 
 // Internal constants
 #define NETDATA_GLOBAL_VECTOR 24
-#define NETDATA_MAX_MONITOR_VECTOR 9
 #define NETDATA_VFS_ERRORS 3
 
 // Map index
@@ -32,8 +31,6 @@
 #define NETDATA_PROCESS_STATUS_NAME "process_status"
 
 #define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
-#define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
-#define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
 // Charts created on Apps submenu
 #define NETDATA_SYSCALL_APPS_FILE_OPEN "file_open"
@@ -53,6 +50,9 @@
 #define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
 #define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR "vfs_write_error"
 #define NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR "vfs_read_error"
+
+// Process configuration name
+#define NETDATA_PROCESS_CONFIG_FILE "process.conf"
 
 // Index from kernel
 typedef enum ebpf_process_index {
@@ -93,6 +93,25 @@ typedef enum ebpf_process_index {
 
 } ebpf_process_index_t;
 
+// This enum acts as an index for publish vector.
+// Do not change the enum order because we use
+// different algorithms to make charts with incremental
+// values (the three initial positions) and absolute values
+// (the remaining charts). 
+typedef enum netdata_publish_process {
+    NETDATA_KEY_PUBLISH_PROCESS_OPEN,
+    NETDATA_KEY_PUBLISH_PROCESS_CLOSE,
+    NETDATA_KEY_PUBLISH_PROCESS_UNLINK,
+    NETDATA_KEY_PUBLISH_PROCESS_READ,
+    NETDATA_KEY_PUBLISH_PROCESS_WRITE,
+    NETDATA_KEY_PUBLISH_PROCESS_EXIT,
+    NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK,
+    NETDATA_KEY_PUBLISH_PROCESS_FORK,
+    NETDATA_KEY_PUBLISH_PROCESS_CLONE,
+
+    NETDATA_KEY_PUBLISH_PROCESS_END
+} netdata_publish_process_t;
+
 typedef struct ebpf_process_publish_apps {
     // Number of calls during the last read
     uint64_t call_sys_open;
@@ -117,22 +136,6 @@ typedef struct ebpf_process_publish_apps {
     // Number of bytes during the last read
     uint64_t bytes_written;
     uint64_t bytes_read;
-
-    // Dimensions sent to chart
-    uint64_t publish_open;
-    uint64_t publish_closed;
-    uint64_t publish_deleted;
-    uint64_t publish_write_call;
-    uint64_t publish_write_bytes;
-    uint64_t publish_read_call;
-    uint64_t publish_read_bytes;
-    uint64_t publish_process;
-    uint64_t publish_thread;
-    uint64_t publish_task;
-    uint64_t publish_open_error;
-    uint64_t publish_close_error;
-    uint64_t publish_write_error;
-    uint64_t publish_read_error;
 } ebpf_process_publish_apps_t;
 
 #endif /* NETDATA_EBPF_PROCESS_H */

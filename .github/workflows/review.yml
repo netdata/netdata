@@ -3,6 +3,11 @@
 name: Review
 on:
   pull_request:
+env:
+  run_eslint: 0
+  run_hadolint: 0
+  run_shellcheck: 0
+  run_yamllint: 0
 jobs:
   eslint:
     name: eslint
@@ -10,12 +15,41 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Check files
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.js|node\.d\.plugin\.in' ; then
+            echo 'run_eslint=1' >> $GITHUB_ENV
+          fi
       - name: Run eslint
+        if: env.run_eslint == 1
         uses: reviewdog/action-eslint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           eslint_flags: '.'
+
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Check files
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*Dockerfile*' ; then
+            echo 'run_hadolint=1' >> $GITHUB_ENV
+          fi
+      - name: Run hadolint
+        if: env.run_hadolint == 1
+        uses: reviewdog/action-hadolint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
 
   shellcheck:
     name: shellcheck
@@ -23,7 +57,16 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Check files
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.sh.*' ; then
+            echo 'run_shellcheck=1' >> $GITHUB_ENV
+          fi
       - name: Run shellcheck
+        if: env.run_shellcheck == 1
         uses: reviewdog/action-shellcheck@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -38,7 +81,16 @@ jobs:
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Check files
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.ya?ml|python\.d/.*\.conf' ; then
+            echo 'run_yamllint=1' >> $GITHUB_ENV
+          fi
       - name: Run yamllint
+        if: env.run_yamllint == 1
         uses: reviewdog/action-yamllint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

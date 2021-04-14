@@ -85,4 +85,4 @@ process_data "foreach_with_template" 10 "$HEALTHDIR/dim_foreach_with_template_sp
 rm "$HEALTHDIR/dim_foreach_with_template_sp.conf"
 rm -rf "$OUTDIR"
 
-echo  -e "${GREEN} all the tests were sucessful ${NOCOLOR}"
+echo  -e "${GREEN} all the tests were successful ${NOCOLOR}"

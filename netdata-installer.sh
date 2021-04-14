@@ -68,7 +68,7 @@ if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
   if _cannot_use_tmpdir /tmp; then
     if _cannot_use_tmpdir "${PWD}"; then
       echo >&2
-      echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+      echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
       exit 1
     else
       TMPDIR="${PWD}"
@@ -205,14 +205,17 @@ USAGE: ${PROGRAM} [options]
   --dont-start-it            Do not (re)start netdata after installation
   --dont-wait                Run installation in non-interactive mode
   --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --auto-update-type         Override the auto-update scheduling mechanism detection, currently supported types
+                             are: systemd, interval, crontab
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
-  --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
+  --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
+  --aclk-ng                  Forces build of ACLK Next Generation which is fallback by default.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -232,10 +235,11 @@ USAGE: ${PROGRAM} [options]
   --enable-lto               Enable Link-Time-Optimization. Default: enabled
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
+  --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
-  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam. (DO_NOT_TRACK=1)
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -246,7 +250,7 @@ If you also need to provide different LDFLAGS, use something like this:
 
   LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
 
-or use the following if both LDFLAGS and CFLAGS need to be overriden:
+or use the following if both LDFLAGS and CFLAGS need to be overridden:
 
   CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
 
@@ -273,10 +277,23 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
+    "--use-system-lws") USE_SYSTEM_LWS=1 ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
     "--auto-update" | "-u") AUTOUPDATE=1 ;;
+    "--auto-update-type")
+      AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      case "${AUTO_UPDATE_TYPE}" in
+        systemd|interval|crontab)
+          shift 1
+          ;;
+        *)
+          echo "Unrecognized value for --auto-update-type. Valid values are: systemd, interval, crontab"
+          exit 1
+          ;;
+      esac
+      ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
     "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi" ;;
@@ -303,6 +320,10 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
+    "--aclk-ng")
+      NETDATA_ACLK_NG=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-ng/} --with-aclk-ng"
+      ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         echo "Cloud explicitly enabled, ignoring --disable-cloud."
@@ -519,7 +540,7 @@ build_libmosquitto() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   if [ "$(uname -s)" = Linux ]; then
@@ -551,8 +572,8 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-    echo "Skipping cloud"
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
+    echo "Skipping libmosquitto"
     return 0
   fi
 
@@ -599,10 +620,31 @@ build_libwebsockets() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
+
+  if [ "$(uname)" = "Darwin" ]; then
+    run patch -p1 << "EOF"
+--- a/lib/plat/unix/private.h
++++ b/lib/plat/unix/private.h
+@@ -164,6 +164,8 @@ delete_from_fd(const struct lws_context *context, int fd);
+  * but happily have something equivalent in the SO_NOSIGPIPE flag.
+  */
+ #ifdef __APPLE__
++/* iOS SDK 12+ seems to define it, undef it for compatibility both ways */
++#undef MSG_NOSIGNAL
+ #define MSG_NOSIGNAL SO_NOSIGPIPE
+ #endif
+EOF
+
+    # shellcheck disable=SC2181
+    if [ $? -ne 0 ]; then
+      return 1
+    fi
+  fi
+
   if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
     run ${env_cmd} cmake \
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
@@ -627,7 +669,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
     return 0
   fi
 
@@ -654,6 +696,7 @@ bundle_libwebsockets() {
       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libwebsockets built and prepared."
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws=externaldeps/libwebsockets"
     else
       run_failed "Failed to build libwebsockets."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
@@ -678,13 +721,18 @@ bundle_libwebsockets
 
 build_judy() {
   local env_cmd=''
+  local libtoolize="libtoolize"
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+  fi
+
+  if [ "$(uname)" = "Darwin" ]; then
+    libtoolize="glibtoolize"
   fi
 
   pushd "${1}" > /dev/null || return 1
-  if run ${env_cmd} libtoolize --force --copy &&
+  if run ${env_cmd} ${libtoolize} --force --copy &&
     run ${env_cmd} aclocal &&
     run ${env_cmd} autoheader &&
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
@@ -763,7 +811,7 @@ build_jsonc() {
   local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS= CXXFLAGS= LDFLAGS="
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
   fi
 
   pushd "${1}" > /dev/null || exit 1
@@ -834,7 +882,7 @@ bundle_jsonc
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS= CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
   popd > /dev/null || exit 1
 }
 
@@ -900,6 +948,18 @@ bundle_libbpf
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
   "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" classic
+fi
+
+# -----------------------------------------------------------------------------
+# By default, `git` does not update local tags based on remotes. Because
+# we use the most recent tag as part of our version determination in
+# our build, this can lead to strange versions that look ancient but are
+# actually really recent. To avoid this, try and fetch tags if we're
+# working in a git checkout.
+if [ -d ./.git ] ; then
+  echo >&2
+  progress "Updating tags in git to ensure a consistent version number"
+  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
 fi
 
 # -----------------------------------------------------------------------------
@@ -1045,7 +1105,7 @@ run $make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
@@ -1258,12 +1318,14 @@ if [ "${UID}" -eq 0 ]; then
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
     run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
+    run sh -c "setcap cap_perfmon+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\" || setcap cap_sys_admin+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin\""
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
     run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then
@@ -1553,6 +1615,26 @@ remove_old_ebpf() {
     echo >&2 "Renaming eBPF configuration file."
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
   fi
+
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
+    echo >&2 "Removing old eBPF programs with patch."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
+  fi
+
+  # Remove old eBPF program to store new eBPF program inside subdirectory
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.o" ]; then
+    echo >&2 "Removing old eBPF programs installed in old directory."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
+  fi
+
+  # Remove old reject list from previous directory
+  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
+    echo >&2 "Removing old ebpf_kernel_reject_list.txt."
+    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
+  fi
 }
 
 install_ebpf() {
@@ -1589,7 +1671,16 @@ install_ebpf() {
   # chown everything to root:netdata before we start copying out of our package
   run chown -R root:netdata "${tmp}"
 
-  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d
+  if [ ! -d "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d ]; then
+    mkdir "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
+    RET=$?
+    if [ "${RET}" != "0" ]; then
+      rm -rf "${tmp}"
+      return 1
+    fi
+  fi
+
+  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
 
   rm -rf "${tmp}"
 
@@ -1619,7 +1710,7 @@ progress "Install netdata at system init"
 # By default we assume the shutdown/startup of the Netdata Agent are effectively
 # without any system supervisor/init like SystemD or SysV. So we assume the most
 # basic startup/shutdown commands...
-NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/bin/netdatacli shutdown-agent"
+NETDATA_STOP_CMD="${NETDATA_PREFIX}/usr/sbin/netdatacli shutdown-agent"
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
@@ -1796,7 +1887,7 @@ install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
 progress "Check if we must enable/disable the netdata updater tool"
 if [ "${AUTOUPDATE}" = "1" ]; then
-  enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
+  enable_netdata_updater ${AUTO_UPDATE_TYPE} || run_failed "Cannot enable netdata updater tool"
 else
   disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
 fi
@@ -1811,6 +1902,7 @@ cat << EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 LDFLAGS="${LDFLAGS}"
+NETDATA_TMPDIR="${TMPDIR}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"

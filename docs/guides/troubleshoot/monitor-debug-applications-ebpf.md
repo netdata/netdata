@@ -2,6 +2,7 @@
 title: "Monitor, troubleshoot, and debug applications with eBPF metrics"
 description: "Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot, and debug your custom application using low-level kernel feedback."
 image: /img/seo/guides/troubleshoot/monitor-debug-applications-ebpf.png
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md
 -->
 
 # Monitor, troubleshoot, and debug applications with eBPF metrics
@@ -56,8 +57,9 @@ dev: custom-app
 ...
 ```
 
-Restart Netdata with `sudo service netdata restart` or the appropriate method for your system to begin seeing metrics
-for this particular group+process. You can also add additional processes to the same group.
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to begin seeing metrics for this particular
+group+process. You can also add additional processes to the same group.
 
 You can set up `apps_groups.conf` to more show more precise eBPF metrics for any application or service running on your
 system, even if it's a standard package like Redis, Apache, or any other [application/service Netdata collects
@@ -104,7 +106,8 @@ Replace `entry` with `return`:
     network viewer = yes
 ```
 
-Restart Netdata with `sudo service netdata restart` or the appropriate method for your system.
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 ## Get familiar with per-application eBPF metrics and charts
 
@@ -112,14 +115,14 @@ Visit the Netdata dashboard at `http://NODE:19999`, replacing `NODE` with the ho
 to monitor this application. Scroll down to the **Applications** section. These charts now feature a `firefox` dimension
 with metrics specific to that process.
 
-Pay particular attention to the charts in the **ebpf syscall** and **ebpf net** sections. These charts are populated by
-low-level Linux kernel metrics thanks to eBPF, and showcase the volume of calls to open/close files, call functions like
-`do_fork`, IO activity on the VFS, and much more.
+Pay particular attention to the charts in the **ebpf file**, **ebpf syscall**, **ebpf process**, and **ebpf net**
+sub-sections. These charts are populated by low-level Linux kernel metrics thanks to eBPF, and showcase the volume of
+calls to open/close files, call functions like `do_fork`, IO activity on the VFS, and much more.
 
 See the [eBPF collector documentation](/collectors/ebpf.plugin/README.md#integration-with-appsplugin) for the full list
 of per-application charts.
 
-Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to idenfity
+Let's show some examples of how you can first identify normal eBPF patterns, then use that knowledge to identify
 anomalies in a few simulated scenarios.
 
 For example, the following screenshot shows the number of open files, failures to open files, and closed files on a
@@ -236,16 +239,14 @@ If you don't already have a Netdata Cloud account, go [sign in](https://app.netd
 Read the [get started with Cloud guide](https://learn.netdata.cloud/docs/cloud/get-started) for a walkthrough of node
 claiming and other fundamentals.
 
-Add more charts to the Nodes view by clicking on the gear icon at the far end of the table. Click on the **Context**
-input and scroll until you find the eBPF chart you're interested in, or type in the name of the context directly. Maybe
-something like `apps.vfs_write_call`? Next, click on the **Dimensions** input and find the `dev` dimension, or maybe
-`apache`/`redis` if you set your `apps_groups.conf` up like the examples above.
+Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the [Overview
+dashboard](/docs/visualize/overview-infrastructure.md) under the same **Applications** or **eBPF** sections that you
+find on the local Agent dashboard. Or, [create new dashboards](/docs/visualize/create-dashboards.md) using eBPF metrics
+from any number of distributed nodes to see how your application interacts with multiple Linux kernels on multiple Linux
+systems. 
 
-Click **Save** to add the chart for all your claimed nodes. Now you can see how your application interacts with multiple
-Linux kernels on multiple Linux systems. 
-
-Now that you can see these metrics in Netdata Cloud, you can [invite your
-team](https://learn.netdata.cloud/docs/cloud/collaborate/invite-your-team) and share your findings with others.
+Now that you can see eBPF metrics in Netdata Cloud, you can [invite your
+team](https://learn.netdata.cloud/docs/cloud/manage/invite-your-team) and share your findings with others.
 
 ## What's next?
 
@@ -253,7 +254,7 @@ Debugging and troubleshooting an application takes a special combination of prac
 Netdata's eBPF metrics to back you up, you can rest assured that you see every minute detail of how your application
 interacts with the Linux kernel.
 
-If you're still trying to wrap your head aroud what we offer, be sure to read up on our accompanying documentation and
+If you're still trying to wrap your head around what we offer, be sure to read up on our accompanying documentation and
 other resources on eBPF monitoring with Netdata:
 
 -   [eBPF collector](/collectors/ebpf.plugin/README.md)

@@ -25,6 +25,7 @@
 extern void *proc_main(void *ptr);
 
 extern int do_proc_net_dev(int update_every, usec_t dt);
+extern int do_proc_net_wireless(int update_every, usec_t dt);
 extern int do_proc_diskstats(int update_every, usec_t dt);
 extern int do_proc_mdstat(int update_every, usec_t dt);
 extern int do_proc_net_snmp(int update_every, usec_t dt);
@@ -64,7 +65,8 @@ extern int get_numa_node_count(void);
 extern unsigned long long tcpext_TCPSynRetrans;
 
 // netdev renames
-extern void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name);
+extern void netdev_rename_device_add(
+    const char *host_device, const char *container_device, const char *container_name, struct label *labels);
 extern void netdev_rename_device_del(const char *host_device);
 
 #include "proc_self_mountinfo.h"

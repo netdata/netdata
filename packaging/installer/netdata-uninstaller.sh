@@ -14,7 +14,7 @@
 usage="$(basename "$0") [-h] [-f ] -- program to calculate the answer to life, the universe and everything
 
 where:
-    -e, --env    path to environment file (defauls to '/etc/netdata/.environment'
+    -e, --env    path to environment file (defaults to '/etc/netdata/.environment'
     -f, --force  force uninstallation and do not ask any questions
     -h           show this help text
     -y, --yes    flag needs to be set to proceed with uninstallation"
@@ -453,9 +453,17 @@ rm_file /etc/logrotate.d/netdata
 rm_file /etc/systemd/system/netdata.service
 rm_file /lib/systemd/system/netdata.service
 rm_file /usr/lib/systemd/system/netdata.service
+rm_file /etc/systemd/system/netdata-updater.service
+rm_file /lib/systemd/system/netdata-updater.service
+rm_file /usr/lib/systemd/system/netdata-updater.service
+rm_file /etc/systemd/system/netdata-updater.timer
+rm_file /lib/systemd/system/netdata-updater.timer
+rm_file /usr/lib/systemd/system/netdata-updater.timer
 rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
+rm_file /etc/cron.d/netdata-updater
+
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
   rm_dir "${NETDATA_PREFIX}"

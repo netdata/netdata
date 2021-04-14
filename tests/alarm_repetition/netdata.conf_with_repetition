@@ -29,6 +29,7 @@
 [plugins]
     proc = yes
     diskspace = no
+    timex = no
     cgroups = no
     tc = no
     idlejitter = no

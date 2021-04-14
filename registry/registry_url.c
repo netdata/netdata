@@ -13,11 +13,11 @@ int registry_url_compare(void *a, void *b) {
 }
 
 inline REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) {
-    return (REGISTRY_URL *)avl_insert(&(registry.registry_urls_root_index), (avl *)(u));
+    return (REGISTRY_URL *)avl_insert(&(registry.registry_urls_root_index), (avl_t *)(u));
 }
 
 inline REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) {
-    return (REGISTRY_URL *)avl_remove(&(registry.registry_urls_root_index), (avl *)(u));
+    return (REGISTRY_URL *)avl_remove(&(registry.registry_urls_root_index), (avl_t *)(u));
 }
 
 REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
@@ -33,7 +33,7 @@ REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
     strncpyz(n->url, url, n->len);
     n->hash = simple_hash(n->url);
 
-    REGISTRY_URL *u = (REGISTRY_URL *)avl_search(&(registry.registry_urls_root_index), (avl *)n);
+    REGISTRY_URL *u = (REGISTRY_URL *)avl_search(&(registry.registry_urls_root_index), (avl_t *)n);
     if(!u) {
         debug(D_REGISTRY, "Registry: registry_url_get('%s', %zu): allocating %zu bytes", url, urllen, sizeof(REGISTRY_URL) + urllen);
         u = callocz(1, sizeof(REGISTRY_URL) + urllen); // no need for +1, 1 is already in REGISTRY_URL

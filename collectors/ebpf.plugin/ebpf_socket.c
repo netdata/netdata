@@ -17,18 +17,18 @@ static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_
                                                             "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
 static netdata_idx_t *socket_hash_values = NULL;
-static netdata_syscall_stat_t *socket_aggregated_data = NULL;
-static netdata_publish_syscall_t *socket_publish_aggregated = NULL;
+static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
+static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
 static ebpf_data_t socket_data;
 
-static ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
-static ebpf_socket_publish_apps_t **socket_bandwidth_prev = NULL;
+ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 static int socket_apps_created = 0;
 pthread_mutex_t nv_mutex;
 int wait_to_plot = 0;
+int read_thread_closed = 1;
 
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
@@ -37,6 +37,14 @@ netdata_socket_t *socket_values;
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
 static int *map_fd = NULL;
+static struct bpf_object *objects = NULL;
+static struct bpf_link **probe_links = NULL;
+
+struct config socket_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
 
 /*****************************************************************
  *
@@ -83,10 +91,10 @@ static void ebpf_update_global_publish(
         move = move->next;
     }
 
-    tcp->write = -((long)publish[0].nbyte);
+    tcp->write = -(long)publish[0].nbyte;
     tcp->read = (long)publish[1].nbyte;
 
-    udp->write = -((long)publish[3].nbyte);
+    udp->write = -(long)publish[3].nbyte;
     udp->read = (long)publish[4].nbyte;
 }
 
@@ -254,19 +262,6 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
     }
 }
 
-
-/**
- * Update the publish strctures to create the dimenssions
- *
- * @param curr   Last values read from memory.
- * @param prev   Previous values read from memory.
- */
-static void ebpf_socket_update_apps_publish(ebpf_socket_publish_apps_t *curr, ebpf_socket_publish_apps_t *prev)
-{
-    curr->publish_recv = curr->received - prev->received;
-    curr->publish_sent = curr->sent - prev->sent;
-}
-
 /**
  * Send data to Netdata calling auxiliar functions.
  *
@@ -278,24 +273,32 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
 
+    // We read bytes from function arguments, but bandiwdth is given in bits,
+    // so we need to multiply by 8 to convert for the final value.
     write_count_chart(
       NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(
-        NETDATA_TCP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[0], socket_id_names[1], &common_tcp);
+        NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write*8/1000,
+        socket_id_names[1], common_tcp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
           NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
     }
     write_count_chart(
-        NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_RETRANSMIT_START], 1);
+        NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
+        1);
 
     write_count_chart(
-        NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
+        NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
+        2);
     write_io_chart(
-        NETDATA_UDP_FUNCTION_BYTES, NETDATA_EBPF_FAMILY, socket_id_names[3], socket_id_names[4], &common_udp);
+        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY,
+        socket_id_names[3],(long long)common_udp.write*8/100,
+        socket_id_names[4], (long long)common_udp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(
-            NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START], 2);
+            NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START],
+            2);
     }
 }
 
@@ -342,8 +345,10 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_sent));
-            write_chart_dimension(w->name, value);
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          bytes_sent));
+            // We multiply by 0.008, because we read bytes, but we display bits
+            write_chart_dimension(w->name, ((value)*8)/1000);
         }
     }
     write_end_chart();
@@ -351,11 +356,64 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t, publish_recv));
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          bytes_received));
+            // We multiply by 0.008, because we read bytes, but we display bits
+            write_chart_dimension(w->name, ((value)*8)/1000);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_sent));
             write_chart_dimension(w->name, value);
         }
     }
     write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_tcp_received));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          retransmit));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_udp_sent));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
+                                                                          call_udp_received));
+            write_chart_dimension(w->name, value);
+        }
+    }
+    write_end_chart();
+
 }
 
 /*****************************************************************
@@ -378,16 +436,18 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Calls to internal functions",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_SOCKET_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21070,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
                       3);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_TCP_FUNCTION_BYTES,
-                      "TCP bandwidth",
-                      EBPF_COMMON_DIMENSION_BYTESS,
+    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_TCP_FUNCTION_BITS,
+                      "TCP bandwidth", EBPF_COMMON_DIMENSION_BITS,
                       NETDATA_SOCKET_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21071,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
@@ -399,6 +459,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "TCP errors",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_SOCKET_GROUP,
+                          NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE,
                           21072,
                           ebpf_create_global_dimension,
                           socket_publish_aggregated,
@@ -410,9 +472,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Packages retransmitted",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_SOCKET_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21073,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_RETRANSMIT_START],
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
                       1);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -420,19 +484,21 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "UDP calls",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_SOCKET_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21074,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_UDP_START],
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_UDP_FUNCTION_BYTES,
-                      "UDP bandwidth",
-                      EBPF_COMMON_DIMENSION_BYTESS,
+    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_UDP_FUNCTION_BITS,
+                      "UDP bandwidth", EBPF_COMMON_DIMENSION_BITS,
                       NETDATA_SOCKET_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
                       21075,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_UDP_START],
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2);
 
     if (em->mode < MODE_ENTRY) {
@@ -441,9 +507,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "UDP errors",
                           EBPF_COMMON_DIMENSION_CALL,
                           NETDATA_SOCKET_GROUP,
+                          NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE,
                           21076,
                           ebpf_create_global_dimension,
-                          &socket_publish_aggregated[NETDATA_UDP_START],
+                          &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                           2);
     }
 }
@@ -453,23 +521,72 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
- * @param em a pointer to the structure with the default values.
+ * @param em   a pointer to the structure with the default values.
+ * @param ptr  a pointer for targets
  */
-void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
+void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     UNUSED(em);
+    struct target *root = ptr;;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
-                               "Bytes sent",
-                               EBPF_COMMON_DIMENSION_BYTESS,
+                               "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20080,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
-                               "bytes received",
-                               EBPF_COMMON_DIMENSION_BYTESS,
+                               "bytes received", EBPF_COMMON_DIMENSION_BITS,
                                NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20081,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
+                               "Calls for tcp_sendmsg",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20082,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
+                               "Calls for tcp_cleanup_rbuf",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20083,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
+                               "Calls for tcp_retransmit",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20084,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
+                               "Calls for udp_sendmsg",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20085,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
+                               "Calls for udp_recvmsg",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_NET_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20086,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root);
 
     socket_apps_created = 1;
@@ -483,7 +600,7 @@ void ebpf_socket_create_apps_charts(ebpf_module_t *em, struct target *root)
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -495,7 +612,8 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          title,
                          units,
                          family,
-                         "stacked",
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         NULL,
                          order);
 
     uint32_t i;
@@ -519,7 +637,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -531,7 +649,8 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
                          title,
                          units,
                          family,
-                         "stacked",
+                         NETDATA_EBPF_CHART_TYPE_STACKED,
+                         NULL,
                          order);
 
     uint32_t i;
@@ -562,8 +681,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
 
     if (ptr == (netdata_vector_plot_t *)&outbound_vectors) {
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_BYTES,
-                                    "Outbound connections (bytes).",
-                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Outbound connections (bytes).", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21080,
                                     ptr);
@@ -583,8 +701,7 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                          ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
-                                    "Inbound connections (bytes)",
-                                    EBPF_COMMON_DIMENSION_BYTESS,
+                                    "Inbound connections (bytes)", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21084,
                                     ptr);
@@ -1054,7 +1171,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
     memcpy(&test.index, lindex, sizeof(netdata_socket_idx_t));
     test.flags = flags;
 
-    ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl *)&test);
+    ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
         if (lvalues->ct > ret->plot.last_time) {
             update_socket_data(&ret->sock, lvalues);
@@ -1092,7 +1209,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         w->flags = flags;
         netdata_socket_plot_t *check ;
-        check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl *)w);
+        check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl_t *)w);
         if (check != w)
             error("Internal error, cannot insert the AVL tree.");
 
@@ -1208,7 +1325,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         return;
 
     netdata_socket_idx_t key = {};
-    netdata_socket_idx_t next_key;
+    netdata_socket_idx_t next_key = {};
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
@@ -1304,7 +1421,7 @@ void update_listen_table(uint16_t value, uint8_t proto)
 static void read_listen_table()
 {
     uint16_t key = 0;
-    uint16_t next_key;
+    uint16_t next_key = 0;
 
     int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
     uint8_t value;
@@ -1341,9 +1458,10 @@ void *ebpf_socket_read_hash(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    read_thread_closed = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS;
+    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_time;
     int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
     int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
     int network_connection = em->optional;
@@ -1359,6 +1477,7 @@ void *ebpf_socket_read_hash(void *ptr)
         pthread_mutex_unlock(&nv_mutex);
     }
 
+    read_thread_closed = 1;
     return NULL;
 }
 
@@ -1386,22 +1505,22 @@ static void read_hash_global_tables()
         }
     }
 
-    socket_aggregated_data[0].call = res[NETDATA_KEY_CALLS_TCP_SENDMSG];
-    socket_aggregated_data[1].call = res[NETDATA_KEY_CALLS_TCP_CLEANUP_RBUF];
-    socket_aggregated_data[2].call = res[NETDATA_KEY_CALLS_TCP_CLOSE];
-    socket_aggregated_data[3].call = res[NETDATA_KEY_CALLS_UDP_RECVMSG];
-    socket_aggregated_data[4].call = res[NETDATA_KEY_CALLS_UDP_SENDMSG];
-    socket_aggregated_data[5].call = res[NETDATA_KEY_TCP_RETRANSMIT];
+    socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].call = res[NETDATA_KEY_CALLS_TCP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].call = res[NETDATA_KEY_CALLS_TCP_CLEANUP_RBUF];
+    socket_aggregated_data[NETDATA_IDX_TCP_CLOSE].call = res[NETDATA_KEY_CALLS_TCP_CLOSE];
+    socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].call = res[NETDATA_KEY_CALLS_UDP_RECVMSG];
+    socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].call = res[NETDATA_KEY_CALLS_UDP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_RETRANSMIT].call = res[NETDATA_KEY_TCP_RETRANSMIT];
 
-    socket_aggregated_data[0].ecall = res[NETDATA_KEY_ERROR_TCP_SENDMSG];
-    socket_aggregated_data[1].ecall = res[NETDATA_KEY_ERROR_TCP_CLEANUP_RBUF];
-    socket_aggregated_data[3].ecall = res[NETDATA_KEY_ERROR_UDP_RECVMSG];
-    socket_aggregated_data[4].ecall = res[NETDATA_KEY_ERROR_UDP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].ecall = res[NETDATA_KEY_ERROR_TCP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].ecall = res[NETDATA_KEY_ERROR_TCP_CLEANUP_RBUF];
+    socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].ecall = res[NETDATA_KEY_ERROR_UDP_RECVMSG];
+    socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].ecall = res[NETDATA_KEY_ERROR_UDP_SENDMSG];
 
-    socket_aggregated_data[0].bytes = res[NETDATA_KEY_BYTES_TCP_SENDMSG];
-    socket_aggregated_data[1].bytes = res[NETDATA_KEY_BYTES_TCP_CLEANUP_RBUF];
-    socket_aggregated_data[3].bytes = res[NETDATA_KEY_BYTES_UDP_RECVMSG];
-    socket_aggregated_data[4].bytes = res[NETDATA_KEY_BYTES_UDP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].bytes = res[NETDATA_KEY_BYTES_TCP_SENDMSG];
+    socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].bytes = res[NETDATA_KEY_BYTES_TCP_CLEANUP_RBUF];
+    socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].bytes = res[NETDATA_KEY_BYTES_UDP_RECVMSG];
+    socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].bytes = res[NETDATA_KEY_BYTES_UDP_SENDMSG];
 }
 
 /**
@@ -1413,21 +1532,18 @@ static void read_hash_global_tables()
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
-    ebpf_socket_publish_apps_t *prev = socket_bandwidth_prev[current_pid];
     if (!curr) {
-        ebpf_socket_publish_apps_t *ptr = callocz(2, sizeof(ebpf_socket_publish_apps_t));
-        curr = &ptr[0];
+        curr = callocz(1, sizeof(ebpf_socket_publish_apps_t));
         socket_bandwidth_curr[current_pid] = curr;
-        prev = &ptr[1];
-        socket_bandwidth_prev[current_pid] = prev;
-    } else {
-        memcpy(prev, curr, sizeof(ebpf_socket_publish_apps_t));
     }
 
-    curr->sent = eb->sent;
-    curr->received = eb->received;
-
-    ebpf_socket_update_apps_publish(curr, prev);
+    curr->bytes_sent = eb->bytes_sent;
+    curr->bytes_received = eb->bytes_received;
+    curr->call_tcp_sent = eb->call_tcp_sent;
+    curr->call_tcp_received = eb->call_tcp_received;
+    curr->retransmit = eb->retransmit;
+    curr->call_udp_sent = eb->call_udp_sent;
+    curr->call_udp_received = eb->call_udp_received;
 }
 
 /**
@@ -1441,8 +1557,13 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
     ebpf_bandwidth_t *total = &out[0];
     for (i = 1; i < end; i++) {
         ebpf_bandwidth_t *move = &out[i];
-        total->sent += move->sent;
-        total->received += move->received;
+        total->bytes_sent += move->bytes_sent;
+        total->bytes_received += move->bytes_received;
+        total->call_tcp_sent += move->call_tcp_sent;
+        total->call_tcp_received += move->call_tcp_received;
+        total->retransmit += move->retransmit;
+        total->call_udp_sent += move->call_udp_sent;
+        total->call_udp_received += move->call_udp_received;
     }
 }
 
@@ -1467,9 +1588,6 @@ static void ebpf_socket_update_apps_data()
 
         ebpf_socket_fill_publish_apps(key, eb);
 
-        if (eb[0].removed)
-            bpf_map_delete_elem(fd, &key);
-
         pids = pids->next;
     }
 }
@@ -1479,6 +1597,10 @@ static void ebpf_socket_update_apps_data()
  *  FUNCTIONS WITH THE MAIN LOOP
  *
  *****************************************************************/
+
+struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
+                                               NULL, NULL, 1, NULL,
+                                               NULL, ebpf_socket_read_hash };
 
 /**
  * Main loop for this collector.
@@ -1493,10 +1615,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    struct netdata_static_thread socket_threads = {"EBPF SOCKET READ",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, ebpf_socket_read_hash };
-    socket_threads.thread = mallocz(sizeof(netdata_thread_t));;
+    socket_threads.thread = mallocz(sizeof(netdata_thread_t));
 
     netdata_thread_create(socket_threads.thread, socket_threads.name,
                           NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_read_hash, em);
@@ -1594,7 +1713,7 @@ static void clean_allocated_socket_plot()
 }
 
 /**
- * Clean netowrk ports allocated during initializaion.
+ * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
  */
@@ -1650,6 +1769,68 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
+void clean_socket_apps_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(socket_bandwidth_curr[pids->pid]);
+
+        pids = pids->next;
+    }
+}
+
+/**
+ * Cleanup publish syscall
+ *
+ * @param nps list of structures to clean
+ */
+void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps)
+{
+    while (nps) {
+        freez(nps->algorithm);
+        nps = nps->next;
+    }
+}
+
+/**
+ * Clean port Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
+ * Clean IP structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+{
+    ebpf_network_viewer_ip_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_ip_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
 /**
  * Clean up the main thread.
  *
@@ -1657,14 +1838,21 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
  */
 static void ebpf_socket_cleanup(void *ptr)
 {
-    UNUSED(ptr);
-    freez(socket_aggregated_data);
-    freez(socket_publish_aggregated);
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 2*USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
+
+    ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    freez(socket_data.map_fd);
-    freez(socket_bandwidth_curr);
-    freez(socket_bandwidth_prev);
     freez(bandwidth_vector);
 
     freez(socket_values);
@@ -1683,6 +1871,18 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_hostnames(network_viewer_opt.excluded_hostnames);
 
     pthread_mutex_destroy(&nv_mutex);
+    freez(socket_data.map_fd);
+
+    freez(socket_threads.thread);
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
+    finalized_threads = 1;
 }
 
 /*****************************************************************
@@ -1700,12 +1900,11 @@ static void ebpf_socket_cleanup(void *ptr)
  */
 static void ebpf_socket_allocate_global_vectors(size_t length)
 {
-    socket_aggregated_data = callocz(length, sizeof(netdata_syscall_stat_t));
-    socket_publish_aggregated = callocz(length, sizeof(netdata_publish_syscall_t));
+    memset(socket_aggregated_data, 0 ,length * sizeof(netdata_syscall_stat_t));
+    memset(socket_publish_aggregated, 0 ,length * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-    socket_bandwidth_prev = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
@@ -1713,24 +1912,12 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
 }
 
-void change_socket_event()
-{
-    socket_probes[0].type = 'p';
-    socket_probes[4].type = 'p';
-    socket_probes[5].type = 'p';
-    socket_probes[7].name = NULL;
-}
-
 /**
  * Set local function pointers, this function will never be compiled with static libraries
  */
-static void set_local_pointers(ebpf_module_t *em)
+static void set_local_pointers()
 {
     map_fd = socket_data.map_fd;
-
-    if (em->mode == MODE_ENTRY) {
-        change_socket_event();
-    }
 }
 
 /**
@@ -1753,6 +1940,874 @@ static void initialize_inbound_outbound()
  *****************************************************************/
 
 /**
+ * Fill Port list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_port_list_t *move = *out, *store = *out;
+        uint16_t first = ntohs(in->first);
+        uint16_t last = ntohs(in->last);
+        while (move) {
+            uint16_t cmp_first = ntohs(move->first);
+            uint16_t cmp_last = ntohs(move->last);
+            if (cmp_first <= first && first <= cmp_last  &&
+                cmp_first <= last && last <= cmp_last ) {
+                info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
+                     first, last, cmp_first, cmp_last);
+                freez(in->value);
+                freez(in);
+                return;
+            } else if (first <= cmp_first && cmp_first <= last  &&
+                       first <= cmp_last && cmp_last <= last) {
+                info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
+                     first, last, cmp_first, cmp_last);
+                freez(move->value);
+                move->value = in->value;
+                move->first = in->first;
+                move->last = in->last;
+                freez(in);
+                return;
+            }
+
+            store = move;
+            move = move->next;
+        }
+
+        store->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding values %s( %u, %u) to %s port list used on network viewer",
+         in->value, ntohs(in->first), ntohs(in->last),
+         (*out == network_viewer_opt.included_port)?"included":"excluded");
+#endif
+}
+
+/**
+ * Parse Service List
+ *
+ * @param out a pointer to store the link list
+ * @param service the service used to create the structure that will be linked.
+ */
+static void parse_service_list(void **out, char *service)
+{
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+    struct servent *serv = getservbyname((const char *)service, "tcp");
+    if (!serv)
+        serv = getservbyname((const char *)service, "udp");
+
+    if (!serv) {
+        info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdupz(service);
+    w->hash = simple_hash(service);
+
+    w->first = w->last = (uint16_t)serv->s_port;
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Netmask
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param prefix create the netmask based in the CIDR value.
+ *
+ * @return
+ */
+static inline in_addr_t netmask(int prefix) {
+
+    if (prefix == 0)
+        return (~((in_addr_t) - 1));
+    else
+        return (in_addr_t)(~((1 << (32 - prefix)) - 1));
+
+}
+
+/**
+ * Broadcast
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ * @return It returns the last address of the range
+ */
+static inline in_addr_t broadcast(in_addr_t addr, int prefix)
+{
+    return (addr | ~netmask(prefix));
+}
+
+/**
+ * Network
+ *
+ * Copied from iprange (https://github.com/firehol/iprange/blob/master/iprange.h)
+ *
+ * @param addr is the ip address
+ * @param prefix is the CIDR value.
+ *
+ * @return It returns the first address of the range.
+ */
+static inline in_addr_t ipv4_network(in_addr_t addr, int prefix)
+{
+    return (addr & netmask(prefix));
+}
+
+/**
+ * IP to network long
+ *
+ * @param dst the vector to store the result
+ * @param ip the source ip given by our users.
+ * @param domain the ip domain (IPV4 or IPV6)
+ * @param source the original string
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
+{
+    if (inet_pton(domain, ip, dst) <= 0) {
+        error("The address specified (%s) is invalid ", source);
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Get IPV6 Last Address
+ *
+ * @param out the address to store the last address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
+{
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
+        return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0xFFFFFFFFFFFFFFFF;
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+        return;
+    } else if (prefix <= 64) {
+        ret[1] = 0xFFFFFFFFFFFFFFFFULL;
+
+        tmp = be64toh(ret[0]);
+        if (prefix > 0) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp |= ~mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp |= ~mask;
+        ret[1] = htobe64(tmp);
+    }
+
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+}
+
+/**
+ * Calculate ipv6 first address
+ *
+ * @param out the address to store the first address.
+ * @param in the address used to do the math.
+ * @param prefix number of bits used to calculate the address
+ */
+static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in, uint64_t prefix)
+{
+    uint64_t mask,tmp;
+    uint64_t ret[2];
+
+    memcpy(ret, in->addr32, sizeof(union netdata_ip_t));
+
+    if (prefix == 128) {
+        memcpy(out->addr32, in->addr32, sizeof(union netdata_ip_t));
+        return;
+    } else if (!prefix) {
+        ret[0] = ret[1] = 0;
+        memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+        return;
+    } else if (prefix <= 64) {
+        ret[1] = 0ULL;
+
+        tmp = be64toh(ret[0]);
+        if (prefix > 0) {
+            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+            tmp &= mask;
+        }
+        ret[0] = htobe64(tmp);
+    } else {
+        mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
+        tmp = be64toh(ret[1]);
+        tmp &= mask;
+        ret[1] = htobe64(tmp);
+    }
+
+    memcpy(out->addr32, ret, sizeof(union netdata_ip_t));
+}
+
+/**
+ * Is ip inside the range
+ *
+ * Check if the ip is inside a IP range
+ *
+ * @param rfirst    the first ip address of the range
+ * @param rlast     the last ip address of the range
+ * @param cmpfirst  the first ip to compare
+ * @param cmplast   the last ip to compare
+ * @param family    the IP family
+ *
+ * @return It returns 1 if the IP is inside the range and 0 otherwise
+ */
+static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
+                              union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
+{
+    if (family == AF_INET) {
+        if (ntohl(rfirst->addr32[0]) <= ntohl(cmpfirst->addr32[0]) &&
+            ntohl(rlast->addr32[0]) >= ntohl(cmplast->addr32[0]))
+            return 1;
+    } else {
+        if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+            memcmp(rlast->addr8, cmplast->addr8, sizeof(union netdata_ip_t)) >= 0) {
+            return 1;
+        }
+
+    }
+    return 0;
+}
+
+/**
+ * Fill IP list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
+{
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(table);
+#endif
+    if (likely(*out)) {
+        ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
+        while (move) {
+            if (in->ver == move->ver && is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+                info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                     in->value, move->value);
+                freez(in->value);
+                freez(in);
+                return;
+            }
+            store = move;
+            move = move->next;
+        }
+
+        store->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    char first[512], last[512];
+    if (in->ver == AF_INET) {
+        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
+            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
+    } else {
+        if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
+            inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
+            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
+                 first, last,
+                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
+                 table);
+    }
+#endif
+}
+
+/**
+ * Parse IP List
+ *
+ * Parse IP list and link it.
+ *
+ * @param out a pointer to store the link list
+ * @param ip the value given as parameter
+ */
+static void parse_ip_list(void **out, char *ip)
+{
+    ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
+
+    char *ipdup = strdupz(ip);
+    union netdata_ip_t first = { };
+    union netdata_ip_t last = { };
+    char *is_ipv6;
+    if (*ip == '*' && *(ip+1) == '\0') {
+        memset(first.addr8, 0, sizeof(first.addr8));
+        memset(last.addr8, 0xFF, sizeof(last.addr8));
+
+        is_ipv6 = ip;
+
+        clean_ip_structure(list);
+        goto storethisip;
+    }
+
+    char *end = ip;
+    // Move while I cannot find a separator
+    while (*end && *end != '/' && *end != '-') end++;
+
+    // We will use only the classic IPV6 for while, but we could consider the base 85 in a near future
+    // https://tools.ietf.org/html/rfc1924
+    is_ipv6 = strchr(ip, ':');
+
+    int select;
+    if (*end && !is_ipv6) { // IPV4 range
+        select = (*end == '/') ? 0 : 1;
+        *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+            goto cleanipdup;
+        }
+
+        if (!select) { // CIDR
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = (int) str2i(end);
+            if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
+                info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
+                goto cleanipdup;
+            }
+
+            last.addr32[0] = htonl(broadcast(ntohl(first.addr32[0]), select));
+            // This was added to remove
+            // https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
+            UNUSED(last.addr32[0]);
+
+            uint32_t ipv4_test = htonl(ipv4_network(ntohl(first.addr32[0]), select));
+            if (first.addr32[0] != ipv4_test) {
+                first.addr32[0] = ipv4_test;
+                struct in_addr ipv4_convert;
+                ipv4_convert.s_addr = ipv4_test;
+                char ipv4_msg[INET_ADDRSTRLEN];
+                if(inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
+            }
+        } else { // Range
+            select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = ip2nl(last.addr8, end, AF_INET, ipdup);
+            if (select)
+                goto cleanipdup;
+        }
+
+        if (htonl(first.addr32[0]) > htonl(last.addr32[0])) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
+        }
+    } else if (is_ipv6) { // IPV6
+        if (!*end) { // Unique
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+        } else if (*end == '-') {
+            *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
+
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            select = ip2nl(last.addr8, end, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+        } else { // CIDR
+            *end++ = 0x00;
+            if (*end == '!') {
+                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                goto cleanipdup;
+            }
+
+            select = str2i(end);
+            if (select < 0 || select > 128) {
+                info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
+                goto cleanipdup;
+            }
+
+            uint64_t prefix = (uint64_t)select;
+            select = ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            if (select)
+                goto cleanipdup;
+
+            get_ipv6_last_addr(&last, &first, prefix);
+
+            union netdata_ip_t ipv6_test;
+            get_ipv6_first_addr(&ipv6_test, &first, prefix);
+
+            if (memcmp(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t)) != 0) {
+                memcpy(first.addr8, ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                struct in6_addr ipv6_convert;
+                memcpy(ipv6_convert.s6_addr,  ipv6_test.addr8, sizeof(union netdata_ip_t));
+
+                char ipv6_msg[INET6_ADDRSTRLEN];
+                if(inet_ntop(AF_INET6, &ipv6_convert, ipv6_msg, INET6_ADDRSTRLEN))
+                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv6_msg);
+            }
+        }
+
+        if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
+             !memcmp(first.addr32, last.addr32, 2*sizeof(uint32_t))) ||
+            (be64toh(*(uint64_t *)&first.addr32) > be64toh(*(uint64_t *)&last.addr32)) ) {
+            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+                 ipdup);
+            goto cleanipdup;
+        }
+    } else { // Unique ip
+        select = ip2nl(first.addr8, ip, AF_INET, ipdup);
+        if (select)
+            goto cleanipdup;
+
+        memcpy(last.addr8, first.addr8, sizeof(first.addr8));
+    }
+
+    ebpf_network_viewer_ip_list_t *store;
+
+    storethisip:
+    store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
+    store->value = ipdup;
+    store->hash = simple_hash(ipdup);
+    store->ver = (uint8_t)(!is_ipv6)?AF_INET:AF_INET6;
+    memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
+    memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
+
+    fill_ip_list(list, store, "socket");
+    return;
+
+cleanipdup:
+    freez(ipdup);
+}
+
+/**
+ * Parse IP Range
+ *
+ * Parse the IP ranges given and create Network Viewer IP Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+static void parse_ips(char *ptr)
+{
+    // No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        // Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        // No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        // Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isascii(*ptr)) { // Parse port
+            parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
+                          ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+
+
+/**
+ * Parse port list
+ *
+ * Parse an allocated port list with the range given
+ *
+ * @param out a pointer to store the link list
+ * @param range the informed range for the user.
+ */
+static void parse_port_list(void **out, char *range)
+{
+    int first, last;
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+
+    char *copied = strdupz(range);
+    if (*range == '*' && *(range+1) == '\0') {
+        first = 1;
+        last = 65535;
+
+        clean_port_structure(list);
+        goto fillenvpl;
+    }
+
+    char *end = range;
+    //Move while I cannot find a separator
+    while (*end && *end != ':' && *end != '-') end++;
+
+    //It has a range
+    if (likely(*end)) {
+        *end++ = '\0';
+        if (*end == '!') {
+            info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
+            freez(copied);
+            return;
+        }
+        last = str2i((const char *)end);
+    } else {
+        last = 0;
+    }
+
+    first = str2i((const char *)range);
+    if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
+        freez(copied);
+        return;
+    }
+
+    if (!last)
+        last = first;
+
+    if (last < NETDATA_MINIMUM_PORT_VALUE || last > NETDATA_MAXIMUM_PORT_VALUE) {
+        info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
+        freez(copied);
+        return;
+    }
+
+    if (first > last) {
+        info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
+        freez(copied);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w;
+fillenvpl:
+    w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = copied;
+    w->hash = simple_hash(copied);
+    w->first = (uint16_t)htons((uint16_t)first);
+    w->last = (uint16_t)htons((uint16_t)last);
+    w->cmp_first = (uint16_t)first;
+    w->cmp_last = (uint16_t)last;
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Read max dimension.
+ *
+ * Netdata plot two dimensions per connection, so it is necessary to adjust the values.
+ *
+ * @param cfg the configuration structure
+ */
+static void read_max_dimension(struct config *cfg)
+{
+    int maxdim ;
+    maxdim = (int) appconfig_get_number(cfg,
+                                        EBPF_NETWORK_VIEWER_SECTION,
+                                        EBPF_MAXIMUM_DIMENSIONS,
+                                        NETDATA_NV_CAP_VALUE);
+    if (maxdim < 0) {
+        error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
+              maxdim, NETDATA_NV_CAP_VALUE);
+        maxdim = NETDATA_NV_CAP_VALUE;
+    }
+
+    maxdim /= 2;
+    if (!maxdim) {
+        info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
+        network_viewer_opt.max_dim = 1;
+        return;
+    }
+
+    network_viewer_opt.max_dim = (uint32_t)maxdim;
+}
+
+/**
+ * Parse Port Range
+ *
+ * Parse the port ranges given and create Network Viewer Port Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+static void parse_ports(char *ptr)
+{
+    // No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        // Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        // No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        // Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isdigit(*ptr)) { // Parse port
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
+        } else if (isalpha(*ptr)) { // Parse service
+            parse_service_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                               ptr);
+        } else if (*ptr == '*') { // All
+            parse_port_list((!neg)?(void **)&network_viewer_opt.included_port:(void **)&network_viewer_opt.excluded_port,
+                            ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+/**
+ * Link hostname
+ *
+ * @param out is the output link list
+ * @param in the hostname to add to list.
+ */
+static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_network_viewer_hostname_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_hostname_list_t *move = *out;
+        for (; move->next ; move = move->next ) {
+            if (move->hash == in->hash && !strcmp(move->value, in->value)) {
+                info("The hostname %s was already inserted, it will be ignored.", in->value);
+                freez(in->value);
+                simple_pattern_free(in->value_pattern);
+                freez(in);
+                return;
+            }
+        }
+
+        move->next = in;
+    } else {
+        *out = in;
+    }
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding value %s to %s hostname list used on network viewer",
+         in->value,
+         (*out == network_viewer_opt.included_hostnames)?"included":"excluded");
+#endif
+}
+
+/**
+ * Link Hostnames
+ *
+ * Parse the list of hostnames to create the link list.
+ * This is not associated with the IP, because simple patterns like *example* cannot be resolved to IP.
+ *
+ * @param out is the output link list
+ * @param parse is a pointer with the text to parser.
+ */
+static void link_hostnames(char *parse)
+{
+    // No value
+    if (unlikely(!parse))
+        return;
+
+    while (likely(parse)) {
+        // Find the first valid value
+        while (isspace(*parse)) parse++;
+
+        // No valid value found
+        if (unlikely(!*parse))
+            return;
+
+        // Find space that ends the list
+        char *end = strchr(parse, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*parse == '!') {
+            neg++;
+            parse++;
+        }
+
+        ebpf_network_viewer_hostname_list_t *hostname = callocz(1 , sizeof(ebpf_network_viewer_hostname_list_t));
+        hostname->value = strdupz(parse);
+        hostname->hash = simple_hash(parse);
+        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT);
+
+        link_hostname((!neg)?&network_viewer_opt.included_hostnames:&network_viewer_opt.excluded_hostnames,
+                      hostname);
+
+        parse = end;
+    }
+}
+
+/**
+ * Parse network viewer section
+ *
+ * @param cfg the configuration structure
+ */
+void parse_network_viewer_section(struct config *cfg)
+{
+    read_max_dimension(cfg);
+
+    network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(cfg,
+                                                                           EBPF_NETWORK_VIEWER_SECTION,
+                                                                           EBPF_CONFIG_RESOLVE_HOSTNAME,
+                                                                           CONFIG_BOOLEAN_NO);
+
+    network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(cfg,
+                                                                          EBPF_NETWORK_VIEWER_SECTION,
+                                                                          EBPF_CONFIG_RESOLVE_SERVICE,
+                                                                          CONFIG_BOOLEAN_NO);
+
+    char *value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL);
+    parse_ports(value);
+
+    if (network_viewer_opt.hostname_resolution_enabled) {
+        value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_HOSTNAMES, NULL);
+        link_hostnames(value);
+    } else {
+        info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
+    }
+
+    value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION,
+                          "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
+    parse_ips(value);
+}
+
+/**
+ * Link dimension name
+ *
+ * Link user specified names inside a link list.
+ *
+ * @param port the port number associated to the dimension name.
+ * @param hash the calculated hash for the dimension name.
+ * @param name the dimension name.
+ */
+static void link_dimension_name(char *port, uint32_t hash, char *value)
+{
+    int test = str2i(port);
+    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
+        error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
+        return;
+    }
+
+    ebpf_network_viewer_dim_name_t *w;
+    w = callocz(1, sizeof(ebpf_network_viewer_dim_name_t));
+
+    w->name = strdupz(value);
+    w->hash = hash;
+
+    w->port = (uint16_t) htons(test);
+
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    if (unlikely(!names)) {
+        network_viewer_opt.names = w;
+    } else {
+        for (; names->next; names = names->next) {
+            if (names->port == w->port) {
+                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
+                freez(names->name);
+                names->name = w->name;
+                names->hash = w->hash;
+                freez(w);
+                return;
+            }
+        }
+        names->next = w;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, htons(w->port));
+#endif
+}
+
+/**
+ * Parse service Name section.
+ *
+ * This function gets the values that will be used to overwrite dimensions.
+ *
+ * @param cfg the configuration structure
+ */
+void parse_service_name_section(struct config *cfg)
+{
+    struct section *co = appconfig_get_section(cfg, EBPF_SERVICE_NAME_SECTION);
+    if (co) {
+        struct config_option *cv;
+        for (cv = co->values; cv ; cv = cv->next) {
+            link_dimension_name(cv->name, cv->hash, cv->value);
+        }
+    }
+
+    // Always associated the default port to Netdata
+    ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
+    if (names) {
+        uint16_t default_port = htons(19999);
+        while (names) {
+            if (names->port == default_port)
+                return;
+
+            names = names->next;
+        }
+    }
+
+    char *port_string = getenv("NETDATA_LISTEN_PORT");
+    if (port_string) {
+        // if variable has an invalid value, we assume netdata is using 19999
+        int default_port = str2i(port_string);
+        if (default_port > 0 && default_port < 65536)
+            link_dimension_name(port_string, simple_hash(port_string), "Netdata");
+    }
+}
+
+/**
  * Socket thread
  *
  * Thread used to generate socket charts.
@@ -1765,11 +2820,17 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
+    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&socket_data);
+
+    ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
+    parse_network_viewer_section(&socket_config);
+    parse_service_name_section(&socket_config);
 
     if (!em->enabled)
         goto endsocket;
@@ -1788,19 +2849,24 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
-    set_local_pointers(em);
-    if (ebpf_load_program(
-            ebpf_plugin_dir, em->thread_id, em->mode, kernel_string, em->thread_name, socket_data.map_fd)) {
+    set_local_pointers();
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
+    if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endsocket;
     }
 
+    int algorithms[NETDATA_MAX_SOCKET_VECTOR] = {
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
+    };
     ebpf_global_labels(
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
-        NETDATA_MAX_SOCKET_VECTOR);
+        algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
     ebpf_create_global_charts(em);
 
+    finalized_threads = 0;
     pthread_mutex_unlock(&lock);
 
     socket_collector((usec_t)(em->update_time * USEC_PER_SEC), em);

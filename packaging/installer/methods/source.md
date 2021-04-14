@@ -1,7 +1,7 @@
 <!--
 title: "Manually build Netdata from source"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
 description: "Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts."
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
 -->
 
 # Manually build Netdata from source
@@ -62,9 +62,9 @@ Netdata Cloud functionality. To prepare this library for the build system:
     of `packaging/mosquitto.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
     -   Navigating to https://github.com/netdata/mosquitto/releases and
-        donwloading and unpacking the source code archive for that release.
+        downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
-3.  If building on a platfom other than Linux, prepare the mosquitto
+3.  If building on a platform other than Linux, prepare the mosquitto
     sources by running `cmake -D WITH_STATIC_LIBRARIES:boolean=YES .` in
     the mosquitto source directory.
 4.  Build mosquitto by running `make -C lib` in the mosquitto source directory.
@@ -89,9 +89,9 @@ library for the build system:
     of `packaging/libwebsockets.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
     -   Navigating to https://github.com/warmcat/libwebsockets/releases and
-        donwloading and unpacking the source code archive for that release.
+        downloading and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
-3.  Prepare the libweboskcets sources by running `cmake -D
+3.  Prepare the libwebsockets sources by running `cmake -D
     LWS_WITH_SOCKS5:bool=ON .` in the libwebsockets source directory.
 4.  Build libwebsockets by running `make` in the libwebsockets source
     directory.
@@ -112,7 +112,7 @@ you can do the following to prepare a copy for the build system:
 1.  Verify the tag that Netdata expects to be used by checking the contents
     of `packaging/jsonc.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/json-c/json-c and donwloading
+    -   Navigating to https://github.com/json-c/json-c and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the JSON-C sources by running `cmake -DBUILD_SHARED_LIBS=OFF .`
@@ -201,7 +201,7 @@ NPM. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/dashboard.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/dashboard and donwloading
+    -   Navigating to https://github.com/netdata/dashboard and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `npm install` in the dashboard source tree.
@@ -216,7 +216,7 @@ and are developed in a separate repository from the mian Netdata code.
 An installation without these collectors is still usable, but will be
 unable to collect metrics for a number of network services the system
 may be providing. You can either install a pre-built copy of these
-eollectors, or build them locally.
+collectors, or build them locally.
 
 #### Installing the pre-built Go collectors
 
@@ -229,7 +229,7 @@ we officially support. To use one of these:
     required release, and download the `go.d.plugin-*.tar.gz` file
     for your system type and CPu architecture and the `config.tar.gz`
     configuration file archive.
-3.  Extract the `go.d.plugin-*.tar.gz` archive into a temprary
+3.  Extract the `go.d.plugin-*.tar.gz` archive into a temporary
     location, and then copy the single file in the archive to
     `/usr/libexec/netdata/plugins.d` or the equivalent location for your
     build of Netdata and rename it to `go.d.plugin`.
@@ -246,12 +246,12 @@ newer. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/go.d.plugin and donwloading
+    -   Navigating to https://github.com/netdata/go.d.plugin and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `make` in the go.d.plugin source tree.
 4.  Copy `bin/godplugin` to `/usr/libexec/netdata/plugins.d` or th
-    eequivalent location for your build of Netdata and rename it to
+    equivalent location for your build of Netdata and rename it to
     `go.d.plugin`.
 5.  Copy the contents of the `config` directory to `/etc/netdata` or the
     equivalent location for your build of Netdata.
@@ -274,7 +274,7 @@ using glibc or musl. To use one of these:
     the contents of `packaging/ebpf.version` in your Netdata sources.
 2.  Go to https://github.com/netdata/kernel-collector/releases, select the
     required release, and download the `netdata-kernel-collector-*.tar.xz`
-    file for the libc variant your system uses (eithe rmusl or glibc).
+    file for the libc variant your system uses (either rmusl or glibc).
 3.  Extract the contents of the archive to a temporary location, and then
     copy all of the `.o` and `.so.*` files and the contents of the `library/`
     directory to `/usr/libexec/netdata/plugins.d` or the equivalent location
@@ -288,4 +288,4 @@ repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fsource.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fsource&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

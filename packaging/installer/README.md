@@ -48,11 +48,16 @@ page](/packaging/installer/methods/kickstart.md).
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
-When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
-a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+### Post-installation
 
-Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](/docs/getting-started.md) for a quick overview.
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
 
 ## Have a different operating system, or want to try another method?
 
@@ -140,6 +145,17 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
 With automatic updates disabled, you can choose exactly when and how you [update
 Netdata](/packaging/installer/UPDATE.md).
 
+### Network usage of Netdata’s automatic updater
+
+The auto-update functionality set up by the installation scripts requires working internet access to function
+correctly. In particular, it currently requires access to GitHub (to check if a newer version of the updater script
+is available or not, as well as potentially fetching build-time dependencies that are bundled as part of the install),
+and Google Cloud Storage (to check for newer versions of Netdata and download the sources if there is a newer version).
+
+Note that the auto-update functionality will check for updates to itself independently of updates to Netdata,
+and will try to use the latest version of the updater script whenever possible. This is intended to reduce the
+amount of effort required by users to get updates working again in the event of a bug in the updater code.
+
 ## Nightly vs. stable releases
 
 The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's
@@ -168,7 +184,7 @@ the community helps fix any bugs that might have been introduced in previous rel
     installation
 -   Retain more control over the Netdata version you use
 
-## Installation notes and known issues
+## Troubleshooting and known issues
 
 We are tracking a few issues related to installation and packaging.
 
@@ -216,8 +232,8 @@ the lines to match the output from `ls -la` above and uncomment them if necessar
     web files group = netdata
 ```
 
-Save the file, [restart the Netdata Agent](/docs/getting-started.md#start-stop-and-restart-netdata), and try accessing
-the dashboard again.
+Save the file, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, and try accessing the dashboard again.
 
 ### Multiple versions of OpenSSL
 
@@ -233,3 +249,5 @@ issue altogether. Or, you can manually remove one version of OpenSSL to remove t
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

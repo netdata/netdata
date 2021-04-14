@@ -1,24 +1,24 @@
 <!--
----
 title: "Install Netdata on offline systems"
+description: "Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
----
 -->
 
 # Install Netdata on offline systems
 
-You can install Netdata on systems without internet access, but you need to take a few extra steps to make it work.
+The Netdata Agent installs on offline or air gapped systems with a few additional steps.
 
 By default, the `kickstart.sh` and `kickstart-static64.sh` download Netdata assets, like the precompiled binary and a
-few dependencies, using the system's internet connection, but you can also supply these files from the local filesystem.
+few dependencies, using the system's internet connection, but the Agent installer can also use equivalent files already
+present on the local filesystem.
 
 First, download the required files. If you're using `kickstart.sh`, you need the Netdata tarball, the checksums, the
 go.d plugin binary, and the go.d plugin configuration. If you're using `kickstart-static64.sh`, you need only the
 Netdata tarball and checksums.
 
-Download the files you need to a system of yours that's connected to the internet. You can use the commands below, or
-visit the [latest Netdata release page](https://github.com/netdata/netdata/releases/latest) and [latest go.d plugin
-release page](https://github.com/netdata/go.d.plugin/releases) to download the required files manually.
+Download the files you need to a system of yours that's connected to the internet. Use the commands below, or visit the
+[latest Netdata release page](https://github.com/netdata/netdata/releases/latest) and [latest go.d plugin release
+page](https://github.com/netdata/go.d.plugin/releases) to download the required files manually.
 
 **If you're using `kickstart.sh`**, use the following commands:
 
@@ -76,8 +76,15 @@ bash kickstart.sh --local-files /tmp/netdata-(version-number-here).tar.gz /tmp/s
 bash kickstart-static64.sh --local-files /tmp/netdata-(version-number-here).gz.run /tmp/sha256sums.txt
 ```
 
-Now that Netdata is installed, be sure to visit our [getting started guide](/docs/getting-started.md) for a
-quick overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. 
+## What's next?
 
-Or, get the full guided tour of Netdata's capabilities with our [step-by-step
-guide](/docs/guides/step-by-step/step-00.md)!
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackages%2Finstaller%2Fmethods%2Foffline&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

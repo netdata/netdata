@@ -5,7 +5,6 @@
 
 #include "../daemon/common.h"
 #include "libnetdata/libnetdata.h"
-#include "aclk_common.h"
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
@@ -43,12 +42,6 @@ extern struct aclk_metrics_per_sample {
     volatile uint32_t latency_count;
 #endif
 
-    volatile uint32_t write_q_added;
-    volatile uint32_t write_q_consumed;
-
-    volatile uint32_t read_q_added;
-    volatile uint32_t read_q_consumed;
-
     volatile uint32_t cloud_req_recvd;
     volatile uint32_t cloud_req_err;
 
@@ -62,5 +55,10 @@ extern uint32_t *aclk_queries_per_thread;
 void *aclk_stats_main_thread(void *ptr);
 void aclk_stats_thread_cleanup();
 void aclk_stats_upd_online(int online);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+void aclk_stats_msg_published(uint16_t id);
+void aclk_stats_msg_puback(uint16_t id);
+#endif /* NETDATA_INTERNAL_CHECKS */
 
 #endif /* NETDATA_ACLK_STATS_H */

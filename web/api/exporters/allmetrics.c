@@ -4,25 +4,38 @@
 
 struct prometheus_output_options {
     char *name;
-    BACKENDS_PROMETHEUS_OUTPUT_OPTIONS flag;
+    PROMETHEUS_OUTPUT_OPTIONS flag;
 } prometheus_output_flags_root[] = {
-        { "help",       BACKENDS_PROMETHEUS_OUTPUT_HELP       },
-        { "types",      BACKENDS_PROMETHEUS_OUTPUT_TYPES      },
-        { "names",      BACKENDS_PROMETHEUS_OUTPUT_NAMES      },
-        { "timestamps", BACKENDS_PROMETHEUS_OUTPUT_TIMESTAMPS },
-        { "variables",  BACKENDS_PROMETHEUS_OUTPUT_VARIABLES  },
-        { "oldunits",   BACKENDS_PROMETHEUS_OUTPUT_OLDUNITS   },
-        { "hideunits",  BACKENDS_PROMETHEUS_OUTPUT_HIDEUNITS  },
-        // terminator
-        { NULL, BACKENDS_PROMETHEUS_OUTPUT_NONE },
+    { "help",       PROMETHEUS_OUTPUT_HELP       },
+    { "types",      PROMETHEUS_OUTPUT_TYPES      },
+    { "names",      PROMETHEUS_OUTPUT_NAMES      },
+    { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
+    { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
+    { "oldunits",   PROMETHEUS_OUTPUT_OLDUNITS   },
+    { "hideunits",  PROMETHEUS_OUTPUT_HIDEUNITS  },
+    // terminator
+    { NULL, PROMETHEUS_OUTPUT_NONE },
 };
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
     const char *prometheus_server = w->client_ip;
-    uint32_t prometheus_backend_options = global_backend_options;
-    BACKENDS_PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = BACKENDS_PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?BACKENDS_PROMETHEUS_OUTPUT_NAMES:0);
-    const char *prometheus_prefix = global_backend_prefix;
+
+    uint32_t prometheus_exporting_options;
+    if (prometheus_exporter_instance)
+        prometheus_exporting_options = prometheus_exporter_instance->config.options;
+    else
+        prometheus_exporting_options = global_backend_options;
+
+    PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options =
+        PROMETHEUS_OUTPUT_TIMESTAMPS |
+        ((prometheus_exporting_options & BACKEND_OPTION_SEND_NAMES) ? PROMETHEUS_OUTPUT_NAMES : 0);
+
+    const char *prometheus_prefix;
+    if (prometheus_exporter_instance)
+        prometheus_prefix = prometheus_exporter_instance->config.prefix;
+    else
+        prometheus_prefix = global_backend_prefix;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -51,7 +64,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             prometheus_prefix = value;
         }
         else if(!strcmp(name, "data") || !strcmp(name, "source") || !strcmp(name, "data source") || !strcmp(name, "data-source") || !strcmp(name, "data_source") || !strcmp(name, "datasource")) {
-            prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
+            prometheus_exporting_options = backend_parse_data_source(value, prometheus_exporting_options);
         }
         else {
             int i;
@@ -84,24 +97,24 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            backends_rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
                     host
                     , w->response.data
                     , prometheus_server
                     , prometheus_prefix
-                    , prometheus_backend_options
+                    , prometheus_exporting_options
                     , prometheus_output_options
             );
             return HTTP_RESP_OK;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            backends_rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
                     host
                     , w->response.data
                     , prometheus_server
                     , prometheus_prefix
-                    , prometheus_backend_options
+                    , prometheus_exporting_options
                     , prometheus_output_options
             );
             return HTTP_RESP_OK;

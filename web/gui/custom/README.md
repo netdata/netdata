@@ -1,8 +1,7 @@
 <!--
----
 title: "Custom dashboards"
+description: "Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/custom/README.md
----
 -->
 
 # Custom dashboards
@@ -183,14 +182,14 @@ by adding this fragment before loading it:
 
 ```html
 <script>var netdataDontStart = true;</script>
-`"
+```
 
 The above, will inform the `dashboard.js` to load everything, but not process the web page until you tell it to.
 You can tell it to start processing the page, by running this javascript code:
 
 ```js
 NETDATA.start();
-`"
+```
 
 Be careful not to call the `NETDATA.start()` multiple times. Each call to this
 function will spawn a new thread that will start refreshing the charts.
@@ -325,7 +324,7 @@ Netdata supports a number of chart libraries. The default chart library is
 Each chart library has a number of specific settings. To learn more about them,
 you should investigate the documentation of the given chart library, or visit
 the appropriate JavaScript file that defines the library's options. These files
-are concatenated into the monolithin `dashboard.js` for deployment.
+are concatenated into the monolithic `dashboard.js` for deployment.
 
 -   [Dygraph](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L2034)
 -   [d3](https://github.com/netdata/netdata/blob/5b57fc441c40959514c4e2d0863be2e6a417e352/web/gui/dashboard.js#L4095)

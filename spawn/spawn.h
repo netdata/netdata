@@ -42,7 +42,7 @@ struct spawn_prot_header {
 #define SPAWN_CMD_DONE              0x00000008
 
 struct spawn_cmd_info {
-    avl avl;
+    avl_t avl;
 
     /* concurrency control per command */
     uv_mutex_t mutex;
@@ -58,7 +58,7 @@ struct spawn_cmd_info {
 
 /* spawn command queue */
 struct spawn_queue {
-    avl_tree cmd_tree;
+    avl_tree_type cmd_tree;
 
     /* concurrency control of command queue */
     uv_mutex_t mutex;

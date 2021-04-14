@@ -9,7 +9,7 @@
     "/info": {
       "get": {
         "summary": "Get netdata basic information",
-        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization, K8s nodes and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
         "responses": {
           "200": {
             "description": "netdata basic information.",
@@ -130,13 +130,24 @@
           {
             "name": "chart",
             "in": "query",
-            "description": "The id of the chart as returned by the /charts call.",
-            "required": true,
+            "description": "The id of the chart as returned by the /charts call. Note chart or context must be specified",
+            "required": false,
             "allowEmptyValue": false,
             "schema": {
               "type": "string",
               "format": "as returned by /charts",
               "default": "system.cpu"
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "The context of the chart as returned by the /charts call. Note chart or context must be specified",
+            "required": false,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts"
             }
           },
           {
@@ -156,7 +167,7 @@
           {
             "name": "after",
             "in": "query",
-            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). If not specified the default is -600 seconds. Netdata will adapt this parameter to the boundaries of the round robin database unless the allow_past option is specified.",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -191,7 +202,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -273,7 +284,8 @@
                   "unaligned",
                   "match-ids",
                   "match-names",
-                  "showcustomvars"
+                  "showcustomvars",
+                  "allow_past"
                 ]
               },
               "default": [
@@ -328,7 +340,7 @@
             "description": "Bad request - the body will include a message stating what is wrong."
           },
           "404": {
-            "description": "No chart with the given id is found."
+            "description": "Chart or context is not found. The supplied chart or context will be reported."
           },
           "500": {
             "description": "Internal server error. This usually means the server is out of memory."
@@ -404,7 +416,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -478,7 +490,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -502,7 +514,7 @@
           {
             "name": "value_color",
             "in": "query",
-            "description": "A color to be used for the background of the value *(right)* part of badge. You can set multiple using a pipe with a condition each, like this: `color<value|color:null` The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter. Currently only integers are suported as values.",
+            "description": "A color to be used for the background of the value *(right)* part of badge. You can set multiple using a pipe with a condition each, like this: `color<value|color:null` The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter. Currently only integers are supported as values.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
@@ -513,14 +525,14 @@
           {
             "name": "text_color_lbl",
             "in": "query",
-            "description": "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
+            "description": "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -544,14 +556,14 @@
           {
             "name": "text_color_val",
             "in": "query",
-            "description": "Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
+            "description": "Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
               "oneOf": [
                 {
                   "type": "string",
-                  "enum" : [
+                  "enum": [
                     "green",
                     "brightgreen",
                     "yellow",
@@ -812,7 +824,7 @@
     "/alarms": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the Netdata agent. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned, the same response is delivered when \"?active\" is passed in the URL. By passing \"?all\", all the enabled alarms are returned.",
+        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned.",
         "parameters": [
           {
             "name": "all",
@@ -852,7 +864,7 @@
     "/alarms_values": {
       "get": {
         "summary": "Get a list of active or raised alarms on the server",
-        "description": "The alarms endpoint returns the list of all raised or enabled alarms on the Netdata agent. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned, the same response is delivered when \"?active\" is passed in the URL. By passing \"?all\", all the enabled alarms are returned.",
+        "description": "The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing \"?all\", all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value` and alarm `status`.",
         "parameters": [
           {
             "name": "all",
@@ -986,7 +998,7 @@
     "/manage/health": {
       "get": {
         "summary": "Accesses the health management API to control health checks and notifications at runtime.",
-        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenaria, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
+        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenarios, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
         "parameters": [
           {
             "name": "cmd",
@@ -1091,6 +1103,35 @@
               "host2.example.com"
             ]
           },
+          "mirrored_hosts_status": {
+            "type": "array",
+            "description": "List of details of hosts mirrored to this served (including self). Indexes correspond to indexes in \"mirrored_hosts\".",
+            "items": {
+              "type": "object",
+              "description": "Host data",
+              "properties": {
+                "guid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": false,
+                  "description": "Host unique GUID from `netdata.public.unique.id`.",
+                  "example": "245e4bff-3b34-47c1-a6e5-5c535a9abfb2"
+                },
+                "reachable": {
+                  "type": "boolean",
+                  "nullable": false,
+                  "description": "Current state of streaming. Always true for localhost/self."
+                },
+                "claim_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true,
+                  "description": "Cloud GUID/identifier in case the host is claimed. If child status unknown or unclaimed this field is set to `null`",
+                  "example": "c3b2a66a-3052-498c-ac52-7fe9e8cccb0c"
+                }
+              }
+            }
+          },
           "os_name": {
             "type": "string",
             "description": "Operating System Name.",
@@ -1130,6 +1171,11 @@
             "type": "string",
             "description": "Kernel Version.",
             "example": "4.19.32-1-MANJARO"
+          },
+          "is_k8s_node": {
+            "type": "boolean",
+            "description": "Netdata is running on a K8s node.",
+            "example": false
           },
           "architecture": {
             "type": "string",
@@ -1458,7 +1504,7 @@
           },
           "update_every": {
             "type": "number",
-            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
+            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (independently of the current view)."
           },
           "view_update_every": {
             "type": "number",
@@ -1466,11 +1512,11 @@
           },
           "first_entry": {
             "type": "number",
-            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
+            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (independently of the current view)."
           },
           "last_entry": {
             "type": "number",
-            "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
+            "description": "The UNIX timestamp of the latest entry in the round robin database (independently of the current view)."
           },
           "after": {
             "type": "number",
@@ -1503,7 +1549,7 @@
             }
           },
           "latest_values": {
-            "description": "The latest values collected for the chart (indepedently of the current view).",
+            "description": "The latest values collected for the chart (independently of the current view).",
             "type": "array",
             "items": {
               "type": "string"

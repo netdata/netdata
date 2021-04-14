@@ -3,6 +3,10 @@
 #ifndef NETDATA_LIB_H
 #define NETDATA_LIB_H 1
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -201,11 +205,7 @@
 #define WARNUNUSED
 #endif
 
-#ifdef abs
-#undef abs
-#endif
-#define abs(x) (((x) < 0)? (-(x)) : (x))
-
+#define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
@@ -287,10 +287,12 @@ extern char *read_by_filename(char *filename, long *file_size);
 #endif
 #endif
 
-#define BITS_IN_A_KILOBIT 1000
+#define BITS_IN_A_KILOBIT     1000
+#define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
 #define UNUSED(x) (void)(x)
+#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
@@ -314,7 +316,7 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
-#ifdef HAVE_LIBBPF
+#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
 #include "eval/eval.h"
@@ -327,5 +329,9 @@ extern char *netdata_configured_host_prefix;
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif // NETDATA_LIB_H

@@ -80,7 +80,7 @@ Number of charts depends on mongodb version, storage engine and other features (
 13. **Cache metrics** (WiredTiger):
 
     -   percentage of bytes currently in the cache (amount of space taken by cached data)
-    -   percantage of tracked dirty bytes in the cache (amount of space taken by dirty data)
+    -   percentage of tracked dirty bytes in the cache (amount of space taken by dirty data)
 
 14. **Pages evicted from cache** (WiredTiger):
 
@@ -183,8 +183,8 @@ db.createUser({
 
 ## Configuration
 
-Edit the `python.d/mongodb.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/step-by-step/step-04.md#find-your-netdataconf-file), which is typically at `/etc/netdata`.
+Edit the `python.d/mongodb.conf` configuration file using `edit-config` from the Netdata [config
+directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

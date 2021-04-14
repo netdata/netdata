@@ -22,14 +22,14 @@ inline int health_alarm_log_open(RRDHOST *host) {
     return -1;
 }
 
-inline void health_alarm_log_close(RRDHOST *host) {
+static inline void health_alarm_log_close(RRDHOST *host) {
     if(host->health_log_fp) {
         fclose(host->health_log_fp);
         host->health_log_fp = NULL;
     }
 }
 
-inline void health_log_rotate(RRDHOST *host) {
+static inline void health_log_rotate(RRDHOST *host) {
     static size_t rotate_every = 0;
 
     if(unlikely(rotate_every == 0)) {
@@ -73,13 +73,13 @@ inline void health_label_log_save(RRDHOST *host) {
     if(likely(host->health_log_fp)) {
         BUFFER *wb = buffer_create(1024);
         rrdhost_check_rdlock(host);
-        netdata_rwlock_rdlock(&host->labels_rwlock);
-        struct label *l=localhost->labels;
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+        struct label *l=localhost->labels.head;
         while (l != NULL) {
             buffer_sprintf(wb,"%s=%s\t ", l->key, l->value);
             l = l->next;
         }
-        netdata_rwlock_unlock(&host->labels_rwlock);
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
 
         char *write = (char *) buffer_tostring(wb) ;
 
@@ -153,12 +153,16 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
         }
     }
 #ifdef ENABLE_ACLK
-    if (netdata_cloud_setting)
-        aclk_update_alarm(host, ae);
+    if (netdata_cloud_setting) {
+        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
+            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
+            aclk_update_alarm(host, ae);
+        }
+    }
 #endif
 }
 
-uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
+static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
 {
     uint32_t hash_chart = simple_hash(chart);
     uint32_t hash_name = simple_hash(name);
@@ -174,7 +178,7 @@ uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, u
     return 1;
 }
 
-inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
+static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     errno = 0;
 
     char *s, *buf = mallocz(65536 + 1);
@@ -209,8 +213,8 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
             ALARM_ENTRY *ae = NULL;
 
-            if(entries < 26) {
-                error("HEALTH [%s]: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring it.", host->hostname, line, filename, entries);
+            if(entries < 27) {
+                error("HEALTH [%s]: line %zu of file '%s' should have at least 27 entries, but it has %d. Ignoring it.", host->hostname, line, filename, entries);
                 errored++;
                 continue;
             }
@@ -239,7 +243,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
                 if (!rc) {
                     for(rc = host->alarms; rc ; rc = rc->next) {
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl *)rc);
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
                         if(rdcmp != rc) {
                             error("Cannot insert the alarm index ID using log %s", rc->name);
                         }
@@ -297,7 +301,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 continue;
             }
 
-            // check for a possible host missmatch
+            // check for a possible host mismatch
             //if(strcmp(pointers[1], host->hostname))
             //    error("HEALTH [%s]: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", host->hostname, line, filename, pointers[1], host->hostname);
 

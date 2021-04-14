@@ -64,7 +64,7 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
         }
     }
 
-    if(unlikely(!rrdset_is_available_for_backends(st))) {
+    if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, host->hostname);
         return 0;
     }

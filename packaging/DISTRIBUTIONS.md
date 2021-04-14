@@ -1,8 +1,6 @@
 <!--
----
 title: "Netdata distribution support matrix"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/DISTRIBUTIONS.md
----
 -->
 
 # Netdata distribution support matrix
@@ -21,7 +19,7 @@ have complete visibility over the range of support.
 -   **Family**: The family that the OS belongs to
 -   **CI: Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
 -   **CI: Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
--   **CD**: Continious deployment support has been fully enabled for this operating system
+-   **CD**: Continuous deployment support has been fully enabled for this operating system
 -   **.DEB**: We provide a `.DEB` package for that particular operating system
 -   **.RPM**: We provide a `.RPM` package for that particular operating system
 -   **Installer**: Running netdata from source, using our installer, is working for this operating system

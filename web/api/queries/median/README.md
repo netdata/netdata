@@ -1,8 +1,7 @@
 <!--
----
 title: "Median"
+description: "Use median in API queries and health entities to find the 'middle' value from a sample, eliminating any unwanted spikes in the returned metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/median/README.md
----
 -->
 
 # Median

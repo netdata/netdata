@@ -39,6 +39,7 @@ int registry_init(void) {
     registry.registry_to_announce = config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
     registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
     registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
+    registry.enable_cookies_samesite_secure = config_get_boolean(CONFIG_SECTION_REGISTRY, "enable cookies SameSite and Secure", 1);
 
     registry_update_cloud_base_url();
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);

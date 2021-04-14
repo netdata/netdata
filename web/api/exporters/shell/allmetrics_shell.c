@@ -119,7 +119,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
                            , st->family
                            , st->context
                            , st->units
-                           , rrdset_last_entry_t(st)
+                           , rrdset_last_entry_t_nolock(st)
             );
 
             chart_counter++;

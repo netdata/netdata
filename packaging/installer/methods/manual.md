@@ -1,8 +1,7 @@
 <!--
----
 title: "Install Netdata on Linux from a Git checkout"
+description: "Use the Netdata Agent source code from GitHub, plus helper scripts to set up your system, to install Netdata without packages or binaries."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
----
 -->
 
 # Install Netdata on Linux from a Git checkout
@@ -33,7 +32,7 @@ and other operating systems and is regularly tested. You can find this tool [her
 
 -   **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
 
--   **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
+-   **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
     -   Please note that for RHEL/CentOS you need
         [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
         In addition, RHEL/CentOS version 6 also need
@@ -148,7 +147,7 @@ And install the minimum required dependencies.
 ### CentOS / RHEL 8.x
 
 For CentOS / RHEL 8.x a lot of development packages have moved out into their
-own separate repositories. Some other dependeicies are either missing completely
+own separate repositories. Some other dependencies are either missing completely
 or have to be sourced by 3rd-parties.
 
 CentOS 8.x:
@@ -164,7 +163,7 @@ And install the minimum required dependencies:
 yum install -y 'dnf-command(config-manager)'
 
 # Enable PowerTools
-yum config-manager --set-enabled PowerTools
+yum config-manager --set-enabled powertools
 
 # Enable EPEL
 yum install -y epel-release
@@ -187,7 +186,7 @@ Do this to install and run Netdata:
 
 ```sh
 # download it - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=100
+git clone https://github.com/netdata/netdata.git --depth=100 --recursive
 cd netdata
 
 # run script with root privileges to build, install, start Netdata
@@ -218,8 +217,13 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ## What's next?
 
-When you finish installing Netdata, be sure to visit our [step-by-step guide](/docs/guides/step-by-step/step-00.md) for
-a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
+[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
-guide](/docs/getting-started.md) for a quick overview.
+Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
+solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
+external databases, and more.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2Fmethods%2Fmanual&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -1,12 +1,10 @@
 <!--
----
-title: "Web dashboards overview"
-date: 2020-03-11
+title: "Dashboards"
+description: "Every Netdata Agent comes bundled with hundreds of interactive, customizable charts designed by monitoring and troubleshooting experts."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/README.md
----
 -->
 
-# Web dashboards overview
+# Dashboards
 
 Because Netdata is a health monitoring and _performance troubleshooting_ system,
 we put a lot of emphasis on real-time, meaningful, and context-aware charts.
@@ -16,11 +14,10 @@ team and the community, but you can also customize them yourself.
 
 There are two primary ways to view Netdata's dashboards:
 
-1.  The [standard web dashboard](/web/gui/README.md) that comes pre-configured with every
-   Netdata installation. You can see it at `http://SERVER-IP:19999`, or
-   `http://localhost:19999` on `localhost`. You can customize the contents and
-   colors of the standard dashboard [using
-   JavaScript](/web/gui/README.md#customizing-the-standard-dashboard).
+1.  The [local Agent dashboard](/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
+    see it at `http://NODE:19999`, replacing `NODE` with `localhost`, the hostname of your node, or its IP address. You
+    can customize the contents and colors of the standard dashboard [using
+    JavaScript](/web/gui/README.md#customizing-the-standard-dashboard).
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
    [customize the standard dashboards](/web/gui/README.md#customizing-the-standard-dashboard)
@@ -29,9 +26,8 @@ There are two primary ways to view Netdata's dashboards:
 
 You can also view all the data Netdata collects through the [REST API v1](/web/api/).
 
-No matter where you use Netdata's charts, you'll want to know how to
-[use](#using-charts) them. You'll also want to understand how Netdata defines
-[charts](#charts), [dimensions](#dimensions), [families](#families), and
+No matter where you use Netdata's charts, you'll want to know how to [use](#using-charts) them. You'll also want to
+understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and
 [contexts](#contexts).
 
 ## Using charts

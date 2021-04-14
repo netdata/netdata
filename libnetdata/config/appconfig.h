@@ -111,7 +111,7 @@
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
 struct config_option {
-    avl avl;                // the index entry of this entry - this has to be first!
+    avl_t avl_node;         // the index entry of this entry - this has to be first!
 
     uint8_t flags;
     uint32_t hash;          // a simple hash to speed up searching
@@ -124,14 +124,14 @@ struct config_option {
 };
 
 struct section {
-    avl avl;                // the index entry of this section - this has to be first!
+    avl_t avl_node;         // the index entry of this section - this has to be first!
 
     uint32_t hash;          // a simple hash to speed up searching
                             // we first compare hashes, and only if the hashes are equal we do string comparisons
 
     char *name;
 
-    struct section *next;    // gloabl config_mutex protects just this
+    struct section *next;    // global config_mutex protects just this
 
     struct config_option *values;
     avl_tree_lock values_index;
@@ -181,6 +181,8 @@ extern int appconfig_move(struct config *root, const char *section_old, const ch
 extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
 
 extern int appconfig_section_compare(void *a, void *b);
+
+extern void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
 
 extern int config_parse_duration(const char* string, int* result);
 

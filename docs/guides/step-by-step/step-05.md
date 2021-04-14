@@ -11,7 +11,7 @@ To accurately monitor the health of your systems and applications, you need to k
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 
 
 Netdata comes with hundreds of pre-configured alarms that don't require configuration. They were designed by our
-community of system adminstrators to cover the most important parts of production systems, so, in many cases, you won't
+community of system administrators to cover the most important parts of production systems, so, in many cases, you won't
 need to edit them.
 
 Luckily, Netdata's alarm and notification system are incredibly adaptable to your infrastructure's unique needs.
@@ -69,12 +69,8 @@ the `warn` and `crit` lines to the values of your choosing. For example:
     crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
 
-You _can_ [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata) to enable your tune, but you can
-also send a signal to Netdata to reload _only_ the health monitoring component.
-
-```bash
-killall -USR2 netdata
-```
+You _can_ restart Netdata with `sudo systemctl restart netdata`, to enable your tune, but you can also reload _only_ the
+health monitoring component using one of the available [methods](/health/QUICKSTART.md#reload-health-configuration).
 
 You can also tune any other aspect of the default alarms. To better understand how each line in a health entity works,
 read our [health documentation](/health/README.md).
@@ -106,7 +102,7 @@ To silence this alarm, change `sysadmin` to `silent`.
       to: silent
 ```
 
-Use `killall -USR2 netdata` to reload your health configuration. You can add `to: silent` to any alarm you'd rather not
+Use `netdatacli reload-health` to reload your health configuration. You can add `to: silent` to any alarm you'd rather not
 bother you with notifications.
 
 ## Write your first health entity

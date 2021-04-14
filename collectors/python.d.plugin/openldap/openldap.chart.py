@@ -50,7 +50,7 @@ CHARTS = {
         ]
     },
     'referrals_sent': {
-        'options': [None, 'Referrals', 'referals/s', 'ldap', 'openldap.referrals', 'line'],
+        'options': [None, 'Referrals', 'referrals/s', 'ldap', 'openldap.referrals', 'line'],
         'lines': [
             ['referrals_sent', 'sent', 'incremental']
         ]

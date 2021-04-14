@@ -110,11 +110,11 @@ void kinesis_put_record(
 }
 
 /**
- * Get results from service responces
+ * Get results from service responses
  *
  * @param request_outcomes_p request outcome information.
  * @param error_message report error message to a caller.
- * @param sent_bytes report to a caller how many bytes was successfuly sent.
+ * @param sent_bytes report to a caller how many bytes was successfully sent.
  * @param lost_bytes report to a caller how many bytes was lost during transmission.
  * @return Returns 0 if all data was sent successfully, 1 when data was lost on transmission
  */

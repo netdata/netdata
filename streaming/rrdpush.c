@@ -334,35 +334,35 @@ void rrdset_done_push(RRDSET *st) {
 
 // labels
 void rrdpush_send_labels(RRDHOST *host) {
-    if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
+    if (!host->labels.head || !(host->labels.labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels.labels_flag & LABEL_FLAG_STOP_STREAM))
         return;
 
     sender_start(host->sender);
     rrdhost_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
 
-    struct label *labels = host->labels;
-    while(labels) {
+    struct label *label_i = host->labels.head;
+    while(label_i) {
         buffer_sprintf(host->sender->build
                 , "LABEL \"%s\" = %d %s\n"
-                , labels->key
-                , (int)labels->label_source
-                , labels->value);
+                , label_i->key
+                , (int)label_i->label_source
+                , label_i->value);
 
-        labels = labels->next;
+        label_i = label_i->next;
     }
 
     buffer_sprintf(host->sender->build
             , "OVERWRITE %s\n", "labels");
 
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
     rrdhost_unlock(host);
     sender_commit(host->sender);
 
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
-    host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+    host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
 
 void rrdpush_claimed_id(RRDHOST *host)
@@ -374,11 +374,11 @@ void rrdpush_claimed_id(RRDHOST *host)
         return;
 
     sender_start(host->sender);
-    netdata_mutex_lock(&host->claimed_id_lock);
+    rrdhost_aclk_state_lock(host);
 
-    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->claimed_id ? host->claimed_id : "NULL") );
+    buffer_sprintf(host->sender->build, "CLAIMED_ID %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
 
-    netdata_mutex_unlock(&host->claimed_id_lock);
+    rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender);
 
     // signal the sender there are more data

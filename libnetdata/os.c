@@ -215,4 +215,3 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len) {
 }
 
 #endif // (TARGET_OS == OS_MACOS)
-

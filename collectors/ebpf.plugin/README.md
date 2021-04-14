@@ -148,6 +148,7 @@ accepts the following values: ​
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
+-   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
     
 #### Integration with `apps.plugin`
 
@@ -156,47 +157,80 @@ The eBPF collector also creates charts for each running application through an i
 interact with the Linux kernel.
 
 When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
-    
--   eBPF syscall    
-    -   Number of calls to open files.
-    -   Number of files closed.
-    -   Number of calls to delete files.
-    -   Number of calls to `vfs_write`.
-    -   Number of calls to `vfs_read`.
-    -   Number of bytes written trough `vfs_write`
-    -   Number of bytes read trough `vfs_read`
-    -   Number of process created trough `do_fork`
-    -   Number of threads created trough `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version.
-    -   Number of times that a process called `do_exit`. 
+
+-   eBPF file
+    -   Number of calls to open files. (`apps.file_open`)
+    -   Number of files closed. (`apps.file_closed`)
     -   Number of calls to open files that returned errors.
     -   Number of calls to close files that returned errors.
+-   eBPF syscall
+    -   Number of calls to delete files. (`apps.file_deleted`)
+    -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
+    -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
+    -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
+    -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
+    -   Number of calls to write a file that returned errors.
     -   Number of calls to read a file that returned errors.
-    -   Number of calls to read a file that returned errors.
+-   eBPF process
+    -   Number of process created with `do_fork`. (`apps.process_create`)
+    -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
+    -   Number of times that a process called `do_exit`. (`apps.task_close`)
 -   eBPF net
-    -   Number of bytes transmited per seconds.   
+    -   Number of bytes sent. (`apps.bandwidth_sent`)
+    -   Number of bytes received. (`apps.bandwidth_recv`)
 
-If you want to disable these charts, change the setting `disable apps` to `no`.
+If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
+`no`.
 
 ```conf
 [global]
-   disable apps = no
+   apps = yes
 ```
 
-### `[ebpf programs]`
+#### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
+-   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+    [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    for each application.
 -   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
+-   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
 
-### `[network viewer]`
+## Thread configuration
+
+You can configure each thread of the eBPF data collector by editing either the `cachestat.conf`, `process.conf`, 
+or `network.conf` files. Use [`edit-config`](/docs/configure/nodes.md) from your Netdata config directory:
+
+```bash
+cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf.d/process.conf
+```
+
+### Configuration files
+
+The following configuration files are available:
+
+- `cachestat.conf`: Configuration for the `cachestat` thread.
+- `process.conf`: Configuration for the `process` thread.
+- `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
+  also lets you specify which network the eBPF collector monitors.
+- `sync.conf`: Configuration for the `sync` thread.
+
+### Network configuration
+
+The network configuration has specific options to configure which network(s) the eBPF collector monitors. These options
+are divided in the following sections:
+
+#### `[network connections]`
 
 You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
 ```conf
-[network viewer]
+[network connections]
     maximum dimensions = 500
     resolve hostname ips = no
     ports = 1-1024 !145 !domain
@@ -217,28 +251,43 @@ The following options are available:
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address. 
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresess, but this
+    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this
     can be changed with the `ips` setting.
     
-By default, Netdata displays up to 500 dimensions on network viewer charts. If there are more possible dimensions, they
-will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
+By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
+they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
 dimensions` setting.
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
 the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
-### `[service name]`
+#### `[service name]`
 
-Netdata uses the list of services in `/etc/services` to plot network viewer charts. If this file does not contain the
+Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
 
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network viewer charts, and thus see the name of the service instead of its port, define it:
+service in network connection charts, and thus see the name of the service instead of its port, define it:
 
 ```conf
 [service name]
     19999 = Netdata
+```
+
+### Sync configuration
+
+The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are 
+monitored.
+
+```conf
+[syscalls]
+    sync = yes
+    msync = yes
+    fsync = yes
+    fdatasync = yes
+    syncfs = yes
+    sync_file_range = yes
 ```
 
 ## Troubleshooting
@@ -248,7 +297,7 @@ output.
 
 ```bash
 cd /usr/libexec/netdata/plugins.d/
-sudo -u netdata bash
+sudo su -s /bin/bash netdata
 ./ebpf.plugin
 ```
 
@@ -271,7 +320,7 @@ curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tool
 
 If this script returns no output, your system is ready to compile and run the eBPF collector.
 
-If you see a warning about a missing kerkel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
+If you see a warning about a missing kernel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
 BPF_JIT`), you will need to recompile your kernel to support this configuration. The process of recompiling Linux
 kernels varies based on your distribution and version. Read the documentation for your system's distribution to learn
 more about the specific workflow for recompiling the kernel, ensuring that you set all the necessary 

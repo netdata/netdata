@@ -16,7 +16,7 @@ static char prot_buffer[MAX_COMMAND_LENGTH];
 static unsigned prot_buffer_len = 0;
 
 struct spawn_execution_info {
-    avl avl;
+    avl_t avl;
 
     void *handle;
     int exit_status;
@@ -106,7 +106,7 @@ static void wait_children(void *arg)
 {
     siginfo_t i;
     struct spawn_execution_info tmp, *exec_info;
-    avl *ret_avl;
+    avl_t *ret_avl;
 
     (void)arg;
     while (!server_shutdown) {
@@ -133,7 +133,7 @@ static void wait_children(void *arg)
 #endif
             fatal_assert(CLD_EXITED == i.si_code);
             tmp.pid = (pid_t)i.si_pid;
-            while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl *)&tmp))) {
+            while (NULL == (ret_avl = avl_remove_lock(&spawn_outstanding_exec_tree, (avl_t *)&tmp))) {
                 fprintf(stderr,
                         "SPAWN: race condition detected, waiting for child process %d to be indexed.\n",
                         (int)tmp.pid);
@@ -153,7 +153,7 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
 {
     uv_buf_t writebuf[2];
     int ret;
-    avl *avl_ret;
+    avl_t *avl_ret;
     struct spawn_execution_info *exec_info;
     struct write_context *write_ctx;
 
@@ -174,8 +174,8 @@ void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t
         exec_info = mallocz(sizeof(*exec_info));
         exec_info->handle = handle;
         exec_info->pid = write_ctx->spawn_result.exec_pid;
-        avl_ret = avl_insert_lock(&spawn_outstanding_exec_tree, (avl *)exec_info);
-        fatal_assert(avl_ret == (avl *)exec_info);
+        avl_ret = avl_insert_lock(&spawn_outstanding_exec_tree, (avl_t *)exec_info);
+        fatal_assert(avl_ret == (avl_t *)exec_info);
 
         /* wake up the thread that blocks waiting for processes to exit */
         uv_mutex_lock(&wait_children_mutex);

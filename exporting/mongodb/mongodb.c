@@ -102,7 +102,7 @@ int init_mongodb_instance(struct instance *instance)
     instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = format_batch_mongodb;
 
-    instance->send_header = NULL;
+    instance->prepare_header = NULL;
     instance->check_response = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -284,9 +284,12 @@ void mongodb_connector_worker(void *instance_p)
         struct stats *stats = &instance->stats;
 
         uv_mutex_lock(&instance->mutex);
-        while (!instance->data_is_ready)
-            uv_cond_wait(&instance->cond_var, &instance->mutex);
-        instance->data_is_ready = 0;
+        if (!connector_specific_data->first_buffer->insert ||
+            !connector_specific_data->first_buffer->documents_inserted) {
+            while (!instance->data_is_ready)
+                uv_cond_wait(&instance->cond_var, &instance->mutex);
+            instance->data_is_ready = 0;
+        }
 
         if (unlikely(instance->engine->exit)) {
             uv_mutex_unlock(&instance->mutex);

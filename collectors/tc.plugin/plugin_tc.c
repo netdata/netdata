@@ -12,7 +12,7 @@
 #define TC_LINE_MAX 1024
 
 struct tc_class {
-    avl avl;
+    avl_t avl;
 
     char *id;
     uint32_t hash;
@@ -56,7 +56,7 @@ struct tc_class {
 };
 
 struct tc_device {
-    avl avl;
+    avl_t avl;
 
     char *id;
     uint32_t hash;
@@ -81,7 +81,7 @@ struct tc_device {
     RRDSET *st_tokens;
     RRDSET *st_ctokens;
 
-    avl_tree classes_index;
+    avl_tree_type classes_index;
 
     struct tc_class *classes;
     struct tc_class *last_class;
@@ -102,20 +102,20 @@ static int tc_device_compare(void* a, void* b) {
     else return strcmp(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
 }
 
-avl_tree tc_device_root_index = {
+avl_tree_type tc_device_root_index = {
         NULL,
         tc_device_compare
 };
 
-#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl *)(st))
-#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl *)(st))
+#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl_t *)(st))
+#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl_t *)(st))
 
 static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
     struct tc_device tmp;
     tmp.id = (char *)id;
     tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-    return (struct tc_device *)avl_search(&(tc_device_root_index), (avl *)&tmp);
+    return (struct tc_device *)avl_search(&(tc_device_root_index), (avl_t *)&tmp);
 }
 
 
@@ -128,15 +128,15 @@ static int tc_class_compare(void* a, void* b) {
     else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
 }
 
-#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl *)(rd))
-#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl *)(rd))
+#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl_t *)(rd))
+#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl_t *)(rd))
 
 static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
     struct tc_class tmp;
     tmp.id = (char *)id;
     tmp.hash = (hash)?hash:simple_hash(tmp.id);
 
-    return (struct tc_class *)avl_search(&(st->classes_index), (avl *) &tmp);
+    return (struct tc_class *)avl_search(&(st->classes_index), (avl_t *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
@@ -558,7 +558,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , "tokens"
                     , PLUGIN_TC_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_TOCKENS
+                    , NETDATA_CHART_PRIO_TC_QOS_TOKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -614,7 +614,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , "ctokens"
                     , PLUGIN_TC_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_TC_QOS_CTOCKENS
+                    , NETDATA_CHART_PRIO_TC_QOS_CTOKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );

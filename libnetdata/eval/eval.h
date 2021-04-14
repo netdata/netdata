@@ -28,7 +28,7 @@ typedef struct eval_expression {
     const char *parsed_as;
 
     RRDCALC_STATUS *status;
-    calculated_number *this;
+    calculated_number *myself;
     time_t *after;
     time_t *before;
 

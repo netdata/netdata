@@ -135,13 +135,20 @@ EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type)
 {
     if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_GRAPHITE;
-    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_TELNET;
-    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP;
+    } else if (!strcmp(type, "graphite:http") || !strcmp(type, "graphite:https")) {
+        return EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP;
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_JSON;
-    } else if (!strcmp(type, "prometheus_remote_write")) {
+    } else if (!strcmp(type, "json:http") || !strcmp(type, "json:https")) {
+        return EXPORTING_CONNECTOR_TYPE_JSON_HTTP;
+    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB;
+    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+        return EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP;
+    } else if (
+        !strcmp(type, "prometheus_remote_write") ||
+        !strcmp(type, "prometheus_remote_write:http") ||
+        !strcmp(type, "prometheus_remote_write:https")) {
         return EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return EXPORTING_CONNECTOR_TYPE_KINESIS;
@@ -231,7 +238,21 @@ struct engine *read_exporting_config()
         prometheus_exporter_instance->config.update_every =
             prometheus_config_get_number(EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);
 
-        if (prometheus_config_get_boolean("send names instead of ids", CONFIG_BOOLEAN_YES))
+        // wait for backend subsystem to be initialized
+        for (int retries = 0; !global_backend_source && retries < 1000; retries++)
+            sleep_usec(10000);
+
+        if (!global_backend_source)
+            global_backend_source = "average";
+
+        prometheus_exporter_instance->config.options |= global_backend_options & EXPORTING_OPTIONS_SOURCE_BITS;
+
+        char *data_source = prometheus_config_get("data source", global_backend_source);
+        prometheus_exporter_instance->config.options =
+            exporting_parse_data_source(data_source, prometheus_exporter_instance->config.options);
+
+        if (prometheus_config_get_boolean(
+                "send names instead of ids", global_backend_options & EXPORTING_OPTION_SEND_NAMES))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
@@ -250,6 +271,8 @@ struct engine *read_exporting_config()
             simple_pattern_create(prometheus_config_get("send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
             prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+
+        prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_backend_prefix);
     }
 
     // TODO: change BACKEND to EXPORTING
@@ -431,8 +454,25 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.prefix = strdupz(exporter_get(instance_name, "prefix", "netdata"));
 
+        tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));
+
 #ifdef ENABLE_HTTPS
-        if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_USING_HTTP && !strncmp(tmp_ci_list->local_ci.connector_name, "opentsdb:https", 14)) {
+
+#define STR_GRAPHITE_HTTPS "graphite:https"
+#define STR_JSON_HTTPS "json:https"
+#define STR_OPENTSDB_HTTPS "opentsdb:https"
+#define STR_PROMETHEUS_REMOTE_WRITE_HTTPS "prometheus_remote_write:https"
+
+        if ((tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_GRAPHITE_HTTPS, strlen(STR_GRAPHITE_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_JSON_HTTPS, strlen(STR_JSON_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP &&
+             !strncmp(tmp_ci_list->local_ci.connector_name, STR_OPENTSDB_HTTPS, strlen(STR_OPENTSDB_HTTPS))) ||
+            (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE &&
+             !strncmp(
+                 tmp_ci_list->local_ci.connector_name, STR_PROMETHEUS_REMOTE_WRITE_HTTPS,
+                 strlen(STR_PROMETHEUS_REMOTE_WRITE_HTTPS)))) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
         }
 #endif

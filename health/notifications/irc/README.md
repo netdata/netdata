@@ -1,8 +1,6 @@
 <!--
----
 title: "IRC"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/irc/README.md
----
 -->
 
 # IRC
@@ -31,7 +29,7 @@ Set the path for `nc` in `/etc/netdata/health_alarm_notify.conf` (to edit it on 
 nc="/usr/bin/nc"
 ```
 
-2.  Αn `IRC_NETWORK` to which your preffered channels belong to.   
+2.  Αn `IRC_NETWORK` to which your preferred channels belong to.   
 3.  One or more channels ( `DEFAULT_RECIPIENT_IRC` ) to post the messages to.   
 4.  An `IRC_NICKNAME` and an `IRC_REALNAME` to identify in IRC.   
 

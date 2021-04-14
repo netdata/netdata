@@ -2,7 +2,7 @@
 
 #include "health.h"
 
-static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
+void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
     if(value && *value) {
         buffer_sprintf(wb, "%s\"%s\":\"", prefix, label);
         buffer_strcat_htmlescape(wb, value);
@@ -13,7 +13,7 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
@@ -93,18 +93,22 @@ inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
     buffer_strcat(wb, "\t}");
 }
 
-void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
+void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     buffer_strcat(wb, "[");
 
     unsigned int max = host->health_log.max;
     unsigned int count = 0;
+    uint32_t hash_chart = 0;
+    if (chart) hash_chart = simple_hash(chart);
     ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && count < max ; count++, ae = ae->next) {
-        if(ae->unique_id > after) {
-            if(likely(count)) buffer_strcat(wb, ",");
+    for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
+        if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) {
+            if (likely(count))
+                buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
+            count++;
         }
     }
 
@@ -291,11 +295,14 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     rrdhost_unlock(host);
 }
 
-void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
+static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
     RRDCALC *rc;
     int i;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
             continue;
 
         if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
@@ -342,6 +349,18 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
     rrdhost_unlock(host);
 }
 
+static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, time_t mark)
+{
+    ALARM_ENTRY *ae = host->health_log.alarms;
+
+    while(ae) {
+        if (ae->alarm_id == alarm_id && ae->unique_id > mark &&
+            (ae->new_status != RRDCALC_STATUS_WARNING && ae->new_status != RRDCALC_STATUS_CRITICAL))
+            return 1;
+        ae = ae->next;
+    }
+    return 0;
+}
 
 void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
@@ -352,14 +371,19 @@ void health_active_log_alarms_2json(RRDHOST *host, BUFFER *wb) {
     unsigned int count = 0;
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && count < max ; ae = ae->next) {
+        if (!ae->updated_by_id &&
+            ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
+             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL) &&
+              ae->new_status == RRDCALC_STATUS_REMOVED))) {
 
-        if(likely(!((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL)
-                    && !ae->updated_by_id)))
-            continue;
+            if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
+                continue;
 
-        if(likely(count)) buffer_strcat(wb, ",");
+            if (likely(count))
+                buffer_strcat(wb, ",");
             health_alarm_entry2json_nolock(wb, ae, host);
-        count++;
+            count++;
+        }
     }
     buffer_strcat(wb, "]");
 

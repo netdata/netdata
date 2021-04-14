@@ -1,8 +1,6 @@
 <!--
----
 title: "The build system"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/BUILD.md
----
 -->
 
 # The build system
@@ -59,7 +57,7 @@ cmake -DENABLE_DBENGINE
 
 ### Dependency detection
 
-We have a mixture of soft- and hard-depedencies on libraries. For most of these we expect
+We have a mixture of soft- and hard-dependencies on libraries. For most of these we expect
 `pkg-config` information, for some we manually probe for libraries and include files. We
 should treat all of the external dependencies consistently:
 
@@ -348,10 +346,10 @@ We should follow these steps:
 9. Deprecate / remove the autotools build-system completely (so that we can support a single
    build-system).
 
-Some smaller miscellaeneous suggestions:
+Some smaller miscellaneous suggestions:
 
 1. Remove the `_Generic` / `strerror_r` config to make the system simpler (use the technique
-   on the blog post to make the standard version re-enterant so that it is thread-safe).
+   on the blog post to make the standard version re-entrant so that it is thread-safe).
 2. Pull in jemalloc by source into the repo if it is our preferred malloc implementation.
 
 # Background
@@ -364,3 +362,4 @@ Some smaller miscellaeneous suggestions:
 * [header checks in CMake](https://stackoverflow.com/questions/647892/how-to-check-header-files-and-library-functions-in-cmake-like-it-is-done-in-auto)
 * [how to write platform checks](https://gitlab.kitware.com/cmake/community/wikis/doc/tutorials/How-To-Write-Platform-Checks)
 
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FBUILD&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

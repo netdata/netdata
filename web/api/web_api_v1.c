@@ -35,6 +35,7 @@ static struct {
         , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
+        , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
         , {                  NULL, 0, 0}
 };
 
@@ -275,6 +276,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
+    char *chart = NULL;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -284,12 +286,13 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "chart")) chart = value;
     }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after);
+    health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 
@@ -353,12 +356,15 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 1);
+#ifdef ENABLE_DBENGINE
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        sql_rrdset2json(host, w->response.data);
+#endif
     return HTTP_RESP_OK;
 }
 
@@ -397,7 +403,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     , *before_str = NULL
     , *after_str = NULL
     , *group_time_str = NULL
-    , *points_str = NULL;
+    , *points_str = NULL
+    , *context = NULL
+    , *chart_label_key = NULL;
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
@@ -416,7 +424,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "chart")) chart = value;
+        if(!strcmp(name, "context")) context = value;
+        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
             if(!dimensions) dimensions = buffer_create(100);
             buffer_strcat(dimensions, "|");
@@ -482,20 +492,71 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     fix_google_param(responseHandler);
     fix_google_param(outFileName);
 
-    if(!chart || !*chart) {
+    RRDSET *st = NULL;
+
+    if((!chart || !*chart) && (!context)) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
-    if(!st) {
-        buffer_strcat(w->response.data, "Chart is not found: ");
-        buffer_strcat_htmlescape(w->response.data, chart);
+    struct context_param  *context_param_list = NULL;
+    if (context && !chart) {
+        RRDSET *st1;
+        uint32_t context_hash = simple_hash(context);
+
+        rrdhost_rdlock(host);
+        rrdset_foreach_read(st1, host) {
+            if (st1->hash_context == context_hash && !strcmp(st1->context, context) &&
+                (!chart_label_key || rrdset_contains_label_keylist(st1, chart_label_key)))
+                build_context_param_list(&context_param_list, st1);
+        }
+        rrdhost_unlock(host);
+        if (likely(context_param_list && context_param_list->rd))  // Just set the first one
+            st = context_param_list->rd->rrdset;
+        else {
+            if (!chart_label_key)
+                sql_build_context_param_list(&context_param_list, host, context, NULL);
+        }
+    }
+    else {
+        st = rrdset_find(host, chart);
+        if (!st)
+            st = rrdset_find_byname(host, chart);
+        if (likely(st))
+            st->last_accessed_time = now_realtime_sec();
+        else
+            sql_build_context_param_list(&context_param_list, host, NULL, chart);
+    }
+
+    if (!st) {
+        if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
+            st = context_param_list->rd->rrdset;
+        else {
+            free_context_param_list(&context_param_list);
+            context_param_list = NULL;
+        }
+    }
+
+    if (!st && !context_param_list) {
+        if (context && !chart) {
+            if (!chart_label_key) {
+                buffer_strcat(w->response.data, "Context is not found: ");
+                buffer_strcat_htmlescape(w->response.data, context);
+            } else {
+                buffer_strcat(w->response.data, "Context: ");
+                buffer_strcat_htmlescape(w->response.data, context);
+                buffer_strcat(w->response.data, " or chart label key: ");
+                buffer_strcat_htmlescape(w->response.data, chart_label_key);
+                buffer_strcat(w->response.data, " not found");
+            }
+        }
+        else {
+            buffer_strcat(w->response.data, "Chart is not found: ");
+            buffer_strcat_htmlescape(w->response.data, chart);
+        }
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }
-    st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
@@ -540,7 +601,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     }
 
     ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data);
+                                 , options, &last_timestamp_in_data, context_param_list, chart_label_key);
+
+    free_context_param_list(&context_param_list);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
@@ -620,6 +683,9 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 /*
     int redirects = 0;
 */
+
+	// Don't cache registry responses
+    buffer_no_cacheable(w->response.data);
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -804,12 +870,12 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
             (host->receiver || host == localhost) ? "true" : "false");
         netdata_mutex_unlock(&host->receiver_lock);
 
-        netdata_mutex_lock(&host->claimed_id_lock);
-        if (host->claimed_id)
-            buffer_sprintf(wb, "\"%s\" }", host->claimed_id);
+        rrdhost_aclk_state_lock(host);
+        if (host->aclk_state.claimed_id)
+            buffer_sprintf(wb, "\"%s\" }", host->aclk_state.claimed_id);
         else
             buffer_strcat(wb, "null }");
-        netdata_mutex_unlock(&host->claimed_id_lock);
+        rrdhost_aclk_state_unlock(host);
 
         count++;
     }
@@ -832,8 +898,8 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
 
     int count = 0;
     rrdhost_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels_rwlock);
-    for (struct label *label = host->labels; label; label = label->next) {
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+    for (struct label *label = host->labels.head; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
         buffer_strcat(wb, tabs);
 
@@ -844,7 +910,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
         count++;
     }
     buffer_strcat(wb, "\n");
-    netdata_rwlock_unlock(&host->labels_rwlock);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
     rrdhost_unlock(host);
 }
 
@@ -884,6 +950,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
         buffer_sprintf(wb, "\t\"container_os_version_id\": \"%s\",\n", host->system_info->container_os_version_id);
     if (host->system_info->container_os_detection)
         buffer_sprintf(wb, "\t\"container_os_detection\": \"%s\",\n", host->system_info->container_os_detection);
+    if (host->system_info->is_k8s_node)
+        buffer_sprintf(wb, "\t\"is_k8s_node\": \"%s\",\n", host->system_info->is_k8s_node);
 
     buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", (host->system_info->kernel_name) ? host->system_info->kernel_name : "");
     buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", (host->system_info->kernel_version) ? host->system_info->kernel_version : "");
@@ -910,6 +978,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+#ifdef ACLK_NG
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
+#else
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"legacy\",\n");
+#endif
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif

@@ -1,8 +1,6 @@
 <!--
----
 title: "Privacy Policy"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/privacy-policy.md
----
 -->
 
 # Privacy Policy

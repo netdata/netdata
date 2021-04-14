@@ -58,7 +58,7 @@ while [ "${1}" ]; do
 done
 
 if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
-  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemtry"
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
 
 deleted_stock_configs=0
@@ -127,25 +127,6 @@ if portable_add_group netdata; then
   fi
 else
   run_failed "I could not add group netdata, so no user netdata will be created as well. Netdata run as root:root"
-fi
-
-# -----------------------------------------------------------------------------
-progress "Check SSL certificates paths"
-
-if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]; then
-  if [ ! -f /opt/netdata/.curlrc ]; then
-    cacert=
-
-    # CentOS
-    [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
-
-    if [ -n "${cacert}" ]; then
-      echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
-      echo > /opt/netdata/.curlrc "cacert=${cacert}"
-    else
-      run_failed "Failed to find /etc/ssl/certs/ca-certificates.crt"
-    fi
-  fi
 fi
 
 # -----------------------------------------------------------------------------

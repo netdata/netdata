@@ -1,0 +1,3 @@
+[submodule "mqtt_websockets"]
+	path = mqtt_websockets
+	url = https://github.com/underhood/mqtt_websockets.git

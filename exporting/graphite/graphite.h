@@ -13,4 +13,6 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd);
 int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM *rd);
 
+void graphite_http_prepare_header(struct instance *instance);
+
 #endif //NETDATA_EXPORTING_GRAPHITE_H

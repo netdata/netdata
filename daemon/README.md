@@ -1,9 +1,7 @@
 <!--
----
 title: "Netdata daemon"
 date: 2020-04-29
 custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
----
 -->
 
 # Netdata daemon
@@ -397,10 +395,10 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to restart netdata:
+then execute this to [restart Netdata](/docs/configure/start-stop-restart.md):
 
 ```sh
-sudo service netdata restart
+sudo systemctl restart netdata
 ```
 
 #### Example 2: Netdata with nice -1 on systemd systems
@@ -516,7 +514,7 @@ section(s) you need to trace.
 
 We have made the most to make Netdata crash free. If however, Netdata crashes on your system, it would be very helpful
 to provide stack traces of the crash. Without them, is will be almost impossible to find the issue (the code base is
-quite large to find such an issue by just objerving it).
+quite large to find such an issue by just observing it).
 
 To provide stack traces, **you need to have Netdata compiled with debugging**. There is no need to enable any tracing
 (`debug flags`).

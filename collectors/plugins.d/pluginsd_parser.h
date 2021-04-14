@@ -16,6 +16,8 @@ typedef struct parser_user_object {
     struct label *new_labels;
     size_t count;
     int enabled;
+    uint8_t st_exists;
+    uint8_t host_exists;
     void *private; // the user can set this for private use
 } PARSER_USER_OBJECT;
 

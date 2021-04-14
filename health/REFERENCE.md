@@ -21,7 +21,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     altogether, run health checks more or less often, and more. See [daemon
     configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
--   The individual `.conf` files in `health.d/`. These health entitiy files are organized by the type of metric they are
+-   The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
@@ -60,6 +60,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
+| [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
+| [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
@@ -70,7 +72,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`exec`](#alarm-line-exec)                          | no              | The script to execute when the alarm changes status.                                  |
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
-| [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
+| [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
@@ -150,6 +152,31 @@ begin with `redis`.
 hosts: server1 server2 database* !redis3 redis*
 ```
 
+#### Alarm line `plugin`
+
+The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
+you can create a filter for an alarm that applies specifically to `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+```
+
+The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
+inclusive filter that is unlikely to be of much use in production. See [`module`](#alarm-line-module) for a
+comprehensive example using both.
+
+#### Alarm line `module`
+
+The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
+list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
+
+```yaml
+plugin: python.d.plugin
+module: isc_dhcpd
+```
+
 #### Alarm line `families`
 
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
@@ -214,7 +241,7 @@ A `calc` is designed to apply some calculation to the values or variables availa
 calculation will be made available at the `$this` variable, overwriting the value from your `lookup`, to use in warning
 and critical expressions.
 
-When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retreived a value from Netdata's
+When paired with `lookup`, `calc` will perform the calculation just after `lookup` has retrieved a value from Netdata's
 database.
 
 You can use `calc` without `lookup` if you are using [other available variables](#variables).
@@ -313,7 +340,7 @@ delay: [[[up U] [down D] multiplier M] max X]
      will delay the notification by 1 minute. This is used to prevent notifications for flapping
      alarms. The default `D` is zero.
 
--   `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
+-   `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
      delayed. The default multiplier is `1.0`.
 
 -   `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
@@ -359,12 +386,12 @@ repeat: [off] [warning DURATION] [critical DURATION]
 -   `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
     notification for CRITICAL mode.
 
-#### Alarm line `option`
+#### Alarm line `options`
 
-The only possible value for the `option` line is
+The only possible value for the `options` line is
 
 ```yaml
-option: no-clear-notification
+options: no-clear-notification
 ```
 
 For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an

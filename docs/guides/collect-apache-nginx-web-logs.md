@@ -10,7 +10,7 @@ performance of their web servers, and Netdata is taking important steps to make 
 
 By parsing web server log files with Netdata, and seeing the volume of redirects, requests, or server errors over time,
 you can better understand what's happening on your infrastructure. Too many bad requests? Maybe a recent deploy missed a
-few small SVG icons. Too many requsests? Time to batten down the hatches—it's a DDoS.
+few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
 Netdata has been capable of monitoring web log files for quite some time, thanks for the [weblog python.d
 module](/collectors/python.d.plugin/web_log/README.md), but we recently refactored this module in Go, and that effort
@@ -52,8 +52,8 @@ Find the `web_log` line, uncomment it, and set it to `web_log: no`. Next, open t
 
 Find the `web_log` line again, uncomment it, and set it to `web_log: yes`.
 
-Finally, restart Netdata with `service netdata restart`, or the appropriate method for your system. You should see
-metrics in your Netdata dashboard!
+Finally, restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system. You should see metrics in your Netdata dashboard!
 
 ![Example of real-time web server log metrics in Netdata's
 dashboard](https://user-images.githubusercontent.com/1153921/69448130-2980c280-0d15-11ea-9fa5-6dcff25a92c3.png)
@@ -120,8 +120,9 @@ jobs:
     log_type: auto
 ```
 
-Restart Netdata with `service netdata restart` or the appropriate method for your system. Netdata should pick up your
-web server's access log and begin showing real-time charts!
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and
+begin showing real-time charts!
 
 ### Custom log formats and fields
 

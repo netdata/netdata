@@ -1,8 +1,6 @@
 <!--
----
 title: "SSV formatter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/ssv/README.md
----
 -->
 
 # SSV formatter

@@ -32,7 +32,7 @@
 
 
 struct rrdcalc {
-    avl avl;                        // the index, with key the id - this has to be first!
+    avl_t avl;                      // the index, with key the id - this has to be first!
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
@@ -44,6 +44,13 @@ struct rrdcalc {
 
     char *chart;                    // the chart id this should be linked to
     uint32_t hash_chart;
+
+
+    char *plugin_match;             //the plugin name that should be linked to
+    SIMPLE_PATTERN *plugin_pattern;
+
+    char *module_match;             //the module name that should be linked to
+    SIMPLE_PATTERN *module_pattern;
 
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm

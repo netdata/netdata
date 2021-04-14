@@ -1,8 +1,6 @@
 <!--
----
 title: "tc.plugin"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/tc.plugin/README.md
----
 -->
 
 # tc.plugin
@@ -174,7 +172,7 @@ And this is what you are going to get:
 
 ## QoS Configuration with tc
 
-First, setup the tc rules in rc.local using commands to assign different DSCP markings to different classids. You can see one such example in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973). 
+First, setup the tc rules in rc.local using commands to assign different QoS markings to different classids. You can see one such example in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973). 
 
 Then, map the classids to names by creating `/etc/iproute2/tc_cls`. For example:
 

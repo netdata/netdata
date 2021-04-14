@@ -15,7 +15,7 @@ Starting with v1.12, Netdata collects anonymous usage information by default and
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
 ## Limitations running the Agent in Docker
@@ -32,13 +32,22 @@ directive, not a COMMAND directive. Please adapt your execution scripts accordin
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-## Run the Agent with the Docker command
+## Create a new Netdata Agent container
 
-Quickly start a new Agent with the `docker run` command.
+You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
+visit the Agent dashboard `http://NODE:19999`.
+
+Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
+_within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
+you want to access the configuration files from your _host_ machine, see [host-editable
+configuration](#host-editable-configuration).
+
+**`docker run`**: Use the `docker run` command, along with the following options, to start a new container.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
@@ -52,12 +61,8 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-You can then access the dashboard at `http://localhost:19999`.
-
-## Run the Agent with Docker Compose
-
-The above can be converted to a `docker-compose.yml` file to use with [Docker
-Compose](https://docs.docker.com/compose/):
+**Docker Compose**: Copy the following code and paste into a new file called `docker-compose.yml`, then run
+`docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
 ```yaml
 version: '3'
@@ -74,6 +79,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
@@ -83,11 +89,26 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
 
 volumes:
+  netdataconfig:
   netdatalib:
   netdatacache:
 ```
 
-Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
+## Docker tags
+
+The official `netdata/netdata` Docker image provides the following named tags:
+
+* `stable`: The `stable` tag will always point to the most recently published stable build.
+* `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
+  updated daily at around 01:00 UTC.
+* `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
+  or a nightly build. This is what Docker will use by default if you do not specify a tag.
+
+Additionally, for each stable release, three tags are pushed, one with the full version of the release (for example,
+`v1.30.0`), one with just the major and minor version (for example, `v1.30`), and one with just the major version
+(for example, `v1`). The tags for the minor versions and major versions are updated whenever a release is published
+that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
+point to that instead of `v1.30.0`).
 
 ## Health Checks
 
@@ -102,7 +123,7 @@ You can control how the health checks run by using the environment variable `NET
     correctly or not. This is sufficient to ensure that Netdata did not
     hang during startup, but does not provide a rigorous verification
     that the daemon is collecting data or is otherwise usable.
--   If set to anything else, the health check will treat the vaule as a
+-   If set to anything else, the health check will treat the value as a
     URL to check for a 200 status code on. In most cases, this should
     start with `http://localhost:19999/` to check the agent running in
     the container.
@@ -114,10 +135,116 @@ need to use a non-default configuration for health checks to work.
 
 ## Configure Agent containers
 
-You may need to configure the above `docker run...` and `docker-compose` commands based on your needs. You should
-reference the [`docker run`](https://docs.docker.com/engine/reference/run/) and [Docker
-Compose](https://docs.docker.com/compose/) documentation for details, but we'll cover a few recommended configurations
-below, as well as those that are unique to Netdata Agent containers.
+If you started an Agent container using one of the [recommended methods](#create-a-new-netdata-agent-container) and you
+want to edit Netdata's configuration, you must first use `docker exec` to attach to the container. Replace `netdata`
+with the name of your container.
+
+```bash
+docker exec -it netdata bash
+cd /etc/netdata
+./edit-config netdata.conf
+```
+
+You need to restart the Agent to apply changes. Exit the container if you haven't already, then use the `docker` command
+to restart the container: `docker restart netdata`.
+
+### Host-editable configuration
+
+If you want to make your container's configuration directory accessible from the host system, you need to use a
+[volume](https://docs.docker.com/storage/bind-mounts/) rather than a bind mount. The following commands create a
+temporary `netdata_tmp` container, which is used to populate a `netdataconfig` directory, which is then mounted inside
+the container at `/etc/netdata`.
+
+```bash
+mkdir netdataconfig
+docker run -d --name netdata_tmp netdata/netdata
+docker cp netdata_tmp:/etc/netdata netdataconfig/
+docker rm -f netdata_tmp
+```
+
+**`docker run`**: Use the `docker run` command, along with the following options, to start a new container. Note the
+changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \` line from the recommended example above.
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
+
+**Docker Compose**: Copy the following code and paste into a new file called `docker-compose.yml`, then run
+`docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container. Note the changed
+`./netdataconfig/netdata:/etc/netdata:ro` line from the recommended example above.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./netdataconfig/netdata:/etc/netdata:ro
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdatalib:
+  netdatacache:
+```
+
+### Change the default hostname
+
+You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata
+Cloud, when creating a new container. If you want to change the hostname of a Netdata container _after_ you started it,
+you can safely stop and remove it. You configuration and metrics data reside in persistent volumes and are reattached to
+the recreated container.
+
+If you use `docker-run`, use the `--hostname` option with `docker run`.
+
+```bash
+docker run -d --name=netdata \
+  --hostname=my_docker_netdata
+```
+
+If you use `docker-compose`, add a `hostname:` key/value pair into your `docker-compose.yml` file, then create the
+container again using `docker-compose up -d`.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: my_docker_compose_netdata
+    ...
+```
+
+If you don't want to destroy and recreate your container, you can edit the Agent's `netdata.conf` file directly. See the
+above section on [configuring Agent containers](#configure-agent-containers) to find the appropriate method based on
+how you created the container.
 
 ### Add or remove other volumes
 
@@ -142,6 +269,12 @@ This allows the information to be passed into `docker-compose` using:
 ```bash
 VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
 ```
+
+#### Files inside systemd volumes
+
+If a volume is used by systemd service, some files can be removed during 
+[reinitialization](https://github.com/netdata/netdata/issues/9916). To avoid this, you need to add
+`RuntimeDirectoryPreserve=yes` to the service file.
 
 ### Docker container names resolution
 
