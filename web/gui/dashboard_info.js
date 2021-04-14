@@ -1058,7 +1058,7 @@ netdataDashboard.context = {
     // network interfaces
 
     'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintented VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
+        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
     },
 
     'net.duplex': {
@@ -1240,7 +1240,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
     },
 
     'apps.bandwidth_udp_send': {
@@ -1967,7 +1967,7 @@ netdataDashboard.context = {
     },
 
     'beanstalk.connections_rate': {
-        info: 'Tthe rate of connections opened to beanstalkd.'
+        info: 'The rate of connections opened to beanstalkd.'
     },
 
     'beanstalk.commands_rate': {
@@ -2593,7 +2593,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metadata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
         colors: [NETDATA.colors[12]]
     },
 
@@ -2602,7 +2602,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.metadata': {
-        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem interal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
+        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem internal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
     },
 
     'btrfs.system': {
@@ -2623,7 +2623,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.message_rates': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.'
     },
 
     'rabbitmq.global_counts': {
@@ -2666,7 +2666,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.queue_messages_stats': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
@@ -2774,7 +2774,7 @@ netdataDashboard.context = {
     },
 
     'boinc.tasks': {
-        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partially processed but suspended.'
     },
 
     'boinc.states': {
@@ -2923,7 +2923,7 @@ netdataDashboard.context = {
 
     // VM specific
     'vsphere.vm_mem_usage_percentage': {
-        info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
+        info: 'Percentage of used virtual machine “physical” memory: <code>active</code> / <code>virtual machine configured size</code>.'
     },
 
     'vsphere.vm_mem_usage': {
@@ -3356,7 +3356,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_retransmit': {
         title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
     },
 
     'ebpf.tcp_error': {
@@ -3414,7 +3414,7 @@ netdataDashboard.context = {
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
