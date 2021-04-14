@@ -333,7 +333,7 @@ CHARTS = {
         'algo': ABSOLUTE,
     },
     'nand_writes_1gib': {
-        'options': [None, 'NAND Writes 1GiB', 'blocks', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
+        'options': [None, 'NAND Writes', 'GiB', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
         'lines': [],
         'attrs': [ATTR249],
         'algo': ABSOLUTE,
