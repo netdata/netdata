@@ -1495,32 +1495,30 @@ char *read_by_filename(char *filename, long *file_size)
 
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where)
 {
-   size_t size        = strlen(src) + 1;
-   size_t find_len    = strlen(find);
-   size_t repl_len    = strlen(replace);
-   char *value, *dst;
+    size_t size = strlen(src) + 1;
+    size_t find_len = strlen(find);
+    size_t repl_len = strlen(replace);
+    char *value, *dst;
 
-   if (likely(where))
-       size += (repl_len - find_len);
+    if (likely(where))
+        size += (repl_len - find_len);
 
-   value = mallocz(size);
-   dst = value;
+    value = mallocz(size);
+    dst = value;
 
-   if (likely(where)) {
-       size_t count = where - src;
+    if (likely(where)) {
+        size_t count = where - src;
 
-       dst = value + (dst - value);
+        memmove(dst, src, count);
+        src += count;
+        dst += count;
 
-       memmove(dst, src, count);
-       src += count;
-       dst += count;
+        memmove(dst, replace, repl_len);
+        src += find_len;
+        dst += repl_len;
+    }
 
-       memmove(dst, replace, repl_len);
-       src += find_len;
-       dst += repl_len;
-   }
+    strcpy(dst, src);
 
-   strcpy(dst, src);
-
-   return value;
+    return value;
 }
