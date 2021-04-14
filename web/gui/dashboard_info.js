@@ -561,7 +561,7 @@ netdataDashboard.menu = {
 
     'filesystem': {
         title: 'Filesystem',
-        icon: '<i class="fas fa-database"></i>',
+        icon: '<i class="fas fa-hdd"></i>',
     },
 
     'vernemq': {
