@@ -89,7 +89,7 @@ metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html), which is just _
 
 The Netdata Agent also comes with a [web log
 collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog), which reads Apache's access
-log file, procesess each line, and converts them into per-second metrics. On Debian systems, it reads the file at
+log file, processes each line, and converts them into per-second metrics. On Debian systems, it reads the file at
 `/var/log/apache2/access.log`.
 
 At installation, the Netdata Agent adds itself to the [`adm`
