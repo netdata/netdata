@@ -30,6 +30,10 @@ struct netdata_static_thread dcstat_threads = {"DCSTAT KERNEL",
                                                NULL, NULL, 1, NULL,
                                                NULL,  NULL};
 
+static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                           .user_input = 0},
+                                          {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
@@ -505,9 +509,11 @@ void *ebpf_dcstat_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_dcstat_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = dcstat_maps;
     fill_ebpf_data(&dcstat_data);
 
     ebpf_update_module(em, &dcstat_config, NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE);
+    ebpf_update_pid_table(&dcstat_maps[0], em);
 
     if (!em->enabled)
         goto enddcstat;
