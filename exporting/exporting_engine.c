@@ -4,7 +4,7 @@
 
 static struct engine *engine = NULL;
 
-void analytics_exporting_connectors (BUFFER *b)
+void analytics_exporting_connectors(BUFFER *b)
 {
     if (!engine)
         return;
@@ -12,8 +12,8 @@ void analytics_exporting_connectors (BUFFER *b)
     uint8_t count = 0;
 
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-
-        if (count) buffer_strcat(b, "|");
+        if (count)
+            buffer_strcat(b, "|");
 
         switch (instance->config.type) {
             case EXPORTING_CONNECTOR_TYPE_GRAPHITE:

@@ -1314,8 +1314,8 @@ int main(int argc, char **argv) {
     send_statistics("START", "-",  "-");
 
     //check if ANALYTICS needs to start
-    if (netdata_anonymous_statistics_enabled==1) {
-        for (i = 0; static_threads[i].name != NULL ; i++) {
+    if (netdata_anonymous_statistics_enabled == 1) {
+        for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->thread = mallocz(sizeof(netdata_thread_t));
