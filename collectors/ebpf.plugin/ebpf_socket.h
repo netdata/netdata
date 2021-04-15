@@ -24,7 +24,18 @@
 #define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
 #define EBPF_CONFIG_PORTS "ports"
 #define EBPF_CONFIG_HOSTNAMES "hostnames"
+#define EBPF_CONFIG_BANDWIDTH_SIZE "bandwidth table size"
+#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
+#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_UDP_SIZE "udp connection table size"
 #define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
+
+enum ebpf_socket_table_list {
+    NETDATA_SOCKET_TABLE_BANDWIDTH,
+    NETDATA_SOCKET_TABLE_IPV4,
+    NETDATA_SOCKET_TABLE_IPV6,
+    NETDATA_SOCKET_TABLE_UDP
+};
 
 enum ebpf_socket_publish_index {
     NETDATA_IDX_TCP_SENDMSG,
@@ -94,6 +105,10 @@ typedef enum ebpf_socket_idx {
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_COMPILED_CONNECTIONS_ALLOWED 65535U
+#define NETDATA_MAXIMUM_CONNECTIONS_ALLOWED 16384U
+#define NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED 8192U
+#define NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED 4096U
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32

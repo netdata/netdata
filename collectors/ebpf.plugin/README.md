@@ -149,6 +149,7 @@ accepts the following values: ​
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
 -   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
+-   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
     
 #### Integration with `apps.plugin`
 
@@ -186,6 +187,11 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
 [global]
    apps = yes
 ```
+
+When the integration is enabled, eBPF collector allocates memory for each process running. The total 
+ allocated memory has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, 
+ it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
+ for each processor it runs.
 
 #### `[ebpf programs]`
 
@@ -347,13 +353,16 @@ mount these filesystems on startup. More information can be found in the [ftrace
 
 ## Performance
 
-Because eBPF monitoring is complex, we are evaluating the performance of this new collector in various real-world
-conditions, across various system loads, and when monitoring complex applications.
+eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin 
+significantly increases kernel memory usage by several hundred MB.
 
-Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
-nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
-much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
-your complex applications at any load.
+If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, 
+consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next, 
+[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system 
+memory usage (see the `system.ram` chart) has dropped significantly.
+
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode) 
+in `ebpf.conf`.
 
 ## SELinux
 

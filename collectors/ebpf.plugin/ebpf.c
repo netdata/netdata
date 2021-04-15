@@ -77,19 +77,22 @@ pthread_cond_t collect_data_cond_var;
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_process_create_apps_charts },
+      .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
+      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = NULL  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = NULL },
+      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0 },
 };
 
 // Link with apps.plugin
@@ -774,6 +777,22 @@ static void ebpf_update_interval()
 }
 
 /**
+ * Update PID table size
+ *
+ * Update default size with value from user
+ */
+static void ebpf_update_table_size()
+{
+    int i;
+    uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
+                                                    EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].pid_map_size = value;
+    }
+}
+
+
+/**
  * Read collector values
  *
  * @param disable_apps variable to store information related to apps.
@@ -792,6 +811,8 @@ static void read_collector_values(int *disable_apps)
     how_to_load(value);
 
     ebpf_update_interval();
+
+    ebpf_update_table_size();
 
     // This is kept to keep compatibility
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",

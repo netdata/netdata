@@ -18,6 +18,10 @@ static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open"
                                                               "release_task", "_do_fork",   "sys_clone" };
 static char *status[] = { "process", "zombie" };
 
+static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                                 .user_input = 0},
+                                             {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
@@ -1029,6 +1033,7 @@ void *ebpf_process_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = process_maps;
     process_enabled = em->enabled;
     fill_ebpf_data(&process_data);
 
@@ -1041,6 +1046,7 @@ void *ebpf_process_thread(void *ptr)
     }
 
     ebpf_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
+    ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
