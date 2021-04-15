@@ -42,7 +42,6 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 
 ## Menu
 
-- [Menu](#menu)
 - [Features](#features)
 - [Get Netdata](#get-netdata)
   - [Docker](#docker)
