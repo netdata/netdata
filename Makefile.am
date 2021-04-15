@@ -37,11 +37,8 @@ EXTRA_DIST = \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
     README.md \
-    CONTRIBUTORS.md \
-    CODE_OF_CONDUCT.md \
     LICENSE \
     REDISTRIBUTED.md \
-    CONTRIBUTING.md \
     $(NULL)
 
 SUBDIRS = \

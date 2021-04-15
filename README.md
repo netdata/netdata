@@ -44,7 +44,11 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
 
 - [Features](#features)
 - [Get Netdata](#get-netdata)
+  - [Docker](#docker)
+  - [Other operating systems](#other-operating-systems)
+  - [Post-installation](#post-installation)
 - [How it works](#how-it-works)
+- [Infographic](#infographic)
 - [Documentation](#documentation)
 - [Community](#community)
 - [Contribute](#contribute)
@@ -190,11 +194,14 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## Community
 
-You can find most of the Netdata team in our [community forum](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and get to know the Netdata team.
+Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+
+Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
+ask questions, find resources, and engage with passionate professionals.
 
 You can also find Netdata on:
 
+-   [Reddit](https://www.reddit.com/r/netdata/)
 -   [Facebook](https://www.facebook.com/linuxnetdata/)
 -   [Twitter](https://twitter.com/linuxnetdata)
 -   [StackShare](https://stackshare.io/netdata)
@@ -203,10 +210,12 @@ You can also find Netdata on:
 
 ## Contribute
 
-We welcome [contributions](/CONTRIBUTING.md) to our code and to our
-[documentation](/docs/contributing/contributing-documentation.md). Feel free to join the team!
+Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
-To report bugs or get help, use [GitHub's issues](https://github.com/netdata/netdata/issues).
+- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
+- We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2C+needs+triage&template=bug_report.md).
+- View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from source and preparing a package.
@@ -225,5 +234,3 @@ _When people first hear about a new product, they frequently ask if it is any go
 
 > Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
 > the answer shall be “yes.".
-
-So, we follow the tradition...
