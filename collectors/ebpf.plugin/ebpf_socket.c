@@ -17,17 +17,17 @@ static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_
                                                             "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
 static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
-                                           .internal_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .user_input = 0},
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
                                           {.name = "tbl_conn_ipv4",
-                                           .internal_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .user_input = 0},
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
                                           {.name = "tbl_conn_ipv6",
-                                           .internal_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .user_input = 0},
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
                                           {.name = "tbl_nv_udp_conn_stats",
-                                           .internal_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED,
-                                           .user_input = 0},
+                                           .internal_input = NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED},
                                           {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 static netdata_idx_t *socket_hash_values = NULL;
@@ -2837,7 +2837,7 @@ void parse_table_size_options(struct config *cfg)
 
     socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) appconfig_get_number(cfg,
                                                                                       EBPF_GLOBAL_SECTION,
-                                                                                      EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+                                                                                      EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
 }
 
 /**
