@@ -301,7 +301,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 continue;
             }
 
-            // check for a possible host missmatch
+            // check for a possible host mismatch
             //if(strcmp(pointers[1], host->hostname))
             //    error("HEALTH [%s]: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", host->hostname, line, filename, pointers[1], host->hostname);
 

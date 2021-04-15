@@ -48,7 +48,7 @@ static struct netwireless {
     const char *chart_family;
 
     // charts
-    // satus
+    // status
     RRDSET *st_status;
 
     // Quality
@@ -119,7 +119,7 @@ static void netwireless_cleanup(struct timeval *timestamp)
 {
     struct netwireless *previous = NULL;
     struct netwireless *current;
-    // search it, from begining to the end
+    // search it, from beginning to the end
     for (current = netwireless_root; current;) {
 
         if (timercmp(&current->updated, timestamp, <)) {
@@ -145,7 +145,7 @@ static struct netwireless *find_or_create_wireless(const char *name)
     struct netwireless *wireless;
     uint32_t hash = simple_hash(name);
 
-    // search it, from begining to the end
+    // search it, from beginning to the end
     for (wireless = netwireless_root ; wireless ; wireless = wireless->next) {
         if (unlikely(hash == wireless->hash && !strcmp(name, wireless->name))) {
             return wireless;

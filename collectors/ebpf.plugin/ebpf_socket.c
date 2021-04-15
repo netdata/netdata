@@ -600,7 +600,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -637,7 +637,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -1325,7 +1325,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         return;
 
     netdata_socket_idx_t key = {};
-    netdata_socket_idx_t next_key;
+    netdata_socket_idx_t next_key = {};
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
@@ -1421,7 +1421,7 @@ void update_listen_table(uint16_t value, uint8_t proto)
 static void read_listen_table()
 {
     uint16_t key = 0;
-    uint16_t next_key;
+    uint16_t next_key = 0;
 
     int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
     uint8_t value;
@@ -1713,7 +1713,7 @@ static void clean_allocated_socket_plot()
 }
 
 /**
- * Clean netowrk ports allocated during initializaion.
+ * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
  */
@@ -1769,7 +1769,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
-void clean_thread_structures() {
+void clean_socket_apps_structures() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         freez(socket_bandwidth_curr[pids->pid]);
@@ -1853,8 +1853,6 @@ static void ebpf_socket_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    clean_thread_structures();
-    freez(socket_bandwidth_curr);
     freez(bandwidth_vector);
 
     freez(socket_values);
@@ -2755,7 +2753,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
+                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;
@@ -2822,6 +2820,8 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
+    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 

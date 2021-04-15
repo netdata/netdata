@@ -464,7 +464,7 @@ static void ebpf_process_update_apps_data()
  * @param family the chart family
  * @param name   the chart name
  * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashaboard
+ * @param web    the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  * @param algorithm the algorithm used to make the charts.
  */
@@ -494,7 +494,7 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
  * @param family the chart family
  * @param name   the chart name
  * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashaboard
+ * @param web    the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
  */
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
@@ -905,26 +905,6 @@ void clean_global_memory() {
     }
 }
 
-void clean_pid_on_target(struct pid_on_target *ptr) {
-    while (ptr) {
-        struct pid_on_target *next = ptr->next;
-        freez(ptr);
-
-        ptr = next;
-    }
-}
-
-void clean_apps_structures(struct target *ptr) {
-    struct target *agdt = ptr;
-    while (agdt) {
-        struct target *next = agdt->next;
-        clean_pid_on_target(agdt->root_pid);
-        freez(agdt);
-
-        agdt = next;
-    }
-}
-
 /**
  * Clean up the main thread.
  *
@@ -949,7 +929,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(global_process_stats);
     freez(current_apps_data);
 
-    clean_apps_structures(apps_groups_root_target);
     freez(process_data.map_fd);
 
     struct bpf_program *prog;

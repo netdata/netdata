@@ -53,6 +53,8 @@ upstream backend {
 server {
     # nginx listens to this
     listen 80;
+    # uncomment the line if you want nginx to listen on IPv6 address
+    #listen [::]:80;
 
     # the virtual host name of this
     server_name netdata.example.com;
@@ -82,16 +84,18 @@ upstream netdata {
 }
 
 server {
-   listen 80;
+    listen 80;
+    # uncomment the line if you want nginx to listen on IPv6 address
+    #listen [::]:80;
 
-   # the virtual host name of this subfolder should be exposed
-   #server_name netdata.example.com;
+    # the virtual host name of this subfolder should be exposed
+    #server_name netdata.example.com;
 
-   location = /netdata {
+    location = /netdata {
         return 301 /netdata/;
-   }
+    }
 
-   location ~ /netdata/(?<ndpath>.*) {
+    location ~ /netdata/(?<ndpath>.*) {
         proxy_redirect off;
         proxy_set_header Host $host;
 
@@ -127,6 +131,8 @@ upstream backend-server2 {
 
 server {
     listen 80;
+    # uncomment the line if you want nginx to listen on IPv6 address
+    #listen [::]:80;
 
     # the virtual host name of this subfolder should be exposed
     #server_name netdata.example.com;

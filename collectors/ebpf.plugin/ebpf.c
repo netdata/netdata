@@ -130,7 +130,17 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    freez(global_process_stat);
+    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+        clean_socket_apps_structures();
+        freez(socket_bandwidth_curr);
+    }
+
+    if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled = 0;
+        clean_cachestat_pid_structures();
+        freez(cachestat_pid);
+    }
 
     /*
     int ret = fork();
@@ -154,7 +164,7 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); // Sleep 200 miliseconds to father dies.
+            sleep_usec(200000); // Sleep 200 milliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
@@ -318,7 +328,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param id        chart id
  * @param title     chart title
  * @param units     units label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
@@ -376,7 +386,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param id        chart id
  * @param title     chart title
  * @param units     axis label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param context   chart context
  * @param charttype chart type
  * @param order     order number of the specified chart
@@ -691,7 +701,7 @@ static void read_local_addresses()
 }
 
 /**
- * Start Ptherad Variable
+ * Start Pthread Variable
  *
  * This function starts all pthread variables.
  *

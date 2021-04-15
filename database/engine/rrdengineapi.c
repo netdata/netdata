@@ -32,7 +32,7 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-/* Transform legacy UUID to be unique across hosts deterministacally */
+/* Transform legacy UUID to be unique across hosts deterministically */
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
@@ -359,7 +359,7 @@ static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
  *         reference dimension that that have different data collection intervals and overlap with the time range
  *         [start_time,end_time]. The caller must free (*region_info_arrayp) with freez(). If region_info_arrayp is set
  *         to NULL nothing was allocated.
- * @param max_intervalp is derefenced and set to be the largest data collection interval of all regions.
+ * @param max_intervalp is dereferenced and set to be the largest data collection interval of all regions.
  * @return number of regions with different data collection intervals.
  */
 unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,

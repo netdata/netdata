@@ -72,7 +72,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`exec`](#alarm-line-exec)                          | no              | The script to execute when the alarm changes status.                                  |
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
-| [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
+| [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
@@ -386,12 +386,12 @@ repeat: [off] [warning DURATION] [critical DURATION]
 -   `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
     notification for CRITICAL mode.
 
-#### Alarm line `option`
+#### Alarm line `options`
 
-The only possible value for the `option` line is
+The only possible value for the `options` line is
 
 ```yaml
-option: no-clear-notification
+options: no-clear-notification
 ```
 
 For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an

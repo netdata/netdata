@@ -77,7 +77,7 @@
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
-// the netdata deamon
+// the netdata daemon
 #include "daemon.h"
 #include "main.h"
 #include "signals.h"

@@ -89,7 +89,7 @@ enum ebpf_module_indexes {
 #endif
 #endif
 
-// Chart defintions
+// Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"

@@ -16,6 +16,8 @@ if [ "${1}" = "install" ]
     then
     [ "${UID}" != 0 ] && echo >&2 "Please run me as root. This will install a single binary file: /usr/local/bin/fping." && exit 1
 
+    [ -z "${2}" ] && fping_version="5.0" || fping_version="${2}"
+
     run() {
         printf >&2 " > "
         printf >&2 "%q " "${@}"
@@ -38,14 +40,14 @@ if [ "${1}" = "install" ]
 
     run cd /usr/src
 
-    if [ -d fping-4.2 ]
+    if [ -d "fping-${fping_version}" ]
         then
-        run rm -rf fping-4.2 || exit 1
+        run rm -rf "fping-${fping_version}" || exit 1
     fi
 
-    download 'https://github.com/schweikert/fping/releases/download/v4.2/fping-4.2.tar.gz' | run tar -zxvpf -
+    download "https://github.com/schweikert/fping/releases/download/v${fping_version}/fping-${fping_version}.tar.gz" | run tar -zxvpf -
     [ $? -ne 0 ] && exit 1
-    run cd fping-4.2 || exit 1
+    run cd "fping-${fping_version}" || exit 1
 
     run ./configure --prefix=/usr/local
     run make clean

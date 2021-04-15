@@ -322,7 +322,7 @@ var named = {
                     service.module.chartFromMembers(service, global_requests, 'received_requests', 'Bind, Global Received Requests by IP version', 'requests/s', 'requests', 'named.requests', netdata.chartTypes.stacked, named.base_priority + 1, netdata.chartAlgorithms.incremental, 1, 1);
 
                 if(global_queries_success_enable === true)
-                    service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'queries', 'named.queries_succcess', netdata.chartTypes.line, named.base_priority + 2, netdata.chartAlgorithms.incremental, 1, 1);
+                    service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'queries', 'named.queries_success', netdata.chartTypes.line, named.base_priority + 2, netdata.chartAlgorithms.incremental, 1, 1);
 
                 if(protocol_queries_enable === true)
                     service.module.chartFromMembers(service, protocol_queries, 'protocols_queries', 'Bind, Global Queries by IP Protocol', 'queries/s', 'queries', 'named.protocol_queries', netdata.chartTypes.stacked, named.base_priority + 3, netdata.chartAlgorithms.incremental, 1, 1);
@@ -597,7 +597,7 @@ var named = {
     },
 
     // module.update()
-    // this is called repeatidly to collect data, by calling
+    // this is called repeatedly to collect data, by calling
     // netdata.serviceExecute()
     update: function(service, callback) {
         service.execute(function(serv, data) {

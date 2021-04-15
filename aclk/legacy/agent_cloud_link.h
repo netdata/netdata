@@ -24,7 +24,7 @@
 
 #define ACLK_MAX_TOPIC 255
 
-#define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff stragegy fow now
+#define ACLK_RECONNECT_DELAY 1 // reconnect delay -- with backoff strategy for now
 #define ACLK_DEFAULT_PORT 9002
 #define ACLK_DEFAULT_HOST "localhost"
 
@@ -57,7 +57,7 @@ extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 extern int aclk_send_message_bin(char *sub_topic, const void *message, size_t len, char *msg_id);
 
 extern char *is_agent_claimed(void);
-extern void aclk_lws_wss_mqtt_layer_disconect_notif();
+extern void aclk_lws_wss_mqtt_layer_disconnect_notif();
 char *create_uuid();
 
 // callbacks for agent cloud link

@@ -46,8 +46,11 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 -   **I/O bandwidth/s (kb/s)**
     The amount of data transferred from and to the disk.
+-   **Amount of discarded data (kb/s)**
 -   **I/O operations/s**
     The number of I/O operations completed.
+-   **Extended I/O operations/s**
+    The number of extended I/O operations completed.
 -   **Queued I/O operations**
     The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
 -   **Backlog size (time in ms)**
@@ -57,12 +60,19 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
     Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
 -   **Average I/O operation time (ms)**
     The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+-   **Average I/O operation time for extended operations (ms)**
+    The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
 -   **Average I/O operation size (kb)**
     The average amount of data of the completed I/O operations.
+-   **Average amount of discarded data (kb)**
+    The average amount of data of the completed discard operations.
 -   **Average Service Time (ms)**
     The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
+-   **Average Service Time for extended I/O operations (ms)**
+    The average service time for completed extended I/O operations.
 -   **Merged I/O operations/s**
     The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
+-   **Merged discard operations/s**
 -   **Total I/O time**
     The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
 -   **Space usage**
@@ -116,6 +126,7 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
   # i/o time for all disks = auto
   # queued operations for all disks = auto
   # utilization percentage for all disks = auto
+  # extended operations for all disks = auto
   # backlog for all disks = auto
   # bcache for all disks = auto
   # bcache priority stats update every = 0
@@ -147,6 +158,7 @@ For each virtual disk, physical disk and partition you will have a section like 
 	# i/o time = auto
 	# queued operations = auto
 	# utilization percentage = auto
+    # extended operations = auto
 	# backlog = auto
 ```
 
@@ -290,6 +302,28 @@ each state.
 #### configuration
 
 `schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
+
+## Monitoring memory
+
+### Monitored memory metrics
+
+-  Amount of memory swapped in/out
+-  Amount of memory paged from/to disk
+-  Number of memory page faults
+-  Number of out of memory kills
+-  Number of NUMA events
+
+### Configuration
+
+```conf
+[plugin:proc:/proc/vmstat]
+	filename to monitor = /proc/vmstat
+	swap i/o = auto
+	disk i/o = yes
+	memory page faults = yes
+	out of memory kills = yes
+	system-wide numa metric summary = auto
+```
 
 ## Monitoring Network Interfaces
 

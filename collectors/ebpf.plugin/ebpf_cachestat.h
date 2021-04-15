@@ -60,5 +60,6 @@ typedef struct netdata_publish_cachestat {
 } netdata_publish_cachestat_t;
 
 extern void *ebpf_cachestat_thread(void *ptr);
+extern void clean_cachestat_pid_structures();
 
 #endif // NETDATA_EBPF_CACHESTAT_H

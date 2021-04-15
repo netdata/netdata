@@ -3,7 +3,7 @@
 
 #include "rrdengine.h"
 
-/* Forward declerations */
+/* Forward declarations */
 static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx);
 
 /* always inserts into tail */

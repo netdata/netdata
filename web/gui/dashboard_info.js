@@ -595,6 +595,18 @@ netdataDashboard.menu = {
         info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
         'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
     },
+
+    'systemdunits': {
+        title: 'systemd units',
+        icon: '<i class="fas fa-cogs"></i>',
+        info: '<b>systemd</b> provides a dependency system between various entities called "units" of 11 different types. ' +
+        'Units encapsulate various objects that are relevant for system boot-up and maintenance. ' +
+        'Units may be <code>active</code> (meaning started, bound, plugged in, depending on the unit type), ' +
+        'or <code>inactive</code> (meaning stopped, unbound, unplugged), ' +
+        'as well as in the process of being activated or deactivated, i.e. between the two states (these states are called <code>activating</code>, <code>deactivating</code>). ' +
+        'A special <code>failed</code> state is available as well, which is very similar to <code>inactive</code> and is entered when the service failed in some way (process returned error code on exit, or crashed, an operation timed out, or after too many restarts). ' +
+        'For detailes, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.html" target="_blank"> systemd(1)</a>.'
+    },
 };
 
 
@@ -842,6 +854,10 @@ netdataDashboard.context = {
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
     },
 
+    'system.clock_sync_state': {
+        info: 'State map: 0 - not synchronized, 1 - synchronized'
+    },
+
     'system.forks': {
         colors: '#5555DD',
         info: 'Number of new processes created.'
@@ -1054,7 +1070,7 @@ netdataDashboard.context = {
     // network interfaces
 
     'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintented VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
+        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
     },
 
     'net.duplex': {
@@ -1236,7 +1252,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
     },
 
     'apps.bandwidth_udp_send': {
@@ -1424,9 +1440,15 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
+    'disk_ext.iotime': {
+        height: 0.5
+    },
     'disk.mops': {
         height: 0.5,
         info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
+    },
+    'disk_ext.mops': {
+        height: 0.5
     },
     'disk.svctm': {
         height: 0.5,
@@ -1436,9 +1458,16 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The average I/O operation size.'
     },
+    'disk_ext.avgsz': {
+        height: 0.5
+    },
     'disk.await': {
         height: 0.5,
         info: 'The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
+    },
+    'disk_ext.await': {
+        height: 0.5,
+        info: 'The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
     'disk.space': {
@@ -1448,12 +1477,12 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
+    // ------------------------------------------------------------------------
+    // MYSQL
+
     'mysql.net': {
         info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
     },
-
-    // ------------------------------------------------------------------------
-    // MYSQL
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +
@@ -1505,11 +1534,12 @@ netdataDashboard.context = {
 
     'mysql.galera_cluster_state': {
         info:
-            '<code>0</code>: undefined, ' +
-            '<code>1</code>: joining, ' +
-            '<code>2</code>: donor/desynced, ' +
-            '<code>3</code>: joined, ' +
-            '<code>4</code>: synced.'
+            '<code>0</code>: Undefined, ' +
+            '<code>1</code>: Joining, ' +
+            '<code>2</code>: Donor/Desynced, ' +
+            '<code>3</code>: Joined, ' +
+            '<code>4</code>: Synced, ' +
+            '<code>5</code>: Inconsistent.'
     },
 
     'mysql.galera_cluster_weight': {
@@ -1949,7 +1979,7 @@ netdataDashboard.context = {
     },
 
     'beanstalk.connections_rate': {
-        info: 'Tthe rate of connections opened to beanstalkd.'
+        info: 'The rate of connections opened to beanstalkd.'
     },
 
     'beanstalk.commands_rate': {
@@ -2575,7 +2605,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metadata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
         colors: [NETDATA.colors[12]]
     },
 
@@ -2584,7 +2614,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.metadata': {
-        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem interal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
+        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem internal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
     },
 
     'btrfs.system': {
@@ -2605,7 +2635,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.message_rates': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.'
     },
 
     'rabbitmq.global_counts': {
@@ -2648,7 +2678,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.queue_messages_stats': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
@@ -2756,7 +2786,7 @@ netdataDashboard.context = {
     },
 
     'boinc.tasks': {
-        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partially processed but suspended.'
     },
 
     'boinc.states': {
@@ -2905,7 +2935,7 @@ netdataDashboard.context = {
 
     // VM specific
     'vsphere.vm_mem_usage_percentage': {
-        info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
+        info: 'Percentage of used virtual machine “physical” memory: <code>active</code> / <code>virtual machine configured size</code>.'
     },
 
     'vsphere.vm_mem_usage': {
@@ -3338,7 +3368,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_retransmit': {
         title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
     },
 
     'ebpf.tcp_error': {
@@ -3396,7 +3426,7 @@ netdataDashboard.context = {
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
@@ -3845,4 +3875,65 @@ netdataDashboard.context = {
         '<code>0</code> - stopped, <code>10</code> - starting, <code>20</code> - running, <code>30</code> - backoff,' +
         '<code>40</code> - stopping, <code>100</code> - exited, <code>200</code> - fatal, <code>1000</code> - unknown.'
     },
+
+    // ------------------------------------------------------------------------
+    // Systemd units
+
+    'systemd.service_units_state': {
+        info: 'Service units start and control daemons and the processes they consist of. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html#" target="_blank"> systemd.service(5)</a>'
+    },
+
+    'systemd.socket_unit_state': {
+        info: 'Socket units encapsulate local IPC or network sockets in the system, useful for socket-based activation. ' +
+        'For details about socket units, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.socket.html#" target="_blank"> systemd.socket(5)</a>, ' +
+        'for details on socket-based activation and other forms of activation, see <a href="https://www.freedesktop.org/software/systemd/man/daemon.html#" target="_blank"> daemon(7)</a>.'
+    },
+
+    'systemd.target_unit_state': {
+        info: 'Target units are useful to group units, or provide well-known synchronization points during boot-up, ' +
+        'see <a href="https://www.freedesktop.org/software/systemd/man/systemd.target.html#" target="_blank"> systemd.target(5)</a>.'
+    },
+
+    'systemd.path_unit_state': {
+        info: 'Path units may be used to activate other services when file system objects change or are modified. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.path.html#" target="_blank"> systemd.path(5)</a>.'
+    },
+
+    'systemd.device_unit_state': {
+        info: 'Device units expose kernel devices in systemd and may be used to implement device-based activation. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.device.html#" target="_blank"> systemd.device(5)</a>.'
+    },
+
+    'systemd.mount_unit_state': {
+        info: 'Mount units control mount points in the file system. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.mount.html#" target="_blank"> systemd.mount(5)</a>.'
+    },
+
+    'systemd.automount_unit_state': {
+        info: 'Automount units provide automount capabilities, for on-demand mounting of file systems as well as parallelized boot-up. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.automount.html#" target="_blank"> systemd.automount(5)</a>.'
+    },
+
+    'systemd.swap_unit_state': {
+        info: 'Swap units are very similar to mount units and encapsulate memory swap partitions or files of the operating system. ' +
+        'They are described in <a href="https://www.freedesktop.org/software/systemd/man/systemd.swap.html#" target="_blank"> systemd.swap(5)</a>.'
+    },
+
+    'systemd.timer_unit_state': {
+        info: 'Timer units are useful for triggering activation of other units based on timers. ' +
+        'You may find details in <a href="https://www.freedesktop.org/software/systemd/man/systemd.timer.html#" target="_blank"> systemd.timer(5)</a>.'
+    },
+
+    'systemd.scope_unit_state': {
+        info: 'Slice units may be used to group units which manage system processes (such as service and scope units) ' +
+        'in a hierarchical tree for resource management purposes. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.scope.html#" target="_blank"> systemd.scope(5)</a>.'
+    },
+
+    'systemd.slice_unit_state': {
+        info: 'Scope units are similar to service units, but manage foreign processes instead of starting them as well. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.slice.html#" target="_blank"> systemd.slice(5)</a>.'
+    },
+
 };
