@@ -122,7 +122,7 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
         hits = 0;
     }
 
-    calculated_number ratio = (total > 0) ? hits/total : 0;
+    calculated_number ratio = (total > 0) ? hits/total : 1;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;
@@ -378,12 +378,9 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
     calculate_stats(publish);
 
     netdata_publish_syscall_t *ptr = cachestat_counter_publish_aggregated;
-    // The algorithm sets this value to zero sometimes, we are not written them to have a smooth chart
-    if (publish->ratio) {
-        ebpf_one_dimension_write_charts(
-            NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART, ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension,
-            publish->ratio);
-    }
+    ebpf_one_dimension_write_charts(
+        NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART, ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension,
+        publish->ratio);
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART, ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
@@ -535,7 +532,7 @@ static void ebpf_create_memory_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
