@@ -353,14 +353,6 @@ mount these filesystems on startup. More information can be found in the [ftrace
 
 ## Performance
 
-Because eBPF monitoring is complex, we are evaluating the performance of this new collector in various real-world
-conditions, across various system loads, and when monitoring complex applications.
-
-Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
-nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
-much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
-your complex applications at any load.
-
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin 
 significantly increases kernel memory usage by several hundred MB.
 
