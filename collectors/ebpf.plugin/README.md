@@ -123,11 +123,11 @@ To enable the collector, scroll down to the `[plugins]` section ensure the relev
    ebpf = yes
 ```
 
-You can also configure the eBPF collector's behavior by editing `ebpf.conf`.
+You can also configure the eBPF collector's behavior by editing `ebpf.d.conf`.
 
 ```bash
 cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf.conf
+./edit-config ebpf.d.conf
 ```
 
 ### `[global]`

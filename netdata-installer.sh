@@ -1613,7 +1613,7 @@ remove_old_ebpf() {
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
     echo >&2 "Renaming eBPF configuration file."
-    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
   # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
