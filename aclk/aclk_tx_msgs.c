@@ -199,9 +199,9 @@ void aclk_send_info_metadata(mqtt_wss_client client, int metadata_submitted, RRD
     // a fake on_connect message then use the real timestamp to indicate it is within the existing
     // session.
     if (metadata_submitted)
-        msg = create_hdr("update", msg_id, 0, 0, aclk_shared_state.version_neg);
+        msg = create_hdr("update", msg_id, 0, 0, ACLK_VERSION);
     else
-        msg = create_hdr("connect", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
+        msg = create_hdr("connect", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
 
     payload = json_object_new_object();
     json_object_object_add(msg, "payload", payload);
@@ -241,9 +241,9 @@ void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
     // session.
 
     if (metadata_submitted)
-        msg = create_hdr("connect_alarms", msg_id, 0, 0, aclk_shared_state.version_neg);
+        msg = create_hdr("connect_alarms", msg_id, 0, 0, ACLK_VERSION);
     else
-        msg = create_hdr("connect_alarms", msg_id, aclk_session_sec, aclk_session_us, aclk_shared_state.version_neg);
+        msg = create_hdr("connect_alarms", msg_id, aclk_session_sec, aclk_session_us, ACLK_VERSION);
 
     payload = json_object_new_object();
     json_object_object_add(msg, "payload", payload);
@@ -263,39 +263,6 @@ void aclk_send_alarm_metadata(mqtt_wss_client client, int metadata_submitted)
     json_object_put(msg);
     freez(msg_id);
     buffer_free(local_buffer);
-}
-
-void aclk_hello_msg(mqtt_wss_client client)
-{
-    json_object *tmp, *msg;
-
-    char *msg_id = create_uuid();
-
-    ACLK_SHARED_STATE_LOCK;
-    aclk_shared_state.version_neg = 0;
-    aclk_shared_state.version_neg_wait_till = now_monotonic_usec() + USEC_PER_SEC * VERSION_NEG_TIMEOUT;
-    ACLK_SHARED_STATE_UNLOCK;
-
-    //Hello message is versioned separatelly from the rest of the protocol
-    msg = create_hdr("hello", msg_id, 0, 0, ACLK_VERSION_NEG_VERSION);
-
-    tmp = json_object_new_int(ACLK_VERSION_MIN);
-    json_object_object_add(msg, "min-version", tmp);
-
-    tmp = json_object_new_int(ACLK_VERSION_MAX);
-    json_object_object_add(msg, "max-version", tmp);
-
-#ifdef ACLK_NG
-    tmp = json_object_new_string("Next Generation");
-#else
-    tmp = json_object_new_string("Legacy");
-#endif
-    json_object_object_add(msg, "aclk-implementation", tmp);
-
-    aclk_send_message_subtopic(client, msg, ACLK_TOPICID_METADATA);
-
-    json_object_put(msg);
-    freez(msg_id);
 }
 
 void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
@@ -340,7 +307,7 @@ void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
         return;
     }
 
-    msg = create_hdr("chart", NULL, 0, 0, aclk_shared_state.version_neg);
+    msg = create_hdr("chart", NULL, 0, 0, ACLK_VERSION);
     json_object_object_add(msg, "payload", payload);
 
     aclk_send_message_subtopic(client, msg, ACLK_TOPICID_CHART);
@@ -356,7 +323,7 @@ void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg)
     // other are timestamps etc. which in ACLK legacy would be wrong (because ACLK legacy
     // send message with timestamps already to Query Queue they would be incorrect at time
     // when query queue would get to send them)
-    json_object *obj = create_hdr("status-change", NULL, 0, 0, aclk_shared_state.version_neg);
+    json_object *obj = create_hdr("status-change", NULL, 0, 0, ACLK_VERSION);
     json_object_object_add(obj, "payload", msg);
 
     aclk_send_message_subtopic(client, obj, ACLK_TOPICID_ALARMS);
