@@ -40,7 +40,7 @@ exist.
 - `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
 - Various configuration files ending in `.conf` for [configuring plugins or
   collectors](/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
-  `python.d.conf`, and `ebpf.conf`.
+  `python.d.conf`, and `ebpf.d.conf`.
 - Various directories ending in `.d`, which contain other configuration files, each ending in `.conf`, for [configuring
   specific collectors](/docs/collect/enable-configure.md#configure-a-collector).
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
@@ -112,7 +112,7 @@ You can edit any Netdata configuration file using `edit-config`. A few examples:
 
 ```bash
 ./edit-config apps_groups.conf
-./edit-config ebpf.conf
+./edit-config ebpf.d.conf
 ./edit-config health.d/load.conf
 ./edit-config go.d/prometheus.conf
 ```
