@@ -58,6 +58,9 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
 | [`alarm`/`template`](#alarm-line-alarm-or-template) | yes             | Name of the alarm/template.                                                           |
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
+| [`class`](#alarm-line-class)                        | no              | The general classification of the alarm.                                              |
+| [`component`](#alarm-line-component)                | no              | Specify the component of the class of the alarm.                                      |
+| [`type`](#alarm-line-type)                          | no              | The type of error the alarm monitors.                                                 |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
 | [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
@@ -128,6 +131,32 @@ shows a disk I/O chart, the tooltip reads: `proc:/proc/diskstats, disk.io`.
 You're interested in what comes after the comma: `disk.io`. That's the name of the chart's context. 
 
 If you create a template using the `disk.io` context, it will apply an alarm to every disk available on your system.
+
+#### Alarm line `class`
+
+Specify the classification of the alarm or template. 
+
+Class can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` class, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc.
+
+```yaml
+class: Database
+```
+
+#### Alarm line `component`
+
+Component can be used to narrow down what the previous `class` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` classification.
+
+```yaml
+component: MySQL
+```
+
+#### Alarm line `type`
+
+This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues, be it in network interfaces, web servers, or database systems.
+
+```yaml
+type: Latency
+```
 
 #### Alarm line `os`
 
