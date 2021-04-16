@@ -1,8 +1,8 @@
 ---
-title: "Install Netdata"
+title: "Get started"
 description: "Download and install the open-source Netdata monitoring agent on physical/virtual servers, Linux (Ubuntu/Debian/CentOS/etc), Docker, Kubernetes, and many others, often with one command."
 type: how-to
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/install.mdx
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/get-started.mdx
 ---
 
 import { OneLineInstall } from '../src/components/OneLineInstall/'
@@ -10,8 +10,8 @@ import { Install, InstallBox } from '../src/components/Install/'
 
 # Install Netdata
 
-Netdata is an open-source monitoring agent that collects thousands of hardware and software metrics from any physical or
-virtual system (we call them _nodes_) and organizes them in easy-to-use and -navigate interface.
+Netdata is an free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
+any physical or virtual system (we call them _nodes_) and organizes them in easy-to-use and -navigate interface.
 
 Together with Netdata Cloud, you can monitor your entire infrastructure in real time and troubleshoot problems that
 threaten the health of your nodes before they occur.
@@ -26,7 +26,7 @@ which we can't maintain and are often missing features. By installing from a met
 Netdata experience.
 
 <details>
-  <summary><strong>Don't see an installation method that works for you below?</strong></summary>
+  <summary><strong>Need a different installation method, or use a different operating system?</strong></summary>
   <Install>
     <InstallBox
       to="/docs/agent/packaging/installer/methods/kickstart"
@@ -91,6 +91,8 @@ Copy the script, paste it into your node's terminal, and hit `Enter` to begin th
 
 <OneLineInstall />
 
+Next, [open and explore the dashboard](#open-and-explore-the-dashboard).
+
 ## Run Netdata with Docker
 
 You can also try out Netdata's capabilities in a [Docker
@@ -114,10 +116,12 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
+Next, [open and explore the dashboard](#open-and-explore-the-dashboard).
+
 ## Open and explore the dashboard
 
-To open Netdata's dashboard, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either
-`localhost` for a local system, or the hostname/IP address of a remote system.
+To start using Netdata, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
+the hostname/IP address of a remote node.
 
 ![Animated GIF of navigating to the
 dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
@@ -161,7 +165,7 @@ Discover the recommended way to [configure Netdata's settings or behavior](/docs
 `edit-config` script, then apply that knowledge to mission-critical tweaks, such as [changing how long Netdata stores
 metrics](/docs/store/change-metrics-storage.md).
 
-### Dashboards
+### Dashboard
 
 Learn even more about [navigating Netdata's dashboard and interacting with
 charts](/docs/visualize/interact-dashboards-charts.md).
@@ -190,4 +194,4 @@ There is an alternative for those who aren't interested in using Netdata Cloud, 
 Each node can [stream](/streaming/README.md) its metrics to any other node, and the default
 [registry](/registry/README.md) is configurable to create a private "network" of Netdata dashboards.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Finstall&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fget-started&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
