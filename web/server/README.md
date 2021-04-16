@@ -226,7 +226,7 @@ present that may match DNS FQDNs.
 |disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
 |timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
 |accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](/streaming/README.md)|
-|respect do not track policy|`no`|If set to `yes`, will respect the client's browser preferences on storing cookies.|
+|respect do not track policy|`no`|If set to `yes`, Netdata will respect the user's browser preferences for [Do Not Track](https://www.eff.org/issues/do-not-track) (DNT) and storing cookies. If DNT is _enabled_ in the browser, and this option is set to `yes`, users will not be able to sign in to Netdata Cloud via their local Agent dashboard, and their node will not connect to any [registry](/registry/README.md). For certain browsers, users must disable DNT and change this option to `yes` for full functionality.|
 |x-frame-options response header||[Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).|
 |enable gzip compression|`yes`|When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.|
 |gzip compression strategy|`default`|Valid strategies are `default`, `filtered`, `huffman only`, `rle` and `fixed`|
