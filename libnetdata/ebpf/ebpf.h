@@ -15,6 +15,7 @@
 #define EBPF_CFG_LOAD_MODE_RETURN "return"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
+#define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
 
 /**
@@ -95,6 +96,14 @@ typedef enum {
     MODE_ENTRY       // This attaches kprobe when the function is called
 } netdata_run_mode_t;
 
+#define ND_EBPF_DEFAULT_PID_SIZE 32768U
+
+typedef struct ebpf_local_maps {
+    char *name;
+    uint32_t internal_input;
+    uint32_t user_input;
+} ebpf_local_maps_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -107,6 +116,8 @@ typedef struct ebpf_module {
     uint32_t thread_id;
     int optional;
     void (*apps_routine)(struct ebpf_module *em, void *ptr);
+    ebpf_local_maps_t *maps;
+    uint32_t pid_map_size;
 } ebpf_module_t;
 
 #define NETDATA_MAX_PROBES 64

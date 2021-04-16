@@ -183,7 +183,7 @@ struct spawn_cmd_info *spawn_get_unprocessed_cmd(void)
  * The caller has to be the netdata user as configured.
  *
  * @param loop the libuv loop of the caller context
- * @param spawn_channel the birectional libuv IPC pipe that the server and the caller will share
+ * @param spawn_channel the bidirectional libuv IPC pipe that the server and the caller will share
  * @param process the spawn server libuv process context
  * @return 0 on success or the libuv error code
  */

@@ -496,7 +496,7 @@ function toggleAgentItem(e, guid) {
     }
 }
 
-// When you stream metrics from netdata to netdata, the recieving netdata now
+// When you stream metrics from netdata to netdata, the receiving netdata now
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
 const OLD_DASHBOARD_SUFFIX = "old"
@@ -2840,7 +2840,7 @@ function initializeDynamicDashboardWithData(data) {
     }
 }
 
-// an object to keep initilization configuration
+// an object to keep initialization configuration
 // needed due to the async nature of the XSS modal
 var initializeConfig = {
     url: null,
@@ -4431,7 +4431,7 @@ function runOnceOnDashboardWithjQuery() {
 function finalizePage() {
     // resize all charts - without starting the background thread
     // this has to be done while NETDATA is paused
-    // if we ommit this, the affix menu will be wrong, since all
+    // if we omit this, the affix menu will be wrong, since all
     // the Dom elements are initially zero-sized
     NETDATA.parseDom();
 

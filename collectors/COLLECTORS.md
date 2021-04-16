@@ -26,35 +26,38 @@ issues](https://github.com/netdata/netdata/issues). Use the search bar to look f
 collector—we may be looking for contributions from users such as yourself! If you don't see the collector there, make a
 [feature request](https://community.netdata.cloud/c/feature-requests/7/none) on our community forums.
 
--   [Service and application collectors](#service-and-application-collectors)
-    -   [APM (application performance monitoring)](#apm-application-performance-monitoring)
-    -   [Containers and VMs](#containers-and-vms)
-    -   [Data stores](#data-stores)
-    -   [Distributed computing](#distributed-computing)
-    -   [Email](#email)
-    -   [Kubernetes](#kubernetes)
-    -   [Logs](#logs)
-    -   [Messaging](#messaging)
-    -   [Network](#network)
-    -   [Provisioning](#provisioning)
-    -   [Remote devices](#remote-devices)
-    -   [Search](#search)
-    -   [Storage](#storage)
-    -   [Web](#web)
--   [System collectors](#system-collectors)
-    -   [Applications](#applications)
-    -   [Disks and filesystems](#disks-and-filesystems)
-    -   [eBPF (extended Berkeley Packet Filter)](#ebpf)
-    -   [Hardware](#hardware)
-    -   [Memory](#memory)
-    -   [Networks](#networks)
-    -   [Processes](#processes)
-    -   [Resources](#resources)
-    -   [Users](#users)
--   [Netdata collectors](#netdata-collectors)
--   [Orchestrators](#orchestrators)
--   [Third-party collectors](#third-party-collectors)
--   [Etc](#etc)
+- [Supported collectors list](#supported-collectors-list)
+  - [Service and application collectors](#service-and-application-collectors)
+    - [Generic](#generic)
+    - [APM (application performance monitoring)](#apm-application-performance-monitoring)
+    - [Containers and VMs](#containers-and-vms)
+    - [Data stores](#data-stores)
+    - [Distributed computing](#distributed-computing)
+    - [Email](#email)
+    - [Kubernetes](#kubernetes)
+    - [Logs](#logs)
+    - [Messaging](#messaging)
+    - [Network](#network)
+    - [Provisioning](#provisioning)
+    - [Remote devices](#remote-devices)
+    - [Search](#search)
+    - [Storage](#storage)
+    - [Web](#web)
+  - [System collectors](#system-collectors)
+    - [Applications](#applications)
+    - [Disks and filesystems](#disks-and-filesystems)
+    - [eBPF](#ebpf)
+    - [Hardware](#hardware)
+    - [Memory](#memory)
+    - [Networks](#networks)
+    - [Operating systems](#operating-systems)
+    - [Processes](#processes)
+    - [Resources](#resources)
+    - [Users](#users)
+  - [Netdata collectors](#netdata-collectors)
+  - [Orchestrators](#orchestrators)
+  - [Third-party collectors](#third-party-collectors)
+  - [Etc](#etc)
 
 ## Service and application collectors
 
@@ -366,6 +369,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 -   [Device mapper](/collectors/proc.plugin/README.md): Gather metrics about the Linux device mapper with the proc
     collector.
 -   [Disk space](/collectors/diskspace.plugin/README.md): Collect disk space usage metrics on Linux mount points.
+-   [Clock synchronization](/collectors/timex.plugin/README.md): Collect the system clock synchronization status on Linux.
 -   [Files and directories](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/filecheck): Gather
     metrics about the existence, modification time, and size of files or directories.
 -   [ioping.plugin](/collectors/ioping.plugin/README.md): Measure disk read/write latency.

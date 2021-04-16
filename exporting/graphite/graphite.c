@@ -64,7 +64,7 @@ int init_graphite_instance(struct instance *instance)
 }
 
 /**
- * Copy a label value and substitute underscores in place of charachters which can't be used in Graphite output
+ * Copy a label value and substitute underscores in place of characters which can't be used in Graphite output
  *
  * @param dst a destination string.
  * @param src a source string.
@@ -205,7 +205,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
 }
 
 /**
- * Ppepare HTTP header
+ * Prepare HTTP header
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.

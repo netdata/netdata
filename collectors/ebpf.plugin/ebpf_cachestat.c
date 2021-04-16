@@ -24,6 +24,10 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
+static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                             .user_input = 0},
+                                             {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 static int *map_fd = NULL;
 
 struct config cachestat_config = { .first_section = NULL,
@@ -43,7 +47,7 @@ struct config cachestat_config = { .first_section = NULL,
  *
  * Clean the allocated structures.
  */
-static void clean_pid_structures() {
+void clean_cachestat_pid_structures() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         freez(cachestat_pid[pids->pid]);
@@ -70,9 +74,6 @@ static void ebpf_cachestat_cleanup(void *ptr)
         usec_t dt = heartbeat_next(&hb, tick);
         UNUSED(dt);
     }
-
-    clean_pid_structures();
-    freez(cachestat_pid);
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
@@ -125,7 +126,7 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
         hits = 0;
     }
 
-    calculated_number ratio = (total > 0) ? hits/total : 0;
+    calculated_number ratio = (total > 0) ? hits/total : 1;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;
@@ -360,15 +361,11 @@ void *ebpf_cachestat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_time;
-    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         read_global_table();
-
-        if (apps)
-            read_apps_table();
     }
     read_thread_closed = 1;
 
@@ -385,12 +382,9 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
     calculate_stats(publish);
 
     netdata_publish_syscall_t *ptr = cachestat_counter_publish_aggregated;
-    // The algorithm sets this value to zero sometimes, we are not written them to have a smooth chart
-    if (publish->ratio) {
-        ebpf_one_dimension_write_charts(
-            NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART, ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension,
-            publish->ratio);
-    }
+    ebpf_one_dimension_write_charts(
+        NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART, ptr[NETDATA_CACHESTAT_IDX_RATIO].dimension,
+        publish->ratio);
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART, ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
@@ -512,6 +506,9 @@ static void cachestat_collector(ebpf_module_t *em)
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
+        if (apps)
+            read_apps_table();
+
         pthread_mutex_lock(&lock);
 
         cachestat_send_global(&publish);
@@ -539,7 +536,7 @@ static void ebpf_create_memory_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
@@ -615,9 +612,11 @@ void *ebpf_cachestat_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = cachestat_maps;
     fill_ebpf_data(&cachestat_data);
 
     ebpf_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
+    ebpf_update_pid_table(&cachestat_maps[0], em);
 
     if (!em->enabled)
         goto endcachestat;

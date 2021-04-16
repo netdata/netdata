@@ -50,6 +50,7 @@ ATTR199 = '199'
 ATTR202 = '202'
 ATTR206 = '206'
 ATTR233 = '233'
+ATTR249 = '249'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
 ATTR_WRITE_ERR_COR = 'write-total-err-corrected'
@@ -330,7 +331,13 @@ CHARTS = {
         'lines': [],
         'attrs': [ATTR233],
         'algo': ABSOLUTE,
-    }
+    },
+    'nand_writes_1gib': {
+        'options': [None, 'NAND Writes', 'GiB', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
+        'lines': [],
+        'attrs': [ATTR249],
+        'algo': ABSOLUTE,
+    },
 }
 
 # NOTE: 'parse_temp' decodes ATA 194 raw value. Not heavily tested. Written by @Ferroin

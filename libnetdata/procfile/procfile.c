@@ -312,9 +312,9 @@ procfile *procfile_readall(procfile *ff) {
 NOINLINE
 static void procfile_set_separators(procfile *ff, const char *separators) {
     static PF_CHAR_TYPE def[256];
-    static char initilized = 0;
+    static char initialized = 0;
 
-    if(unlikely(!initilized)) {
+    if(unlikely(!initialized)) {
         // this is thread safe
         // if initialized is zero, multiple threads may be executing
         // this code at the same time, setting in def[] the exact same values
@@ -330,7 +330,7 @@ static void procfile_set_separators(procfile *ff, const char *separators) {
                 def[i] = PF_CHAR_IS_WORD;
         }
 
-        initilized = 1;
+        initialized = 1;
     }
 
     // copy the default

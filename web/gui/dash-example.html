@@ -9,6 +9,43 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
+    <script type="application/javascript">
+        /*****************
+         * CONFIGURATION *
+         *****************/
+
+        /**
+         * Netdata URLS. If you use a reverse proxy, add it and uncomment the line below
+         */
+        NETDATA_HOST = 'https://localhost:19999';
+        // REVERSE_PROXY_URL = 'https://my-domain.com/stats'
+
+        /**
+         * Whether to use dark theme in PickNSort. Default is true
+         */
+        DARK_THEME = true;
+
+        /**
+         * How often alarms are refreshed in seconds
+         */
+        ALARM_REFRESH_INTERVAL = 6;
+
+        /*
+         * Change your graph/chart dimensions here. Host columns will automatically adjust.  
+         * Charts are square! Their width is the same as their height.
+         */
+        DASH_OPTIONS = {
+            graph_width: '40em',
+            graph_height: '20em',
+            chart_width: '10em' // Charts are square
+        }
+
+        /*****************
+         *  END CONFIG   *
+         *****************/
+    </script>
+
+
     <div id="alarms" class="collapsed">
         <div class="alarm-collapse-button" onclick="dash.toggle_alarm_collapse()">&rsaquo;</div>
         <span class="alarm-count"></span>
@@ -93,12 +130,11 @@
         </div>
     </div>
 </body>
-<script
-    src="https://code.jquery.com/jquery-3.4.1.min.js"
-    integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
-    crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" 
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" 
+        crossorigin="anonymous">
 </script>
-<script type="text/javascript">
+<script type="application/javascript">
 class PickNSort {
     // PickNSort.js
 
@@ -297,7 +333,7 @@ class PickNSort {
 
     add_css_to_page (dark) {
         /*
-        * TUTORIAL: Change your theme colors here. Not sure how well it will work...
+        * You can change your PickNSort theme colors here. Not sure how well it will work...
         */
         var light_theme = {
             windowbg: "#FFF",
@@ -404,7 +440,7 @@ class PickNSort {
     }
 }
 </script>
-<script type="text/javascript">
+<script type="application/javascript">
     // Dash JS
 
     function picknsort_setup () {
@@ -418,6 +454,21 @@ class PickNSort {
         }
     }
 
+    function load_dashboard_js () {
+        // Import dashboard.js
+        $.ajax({
+            url: dash.base_url + '/dashboard.js',
+            cache: true,
+            dataType: "script",
+            success: function () {
+                console.log("Loaded dashboard.js");
+                setTimeout(function () {
+                    $('#alarms').css("visibility", "visible");
+                }, 400);
+            }
+        });
+    }
+
     class Dash {
         constructor (base_url, link_base_url) {
             this.base_url = base_url; // URL of netdata host, with port
@@ -425,17 +476,7 @@ class PickNSort {
             this.current_alarms = {};
             this.new_alarms = {};
             this.first_build = true;
-            /*
-            * TUTORIAL: Change your graph/chart dimensions here. Host columns will automatically adjust.
-            *             Charts are square! Their width is the same as their height.
-            */
-            this.options = {
-                graph_width: '40em',
-                graph_height: '20em',
-                chart_width: '10em' // Charts are square
-            };
-
-            this.init();
+            this.options = DASH_OPTIONS;
         }
 
         reorder_hosts () {
@@ -514,12 +555,13 @@ class PickNSort {
         }
 
 
-        init () {
+        init (callback) {
             var that = this;
             $.get(this.get_api_url() + '/info', function (data) {
                 that.netdata_info = data;
                 picknsort_setup()
                 that.build();
+                callback();
             });
         }
 
@@ -651,7 +693,6 @@ class PickNSort {
         }
 
         update_alarm_count () {
-            console.log(this.all_alarms_are_warnings());
             var count = $('img.alarm-badge').length;
             $('.alarm-count').text($('img.alarm-badge').length);
             $('.alarm-count').removeClass('no-alarms warnings-only');
@@ -768,26 +809,19 @@ class PickNSort {
         }
     }
 
-    /*
-    * TUTORIAL: Change this to the URL of your netdata host
-    * If you use netdata behind a reverse proxy, add a second parameter for the reverse proxy url like so:
-    *         new Dash('http://localhost:19999', 'https://my-domain.com/stats');
-    */
-    var dash = new Dash('http://localhost:19999');
+    if (typeof REVERSE_PROXY_URL === 'undefined') REVERSE_PROXY_URL = null;
 
-    var picknsort = new PickNSort(true);
+    var dash = new Dash(NETDATA_HOST, REVERSE_PROXY_URL);
 
-    // Import dashboard.js
-    $.getScript(dash.base_url + '/dashboard.js', function() {
-        console.log("Loaded dashboard.js");
-        setTimeout(function () {
-            $('#alarms').css("visibility", "visible");
-        }, 400);
+    var picknsort = new PickNSort(DARK_THEME);
+
+    dash.init(function () {
+        load_dashboard_js();
     });
 
     setInterval(function () {
         dash.digest();
-    }, 6 * 1000);
+    }, ALARM_REFRESH_INTERVAL * 1000);
 
 </script>
 <style type="text/css">
@@ -985,13 +1019,6 @@ class PickNSort {
 
     .netdata-host-stats-container:last-of-type {
         margin-right: 27em;
-    }
-
-    .netdata-host-stats {
-
-    }
-
-    .netdata-message {
     }
 
     .dash-graph {

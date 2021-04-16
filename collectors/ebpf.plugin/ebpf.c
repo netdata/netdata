@@ -77,19 +77,22 @@ pthread_cond_t collect_data_cond_var;
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_process_create_apps_charts },
+      .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts  },
+      .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
-        .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-        .optional = 0, .apps_routine = NULL  },
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE  },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = NULL },
+      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0 },
 };
 
 // Link with apps.plugin
@@ -130,7 +133,17 @@ static void ebpf_exit(int sig)
         return;
     }
 
-    freez(global_process_stat);
+    if (ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled = 0;
+        clean_socket_apps_structures();
+        freez(socket_bandwidth_curr);
+    }
+
+    if (ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_CACHESTAT_IDX].enabled = 0;
+        clean_cachestat_pid_structures();
+        freez(cachestat_pid);
+    }
 
     /*
     int ret = fork();
@@ -154,7 +167,7 @@ static void ebpf_exit(int sig)
         int sid = setsid();
         if (sid >= 0) {
             debug(D_EXIT, "Wait for father %d die", getpid());
-            sleep_usec(200000); // Sleep 200 miliseconds to father dies.
+            sleep_usec(200000); // Sleep 200 milliseconds to father dies.
             clean_loaded_events();
         } else {
             error("Cannot become session id leader, so I won't try to clean kprobe_events.\n");
@@ -318,7 +331,7 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param id        chart id
  * @param title     chart title
  * @param units     units label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
@@ -376,7 +389,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param id        chart id
  * @param title     chart title
  * @param units     axis label
- * @param family    group name used to attach the chart on dashaboard
+ * @param family    group name used to attach the chart on dashboard
  * @param context   chart context
  * @param charttype chart type
  * @param order     order number of the specified chart
@@ -691,7 +704,7 @@ static void read_local_addresses()
 }
 
 /**
- * Start Ptherad Variable
+ * Start Pthread Variable
  *
  * This function starts all pthread variables.
  *
@@ -764,6 +777,22 @@ static void ebpf_update_interval()
 }
 
 /**
+ * Update PID table size
+ *
+ * Update default size with value from user
+ */
+static void ebpf_update_table_size()
+{
+    int i;
+    uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
+                                                    EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].pid_map_size = value;
+    }
+}
+
+
+/**
  * Read collector values
  *
  * @param disable_apps variable to store information related to apps.
@@ -782,6 +811,8 @@ static void read_collector_values(int *disable_apps)
     how_to_load(value);
 
     ebpf_update_interval();
+
+    ebpf_update_table_size();
 
     // This is kept to keep compatibility
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
@@ -1027,7 +1058,7 @@ static void parse_args(int argc, char **argv)
 
     if (load_collector_config(ebpf_user_config_dir, &disable_apps)) {
         info(
-            "Does not have a configuration file inside `%s/ebpf.conf. It will try to load stock file.",
+            "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
         if (load_collector_config(ebpf_stock_config_dir, &disable_apps)) {
             info("Does not have a stock file. It is starting with default options.");

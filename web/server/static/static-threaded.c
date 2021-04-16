@@ -141,7 +141,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
 // web server clients
 
 static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
-    (void)data;         // Supress warning on unused argument
+    (void)data;         // Suppress warning on unused argument
 
     worker_private->connected++;
 

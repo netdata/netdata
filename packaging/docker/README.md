@@ -11,7 +11,7 @@ you get set up quickly, and doesn't install anything permanent on the system, wh
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 

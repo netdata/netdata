@@ -149,20 +149,6 @@ jobs:
     # This is the nightly execution step
     #
     - stage: Nightly release
-      _template: &NIGHTLY_TEMPLATE
-        git:
-          depth: false
-        script:
-          - echo "GIT Branch:" && git branch
-          - echo "Last commit:" && git log -1
-          - echo "GIT Describe:" && git describe
-          - echo "packaging/version:" && cat packaging/version
-          - "sudo echo '{\"experimental\": true}' > /etc/docker/daemon.json && sudo systemctl restart docker"
-          - packaging/docker/check_login.sh
-            && tick packaging/docker/build.sh
-            && packaging/docker/publish.sh
-        after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
-
       name: Create nightly release artifacts, publish to GCS
       script:
         - echo "GIT Branch:" && git branch

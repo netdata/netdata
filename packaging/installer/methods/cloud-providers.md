@@ -118,7 +118,7 @@ Add a new rule with the following options:
 Source: Any
 Source port ranges: 19999
 Destination: Any
-Destination port randes: 19999
+Destination port ranges: 19999
 Protocol: TCP
 Action: Allow
 Priority: 310

@@ -265,7 +265,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  * @param path the directory to search apps_%s.conf
  * @param file the word to complement the file name.
  *
- * @return It returns 0 on succcess and -1 otherwise
+ * @return It returns 0 on success and -1 otherwise
  */
 int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
 {
@@ -470,7 +470,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
 /**
  * Get PID entry
  *
- * Get or allocate the PID entry for the specifid pid.
+ * Get or allocate the PID entry for the specified pid.
  *
  * @param pid the pid to search the data.
  *
@@ -664,7 +664,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
  * @param pid the current pid that we are working
  * @param ptr a NULL value
  *
- * @return It returns 1 on succcess and 0 otherwise
+ * @return It returns 1 on success and 0 otherwise
  */
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
@@ -943,7 +943,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-            del_pid_entry(r);
 
             // Clean process structure
             freez(global_process_stats[r]);
@@ -953,6 +952,8 @@ void cleanup_exited_pids()
             current_apps_data[r] = NULL;
 
             cleanup_variables_from_other_threads(r);
+
+            del_pid_entry(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;

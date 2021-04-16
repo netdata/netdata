@@ -31,6 +31,7 @@ opensips_check() {
   # try to find it in the system
   if [ -z "$opensips_cmd" ]; then
     require_cmd opensipsctl || return 1
+    opensips_cmd="$OPENSIPSCTL_CMD"
   fi
 
   # check once if the command works
