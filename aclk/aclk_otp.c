@@ -607,7 +607,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     if (agent_id == NULL)
     {
         error("Agent was not claimed - cannot perform challenge/response");
-        buffer_flush(buf);
+        buffer_free(buf);
         return 1;
     }
 
@@ -620,26 +620,26 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     if (aclk_https_request(&req, &resp)) {
         error("Error trying to contact env endpoint");
         https_req_response_free(&resp);
-        buffer_flush(buf);
-        return 2;
+        buffer_free(buf);
+        return 1;
     }
     if (resp.http_code != 200) {
         error("The HTTP code not 200 OK (Got %d)", resp.http_code);
         https_req_response_free(&resp);
-        buffer_flush(buf);
-        return 3;
+        buffer_free(buf);
+        return 1;
     }
 
     if (parse_json_env(resp.payload, env)) {
         error ("error parsing /env message");
         https_req_response_free(&resp);
-        buffer_flush(buf);
-        return 4;
+        buffer_free(buf);
+        return 1;
     }
 
     info("Getting Cloud /env successful");
 
     https_req_response_free(&resp);
-    buffer_flush(buf);
+    buffer_free(buf);
     return 0;
 }
