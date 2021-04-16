@@ -61,7 +61,7 @@
 #    weak
 #    weakref
 #
-#   Unsuppored function attributes will be tested with a prototype returning
+#   Unsupported function attributes will be tested with a prototype returning
 #   an int and not accepting any arguments and the result of the check might
 #   be wrong or meaningless so use with care.
 #

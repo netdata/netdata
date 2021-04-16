@@ -419,7 +419,7 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   cat << BANNER4
 
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
-  Anonymous usage stats will be collected and sent to Google Analytics.
+  Anonymous usage stats will be collected and sent to Netdata.
   To opt-out, pass --disable-telemetry option to the installer or export
   the environment variable DO_NOT_TRACK to a non-zero or non-empty value
   (e.g: export DO_NOT_TRACK=1).
@@ -1613,7 +1613,7 @@ remove_old_ebpf() {
 
   if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
     echo >&2 "Renaming eBPF configuration file."
-    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.conf"
+    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
   # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 

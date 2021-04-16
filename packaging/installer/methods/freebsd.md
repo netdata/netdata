@@ -64,7 +64,7 @@ You can now access the Netdata dashboard by navigating to `http://NODE:19999`, r
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
 page](/docs/anonymous-statistics.md).
 

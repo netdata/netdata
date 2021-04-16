@@ -73,31 +73,32 @@ header:
 
 `dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax, and your selections will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
 
-__**Dash will only work if you have implemented netdata streaming using `stream.conf`**__
+__**Dash will only work if you have implemented netdata streaming using `stream.conf`. It is not part of Netdata Cloud.**__
 
 `dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out Netdata Cloud!
 
 ### Configure Dash
 
 First, rename the file so it doesn't get overwritten. For instance, with a webroot at `/usr/share/netdata/web`:
-```
+```bash
 cp /usr/share/netdata/web/dash-example.html /usr/share/netdata/web/dash.html
 ```
 
-Find and change the following line in `dash.html` to reflect your Netdata URLs. The second URL is only used if you access your Netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the Netdata host URL.
+> NOTE: Ensure the owner/permissions match those in the rest of the files in the directory. Usually `netdata:netdata` and `0644`.
+
+Find and change the following lines in `dash.html` to reflect your Netdata URLs. The `REVERSE_PROXY_URL` is optional and only used if you access your Netdata dashboard through a reverse proxy. If it is not set, it defaults to the `NETDATA_HOST` URL.
 
 ```js
-/*
-* TUTORIAL: Change this to the URL of your netdata host
-* If you use netdata behind a reverse proxy, add a second parameter for the reverse proxy url like so:
-*         new Dash('http://localhost:19999', 'https://my-domain.com/stats');
-*/
-var dash = new Dash('http://localhost:19999');
+/**
+ * Netdata URLS. If you use a reverse proxy, add it and uncomment the line below
+ */
+NETDATA_HOST = 'https://localhost:19999';
+// REVERSE_PROXY_URL = 'https://my-domain.com/stats'
 ```
 
 ### The `dash-*` Syntax
 
-If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart:
+If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart, and charts are replicated for each streamed host.
 ```
 <div class="dash-graph"                     <----     Use class dash-graph for line graphs, etc
     data-dash-netdata="system.cpu"          <----     REQUIRED: Use data-dash-netdata to set the data source
@@ -112,17 +113,17 @@ If you want to change the graphs or styling to fit your needs, just add an eleme
 </div>
 ```
 
-To change the sizes of graphs and charts, find the `Dash.options` object in `dash.html` and set your preferences:
+To change the sizes of graphs and charts, find the `DASH_OPTIONS` object in `dash.html` and set your preferences:
 ```js
 /*
-* TUTORIAL: Change your graph/chart dimensions here. Host columns will automatically adjust.
-*           Charts are square! Their width is the same as their height.
-*/
-this.options = {
+ * Change your graph/chart dimensions here. Host columns will automatically adjust.  
+ * Charts are square! Their width is the same as their height.
+ */
+DASH_OPTIONS = {
     graph_width: '40em',
     graph_height: '20em',
     chart_width: '10em' // Charts are square
-};
+}
 ```
 
 To change the display order of your hosts, which is saved in localStorage, click the settings gear in the lower right corner

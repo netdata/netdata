@@ -186,7 +186,7 @@ Do this to install and run Netdata:
 
 ```sh
 # download it - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=100
+git clone https://github.com/netdata/netdata.git --depth=100 --recursive
 cd netdata
 
 # run script with root privileges to build, install, start Netdata

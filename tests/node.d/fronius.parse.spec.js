@@ -60,7 +60,7 @@ describe("fronius parsing for power chart", function () {
     });
 
     it("should return -100 for P_Akku", function () {
-        // it is unclear whether negative values are possible for p_akku (couln't test, nor any API docs found).
+        // it is unclear whether negative values are possible for p_akku (couldn't test, nor any API docs found).
         site.P_Akku = -100;
         var result = subject.parsePowerChart(service, site).dimensions[2];
 

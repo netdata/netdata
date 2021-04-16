@@ -263,7 +263,7 @@ static void destroy_web_client(struct web_client *w)
 // ---------------------------------- Parameterized test-families -----------------------------------------------------
 // There is no way to pass a parameter block into the setup fixture, we would have to patch CMocka and maintain it
 // locally. (The void **current_state in _run_group_tests would be set from a parameter). This is unfortunate as a
-// parameteric unit-tester needs to be to pass parameters to the fixtures. We are faking this by calculating the
+// parametric unit-tester needs to be to pass parameters to the fixtures. We are faking this by calculating the
 // space of tests in the launcher, passing an array of identical unit-tests to CMocka and then counting through the
 // parameters in the shared state passed between tests. To initialise this counter structure we use this global to
 // pass from the launcher (test-builder) to the setup-fixture.

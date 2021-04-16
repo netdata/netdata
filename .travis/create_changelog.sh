@@ -34,6 +34,7 @@ echo "--- Creating changelog ---"
 git checkout master
 git pull
 
+docker login -u "${DOCKER_USERNAME}" -p "${DOCKER_PWD}"
 docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest \
 	--user "${ORGANIZATION}" \
 	--project "${PROJECT}" \

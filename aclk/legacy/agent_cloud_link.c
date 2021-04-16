@@ -653,7 +653,7 @@ static void aclk_graceful_disconnect()
 
     aclk_shutting_down = 1;
     _link_shutdown();
-    aclk_lws_wss_mqtt_layer_disconect_notif();
+    aclk_lws_wss_mqtt_layer_disconnect_notif();
 
     write_q = 1;
     event_loop_timeout = now_realtime_sec() + 5;
@@ -937,7 +937,7 @@ static void aclk_try_to_connect(char *hostname, int port)
 {
     int rc;
 
-// this is usefull for developers working on ACLK
+// this is useful for developers working on ACLK
 // allows connecting agent to any MQTT broker
 // for debugging, development and testing purposes
 #ifndef ACLK_DISABLE_CHALLENGE
@@ -986,7 +986,7 @@ static inline void aclk_hello_msg()
     aclk_shared_state.version_neg_wait_till = now_monotonic_usec() + USEC_PER_SEC * VERSION_NEG_TIMEOUT;
     ACLK_SHARED_STATE_UNLOCK;
 
-    //Hello message is versioned separatelly from the rest of the protocol
+    //Hello message is versioned separately from the rest of the protocol
     aclk_create_header(buf, "hello", msg_id, 0, 0, ACLK_VERSION_NEG_VERSION);
     buffer_sprintf(buf, ",\"min-version\":%d,\"max-version\":%d}", ACLK_VERSION_MIN, ACLK_VERSION_MAX);
     aclk_send_message(ACLK_METADATA_TOPIC, buf->buffer, msg_id);
@@ -1211,7 +1211,7 @@ exited:
     /*
      * this must be last -> if all static threads signal
      * THREAD_EXITED rrdengine will dealloc the RRDSETs
-     * and RRDDIMs that are used by still runing stat thread.
+     * and RRDDIMs that are used by still running stat thread.
      * see netdata_cleanup_and_exit() for reference
      */
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -1555,7 +1555,7 @@ void aclk_single_update_enable()
     aclk_disable_single_updates = 0;
 }
 
-// Trigged by a health reload, sends the alarm metadata
+// Triggered by a health reload, sends the alarm metadata
 void aclk_alarm_reload()
 {
     if (unlikely(aclk_host_initializing(localhost)))

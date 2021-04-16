@@ -16,6 +16,20 @@ static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "rece
 static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
                                                             "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
 
+static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
+                                          {.name = "tbl_conn_ipv4",
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
+                                          {.name = "tbl_conn_ipv6",
+                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
+                                          {.name = "tbl_nv_udp_conn_stats",
+                                           .internal_input = NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED,
+                                           .user_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED},
+                                          {.name = NULL, .internal_input = 0, .user_input = 0}};
+
 static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
@@ -600,7 +614,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -637,7 +651,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param id        the chart id
  * @param title     the chart title
  * @param units     the units label
- * @param family    the group name used to attach the chart on dashaboard
+ * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
  * @param ptr       the plot structure with values.
  */
@@ -1325,7 +1339,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
         return;
 
     netdata_socket_idx_t key = {};
-    netdata_socket_idx_t next_key;
+    netdata_socket_idx_t next_key = {};
     netdata_socket_idx_t removeme;
     int removesock = 0;
 
@@ -1421,7 +1435,7 @@ void update_listen_table(uint16_t value, uint8_t proto)
 static void read_listen_table()
 {
     uint16_t key = 0;
-    uint16_t next_key;
+    uint16_t next_key = 0;
 
     int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
     uint8_t value;
@@ -1713,7 +1727,7 @@ static void clean_allocated_socket_plot()
 }
 
 /**
- * Clean netowrk ports allocated during initializaion.
+ * Clean network ports allocated during initialization.
  *
  * @param ptr a pointer to the link list.
  */
@@ -1769,7 +1783,7 @@ static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
     }
 }
 
-void clean_thread_structures() {
+void clean_socket_apps_structures() {
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         freez(socket_bandwidth_curr[pids->pid]);
@@ -1853,8 +1867,6 @@ static void ebpf_socket_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
 
-    clean_thread_structures();
-    freez(socket_bandwidth_curr);
     freez(bandwidth_vector);
 
     freez(socket_values);
@@ -2755,7 +2767,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                info("Dupplicated definition for a service, the name %s will be ignored. ", names->name);
+                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;
@@ -2809,6 +2821,25 @@ void parse_service_name_section(struct config *cfg)
     }
 }
 
+void parse_table_size_options(struct config *cfg)
+{
+    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                            EBPF_GLOBAL_SECTION,
+                                                                                            EBPF_CONFIG_BANDWIDTH_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+
+    socket_maps[NETDATA_SOCKET_TABLE_IPV4].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                       EBPF_GLOBAL_SECTION,
+                                                                                       EBPF_CONFIG_IPV4_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+
+    socket_maps[NETDATA_SOCKET_TABLE_IPV6].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                       EBPF_GLOBAL_SECTION,
+                                                                                       EBPF_CONFIG_IPV6_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+
+    socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                      EBPF_GLOBAL_SECTION,
+                                                                                      EBPF_CONFIG_UDP_SIZE, NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED);
+}
+
 /**
  * Socket thread
  *
@@ -2822,15 +2853,19 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
 
+    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
     avl_init_lock(&inbound_vectors.tree, compare_sockets);
     avl_init_lock(&outbound_vectors.tree, compare_sockets);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = socket_maps;
     fill_ebpf_data(&socket_data);
 
     ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
+    parse_table_size_options(&socket_config);
 
     if (!em->enabled)
         goto endsocket;

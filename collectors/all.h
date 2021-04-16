@@ -12,6 +12,7 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
+#include "timex.plugin/plugin_timex.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -53,6 +54,8 @@
 #define NETDATA_CHART_PRIO_SYSTEM_SOFT_INTR           1100 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_ENTROPY             1000
 #define NETDATA_CHART_PRIO_SYSTEM_UPTIME              1000
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_STATE           1100
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_OFFSET          1110
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES      1200 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1201
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1202
@@ -80,8 +83,9 @@
 // Memory Section - 1xxx
 
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE       1010
-#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED       1020
-#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS        1030
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_OOM_KILL        1020
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED       1030
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS        1040
 #define NETDATA_CHART_PRIO_MEM_KERNEL                 1100
 #define NETDATA_CHART_PRIO_MEM_SLAB                   1200
 #define NETDATA_CHART_PRIO_MEM_HUGEPAGES              1250
@@ -102,16 +106,16 @@
 // Disks
 
 #define NETDATA_CHART_PRIO_DISK_IO                    2000
-#define NETDATA_CHART_PRIO_DISK_OPS                   2001
-#define NETDATA_CHART_PRIO_DISK_QOPS                  2002
-#define NETDATA_CHART_PRIO_DISK_BACKLOG               2003
-#define NETDATA_CHART_PRIO_DISK_BUSY                  2004
-#define NETDATA_CHART_PRIO_DISK_UTIL                  2005
-#define NETDATA_CHART_PRIO_DISK_AWAIT                 2006
-#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2007
-#define NETDATA_CHART_PRIO_DISK_SVCTM                 2008
-#define NETDATA_CHART_PRIO_DISK_MOPS                  2021
-#define NETDATA_CHART_PRIO_DISK_IOTIME                2022
+#define NETDATA_CHART_PRIO_DISK_OPS                   2010
+#define NETDATA_CHART_PRIO_DISK_QOPS                  2015
+#define NETDATA_CHART_PRIO_DISK_BACKLOG               2020
+#define NETDATA_CHART_PRIO_DISK_BUSY                  2030
+#define NETDATA_CHART_PRIO_DISK_UTIL                  2040
+#define NETDATA_CHART_PRIO_DISK_AWAIT                 2050
+#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2060
+#define NETDATA_CHART_PRIO_DISK_SVCTM                 2070
+#define NETDATA_CHART_PRIO_DISK_MOPS                  2080
+#define NETDATA_CHART_PRIO_DISK_IOTIME                2090
 #define NETDATA_CHART_PRIO_BCACHE_CACHE_ALLOC         2120
 #define NETDATA_CHART_PRIO_BCACHE_HIT_RATIO           2120
 #define NETDATA_CHART_PRIO_BCACHE_RATES               2121
@@ -280,8 +284,8 @@
 #define NETDATA_CHART_PRIO_TC_QOS                     7000
 #define NETDATA_CHART_PRIO_TC_QOS_PACKETS             7010
 #define NETDATA_CHART_PRIO_TC_QOS_DROPPED             7020
-#define NETDATA_CHART_PRIO_TC_QOS_TOCKENS             7030
-#define NETDATA_CHART_PRIO_TC_QOS_CTOCKENS            7040
+#define NETDATA_CHART_PRIO_TC_QOS_TOKENS              7030
+#define NETDATA_CHART_PRIO_TC_QOS_CTOKENS             7040
 
 // Infiniband
 #define NETDATA_CHART_PRIO_INFINIBAND                 7100
@@ -338,6 +342,7 @@
 #define NETDATA_CHART_PRIO_CHECKS                    99999
 
 #define NETDATA_CHART_PRIO_NETDATA_DISKSPACE        132020
+#define NETDATA_CHART_PRIO_NETDATA_TIMEX            132030
 #define NETDATA_CHART_PRIO_NETDATA_TC_CPU           135000
 #define NETDATA_CHART_PRIO_NETDATA_TC_TIME          135001
 

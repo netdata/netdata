@@ -88,7 +88,9 @@ dist_healthconfig_DATA = \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/stiebeleltron.conf \
+    health.d/synchronization.conf \
     health.d/swap.conf \
+    health.d/systemdunits.conf \
     health.d/tcp_conn.conf \
     health.d/tcp_listen.conf \
     health.d/tcp_mem.conf \

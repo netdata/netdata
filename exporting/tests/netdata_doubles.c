@@ -2,7 +2,7 @@
 
 #include "test_exporting_engine.h"
 
-// Use memomy allocation functions guarded by CMocka in strdupz
+// Use memory allocation functions guarded by CMocka in strdupz
 const char *__wrap_strdupz(const char *s)
 {
     char *duplicate = malloc(sizeof(char) * (strlen(s) + 1));

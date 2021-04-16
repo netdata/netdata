@@ -91,7 +91,7 @@ Let's turn on the `return` mode for more granularity when debugging Firefox's be
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory
-sudo ./edit-config ebpf.conf
+sudo ./edit-config ebpf.d.conf
 ```
 
 Replace `entry` with `return`:

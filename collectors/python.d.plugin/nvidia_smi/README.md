@@ -12,7 +12,13 @@ Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilizatio
 ## Requirements and Notes
 
 -   You must have the `nvidia-smi` tool installed and your NVIDIA GPU(s) must support the tool. Mostly the newer high end models used for AI / ML and Crypto or Pro range, read more about [nvidia_smi](https://developer.nvidia.com/nvidia-system-management-interface).
--   You must enable this plugin as its disabled by default due to minor performance issues.
+-   You must enable this plugin, as its disabled by default due to minor performance issues:
+    ```bash
+    cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+    sudo ./edit-config python.d.conf
+    ```
+    Remove the '#' before nvidia_smi so it reads: `nvidia_smi: yes`.
+
 -   On some systems when the GPU is idle the `nvidia-smi` tool unloads and there is added latency again when it is next queried. If you are running GPUs under constant workload this isn't likely to be an issue.
 -   Currently the `nvidia-smi` tool is being queried via cli. Updating the plugin to use the nvidia c/c++ API directly should resolve this issue. See discussion here: <https://github.com/netdata/netdata/pull/4357>
 -   Contributions are welcome.

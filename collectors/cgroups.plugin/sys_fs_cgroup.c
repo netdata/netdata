@@ -142,7 +142,7 @@ static enum cgroups_type cgroups_try_detect_version()
     enum cgroups_systemd_setting systemd_setting;
     int cgroups2_available = 0;
 
-    // 1. check if cgroups2 availible on system at all
+    // 1. check if cgroups2 available on system at all
     FILE *f = mypopen("grep cgroup /proc/filesystems", &command_pid);
     if (!f) {
         error("popen failed");
@@ -168,7 +168,7 @@ static enum cgroups_type cgroups_try_detect_version()
         return CGROUPS_AUTODETECT_FAIL;
 
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
-        // curently we prefer V1 if HYBRID is set as it seems to be more feature complete
+        // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
         // in the future we might want to continue here if SYSTEMD_CGROUP_HYBRID
         // and go ahead with V2
         return CGROUPS_V1;
@@ -1469,7 +1469,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     }
 
     if(user_configurable) {
-        // allow the user to enable/disable this individualy
+        // allow the user to enable/disable this individually
         char option[FILENAME_MAX + 1];
         snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
         cg->enabled = (char) config_get_boolean("plugin:cgroups", option, def);

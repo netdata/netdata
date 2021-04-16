@@ -40,7 +40,7 @@ The information we store in Netdata Cloud is the following (using the publicly a
 How we use them:
 - The data are stored in our production database on Google Cloud and some of it is also used in BigQuery, our data lake, for analytics purposes. These analytics are crucial for our product development process.
 - Email is used to identify users in regards to product use and to enrich our tools with product use, such as our CRM.
-- This data is only be available to Netdata and never to a 3rd party.
+- This data is only available to Netdata and never to a 3rd party.
 
 ## Enable and configure the ACLK
 
