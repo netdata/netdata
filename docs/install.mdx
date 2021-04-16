@@ -1,0 +1,123 @@
+---
+title: "Install Netdata"
+description: "Download and install the open-source Netdata monitoring agent on physical/virtual servers, Linux (Ubuntu/Debian/CentOS/etc), Docker, Kubernetes, and many others, often with one command."
+type: how-to
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/install.mdx
+---
+
+import { OneLineInstall } from '../src/components/OneLineInstall/'
+import { Install, InstallBox } from '../src/components/InstallBox/'
+
+# Install Netdata
+
+Netdata is an open-source monitoring agent that collects thousands of hardware and software metrics from any physical or
+virtual system (we call them _nodes_) and organizes them in easy-to-use and -navigate interface.
+
+Together with Netdata Cloud, you can monitor your entire infrastructure in real time and easily troubleshoot problems
+that threaten the health of your nodes before they occur.
+
+Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
+runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters,
+Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
+
+<Install>
+  <InstallBox
+    to="#install-netdata-on-linux"
+    os="Linux" />
+  <InstallBox
+    to="/docs/agent/packaging/docker"
+    os="Docker" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kubernetes"
+    os="Kubernetes" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/macos"
+    os="macOS" />
+</Install>
+
+## Install Netdata on Linux
+
+The **recommended** way to install the Netdata Agent on a Linux system is our one-line [kickstart
+script](/packaging/installer/methods/kickstart.md). This script automatically installs dependencies and builds Netdata
+from its source code.
+
+> ⚠️ Many Linux distributions ship with third-party packages of Netdata, which we can't maintain and are often missing
+> features. For the complete Netdata experience, use this one-line kickstart, or an [alternative method for
+> Linux](/packaging/installer/README.md#alternative-methods).
+
+Copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
+
+<OneLineInstall />
+
+## Open and explore the dashboard
+
+To open Netdata's dashboard, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either
+`localhost` for a local system, or the hostname/IP address of a remote system.
+
+![Animated GIF of navigating to the
+dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
+
+Netdata's dashboard is a single page with hundreds of preconfigured charts and thousands of metrics that update every
+second. To see more charts, scroll down or use the **menu** on the right-hand side of the dashboard to navigate between
+**sections**, which are groups of closely-related charts. 
+
+![Animated GIF of using the menus and
+submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8ba1-11ea-8140-d0a17a62009b.gif)
+
+## Interact with charts
+
+Every chart in the Netdata dashboard is fully interactive, and these interactions are synchronized across all charts.
+Here's what that looks like:
+
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
+charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
+
+Let's cover two of the most important ways to interact with charts: panning through time and zooming.
+
+To pan through time, **click and hold** (or touch and hold) on any chart, then **drag your mouse** (or finger) to the
+left or right. Dragging to the right pans backward through time, while dragging to the left pans forward in time. Think
+of it like pushing the current timeframe off the screen so you can see what came before or after.
+
+To zoom, press and hold `Shift` or `Alt`, then use your mouse's scrollwheel, or a two-finger pinch if you're using a
+touchpad.
+
+## What's next?
+
+You've now installed Netdata, visited the dashboard at `http://NODE:19999`, learned the basics of getting around, and
+learned how to interact with charts by zooming and panning through time.
+
+Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting.
+
+### Dashboards
+
+Learn more about [navigating the dashboard and interacting with charts](/docs/visualize/interact-dashboards-charts.md).
+
+### Configuration
+
+Discover the recommended way to [configure Netdata's settings or behavior](/docs/configure/nodes.md) using our built-in
+`edit-config` script, then apply that knowledge to mission-critical tweaks, such as [changing how long Netdata stores
+metrics](/docs/store/change-metrics-storage.md).
+
+### Data collection
+
+If you're not seeing certain metrics after installing Netdata, learn more about [how data collectors
+work](/docs/collect/how-collectors-work.md), then configure your system/services to publish their metrics in a way that
+Netdata autodetects.
+
+### Alarms & notifications
+
+Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alarms](/docs/monitor/configure-alarms.md) or [enable
+notifications](/docs/monitor/enable-notifications.md) to customize your Netdata experience.
+
+### Need to monitor multiple nodes in one place?
+
+For robust infrastructure monitoring from a single interface, consider [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud), which streams, aggregates, and visualizes metrics from any number of
+nodes. It's all the same out-of-the-box functionality of the open-source monitoring agent, but for entire
+infrastructure.
+
+If you're not interested in Netdata Cloud, each node can [stream](/streaming/README.md) its metrics to any other node,
+and the default [registry](/registry/README.md) is configurable to create a private "network" of Netdata dashboards.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Finstall-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
