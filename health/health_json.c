@@ -90,7 +90,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
         while ((m = strstr(replaced_info + pos, "$family"))) {
             char *buf = NULL;
             pos = m - replaced_info;
-            buf = find_and_replace(replaced_info, "$family", ae->family, m);
+            buf = find_and_replace(replaced_info, "$family", ae->family ? ae->family : "", m);
             freez(replaced_info);
             replaced_info = strdupz(buf);
             freez(buf);
