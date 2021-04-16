@@ -55,12 +55,6 @@ void *macos_main(void *ptr) {
         if(unlikely(netdata_exit)) break;
 
         // END -- the job is done
-
-        // --------------------------------------------------------------------
-
-        if(!vdo_cpu_netdata) {
-            global_statistics_charts();
-            registry_statistics();
         }
     }
 

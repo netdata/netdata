@@ -4,6 +4,7 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
+#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
 
 static struct global_statistics {
     volatile uint16_t connected_clients;
@@ -947,4 +948,37 @@ void global_statistics_charts(void) {
     }
 #endif
 
+}
+
+static void global_statistics_cleanup(void *ptr)
+{
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_main(void *ptr)
+{
+    netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
+
+    int update_every =
+        (int)config_get_number("CONFIG_SECTION_GLOBAL_STATISTICS", "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while (!netdata_exit) {
+        heartbeat_next(&hb, step);
+
+        global_statistics_charts();
+        registry_statistics();
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
 }

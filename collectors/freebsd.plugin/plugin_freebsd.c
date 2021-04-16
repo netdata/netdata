@@ -164,9 +164,6 @@ void *freebsd_main(void *ptr) {
                 rrddim_set_by_pointer(st, pm->rd, pm->duration);
             }
             rrdset_done(st);
-
-            global_statistics_charts();
-            registry_statistics();
         }
     }
 
