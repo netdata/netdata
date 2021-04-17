@@ -299,6 +299,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
+    char *hash_str = NULL;
 
     buffer_flush(w->response.data);
 
@@ -314,15 +315,21 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         // they are not null and not empty
 
         if(!strcmp(name, "chart")) chart = value;
+        if(!strcmp(name, "hash")) hash_str = value;
         //else {
         /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
         //}
     }
 
+    if (hash_str && *hash_str) {
+        sql_chart_from_hash_id(hash_str, w->response.data);
+        return HTTP_RESP_OK;
+    }
+
     if(!chart || !*chart) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
-        goto cleanup;
+        return HTTP_RESP_OK;
     }
 
     RRDSET *st = rrdset_find(host, chart);

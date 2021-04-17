@@ -20,6 +20,10 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
+
+    "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
+    "family text, context text, title text, unit text, plugin text, module text, priority integer);",
+
     "delete from chart_active;",
     "delete from dimension_active;",
     "delete from chart where chart_id not in (select chart_id from dimension);",
@@ -1336,6 +1340,239 @@ failed:
     UNUSED(context);
     UNUSED(chart);
 #endif
+    return;
+}
+
+
+/*
+ * Store a chart hash in the database
+ */
+
+#define SQL_STORE_CHART_HASH "insert into chart_hash (hash_id, type, id, " \
+    "name, family, context, title, unit, plugin, module, priority) " \
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11) on conflict(hash_id) do nothing;"
+
+int sql_store_chart_hash(
+    uuid_t *hash_id, const char *type, const char *id, const char *name, const char *family,
+    const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc, param = 0;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_STORE_CHART_HASH, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store chart, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    param++;
+    rc = sqlite3_bind_blob(res, 1, hash_id, sizeof(*hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 2, type, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 3, id, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    if (name && *name)
+        rc = sqlite3_bind_text(res, 4, name, -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, 4);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 5, family, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 6, context, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 7, title, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 8, units, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 9, plugin, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 10, module, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_int(res, 11, (int) priority);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store chart hash_id, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in chart hash_id store function, rc = %d", rc);
+
+    return 0;
+
+    bind_fail:
+    error_report("Failed to bind parameter %d to store chart hash_id, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in chart hash_id store function, rc = %d", rc);
+    return 1;
+}
+
+void compute_chart_hash(RRDSET *st)
+{
+    EVP_MD_CTX *evpctx;
+    unsigned char hash_value[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    char  priority_str[32];
+
+    sprintf(priority_str, "%ld", st->priority);
+
+    evpctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
+    //EVP_DigestUpdate(evpctx, st->type, strlen(st->type));
+    EVP_DigestUpdate(evpctx, st->id, strlen(st->id));
+    EVP_DigestUpdate(evpctx, st->name, strlen(st->name));
+    EVP_DigestUpdate(evpctx, st->family, strlen(st->family));
+    EVP_DigestUpdate(evpctx, st->context, strlen(st->context));
+    EVP_DigestUpdate(evpctx, st->title, strlen(st->title));
+    EVP_DigestUpdate(evpctx, st->units, strlen(st->units));
+    EVP_DigestUpdate(evpctx, st->plugin_name, strlen(st->plugin_name));
+    if (st->module_name)
+        EVP_DigestUpdate(evpctx, st->module_name, strlen(st->module_name));
+    EVP_DigestUpdate(evpctx, priority_str, strlen(priority_str));
+    //EVP_DigestUpdate(evpctx, st->chart_type, strlen(st->chart_type));
+    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
+    EVP_MD_CTX_destroy(evpctx);
+    fatal_assert(hash_len > sizeof(uuid_t));
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower(*((uuid_t *) &hash_value), uuid_str);
+    info("Calculating HASH %s for chart %s", uuid_str, st->name);
+    uuid_copy(st->state->hash_id, *((uuid_t *) &hash_value));
+
+    (void)sql_store_chart_hash(
+        (uuid_t *)&hash_value,
+        st->type,
+        st->id,
+        st->name,
+        st->family,
+        st->context,
+        st->title,
+        st->units,
+        st->plugin_name,
+        st->module_name,
+        st->priority);
+    return;
+}
+
+#define SELECT_CHART_WITH_HASH "select hash_id, id, name, type, family, context, title, plugin, " \
+    "module, unit, priority from chart_hash where hash_id = @hash_id;"
+
+void sql_chart_from_hash_id(char *hash_str, BUFFER *wb)
+{
+    int rc;
+    sqlite3_stmt *res_chart = NULL;
+
+    uuid_t hash_id;
+    uuid_parse(hash_str, hash_id);
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_CHART_WITH_HASH, -1, &res_chart, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch chart config with hash");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res_chart, 1, &hash_id, sizeof(hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch chart config with hash");
+        goto failed;
+    }
+
+    buffer_sprintf(wb, "{");
+
+    size_t c = 0;
+
+    while (sqlite3_step(res_chart) == SQLITE_ROW) {
+        char id[512];
+        sprintf(id, "%s.%s", sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 1));
+
+        if (c)
+            buffer_strcat(wb, ",\n\t\"");
+        else
+            buffer_strcat(wb, "\n\t\"");
+        c++;
+
+        buffer_strcat(wb, id);
+        buffer_strcat(wb, "\": ");
+
+        buffer_sprintf(
+            wb,
+            "\t{\n"
+            "\t\t\"id\": \"%s\",\n"
+            "\t\t\"name\": \"%s\",\n"
+            "\t\t\"type\": \"%s\",\n"
+            "\t\t\"family\": \"%s\",\n"
+            "\t\t\"context\": \"%s\",\n"
+            "\t\t\"title\": \"%s (%s)\",\n"
+            "\t\t\"plugin\": \"%s\",\n"
+            "\t\t\"module\": \"%s\",\n"
+            "\t\t\"units\": \"%s\",\n"
+            "\t\t\"priority\": \"%ld\",\n"
+            "\t\t\"hash_id\": \"%s\"\n",
+            sqlite3_column_text(res_chart, 1),
+            sqlite3_column_text(res_chart, 2),
+            sqlite3_column_text(res_chart, 3), sqlite3_column_text(res_chart, 4), sqlite3_column_text(res_chart, 5),
+            sqlite3_column_text(res_chart, 6), sqlite3_column_text(res_chart, 1) ,
+            (const char *) sqlite3_column_text(res_chart, 7) ? (const char *) sqlite3_column_text(res_chart, 7) : (char *) "",
+            (const char *) sqlite3_column_text(res_chart,8) ? (const char *) sqlite3_column_text(res_chart, 8) : (char *) "",
+            (const char *) sqlite3_column_text(res_chart, 9),
+            (long) sqlite3_column_int(res_chart, 10),
+            hash_str);
+
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset the prepared statement when reading chart config with hash");
+        buffer_strcat(wb, "\n\t}");
+    }
+
+    buffer_sprintf(wb, "\n}\n");
+
+failed:
+    rc = sqlite3_finalize(res_chart);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading chart config with hash");
+
     return;
 }
 
