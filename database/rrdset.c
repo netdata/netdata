@@ -931,6 +931,7 @@ RRDSET *rrdset_create_custom(
         update_chart_metadata(st->chart_uuid, st, id, name);
 
     store_active_chart(st->chart_uuid);
+    compute_chart_hash(st);
 
     rrdhost_cleanup_obsolete_charts(host);
 

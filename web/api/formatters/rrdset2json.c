@@ -40,6 +40,8 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     time_t first_entry_t = rrdset_first_entry_t_nolock(st);
     time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
 
+    char hash_id[GUID_LEN + 1];
+    uuid_unparse_lower(st->state->hash_id, hash_id);
     buffer_sprintf(wb,
             "\t\t{\n"
             "\t\t\t\"id\": \"%s\",\n"
@@ -55,6 +57,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             "\t\t\t\"units\": \"%s\",\n"
             "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
             "\t\t\t\"chart_type\": \"%s\",\n"
+            "\t\t\t\"hash_id\": \"%s\",\n"
                     , st->id
                     , st->name
                     , st->type
@@ -68,6 +71,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                     , st->units
                     , st->name
                     , rrdset_type_name(st->chart_type)
+                    , hash_id
     );
 
     if (likely(!skip_volatile))
