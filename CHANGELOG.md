@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Update eBPF documentation [\#10982](https://github.com/netdata/netdata/pull/10982) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove outdated privacy policy and terms of use [\#10979](https://github.com/netdata/netdata/pull/10979) ([joelhans](https://github.com/joelhans))
 - collectors/charts.d/opensips: fix detection of `opensipsctl` executable  [\#10978](https://github.com/netdata/netdata/pull/10978) ([ilyam8](https://github.com/ilyam8))
 - Update fping version [\#10977](https://github.com/netdata/netdata/pull/10977) ([Habetdin](https://github.com/Habetdin))
 - fix uil in statsd guide [\#10975](https://github.com/netdata/netdata/pull/10975) ([OdysLam](https://github.com/OdysLam))
@@ -299,7 +300,6 @@
 - Dispatch cgroup discovery into another thread [\#10399](https://github.com/netdata/netdata/pull/10399) ([vlvkobal](https://github.com/vlvkobal))
 - Fix data source option for Prometheus web API in exporting configuration [\#10397](https://github.com/netdata/netdata/pull/10397) ([vlvkobal](https://github.com/vlvkobal))
 - Docs housekeeping for SEO and syntax, part 1 [\#10388](https://github.com/netdata/netdata/pull/10388) ([joelhans](https://github.com/joelhans))
-- Persist `$TMPDIR` from installer to updater. [\#10384](https://github.com/netdata/netdata/pull/10384) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
@@ -332,8 +332,6 @@
 - Fix a buffer overflow when extracting information from a STREAM connection [\#10391](https://github.com/netdata/netdata/pull/10391) ([stelfrag](https://github.com/stelfrag))
 - fix typo in performance.md [\#10386](https://github.com/netdata/netdata/pull/10386) ([OdysLam](https://github.com/OdysLam))
 - Fix a lock check [\#10385](https://github.com/netdata/netdata/pull/10385) ([vlvkobal](https://github.com/vlvkobal))
-- dashboard v2.11 [\#10383](https://github.com/netdata/netdata/pull/10383) ([jacekkolasa](https://github.com/jacekkolasa))
-- Fixed handling of dependencies on Gentoo. [\#10382](https://github.com/netdata/netdata/pull/10382) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
