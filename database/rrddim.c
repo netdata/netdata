@@ -585,6 +585,8 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
 inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
+    if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return;
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 #ifdef ENABLE_ACLK
     rrdset_flag_set(st, RRDSET_FLAG_ACLK);
