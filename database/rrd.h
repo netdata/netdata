@@ -54,6 +54,7 @@ struct context_param {
     uint8_t flags;
 };
 
+#define RRDSET_MINIMUM_LIVE_COUNT 3
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2
 #define META_MODULE_UPDATED 4
@@ -1341,5 +1342,6 @@ extern void set_host_properties(
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
+#include "sqlite/sqlite_aclk.h"
 
 #endif /* NETDATA_RRD_H */
