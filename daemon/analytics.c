@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "common.h"
 
 struct analytics_data analytics_data;
@@ -386,10 +388,16 @@ void analytics_metrics(void)
     RRDSET *st;
     long int dimensions = 0;
     RRDDIM *rd;
-    rrdset_foreach_read(st, localhost){ rrddim_foreach_read(rd, st){
-            if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+    rrdset_foreach_read(st, localhost)
+    {
+        rrdset_rdlock(st);
+        rrddim_foreach_read(rd, st)
+        {
+            if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+                continue;
             dimensions++;
         }
+        rrdset_unlock(st);
     }
     {
         char b[7];
@@ -403,7 +411,6 @@ void analytics_alarms(void)
     int alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[10];
     RRDCALC *rc;
-
     for (rc = localhost->alarms; rc; rc = rc->next) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
@@ -472,7 +479,7 @@ void analytics_gather_immutable_meta_data(void)
  */
 void analytics_gather_mutable_meta_data(void)
 {
-    rrdhost_rdlock(localhost); //can we avoid the lock?
+    rrdhost_rdlock(localhost);
 
     analytics_collectors();
     analytics_alarms();
@@ -481,7 +488,7 @@ void analytics_gather_mutable_meta_data(void)
 
     rrdhost_unlock(localhost);
 
-    analytics_mirrored_hosts(); //needs complete lock ?
+    analytics_mirrored_hosts();
     analytics_alarms_notifications();
 
     analytics_set_data(
