@@ -421,6 +421,7 @@ static int aclk_block_till_recon_allowed() {
     return 0;
 }
 
+#ifndef ACLK_DISABLE_CHALLENGE
 /* Cloud returns transport list ordered with highest
  * priority first. This function selects highest prio
  * transport that we can actually use (support)
@@ -435,6 +436,7 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
     }
     return -1;
 }
+#endif
 
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
@@ -452,11 +454,12 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 {
     int ret;
 
-    url_t auth_url;
     url_t base_url;
-    url_t mqtt_url;
 
 #ifndef ACLK_DISABLE_CHALLENGE
+    url_t auth_url;
+    url_t mqtt_url;
+
     char *mqtt_otp_user = NULL;
     char *mqtt_otp_pass = NULL;
 #endif
@@ -524,7 +527,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         mqtt_conn_params.clientid = mqtt_otp_user;
         mqtt_conn_params.username = mqtt_otp_user;
         mqtt_conn_params.password = mqtt_otp_pass;
-#endif
 
         // Do the MQTT connection
         ret = aclk_get_transport_idx(aclk_env);
@@ -539,15 +541,21 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             url_t_destroy(&mqtt_url);
             continue;
         }
+#endif
 
         lwt = aclk_generate_disconnect(NULL);
         mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
         mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
 
+#ifdef ACLK_DISABLE_CHALLENGE
+        ret = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        url_t_destroy(&base_url);
+#else
         ret = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        url_t_destroy(&mqtt_url);
+#endif
 
         json_object_put(lwt);
-        url_t_destroy(&mqtt_url);
 
         if (!ret) {
             info("MQTTWSS connection succeeded");
