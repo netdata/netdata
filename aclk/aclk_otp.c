@@ -3,8 +3,6 @@
 
 #include "aclk_otp.h"
 
-#include "https_client.h"
-
 #include "../daemon/common.h"
 
 #include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
@@ -191,7 +189,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
-void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass) {
+void aclk_get_mqtt_otp(RSA *p_key, char **mqtt_usr, char **mqtt_pass, url_t *target) {
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
@@ -205,9 +203,9 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     }
 
     // GET Challenge
-    req.host = aclk_hostname;
-    req.port = port;
-    buffer_sprintf(url, "%s%s/challenge", OTP_URL_PREFIX, agent_id);
+    req.host = target->host;
+    req.port = target->port;
+    buffer_sprintf(url, "%s/node/%s/challenge", target->path, agent_id);
     req.url = url->buffer;
 
     if (aclk_https_request(&req, &resp)) {
@@ -256,7 +254,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     // POST password
     req.request_type = HTTP_REQ_POST;
     buffer_flush(url);
-    buffer_sprintf(url, "%s%s/password", OTP_URL_PREFIX, agent_id);
+    buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
     req.url = url->buffer;
     req.payload = response_json;
     req.payload_size = strlen(response_json);
@@ -297,4 +295,358 @@ cleanup:
     if (agent_id != NULL)
         freez(agent_id);
     buffer_free(url);
+}
+
+#define PARSE_ENV_JSON_CHK_TYPE(it, type, name)                                                                        \
+    if (json_object_get_type(json_object_iter_peek_value(it)) != type) {                                               \
+        error("value of key \"%s\" should be %s", name, #type);                                                        \
+        goto exit;                                                                                                     \
+    }
+
+#define JSON_KEY_ENC "encoding"
+#define JSON_KEY_AUTH_ENDPOINT "authEndpoint"
+#define JSON_KEY_TRP "transports"
+#define JSON_KEY_TRP_TYPE "type"
+#define JSON_KEY_TRP_ENDPOINT "endpoint"
+#define JSON_KEY_BACKOFF "backoff"
+#define JSON_KEY_BACKOFF_BASE "base"
+#define JSON_KEY_BACKOFF_MAX "maxSeconds"
+#define JSON_KEY_BACKOFF_MIN "minSeconds"
+#define JSON_KEY_CAPS "capabilities"
+
+static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *trp) {
+    struct json_object_iterator it;
+    struct json_object_iterator itEnd;
+
+    it = json_object_iter_begin(json);
+    itEnd = json_object_iter_end(json);
+
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP_TYPE)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_TRP_TYPE)
+            if (trp->type != ACLK_TRP_UNKNOWN) {
+                error(JSON_KEY_TRP_TYPE " set already");
+                goto exit;
+            }
+            trp->type = aclk_transport_type_t_from_str(json_object_get_string(json_object_iter_peek_value(&it)));
+            if (trp->type == ACLK_TRP_UNKNOWN) {
+                error(JSON_KEY_TRP_TYPE " unknown type \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
+                goto exit;
+            }
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP_ENDPOINT)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_TRP_ENDPOINT)
+            if (trp->endpoint) {
+                error(JSON_KEY_TRP_ENDPOINT " set already");
+                goto exit;
+            }
+            trp->endpoint = strdupz(json_object_get_string(json_object_iter_peek_value(&it)));
+            json_object_iter_next(&it);
+            continue;
+        }
+        
+        error ("unknown JSON key in dictionary (\"%s\")", json_object_iter_peek_name(&it));
+        json_object_iter_next(&it);
+    }
+
+    if (!trp->endpoint) {
+        error (JSON_KEY_TRP_ENDPOINT " is missing from JSON dictionary");
+        goto exit;
+    }
+
+    if (trp->type == ACLK_TRP_UNKNOWN) {
+        error ("transport type not set");
+        goto exit;
+    }
+
+    return 0;
+
+exit:
+    aclk_transport_desc_t_destroy(trp);
+    return 1;
+}
+
+static int parse_json_env_transports(json_object *json_array, aclk_env_t *env) {
+    aclk_transport_desc_t *trp;
+    json_object *obj;
+
+    if (env->transports) {
+        error("transports have been set already");
+        return 1;
+    }
+
+    env->transport_count = json_object_array_length(json_array);
+
+    env->transports = callocz(env->transport_count , sizeof(aclk_transport_desc_t *));
+
+    for (size_t i = 0; i < env->transport_count; i++) {
+        trp = callocz(1, sizeof(aclk_transport_desc_t));
+        obj = json_object_array_get_idx(json_array, i);
+        if (parse_json_env_transport(obj, trp)) {
+            error("error parsing transport idx %d", (int)i);
+            freez(trp);
+            return 1;
+        }
+        env->transports[i] = trp;
+    }
+
+    return 0;
+}
+
+#define MATCHED_CORRECT  1
+#define MATCHED_ERROR   -1
+#define NOT_MATCHED      0
+static int parse_json_backoff_int(struct json_object_iterator *it, int *out, const char* name, int min, int max) {
+    if (!strcmp(json_object_iter_peek_name(it), name)) {
+        if (json_object_get_type(json_object_iter_peek_value(it)) != json_type_int) {
+            error("Could not parse \"%s\". Not an integer as expected.", name);
+            return MATCHED_ERROR;
+        }
+
+        *out = json_object_get_int(json_object_iter_peek_value(it));
+
+        if (*out < min || *out > max) {
+            error("Value of \"%s\"=%d out of range (%d-%d).", name, *out, min, max);
+            return MATCHED_ERROR;
+        }
+
+        return MATCHED_CORRECT;
+    }
+    return NOT_MATCHED;
+}
+
+static int parse_json_backoff(json_object *json, aclk_backoff_t *backoff) {
+    struct json_object_iterator it;
+    struct json_object_iterator itEnd;
+    int ret;
+
+    it = json_object_iter_begin(json);
+    itEnd = json_object_iter_end(json);
+
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        if ( (ret = parse_json_backoff_int(&it, &backoff->base, JSON_KEY_BACKOFF_BASE, 1, 10)) ) {
+            if (ret == MATCHED_ERROR) {
+                return 1;
+            }
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if ( (ret = parse_json_backoff_int(&it, &backoff->max_s, JSON_KEY_BACKOFF_MAX, 500, INT_MAX)) ) {
+            if (ret == MATCHED_ERROR) {
+                return 1;
+            }
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if ( (ret = parse_json_backoff_int(&it, &backoff->min_s, JSON_KEY_BACKOFF_MIN, 0, INT_MAX)) ) {
+            if (ret == MATCHED_ERROR) {
+                return 1;
+            }
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        error ("unknown JSON key in dictionary (\"%s\")", json_object_iter_peek_name(&it));
+        json_object_iter_next(&it);
+    }
+
+    return 0;
+}
+
+static int parse_json_env_caps(json_object *json, aclk_env_t *env) {
+    json_object *obj;
+    const char *str;
+
+    if (env->capabilities) {
+        error("transports have been set already");
+        return 1;
+    }
+
+    env->capability_count = json_object_array_length(json);
+
+    // empty capabilities list is allowed
+    if (!env->capability_count)
+        return 0;
+
+    env->capabilities = callocz(env->capability_count , sizeof(char *));
+
+    for (size_t i = 0; i < env->capability_count; i++) {
+        obj = json_object_array_get_idx(json, i);
+        if (json_object_get_type(obj) != json_type_string) {
+            error("Capability at index %d not a string!", (int)i);
+            return 1;
+        }
+        str = json_object_get_string(obj);
+        if (!str) {
+            error("Error parsing capabilities");
+            return 1;
+        }
+        env->capabilities[i] = strdupz(str);
+    }
+
+    return 0;
+}
+
+static int parse_json_env(const char *json_str, aclk_env_t *env) {
+    json_object *json;
+    struct json_object_iterator it;
+    struct json_object_iterator itEnd;
+
+    json = json_tokener_parse(json_str);
+    if (!json) {
+        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        return 1;
+    }
+
+    it = json_object_iter_begin(json);
+    itEnd = json_object_iter_end(json);
+
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_AUTH_ENDPOINT)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_AUTH_ENDPOINT)
+            if (env->auth_endpoint) {
+                error("authEndpoint set already");
+                goto exit;
+            }
+            env->auth_endpoint = strdupz(json_object_get_string(json_object_iter_peek_value(&it)));
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_ENC)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_ENC)
+            if (env->encoding != ACLK_ENC_UNKNOWN) {
+                error(JSON_KEY_ENC " set already");
+                goto exit;
+            }
+            env->encoding = aclk_encoding_type_t_from_str(json_object_get_string(json_object_iter_peek_value(&it)));
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_array, JSON_KEY_TRP)
+
+            json_object *now = json_object_iter_peek_value(&it);
+            parse_json_env_transports(now, env);
+
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_BACKOFF)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_object, JSON_KEY_BACKOFF)
+
+            if (parse_json_backoff(json_object_iter_peek_value(&it), &env->backoff)) {
+                env->backoff.base = 0;
+                error("Error parsing Backoff parameters in env");
+                goto exit;
+            }
+
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_CAPS)) {
+            PARSE_ENV_JSON_CHK_TYPE(&it, json_type_array, JSON_KEY_CAPS)
+
+            if (parse_json_env_caps(json_object_iter_peek_value(&it), env)) {
+                error("Error parsing capabilities list");
+                goto exit;
+            }
+
+            json_object_iter_next(&it);
+            continue;
+        }
+
+        error ("unknown JSON key in dictionary (\"%s\")", json_object_iter_peek_name(&it));
+        json_object_iter_next(&it);
+    }
+
+    // Check all compulsory keys have been set
+    if (env->transport_count < 1) {
+        error("env has to return at least one transport");
+        goto exit;
+    }
+    if (!env->auth_endpoint) {
+        error(JSON_KEY_AUTH_ENDPOINT " is compulsory");
+        goto exit;
+    }
+    if (env->encoding == ACLK_ENC_UNKNOWN) {
+        error(JSON_KEY_ENC " is compulsory");
+        goto exit;
+    }
+    if (!env->backoff.base) {
+        error(JSON_KEY_BACKOFF " is compulsory");
+        goto exit;
+    }
+
+    json_object_put(json);
+    return 0;
+
+exit:
+    aclk_env_t_destroy(env);
+    json_object_put(json);
+    return 1;
+}
+
+int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
+    BUFFER *buf = buffer_create(1024);
+
+    https_req_t req = HTTPS_REQ_T_INITIALIZER;
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
+
+    req.request_type = HTTP_REQ_GET;
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+    {
+        error("Agent was not claimed - cannot perform challenge/response");
+        buffer_free(buf);
+        return 1;
+    }
+
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=json$claim_id=%s", &(VERSION[1]) /* skip 'v' at beginning */, agent_id);
+    freez(agent_id);
+
+    req.host = (char*)aclk_hostname;
+    req.port = aclk_port;
+    req.url = buf->buffer;
+    if (aclk_https_request(&req, &resp)) {
+        error("Error trying to contact env endpoint");
+        https_req_response_free(&resp);
+        buffer_free(buf);
+        return 1;
+    }
+    if (resp.http_code != 200) {
+        error("The HTTP code not 200 OK (Got %d)", resp.http_code);
+        https_req_response_free(&resp);
+        buffer_free(buf);
+        return 1;
+    }
+
+    if (!resp.payload || !resp.payload_size) {
+        error("Unexpected empty payload as response to /env call");
+        https_req_response_free(&resp);
+        buffer_free(buf);
+        return 1;
+    }
+
+    if (parse_json_env(resp.payload, env)) {
+        error ("error parsing /env message");
+        https_req_response_free(&resp);
+        buffer_free(buf);
+        return 1;
+    }
+
+    info("Getting Cloud /env successful");
+
+    https_req_response_free(&resp);
+    buffer_free(buf);
+    return 0;
 }

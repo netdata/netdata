@@ -43,6 +43,8 @@ extern int aclk_connected;
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
 
+extern aclk_env_t *aclk_env;
+
 void *aclk_main(void *ptr);
 void aclk_single_update_disable();
 void aclk_single_update_enable();

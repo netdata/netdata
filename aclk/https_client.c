@@ -550,3 +550,103 @@ void https_req_response_init(https_req_response_t *res) {
     res->payload = NULL;
     res->payload_size = 0;
 }
+
+static inline char *min_non_null(char *a, char *b) {
+    if (!a)
+        return b;
+    if (!b)
+        return a;
+    return (a < b ? a : b);
+}
+
+#define URI_PROTO_SEPARATOR "://"
+#define URL_PARSER_LOG_PREFIX "url_parser "
+
+static int parse_host_port(url_t *url) {
+    char *ptr = strrchr(url->host, ':');
+    if (ptr) {
+        size_t port_len = strlen(ptr + 1);
+        if (!port_len) {
+            error(URL_PARSER_LOG_PREFIX ": specified but no port number");
+            return 1;
+        }
+        if (port_len > 5 /* MAX port lenght is 5digit long in decimal */) {
+            error(URL_PARSER_LOG_PREFIX "port # is too long");
+            return 1;
+        }
+        *ptr = 0;
+        if (!strlen(url->host)) {
+            error(URL_PARSER_LOG_PREFIX "host empty after removing port");
+            return 1;
+        }
+        url->port = atoi (ptr + 1);
+    }
+    return 0;
+}
+
+static inline void port_by_proto(url_t *url) {
+    if (url->port)
+        return;
+    if (!url->proto)
+        return;
+    if (!strcmp(url->proto, "http")) {
+        url->port = 80;
+        return;
+    }
+    if (!strcmp(url->proto, "https")) {
+        url->port = 443;
+        return;
+    }
+}
+
+#define STRDUPZ_2PTR(dest, start, end)                                                                                 \
+    {                                                                                                                  \
+        dest = mallocz(1 + end - start);                                                                               \
+        memcpy(dest, start, end - start);                                                                              \
+        dest[end - start] = 0;                                                                                         \
+    }
+
+int url_parse(const char *url, url_t *parsed) {
+    const char *start = url;
+    const char *end = strstr(url, URI_PROTO_SEPARATOR);
+
+    if (end) {
+        if (end == start) {
+            error (URL_PARSER_LOG_PREFIX "found " URI_PROTO_SEPARATOR " without protocol specified");
+            return 1;
+        }
+
+        STRDUPZ_2PTR(parsed->proto, start, end)
+        start = end + strlen(URI_PROTO_SEPARATOR);
+    }
+
+    end = strchr(start, '/');
+    if (!end)
+        end = start + strlen(start);
+    
+    if (start == end) {
+        error(URL_PARSER_LOG_PREFIX "Host empty");
+        return 1;
+    }
+
+    STRDUPZ_2PTR(parsed->host, start, end);
+
+    if (parse_host_port(parsed))
+        return 1;
+
+    if (!*end) {
+        parsed->path = strdupz("/");
+        port_by_proto(parsed);
+        return 0;
+    }
+
+    parsed->path = strdupz(end);
+    port_by_proto(parsed);
+    return 0;
+}
+
+void url_t_destroy(url_t *url) {
+    freez(url->host);
+    freez(url->path);
+    freez(url->proto);
+}

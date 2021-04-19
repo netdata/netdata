@@ -10,6 +10,48 @@
 #define UUID_STR_LEN 37
 #endif
 
+aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str) {
+    if (!strcmp(str, "json")) {
+        return ACLK_ENC_JSON;
+    }
+    if (!strcmp(str, "proto")) {
+        return ACLK_ENC_PROTO;
+    }
+    return ACLK_ENC_UNKNOWN;
+}
+
+aclk_transport_type_t aclk_transport_type_t_from_str(const char *str) {
+    if (!strcmp(str, "MQTTv3")) {
+        return ACLK_TRP_MQTT_3_1_1;
+    }
+    if (!strcmp(str, "MQTTv5")) {
+        return ACLK_TRP_MQTT_5;
+    }
+    return ACLK_TRP_UNKNOWN;
+}
+
+void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc) {
+    freez(trp_desc->endpoint);
+}
+
+void aclk_env_t_destroy(aclk_env_t *env) {
+    freez(env->auth_endpoint);
+    if (env->transports) {
+        for (size_t i = 0; i < env->transport_count; i++) {
+            if(env->transports[i]) {
+                aclk_transport_desc_t_destroy(env->transports[i]);
+                env->transports[i] = NULL;
+            }
+        }
+        freez(env->transports);
+    }
+    if (env->capabilities) {
+        for (size_t i = 0; i < env->capability_count; i++)
+            freez(env->capabilities[i]);
+        freez(env->capabilities);
+    }
+}
+
 #ifdef ACLK_LOG_CONVERSATION_DIR
 volatile int aclk_conversation_log_counter = 0;
 #if !defined(HAVE_C___ATOMIC) || defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
@@ -86,47 +128,6 @@ const char *aclk_get_topic(enum aclk_topics topic)
     generate_topic_cache();
 
     return aclk_topic_cache[topic].topic;
-}
-
-int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port)
-{
-    int pos = 0;
-    if (!strncmp("https://", url, 8)) {
-        pos = 8;
-    } else if (!strncmp("http://", url, 7)) {
-        error("Cannot connect ACLK over %s -> unencrypted link is not supported", url);
-        return 1;
-    }
-    int host_end = pos;
-    while (url[host_end] != 0 && url[host_end] != '/' && url[host_end] != ':')
-        host_end++;
-    if (url[host_end] == 0) {
-        *aclk_hostname = strdupz(url + pos);
-        *aclk_port = 443;
-        info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
-        return 0;
-    }
-    if (url[host_end] == ':') {
-        *aclk_hostname = callocz(host_end - pos + 1, 1);
-        strncpy(*aclk_hostname, url + pos, host_end - pos);
-        int port_end = host_end + 1;
-        while (url[port_end] >= '0' && url[port_end] <= '9')
-            port_end++;
-        if (port_end - host_end > 6) {
-            error("Port specified in %s is invalid", url);
-            freez(*aclk_hostname);
-            *aclk_hostname = NULL;
-            return 1;
-        }
-        *aclk_port = atoi(&url[host_end+1]);
-    }
-    if (url[host_end] == '/') {
-        *aclk_port = 443;
-        *aclk_hostname = callocz(1, host_end - pos + 1);
-        strncpy(*aclk_hostname, url+pos, host_end - pos);
-    }
-    info("Setting ACLK target host=%s port=%d from %s", *aclk_hostname, *aclk_port, url);
-    return 0;
 }
 
 /*
