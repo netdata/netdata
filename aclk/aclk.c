@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk.h"
 
 #include "aclk_stats.h"

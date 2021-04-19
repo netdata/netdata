@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk_stats.h"
 
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
