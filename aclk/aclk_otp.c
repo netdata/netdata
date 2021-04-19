@@ -195,7 +195,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
-    https_req_response_t resp = HTTPS_RES_RESPONSE_T_INITIALIZER;
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
@@ -251,7 +251,7 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     debug(D_ACLK, "Password phase: %s",response_json);
 
     https_req_response_free(&resp);
-    memset(&resp, 0, sizeof(https_req_response_t));
+    https_req_response_init(&resp);
 
     // POST password
     req.request_type = HTTP_REQ_POST;

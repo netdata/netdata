@@ -35,8 +35,9 @@ typedef struct {
 } https_req_response_t;
 
 void https_req_response_free(https_req_response_t *res);
+void https_req_response_init(https_req_response_t *res);
 
-#define HTTPS_RES_RESPONSE_T_INITIALIZER            \
+#define HTTPS_REQ_RESPONSE_T_INITIALIZER            \
     {                                               \
         .http_code = 0,                             \
         .payload = NULL,                            \

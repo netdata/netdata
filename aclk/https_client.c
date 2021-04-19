@@ -544,3 +544,9 @@ exit_req_ctx:
 void https_req_response_free(https_req_response_t *res) {
     freez(res->payload);
 }
+
+void https_req_response_init(https_req_response_t *res) {
+    res->http_code = 0;
+    res->payload = NULL;
+    res->payload_size = 0;
+}
