@@ -630,6 +630,13 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
         return 1;
     }
 
+    if (!resp.payload || !resp.payload_size) {
+        error("Unexpected empty payload as response to /env call");
+        https_req_response_free(&resp);
+        buffer_free(buf);
+        return 1;
+    }
+
     if (parse_json_env(resp.payload, env)) {
         error ("error parsing /env message");
         https_req_response_free(&resp);
