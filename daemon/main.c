@@ -71,6 +71,7 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 struct netdata_static_thread static_threads[] = {
+    NETDATA_PLUGIN_HOOK_GLOBAL_STATISTICS
 
     NETDATA_PLUGIN_HOOK_CHECKS
     NETDATA_PLUGIN_HOOK_FREEBSD

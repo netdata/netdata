@@ -4,6 +4,7 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
+#define CONFIG_SECTION_GLOBAL_STATISTICS "global statistics"
 
 static struct global_statistics {
     volatile uint16_t connected_clients;
@@ -181,61 +182,10 @@ void global_statistics_charts(void) {
                             average_response_time = -1;
 
     struct global_statistics gs;
-    struct rusage me, thread;
+    struct rusage me;
 
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
-    getrusage(RUSAGE_THREAD, &thread);
     getrusage(RUSAGE_SELF, &me);
-
-    {
-        static RRDSET *st_cpu_thread = NULL;
-        static RRDDIM *rd_cpu_thread_user = NULL,
-                      *rd_cpu_thread_system = NULL;
-
-#ifdef __FreeBSD__
-        if (unlikely(!st_cpu_thread)) {
-            st_cpu_thread = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_freebsd_cpu"
-                    , NULL
-                    , "freebsd"
-                    , NULL
-                    , "NetData FreeBSD Plugin CPU usage"
-                    , "milliseconds/s"
-                    , "netdata"
-                    , "stats"
-                    , 132000
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_STACKED
-            );
-#else
-        if (unlikely(!st_cpu_thread)) {
-            st_cpu_thread = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_proc_cpu"
-                    , NULL
-                    , "proc"
-                    , NULL
-                    , "NetData Proc Plugin CPU usage"
-                    , "milliseconds/s"
-                    , "netdata"
-                    , "stats"
-                    , 132000
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_STACKED
-            );
-#endif
-
-            rd_cpu_thread_user   = rrddim_add(st_cpu_thread, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            rd_cpu_thread_system = rrddim_add(st_cpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        }
-        else
-            rrdset_next(st_cpu_thread);
-
-        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_user,   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-        rrdset_done(st_cpu_thread);
-    }
 
     // ----------------------------------------------------------------
 
@@ -251,7 +201,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData CPU usage"
+                    , "Netdata CPU usage"
                     , "milliseconds/s"
                     , "netdata"
                     , "stats"
@@ -284,7 +234,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Web Clients"
+                    , "Netdata Web Clients"
                     , "connected clients"
                     , "netdata"
                     , "stats"
@@ -315,7 +265,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Web Requests"
+                    , "Netdata Web Requests"
                     , "requests/s"
                     , "netdata"
                     , "stats"
@@ -347,7 +297,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Network Traffic"
+                    , "Netdata Network Traffic"
                     , "kilobits/s"
                     , "netdata"
                     , "stats"
@@ -381,7 +331,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData API Response Time"
+                    , "Netdata API Response Time"
                     , "milliseconds/request"
                     , "netdata"
                     , "stats"
@@ -430,7 +380,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData API Responses Compression Savings Ratio"
+                    , "Netdata API Responses Compression Savings Ratio"
                     , "percentage"
                     , "netdata"
                     , "stats"
@@ -477,7 +427,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "queries"
                     , NULL
-                    , "NetData API Queries"
+                    , "Netdata API Queries"
                     , "queries/s"
                     , "netdata"
                     , "stats"
@@ -510,7 +460,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "queries"
                     , NULL
-                    , "NetData API Points"
+                    , "Netdata API Points"
                     , "points/s"
                     , "netdata"
                     , "stats"
@@ -579,7 +529,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine data extents' compression savings ratio"
+                        , "Netdata DB engine data extents' compression savings ratio"
                         , "percentage"
                         , "netdata"
                         , "stats"
@@ -621,7 +571,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine page cache hit ratio"
+                        , "Netdata DB engine page cache hit ratio"
                         , "percentage"
                         , "netdata"
                         , "stats"
@@ -676,7 +626,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData dbengine page cache statistics"
+                        , "Netdata dbengine page cache statistics"
                         , "pages"
                         , "netdata"
                         , "stats"
@@ -721,7 +671,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData dbengine long-term page statistics"
+                , "Netdata dbengine long-term page statistics"
                 , "pages"
                 , "netdata"
                 , "stats"
@@ -761,7 +711,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData DB engine I/O throughput"
+                , "Netdata DB engine I/O throughput"
                 , "MiB/s"
                 , "netdata"
                 , "stats"
@@ -795,7 +745,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine I/O operations"
+                        , "Netdata DB engine I/O operations"
                         , "operations/s"
                         , "netdata"
                         , "stats"
@@ -830,7 +780,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine errors"
+                        , "Netdata DB engine errors"
                         , "errors/s"
                         , "netdata"
                         , "stats"
@@ -867,7 +817,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine File Descriptors"
+                        , "Netdata DB engine File Descriptors"
                         , "descriptors"
                         , "netdata"
                         , "stats"
@@ -906,7 +856,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData DB engine RAM usage"
+                , "Netdata DB engine RAM usage"
                 , "MiB"
                 , "netdata"
                 , "stats"
@@ -947,4 +897,37 @@ void global_statistics_charts(void) {
     }
 #endif
 
+}
+
+static void global_statistics_cleanup(void *ptr)
+{
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_main(void *ptr)
+{
+    netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
+
+    int update_every =
+        (int)config_get_number("CONFIG_SECTION_GLOBAL_STATISTICS", "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while (!netdata_exit) {
+        heartbeat_next(&hb, step);
+
+        global_statistics_charts();
+        registry_statistics();
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
 }

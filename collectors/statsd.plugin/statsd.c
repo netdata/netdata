@@ -2418,7 +2418,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd"
             , "netdata.statsd_cpu"
-            , "NetData statsd charting thread CPU usage"
+            , "Netdata statsd charting thread CPU usage"
             , "milliseconds/s"
             , PLUGIN_STATSD_NAME
             , "stats"
