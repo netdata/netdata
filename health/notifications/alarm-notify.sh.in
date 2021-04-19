@@ -587,8 +587,8 @@ filter_recipient_by_criticality() {
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
-# check msteam
-[ -z "${MSTEAM_WEBHOOK_URL}" ] && SEND_MSTEAM="NO"
+# check msteams
+[ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
 
 # check pd
 [ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
