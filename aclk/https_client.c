@@ -564,9 +564,8 @@ static inline char *min_non_null(char *a, char *b) {
 
 static int parse_host_port(url_t *url) {
     char *ptr = strrchr(url->host, ':');
-    size_t port_len;
     if (ptr) {
-        port_len = strlen(ptr + 1);
+        size_t port_len = strlen(ptr + 1);
         if (!port_len) {
             error(URL_PARSER_LOG_PREFIX ": specified but no port number");
             return 1;
