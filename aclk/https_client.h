@@ -3,6 +3,8 @@
 #ifndef NETDATA_HTTPS_CLIENT_H
 #define NETDATA_HTTPS_CLIENT_H
 
+#include "libnetdata/libnetdata.h"
+
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
