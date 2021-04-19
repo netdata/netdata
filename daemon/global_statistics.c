@@ -182,61 +182,10 @@ void global_statistics_charts(void) {
                             average_response_time = -1;
 
     struct global_statistics gs;
-    struct rusage me, thread;
+    struct rusage me;
 
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
-    getrusage(RUSAGE_THREAD, &thread);
     getrusage(RUSAGE_SELF, &me);
-
-    {
-        static RRDSET *st_cpu_thread = NULL;
-        static RRDDIM *rd_cpu_thread_user = NULL,
-                      *rd_cpu_thread_system = NULL;
-
-#ifdef __FreeBSD__
-        if (unlikely(!st_cpu_thread)) {
-            st_cpu_thread = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_freebsd_cpu"
-                    , NULL
-                    , "freebsd"
-                    , NULL
-                    , "NetData FreeBSD Plugin CPU usage"
-                    , "milliseconds/s"
-                    , "netdata"
-                    , "stats"
-                    , 132000
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_STACKED
-            );
-#else
-        if (unlikely(!st_cpu_thread)) {
-            st_cpu_thread = rrdset_create_localhost(
-                    "netdata"
-                    , "plugin_proc_cpu"
-                    , NULL
-                    , "proc"
-                    , NULL
-                    , "NetData Proc Plugin CPU usage"
-                    , "milliseconds/s"
-                    , "netdata"
-                    , "stats"
-                    , 132000
-                    , localhost->rrd_update_every
-                    , RRDSET_TYPE_STACKED
-            );
-#endif
-
-            rd_cpu_thread_user   = rrddim_add(st_cpu_thread, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            rd_cpu_thread_system = rrddim_add(st_cpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        }
-        else
-            rrdset_next(st_cpu_thread);
-
-        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_user,   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-        rrdset_done(st_cpu_thread);
-    }
 
     // ----------------------------------------------------------------
 

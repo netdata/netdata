@@ -123,16 +123,49 @@ void *freebsd_main(void *ptr) {
 
         // END -- the job is done
 
-        // --------------------------------------------------------------------
+        if (vdo_cpu_netdata) {
+            static RRDSET *st_cpu_thread = NULL, *st_duration = NULL;
+            static RRDDIM *rd_user = NULL, *rd_system = NULL;
 
-        if(vdo_cpu_netdata) {
-            static RRDSET *st = NULL;
+            // ----------------------------------------------------------------
 
-            if(unlikely(!st)) {
-                st = rrdset_find_active_bytype_localhost("netdata", "plugin_freebsd_modules");
+            struct rusage thread;
+            getrusage(RUSAGE_THREAD, &thread);
 
-                if(!st) {
-                    st = rrdset_create_localhost(
+            if (unlikely(!st_cpu_thread)) {
+                st_cpu_thread = rrdset_create_localhost(
+                    "netdata",
+                    "plugin_freebsd_cpu",
+                    NULL,
+                    "freebsd",
+                    NULL,
+                    "NetData FreeBSD Plugin CPU usage",
+                    "milliseconds/s",
+                    "freebsd",
+                    "stats",
+                    132000,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+                rd_user =   rrddim_add(st_cpu_thread, "user",   NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
+                rd_system = rrddim_add(st_cpu_thread, "system", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_INCREMENTAL);
+            } else {
+                rrdset_next(st_cpu_thread);
+            }
+
+            rrddim_set_by_pointer(
+                st_cpu_thread, rd_user,   thread.ru_utime.tv_sec * USEC_PER_SEC + thread.ru_utime.tv_usec);
+            rrddim_set_by_pointer(
+                st_cpu_thread, rd_system, thread.ru_stime.tv_sec * USEC_PER_SEC + thread.ru_stime.tv_usec);
+            rrdset_done(st_cpu_thread);
+
+            // ----------------------------------------------------------------
+
+            if(unlikely(!st_duration)) {
+                st_duration = rrdset_find_active_bytype_localhost("netdata", "plugin_freebsd_modules");
+
+                if(!st_duration) {
+                    st_duration = rrdset_create_localhost(
                             "netdata"
                             , "plugin_freebsd_modules"
                             , NULL
@@ -140,7 +173,7 @@ void *freebsd_main(void *ptr) {
                             , NULL
                             , "NetData FreeBSD Plugin Modules Durations"
                             , "milliseconds/run"
-                            , "netdata"
+                            , "freebsd"
                             , "stats"
                             , 132001
                             , localhost->rrd_update_every
@@ -151,19 +184,19 @@ void *freebsd_main(void *ptr) {
                         struct freebsd_module *pm = &freebsd_modules[i];
                         if(unlikely(!pm->enabled)) continue;
 
-                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                        pm->rd = rrddim_add(st_duration, pm->dim, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     }
                 }
             }
-            else rrdset_next(st);
+            else rrdset_next(st_duration);
 
             for(i = 0 ; freebsd_modules[i].name ;i++) {
                 struct freebsd_module *pm = &freebsd_modules[i];
                 if(unlikely(!pm->enabled)) continue;
 
-                rrddim_set_by_pointer(st, pm->rd, pm->duration);
+                rrddim_set_by_pointer(st_duration, pm->rd, pm->duration);
             }
-            rrdset_done(st);
+            rrdset_done(st_duration);
         }
     }
 
