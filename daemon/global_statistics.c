@@ -201,7 +201,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData CPU usage"
+                    , "Netdata CPU usage"
                     , "milliseconds/s"
                     , "netdata"
                     , "stats"
@@ -234,7 +234,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Web Clients"
+                    , "Netdata Web Clients"
                     , "connected clients"
                     , "netdata"
                     , "stats"
@@ -265,7 +265,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Web Requests"
+                    , "Netdata Web Requests"
                     , "requests/s"
                     , "netdata"
                     , "stats"
@@ -297,7 +297,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData Network Traffic"
+                    , "Netdata Network Traffic"
                     , "kilobits/s"
                     , "netdata"
                     , "stats"
@@ -331,7 +331,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData API Response Time"
+                    , "Netdata API Response Time"
                     , "milliseconds/request"
                     , "netdata"
                     , "stats"
@@ -380,7 +380,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "netdata"
                     , NULL
-                    , "NetData API Responses Compression Savings Ratio"
+                    , "Netdata API Responses Compression Savings Ratio"
                     , "percentage"
                     , "netdata"
                     , "stats"
@@ -427,7 +427,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "queries"
                     , NULL
-                    , "NetData API Queries"
+                    , "Netdata API Queries"
                     , "queries/s"
                     , "netdata"
                     , "stats"
@@ -460,7 +460,7 @@ void global_statistics_charts(void) {
                     , NULL
                     , "queries"
                     , NULL
-                    , "NetData API Points"
+                    , "Netdata API Points"
                     , "points/s"
                     , "netdata"
                     , "stats"
@@ -529,7 +529,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine data extents' compression savings ratio"
+                        , "Netdata DB engine data extents' compression savings ratio"
                         , "percentage"
                         , "netdata"
                         , "stats"
@@ -571,7 +571,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine page cache hit ratio"
+                        , "Netdata DB engine page cache hit ratio"
                         , "percentage"
                         , "netdata"
                         , "stats"
@@ -626,7 +626,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData dbengine page cache statistics"
+                        , "Netdata dbengine page cache statistics"
                         , "pages"
                         , "netdata"
                         , "stats"
@@ -671,7 +671,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData dbengine long-term page statistics"
+                , "Netdata dbengine long-term page statistics"
                 , "pages"
                 , "netdata"
                 , "stats"
@@ -711,7 +711,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData DB engine I/O throughput"
+                , "Netdata DB engine I/O throughput"
                 , "MiB/s"
                 , "netdata"
                 , "stats"
@@ -745,7 +745,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine I/O operations"
+                        , "Netdata DB engine I/O operations"
                         , "operations/s"
                         , "netdata"
                         , "stats"
@@ -780,7 +780,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine errors"
+                        , "Netdata DB engine errors"
                         , "errors/s"
                         , "netdata"
                         , "stats"
@@ -817,7 +817,7 @@ void global_statistics_charts(void) {
                         , NULL
                         , "dbengine"
                         , NULL
-                        , "NetData DB engine File Descriptors"
+                        , "Netdata DB engine File Descriptors"
                         , "descriptors"
                         , "netdata"
                         , "stats"
@@ -856,7 +856,7 @@ void global_statistics_charts(void) {
                 , NULL
                 , "dbengine"
                 , NULL
-                , "NetData DB engine RAM usage"
+                , "Netdata DB engine RAM usage"
                 , "MiB"
                 , "netdata"
                 , "stats"

@@ -1082,7 +1082,7 @@ void *tc_main(void *ptr) {
                             , NULL
                             , "tc.helper"
                             , NULL
-                            , "NetData TC CPU usage"
+                            , "Netdata TC CPU usage"
                             , "milliseconds/s"
                             , PLUGIN_TC_NAME
                             , NULL
@@ -1109,7 +1109,7 @@ void *tc_main(void *ptr) {
                             , NULL
                             , "tc.helper"
                             , NULL
-                            , "NetData TC script execution"
+                            , "Netdata TC script execution"
                             , "milliseconds/run"
                             , PLUGIN_TC_NAME
                             , NULL

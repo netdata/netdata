@@ -366,7 +366,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Sessions"
+                , "Netdata Registry Sessions"
                 , "sessions"
                 , "registry"
                 , "stats"
@@ -391,7 +391,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Entries"
+                , "Netdata Registry Entries"
                 , "entries"
                 , "registry"
                 , "stats"
@@ -424,7 +424,7 @@ void registry_statistics(void) {
                 , NULL
                 , "registry"
                 , NULL
-                , "NetData Registry Memory"
+                , "Netdata Registry Memory"
                 , "KiB"
                 , "registry"
                 , "stats"

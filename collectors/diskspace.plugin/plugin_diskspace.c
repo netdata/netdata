@@ -413,7 +413,7 @@ void *diskspace_main(void *ptr) {
                         , NULL
                         , "diskspace"
                         , NULL
-                        , "NetData Disk Space Plugin CPU usage"
+                        , "Netdata Disk Space Plugin CPU usage"
                         , "milliseconds/s"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
@@ -441,7 +441,7 @@ void *diskspace_main(void *ptr) {
                         , NULL
                         , "diskspace"
                         , NULL
-                        , "NetData Disk Space Plugin Duration"
+                        , "Netdata Disk Space Plugin Duration"
                         , "milliseconds/run"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
