@@ -240,12 +240,11 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
 }
 
 static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
-    int ret;
     ctx->written = 0;
     ctx->poll_fd.events |= POLLOUT;
 
     do {
-        ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
+        int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
             error("poll error");
             return 1;
