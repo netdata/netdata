@@ -9,6 +9,12 @@
 
 #include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
+// CentOS 7 has older version that doesn't define this
+// same goes for MacOS
+#ifndef UUID_STR_LEN
+#define UUID_STR_LEN 37
+#endif
+
 struct dictionary_singleton {
     char *key;
     char *result;
@@ -167,54 +173,74 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     return result;
 }
 
-// aclk_get_mqtt_otp is slightly modified original code from @amoss
-void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass)
-{
-    char *data_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-    debug(D_ACLK, "Performing challenge-response sequence");
-    if (*mqtt_pass != NULL)
-    {
-        freez(*mqtt_pass);
-        *mqtt_pass = NULL;
+static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
+    int rc;
+    // wrapper for ACLK only which loads ACLK specific proxy settings
+    // then only calls https_request
+    struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .type = MQTT_WSS_DIRECT };
+    aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+
+    if (proxy_conf.type == MQTT_WSS_PROXY_HTTP) {
+        request->proxy_host = (char*)proxy_conf.host; // TODO make it const as well
+        request->proxy_port = proxy_conf.port;
     }
-    // curl http://cloud-iam-agent-service:8080/api/v1/auth/node/00000000-0000-0000-0000-000000000000/challenge
-    // TODO - target host?
+
+    rc = https_request(request, response);
+    freez((char*)proxy_conf.host);
+    return rc;
+}
+
+#define OTP_URL_PREFIX "/api/v1/auth/node/"
+void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_usr, char **mqtt_pass) {
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+
+    https_req_t req = HTTPS_REQ_T_INITIALIZER;
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
+
     char *agent_id = is_agent_claimed();
     if (agent_id == NULL)
     {
         error("Agent was not claimed - cannot perform challenge/response");
-        goto CLEANUP;
+        goto cleanup;
     }
-    char url[1024];
-    sprintf(url, "/api/v1/auth/node/%s/challenge", agent_id);
-    info("Retrieving challenge from cloud: %s %d %s", aclk_hostname, port, url);
-    if (https_request(HTTP_REQ_GET, aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, NULL))
-    {
-        error("Challenge failed: %s", data_buffer);
-        goto CLEANUP;
+
+    // GET Challenge
+    req.host = aclk_hostname;
+    req.port = port;
+    buffer_sprintf(url, "%s%s/challenge", OTP_URL_PREFIX, agent_id);
+    req.url = url->buffer;
+
+    if (aclk_https_request(&req, &resp)) {
+        error ("ACLK_OTP Challenge failed");
+        goto cleanup;
     }
+    if (resp.http_code != 200) {
+        error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
+        goto cleanup_resp;
+    }
+    info ("ACLK_OTP Got Challenge from Cloud");
+
     struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
 
-    debug(D_ACLK, "Challenge response from cloud: %s", data_buffer);
-    if (json_parse(data_buffer, &challenge, json_extract_singleton) != JSON_OK)
+    if (json_parse(resp.payload, &challenge, json_extract_singleton) != JSON_OK)
     {
         freez(challenge.result);
-        error("Could not parse the json response with the challenge: %s", data_buffer);
-        goto CLEANUP;
+        error("Could not parse the the challenge");
+        goto cleanup_resp;
     }
     if (challenge.result == NULL) {
-        error("Could not retrieve challenge from auth response: %s", data_buffer);
-        goto CLEANUP;
+        error("Could not retrieve challenge JSON key from challenge response");
+        goto cleanup_resp;
     }
 
-
+    // Decrypt the Challenge and Calculate Response
     size_t challenge_len = strlen(challenge.result);
     unsigned char decoded[512];
     size_t decoded_len = base64_decode((unsigned char*)challenge.result, challenge_len, decoded, sizeof(decoded));
+    freez(challenge.result);
 
     unsigned char plaintext[4096]={};
     int decrypted_length = private_decrypt(p_key, decoded, decoded_len, plaintext);
-    freez(challenge.result);
     char encoded[512];
     size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
     encoded[encoded_len] = 0;
@@ -223,27 +249,39 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     char response_json[4096]={};
     sprintf(response_json, "{\"response\":\"%s\"}", encoded);
     debug(D_ACLK, "Password phase: %s",response_json);
-    // TODO - host
-    sprintf(url, "/api/v1/auth/node/%s/password", agent_id);
-    if (https_request(HTTP_REQ_POST, aclk_hostname, port, url, data_buffer, NETDATA_WEB_RESPONSE_INITIAL_SIZE, response_json))
-    {
-        error("Challenge-response failed: %s", data_buffer);
-        goto CLEANUP;
-    }
 
-    debug(D_ACLK, "Password response from cloud: %s", data_buffer);
+    https_req_response_free(&resp);
+    https_req_response_init(&resp);
+
+    // POST password
+    req.request_type = HTTP_REQ_POST;
+    buffer_flush(url);
+    buffer_sprintf(url, "%s%s/password", OTP_URL_PREFIX, agent_id);
+    req.url = url->buffer;
+    req.payload = response_json;
+    req.payload_size = strlen(response_json);
+
+    if (aclk_https_request(&req, &resp)) {
+        error ("ACLK_OTP Password error trying to post result to password");
+        goto cleanup;
+    }
+    if (resp.http_code != 201) {
+        error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
+        goto cleanup_resp;
+    }
+    info ("ACLK_OTP Got Password from Cloud");
 
     struct dictionary_singleton password = { .key = "password", .result = NULL };
-    if (json_parse(data_buffer, &password, json_extract_singleton) != JSON_OK)
+    if (json_parse(resp.payload, &password, json_extract_singleton) != JSON_OK)
     {
         freez(password.result);
-        error("Could not parse the json response with the password: %s", data_buffer);
-        goto CLEANUP;
+        error("Could not parse the json response with the password");
+        goto cleanup_resp;
     }
 
     if (password.result == NULL ) {
         error("Could not retrieve password from auth response");
-        goto CLEANUP;
+        goto cleanup_resp;
     }
     if (*mqtt_pass != NULL )
         freez(*mqtt_pass);
@@ -253,9 +291,10 @@ void aclk_get_mqtt_otp(RSA *p_key, char *aclk_hostname, int port, char **mqtt_us
     *mqtt_usr = agent_id;
     agent_id = NULL;
 
-CLEANUP:
+cleanup_resp:
+    https_req_response_free(&resp);
+cleanup:
     if (agent_id != NULL)
         freez(agent_id);
-    freez(data_buffer);
-    return;
+    buffer_free(url);
 }

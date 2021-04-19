@@ -420,45 +420,6 @@ static int aclk_block_till_recon_allowed() {
     return 0;
 }
 
-#define HTTP_PROXY_PREFIX "http://"
-static void set_proxy(struct mqtt_wss_proxy *out)
-{
-    ACLK_PROXY_TYPE pt;
-    const char *ptr = aclk_get_proxy(&pt);
-    char *tmp;
-    char *host;
-    if (pt != PROXY_TYPE_HTTP)
-        return;
-
-    out->port = 0;
-
-    if (!strncmp(ptr, HTTP_PROXY_PREFIX, strlen(HTTP_PROXY_PREFIX)))
-        ptr += strlen(HTTP_PROXY_PREFIX);
-
-    if ((tmp = strchr(ptr, '@')))
-        ptr = tmp;
-
-    if ((tmp = strchr(ptr, '/'))) {
-        host = mallocz((tmp - ptr) + 1);
-        memcpy(host, ptr, (tmp - ptr));
-        host[tmp - ptr] = 0;
-    } else
-        host = strdupz(ptr);
-
-    if ((tmp = strchr(host, ':'))) {
-        *tmp = 0;
-        tmp++;
-        out->port = atoi(tmp);
-    }
-
-    if (out->port <= 0 || out->port > 65535)
-        out->port = 8080;
-
-    out->host = host;
-
-    out->type = MQTT_WSS_PROXY_HTTP;
-}
-
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
  * @return  0 - Successfull Connection,
@@ -500,9 +461,8 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        struct mqtt_wss_proxy proxy_conf;
-        proxy_conf.type = MQTT_WSS_DIRECT;
-        set_proxy(&proxy_conf);
+        struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .type = MQTT_WSS_DIRECT };
+        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
 
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",

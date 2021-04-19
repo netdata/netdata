@@ -3,6 +3,7 @@
 #define ACLK_UTIL_H
 
 #include "libnetdata/libnetdata.h"
+#include "mqtt_wss_client.h"
 
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
@@ -48,5 +49,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
 int aclk_decode_base_url(char *url, char **aclk_hostname, int *aclk_port);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
+
+void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type);
 
 #endif /* ACLK_UTIL_H */
