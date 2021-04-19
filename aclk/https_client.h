@@ -18,7 +18,7 @@ typedef struct {
     int port;
     char *url;
 
-    int timeout_s; //timeout in seconds for the network operation (send/recv)
+    time_t timeout_s; //timeout in seconds for the network operation (send/recv)
 
     void *payload;
     size_t payload_size;
