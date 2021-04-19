@@ -25,14 +25,6 @@ typedef struct {
     int proxy_port;
 } https_req_t;
 
-typedef struct https_req_hdr https_req_hdr_t;
-struct https_req_hdr {
-    char *key;
-    char *val;
-
-    https_req_hdr_t *next;
-};
-
 typedef struct {
     int http_code;
 
