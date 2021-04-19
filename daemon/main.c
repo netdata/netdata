@@ -27,12 +27,8 @@ void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
-     //re-gather meta data
-    if (netdata_anonymous_statistics_enabled == 1) {
-        analytics_gather_mutable_meta_data();
-        send_statistics("EXIT", ret?"ERROR":"OK","-");
-        analytics_free_data();
-    }
+    send_statistics("EXIT", ret?"ERROR":"OK","-");
+    analytics_free_data();
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
