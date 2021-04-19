@@ -147,9 +147,9 @@ void analytics_set_data_str(char **name, char *value)
     size_t value_string_len;
     if (*name)
         freez(*name);
-    value_string_len = strlen(value) + 3;
+    value_string_len = strlen(value) + 4;
     *name = mallocz(sizeof(char) * value_string_len);
-    snprintfz(*name, value_string_len, "\"%s\"", value);
+    snprintfz(*name, value_string_len - 1, "\"%s\"", value);
 }
 
 /*
