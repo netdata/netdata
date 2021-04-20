@@ -520,9 +520,12 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        // TODO check success
-        aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &auth_url);
+        ret = aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &auth_url);
         url_t_destroy(&auth_url);
+        if (ret) {
+            error("Error passing Challenge/Response to get OTP");
+            continue;
+        }
 
         mqtt_conn_params.clientid = mqtt_otp_user;
         mqtt_conn_params.username = mqtt_otp_user;
