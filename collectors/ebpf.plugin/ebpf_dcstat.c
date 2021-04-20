@@ -141,7 +141,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20101,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
@@ -150,7 +150,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20102,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
@@ -159,7 +159,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_APPS_DCSTAT_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20103,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 }
 
@@ -355,8 +355,14 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REFERENCE_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.cache_access;
+            if (w->dcstat.curr.cache_access < w->dcstat.prev.cache_access) {
+                w->dcstat.prev.cache_access = 0;
+            }
+
+            w->dcstat.cache_access = (long long)w->dcstat.curr.cache_access - (long long)w->dcstat.prev.cache_access;
+            value = (collected_number) w->dcstat.cache_access;
             write_chart_dimension(w->name, value);
+            w->dcstat.prev.cache_access = w->dcstat.curr.cache_access;
         }
     }
     write_end_chart();
@@ -364,8 +370,14 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.file_system;
+            if (w->dcstat.curr.file_system < w->dcstat.prev.file_system) {
+                w->dcstat.prev.file_system = 0;
+            }
+
+            value = (collected_number) (!w->dcstat.cache_access) ? 0 :
+                    (long long )w->dcstat.curr.file_system - (long long)w->dcstat.prev.file_system;
             write_chart_dimension(w->name, value);
+            w->dcstat.prev.file_system = w->dcstat.curr.file_system;
         }
     }
     write_end_chart();
@@ -373,8 +385,13 @@ void ebpf_dcache_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->dcstat.curr.not_found;
+            if (w->dcstat.curr.not_found < w->dcstat.prev.not_found) {
+                w->dcstat.prev.not_found = 0;
+            }
+            value = (collected_number) (!w->dcstat.cache_access) ? 0 :
+                    (long long)w->dcstat.curr.not_found - (long long)w->dcstat.prev.not_found;
             write_chart_dimension(w->name, value);
+            w->dcstat.prev.not_found = w->dcstat.curr.not_found;
         }
     }
     write_end_chart();

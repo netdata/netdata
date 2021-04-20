@@ -50,8 +50,10 @@ typedef struct netdata_publish_dcstat_pid {
 
 typedef struct netdata_publish_dcstat {
     long long ratio;
+    long long cache_access;
 
     netdata_dcstat_pid_t curr;
+    netdata_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
 
 extern void *ebpf_dcstat_thread(void *ptr);
