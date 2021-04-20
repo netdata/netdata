@@ -35,7 +35,7 @@ Then, as the issue passes, the anomaly probabilities should settle back down int
 ## Requirements
 
 - This collector will only work with Python 3 and requires the packages below be installed.
-- Typically you will not need to do this, but, if needed, to ensure Python 3 is used you can add the below line to the `[plugin:python.d]` section of `netdata.conf`
+- _Optional_: Ensure your node uses Python 3 by adding the line below to the `[plugin:python.d]` section of `netdata.conf`.
 
 ```conf
 [plugin:python.d]
