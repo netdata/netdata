@@ -19,7 +19,7 @@ jobs:
           submodules: recursive
       - name: Install the agent
         run: |
-          ./netdata-installer.sh --dont-wait
+          sudo ./netdata-installer.sh --dont-wait
           cd tests
       - name: Cypress run
         uses: cypress-io/github-action@v2
