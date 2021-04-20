@@ -112,7 +112,15 @@ struct topic_name {
     { .id = ACLK_TOPICID_METADATA, .name = "meta"      },
     { .id = ACLK_TOPICID_COMMAND,  .name = "inbox-cmd" },
     { .id = ACLK_TOPICID_UNKNOWN,  .name = NULL        }
-}; 
+};
+
+enum aclk_topics compulsory_topics[] = {
+    ACLK_TOPICID_CHART,
+    ACLK_TOPICID_ALARMS,
+    ACLK_TOPICID_METADATA,
+    ACLK_TOPICID_COMMAND,
+    ACLK_TOPICID_UNKNOWN
+};
 
 static enum aclk_topics topic_name_to_id(const char *name) {
     struct topic_name *topic = topic_names;
@@ -123,6 +131,16 @@ static enum aclk_topics topic_name_to_id(const char *name) {
         topic++;
     }
     return ACLK_TOPICID_UNKNOWN;
+}
+
+static const char *topic_id_to_name(enum aclk_topics tid) {
+    struct topic_name *topic = topic_names;
+    while (topic->name) {
+        if (topic->id == tid)
+            return topic->name;
+        topic++;
+    }
+    return "unknown";
 }
 
 #define CLAIM_ID_REPLACE_TAG "#{claim_id}"
@@ -227,6 +245,13 @@ int aclk_generate_topic_cache(struct json_object *json)
         }
     }
 
+    for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
+        if (!aclk_get_topic(compulsory_topics[i])) {
+            error("missing compulsory topic \"%s\" in password response from cloud", topic_id_to_name(compulsory_topics[i]));
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -237,14 +262,17 @@ int aclk_generate_topic_cache(struct json_object *json)
  */
 const char *aclk_get_topic(enum aclk_topics topic)
 {
-    if (!aclk_topic_cache)
-        fatal("Topic cache not initialized");
+    if (!aclk_topic_cache) {
+        error("Topic cache not initialized");
+        return NULL;
+    }
 
     for (size_t i = 0; i < aclk_topic_cache_items; i++) {
         if (aclk_topic_cache[i]->topic_id == topic)
             return aclk_topic_cache[i]->topic;
     }
-    fatal("Unknown topic");
+    error("Unknown topic");
+    return NULL;
 }
 
 /*
