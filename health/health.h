@@ -37,20 +37,6 @@ extern unsigned int default_health_enabled;
 #define HEALTH_LISTEN_BACKLOG 4096
 #endif
 
-#define HEALTH_ON_KEY "on"
-#define HEALTH_EVERY_KEY "every"
-#define HEALTH_GREEN_KEY "green"
-#define HEALTH_RED_KEY "red"
-#define HEALTH_WARN_KEY "warn"
-#define HEALTH_CRIT_KEY "crit"
-#define HEALTH_EXEC_KEY "exec"
-#define HEALTH_RECIPIENT_KEY "to"
-#define HEALTH_UNITS_KEY "units"
-#define HEALTH_INFO_KEY "info"
-#define HEALTH_DELAY_KEY "delay"
-#define HEALTH_OPTIONS_KEY "options"
-#define HEALTH_FOREACH_KEY "foreach"
-
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
 extern char *silencers_filename;
@@ -81,6 +67,9 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         const char *name,
         const char *chart,
         const char *family,
+        const char *class,
+        const char *component,
+        const char *type,
         const char *exec,
         const char *recipient,
         time_t duration,

@@ -111,6 +111,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%d\t%d\t%d\t%d"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\t%016lx"
+                        "\t%s\t%s\t%s"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -145,6 +146,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
+                            , (ae->class)?ae->class:"Unknown"
+                            , (ae->component)?ae->component:"Unknown"
+                            , (ae->type)?ae->type:"Unknown"
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -191,7 +195,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 30, entries = 0;
+        int max_entries = 33, entries = 0;
         char *pointers[max_entries];
 
         pointers[entries++] = s++;
@@ -364,6 +368,20 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->last_repeat = last_repeat;
 
+            if (likely(entries > 28)) {
+                freez(ae->class);
+                ae->class = strdupz(pointers[28]);
+                if(!*ae->class) { freez(ae->class); ae->class = NULL; }
+
+                freez(ae->component);
+                ae->component = strdupz(pointers[29]);
+                if(!*ae->component) { freez(ae->component); ae->component = NULL; }
+
+                freez(ae->type);
+                ae->type = strdupz(pointers[30]);
+                if(!*ae->type) { freez(ae->type); ae->type = NULL; }
+            }
+
             char value_string[100 + 1];
             freez(ae->old_value_string);
             freez(ae->new_value_string);
@@ -442,6 +460,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         const char *name,
         const char *chart,
         const char *family,
+        const char *class,
+        const char *component,
+        const char *type,
         const char *exec,
         const char *recipient,
         time_t duration,
@@ -469,11 +490,19 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(family)
         ae->family = strdupz(family);
 
+    if (class)
+        ae->class = strdupz(class);
+
+    if (component)
+        ae->component = strdupz(component);
+
+    if (type)
+        ae->type = strdupz(type);
+
     if(exec) ae->exec = strdupz(exec);
     if(recipient) ae->recipient = strdupz(recipient);
     if(source) ae->source = strdupz(source);
     if(units) ae->units = strdupz(units);
-    if(info) ae->info = strdupz(info);
 
     ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
@@ -485,6 +514,24 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     char value_string[100 + 1];
     ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
     ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+
+    char *replaced_info = NULL;
+    if (likely(info)) {
+        char *m;
+        replaced_info = strdupz(info);
+        size_t pos = 0;
+        while ((m = strstr(replaced_info + pos, "$family"))) {
+            char *buf = NULL;
+            pos = m - replaced_info;
+            buf = find_and_replace(replaced_info, "$family", (ae->family) ? ae->family : "", m);
+            freez(replaced_info);
+            replaced_info = strdupz(buf);
+            freez(buf);
+        }
+    }
+
+    if(replaced_info) ae->info = strdupz(replaced_info);
+    freez(replaced_info);
 
     ae->old_status = old_status;
     ae->new_status = new_status;
@@ -548,6 +595,9 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
     freez(ae->family);
+    freez(ae->class);
+    freez(ae->component);
+    freez(ae->type);
     freez(ae->exec);
     freez(ae->recipient);
     freez(ae->source);
