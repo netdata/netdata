@@ -1,0 +1,25 @@
+---
+name: UI tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  source-build:
+    name: Run Netdata Agent UI tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install the agent
+        run: |
+          ./netdata-installer.sh --dont-wait
+          cd tests
+      - name: Cypress run
+        uses: cypress-io/github-action@v2
