@@ -50,6 +50,7 @@ include boinc/Makefile.inc
 include ceph/Makefile.inc
 include chrony/Makefile.inc
 include couchdb/Makefile.inc
+include correlations/Makefile.inc
 include dnsdist/Makefile.inc
 include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc
@@ -57,6 +58,7 @@ include dovecot/Makefile.inc
 include elasticsearch/Makefile.inc
 include energid/Makefile.inc
 include example/Makefile.inc
+include example2/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc
 include freeradius/Makefile.inc
@@ -99,6 +101,7 @@ include riakkv/Makefile.inc
 include samba/Makefile.inc
 include sensors/Makefile.inc
 include smartd_log/Makefile.inc
+include smoothing/Makefile.inc
 include spigotmc/Makefile.inc
 include springboot/Makefile.inc
 include squid/Makefile.inc
@@ -109,6 +112,7 @@ include uwsgi/Makefile.inc
 include varnish/Makefile.inc
 include w1sensor/Makefile.inc
 include web_log/Makefile.inc
+include zscores/Makefile.inc
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
