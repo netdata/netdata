@@ -267,12 +267,16 @@ struct engine *read_exporting_config()
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
-        prometheus_exporter_instance->config.charts_pattern =
-            simple_pattern_create(prometheus_config_get("send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+        prometheus_exporter_instance->config.charts_pattern = simple_pattern_create(
+            prometheus_config_get("send charts matching", global_backend_send_charts_matching),
+            NULL,
+            SIMPLE_PATTERN_EXACT);
         prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create(
             prometheus_config_get("send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
         prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_backend_prefix);
+
+        prometheus_exporter_instance->config.initialized = 1;
     }
 
     // TODO: change BACKEND to EXPORTING

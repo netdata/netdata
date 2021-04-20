@@ -77,6 +77,8 @@ struct instance_config {
     SIMPLE_PATTERN *charts_pattern;
     SIMPLE_PATTERN *hosts_pattern;
 
+    int initialized;
+
     void *connector_specific_config;
 };
 
