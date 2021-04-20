@@ -156,19 +156,19 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
     while (!json_object_iter_equal(&it, &itEnd)) {
         if (!strcmp(json_object_iter_peek_name(&it), JSON_TOPIC_KEY_NAME)) {
             if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_string) {
-                error(JSON_TOPIC_KEY_NAME " is expected to be json_type_string");
+                error("topic dictionary key \"" JSON_TOPIC_KEY_NAME "\" is expected to be json_type_string");
                 return 1;
             }
             topic->topic_id = topic_name_to_id(json_object_get_string(json_object_iter_peek_value(&it)));
             if (topic->topic_id == ACLK_TOPICID_UNKNOWN) {
-                error(JSON_TOPIC_KEY_NAME " has unkown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
+                info("topic dictionary has unkown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
             }
             json_object_iter_next(&it);
             continue;
         }
         if (!strcmp(json_object_iter_peek_name(&it), JSON_TOPIC_KEY_TOPIC)) {
             if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_string) {
-                error(JSON_TOPIC_KEY_TOPIC " is expected to be json_type_string");
+                error("topic dictionary key \"" JSON_TOPIC_KEY_TOPIC "\" is expected to be json_type_string");
                 return 1;
             }
             topic->topic_recvd = strdupz(json_object_get_string(json_object_iter_peek_value(&it)));
@@ -176,12 +176,12 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
             continue;
         }
 
-        error("Unknown/Unexpected key \"%s\" in topic description. Ignoring!", json_object_iter_peek_name(&it));
+        error("topic dictionary has Unknown/Unexpected key \"%s\" in topic description. Ignoring!", json_object_iter_peek_name(&it));
         json_object_iter_next(&it);
     }
 
     if (!topic->topic_recvd) {
-        error("Missig compulsory key %s", JSON_TOPIC_KEY_TOPIC);
+        error("topic dictionary Missig compulsory key %s", JSON_TOPIC_KEY_TOPIC);
         return 1;
     }
 
