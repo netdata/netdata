@@ -96,7 +96,7 @@ local:
     protocol: 'http'
 
     # SSL verify parameter for requests.get() calls
-    verify: true
+    tls_verify: true
 
     # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
     charts_regex: 'system\..*'
