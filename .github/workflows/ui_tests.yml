@@ -19,7 +19,7 @@ jobs:
           submodules: recursive
       - name: Install the agent
         run: |
-          curl -Ss 'https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
+          sudo apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libelf-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
           sudo ./netdata-installer.sh --dont-wait
           cd tests
       - name: Cypress run
