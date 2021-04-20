@@ -126,16 +126,16 @@ static enum aclk_topics topic_name_to_id(const char *name) {
 }
 
 #define CLAIM_ID_REPLACE_TAG "#{claim_id}"
-static void topic_generate_final(struct aclk_topic *topic) {
+static void topic_generate_final(struct aclk_topic *t) {
     char *dest;
-    char *replace_tag = strstr(topic->topic_recvd, CLAIM_ID_REPLACE_TAG);
+    char *replace_tag = strstr(t->topic_recvd, CLAIM_ID_REPLACE_TAG);
     if (!replace_tag)
         return;
 
-    topic->topic = mallocz(strlen(topic->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(localhost->aclk_state.claimed_id));
-    dest = topic->topic;
-    memcpy(topic->topic, topic->topic_recvd, replace_tag - topic->topic_recvd);
-    dest = topic->topic + (replace_tag - topic->topic_recvd);
+    t->topic = mallocz(strlen(t->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(localhost->aclk_state.claimed_id));
+    dest = t->topic;
+    memcpy(t->topic, t->topic_recvd, replace_tag - t->topic_recvd);
+    dest = t->topic + (replace_tag - t->topic_recvd);
     // TODO check claimed_id NULL
     memcpy(dest, localhost->aclk_state.claimed_id, strlen(localhost->aclk_state.claimed_id));
     dest += strlen(localhost->aclk_state.claimed_id);
