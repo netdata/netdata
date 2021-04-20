@@ -132,13 +132,21 @@ static void topic_generate_final(struct aclk_topic *t) {
     if (!replace_tag)
         return;
 
+    rrdhost_aclk_state_lock(localhost);
+    if (unlikely(!localhost->aclk_state.claimed_id)) {
+        error("This should never be called if agent not claimed");
+        rrdhost_aclk_state_unlock(localhost);
+        return;
+    }
+
     t->topic = mallocz(strlen(t->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(localhost->aclk_state.claimed_id));
     dest = t->topic;
     memcpy(t->topic, t->topic_recvd, replace_tag - t->topic_recvd);
     dest = t->topic + (replace_tag - t->topic_recvd);
-    // TODO check claimed_id NULL
+
     memcpy(dest, localhost->aclk_state.claimed_id, strlen(localhost->aclk_state.claimed_id));
     dest += strlen(localhost->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(localhost);
     replace_tag += strlen(CLAIM_ID_REPLACE_TAG);
     strcpy(dest, replace_tag);
     dest += strlen(replace_tag);
