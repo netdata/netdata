@@ -391,9 +391,23 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
                           dcstat_hash_values[NETDATA_KEY_DC_MISS]);
 
     netdata_publish_syscall_t *ptr = dcstat_counter_publish_aggregated;
-    ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
-    ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
-    ptr[NETDATA_DCSTAT_IDX_MISS].ncall = dcstat_hash_values[NETDATA_KEY_DC_MISS];
+    netdata_idx_t value = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
+    if (value != ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall) {
+        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = value - ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall;
+        ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall = value;
+
+        value = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
+        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall =  value - ptr[NETDATA_DCSTAT_IDX_SLOW].pcall;
+        ptr[NETDATA_DCSTAT_IDX_SLOW].pcall = value;
+
+        value = dcstat_hash_values[NETDATA_KEY_DC_MISS];
+        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = value - ptr[NETDATA_DCSTAT_IDX_MISS].pcall;
+        ptr[NETDATA_DCSTAT_IDX_MISS].pcall = value;
+    } else {
+        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = 0;
+        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = 0;
+        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = 0;
+    }
 
     ebpf_one_dimension_write_charts(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                                     ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
@@ -529,8 +543,8 @@ void *ebpf_dcstat_thread(void *ptr)
     }
 
     int algorithms[NETDATA_DCSTAT_IDX_END] = {
-        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,
-        NETDATA_EBPF_INCREMENTAL_IDX
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_ABSOLUTE_IDX
     };
 
     ebpf_global_labels(dcstat_counter_aggregated_data, dcstat_counter_publish_aggregated,
