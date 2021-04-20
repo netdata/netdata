@@ -21,6 +21,7 @@ jobs:
         run: |
           sudo apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libelf-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake
           sudo ./netdata-installer.sh --dont-wait
-          cd tests
       - name: Cypress run
-        uses: cypress-io/github-action@v2
+        run: |
+          npm install cypress --save-dev
+          ./node_modules/.bin/cypress run --config-file tests/cypress/config.json
