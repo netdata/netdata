@@ -245,7 +245,7 @@ void global_statistics_charts(void) {
                 "stats",
                 130100,
                 localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
+                RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         } else
