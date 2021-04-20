@@ -181,6 +181,11 @@ void global_statistics_charts(void) {
     static collected_number compression_ratio = -1,
                             average_response_time = -1;
 
+    static time_t netdata_start_time = 0;
+    if (!netdata_start_time)
+        netdata_start_time = now_boottime_sec();
+    time_t netdata_uptime = now_boottime_sec() - netdata_start_time;
+
     struct global_statistics gs;
     struct rusage me;
 
@@ -219,6 +224,35 @@ void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_cpu, rd_cpu_user,   me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
         rrddim_set_by_pointer(st_cpu, rd_cpu_system, me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
         rrdset_done(st_cpu);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_uptime = NULL;
+        static RRDDIM *rd_uptime = NULL;
+
+        if (unlikely(!st_uptime)) {
+            st_uptime = rrdset_create_localhost(
+                "netdata",
+                "uptime",
+                NULL,
+                "netdata",
+                NULL,
+                "Netdata uptime",
+                "seconds",
+                "netdata",
+                "stats",
+                130100,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_LINE);
+
+            rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        } else
+            rrdset_next(st_uptime);
+
+        rrddim_set_by_pointer(st_uptime, rd_uptime, netdata_uptime);
+        rrdset_done(st_uptime);
     }
 
     // ----------------------------------------------------------------
