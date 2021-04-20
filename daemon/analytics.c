@@ -369,10 +369,9 @@ void analytics_charts(void)
 {
     RRDSET *st;
     int c = 0;
-    int show_archived = 0;
     rrdset_foreach_read(st, localhost)
     {
-        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
+        if (rrdset_is_available_for_viewers(st)) {
             c++;
         }
     }
