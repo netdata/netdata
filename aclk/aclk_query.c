@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aclk_query.h"
 #include "aclk_stats.h"
 #include "aclk_query_queue.h"
