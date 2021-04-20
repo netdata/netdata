@@ -339,7 +339,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_hello_msg(client);
     ACLK_SHARED_STATE_LOCK;
     if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
-        error("Sending `connect` payload immediatelly as popcorning was finished already.");
+        error("Sending `connect` payload immediately as popcorning was finished already.");
         queue_connect_payloads();
     }
     ACLK_SHARED_STATE_UNLOCK;
