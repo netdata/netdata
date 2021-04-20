@@ -499,7 +499,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .clientid   = "anon",
             .username   = "anon",
             .password   = "anon",
-            .will_topic = NULL,
+            .will_topic = "lwt",
             .will_msg   = NULL,
             .will_flags = MQTT_WSS_PUB_QOS2,
             .keep_alive = 60
