@@ -136,15 +136,43 @@ If you create a template using the `disk.io` context, it will apply an alarm to 
 
 Specify the classification of the alarm or template. 
 
-Class can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` class, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc.
+Class can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` class, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc. Example:
 
 ```yaml
 class: Database
 ```
 
+Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:
+
+| Class                    | Groups alarms for:                              |
+| ------------------------ | ----------------------------------------------- |
+| Ad Filtering             | Services related to Ad Filtering (like pi-hole) |
+| Certificates             | 
+| Cgroups                  |
+| Computing                | 
+| Containers               |
+| Database                 | Database systems (e.g. MySQL, Postgress, etc)   |
+| Data Sharing             |
+| DHCP                     |
+| DNS                      | 
+| Kubernetes               |
+| KV Storage               |
+| Linux                    | Services specific to Linux (e.g. systemd)       |
+| Messaging                |
+| Netdata                  | Internal Netdata components monitoring          |
+| Other                    |
+| Power Supply             |
+| Search engine            |
+| Storage                  |
+| System                   | General system alarms (e.g. cpu, network, etc.) |
+| Virtual Machine          | Virtual Machine software                        |
+| Web Proxy                |
+| Web Server               | Web server software (e.g. Apache, ngnix, etc.)  |
+| Windows                  |                                                 |
+
 #### Alarm line `component`
 
-Component can be used to narrow down what the previous `class` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` classification.
+Component can be used to narrow down what the previous `class` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` classification. Example:
 
 ```yaml
 component: MySQL
@@ -152,7 +180,7 @@ component: MySQL
 
 #### Alarm line `type`
 
-This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues, be it in network interfaces, web servers, or database systems.
+This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues, be it in network interfaces, web servers, or database systems. Example:
 
 ```yaml
 type: Latency
