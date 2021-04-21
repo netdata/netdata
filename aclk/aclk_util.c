@@ -158,7 +158,6 @@ static void topic_generate_final(struct aclk_topic *t) {
     }
 
     t->topic = mallocz(strlen(t->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(localhost->aclk_state.claimed_id));
-    dest = t->topic;
     memcpy(t->topic, t->topic_recvd, replace_tag - t->topic_recvd);
     dest = t->topic + (replace_tag - t->topic_recvd);
 
