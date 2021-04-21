@@ -74,31 +74,6 @@ context('Assertions', () => {
         cy.get('[data-netdata^="disk_svctm."][id^="chart_disk_svctm_"]')
         cy.get('[data-netdata^="disk_iotime."][id^="chart_disk_iotime_"]')
 
-        // /System/Volumes/Data
-        cy.get('h2#menu_disk_submenu__System_Volumes_Data').contains('/System/Volumes/Data');
-        cy.get('[data-netdata="disk_space./System/Volumes/Data"][id="chart_disk_space__System_Volumes_Data"]')
-        cy.get('[data-netdata="disk_inodes./System/Volumes/Data"][id="chart_disk_inodes__System_Volumes_Data"]')
-
-        // /System/Volumes/Preboot
-        cy.get('h2#menu_disk_submenu__System_Volumes_Preboot').contains('/System/Volumes/Preboot');
-        cy.get('[data-netdata="disk_space./System/Volumes/Preboot"][id="chart_disk_space__System_Volumes_Preboot"]')
-        cy.get('[data-netdata="disk_inodes./System/Volumes/Preboot"][id="chart_disk_inodes__System_Volumes_Preboot"]')
-
-        // /System/Volumes/Update
-        cy.get('h2#menu_disk_submenu__System_Volumes_Update').contains('/System/Volumes/Update');
-        cy.get('[data-netdata="disk_space./System/Volumes/Update"][id="chart_disk_space__System_Volumes_Update"]')
-        cy.get('[data-netdata="disk_inodes./System/Volumes/Update"][id="chart_disk_inodes__System_Volumes_Update"]')
-
-        // /System/Volumes/VM
-        cy.get('h2#menu_disk_submenu__System_Volumes_VM').contains('/System/Volumes/VM');
-        cy.get('[data-netdata="disk_space./System/Volumes/VM"][id="chart_disk_space__System_Volumes_VM"]')
-        cy.get('[data-netdata="disk_inodes./System/Volumes/VM"][id="chart_disk_inodes__System_Volumes_VM"]')
-
-        // /Volumes/Recovery
-        cy.get('h2#menu_disk_submenu__Volumes_Recovery').contains('/Volumes/Recovery');
-        cy.get('[data-netdata="disk_space./Volumes/Recovery"][id="chart_disk_space__Volumes_Recovery"]')
-        cy.get('[data-netdata="disk_inodes./Volumes/Recovery"][id="chart_disk_inodes__Volumes_Recovery"]')
-
         //  IPv4 Networking
 
         cy.get('h1#menu_ipv4').contains('IPv4 Networking');
