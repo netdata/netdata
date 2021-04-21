@@ -105,9 +105,8 @@ context('Assertions', () => {
 
         cy.get('h2#menu_ipv6_submenu_packets').contains('packets');
         cy.get('[data-netdata="ipv6.packets"][id="chart_ipv6_packets"]')
-        cy.get('h2#menu_ipv6_submenu_errors').contains('errors');
-        cy.get('[data-netdata="ipv6.errors"][id="chart_ipv6_errors"]')
-        
+
+
         //   Network Interfaces
 
         cy.get('h1#menu_net').contains('Network Interfaces');
