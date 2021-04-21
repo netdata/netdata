@@ -314,7 +314,12 @@ void simple_connector_worker(void *instance_p)
             size_t reconnects = 0;
 
             sock = connect_to_one_of(
-                instance->config.destination, connector_specific_config->default_port, &timeout, &reconnects, NULL, 0);
+                instance->config.destination,
+                connector_specific_config->default_port,
+                &timeout,
+                &reconnects,
+                connector_specific_data->connected_to,
+                CONNECTED_TO_MAX);
 #ifdef ENABLE_HTTPS
             if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
                 if (netdata_exporting_ctx) {
