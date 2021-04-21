@@ -4,64 +4,6 @@
 
 static struct engine *engine = NULL;
 
-void analytics_exporting_connectors(BUFFER *b)
-{
-    if (!engine)
-        return;
-
-    uint8_t count = 0;
-
-    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-        if (count)
-            buffer_strcat(b, "|");
-
-        switch (instance->config.type) {
-            case EXPORTING_CONNECTOR_TYPE_GRAPHITE:
-                buffer_strcat(b, "Graphite");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP:
-                buffer_strcat(b, "GraphiteHTTP");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_JSON:
-                buffer_strcat(b, "JSON");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
-                buffer_strcat(b, "JSONHTTP");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
-                buffer_strcat(b, "OpenTSDB");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
-                buffer_strcat(b, "OpenTSDBHTTP");
-                break;
-            case EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE:
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-                buffer_strcat(b, "PrometheusRemoteWrite");
-#endif
-                break;
-            case EXPORTING_CONNECTOR_TYPE_KINESIS:
-#if HAVE_KINESIS
-                buffer_strcat(b, "Kinesis");
-#endif
-                break;
-            case EXPORTING_CONNECTOR_TYPE_PUBSUB:
-#if ENABLE_EXPORTING_PUBSUB
-                buffer_strcat(b, "Pubsub");
-#endif
-                break;
-            case EXPORTING_CONNECTOR_TYPE_MONGODB:
-#if HAVE_MONGOC
-                buffer_strcat(b, "MongoDB");
-#endif
-                break;
-            default:
-                buffer_strcat(b, "Unknown");
-        }
-
-        count++;
-    }
-}
-
 /**
  * Exporting Clean Engine
  *
