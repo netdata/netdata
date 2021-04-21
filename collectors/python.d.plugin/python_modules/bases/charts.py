@@ -24,7 +24,7 @@ DIMENSION_SET = "SET '{id}' = {value}\n"
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
 RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time for {job_name}' 'ms' 'python.d' " \
-                       "netdata.pythond_runtime line 145000 {update_every}\n" \
+                       "netdata.pythond_runtime line 145000 {update_every} '' 'python.d.plugin' '{module_name}'\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
 
 
@@ -45,6 +45,7 @@ def create_runtime_chart(func):
         chart = RUNTIME_CHART_CREATE.format(
             job_name=self.name,
             update_every=self._runtime_counters.update_every,
+            module_name=self.module_name,
         )
         safe_print(chart)
         ok = func(*args, **kwargs)
