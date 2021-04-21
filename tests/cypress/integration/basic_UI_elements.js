@@ -66,7 +66,7 @@ context('Assertions', () => {
         cy.get('[data-netdata^="disk."][data-dimensions="writes"]')
         cy.get('[data-netdata^="disk_util."][data-dimensions]')
 
-        cy.get('[data-netdata^="disk."][id^="chart_disk_disk0"]')
+        cy.get('[data-netdata^="disk."][id^="chart_disk_"]')
         cy.get('[data-netdata^="disk_ops."][id^="chart_disk_ops_"]')
         cy.get('[data-netdata^="disk_util."][id^="chart_disk_util_"]')
         cy.get('[data-netdata^="disk_await."][id^="chart_disk_await_"]')
