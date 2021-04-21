@@ -18,12 +18,11 @@ context('Assertions', () => {
         cy.get('[data-target="#optionsModal"][title="Settings"]')
 
         // Assert presence of gauges
-        cy.get('[data-title="Used Swap"][data-units="%"]')
         cy.get('[data-title="Disk Read"][data-common-units="system.io.mainhead"]')
         cy.get('[data-title="Disk Write"][data-common-units="system.io.mainhead"]')
         cy.get('[data-title="CPU"][data-units="%"]')
-        cy.get('[data-title="IPv4 Inbound"][data-common-units="system.ipv4.mainhead"]')
-        cy.get('[data-title="IPv4 Outbound"][data-common-units="system.ipv4.mainhead"]')
+        cy.get('[data-title$="Inbound"][data-common-units$="mainhead"]')
+        cy.get('[data-title$="Outbound"][data-common-units$="mainhead"]')
         cy.get('[data-title="Used RAM"][data-units="%"]')
 
         // Charts
