@@ -165,7 +165,7 @@ pd
 fleep
 syslog
 custom
-msteam
+msteams
 kavenegar
 prowl
 irc
@@ -300,8 +300,11 @@ done
 # slack configs
 SLACK_WEBHOOK_URL=
 
-# Microsoft Team configs
-MSTEAM_WEBHOOK_URL=
+# Microsoft Teams configs
+MSTEAMS_WEBHOOK_URL=
+
+# Legacy Microsoft Teams configs for backwards compatability:
+declare -A role_recipients_msteam
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -431,6 +434,37 @@ if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; th
   host="$(hostname -f 2>/dev/null)"
 fi
 
+
+# -----------------------------------------------------------------------------
+# migrate old Microsoft Teams configuration keys after loading configuration
+
+msteams_migration() {
+    SEND_MSTEAMS=${SEND_MSTEAM:-$SEND_MSTEAMS}
+    DEFAULT_RECIPIENT_MSTEAMS=${DEFAULT_RECIPIENT_MSTEAM:-$DEFAULT_RECIPIENT_MSTEAMS}
+    MSTEAMS_WEBHOOK_URL=${MSTEAM_WEBHOOK_URL:-$MSTEAMS_WEBHOOK_URL}
+    MSTEAMS_ICON_DEFAULT=${MSTEAM_ICON_DEFAULT:-$MSTEAMS_ICON_DEFAULT}
+    MSTEAMS_ICON_CLEAR=${MSTEAM_ICON_CLEAR:-$MSTEAMS_ICON_CLEAR}
+    MSTEAMS_ICON_WARNING=${MSTEAM_ICON_WARNING:-$MSTEAMS_ICON_WARNING}
+    MSTEAMS_ICON_CRITICAL=${MSTEAM_ICON_CRITICAL:-$MSTEAMS_ICON_CRITICAL}
+    MSTEAMS_COLOR_DEFAULT=${MSTEAM_COLOR_DEFAULT:-$MSTEAMS_COLOR_DEFAULT}
+    MSTEAMS_COLOR_CLEAR=${MSTEAM_COLOR_CLEAR:-$MSTEAMS_COLOR_CLEAR}
+    MSTEAMS_COLOR_WARNING=${MSTEAM_COLOR_WARNING:-$MSTEAMS_COLOR_WARNING}
+    MSTEAMS_COLOR_CRITICAL=${MSTEAM_COLOR_CRITICAL:-$MSTEAMS_COLOR_CRITICAL}
+
+    # migrate role specific recipients:
+    for key in "${!role_recipients_msteam[@]}"; do
+        # Disable check, if role_recipients_msteams is ever used:
+        # The role_recipients_$method are created and used programmatically
+        # by iterating over $methods. shellcheck therefore doesn't realize
+        # that role_recipients_msteams is actually used in the block
+        # "find the recipients' addresses per method".
+        # shellcheck disable=SC2034
+        role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
+    done
+}
+
+msteams_migration
+
 # -----------------------------------------------------------------------------
 # filter a recipient based on alarm event severity
 
@@ -553,8 +587,8 @@ filter_recipient_by_criticality() {
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
-# check msteam
-[ -z "${MSTEAM_WEBHOOK_URL}" ] && SEND_MSTEAM="NO"
+# check msteams
+[ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
 
 # check pd
 [ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
@@ -581,7 +615,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_HANGOUTS}" = "YES" ] ||
   [ "${SEND_MATRIX}" = "YES" ] ||
   [ "${SEND_CUSTOM}" = "YES" ] ||
-  [ "${SEND_MSTEAM}" = "YES" ] ||
+  [ "${SEND_MSTEAMS}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
   [ "${SEND_OPSGENIE}" = "YES" ]; then
@@ -595,7 +629,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_PUSHBULLET="NO"
     SEND_TELEGRAM="NO"
     SEND_SLACK="NO"
-    SEND_MSTEAM="NO"
+    SEND_MSTEAMS="NO"
     SEND_ROCKETCHAT="NO"
     SEND_ALERTA="NO"
     SEND_PD="NO"
@@ -750,7 +784,7 @@ for method in "${SEND_EMAIL}" \
   "${SEND_AWSSNS}" \
   "${SEND_SYSLOG}" \
   "${SEND_SMS}" \
-  "${SEND_MSTEAM}" \
+  "${SEND_MSTEAMS}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
   "${SEND_OPSGENIE}" ; do
@@ -1288,22 +1322,22 @@ send_telegram() {
 # -----------------------------------------------------------------------------
 # Microsoft Team sender
 
-send_msteam() {
+send_msteams() {
 
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-  [ "${SEND_MSTEAM}" != "YES" ] && return 1
+  [ "${SEND_MSTEAMS}" != "YES" ] && return 1
 
   case "${status}" in
-  WARNING) icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}" ;;
-  CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}" ;;
-  CLEAR) icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}" ;;
-  *) icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}" ;;
+  WARNING) icon="${MSTEAMS_ICON_WARNING}" && color="${MSTEAMS_COLOR_WARNING}" ;;
+  CRITICAL) icon="${MSTEAMS_ICON_CRITICAL}" && color="${MSTEAMS_COLOR_CRITICAL}" ;;
+  CLEAR) icon="${MSTEAMS_ICON_CLEAR}" && color="${MSTEAMS_COLOR_CLEAR}" ;;
+  *) icon="${MSTEAMS_ICON_DEFAULT}" && color="${MSTEAMS_COLOR_DEFAULT}" ;;
   esac
 
   for channel in ${channels}; do
     ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
-    ## Online designer : https://acdesignerbeta.azurewebsites.net/
+    ## Online designer : https://adaptivecards.io/designer/
     payload="$(
       cat <<EOF
         {
@@ -2346,13 +2380,13 @@ send_hangouts "${to_hangouts}"
 SENT_HANGOUTS=$?
 
 # -----------------------------------------------------------------------------
-# send the Microsoft notification
+# send the Microsoft Teams notification
 
-# Microsoft team aggregates posts from the same username
+# Microsoft teams aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
-SENT_MSTEAM=$?
+send_msteams "${MSTEAMS_WEBHOOK_URL}" "${to_msteams}"
+SENT_MSTEAMS=$?
 
 # -----------------------------------------------------------------------------
 # send the rocketchat notification
@@ -2769,7 +2803,7 @@ for state in "${SENT_EMAIL}" \
   "${SENT_MATRIX}" \
   "${SENT_SYSLOG}" \
   "${SENT_SMS}" \
-  "${SENT_MSTEAM}" \
+  "${SENT_MSTEAMS}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
   "${SENT_OPSGENIE}"; do
