@@ -73,8 +73,8 @@ context('Assertions', () => {
         cy.get('[data-netdata^="disk_avgsz."][id^="chart_disk_avgsz_"]')
         cy.get('[data-netdata^="disk_svctm."][id^="chart_disk_svctm_"]')
         cy.get('[data-netdata^="disk_iotime."][id^="chart_disk_iotime_"]')
-        cy.get('[data-netdata^="disk_space./"][id^="chart_disk_space__"]')
-        cy.get('[data-netdata^="disk_inodes./"][id^="chart_disk_inodes__"]')
+        cy.get('[data-netdata^="disk_space./"][id^="chart_disk_space_"]')
+        cy.get('[data-netdata^="disk_inodes./"][id^="chart_disk_inodes_"]')
 
         // /System/Volumes/Data
         cy.get('h2#menu_disk_submenu__System_Volumes_Data').contains('/System/Volumes/Data');
