@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Add a chart with netdata uptime [\#10997](https://github.com/netdata/netdata/pull/10997) ([vlvkobal](https://github.com/vlvkobal))
 - Move global stats to a separate thread [\#10991](https://github.com/netdata/netdata/pull/10991) ([vlvkobal](https://github.com/vlvkobal))
+- adds missing SPDX license info into ACLK-NG [\#10990](https://github.com/netdata/netdata/pull/10990) ([underhood](https://github.com/underhood))
 - Update eBPF documentation [\#10982](https://github.com/netdata/netdata/pull/10982) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove outdated privacy policy and terms of use [\#10979](https://github.com/netdata/netdata/pull/10979) ([joelhans](https://github.com/joelhans))
 - collectors/charts.d/opensips: fix detection of `opensipsctl` executable  [\#10978](https://github.com/netdata/netdata/pull/10978) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +19,7 @@
 - Remove condition that was creating gaps [\#10972](https://github.com/netdata/netdata/pull/10972) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add a metric for percpu memory [\#10964](https://github.com/netdata/netdata/pull/10964) ([vlvkobal](https://github.com/vlvkobal))
 - Bring flexible adjust for eBPF hash tables [\#10962](https://github.com/netdata/netdata/pull/10962) ([thiagoftsm](https://github.com/thiagoftsm))
+- Provide new attributes in health conf files [\#10961](https://github.com/netdata/netdata/pull/10961) ([MrZammler](https://github.com/MrZammler))
 - Fix epbf crash when process exit [\#10957](https://github.com/netdata/netdata/pull/10957) ([thiagoftsm](https://github.com/thiagoftsm))
 - Contributing revamp, take 2 [\#10956](https://github.com/netdata/netdata/pull/10956) ([OdysLam](https://github.com/OdysLam))
 - health: add Inconsistent state to the mysql\_galera\_cluster\_state alarm [\#10945](https://github.com/netdata/netdata/pull/10945) ([ilyam8](https://github.com/ilyam8))
@@ -47,6 +50,7 @@
 - python.d\(smartd\_log\): collect attribute 249 -- NAND Writes 1GiB [\#10872](https://github.com/netdata/netdata/pull/10872) ([RaitoBezarius](https://github.com/RaitoBezarius))
 - Improvements to dash-example.html [\#10870](https://github.com/netdata/netdata/pull/10870) ([tnyeanderson](https://github.com/tnyeanderson))
 - Replace references to Google Analytics with Posthog where relevant [\#10868](https://github.com/netdata/netdata/pull/10868) ([andrewm4894](https://github.com/andrewm4894))
+- prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 - implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
 - implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
 - Add docs on Nginx with IPv6 listen for certbot to work [\#10473](https://github.com/netdata/netdata/pull/10473) ([jilleJr](https://github.com/jilleJr))
@@ -300,8 +304,6 @@
 - Improve configuration docs with common changes and start/stop/restart directions [\#10415](https://github.com/netdata/netdata/pull/10415) ([joelhans](https://github.com/joelhans))
 - Small updates, improvements, and housekeeping to docs [\#10405](https://github.com/netdata/netdata/pull/10405) ([joelhans](https://github.com/joelhans))
 - python.d/fail2ban: Add handling "yes" and "no" as bool, match flexible spaces [\#10400](https://github.com/netdata/netdata/pull/10400) ([grinapo](https://github.com/grinapo))
-- Dispatch cgroup discovery into another thread [\#10399](https://github.com/netdata/netdata/pull/10399) ([vlvkobal](https://github.com/vlvkobal))
-- Fix data source option for Prometheus web API in exporting configuration [\#10397](https://github.com/netdata/netdata/pull/10397) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
@@ -312,8 +314,6 @@
 - Use bash shell as user netdata for debug [\#10425](https://github.com/netdata/netdata/pull/10425) ([Steve8291](https://github.com/Steve8291))
 - Add Realtek network cards to the list of physical interfaces on FreeBSD [\#10414](https://github.com/netdata/netdata/pull/10414) ([vlvkobal](https://github.com/vlvkobal))
 - Update main README with release news [\#10412](https://github.com/netdata/netdata/pull/10412) ([joelhans](https://github.com/joelhans))
-- Added instructions on which file to edit. [\#10398](https://github.com/netdata/netdata/pull/10398) ([kdvlr](https://github.com/kdvlr))
-- ACLK collector list use mguid instead of hostname [\#10394](https://github.com/netdata/netdata/pull/10394) ([underhood](https://github.com/underhood))
 
 ## [v1.28.0](https://github.com/netdata/netdata/tree/v1.28.0) (2020-12-18)
 
@@ -326,11 +326,6 @@
 ## [v1.27.0](https://github.com/netdata/netdata/tree/v1.27.0) (2020-12-17)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.26.0...v1.27.0)
-
-**Merged pull requests:**
-
-- Fixed option parsing in kickstart.sh. [\#10396](https://github.com/netdata/netdata/pull/10396) ([Ferroin](https://github.com/Ferroin))
-- invalid\_addr\_cleanup: Initialize variables [\#10395](https://github.com/netdata/netdata/pull/10395) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.26.0](https://github.com/netdata/netdata/tree/v1.26.0) (2020-10-14)
 
