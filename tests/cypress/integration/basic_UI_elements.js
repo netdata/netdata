@@ -43,11 +43,6 @@ context('Assertions', () => {
         cy.get('h2#menu_system_submenu_ram').contains('ram');
         cy.get('[data-netdata="system.ram"][id="chart_system_ram"]')
 
-        // Swap
-        cy.get('h2#menu_system_submenu_swap').contains('swap');
-        cy.get('[data-netdata="system.swap"][id="chart_system_swap"]')
-        cy.get('[data-netdata="system.swapio"][id="chart_system_swapio"]')
-
         // Network
         cy.get('h2#menu_system_submenu_network').contains('network');
         cy.get('[data-netdata="system.ipv4"][id="chart_system_ipv4"]')
@@ -67,19 +62,19 @@ context('Assertions', () => {
 
         // Disks
         cy.get('h1#menu_disk').contains('Disks');
-        cy.get('[data-netdata="disk.disk0"][data-dimensions="reads"]')
-        cy.get('[data-netdata="disk.disk0"][data-dimensions="writes"]')
-        cy.get('[data-netdata="disk_util.disk0"][data-dimensions]')
+        cy.get('[data-netdata^="disk."][data-dimensions="reads"]')
+        cy.get('[data-netdata^="disk."][data-dimensions="writes"]')
+        cy.get('[data-netdata^="disk_util."][data-dimensions]')
 
-        cy.get('[data-netdata="disk.disk0"][id="chart_disk_disk0"]')
-        cy.get('[data-netdata="disk_ops.disk0"][id="chart_disk_ops_disk0"]')
-        cy.get('[data-netdata="disk_util.disk0"][id="chart_disk_util_disk0"]')
-        cy.get('[data-netdata="disk_await.disk0"][id="chart_disk_await_disk0"]')
-        cy.get('[data-netdata="disk_avgsz.disk0"][id="chart_disk_avgsz_disk0"]')
-        cy.get('[data-netdata="disk_svctm.disk0"][id="chart_disk_svctm_disk0"]')
-        cy.get('[data-netdata="disk_iotime.disk0"][id="chart_disk_iotime_disk0"]')
-        cy.get('[data-netdata="disk_space./"][id="chart_disk_space__"]')
-        cy.get('[data-netdata="disk_inodes./"][id="chart_disk_inodes__"]')
+        cy.get('[data-netdata^="disk."][id="chart_disk_disk0"]')
+        cy.get('[data-netdata^="disk_ops."][id^="chart_disk_ops_"]')
+        cy.get('[data-netdata^="disk_util."][id^="chart_disk_util_"]')
+        cy.get('[data-netdata^="disk_await."][id^="chart_disk_await_"]')
+        cy.get('[data-netdata^="disk_avgsz."][id^="chart_disk_avgsz_"]')
+        cy.get('[data-netdata^="disk_svctm."][id^="chart_disk_svctm_"]')
+        cy.get('[data-netdata^="disk_iotime."][id^="chart_disk_iotime_"]')
+        cy.get('[data-netdata^="disk_space./"][id^="chart_disk_space__"]')
+        cy.get('[data-netdata^="disk_inodes./"][id^="chart_disk_inodes__"]')
 
         // /System/Volumes/Data
         cy.get('h2#menu_disk_submenu__System_Volumes_Data').contains('/System/Volumes/Data');
