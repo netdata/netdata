@@ -235,23 +235,6 @@ void *aclk_query_main_thread(void *ptr)
 {
     struct aclk_query_thread *info = ptr;
     while (!netdata_exit) {
-        ACLK_SHARED_STATE_LOCK;
-        if (unlikely(!aclk_shared_state.version_neg)) {
-            if (!aclk_shared_state.version_neg_wait_till || aclk_shared_state.version_neg_wait_till > now_monotonic_usec()) {
-                ACLK_SHARED_STATE_UNLOCK;
-                info("Waiting for ACLK Version Negotiation message from Cloud");
-                sleep(1);
-                continue;
-            }
-            errno = 0;
-            error("ACLK version negotiation failed. No reply to \"hello\" with \"version\" from cloud in time of %ds."
-                " Reverting to default ACLK version of %d.", VERSION_NEG_TIMEOUT, ACLK_VERSION_MIN);
-            aclk_shared_state.version_neg = ACLK_VERSION_MIN;
-// When ACLK v3 is implemented you will need this
-//            aclk_set_rx_handlers(aclk_shared_state.version_neg);
-        }
-        ACLK_SHARED_STATE_UNLOCK;
-
         aclk_query_process_msgs(info);
 
         QUERY_THREAD_LOCK;

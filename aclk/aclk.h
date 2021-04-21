@@ -9,23 +9,8 @@ typedef struct aclk_rrdhost_state {
 #include "../daemon/common.h"
 #include "aclk_util.h"
 
-// minimum and maximum supported version of ACLK
-// in this version of agent
-#define ACLK_VERSION_MIN 2
-#define ACLK_VERSION_MAX 2
-
-// Version negotiation messages have they own versioning
-// this is also used for LWT message as we set that up
-// before version negotiation
-#define ACLK_VERSION_NEG_VERSION 1
-
-// Maximum time to wait for version negotiation before aborting
-// and defaulting to oldest supported version
-#define VERSION_NEG_TIMEOUT 3
-
-#if ACLK_VERSION_MIN > ACLK_VERSION_MAX
-#error "ACLK_VERSION_MAX must be >= than ACLK_VERSION_MIN"
-#endif
+// version for aclk legacy (old cloud arch)
+#define ACLK_VERSION 2
 
 // Define ACLK Feature Version Boundaries Here
 #define ACLK_V_COMPRESSION 2
@@ -69,11 +54,6 @@ typedef enum aclk_agent_state {
 extern struct aclk_shared_state {
     ACLK_AGENT_STATE agent_state;
     time_t last_popcorn_interrupt;
-
-    // read only while ACLK connected
-    // protect by lock otherwise
-    int version_neg;
-    usec_t version_neg_wait_till;
 
     // To wait for `disconnect` message PUBACK
     // when shuting down

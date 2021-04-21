@@ -43,8 +43,6 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 struct aclk_shared_state aclk_shared_state = {
     .agent_state = AGENT_INITIALIZING,
     .last_popcorn_interrupt = 0,
-    .version_neg = 0,
-    .version_neg_wait_till = 0,
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0
 };
@@ -338,7 +336,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_stats_upd_online(1);
     aclk_connected = 1;
     aclk_pubacks_per_conn = 0;
-    aclk_hello_msg(client);
+
     ACLK_SHARED_STATE_LOCK;
     if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
         error("Sending `connect` payload immediately as popcorning was finished already.");

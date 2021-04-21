@@ -166,81 +166,6 @@ error:
     return 1;
 }
 
-// This handles `version` message from cloud used to negotiate
-// protocol version we will use
-static int aclk_handle_version_response(struct aclk_request *cloud_to_agent, char *raw_payload)
-{
-    UNUSED(raw_payload);
-    int version = -1;
-    errno = 0;
-
-    if (unlikely(cloud_to_agent->version != ACLK_VERSION_NEG_VERSION)) {
-        error(
-            "Unsuported version of \"version\" message from cloud. Expected %d, Got %d",
-            ACLK_VERSION_NEG_VERSION,
-            cloud_to_agent->version);
-        return 1;
-    }
-    if (unlikely(!cloud_to_agent->min_version)) {
-        error("Min version missing or 0");
-        return 1;
-    }
-    if (unlikely(!cloud_to_agent->max_version)) {
-        error("Max version missing or 0");
-        return 1;
-    }
-    if (unlikely(cloud_to_agent->max_version < cloud_to_agent->min_version)) {
-        error(
-            "Max version (%d) must be >= than min version (%d)", cloud_to_agent->max_version,
-            cloud_to_agent->min_version);
-        return 1;
-    }
-
-    if (unlikely(cloud_to_agent->min_version > ACLK_VERSION_MAX)) {
-        error(
-            "Agent too old for this cloud. Minimum version required by cloud %d."
-            " Maximum version supported by this agent %d.",
-            cloud_to_agent->min_version, ACLK_VERSION_MAX);
-        aclk_kill_link = 1;
-        aclk_disable_runtime = 1;
-        return 1;
-    }
-    if (unlikely(cloud_to_agent->max_version < ACLK_VERSION_MIN)) {
-        error(
-            "Cloud version is too old for this agent. Maximum version supported by cloud %d."
-            " Minimum (oldest) version supported by this agent %d.",
-            cloud_to_agent->max_version, ACLK_VERSION_MIN);
-        aclk_kill_link = 1;
-        return 1;
-    }
-
-    version = MIN(cloud_to_agent->max_version, ACLK_VERSION_MAX);
-
-    ACLK_SHARED_STATE_LOCK;
-    if (unlikely(now_monotonic_usec() > aclk_shared_state.version_neg_wait_till)) {
-        errno = 0;
-        error("The \"version\" message came too late ignoring.");
-        goto err_cleanup;
-    }
-    if (unlikely(aclk_shared_state.version_neg)) {
-        errno = 0;
-        error("Version has already been set to %d", aclk_shared_state.version_neg);
-        goto err_cleanup;
-    }
-    aclk_shared_state.version_neg = version;
-    ACLK_SHARED_STATE_UNLOCK;
-
-    info("Choosing version %d of ACLK", version);
-
-    aclk_set_rx_handlers(version);
-
-    return 0;
-
-err_cleanup:
-    ACLK_SHARED_STATE_UNLOCK;
-    return 1;
-}
-
 typedef struct aclk_incoming_msg_type{
     char *name;
     int(*fnc)(struct aclk_request *, char *);
@@ -248,19 +173,10 @@ typedef struct aclk_incoming_msg_type{
 
 aclk_incoming_msg_type aclk_incoming_msg_types_compression[] = {
     { .name = "http",    .fnc = aclk_handle_cloud_request_v2 },
-    { .name = "version", .fnc = aclk_handle_version_response },
     { .name = NULL,      .fnc = NULL                         }
 };
 
 struct aclk_incoming_msg_type *aclk_incoming_msg_types = aclk_incoming_msg_types_compression;
-
-void aclk_set_rx_handlers(int version)
-{
-// ACLK_NG ACLK version support starts at 2
-// TODO ACLK v3
-    UNUSED(version);
-    aclk_incoming_msg_types = aclk_incoming_msg_types_compression;
-}
 
 int aclk_handle_cloud_message(char *payload)
 {
@@ -295,10 +211,6 @@ int aclk_handle_cloud_message(char *payload)
         goto err_cleanup;
     }
 
-    if (!aclk_shared_state.version_neg && strcmp(cloud_to_agent.type_id, "version")) {
-        error("Only \"version\" message is allowed before popcorning and version negotiation is finished. Ignoring");
-        goto err_cleanup;
-    }
 
     for (int i = 0; aclk_incoming_msg_types[i].name; i++) {
         if (strcmp(cloud_to_agent.type_id, aclk_incoming_msg_types[i].name) == 0) {
