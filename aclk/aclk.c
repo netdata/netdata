@@ -201,6 +201,11 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 {
     char cmsg[RX_MSGLEN_MAX];
     size_t len = (msglen < RX_MSGLEN_MAX - 1) ? msglen : (RX_MSGLEN_MAX - 1);
+    const char *cmd_topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
+    if (!cmd_topic) {
+        error("Error retrieving command topic");
+        return;
+    }
 
     if (msglen > RX_MSGLEN_MAX - 1)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
@@ -224,7 +229,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 
     debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d MSG: \"%s\"", topic, qos, cmsg);
 
-    if (strcmp(aclk_get_topic(ACLK_TOPICID_COMMAND), topic))
+    if (strcmp(cmd_topic, topic))
         error("Received message on unexpected topic %s", topic);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
@@ -323,7 +328,12 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_session_sec = now / USEC_PER_SEC;
     aclk_session_us = now % USEC_PER_SEC;
 
-    mqtt_wss_subscribe(client, aclk_get_topic(ACLK_TOPICID_COMMAND), 1);
+    const char *topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
+
+    if (!topic)
+        error("Unable to fetch topic for COMMAND (to subscribe)");
+    else
+        mqtt_wss_subscribe(client, topic, 1);
 
     aclk_stats_upd_online(1);
     aclk_connected = 1;
@@ -331,7 +341,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_hello_msg(client);
     ACLK_SHARED_STATE_LOCK;
     if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
-        error("Sending `connect` payload immediatelly as popcorning was finished already.");
+        error("Sending `connect` payload immediately as popcorning was finished already.");
         queue_connect_payloads();
     }
     ACLK_SHARED_STATE_UNLOCK;
@@ -461,9 +471,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #ifndef ACLK_DISABLE_CHALLENGE
     url_t auth_url;
     url_t mqtt_url;
-
-    char *mqtt_otp_user = NULL;
-    char *mqtt_otp_pass = NULL;
 #endif
 
     json_object *lwt;
@@ -494,7 +501,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .clientid   = "anon",
             .username   = "anon",
             .password   = "anon",
-            .will_topic = aclk_get_topic(ACLK_TOPICID_METADATA),
+            .will_topic = "lwt",
             .will_msg   = NULL,
             .will_flags = MQTT_WSS_PUB_QOS2,
             .keep_alive = 60
@@ -522,16 +529,20 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        ret = aclk_get_mqtt_otp(aclk_private_key, &mqtt_otp_user, &mqtt_otp_pass, &auth_url);
+        ret = aclk_get_mqtt_otp(aclk_private_key, (char **)&mqtt_conn_params.clientid, (char **)&mqtt_conn_params.username, (char **)&mqtt_conn_params.password, &auth_url);
         url_t_destroy(&auth_url);
         if (ret) {
             error("Error passing Challenge/Response to get OTP");
             continue;
         }
 
-        mqtt_conn_params.clientid = mqtt_otp_user;
-        mqtt_conn_params.username = mqtt_otp_user;
-        mqtt_conn_params.password = mqtt_otp_pass;
+        // aclk_get_topic moved here as during OTP we
+        // generate the topic cache
+        mqtt_conn_params.will_topic = aclk_get_topic(ACLK_TOPICID_METADATA);
+        if (!mqtt_conn_params.will_topic) {
+            error("Couldn't get LWT topic. Will not send LWT.");
+            continue;
+        }
 
         // Do the MQTT connection
         ret = aclk_get_transport_idx(aclk_env);
@@ -558,6 +569,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #else
         ret = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
         url_t_destroy(&mqtt_url);
+
+        freez((char*)mqtt_conn_params.clientid);
+        freez((char*)mqtt_conn_params.password);
+        freez((char*)mqtt_conn_params.username);
 #endif
 
         json_object_put(lwt);

@@ -13,8 +13,14 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
 {
     uint16_t packet_id;
     const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
+    const char *topic = aclk_get_topic(subtopic);
 
-    mqtt_wss_publish_pid(client, aclk_get_topic(subtopic), str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
+    if (unlikely(!topic)) {
+        error("Couldn't get topic. Aborting mesage send");
+        return;
+    }
+
+    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif
@@ -30,8 +36,14 @@ static uint16_t aclk_send_message_subtopic_pid(mqtt_wss_client client, json_obje
 {
     uint16_t packet_id;
     const char *str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
+    const char *topic = aclk_get_topic(subtopic);
 
-    mqtt_wss_publish_pid(client, aclk_get_topic(subtopic), str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
+    if (unlikely(!topic)) {
+        error("Couldn't get topic. Aborting mesage send");
+        return 0;
+    }
+
+    mqtt_wss_publish_pid(client, topic, str, strlen(str),  MQTT_WSS_PUB_QOS1, &packet_id);
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
 #endif
