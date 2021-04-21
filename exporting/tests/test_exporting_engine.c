@@ -17,6 +17,7 @@ char log_line[MAX_LOG_LINE + 1];
 BACKEND_OPTIONS global_backend_options = 0;
 const char *global_backend_source = "average";
 const char *global_backend_prefix = "netdata";
+const char *global_backend_send_charts_matching = "*";
 
 void init_connectors_in_tests(struct engine *engine)
 {
@@ -268,7 +269,7 @@ static void test_rrdset_is_exportable(void **state)
     assert_int_equal(__real_rrdset_is_exportable(instance, st), 1);
 
     assert_ptr_not_equal(st->exporting_flags, NULL);
-    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_SEND);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_EXPORTING_SEND);
 }
 
 static void test_false_rrdset_is_exportable(void **state)
@@ -285,7 +286,7 @@ static void test_false_rrdset_is_exportable(void **state)
     assert_int_equal(__real_rrdset_is_exportable(instance, st), 0);
 
     assert_ptr_not_equal(st->exporting_flags, NULL);
-    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_IGNORE);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_EXPORTING_IGNORE);
 }
 
 static void test_exporting_calculate_value_from_stored_data(void **state)
@@ -993,9 +994,9 @@ static void test_can_send_rrdset(void **state)
 
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 1);
 
-    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
-    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
 
     // TODO: test with a denying simple pattern
 

@@ -146,6 +146,8 @@ int setup_prometheus(void **state)
     prometheus_exporter_instance->config.charts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
     prometheus_exporter_instance->config.hosts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
 
+    prometheus_exporter_instance->config.initialized = 1;
+
     return 0;
 }
 

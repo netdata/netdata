@@ -18,16 +18,16 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
     RRDHOST *host = st->rrdhost;
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
 
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_BACKEND_SEND))) {
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_SEND))) {
         // we have not checked this chart
         if (simple_pattern_matches(instance->config.charts_pattern, st->id) ||
             simple_pattern_matches(instance->config.charts_pattern, st->name))
-            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_SEND);
+            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
         else {
-            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
+            rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
             debug(
                 D_BACKEND,
                 "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
@@ -855,7 +855,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    if (unlikely(!prometheus_exporter_instance))
+    if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
     prometheus_exporter_instance->before = now_realtime_sec();
@@ -892,7 +892,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     EXPORTING_OPTIONS exporting_options,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    if (unlikely(!prometheus_exporter_instance))
+    if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
     prometheus_exporter_instance->before = now_realtime_sec();

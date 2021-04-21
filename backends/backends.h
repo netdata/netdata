@@ -37,6 +37,7 @@ extern int global_backend_update_every;
 extern BACKEND_OPTIONS global_backend_options;
 extern const char *global_backend_source;
 extern const char *global_backend_prefix;
+extern const char *global_backend_send_charts_matching;
 
 extern void *backends_main(void *ptr);
 BACKEND_TYPE backend_select_type(const char *type);
