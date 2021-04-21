@@ -111,14 +111,6 @@ context('Assertions', () => {
 
         cy.get('h1#menu_net').contains('Network Interfaces');
 
-        // cups
-        cy.get('h1#menu_cups').contains('cups');
-        cy.get('h2#menu_cups_submenu_overview').contains('overview');
-        cy.get('[data-netdata="cups.dest_state"][id="chart_cups_dest_state"]')
-        cy.get('[data-netdata="cups.dest_option"][id="chart_cups_dest_option"]')
-        cy.get('[data-netdata="cups.job_num"][id="chart_cups_job_num"]')
-        cy.get('[data-netdata="cups.job_size"][id="chart_cups_job_size"]')
-
         // Netdata Monitoring
         cy.get('h1#menu_netdata').contains('Netdata Monitoring');
         cy.get('h2#menu_netdata_submenu_netdata').contains('netdata');
