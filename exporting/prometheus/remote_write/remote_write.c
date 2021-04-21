@@ -31,7 +31,7 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
         "Content-Length: %zu\r\n"
         "\r\n",
         connector_specific_config->remote_write_path,
-        instance->config.destination,
+        simple_connector_data->connected_to,
         buffer_strlen(simple_connector_data->last_buffer->buffer));
 }
 

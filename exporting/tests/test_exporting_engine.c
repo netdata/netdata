@@ -618,6 +618,7 @@ static void test_simple_connector_worker(void **state)
     simple_connector_data->buffer = buffer_create(0);
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
+    strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
@@ -626,8 +627,8 @@ static void test_simple_connector_worker(void **state)
     expect_string(__wrap_connect_to_one_of, destination, "localhost");
     expect_value(__wrap_connect_to_one_of, default_port, 2003);
     expect_not_value(__wrap_connect_to_one_of, reconnects_counter, 0);
-    expect_value(__wrap_connect_to_one_of, connected_to, 0);
-    expect_value(__wrap_connect_to_one_of, connected_to_size, 0);
+    expect_string(__wrap_connect_to_one_of, connected_to, "localhost");
+    expect_value(__wrap_connect_to_one_of, connected_to_size, CONNECTED_TO_MAX);
     will_return(__wrap_connect_to_one_of, 2);
 
     expect_function_call(__wrap_send);
@@ -1170,6 +1171,7 @@ static void test_prometheus_remote_write_prepare_header(void **state)
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
+    strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
 
