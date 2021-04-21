@@ -10,7 +10,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/metrics-sto
 The simplest streaming configuration is **replication**, in which a child node streams its metrics in real time to a
 parent node, and both nodes retain metrics in their own databases.
 
-
+To configure replication, you need two nodes, each running Netdata. First you'll first enable streaming on your parent
+node, then enable streaming on your child node. When you're finished, you'll be able to see the child node's metrics in
+the parent node's dashboard, quickly switch between the two dashboards, and be able to serve [alarm
+notifications](/docs/monitor/enable-notifications.md) from either or both nodes.
 
 ## Enable streaming on the parent node
 
@@ -18,6 +21,8 @@ First, log onto the node that will act as the parent.
 
 Run `uuidgen` to create a new API key, which is a randomly-generated machine GUID the Netdata Agent uses to identify
 itself while initiating a streaming connection. Copy that into a separate text file for later use.
+
+> Find how to [install `uuidgen`](https://command-not-found.com/uuidgen) on your node, if you don't already have it.
 
 Next, open `stream.conf` using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
 from within the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
@@ -48,11 +53,11 @@ method](/docs/configure/start-stop-restart.md) for your system.
 
 ## Enable streaming on the child node
 
-Log into the node that will act as the child.
+Connect to your child node with SSH.
 
-Open `stream.conf` again. Scroll down to the section beginning with `[stream]`. Set `enabled` to `yes`. Paste the IP
-address of your parent node at the end of the `destination` line, and paste the API key generated on the parent node
-onto the `api key` line.
+Open `stream.conf` again. Scroll down to the `[stream]` section and set `enabled` to `yes`. Paste the IP address of your
+parent node at the end of the `destination` line, and paste the API key generated on the parent node onto the `api key`
+line.
 
 Leave all the other settings as their defaults. A simplified version of the configuration, minus the commented lines,
 looks like the following:
@@ -67,18 +72,19 @@ looks like the following:
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
 method](/docs/configure/start-stop-restart.md) for your system.
 
-## View streamed metrics in Netdata's dashboards
+## View streamed metrics in Netdata's dashboard
 
 At this point, the child node is streaming its metrics in real time to its parent. Open the local Agent dashboard for
 the parent by navigating to `http://PARENT-NODE:19999` in your browser, replacing `PARENT-NODE` with its IP address or
 hostname.
 
-This dashboard shows parent metrics. To see child metrics, open the left-hand sidebar with the hamburger icon in the top
-navigation. Both nodes appear under the **Replicated Nodes** menu. Click on either of the links to switch between
+This dashboard shows parent metrics. To see child metrics, open the left-hand sidebar with the hamburger icon
+![Hamburger icon](https://raw.githubusercontent.com/netdata/netdata-ui/master/src/components/icon/assets/hamburger.svg)
+in the top panel. Both nodes appear under the **Replicated Nodes** menu. Click on either of the links to switch between
 separate parent and child dashboards.
 
-![Switching between
-](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
+![Switching between parent and child
+dashboards](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
 
 The child dashboard is also available directly at `http://PARENT-NODE:19999/host/CHILD-HOSTNAME`, which in this example
 is `http://203.0.113.0:19999/host/netdata-child`.
@@ -96,7 +102,7 @@ every child node streaming to it. Each instance is sized identically based on th
 setting in `netdata.conf`. See our doc on [changing metrics retention](/docs/store/change-metrics-strorage.md) for
 details.
 
-### Related reference documentation
+### Related information & further reading
 
 - Streaming
   - [How Netdata streams metrics](/docs/metrics-storage-management/how-streaming-works.mdx)
