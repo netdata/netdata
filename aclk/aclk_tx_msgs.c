@@ -319,8 +319,7 @@ void aclk_chart_msg(mqtt_wss_client client, RRDHOST *host, const char *chart)
 void aclk_alarm_state_msg(mqtt_wss_client client, json_object *msg)
 {
     // we create header here on purpose (and not send message with it already as `msg` param)
-    // one is version_neg is guaranteed to be done here
-    // other are timestamps etc. which in ACLK legacy would be wrong (because ACLK legacy
+    // timestamps etc. which in ACLK legacy would be wrong (because ACLK legacy
     // send message with timestamps already to Query Queue they would be incorrect at time
     // when query queue would get to send them)
     json_object *obj = create_hdr("status-change", NULL, 0, 0, ACLK_VERSION);
