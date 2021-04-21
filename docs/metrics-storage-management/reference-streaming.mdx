@@ -1,0 +1,28 @@
+---
+title: "Streaming reference"
+description: ""
+type: reference
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/metrics-storage-management/reference-streaming.mdx
+---
+
+# Streaming reference
+
+
+
+## Configuration
+
+From within your Netdata config directory (typically `/etc/netdata`), [use `edit-config`](/docs/configure/nodes.md) to
+open `stream.conf`.
+
+```
+sudo ./edit-config stream.conf
+```
+
+## Settings
+
+| Setting                                    | Default                                                                                                                                                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| :----------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ssl key`                                  | `/etc/netdata/ssl/key.pem`                                                                                                                                                             | Declare the location of an SSL key to [enable HTTPS](#enable-HTTPSTLS-support).                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+## Examples
+
