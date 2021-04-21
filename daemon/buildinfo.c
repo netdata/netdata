@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include "./config.h"
-#include "common.h"
 
 // Optional features
 
@@ -313,49 +312,3 @@ void print_build_info_json(void) {
     printf("  }\n");
     printf("}\n");
 };
-
-//return a list of enabled features for use in analytics
-//find a way to have proper |
-void analytics_build_info(BUFFER *b) {
-    if(FEAT_DBENGINE)        buffer_strcat (b, "dbengine");
-    if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
-    if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
-    if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
-
-    if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
-    if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
-    if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");
-    if(FEAT_CRYPTO)          buffer_strcat (b, "|libcrypto");
-    if(FEAT_LIBM)            buffer_strcat (b, "|libm");
-
-#ifndef ACLK_NG
-#if defined(ENABLE_ACLK)
-    {
-        char buf[20];
-        snprintfz(buf, 19, "|LWS v%d.%d.%d", LWS_LIBRARY_VERSION_MAJOR, LWS_LIBRARY_VERSION_MINOR, LWS_LIBRARY_VERSION_PATCH);
-        if(FEAT_LWS)         buffer_strcat(b, buf);
-    }
-#else
-    if(FEAT_LWS)            buffer_strcat(b, "|LWS");
-#endif
-    if(FEAT_MOSQUITTO)      buffer_strcat(b, "|mosquitto");
-#endif
-    if(FEAT_TCMALLOC)       buffer_strcat(b, "|tcalloc");
-    if(FEAT_ZLIB)           buffer_strcat(b, "|zlib");
-
-    if(FEAT_APPS_PLUGIN)    buffer_strcat(b, "|apps");
-    if(FEAT_CGROUP_NET)     buffer_strcat(b, "|cgroup Network Tracking");
-    if(FEAT_CUPS)           buffer_strcat(b, "|CUPS");
-    if(FEAT_EBPF)           buffer_strcat(b, "|EBPF");
-    if(FEAT_IPMI)           buffer_strcat(b, "|IPMI");
-    if(FEAT_NFACCT)         buffer_strcat(b, "|NFACCT");
-    if(FEAT_PERF)           buffer_strcat(b, "|perf");
-    if(FEAT_SLABINFO)       buffer_strcat(b, "|slabinfo");
-    if(FEAT_XEN)            buffer_strcat(b, "|Xen");
-    if(FEAT_XEN_VBD_ERROR)  buffer_strcat(b, "|Xen VBD Error Tracking");
-
-    if(FEAT_KINESIS)        buffer_strcat(b, "|AWS Kinesis");
-    if(FEAT_PUBSUB)         buffer_strcat(b, "|GCP PubSub");
-    if(FEAT_MONGO)          buffer_strcat(b, "|MongoDB");
-    if(FEAT_REMOTE_WRITE)   buffer_strcat(b, "|Prometheus Remote Write");
-}

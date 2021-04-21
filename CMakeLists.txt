@@ -828,8 +828,6 @@ set(DAEMON_FILES
         daemon/daemon.h
         daemon/global_statistics.c
         daemon/global_statistics.h
-        daemon/analytics.c
-        daemon/analytics.h
         daemon/main.c
         daemon/main.h
         daemon/signals.c
