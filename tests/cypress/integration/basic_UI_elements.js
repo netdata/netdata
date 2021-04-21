@@ -98,11 +98,6 @@ context('Assertions', () => {
         // packets
         cy.get('h2#menu_ipv4_submenu_packets').contains('packets');
         cy.get('[data-netdata="ipv4.packets"][id="chart_ipv4_packets"]')
-        
-        // fragments
-        cy.get('h2#menu_ipv4_submenu_fragments').contains('fragments');
-        cy.get('[data-netdata="ipv4.fragsout"][id="chart_ipv4_fragsout"]')
-        cy.get('[data-netdata="ipv4.fragsin"][id="chart_ipv4_fragsin"]')
 
         //  IPv6 Networking
 
@@ -112,13 +107,7 @@ context('Assertions', () => {
         cy.get('[data-netdata="ipv6.packets"][id="chart_ipv6_packets"]')
         cy.get('h2#menu_ipv6_submenu_errors').contains('errors');
         cy.get('[data-netdata="ipv6.errors"][id="chart_ipv6_errors"]')
-        cy.get('h2#menu_ipv6_submenu_icmp').contains('icmp');
-        cy.get('[data-netdata="ipv6.icmp"][id="chart_ipv6_icmp"]')
-        cy.get('[data-netdata="ipv6.icmperrors"][id="chart_ipv6_icmperrors"]')
-        cy.get('[data-netdata="ipv6.icmprouter"][id="chart_ipv6_icmprouter"]')
-        cy.get('[data-netdata="ipv6.icmpneighbor"][id="chart_ipv6_icmpneighbor"]')
-        cy.get('[data-netdata="ipv6.icmptypes"][id="chart_ipv6_icmptypes"]')
-
+        
         //   Network Interfaces
 
         cy.get('h1#menu_net').contains('Network Interfaces');
