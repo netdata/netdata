@@ -148,7 +148,7 @@ jobs:
               yum -y groupinstall 'Development Tools' &&
               yum -y install libcurl-devel openssl-devel libuuid-devel
             build_kinesis: >-
-              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
               -DBUILD_ONLY=kinesis
               ./aws-sdk-cpp &&
@@ -160,7 +160,7 @@ jobs:
               DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential &&
               DEBIAN_FRONTEND=noninteractive apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
-              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
               -DBUILD_ONLY=kinesis
               ./aws-sdk-cpp &&
@@ -172,7 +172,7 @@ jobs:
               dnf -y groupinstall 'Development Tools' &&
               dnf -y install libcurl-devel openssl-devel libuuid-devel
             build_kinesis: >-
-              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
               -DBUILD_ONLY=kinesis
               ./aws-sdk-cpp &&
@@ -184,7 +184,7 @@ jobs:
               DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential &&
               DEBIAN_FRONTEND=noninteractive apt-get install -y libcurl4-openssl-dev libssl-dev uuid-dev zlib1g-dev libpulse-dev
             build_kinesis: >-
-              git clone https://github.com/aws/aws-sdk-cpp.git &&
+              git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
               -DBUILD_ONLY=kinesis
               ./aws-sdk-cpp &&
