@@ -45,7 +45,7 @@ context('Assertions', () => {
 
         // Network
         cy.get('h2#menu_system_submenu_network').contains('network');
-        cy.get('[data-netdata="system.ipv4"][id="chart_system_ipv4"]')
+        cy.get('[data-netdata^="system."][id^="chart_system_"]')
 
         // Idlejitter
         cy.get('h2#menu_system_submenu_idlejitter').contains('idlejitter');
