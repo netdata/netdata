@@ -430,6 +430,7 @@ if [ -z "${NAME}" ]; then
 
   elif [[ ${CGROUP} =~ machine.slice_machine.*-lxc ]]; then
     # libvirtd / lxc containers
+    # e.g.: machine.slice_machine-lxc/x2d9192/x2datvie0ximta01.scope
     NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
   elif [[ ${CGROUP} =~ machine-lxc.*scope ]]; then
     # libvirtd / lxc containers
