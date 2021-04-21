@@ -98,11 +98,7 @@ context('Assertions', () => {
         // packets
         cy.get('h2#menu_ipv4_submenu_packets').contains('packets');
         cy.get('[data-netdata="ipv4.packets"][id="chart_ipv4_packets"]')
-
-        // errors
-        cy.get('h2#menu_ipv4_submenu_errors').contains('errors');
-        cy.get('[data-netdata="ipv4.errors"][id="chart_ipv4_errors"]')
-
+        
         // fragments
         cy.get('h2#menu_ipv4_submenu_fragments').contains('fragments');
         cy.get('[data-netdata="ipv4.fragsout"][id="chart_ipv4_fragsout"]')
