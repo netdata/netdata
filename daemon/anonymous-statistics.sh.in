@@ -44,6 +44,8 @@ REQ_BODY="$(cat << EOF
         "action_data": "${ACTION_DATA}",
         "netdata_machine_guid": "${NETDATA_REGISTRY_UNIQUE_ID}",
         "netdata_version": "${NETDATA_VERSION}",
+        "netdata_buildinfo": ${NETDATA_BUILDINFO},
+        "netdata_release_channel": ${NETDATA_CONFIG_RELEASE_CHANNEL},
         "host_os_name": "${NETDATA_HOST_OS_NAME}",
         "host_os_id": "${NETDATA_HOST_OS_ID}",
         "host_os_id_like": "${NETDATA_HOST_OS_ID_LIKE}",
@@ -72,7 +74,38 @@ REQ_BODY="$(cat << EOF
         "system_disk_detection": "${NETDATA_SYSTEM_DISK_DETECTION}",
         "system_ram_detection": "${NETDATA_SYSTEM_RAM_DETECTION}",
         "system_total_disk_size": "${NETDATA_SYSTEM_TOTAL_DISK_SIZE}",
-        "system_total_ram": "${NETDATA_SYSTEM_TOTAL_RAM}"
+        "system_total_ram": "${NETDATA_SYSTEM_TOTAL_RAM}",
+        "config_stream_enabled": ${NETDATA_CONFIG_STREAM_ENABLED},
+        "config_memory_mode": ${NETDATA_CONFIG_MEMORY_MODE},
+        "config_page_cache_size": ${NETDATA_CONFIG_PAGE_CACHE_SIZE},
+        "config_multidb_disk_quota": ${NETDATA_CONFIG_MULTIDB_DISK_QUOTA},
+        "config_https_enabled": ${NETDATA_CONFIG_HTTPS_ENABLED},
+        "config_web_enabled": ${NETDATA_CONFIG_WEB_ENABLED},
+        "config_exporting_enabled": ${NETDATA_CONFIG_EXPORTING_ENABLED},
+        "config_is_parent": ${NETDATA_CONFIG_IS_PARENT},
+        "config_hosts_available": ${NETDATA_CONFIG_HOSTS_AVAILABLE},
+        "alarms_normal": ${NETDATA_ALARMS_NORMAL},
+        "alarms_warning": ${NETDATA_ALARMS_WARNING},
+        "alarms_critical": ${NETDATA_ALARMS_CRITICAL},
+        "host_charts_count": ${NETDATA_CHARTS_COUNT},
+        "host_metrics_count": ${NETDATA_METRICS_COUNT},
+        "host_collectors":[
+            ${NETDATA_COLLECTORS}
+        ],
+        "host_collectors_count": ${NETDATA_COLLECTORS_COUNT},
+        "host_notification_methods": ${NETDATA_NOTIFICATION_METHODS},
+        "host_allmetrics_prometheus_used": ${NETDATA_ALLMETRICS_PROMETHEUS_USED},
+        "host_allmetrics_shell_used": ${NETDATA_ALLMETRICS_SHELL_USED},
+        "host_allmetrics_json_used": ${NETDATA_ALLMETRICS_JSON_USED},
+        "host_dashboard_used": ${NETDATA_DASHBOARD_USED},
+        "host_cloud_available": ${NETDATA_HOST_CLOUD_AVAILABLE},
+        "host_agent_claimed": ${NETDATA_HOST_AGENT_CLAIMED},
+        "host_aclk_available": ${NETDATA_HOST_ACLK_AVAILABLE},
+        "host_aclk_implementation": ${NETDATA_HOST_ACLK_IMPLEMENTATION},
+        "mirrored_host_count": ${NETDATA_MIRRORED_HOST_COUNT},
+        "mirrored_hosts_reachable": ${NETDATA_MIRRORED_HOSTS_REACHABLE},
+        "mirrored_hosts_unreachable": ${NETDATA_MIRRORED_HOSTS_UNREACHABLE},
+        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS}
   }
 }
 EOF
