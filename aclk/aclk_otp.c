@@ -305,7 +305,7 @@ static int aclk_parse_otp_error(const char *json_str) {
 
     json = json_tokener_parse(json_str);
     if (!json) {
-        error("JSON-C failed to parse the payload of http respons of /env endpoint");
+        error("JSON-C failed to parse the payload of http response of /env endpoint");
         return 1;
     }
 
