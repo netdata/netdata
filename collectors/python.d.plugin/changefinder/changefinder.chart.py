@@ -122,7 +122,7 @@ class Service(UrlService):
         self.x_latest[model] = x
         x = x_diff
         return x
-    
+
     def _get_data(self):
 
         # pull data from self.url
