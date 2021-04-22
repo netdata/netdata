@@ -128,11 +128,13 @@ context('Assertions', () => {
         cy.get('[data-netdata="netdata.dbengine_compression_ratio"][id="chart_netdata_dbengine_compression_ratio"]')
         cy.get('[data-netdata="netdata.page_cache_hit_ratio"][id="chart_netdata_page_cache_hit_ratio"]')
         cy.get('[data-netdata="netdata.page_cache_stats"][id="chart_netdata_page_cache_stats"]')
-        cy.get('[data-netdata="netdata.dbengine_long_term_page_stats"][id="chart_netdata_dbengine_long_term_page_stats"]')
+        cy.get('[data-netdata="netdata.dbengine_long_term_page_stats"]' +
+            '[id="chart_netdata_dbengine_long_term_page_stats"]')
         cy.get('[data-netdata="netdata.dbengine_io_throughput"][id="chart_netdata_dbengine_io_throughput"]')
         cy.get('[data-netdata="netdata.dbengine_io_operations"][id="chart_netdata_dbengine_io_operations"]')
         cy.get('[data-netdata="netdata.dbengine_global_errors"][id="chart_netdata_dbengine_global_errors"]')
-        cy.get('[data-netdata="netdata.dbengine_global_file_descriptors"][id="chart_netdata_dbengine_global_file_descriptors"]')
+        cy.get('[data-netdata="netdata.dbengine_global_file_descriptors"]' +
+            '[id="chart_netdata_dbengine_global_file_descriptors"]')
         cy.get('[data-netdata="netdata.dbengine_ram"][id="chart_netdata_dbengine_ram"]')
         cy.get('h2#menu_netdata_submenu_statsd').contains('statsd');
         cy.get('[data-netdata="netdata.plugin_statsd_charting_cpu"][id="chart_netdata_plugin_statsd_charting_cpu"]')
