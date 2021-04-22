@@ -428,7 +428,6 @@ static unsigned long aclk_reconnect_delay() {
         return aclk_tbeb_delay(1, 2, 0, 1024);
 
     return aclk_tbeb_delay(1, aclk_env->backoff.base, aclk_env->backoff.min_s, aclk_env->backoff.max_s);
-
 }
 
 /* Block till aclk_reconnect_delay is satisifed or netdata_exit is signalled
