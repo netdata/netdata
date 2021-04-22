@@ -1460,3 +1460,84 @@ failed:
 
     return (rc != SQLITE_ROW);
 }
+
+#define SQL_INVALIDATE_NODE_INSTANCES "update node_instance set node_id = NULL where exists " \
+    "(select host_id from node_instance where host_id = @host_id and claim_id <> @claim_id);"
+
+void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_INVALIDATE_NODE_INSTANCES, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to invalidate node instance information");
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to to invalidate node instance information, rc = %d", rc);
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when invalidating node instance information");
+}
+
+#define SQL_GET_NODE_INSTANCE_LIST "select node_id, host_id from node_instance where node_id is not null;"
+
+struct  node_instance_list *get_node_list(uuid_t *claim_id)
+{
+    struct  node_instance_list *node_list;
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return NULL;
+    }
+
+    node_list = callocz(128, sizeof(*node_list));
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_NODE_INSTANCE_LIST, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return NULL;
+    };
+
+    int row = 0;
+    char host_guid[37];
+    while (sqlite3_step(res) == SQLITE_ROW) {
+       uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
+       uuid_copy(node_list[row].claim_id, *claim_id);
+       node_list[row].querable = 1;
+       uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res, 1)), host_guid);
+       node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
+       node_list[row].hops = uuid_compare(*((uuid_t *)sqlite3_column_blob(res, 1)), localhost->host_uuid) ? 1 : 0;
+       row++;
+    }
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing node instance information");
+
+    return node_list;
+};
