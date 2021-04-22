@@ -6,6 +6,16 @@
 #include "../../daemon/common.h"
 #include "sqlite3.h"
 
+// return a node list
+struct node_instance_list {
+    uuid_t  node_id;
+    uuid_t  claim_id;
+    int live;
+    int querable;
+    int hops;
+};
+
+
 #define SQLITE_INSERT_DELAY (50)        // Insert delay in case of lock
 
 #define SQL_STORE_HOST "insert or replace into host (host_id,hostname,registry_hostname,update_every,os,timezone,tags) values (?1,?2,?3,?4,?5,?6,?7);"
@@ -63,4 +73,6 @@ extern void sql_build_context_param_list(struct context_param **param_list, RRDH
 extern void store_claim_id(uuid_t *host_id, uuid_t *claim_id);
 extern void update_node_id(uuid_t *host_id, uuid_t *node_id);
 extern int get_node_id(uuid_t *host_id, uuid_t *node_id);
+extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
+extern struct node_instance_list *get_node_list(uuid_t *claim_id);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
