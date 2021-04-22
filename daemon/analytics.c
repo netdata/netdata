@@ -17,42 +17,40 @@ struct array_printer {
     BUFFER *both;
 };
 
-/*
- * Set the env variables
- */
-void analytics_setenv_data(void)
+size_t analytics_data_len(void)
 {
-    setenv("NETDATA_CONFIG_STREAM_ENABLED", analytics_data.netdata_config_stream_enabled, 1);
-    setenv("NETDATA_CONFIG_MEMORY_MODE", analytics_data.netdata_config_memory_mode, 1);
-    setenv("NETDATA_CONFIG_EXPORTING_ENABLED", analytics_data.netdata_config_exporting_enabled, 1);
-    setenv("NETDATA_EXPORTING_CONNECTORS", analytics_data.netdata_exporting_connectors, 1);
-    setenv("NETDATA_ALLMETRICS_PROMETHEUS_USED", analytics_data.netdata_allmetrics_prometheus_used, 1);
-    setenv("NETDATA_ALLMETRICS_SHELL_USED", analytics_data.netdata_allmetrics_shell_used, 1);
-    setenv("NETDATA_ALLMETRICS_JSON_USED", analytics_data.netdata_allmetrics_json_used, 1);
-    setenv("NETDATA_DASHBOARD_USED", analytics_data.netdata_dashboard_used, 1);
-    setenv("NETDATA_COLLECTORS", analytics_data.netdata_collectors, 1);
-    setenv("NETDATA_COLLECTORS_COUNT", analytics_data.netdata_collectors_count, 1);
-    setenv("NETDATA_BUILDINFO", analytics_data.netdata_buildinfo, 1);
-    setenv("NETDATA_CONFIG_PAGE_CACHE_SIZE", analytics_data.netdata_config_page_cache_size, 1);
-    setenv("NETDATA_CONFIG_MULTIDB_DISK_QUOTA", analytics_data.netdata_config_multidb_disk_quota, 1);
-    setenv("NETDATA_CONFIG_HTTPS_ENABLED", analytics_data.netdata_config_https_enabled, 1);
-    setenv("NETDATA_CONFIG_WEB_ENABLED", analytics_data.netdata_config_web_enabled, 1);
-    setenv("NETDATA_CONFIG_RELEASE_CHANNEL", analytics_data.netdata_config_release_channel, 1);
-    setenv("NETDATA_MIRRORED_HOST_COUNT", analytics_data.netdata_mirrored_host_count, 1);
-    setenv("NETDATA_MIRRORED_HOSTS_REACHABLE", analytics_data.netdata_mirrored_hosts_reachable, 1);
-    setenv("NETDATA_MIRRORED_HOSTS_UNREACHABLE", analytics_data.netdata_mirrored_hosts_unreachable, 1);
-    setenv("NETDATA_NOTIFICATION_METHODS", analytics_data.netdata_notification_methods, 1);
-    setenv("NETDATA_ALARMS_NORMAL", analytics_data.netdata_alarms_normal, 1);
-    setenv("NETDATA_ALARMS_WARNING", analytics_data.netdata_alarms_warning, 1);
-    setenv("NETDATA_ALARMS_CRITICAL", analytics_data.netdata_alarms_critical, 1);
-    setenv("NETDATA_CHARTS_COUNT", analytics_data.netdata_charts_count, 1);
-    setenv("NETDATA_METRICS_COUNT", analytics_data.netdata_metrics_count, 1);
-    setenv("NETDATA_CONFIG_IS_PARENT", analytics_data.netdata_config_is_parent, 1);
-    setenv("NETDATA_CONFIG_HOSTS_AVAILABLE", analytics_data.netdata_config_hosts_available, 1);
-    setenv("NETDATA_HOST_CLOUD_AVAILABLE", analytics_data.netdata_host_cloud_available, 1);
-    setenv("NETDATA_HOST_ACLK_AVAILABLE", analytics_data.netdata_host_aclk_available, 1);
-    setenv("NETDATA_HOST_ACLK_IMPLEMENTATION", analytics_data.netdata_host_aclk_implementation, 1);
-    setenv("NETDATA_HOST_AGENT_CLAIMED", analytics_data.netdata_host_agent_claimed, 1);
+    return 4 + strlen(analytics_data.netdata_config_stream_enabled) + 4 +
+           strlen(analytics_data.netdata_config_stream_enabled) + 4 +
+           strlen(analytics_data.netdata_config_memory_mode) + 4 +
+           strlen(analytics_data.netdata_config_exporting_enabled) + 4 +
+           strlen(analytics_data.netdata_exporting_connectors) + 4 +
+           strlen(analytics_data.netdata_allmetrics_prometheus_used) + 4 +
+           strlen(analytics_data.netdata_allmetrics_shell_used) + 4 +
+           strlen(analytics_data.netdata_allmetrics_json_used) + 4 +
+           strlen(analytics_data.netdata_dashboard_used) + 4 +
+           strlen(analytics_data.netdata_collectors) + 4 +
+           strlen(analytics_data.netdata_collectors_count) + 4 +
+           strlen(analytics_data.netdata_buildinfo) + 4 +
+           strlen(analytics_data.netdata_config_page_cache_size) + 4 +
+           strlen(analytics_data.netdata_config_multidb_disk_quota) + 4 +
+           strlen(analytics_data.netdata_config_https_enabled) + 4 +
+           strlen(analytics_data.netdata_config_web_enabled) + 4 +
+           strlen(analytics_data.netdata_config_release_channel) + 4 +
+           strlen(analytics_data.netdata_mirrored_host_count) + 4 +
+           strlen(analytics_data.netdata_mirrored_hosts_reachable) + 4 +
+           strlen(analytics_data.netdata_mirrored_hosts_unreachable) + 4 +
+           strlen(analytics_data.netdata_notification_methods) + 4 +
+           strlen(analytics_data.netdata_alarms_normal) + 4 +
+           strlen(analytics_data.netdata_alarms_warning) + 4 +
+           strlen(analytics_data.netdata_alarms_critical) + 4 +
+           strlen(analytics_data.netdata_charts_count) + 4 +
+           strlen(analytics_data.netdata_metrics_count) + 4 +
+           strlen(analytics_data.netdata_config_is_parent) + 4 +
+           strlen(analytics_data.netdata_config_hosts_available) + 4 +
+           strlen(analytics_data.netdata_host_cloud_available) + 4 +
+           strlen(analytics_data.netdata_host_aclk_available) + 4 +
+           strlen(analytics_data.netdata_host_aclk_implementation) + 4 +
+           strlen(analytics_data.netdata_host_agent_claimed);
 }
 
 /*
@@ -467,8 +465,6 @@ void analytics_gather_immutable_meta_data(void)
 {
     analytics_misc();
     analytics_exporters();
-
-    analytics_setenv_data();
 }
 
 /*
@@ -516,8 +512,6 @@ void analytics_gather_mutable_meta_data(void)
         snprintfz(b, 6, "%zu", rrd_hosts_available);
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
-
-    analytics_setenv_data();
 }
 
 void analytics_main_cleanup(void *ptr)
@@ -635,9 +629,6 @@ void set_late_global_environment()
         analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
         buffer_free(bi);
     }
-
-    /* set what we have, to send the START event */
-    analytics_setenv_data();
 }
 
 static void get_system_timezone(void)
@@ -660,12 +651,6 @@ static void get_system_timezone(void)
 
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
-        char *c = buffer;
-        while (*c) {
-            if (unlikely(*c == '\n'))
-                *c = '\0';
-            c++;
-        }
         timezone = buffer;
         info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
     }
@@ -726,7 +711,7 @@ static void get_system_timezone(void)
         *d = '\0';
         strncpyz(buffer, tmp, len);
         timezone = buffer;
-        // info("TIMEZONE: fixed as '%s'", timezone);
+        info("TIMEZONE: fixed as '%s'", timezone);
     }
 
     if (!timezone || !*timezone)
@@ -863,10 +848,29 @@ void send_statistics(const char *action, const char *action_result, const char *
     if (!action_data)
         action_data = "";
     char *command_to_run =
-        mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + 10));
+        mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + analytics_data_len() + 10));
     pid_t command_pid;
 
-    sprintf(command_to_run, "%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
+    sprintf(
+        command_to_run,
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        as_script, action, action_result, action_data, analytics_data.netdata_config_stream_enabled,
+        analytics_data.netdata_config_memory_mode, analytics_data.netdata_config_exporting_enabled,
+        analytics_data.netdata_exporting_connectors, analytics_data.netdata_allmetrics_prometheus_used,
+        analytics_data.netdata_allmetrics_shell_used, analytics_data.netdata_allmetrics_json_used,
+        analytics_data.netdata_dashboard_used, analytics_data.netdata_collectors,
+        analytics_data.netdata_collectors_count, analytics_data.netdata_buildinfo,
+        analytics_data.netdata_config_page_cache_size, analytics_data.netdata_config_multidb_disk_quota,
+        analytics_data.netdata_config_https_enabled, analytics_data.netdata_config_web_enabled,
+        analytics_data.netdata_config_release_channel, analytics_data.netdata_mirrored_host_count,
+        analytics_data.netdata_mirrored_hosts_reachable, analytics_data.netdata_mirrored_hosts_unreachable,
+        analytics_data.netdata_notification_methods, analytics_data.netdata_alarms_normal,
+        analytics_data.netdata_alarms_warning, analytics_data.netdata_alarms_critical,
+        analytics_data.netdata_charts_count, analytics_data.netdata_metrics_count,
+        analytics_data.netdata_config_is_parent, analytics_data.netdata_config_hosts_available,
+        analytics_data.netdata_host_cloud_available, analytics_data.netdata_host_aclk_available,
+        analytics_data.netdata_host_aclk_implementation, analytics_data.netdata_host_agent_claimed);
+
     info("%s", command_to_run);
 
     FILE *fp = mypopen(command_to_run, &command_pid);
