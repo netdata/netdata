@@ -245,7 +245,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 static void puback_callback(uint16_t packet_id)
 {
     if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
-        aclk_tbeb_delay(0, 0, 0, 0);
+        aclk_tbeb_reset();
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
@@ -412,7 +412,7 @@ static unsigned long aclk_reconnect_delay() {
     unsigned long recon_delay;
 
     if (aclk_disable_runtime) {
-        aclk_tbeb_delay(0, 0, 0, 0);
+        aclk_tbeb_reset();
         return 60 * MSEC_PER_SEC;
     }
 
@@ -420,7 +420,7 @@ static unsigned long aclk_reconnect_delay() {
         recon_delay = aclk_block_until - now_monotonic_sec();
         recon_delay *= MSEC_PER_SEC;
         aclk_block_until = 0;
-        aclk_tbeb_delay(0, 0, 0, 0);
+        aclk_tbeb_reset();
         return recon_delay;
     }
 
