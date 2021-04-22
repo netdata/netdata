@@ -410,18 +410,23 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
 
 static unsigned long aclk_reconnect_delay() {
     unsigned long recon_delay;
+    time_t now;
 
     if (aclk_disable_runtime) {
         aclk_tbeb_reset();
         return 60 * MSEC_PER_SEC;
     }
 
+    now = now_monotonic_sec();
     if (aclk_block_until) {
-        recon_delay = aclk_block_until - now_monotonic_sec();
-        recon_delay *= MSEC_PER_SEC;
+        if (now < aclk_block_until) {
+            recon_delay = aclk_block_until - now;
+            recon_delay *= MSEC_PER_SEC;
+            aclk_block_until = 0;
+            aclk_tbeb_reset();
+            return recon_delay;
+        }
         aclk_block_until = 0;
-        aclk_tbeb_reset();
-        return recon_delay;
     }
 
     if (!aclk_env || !aclk_env->backoff.base)
