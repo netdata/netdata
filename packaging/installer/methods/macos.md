@@ -14,6 +14,7 @@ We recommend installing Netdata with the community-created and -maintained [**Ho
 package**](#install-netdata-with-the-homebrew-package). 
 
 -   [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
+-   [Install Netdata via MacPorts](#install-netdata-with-macports)
 -   [Install Netdata from source](#install-netdata-from-source)
 
 ## Install Netdata with the Homebrew package
@@ -33,6 +34,25 @@ brew install netdata
 > Homebrew will place your Netdata configuration directory at `/usr/local/etc/netdata/`. Use the `edit-config` script
 > and the files in this directory to configure Netdata. For reference, you can find stock configuration files at
 > `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+
+Skip on ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
+
+## Install Netdata with MacPorts
+
+To install Netdata with MacPorts, simply run:
+
+```bash
+sudo port install netdata
+```
+
+You can have MacPorts automatically run the `netdata` service in the background and on restarts with:
+
+```bash
+sudo port load netdata
+```
+
+Your Netdata config file will be placed at `/opt/local/etc/netdata/netdata.conf`. You can find stock configuration
+files at `/opt/local/lib/netdata/conf.d/`.
 
 Skip on ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
 
