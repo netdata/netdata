@@ -279,17 +279,17 @@ const char *aclk_get_topic(enum aclk_topics topic)
 /*
  * TBEB with randomness
  *
- * @param mode 0 - to reset the delay,
- *             1 - to advance a step and calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ * @param reset 1 - to reset the delay,
+ *              0 - to advance a step and calculate sleep time in ms
  * @param min, max in seconds
  * @returns delay in ms
  *
  */
 
-unsigned long int aclk_tbeb_delay(int mode, int base, unsigned long int min, unsigned long int max) {
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max) {
     static int attempt = -1;
 
-    if (!mode) {
+    if (reset) {
         attempt = -1;
         return 0;
     }

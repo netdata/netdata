@@ -75,8 +75,8 @@ int aclk_get_conv_log_next();
 #endif
 #endif
 
-unsigned long int aclk_tbeb_delay(int mode, int base, unsigned long int min, unsigned long int max);
-#define aclk_tbeb_reset(x) aclk_tbeb_delay(0, 0, 0, 0)
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max);
+#define aclk_tbeb_reset(x) aclk_tbeb_delay(1, 0, 0, 0)
 
 typedef enum aclk_proxy_type {
     PROXY_TYPE_UNKNOWN = 0,
