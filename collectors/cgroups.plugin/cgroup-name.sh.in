@@ -430,11 +430,12 @@ if [ -z "${NAME}" ]; then
 
   elif [[ ${CGROUP} =~ machine.slice_machine.*-lxc ]]; then
     # libvirtd / lxc containers
-    # e.g.: machine.slice_machine-lxc/x2d9192/x2datvie0ximta01.scope
+	# examples:
+	# before: machine.slice machine-lxc/x2d969/x2dhubud0xians01.scope
+    # after:  lxc/hubud0xians01
+	# before: machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope/libvirt_init.scope
+	# after:  lxc/hubud0xians01/libvirt_init
     NAME="lxc/$(echo "${CGROUP}" | sed 's/machine.slice_machine.*-lxc//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
-  elif [[ ${CGROUP} =~ machine-lxc.*scope ]]; then
-    # libvirtd / lxc containers
-    NAME="lxc/$(echo "${CGROUP}" | sed -r 's/machine-lxc\\x2d[[:digit:]]+\\x2d//g; s/\.scope//g')"
   elif [[ ${CGROUP} =~ machine.slice_machine.*-qemu ]]; then
     # libvirtd / qemu virtual machines
     # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
