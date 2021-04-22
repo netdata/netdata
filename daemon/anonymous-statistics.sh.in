@@ -80,7 +80,7 @@ EOF
 
 # send the anonymous statistics to the Netdata PostHog
 if [ -n "$(command -v curl 2> /dev/null)" ]; then
-  curl -X POST --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/ > /dev/null 2>&1
+  curl -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/ > /dev/null 2>&1
 else
   wget -q -O - --no-check-certificate \
   --method POST \
