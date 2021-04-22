@@ -21,9 +21,9 @@ ORDER = [
 ]
 
 CHARTS = {
-    'scores': {	
-        'options': [None, 'ChangeFinder', 'score', 'Scores', 'scores', 'line'],	
-        'lines': []	
+    'scores': {
+        'options': [None, 'ChangeFinder', 'score', 'Scores', 'scores', 'line'],
+        'lines': []
     },
     'flags': {
         'options': [None, 'ChangeFinder', 'flag', 'Flags', 'flags', 'stacked'],
@@ -80,8 +80,8 @@ class Service(UrlService):
         try:
             score = self.models[model].update(x)
             self.scores_latest[model] = score
-        except Exception as e:
-            score = self.scores_latest.get(model, 0)        
+        except Exception as _:
+            score = self.scores_latest.get(model, 0)
         score = 0 if np.isnan(score) else score
 
         # update sample scores used to calculate percentiles
@@ -93,7 +93,7 @@ class Service(UrlService):
 
         # convert score to percentile
         score = percentileofscore(self.scores_samples[model], score)
-        
+
         # flag based on score percentile
         flag = 1 if score >= self.cf_threshold else 0
 
