@@ -19,7 +19,7 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
-
+    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
     "delete from chart_active;",
     "delete from dimension_active;",
     "delete from chart where chart_id not in (select chart_id from dimension);",
@@ -1336,5 +1336,50 @@ failed:
     UNUSED(context);
     UNUSED(chart);
 #endif
+    return;
+}
+
+#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
+    "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s')) " \
+    "on conflict(host_id) do update set node_id = null, claim_id = excluded.claim_id " \
+    "where claim_id <> excluded.claim_id;"
+
+void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_STORE_CLAIM_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        goto failed;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store node instance information, rc = %d", rc);
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing node instance information");
+
     return;
 }
