@@ -6,10 +6,17 @@
 
 **Merged pull requests:**
 
+- Revert "Provide more agent analytics to posthog" [\#11011](https://github.com/netdata/netdata/pull/11011) ([MrZammler](https://github.com/MrZammler))
+- python.d: add plugin and module names to the runtime charts [\#11007](https://github.com/netdata/netdata/pull/11007) ([ilyam8](https://github.com/ilyam8))
+- Allow the remote write configuration have multiple destinations [\#11005](https://github.com/netdata/netdata/pull/11005) ([vlvkobal](https://github.com/vlvkobal))
+- improvements to anomalies collector following dogfooding [\#11003](https://github.com/netdata/netdata/pull/11003) ([andrewm4894](https://github.com/andrewm4894))
+- Backend chart filtering backward compatibility fix [\#11002](https://github.com/netdata/netdata/pull/11002) ([vlvkobal](https://github.com/vlvkobal))
 - Add a chart with netdata uptime [\#10997](https://github.com/netdata/netdata/pull/10997) ([vlvkobal](https://github.com/vlvkobal))
+- ci: fix aws-kinesis builds [\#10992](https://github.com/netdata/netdata/pull/10992) ([ilyam8](https://github.com/ilyam8))
 - Move global stats to a separate thread [\#10991](https://github.com/netdata/netdata/pull/10991) ([vlvkobal](https://github.com/vlvkobal))
 - adds missing SPDX license info into ACLK-NG [\#10990](https://github.com/netdata/netdata/pull/10990) ([underhood](https://github.com/underhood))
 - Update eBPF documentation [\#10982](https://github.com/netdata/netdata/pull/10982) ([thiagoftsm](https://github.com/thiagoftsm))
+- remove vneg from ACLK-NG [\#10980](https://github.com/netdata/netdata/pull/10980) ([underhood](https://github.com/underhood))
 - Remove outdated privacy policy and terms of use [\#10979](https://github.com/netdata/netdata/pull/10979) ([joelhans](https://github.com/joelhans))
 - collectors/charts.d/opensips: fix detection of `opensipsctl` executable  [\#10978](https://github.com/netdata/netdata/pull/10978) ([ilyam8](https://github.com/ilyam8))
 - Update fping version [\#10977](https://github.com/netdata/netdata/pull/10977) ([Habetdin](https://github.com/Habetdin))
@@ -45,11 +52,13 @@
 - health: add systemdunits alarms [\#10906](https://github.com/netdata/netdata/pull/10906) ([ilyam8](https://github.com/ilyam8))
 - web/gui: add systemdunits info to the dashboard\_info.js [\#10904](https://github.com/netdata/netdata/pull/10904) ([ilyam8](https://github.com/ilyam8))
 - Add a plugin for the system clock synchronization state [\#10895](https://github.com/netdata/netdata/pull/10895) ([vlvkobal](https://github.com/vlvkobal))
+- Provide more agent analytics to posthog [\#10887](https://github.com/netdata/netdata/pull/10887) ([MrZammler](https://github.com/MrZammler))
 - Add a chart for out of memory kills [\#10880](https://github.com/netdata/netdata/pull/10880) ([vlvkobal](https://github.com/vlvkobal))
 - Remove RewriteEngine for dedicated vHost [\#10873](https://github.com/netdata/netdata/pull/10873) ([Steve8291](https://github.com/Steve8291))
 - python.d\(smartd\_log\): collect attribute 249 -- NAND Writes 1GiB [\#10872](https://github.com/netdata/netdata/pull/10872) ([RaitoBezarius](https://github.com/RaitoBezarius))
 - Improvements to dash-example.html [\#10870](https://github.com/netdata/netdata/pull/10870) ([tnyeanderson](https://github.com/tnyeanderson))
 - Replace references to Google Analytics with Posthog where relevant [\#10868](https://github.com/netdata/netdata/pull/10868) ([andrewm4894](https://github.com/andrewm4894))
+- ACLK Passwd endpoint update [\#10859](https://github.com/netdata/netdata/pull/10859) ([underhood](https://github.com/underhood))
 - prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 - implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
 - implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
@@ -302,8 +311,6 @@
 - Add instructions on enabling explicitly disabled collectors [\#10418](https://github.com/netdata/netdata/pull/10418) ([joelhans](https://github.com/joelhans))
 - Change links at bottom of all install docs [\#10416](https://github.com/netdata/netdata/pull/10416) ([joelhans](https://github.com/joelhans))
 - Improve configuration docs with common changes and start/stop/restart directions [\#10415](https://github.com/netdata/netdata/pull/10415) ([joelhans](https://github.com/joelhans))
-- Small updates, improvements, and housekeeping to docs [\#10405](https://github.com/netdata/netdata/pull/10405) ([joelhans](https://github.com/joelhans))
-- python.d/fail2ban: Add handling "yes" and "no" as bool, match flexible spaces [\#10400](https://github.com/netdata/netdata/pull/10400) ([grinapo](https://github.com/grinapo))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
@@ -312,16 +319,10 @@
 **Merged pull requests:**
 
 - Use bash shell as user netdata for debug [\#10425](https://github.com/netdata/netdata/pull/10425) ([Steve8291](https://github.com/Steve8291))
-- Add Realtek network cards to the list of physical interfaces on FreeBSD [\#10414](https://github.com/netdata/netdata/pull/10414) ([vlvkobal](https://github.com/vlvkobal))
-- Update main README with release news [\#10412](https://github.com/netdata/netdata/pull/10412) ([joelhans](https://github.com/joelhans))
 
 ## [v1.28.0](https://github.com/netdata/netdata/tree/v1.28.0) (2020-12-18)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.27.0...v1.28.0)
-
-**Merged pull requests:**
-
-- Fix locking after on\_connect failure [\#10401](https://github.com/netdata/netdata/pull/10401) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.27.0](https://github.com/netdata/netdata/tree/v1.27.0) (2020-12-17)
 
