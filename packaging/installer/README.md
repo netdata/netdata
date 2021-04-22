@@ -73,56 +73,42 @@ operating systems.
 ### Alternative methods
 
 <Install>
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/kickstart"
-        os="Linux with one-line kickstart script" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/packages"
-        os="Linux with .deb/.rpm" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/kickstart-64"
-        os="Linux with static 64-bit binary" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/manual" 
-        os="Linux from Git" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/source"
-        os="Linux from source" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/offline" 
-        os="Linux for offline nodes" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/docker"
-        os="Docker" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/kubernetes"
-        os="Kubernetes" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/macos"
-        os="macOS" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/cloud-providers"
-        os="Cloud providers (GCP, AWS, Azure)" />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/freebsd"
-        os="FreeBSD"
-        community />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/pfsense"
-        os="pfSense" 
-        community />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/synology"
-        os="Synology" 
-        community />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/alpine"
-        os="Alpine" 
-        community />
-    <InstallBox
-        to="/docs/agent/packaging/installer/methods/freenas"
-        os="FreeNAS" 
-        community />
+  <InstallBox
+    to="#install-on-linux-with-one-line-installer-recommended"
+    os="General Linux with one-line installer (recommended)"
+    svg="linux" />
+  <InstallBox
+    to="#run-netdata-with-docker"
+    os="Run with Docker" 
+    svg="docker" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kubernetes"
+    os="Deploy on Kubernetes" 
+    svg="kubernetes" />
+   <InstallBox
+    to="/docs/agent/packaging/installer/methods/macos"
+    os="Install on macOS" 
+    svg="macos" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/packages"
+    os="Linux with .deb/.rpm packages" 
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kickstart-64"
+    os="Linux with static 64-bit binary" 
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/manual"
+    os="Linux from Git" 
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/source"
+    os="Linux from source"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/offline" 
+    os="Linux for offline nodes"
+    svg="linux" />
 </Install>
 
 ## Automatic updates

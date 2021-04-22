@@ -12,113 +12,55 @@ import { Install, InstallBox } from '../src/components/Install/'
 # Get started with Netdata
 
 Netdata is an free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
-any physical or virtual system (we call them _nodes_) and organizes them in easy-to-use and -navigate interface.
+any physical or virtual system (we call them _nodes_) and organizes them in an easy-to-use and -navigate interface.
 
-Together with Netdata Cloud, you can monitor your entire infrastructure in real time and troubleshoot problems that
-threaten the health of your nodes before they occur.
+Together with [Netdata Cloud](https://learn.netdata.cloud/docs/cloud), you can monitor your entire infrastructure in
+real time and troubleshoot problems that threaten the health of your nodes before they occur.
 
 Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
 runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters,
 Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
 
-The best way to install Netdata is to use the **[one-line kickstart script on Linux](#install-netdata-on-linux)** or
-**[run with Docker](#run-netdata-with-docker)**. Many Linux distributions ship with third-party packages of Netdata,
-which we can't maintain and are often missing features. By installing from a method listed here, you'll get the complete
-Netdata experience.
-
-## Install Netdata
-
-Choose your installation method below.
-
-The best way to install Netdata is to use the **[one-line kickstart script on Linux](#install-netdata-on-linux)** or
-**[run with Docker](#run-netdata-with-docker)**. Many Linux distributions ship with third-party packages of Netdata,
-which we can't maintain and are often missing features. By installing from a method listed here, you'll get the complete
-Netdata experience.
-
 <Install>
   <InstallBox
-    to="#install-netdata-on-linux"
-    os="General Linux with one-line installer"
+    to="#install-on-linux-with-one-line-installer-recommended"
+    os="General Linux with one-line installer (recommended)"
     svg="linux" />
   <InstallBox
     to="#run-netdata-with-docker"
     os="Run with Docker" 
     svg="docker" />
   <InstallBox
-    to="/docs/agent/packaging/installer/methods/packages"
-    os="Linux with .deb/.rpm packages" 
-    svg="linux" />
-  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kubernetes"
+    os="Deploy on Kubernetes" 
+    svg="kubernetes" />
+   <InstallBox
     to="/docs/agent/packaging/installer/methods/macos"
     os="Install on macOS" 
     svg="macos" />
   <InstallBox
-    to="/docs/agent/packaging/installer/methods/kubernetes"
-    os="Deploy on Kubernetes" 
-    svg="kubernetes" />
+    to="/docs/agent/packaging/installer/methods/packages"
+    os="Linux with .deb/.rpm packages" 
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/kickstart-64"
+    os="Linux with static 64-bit binary" 
+    svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/manual"
     os="Linux from Git" 
     svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/source"
+    os="Linux from source"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/offline" 
+    os="Linux for offline nodes"
+    svg="linux" />
 </Install>
 
-<details>
-  <summary><strong>Need a different installation method, or use a different operating system? See all our options.</strong></summary>
-  <Install>
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/kickstart"
-      os="Linux with one-line installer/kickstart script" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/packages"
-      os="Linux with .deb/.rpm packages" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/kickstart-64"
-      os="Linux with static 64-bit binary" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/manual" 
-      os="Linux from Git" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/source"
-      os="Linux from source" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/offline" 
-      os="Linux for offline nodes" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/docker"
-      os="Docker" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/kubernetes"
-      os="Kubernetes" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/macos"
-      os="macOS" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/cloud-providers"
-      os="Cloud providers (GCP, AWS, Azure)" />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/freebsd"
-      os="FreeBSD"
-      community />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/pfsense"
-      os="pfSense" 
-      community />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/synology"
-      os="Synology" 
-      community />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/alpine"
-      os="Alpine" 
-      community />
-    <InstallBox
-      to="/docs/agent/packaging/installer/methods/freenas"
-      os="FreeNAS" 
-      community />
-  </Install>
-</details>
-
-## Install Netdata on Linux
+## Install on Linux with one-line installer (recommended)
 
 The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
 [kickstart script](/packaging/installer/methods/kickstart.md). This script automatically installs dependencies and
@@ -185,8 +127,7 @@ To pan through time, **click and hold** (or touch and hold) on any chart, then *
 left or right. Dragging to the right pans backward through time, while dragging to the left pans forward in time. Think
 of it like pushing the current timeframe off the screen so you can see what came before or after.
 
-To zoom, press and hold `Shift` or `Alt`, then use your mouse's scroll wheel, or a two-finger pinch if you're using a
-touchpad.
+To zoom, press and hold `Shift`, then use your mouse's scroll wheel, or a two-finger pinch if you're using a touchpad.
 
 ## What's next?
 
