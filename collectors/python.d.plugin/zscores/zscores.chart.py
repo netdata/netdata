@@ -14,8 +14,8 @@ from bases.FrameworkServices.SimpleService import SimpleService
 from netdata_pandas.data import get_data, get_allmetrics
 
 
-priority = 50
-update_every = 1
+priority = 60000
+update_every = 5
 
 ORDER = [
     'z',
