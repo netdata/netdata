@@ -31,7 +31,7 @@
 // Error in WebSocket protocol (e.g. malformed packet)
 #define MQTT_WSS_ERR_PROTO_WS   -3
 
-typedef struct mqtt_wss_client *mqtt_wss_client;
+typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
 /* Creates new instance of MQTT over WSS. Doesn't start connection.
  * @param log_prefix this is prefix to be used when logging to discern between multiple

@@ -61,7 +61,7 @@ char *util_openssl_ret_err(int err)
     return "Unknown!!!";
 }
 
-struct mqtt_wss_client {
+struct mqtt_wss_client_struct {
     ws_client *ws_client;
 
     mqtt_wss_log_ctx_t log;
@@ -180,7 +180,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
     SSL_library_init();
     SSL_load_error_strings();
 
-    mqtt_wss_client client = calloc(1, sizeof(struct mqtt_wss_client));
+    mqtt_wss_client client = calloc(1, sizeof(struct mqtt_wss_client_struct));
     if (!client) {
         mws_error(log, "OOM alocating mqtt_wss_client");
         goto fail;
