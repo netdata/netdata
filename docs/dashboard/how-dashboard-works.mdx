@@ -75,9 +75,10 @@ your dashboard.
 
 ## Alarms
 
-Many of the preconfigured charts on the Netdata dashboard also come with preconfigured alarms. Netdata has three primary
-alarm states: `CLEAR`, `WARNING`, and `CRITICAL`. If an alarm moves from a `CLEAR` state to either `WARNING` or
-`CRITICAL`, Netdata creates a notification to let you know exactly what's going on.
+Many of the preconfigured charts on the Netdata dashboard also come with preconfigured alarms. Netdata sends three
+primary alarm states via alarms: `CLEAR`, `WARNING`, and `CRITICAL`. If an alarm moves from a `CLEAR` state to either
+`WARNING` or `CRITICAL`, Netdata creates a notification to let you know exactly what's going on. There are [other alarm
+states](/health/REFERENCE.md#alarm-statuses) as well.
 
 The easiest way to see alarms is by clicking on the alarm icon ![Alarms
 icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
