@@ -302,6 +302,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
+        sql_load_node_id(host);
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);

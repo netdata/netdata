@@ -879,6 +879,7 @@ struct rrdhost {
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
 #endif
     uuid_t  host_uuid;                              // Global GUID for this host
+    uuid_t  *node_id;                               // Cloud node_id
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection

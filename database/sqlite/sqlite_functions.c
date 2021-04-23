@@ -1383,6 +1383,23 @@ failed:
     return;
 }
 
+static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
+{
+    if (unlikely(!host))
+        return;
+
+    if (unlikely(!node_id)) {
+        freez(host->node_id);
+        host->node_id = NULL;
+        return;
+    }
+
+    if (unlikely(!host->node_id))
+        host->node_id = mallocz(sizeof(*host->node_id));
+    uuid_copy(*(host->node_id), *node_id);
+    return;
+}
+
 #define SQL_UPDATE_NODE_ID  "update node_instance set node_id = @node_id where host_id = @host_id;"
 
 void update_node_id(uuid_t *host_id, uuid_t *node_id)
@@ -1398,7 +1415,7 @@ void update_node_id(uuid_t *host_id, uuid_t *node_id)
 
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_NODE_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
+        error_report("Failed to prepare statement to store node instance information");
         return;
     }
 
@@ -1410,13 +1427,21 @@ void update_node_id(uuid_t *host_id, uuid_t *node_id)
 
     rc = sqlite3_bind_blob(res, 2, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind claim_id parameter to store node instance information");
+        error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
+
+    char host_guid[GUID_LEN + 1];
+    uuid_unparse_lower(*host_id, host_guid);
+    rrd_wrlock();
+    RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
+    if (likely(host))
+            set_host_node_id(host, node_id);
+    rrd_unlock();
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
@@ -1540,4 +1565,44 @@ struct  node_instance_list *get_node_list(uuid_t *claim_id)
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return node_list;
+};
+
+#define SQL_GET_HOST_NODE_ID "select node_id from node_instance where host_id = @host_id;"
+
+void sql_load_node_id(RRDHOST *host)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_HOST_NODE_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return;
+    };
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        goto failed;
+    }
+
+    rc = sqlite3_step(res);
+    if (likely(rc == SQLITE_ROW)) {
+        if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t)))
+            set_host_node_id(host, (uuid_t *)sqlite3_column_blob(res, 0));
+        else
+            set_host_node_id(host, NULL);
+    }
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when storing node instance information");
+
+    return;
 };
