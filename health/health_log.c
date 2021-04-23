@@ -146,7 +146,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
-                            , (ae->class)?ae->class:"Unknown"
+                            , (ae->classification)?ae->classification:"Unknown"
                             , (ae->component)?ae->component:"Unknown"
                             , (ae->type)?ae->type:"Unknown"
         ) < 0))
@@ -369,9 +369,9 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->last_repeat = last_repeat;
 
             if (likely(entries > 28)) {
-                freez(ae->class);
-                ae->class = strdupz(pointers[28]);
-                if(!*ae->class) { freez(ae->class); ae->class = NULL; }
+                freez(ae->classification);
+                ae->classification = strdupz(pointers[28]);
+                if(!*ae->classification) { freez(ae->classification); ae->classification = NULL; }
 
                 freez(ae->component);
                 ae->component = strdupz(pointers[29]);
@@ -491,7 +491,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         ae->family = strdupz(family);
 
     if (class)
-        ae->class = strdupz(class);
+        ae->classification = strdupz(class);
 
     if (component)
         ae->component = strdupz(component);
@@ -595,7 +595,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
     freez(ae->family);
-    freez(ae->class);
+    freez(ae->classification);
     freez(ae->component);
     freez(ae->type);
     freez(ae->exec);

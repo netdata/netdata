@@ -668,7 +668,7 @@ struct alarm_entry {
 
     char *family;
 
-    char *class;
+    char *classification;
     char *component;
     char *type;
 

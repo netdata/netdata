@@ -15,7 +15,7 @@ struct rrdcalctemplate {
     char *exec;
     char *recipient;
 
-    char *class;
+    char *classification;
     char *component;
     char *type;
 

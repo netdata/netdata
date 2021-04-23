@@ -930,7 +930,7 @@ void *health_main(void *ptr) {
                         if(likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
-                                    rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                                    rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                     rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                     rc->delay_last,
                                     (
@@ -980,7 +980,7 @@ void *health_main(void *ptr) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
-                                rc->rrdset->family, rc->class, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
+                                rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,
                                 (
