@@ -28,6 +28,9 @@
         .start_routine = analytics_main \
     },
 
+/* Needed to calculate the space needed for parameters */
+#define ANALYTICS_NO_OF_ITEMS 31
+
 struct analytics_data {
     char *netdata_config_stream_enabled;
     char *netdata_config_memory_mode;
@@ -60,6 +63,8 @@ struct analytics_data {
     char *netdata_host_aclk_available;
     char *netdata_host_aclk_implementation;
     char *netdata_host_agent_claimed;
+
+    size_t data_length;
 
     uint8_t prometheus_hits;
     uint8_t shell_hits;

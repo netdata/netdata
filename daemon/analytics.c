@@ -17,42 +17,6 @@ struct array_printer {
     BUFFER *both;
 };
 
-size_t analytics_data_len(void)
-{
-    return 4 + strlen(analytics_data.netdata_config_stream_enabled) + 4 +
-           strlen(analytics_data.netdata_config_stream_enabled) + 4 +
-           strlen(analytics_data.netdata_config_memory_mode) + 4 +
-           strlen(analytics_data.netdata_config_exporting_enabled) + 4 +
-           strlen(analytics_data.netdata_exporting_connectors) + 4 +
-           strlen(analytics_data.netdata_allmetrics_prometheus_used) + 4 +
-           strlen(analytics_data.netdata_allmetrics_shell_used) + 4 +
-           strlen(analytics_data.netdata_allmetrics_json_used) + 4 +
-           strlen(analytics_data.netdata_dashboard_used) + 4 +
-           strlen(analytics_data.netdata_collectors) + 4 +
-           strlen(analytics_data.netdata_collectors_count) + 4 +
-           strlen(analytics_data.netdata_buildinfo) + 4 +
-           strlen(analytics_data.netdata_config_page_cache_size) + 4 +
-           strlen(analytics_data.netdata_config_multidb_disk_quota) + 4 +
-           strlen(analytics_data.netdata_config_https_enabled) + 4 +
-           strlen(analytics_data.netdata_config_web_enabled) + 4 +
-           strlen(analytics_data.netdata_config_release_channel) + 4 +
-           strlen(analytics_data.netdata_mirrored_host_count) + 4 +
-           strlen(analytics_data.netdata_mirrored_hosts_reachable) + 4 +
-           strlen(analytics_data.netdata_mirrored_hosts_unreachable) + 4 +
-           strlen(analytics_data.netdata_notification_methods) + 4 +
-           strlen(analytics_data.netdata_alarms_normal) + 4 +
-           strlen(analytics_data.netdata_alarms_warning) + 4 +
-           strlen(analytics_data.netdata_alarms_critical) + 4 +
-           strlen(analytics_data.netdata_charts_count) + 4 +
-           strlen(analytics_data.netdata_metrics_count) + 4 +
-           strlen(analytics_data.netdata_config_is_parent) + 4 +
-           strlen(analytics_data.netdata_config_hosts_available) + 4 +
-           strlen(analytics_data.netdata_host_cloud_available) + 4 +
-           strlen(analytics_data.netdata_host_aclk_available) + 4 +
-           strlen(analytics_data.netdata_host_aclk_implementation) + 4 +
-           strlen(analytics_data.netdata_host_agent_claimed);
-}
-
 /*
  * Debug logging
  */
@@ -134,9 +98,12 @@ void analytics_free_data(void)
  */
 void analytics_set_data(char **name, char *value)
 {
-    if (*name)
+    if (*name) {
+        analytics_data.data_length -= strlen(*name);
         freez(*name);
+    }
     *name = strdupz(value);
+    analytics_data.data_length += strlen(*name);
 }
 
 /*
@@ -145,11 +112,14 @@ void analytics_set_data(char **name, char *value)
 void analytics_set_data_str(char **name, char *value)
 {
     size_t value_string_len;
-    if (*name)
+    if (*name) {
+        analytics_data.data_length -= strlen(*name);
         freez(*name);
+    }
     value_string_len = strlen(value) + 4;
     *name = mallocz(sizeof(char) * value_string_len);
     snprintfz(*name, value_string_len - 1, "\"%s\"", value);
+    analytics_data.data_length += strlen(*name);
 }
 
 /*
@@ -742,6 +712,7 @@ void set_global_environment()
     setenv("HOME", verify_required_directory(netdata_configured_home_dir), 1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
+    analytics_data.data_length = 0;
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
     analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");
@@ -847,8 +818,9 @@ void send_statistics(const char *action, const char *action_result, const char *
         action_result = "";
     if (!action_data)
         action_data = "";
-    char *command_to_run =
-        mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + analytics_data_len() + 10));
+    char *command_to_run = mallocz(
+        sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
+                        analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
     pid_t command_pid;
 
     sprintf(
