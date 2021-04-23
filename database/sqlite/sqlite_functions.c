@@ -1486,7 +1486,7 @@ failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
-    return (rc != SQLITE_ROW);
+    return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
 #define SQL_INVALIDATE_NODE_INSTANCES "update node_instance set node_id = NULL where exists " \
