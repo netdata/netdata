@@ -67,7 +67,7 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         const char *name,
         const char *chart,
         const char *family,
-        const char *class,
+        const char *classification,
         const char *component,
         const char *type,
         const char *exec,

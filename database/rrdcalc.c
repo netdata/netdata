@@ -91,7 +91,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
-                rc->class,
+                rc->classification,
                 rc->component,
                 rc->type,
                 rc->exec,
@@ -168,7 +168,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
-                rc->class,
+                rc->classification,
                 rc->component,
                 rc->type,
                 rc->exec,
@@ -434,7 +434,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     if(rt->units) rc->units = strdupz(rt->units);
     if(rt->info) rc->info = strdupz(rt->info);
 
-    if (rt->class) rc->class = strdupz(rt->class);
+    if (rt->classification) rc->classification = strdupz(rt->classification);
     if (rt->component) rc->component = strdupz(rt->component);
     if (rt->type) rc->type = strdupz(rt->type);
 
@@ -545,7 +545,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     if(rc->units) newrc->units = strdupz(rc->units);
     if(rc->info) newrc->info = strdupz(rc->info);
 
-    if (rc->class) newrc->class = strdupz(rc->class);
+    if (rc->classification) newrc->classification = strdupz(rc->classification);
     if (rc->component) newrc->component = strdupz(rc->component);
     if (rc->type) newrc->type = strdupz(rc->type);
 
@@ -587,7 +587,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
-    freez(rc->class);
+    freez(rc->classification);
     freez(rc->component);
     freez(rc->type);
     simple_pattern_free(rc->spdim);
