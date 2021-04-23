@@ -1468,13 +1468,13 @@ int get_node_id(uuid_t *host_id, uuid_t *node_id)
 
     rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_NODE_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
+        error_report("Failed to prepare statement to select node instance information for a host");
         return 1;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store node instance information");
+        error_report("Failed to bind host_id parameter to select node instance information");
         goto failed;
     }
 
@@ -1484,7 +1484,7 @@ int get_node_id(uuid_t *host_id, uuid_t *node_id)
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing node instance information");
+        error_report("Failed to finalize the prepared statement when selecting node instance information");
 
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
@@ -1505,13 +1505,13 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 
     rc = sqlite3_prepare_v2(db_meta, SQL_INVALIDATE_NODE_INSTANCES, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
+        error_report("Failed to prepare statement to invalidate node instance ids");
         return;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store node instance information");
+        error_report("Failed to bind host_id parameter to invalidate node instance information");
         goto failed;
     }
 
@@ -1523,7 +1523,7 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to to invalidate node instance information, rc = %d", rc);
+        error_report("Failed to invalidate node instance information, rc = %d", rc);
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
