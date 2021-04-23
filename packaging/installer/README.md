@@ -78,7 +78,7 @@ operating systems.
     os="General Linux with one-line installer (recommended)"
     svg="linux" />
   <InstallBox
-    to="#run-netdata-with-docker"
+    to="/docs/agent/packaging/installer/methods/docker"
     os="Run with Docker" 
     svg="docker" />
   <InstallBox
