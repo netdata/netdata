@@ -56,7 +56,7 @@ sudo su -s /bin/bash netdata
 Then pass in the location to find `llvm` as an environment variable for `pip3`.
 
 ```bash
-LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Enable the anomalies collector
