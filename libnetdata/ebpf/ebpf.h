@@ -107,6 +107,7 @@ typedef struct ebpf_local_maps {
 typedef struct ebpf_specify_name {
     char *program_name;
     char *function_to_attach;
+    char *optional;
 } ebpf_specify_name_t;
 
 typedef struct ebpf_module {
