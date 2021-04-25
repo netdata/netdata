@@ -170,7 +170,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
         words = procfile_linewords(ff, l);
 
-        if (unlikely(words < 2))
+        if (unlikely(words < 3))
             continue;
 
         if (unlikely(procfile_lineword(ff, l, 1)[0] != 'a'))
