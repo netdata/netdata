@@ -120,8 +120,6 @@ typedef struct ebpf_module {
     uint32_t pid_map_size;
 } ebpf_module_t;
 
-#define NETDATA_MAX_PROBES 64
-
 extern int get_kernel_version(char *out, int size);
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);

@@ -324,6 +324,18 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
     }
 }
 
+size_t ebpf_count_programs(struct bpf_object *obj)
+{
+    size_t tot = 0;
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, obj)
+    {
+        tot++;
+    }
+
+    return tot;
+}
+
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string, struct bpf_object **obj, int *map_fd)
 {
     char lpath[4096];
@@ -358,7 +370,8 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     }
 
     struct bpf_program *prog;
-    struct bpf_link **links = callocz(NETDATA_MAX_PROBES , sizeof(struct bpf_link *));
+    size_t count_programs =  ebpf_count_programs(*obj);
+    struct bpf_link **links = callocz(count_programs , sizeof(struct bpf_link *));
     i = 0;
     bpf_object__for_each_program(prog, *obj)
     {
