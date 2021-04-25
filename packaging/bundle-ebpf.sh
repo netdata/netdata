@@ -11,4 +11,7 @@ curl -sSL --connect-timeout 10 --retry 3 "https://github.com/netdata/kernel-coll
 grep "${EBPF_TARBALL}" "${SRCDIR}/packaging/ebpf.checksums" | sha256sum -c - || exit 1
 tar -xaf "${EBPF_TARBALL}" -C "${SRCDIR}/tmp/ebpf" || exit 1
 # shellcheck disable=SC2046
-cp -a $(find "${SRCDIR}/tmp/ebpf" -mindepth 1 -maxdepth 1) "${PLUGINDIR}"
+if [ ! -d ${PLUGINDIR}/ebpf.d ];then
+    mkdir ${PLUGINDIR}/ebpf.d
+fi
+cp -a $(find "${SRCDIR}/tmp/ebpf" -mindepth 1 -maxdepth 1) "${PLUGINDIR}/ebpf.d"
