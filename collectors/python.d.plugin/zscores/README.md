@@ -62,7 +62,7 @@ This collector will only work with Python 3 and requires the below packages be i
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages
-pip3 install numpy pandas requests netdata-pandas==0.0.36
+pip3 install numpy pandas requests netdata-pandas==0.0.38
 ```
 
 ## Configuration
