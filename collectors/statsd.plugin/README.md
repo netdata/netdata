@@ -27,7 +27,7 @@ On these charts, we can have alarms as with any metric and chart.
 
 - [K6 load testing tool](https://k6.io)
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
-  - [Collector Readme](k6.md)
+  - [Documentation](/collectors/statsd.plugin/k6.md)
   - [Collector configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/k6.conf)
 
 ## Metrics supported by Netdata
