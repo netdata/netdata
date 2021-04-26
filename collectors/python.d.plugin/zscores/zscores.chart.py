@@ -15,6 +15,7 @@ from netdata_pandas.data import get_data, get_allmetrics
 
 priority = 60000
 update_every = 5
+disabled_by_default = True
 
 ORDER = [
     'z',
