@@ -336,7 +336,20 @@ size_t ebpf_count_programs(struct bpf_object *obj)
     return tot;
 }
 
-static struct bpf_link **ebpf_attach_default_names(struct bpf_object *obj, size_t length)
+static ebpf_specify_name_t *ebpf_find_names(ebpf_specify_name_t *names, const char *prog_name)
+{
+    size_t i = 0;
+    while (names[i].program_name) {
+        if (!strcmp(prog_name, names[i].program_name))
+            return &names[i];
+
+        i++;
+    }
+
+    return NULL;
+}
+
+static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t length, ebpf_specify_name_t *names)
 {
     struct bpf_link **links = callocz(length , sizeof(struct bpf_link *));
     size_t i = 0;
@@ -344,6 +357,20 @@ static struct bpf_link **ebpf_attach_default_names(struct bpf_object *obj, size_
     bpf_object__for_each_program(prog, obj)
     {
         links[i] = bpf_program__attach(prog);
+        if (libbpf_get_error(links[i]) && names) {
+            const char *name = bpf_program__name(prog);
+            ebpf_specify_name_t *w = ebpf_find_names(names, name);
+            if (w) {
+                enum bpf_prog_type type = bpf_program__get_type(prog);
+                if (type == BPF_PROG_TYPE_KPROBE)
+                    links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
+            }
+        }
+
+        if (libbpf_get_error(links[i])) {
+            links[i] = NULL;
+        }
+
         i++;
     }
 
@@ -385,10 +412,8 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     }
 
     size_t count_programs =  ebpf_count_programs(*obj);
-    if (!em->names)
-        return ebpf_attach_default_names(*obj, count_programs);
 
-    return NULL;
+    return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
