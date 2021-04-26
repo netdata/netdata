@@ -19,7 +19,7 @@ disabled_by_default = True
 
 ORDER = [
     'z',
-    '3sigma'
+    '3stddev'
 ]
 
 CHARTS = {
@@ -27,8 +27,8 @@ CHARTS = {
         'options': ['z', 'Z Score', 'z', 'Z Score', 'z', 'line'],
         'lines': []
     },
-    '3sigma': {
-        'options': ['3sigma', 'Z Score >3', 'count', '3 Sigma', '3sigma', 'stacked'],
+    '3stddev': {
+        'options': ['3stddev', 'Z Score >3', 'count', '3 Stddev', '3stddev', 'stacked'],
         'lines': []
     },
 }
@@ -57,7 +57,7 @@ class Service(SimpleService):
         self.per_chart_agg = self.configuration.get('per_chart_agg', 'mean')
         self.order = ORDER
         self.definitions = CHARTS
-        self.collected_dims = {'z': set(), '3sigma': set()}
+        self.collected_dims = {'z': set(), '3stddev': set()}
         self.df_mean = pd.DataFrame()
         self.df_std = pd.DataFrame()
         self.df_z_history = pd.DataFrame()
@@ -80,7 +80,7 @@ class Service(SimpleService):
                 self.charts[chart].del_dimension(dim, hide=False)
 
     def train_model(self):
-        """Calculate the mean and sigma for all relevant metrics and store them for use in calulcating zscore at each timestep.
+        """Calculate the mean and stddev for all relevant metrics and store them for use in calulcating zscore at each timestep.
         """
         before = int(datetime.now().timestamp()) - self.offset_secs
         after = before - self.train_secs
@@ -94,7 +94,7 @@ class Service(SimpleService):
         ).mean().to_frame().rename(columns={0: "std"})
 
     def create_data(self, df_allmetrics):
-        """Use x, mean, sigma to generate z scores and 3sigma flags via some pandas manipulation.
+        """Use x, mean, stddev to generate z scores and 3stddev flags via some pandas manipulation.
         Returning two dictionaries of dimensions and measures, one for each chart.
 
         :param df_allmetrics <pd.DataFrame>: pandas dataframe with latest data from api/v1/allmetrics.
@@ -113,7 +113,7 @@ class Service(SimpleService):
 
         # get average zscore for last z_smooth_n for each metric
         df_z_smooth = self.df_z_history.melt(value_name='z').groupby('index')['z'].mean().to_frame()
-        df_z_smooth['3sigma'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
+        df_z_smooth['3stddev'] = np.where(abs(df_z_smooth['z']) > 300, 1, 0)
         data_z = df_z_smooth['z'].add_suffix('_z').to_dict()
 
         # aggregate to chart level if specified
@@ -125,22 +125,22 @@ class Service(SimpleService):
             else:
                 data_z = list(df_z_smooth.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
-        data_3sigma = {}
+        data_3stddev = {}
         for k in data_z:
-            data_3sigma[k.replace('_z', '')] = 1 if abs(data_z[k]) > 300 else 0
+            data_3stddev[k.replace('_z', '')] = 1 if abs(data_z[k]) > 300 else 0
 
-        return data_z, data_3sigma
+        return data_z, data_3stddev
 
     def get_data(self):
 
         if self.runs_counter <= self.burn_in or self.runs_counter % self.train_every_n == 0:
             self.train_model()
 
-        data_z, data_3sigma = self.create_data(
+        data_z, data_3stddev = self.create_data(
             get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.').transpose())
-        data = {**data_z, **data_3sigma}
+        data = {**data_z, **data_3stddev}
 
         self.validate_charts('z', data_z, divisor=100)
-        self.validate_charts('3sigma', data_3sigma)
+        self.validate_charts('3stddev', data_3stddev)
 
         return data
