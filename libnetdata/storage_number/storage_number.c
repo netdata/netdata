@@ -91,15 +91,32 @@ RET_SN:
     return r;
 }
 
+// Lookup table to make storage number unpacking efficient.
+static calculated_number lut10x[4 * 8];
+
+__attribute__((constructor)) void initialize_lut(void) {
+    // The lookup table is partitioned in 4 subtables based on the
+    // values of the factor and exp bits.
+    for (int i = 0; i < 8; i++) {
+        // factor = 0
+        lut10x[0 * 8 + i] = 1 / pow(10, i);    // exp = 0
+        lut10x[1 * 8 + i] = pow(10, i);        // exp = 1
+
+        // factor = 1
+        lut10x[2 * 8 + i] = 1 / pow(100, i);   // exp = 0
+        lut10x[3 * 8 + i] = pow(100, i);       // exp = 1
+    }
+}
+
 calculated_number unpack_storage_number(storage_number value) {
     if(!value) return 0;
 
-    int sign = 0, exp = 0;
-    int factor = 10;
+    int sign = 1, exp = 0;
+    int factor = 0;
 
     // bit 32 = 0:positive, 1:negative
     if(unlikely(value & (1 << 31)))
-        sign = 1;
+        sign = -1;
 
     // bit 31 = 0:divide, 1:multiply
     if(unlikely(value & (1 << 30)))
@@ -107,7 +124,7 @@ calculated_number unpack_storage_number(storage_number value) {
 
     // bit 27 SN_EXISTS_100
     if(unlikely(value & (1 << 26)))
-        factor = 100;
+        factor = 1;
 
     // bit 26 SN_EXISTS_RESET
     // bit 25 SN_ANOMALY_BIT
@@ -122,17 +139,7 @@ calculated_number unpack_storage_number(storage_number value) {
 
     // fprintf(stderr, "UNPACK: %08X, sign = %d, exp = %d, mul = %d, factor = %d, n = " CALCULATED_NUMBER_FORMAT "\n", value, sign, exp, mul, factor, n);
 
-    if(exp) {
-        for(; mul; mul--)
-            n *= factor;
-    }
-    else {
-        for( ; mul ; mul--)
-            n /= 10;
-    }
-
-    if(sign) n = -n;
-    return n;
+    return sign * lut10x[(factor * 16) + (exp * 8) + mul] * n;
 }
 
 /*
