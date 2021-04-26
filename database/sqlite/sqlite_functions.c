@@ -1490,7 +1490,7 @@ failed:
 }
 
 #define SQL_INVALIDATE_NODE_INSTANCES "update node_instance set node_id = NULL where exists " \
-    "(select host_id from node_instance where host_id = @host_id and claim_id <> @claim_id);"
+    "(select host_id from node_instance where host_id = @host_id and (@claim_id is null or claim_id <> @claim_id));"
 
 void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -1515,7 +1515,11 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    if (claim_id)
+        rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, 2);
+
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind claim_id parameter to invalidate node instance information");
         goto failed;
