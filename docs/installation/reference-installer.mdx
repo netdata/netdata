@@ -9,7 +9,11 @@ import { Install, InstallBox } from '../../src/components/Install/'
 
 # Installer reference
 
+
+
 ## Supported installation methods
+
+
 
 <Install>
   <InstallBox
@@ -61,6 +65,9 @@ process itself. This is true of the following methods:
 - [Build from source](/packaging/installer/methods/source.md)
 - [Offline nodes](/packaging/installer/methods/offline.md)
 
+`netdata-installer.sh` is, essentially, an automated version of the [manual from
+Git](/packaging/installer/methods/manual.md) method.
+
 ### Parameters
 
 The `netdata-install.sh` script takes the following parameters to customize any installation of Netdata.
@@ -76,9 +83,21 @@ The `netdata-install.sh` script takes the following parameters to customize any 
 | `--reinstall`         | If an existing install is detected, reinstall instead of trying to update it. See the [reinstall](/docs/installation/reinstall.mdx) doc for details.                                |
 | `--local-files`       | Used for [offline installations](offline.md). This option conflicts with the `--stable-channel` option. If you set this _and_ `--stable-channel`, Netdata will use the local files. |
 
-If you are a Netdata Cloud user, 
+### Claim to Netdata Cloud during installation
 
+`netdata-installer.sh` accepts additional parameters to automatically [claim](/claim/README.md) your node to Netdata
+Cloud immediately after installation. Using any of the supported methods listed above.
 
+Find the `token` and `rooms` strings by [signing in to Netdata
+Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+| Parameter       | Description                                                                                                                                                                                                             |
+| :-------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--claim-token` | The unique token associated with your Space in Netdata Cloud.                                                                                                                                                           |
+| `--claim-rooms` | A comma-separated list of tokens for each War Room this node should appear in.                                                                                                                                          |
+| `--claim-proxy` | Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [claiming through a proxy](/claim/README.md#claim-through-a-proxy) for details. |
+| `--claim-url`   | Defaults to `https://app.netdata.cloud`.                                                                                                                                                                                |
 
 ## Automatic updates
 
