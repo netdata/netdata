@@ -66,7 +66,7 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 - `--claim-proxy`: Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or
   `http://[user:pass@]host:ip` for an HTTP(S) proxy.See [claiming through a
   proxy](/claim/README.md#claim-through-a-proxy) for details.
-- `--claim-url`: Only set this 
+- `--claim-url`: Defaults to `https://app.netdata.cloud`.
 
 ## Verify script integrity
 
