@@ -1565,6 +1565,7 @@ struct  node_instance_list *get_node_list(void)
         goto failed;
     }
     node_list = callocz(row + 1, sizeof(*node_list));
+    int max_rows = row;
     row = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (sqlite3_column_bytes(res, 0) == sizeof(uuid_t))
@@ -1580,6 +1581,8 @@ struct  node_instance_list *get_node_list(void)
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
         row++;
+        if (row == max_rows)
+            break;
     }
 
 failed:
