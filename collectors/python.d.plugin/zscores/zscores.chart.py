@@ -57,6 +57,7 @@ class Service(SimpleService):
         self.per_chart_agg = self.configuration.get('per_chart_agg', 'mean')
         self.order = ORDER
         self.definitions = CHARTS
+        self.collected_dims = {'z': set(), '3sigma': set()}
         self.df_mean = pd.DataFrame()
         self.df_std = pd.DataFrame()
         self.df_z_history = pd.DataFrame()
@@ -65,10 +66,18 @@ class Service(SimpleService):
         _ = get_allmetrics(self.host, self.charts_in_scope, wide=True, col_sep='.')
         return True
 
-    def validate_charts(self, name, data, algorithm='absolute', multiplier=1, divisor=1):
+    def validate_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
+        """If dimension not in chart then add it.
+        """
         for dim in data:
-            if dim not in self.charts[name]:
-                self.charts[name].add_dimension([dim, dim, algorithm, multiplier, divisor])
+            if dim not in self.collected_dims[chart]:
+                self.collected_dims[chart].add(dim)
+                self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
+
+        for dim in list(self.collected_dims[chart]):
+            if dim not in data:
+                self.collected_dims[chart].remove(dim)
+                self.charts[chart].del_dimension(dim, hide=False)
 
     def train_model(self):
         """Calculate the mean and sigma for all relevant metrics and store them for use in calulcating zscore at each timestep.
