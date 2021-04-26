@@ -21,7 +21,7 @@ Netdata statsd is fast. It can collect more than **1.200.000 metrics per second*
 
 # Available StatsD collectors
 
-Netdata ships with a number of available collectors that are implemented using the StatsD collector. Although, in essence, they are configuration files (as you will read bellow), they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
+Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read bellow), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
 
 On these charts, we can have alarms as with any metric and chart.
 
