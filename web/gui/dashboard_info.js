@@ -607,6 +607,13 @@ netdataDashboard.menu = {
         'A special <code>failed</code> state is available as well, which is very similar to <code>inactive</code> and is entered when the service failed in some way (process returned error code on exit, or crashed, an operation timed out, or after too many restarts). ' +
         'For detailes, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.html" target="_blank"> systemd(1)</a>.'
     },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
+
 };
 
 
