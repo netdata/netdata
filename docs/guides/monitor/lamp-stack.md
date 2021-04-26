@@ -56,8 +56,8 @@ To follow this tutorial, you need:
 
 ## Install the Netdata Agent
 
-If you don't have the free, open-source [Netdata Agent](/docs/get/README.md) installed on your node yet, get started
-with a [single kickstart command](/packaging/installer/methods/kickstart.md):
+If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
+kickstart command](/docs/get-started.mdx):
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -167,8 +167,7 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 
 > If you [signed up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for Netdata Cloud earlier, you can also view
 > the exact same LAMP stack metrics there, plus additional features, like drag-and-drop custom dashboards. Be sure to
-> [claim your node](/docs/get/README.md#claim-your-node-to-netdata-cloud) to start streaming metrics to your browser
-> through Netdata Cloud.
+> [claim your node](/claim/README.md) to start streaming metrics to your browser through Netdata Cloud.
 
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and
@@ -240,7 +239,7 @@ source of issues faster with [Metric Correlations](https://learn.netdata.cloud/d
 
 ### Related reference documentation
 
-- [Netdata Agent · Get Netdata](/docs/get/README.md)
+- [Netdata Agent · Get started](/docs/get-started.mdx)
 - [Netdata Agent · Apache data collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache)
 - [Netdata Agent · Web log collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog)
 - [Netdata Agent · MySQL data collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql)

@@ -209,7 +209,7 @@ Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the cl
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](/docs/get/README.md#install-the-netdata-agent).
+script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
 
 #### Claiming on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 

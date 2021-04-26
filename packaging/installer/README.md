@@ -3,7 +3,7 @@ title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
 -->
 
-import { Install, InstallBox } from '../src/components/Install/'
+import { Install, InstallBox } from '../../../src/components/Install/'
 
 # Installation guide
 
@@ -74,11 +74,11 @@ operating systems.
 
 <Install>
   <InstallBox
-    to="#install-on-linux-with-one-line-installer-recommended"
+    to="/docs/agent/packaging/installer/methods/kickstart"
     os="General Linux with one-line installer (recommended)"
     svg="linux" />
   <InstallBox
-    to="#run-netdata-with-docker"
+    to="/docs/agent/packaging/docker"
     os="Run with Docker" 
     svg="docker" />
   <InstallBox

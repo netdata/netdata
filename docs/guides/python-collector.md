@@ -29,7 +29,7 @@ covered here, or use the included examples for collecting and organizing eithre 
 ## What you need to get started
 
 - A physical or virtual Linux system, which we'll call a _node_.
-- A working installation of the free, open-source [Netdata Agent](/docs/get/README.md).
+- A working installation of the free and open-source [Netdata](/docs/get-started.mdx) monitoring agent.
 
 ## Jobs and elements of a Python collector
 
