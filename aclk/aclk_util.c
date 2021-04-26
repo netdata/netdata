@@ -279,32 +279,38 @@ const char *aclk_get_topic(enum aclk_topics topic)
 /*
  * TBEB with randomness
  *
- * @param mode 0 - to reset the delay,
- *             1 - to advance a step and calculate sleep time [0 .. ACLK_MAX_BACKOFF_DELAY * 1000] ms
+ * @param reset 1 - to reset the delay,
+ *              0 - to advance a step and calculate sleep time in ms
+ * @param min, max in seconds
  * @returns delay in ms
  *
  */
-#define ACLK_MAX_BACKOFF_DELAY 1024
-unsigned long int aclk_reconnect_delay(int mode)
-{
-    static int fail = -1;
-    unsigned long int delay;
 
-    if (!mode || fail == -1) {
-        srandom(time(NULL));
-        fail = mode - 1;
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max) {
+    static int attempt = -1;
+
+    if (reset) {
+        attempt = -1;
         return 0;
     }
 
-    delay = (1 << fail);
+    attempt++;
 
-    if (delay >= ACLK_MAX_BACKOFF_DELAY) {
-        delay = ACLK_MAX_BACKOFF_DELAY * 1000;
-    } else {
-        fail++;
-        delay *= 1000;
-        delay += (random() % (MAX(1000, delay/2)));
+    if (attempt == 0) {
+        srandom(time(NULL));
+        return 0;
     }
+
+    unsigned long int delay = pow(base, attempt - 1);
+    delay *= MSEC_PER_SEC;
+
+    delay += (random() % (MAX(1000, delay/2)));
+
+    if (delay <= min * MSEC_PER_SEC)
+        return min;
+
+    if (delay >= max * MSEC_PER_SEC)
+        return max;
 
     return delay;
 }
