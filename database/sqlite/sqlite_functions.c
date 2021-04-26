@@ -1534,11 +1534,12 @@ failed:
         error_report("Failed to finalize the prepared statement when invalidating node instance information");
 }
 
-#define SQL_GET_NODE_INSTANCE_LIST "select node_id, host_id from node_instance where node_id is not null;"
+#define SQL_GET_NODE_INSTANCE_LIST "select ni.node_id, ni.host_id, h.hostname " \
+    "from node_instance ni, host h where ni.host_id = h.host_id;"
 
-struct  node_instance_list *get_node_list(uuid_t *claim_id)
+struct  node_instance_list *get_node_list(void)
 {
-    struct  node_instance_list *node_list;
+    struct  node_instance_list *node_list = NULL;
     sqlite3_stmt *res = NULL;
     int rc;
 
@@ -1548,8 +1549,6 @@ struct  node_instance_list *get_node_list(uuid_t *claim_id)
         return NULL;
     }
 
-    node_list = callocz(128, sizeof(*node_list));
-
     rc = sqlite3_prepare_v2(db_meta, SQL_GET_NODE_INSTANCE_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement store chart labels");
@@ -1558,16 +1557,32 @@ struct  node_instance_list *get_node_list(uuid_t *claim_id)
 
     int row = 0;
     char host_guid[37];
+    while (sqlite3_step(res) == SQLITE_ROW)
+        row++;
+
+    if (sqlite3_reset(res) != SQLITE_OK) {
+        error_report("Failed to reset the prepared statement fetching storing node instance information");
+        goto failed;
+    }
+    node_list = callocz(row + 1, sizeof(*node_list));
+    row = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
-       uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
-       uuid_copy(node_list[row].claim_id, *claim_id);
-       node_list[row].querable = 1;
-       uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res, 1)), host_guid);
-       node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
-       node_list[row].hops = uuid_compare(*((uuid_t *)sqlite3_column_blob(res, 1)), localhost->host_uuid) ? 1 : 0;
-       row++;
+        if (sqlite3_column_bytes(res, 0) == sizeof(uuid_t))
+            uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
+        if (sqlite3_column_bytes(res, 1) == sizeof(uuid_t)) {
+            uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
+            uuid_copy(node_list[row].host_id, *host_id);
+            node_list[row].querable = 1;
+            uuid_unparse_lower(*host_id, host_guid);
+            node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
+            node_list[row].hops = uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
+            node_list[row].hostname =
+                sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
+        }
+        row++;
     }
 
+failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
