@@ -1341,8 +1341,7 @@ failed:
 
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \
     "(host_id, claim_id, date_created) values (@host_id, @claim_id, strftime('%s')) " \
-    "on conflict(host_id) do update set node_id = null, claim_id = excluded.claim_id " \
-    "where claim_id <> excluded.claim_id;"
+    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
 
 void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -1367,7 +1366,10 @@ void store_claim_id(uuid_t *host_id, uuid_t *claim_id)
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    if (claim_id)
+        rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, 2);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind claim_id parameter to store node instance information");
         goto failed;
