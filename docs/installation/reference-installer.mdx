@@ -1,76 +1,15 @@
-<!--
-title: "Installation guide"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
--->
+---
+title: Installer reference
+description: ''
+type: reference
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/installation/reference-installer.mdx
+---
 
-import { Install, InstallBox } from '../../../src/components/Install/'
+import { Install, InstallBox } from '../../src/components/Install/'
 
-# Installation guide
+# Installer reference
 
-Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
-IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
-
-The best way to install Netdata is with our [**automatic one-line installation
-script**](#automatic-one-line-installation-script), which works with all Linux distributions, or our [**.deb/rpm
-packages**](/packaging/installer/methods/packages.md), which seamlessly install with your distribution's package
-manager.
-
-If you want to install Netdata with Docker, on a Kubernetes cluster, or a different operating system, see [Have a
-different operating system, or want to try another
-method?](#have-a-different-operating-system-or-want-to-try-another-method)
-
-Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
-packages. We recommend you install Netdata using one of the methods listed below to guarantee you get the latest
-checksum-verified packages.
-
-Netdata collects anonymous usage information by default and sends it to our self hosted [PostHog](https://github.com/PostHog/posthog) installation. PostHog is an open source product analytics platform, you can read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
-page.
-
-The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
-_actively_ contributing to Netdata's future.
-
-## Automatic one-line installation script
-
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
-
-This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others.
-
-To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
-nightly updates_, run the following as your normal user:
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
-
-To see more information about this installation script, including how to disable automatic updates, get nightly vs.
-stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
-page](/packaging/installer/methods/kickstart.md). 
-
-Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
-releases](#nightly-vs-stable-releases).
-
-### Post-installation
-
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
-
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
-solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
-external databases, and more.
-
-## Have a different operating system, or want to try another method?
-
-Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
-of approved methods for each operating system/version we support, see our [distribution
-matrix](/packaging/DISTRIBUTIONS.md).
-
-Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
-operating systems.
-
-### Alternative methods
+## Supported installation methods
 
 <Install>
   <InstallBox
@@ -111,20 +50,46 @@ operating systems.
     svg="linux" />
 </Install>
 
+## `netdata-installer.sh`
+
+Many installation methods are a wrapper around a single script, `netdata-installer.sh`, which handles the installation
+process itself. This is true of the following methods:
+
+- [One-line installer (`kickstart.sh`)](/packaging/installer/methods/kickstart.md)
+- [Pre-compiled static binary (`kickstart-static64.sh`)](/packaging/installer/methods/kickstart64.md)
+- [Manual from Git](/packaging/installer/methods/manual.md)
+- [Build from source](/packaging/installer/methods/source.md)
+- [Offline nodes](/packaging/installer/methods/offline.md)
+
+### Parameters
+
+The `netdata-install.sh` script takes the following parameters to customize any installation of Netdata.
+
+| Parameter             | Description                                                                                                                                                                         |
+| :-------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--dont-wait`         | Skip prompting for permission to install any required packages. Useful for automated installation, such as with [Ansible](/docs/guides/ansible.md).                                 |
+| `--dont-start-it`     | Prevent the installer from starting Netdata automatically.                                                                                                                          |
+| `--stable-channel`    | Automatically update only on the release of new major versions. See [nightly vs. stable releases](#nightly-vs-stable-releases).                                                                                                                    |
+| `--nightly-channel`   | Automatically update on every new nightly build. See [nightly vs. stable releases](#nightly-vs-stable-releases).                                                                                                                                   |
+| `--no-updates`        | Prevent automatic updates of any kind.                                                                                                                                              |
+| `--disable-telemetry` | Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make Netdata better.                                                                                     |
+| `--reinstall`         | If an existing install is detected, reinstall instead of trying to update it. See the [reinstall](/docs/installation/reinstall.mdx) doc for details.                                |
+| `--local-files`       | Used for [offline installations](offline.md). This option conflicts with the `--stable-channel` option. If you set this _and_ `--stable-channel`, Netdata will use the local files. |
+
+If you are a Netdata Cloud user, 
+
+
+
 ## Automatic updates
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
 
-If you would prefer to update your Netdata agent manually, you can disable automatic updates by using the `--no-updates`
-option when you install or update Netdata using the [automatic one-line installation
-script](#automatic-one-line-installation-script).
+If you would prefer to [update Netdata manually](/packaging/installer/UPDATE.md), you can disable automatic updates by
+using the `--no-updates` option when you install or update Netdata.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
 ```
-
-With automatic updates disabled, you can choose exactly when and how you [update
-Netdata](/packaging/installer/UPDATE.md).
 
 ### Network usage of Netdata’s automatic updater
 
@@ -230,5 +195,3 @@ issue altogether. Or, you can manually remove one version of OpenSSL to remove t
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
