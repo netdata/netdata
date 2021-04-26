@@ -55,7 +55,7 @@ repo](https://github.com/netdata/community/tree/main/netdata-agent-api/netdata-p
 sudo su -s /bin/bash netdata
 
 # Install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 > If the `pip3` command fails, you need to install it. For example, on an Ubuntu system, use `sudo apt install
