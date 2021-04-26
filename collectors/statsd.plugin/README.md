@@ -19,7 +19,7 @@ Since statsd is embedded in Netdata, it means you now have a statsd server embed
 
 Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
-# Available StatsD Collectors
+# Available StatsD collectors
 
 Netdata ships with a number of available collectors that are implemented using the StatsD collector. Although, in essence, they are configuration files (as you will read bellow), they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
 
