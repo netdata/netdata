@@ -798,13 +798,16 @@ netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
-if !ACLK_NG
+if ACLK_NG
+netdata_LDADD += \
+    $(OPTIONAL_PROTOBUF_LIBS) \
+    $(NULL)
+else
 if ENABLE_ACLK
 netdata_LDADD += \
     $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
-    $(NETDATA_COMMON_LIBS) \
     $(NULL)
 endif #ENABLE_ACLK
 endif #ACLK_NG
@@ -915,7 +918,10 @@ endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    netdata_LDADD += \
+        $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
+        $(OPTIONAL_PROTOBUF_LIBS) \
+        $(NULL)
     BUILT_SOURCES += \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
@@ -1049,7 +1055,10 @@ if ENABLE_UNITTESTS
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDADD += \
+        $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
+        $(OPTIONAL_PROTOBUF_LIBS) \
+        $(NULL)
     exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=init_write_request \
         -Wl,--wrap=add_host_info \
