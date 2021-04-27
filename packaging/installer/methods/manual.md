@@ -178,9 +178,7 @@ yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel lib
 yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
 ```
 
----
-
-### Install Netdata
+## Install Netdata
 
 Do this to install and run Netdata:
 
@@ -201,11 +199,43 @@ cd netdata
 
 -   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
 
-Once the installer completes, the file `/etc/netdata/netdata.conf` will be created (if you changed the installation directory, the configuration will appear in that directory too).
+## Optional parameters to alter your installation
 
-You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check **\[[Memory Requirements]]**.
+`netdata-installer.sh` accepts a few parameters to customize your installation:
 
-To apply the changes you made, you have to restart Netdata.
+-   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+-   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
+-   `--stable-channel`: Automatically update only on the release of new major versions.
+-   `--nightly-channel`: Automatically update on every new nightly build.
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
+    Netdata better.
+-   `--no-updates`: Prevent automatic updates of any kind.
+-   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
+    cannot be used to change installation types.
+-   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
+    tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
+    process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
+    `--stable-channel`, Netdata will use the local files.
+
+### Claim your node during installation
+
+The `netdata-installer.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to
+Netdata Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
+Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+- `--claim-token`: The unique token associated with your Space in Netdata Cloud.
+- `--claim-rooms`: A comma-separated list of tokens for each War Room this node should appear in.
+- `--claim-proxy`: Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or
+  `http://[user:pass@]host:ip` for an HTTP(S) proxy.See [claiming through a
+  proxy](/claim/README.md#claim-through-a-proxy) for details.
+- `--claim-url`: Defaults to `https://app.netdata.cloud`.
+
+For example:
+
+```bash
+./netdata-installer.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+```
 
 ### 'nonrepresentable section on output' errors
 

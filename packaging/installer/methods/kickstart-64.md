@@ -85,6 +85,12 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
   proxy](/claim/README.md#claim-through-a-proxy) for details.
 - `--claim-url`: Defaults to `https://app.netdata.cloud`.
 
+For example:
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+```
+
 ## Verify script integrity
 
 To use `md5sum` to verify the integrity of the `kickstart-static64.sh` script you will download using the one-line
