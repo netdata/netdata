@@ -19,6 +19,17 @@ Since statsd is embedded in Netdata, it means you now have a statsd server embed
 
 Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core. The implementation uses two threads: one thread collects metrics, another one updates the charts from the collected data.
 
+# Available StatsD collectors
+
+Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read bellow), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
+
+On these charts, we can have alarms as with any metric and chart.
+
+- [K6 load testing tool](https://k6.io)
+  - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
+  - [Documentation](/collectors/statsd.plugin/k6.md)
+  - [Configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/k6.conf)
+
 ## Metrics supported by Netdata
 
 Netdata fully supports the StatsD protocol. All StatsD client libraries can be used with Netdata too.
