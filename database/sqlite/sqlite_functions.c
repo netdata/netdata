@@ -1405,21 +1405,22 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
 
 #define SQL_UPDATE_NODE_ID  "update node_instance set node_id = @node_id where host_id = @host_id;"
 
-void update_node_id(uuid_t *host_id, uuid_t *node_id)
+int update_node_id(uuid_t *host_id, uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
-    int rc;
+    RRDHOST *host = NULL;
+    int rc = 2;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
-        return;
+        return 1;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_NODE_ID, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store node instance information");
-        return;
+        return 1;
     }
 
     rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
@@ -1437,11 +1438,12 @@ void update_node_id(uuid_t *host_id, uuid_t *node_id)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
+    rc = sqlite3_changes(res);
 
     char host_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_id, host_guid);
     rrd_wrlock();
-    RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
+    host = rrdhost_find_by_guid(host_guid, 0);
     if (likely(host))
             set_host_node_id(host, node_id);
     rrd_unlock();
@@ -1450,7 +1452,7 @@ failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
-    return;
+    return rc - 1;
 }
 
 #define SQL_SELECT_NODE_ID  "select node_id from node_instance where host_id = @host_id and node_id not null;"
