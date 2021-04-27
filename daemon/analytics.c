@@ -703,7 +703,7 @@ static void get_system_timezone(void)
     {
         time_t t;
         struct tm *tmp, tmbuf;
-        char zone[FILENAME_MAX + 1]; //can be really less, but %z could be abbriviated or long
+        char zone[FILENAME_MAX + 1];
         char sign[2], hh[3], mm[3];
 
         t = now_realtime_sec();

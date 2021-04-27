@@ -98,7 +98,7 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
     freez(old);
 
     old = (void *)host->abbrev_timezone;
-    host->abbrev_timezone = strdupz((abbrev_timezone && *abbrev_timezone)?abbrev_timezone:"UTC");
+    host->abbrev_timezone = strdupz((abbrev_timezone && *abbrev_timezone) ? abbrev_timezone : "UTC");
     freez(old);
 
     host->utc_offset = utc_offset;
