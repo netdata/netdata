@@ -144,13 +144,16 @@ class Service(UrlService):
                 # average dims on chart and run changefinder on that average
                 x = [raw_data[chart]['dimensions'][dim]['value'] for dim in raw_data[chart]['dimensions']]
                 x = [x for x in x if x is not None]
-                x = sum(x) / len(x)
-                x = self.diff(x, chart) if self.cf_diff else x
 
-                score, flag = self.get_score(x, chart)
-                if self.show_scores:
-                    data_score['{}_score'.format(chart)] = score * 100
-                data_flag[chart] = flag
+                if len(x) > 0:
+
+                    x = sum(x) / len(x)
+                    x = self.diff(x, chart) if self.cf_diff else x
+
+                    score, flag = self.get_score(x, chart)
+                    if self.show_scores:
+                        data_score['{}_score'.format(chart)] = score * 100
+                    data_flag[chart] = flag
 
             else:
 
@@ -168,11 +171,11 @@ class Service(UrlService):
                         data_score['{}_score'.format(chart_dim)] = score * 100
                     data_flag[chart_dim] = flag
 
-        if self.show_scores:
+        self.validate_charts('flags', data_flag)
+
+        if self.show_scores & len(data_score) > 0:
             data_score['average_score'] = sum(data_score.values()) / len(data_score)
             self.validate_charts('scores', data_score, divisor=100)
-
-        self.validate_charts('flags', data_flag)
 
         data = {**data_score, **data_flag}
 
