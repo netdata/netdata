@@ -72,6 +72,45 @@ looks like the following:
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
 method](/docs/configure/start-stop-restart.md) for your system.
 
+## Enable TLS/SSL on streaming (optional)
+
+While encrypting the connection between your parent and child nodes is recommended for security, it's not required to
+get started. If you're not interested in encryption, skip ahead to [view streamed
+metrics](#view-streamed-metrics-in-netdata-s-dashboard).
+
+In this example, we'll use self-signed certificates. 
+
+On the **parent** node, use OpenSSL to create the key and certificate, then use `chown` to make the new files readable
+by the `netdata` user.
+
+```bash
+sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
+sudo chown netdata:netdata /etc/netdata/ssl/cert.pem k/etc/netdata/ssl/ey.pem
+```
+
+Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind
+to` setting. Add `^SSL=force` to turn on TLS/SSL.
+
+```conf
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
+
+Next, connect to the **child** node and open `stream.conf`. Add `:SSL` to the end of the existing `destination` setting
+to connect to the parent using TLS/SSL. Uncomment the `ssl skip certificate verification` line to allow the use of
+self-signed certificates.
+
+```conf
+[stream]
+    enabled = yes
+    destination = 203.0.113.0:SSL
+    ssl skip certificate verification = yes
+    api key = 11111111-2222-3333-4444-555555555555
+```
+
+Restart both the parent and child nodes with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to stream encrypted metrics using TLS/SSL.
+
 ## View streamed metrics in Netdata's dashboard
 
 At this point, the child node is streaming its metrics in real time to its parent. Open the local Agent dashboard for
