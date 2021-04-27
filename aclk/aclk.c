@@ -246,18 +246,6 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
     if (msglen > RX_MSGLEN_MAX)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
 
-#ifdef ACLK_LOG_CONVERSATION_DIR
-#define FN_MAX_LEN 512
-    char filename[FN_MAX_LEN];
-    int logfd;
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-rx.json", ACLK_GET_CONV_LOG_NEXT());
-    logfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR );
-    if(logfd < 0)
-        error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
-    write(logfd, msg, msglen);
-    close(logfd);
-#endif
-
     debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
@@ -275,6 +263,18 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
         error_report("Message type empty. Ignoring message from topic \"%s\"", topic);
         return;
     }
+
+#ifdef ACLK_LOG_CONVERSATION_DIR
+#define FN_MAX_LEN 512
+    char filename[FN_MAX_LEN];
+    int logfd;
+    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-rx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgtype);
+    logfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR );
+    if(logfd < 0)
+        error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
+    write(logfd, msg, msglen);
+    close(logfd);
+#endif
 
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
