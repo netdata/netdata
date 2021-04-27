@@ -612,7 +612,13 @@ netdataDashboard.menu = {
         title: 'ChangeFinder',
         icon: '<i class="fas fa-flask"></i>',
         info: 'Online changepoint detection using machine learning. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/changefinder/README.md" target="_blank">here</a>.'
-    }
+    },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
+    },
 
 };
 

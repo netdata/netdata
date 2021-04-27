@@ -55,7 +55,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->name
                    , ae->chart
                    , ae->family
-                   , ae->class?ae->class:"Unknown"
+                   , ae->classification?ae->classification:"Unknown"
                    , ae->component?ae->component:"Unknown"
                    , ae->type?ae->type:"Unknown"
                    , (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false"
@@ -215,7 +215,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->name
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
-                   , rc->class?rc->class:"Unknown"
+                   , rc->classification?rc->classification:"Unknown"
                    , rc->component?rc->component:"Unknown"
                    , rc->type?rc->type:"Unknown"
                    , (rc->rrdset)?"true":"false"

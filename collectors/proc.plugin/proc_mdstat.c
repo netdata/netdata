@@ -8,6 +8,7 @@ struct raid {
     int redundant;
     char *name;
     uint32_t hash;
+    char *level;
 
     RRDDIM *rd_health;
     unsigned long long failed_disks;
@@ -149,6 +150,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
         for (raid_idx = 0; raid_idx < raids_allocated; raid_idx++) {
             struct raid *raid = &raids[raid_idx];
             freez(raid->name);
+            freez(raid->level);
             freez(raid->mismatch_cnt_filename);
         }
         if (raids_num) {
@@ -168,7 +170,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
         words = procfile_linewords(ff, l);
 
-        if (unlikely(words < 2))
+        if (unlikely(words < 3))
             continue;
 
         if (unlikely(procfile_lineword(ff, l, 1)[0] != 'a'))
@@ -177,12 +179,15 @@ int do_proc_mdstat(int update_every, usec_t dt)
         if (unlikely(!raid->name)) {
             raid->name = strdupz(procfile_lineword(ff, l, 0));
             raid->hash = simple_hash(raid->name);
+            raid->level = strdupz(procfile_lineword(ff, l, 2));
         } else if (unlikely(strcmp(raid->name, procfile_lineword(ff, l, 0)))) {
             freez(raid->name);
             freez(raid->mismatch_cnt_filename);
+            freez(raid->level);
             memset(raid, 0, sizeof(struct raid));
             raid->name = strdupz(procfile_lineword(ff, l, 0));
             raid->hash = simple_hash(raid->name);
+            raid->level = strdupz(procfile_lineword(ff, l, 2));
         }
 
         if (unlikely(!raid->name || !raid->name[0]))
@@ -436,7 +441,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_disks", raid->name);
 
                 if (unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_active_byname_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_disks = rrdset_create_localhost(
                         "mdstat",
@@ -473,7 +478,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_mismatch", raid->name);
 
                 if (unlikely(!raid->st_mismatch_cnt && !(raid->st_mismatch_cnt = rrdset_find_active_byname_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_mismatch_cnt = rrdset_create_localhost(
                         "mdstat",
@@ -507,7 +512,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_operation", raid->name);
 
                 if (unlikely(!raid->st_operation && !(raid->st_operation = rrdset_find_active_byname_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_operation = rrdset_create_localhost(
                         "mdstat",
@@ -548,7 +553,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_finish", raid->name);
 
                 if (unlikely(!raid->st_finish && !(raid->st_finish = rrdset_find_active_byname_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_finish = rrdset_create_localhost(
                         "mdstat",
@@ -579,7 +584,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_speed", raid->name);
 
                 if (unlikely(!raid->st_speed && !(raid->st_speed = rrdset_find_active_byname_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_speed = rrdset_create_localhost(
                         "mdstat",
@@ -613,7 +618,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 snprintfz(id, 50, "%s_availability", raid->name);
 
                 if (unlikely(!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_active_localhost(id)))) {
-                    snprintfz(family, 50, "%s", raid->name);
+                    snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_nonredundant = rrdset_create_localhost(
                         "mdstat",

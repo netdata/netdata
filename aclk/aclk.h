@@ -25,6 +25,8 @@ extern int aclk_disable_single_updates;
 extern int aclk_kill_link;
 extern int aclk_connected;
 
+extern time_t aclk_block_until;
+
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
 

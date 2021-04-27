@@ -29,6 +29,8 @@ int aclk_kill_link = 0;
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
+time_t aclk_block_until = 0;
+
 usec_t aclk_session_us = 0;         // Used by the mqtt layer
 time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
@@ -241,7 +243,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 static void puback_callback(uint16_t packet_id)
 {
     if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
-        aclk_reconnect_delay(0);
+        aclk_tbeb_reset();
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_puback(packet_id);
@@ -404,16 +406,41 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     mqtt_wss_disconnect(client, 1000);
 }
 
+static unsigned long aclk_reconnect_delay() {
+    unsigned long recon_delay;
+    time_t now;
+
+    if (aclk_disable_runtime) {
+        aclk_tbeb_reset();
+        return 60 * MSEC_PER_SEC;
+    }
+
+    now = now_monotonic_sec();
+    if (aclk_block_until) {
+        if (now < aclk_block_until) {
+            recon_delay = aclk_block_until - now;
+            recon_delay *= MSEC_PER_SEC;
+            aclk_block_until = 0;
+            aclk_tbeb_reset();
+            return recon_delay;
+        }
+        aclk_block_until = 0;
+    }
+
+    if (!aclk_env || !aclk_env->backoff.base)
+        return aclk_tbeb_delay(0, 2, 0, 1024);
+
+    return aclk_tbeb_delay(0, aclk_env->backoff.base, aclk_env->backoff.min_s, aclk_env->backoff.max_s);
+}
+
 /* Block till aclk_reconnect_delay is satisifed or netdata_exit is signalled
  * @return 0 - Go ahead and connect (delay expired)
  *         1 - netdata_exit
  */
 #define NETDATA_EXIT_POLL_MS (MSEC_PER_SEC/4)
 static int aclk_block_till_recon_allowed() {
-    // Handle reconnect exponential backoff
-    // fnc aclk_reconnect_delay comes from ACLK Legacy @amoss
-    // but has been modifed slightly (more randomness)
-    unsigned long recon_delay = aclk_reconnect_delay(1);
+    unsigned long recon_delay = aclk_reconnect_delay();
+
     info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
     // we want to wake up from time to time to check netdata_exit
     while (recon_delay)

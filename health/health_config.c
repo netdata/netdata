@@ -707,15 +707,15 @@ static int health_readfile(const char *filename, void *data) {
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
-                if(rc->class) {
-                    if(strcmp(rc->class, value) != 0)
+                if(rc->classification) {
+                    if(strcmp(rc->classification, value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rc->name, key, rc->class, value, value);
+                                line, filename, rc->name, key, rc->classification, value, value);
 
-                    freez(rc->class);
+                    freez(rc->classification);
                 }
-                rc->class = strdupz(value);
-                strip_quotes(rc->class);
+                rc->classification = strdupz(value);
+                strip_quotes(rc->classification);
             }
             else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
                 if(rc->component) {
@@ -892,15 +892,15 @@ static int health_readfile(const char *filename, void *data) {
                 rt->hash_context = simple_hash(rt->context);
             }
             else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
-                if(rt->class) {
-                    if(strcmp(rt->class, value) != 0)
+                if(rt->classification) {
+                    if(strcmp(rt->classification, value) != 0)
                         error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                              line, filename, rt->name, key, rt->class, value, value);
+                              line, filename, rt->name, key, rt->classification, value, value);
 
-                    freez(rt->class);
+                    freez(rt->classification);
                 }
-                rt->class = strdupz(value);
-                strip_quotes(rt->class);
+                rt->classification = strdupz(value);
+                strip_quotes(rt->classification);
             }
             else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
                 if(rt->component) {

@@ -35,7 +35,7 @@ server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea
 
 ## Prerequisites
 
-- A node running the Netdata Agent. If you don't yet have that, [get Netdata](/docs/get/README.md).
+- A node running the Netdata Agent. If you don't yet have that, [get Netdata](/docs/get-started.mdx).
 - A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
 - Familiarity with configuring the Netdata Agent with [`edit-config`](/docs/configure/nodes.md).
 - _Optional_: An Nginx web server running on the same node to follow the example configuration steps.
@@ -55,7 +55,7 @@ repo](https://github.com/netdata/community/tree/main/netdata-agent-api/netdata-p
 sudo su -s /bin/bash netdata
 
 # Install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 > If the `pip3` command fails, you need to install it. For example, on an Ubuntu system, use `sudo apt install
