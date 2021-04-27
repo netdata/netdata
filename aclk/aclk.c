@@ -863,6 +863,11 @@ void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *modu
         return;
     }
 
+    if (aclk_use_new_cloud_arch) {
+        // TODO for now prevent sending old INFO payload
+        return;
+    }
+
     COLLECTOR_LOCK;
 
     tmp_collector = _add_collector(host->machine_guid, plugin_name, module_name);
@@ -903,6 +908,11 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
     struct aclk_query *query;
     struct _collector *tmp_collector;
     if (unlikely(!netdata_ready)) {
+        return;
+    }
+
+    if (aclk_use_new_cloud_arch) {
+        // TODO for now prevent sending old INFO payload
         return;
     }
 
