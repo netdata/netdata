@@ -32,8 +32,11 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
 #endif
 }
 
-static uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic)
+static uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
+#ifndef ACLK_LOG_CONVERSATION_DIR
+    UNUSED(msgname);
+#endif
     uint16_t packet_id;
     const char *topic = aclk_get_topic(subtopic);
 
@@ -49,7 +52,7 @@ static uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char 
 #ifdef ACLK_LOG_CONVERSATION_DIR
 #define FN_MAX_LEN 1024
     char filename[FN_MAX_LEN];
-    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx.json", ACLK_GET_CONV_LOG_NEXT());
+    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-tx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgname);
     FILE *fptr;
     fptr = fopen(filename,"w");
     fwrite(msg, msg_len, 1, fptr);
@@ -421,7 +424,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         return 0;
     }
 
-    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN);
+    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
     freez(msg);
     return pid;
 }
@@ -458,7 +461,7 @@ void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creat
         return;
     }
 
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE);
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CREATE_NODE, "CreateNodeInstance");
     freez(msg);
 }
 
@@ -470,7 +473,7 @@ void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_conne
         return;
     }
 
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN);
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
     freez(msg);
 }
 
