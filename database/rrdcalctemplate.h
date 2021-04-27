@@ -31,6 +31,9 @@ struct rrdcalctemplate {
     char *module_match;
     SIMPLE_PATTERN *module_pattern;
 
+    char *charts_match;
+    SIMPLE_PATTERN *charts_pattern;
+
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
