@@ -11,6 +11,7 @@ void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->machine_guid);
     freez(rpt->os);
     freez(rpt->timezone);
+    freez(rpt->abbrev_timezone);
     freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
@@ -307,6 +308,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rpt->machine_guid
                 , rpt->os
                 , rpt->timezone
+                , rpt->abbrev_timezone
+                , rpt->utc_offset
                 , rpt->tags
                 , rpt->program_name
                 , rpt->program_version

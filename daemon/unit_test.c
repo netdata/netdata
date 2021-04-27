@@ -1500,6 +1500,8 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , name
             , os_type
             , netdata_configured_timezone
+            , netdata_configured_abbrev_timezone
+            , netdata_configured_utc_offset
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , program_name
             , program_version

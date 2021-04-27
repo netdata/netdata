@@ -72,6 +72,8 @@ struct receiver_state {
     char *machine_guid;
     char *os;
     char *timezone;         // Unused?
+    char *abbrev_timezone;
+    int32_t utc_offset;
     char *tags;
     char *client_ip;        // Duplicated in pluginsd 
     char *client_port;        // Duplicated in pluginsd 
