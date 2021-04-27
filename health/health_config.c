@@ -12,7 +12,7 @@
 #define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_PLUGIN_KEY "plugin"
 #define HEALTH_MODULE_KEY "module"
-#define HEALTH_CHARTS_KEY "module"
+#define HEALTH_CHARTS_KEY "charts"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
@@ -525,7 +525,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
         hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
         hash_module = simple_uhash(HEALTH_MODULE_KEY);
-        hash_charts = simple_uhash(HEALTH_CHART_KEY);
+        hash_charts = simple_uhash(HEALTH_CHARTS_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
@@ -948,9 +948,9 @@ static int health_readfile(const char *filename, void *data) {
                 rt->module_match = strdupz(value);
                 rt->module_pattern = simple_pattern_create(rt->module_match, NULL, SIMPLE_PATTERN_EXACT);
             }
-            else if(hash == hash_charts && !strcasecmp(key, HEALTH_MODULE_KEY)) {
+            else if(hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
                 freez(rt->charts_match);
-                simple_pattern_free(rt->module_pattern);
+                simple_pattern_free(rt->charts_pattern);
 
                 rt->charts_match = strdupz(value);
                 rt->charts_pattern = simple_pattern_create(rt->charts_match, NULL, SIMPLE_PATTERN_EXACT);
