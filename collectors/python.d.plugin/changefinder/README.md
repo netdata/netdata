@@ -182,7 +182,7 @@ sudo su -s /bin/bash netdata
 - [GitHub repo](https://github.com/shunsukeaihara/changefinder) for the changefinder library.
 - Relevant academic papers:
     - Yamanishi K, Takeuchi J. A unifying framework for detecting outliers and change points from nonstationary time
-      series data. 8th ACM SIGKDD international conference on Knowledge discovery and data mining - KDD ’02. 2002:
+      series data. 8th ACM SIGKDD international conference on Knowledge discovery and data mining - KDD02. 2002:
       676. ([pdf](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.12.3469&rep=rep1&type=pdf))
     - Kawahara Y, Sugiyama M. Sequential Change-Point Detection Based on Direct Density-Ratio Estimation. SIAM
       International Conference on Data Mining. 2009:
