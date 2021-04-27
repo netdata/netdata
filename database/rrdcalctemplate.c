@@ -111,6 +111,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->module_match);
     simple_pattern_free(rt->module_pattern);
 
+    freez(rt->charts_match);
+    simple_pattern_free(rt->charts_pattern);
+
     freez(rt->name);
     freez(rt->exec);
     freez(rt->recipient);
