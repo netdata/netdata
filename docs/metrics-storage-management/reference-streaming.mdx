@@ -11,7 +11,7 @@ Each node running Netdata can stream the metrics it collects, in real time, to a
 [how streaming works](/docs/metrics-storage-management/how-streaming-works.mdx).
 
 For a quickstart guide for enabling a simple `parent-child` streaming relationship, see our [stream metrics between
-nodes](/docs/metrics-storage-management/stream-metrics.mdx) doc. All other configuration options and scenarios are
+nodes](/docs/metrics-storage-management/enable-streaming.mdx) doc. All other configuration options and scenarios are
 covered in the sections below.
 
 ## Configuration
@@ -94,7 +94,7 @@ To enable TCP streaming to a parent node at `203.0.113.0` on port `20000` and wi
 
 #### `send charts matching`
 
-A space-separated list of [Netdata simple patterns](/libnetdata/simple_patterns/README.md) to filter which charts are streamed.
+A space-separated list of [Netdata simple patterns](/libnetdata/simple_pattern/README.md) to filter which charts are streamed.
 
 The default is a single wildcard `*`, which streams all charts.
 
@@ -144,8 +144,8 @@ The [database](/database/README.md) to use for all nodes using this `API_KEY`. V
 
 - `dbengine`: The default, recommended time-series database (TSDB) for Netdata. Stores recent metrics in memory, then
   efficiently spills them to disk for long-term storage.
-- `ram`: Stores metrics _only_ in memory, which means metrics are when Netdata stops or restarts. Ideal for streaming
-  configurations that use ephemeral nodes.
+- `ram`: Stores metrics _only_ in memory, which means metrics are lost when Netdata stops or restarts. Ideal for
+  streaming configurations that use ephemeral nodes.
 - `save`: Stores metrics in memory, but saves metrics to disk when Netdata stops or restarts, and loads historical
   metrics on start.
 - `map`: Stores metrics in memory-mapped files, like swap, with constant disk write.

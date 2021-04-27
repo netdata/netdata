@@ -94,12 +94,13 @@ is `http://203.0.113.0:19999/host/netdata-child`.
 Now that you have a basic streaming setup with replication, you may want to tweak the configuration to eliminate the
 child database, disable the child dashboard, or enable SSL on the streaming connection between the parent and child.
 
-See the [streaming reference doc](/streaming/README.md#supported-streaming-configurations) for details about other
-possible configurations.
+See the [streaming reference
+doc](/docs/metrics-storage-management/reference-streaming.mdx#supported-streaming-configurations) for details about
+other possible configurations.
 
 When using Netdata's default TSDB (`dbengine`), the parent node maintains separate, parallel databases for itself and
 every child node streaming to it. Each instance is sized identically based on the `dbengine multihost disk space`
-setting in `netdata.conf`. See our doc on [changing metrics retention](/docs/store/change-metrics-strorage.md) for
+setting in `netdata.conf`. See our doc on [changing metrics retention](/docs/store/change-metrics-storage.md) for
 details.
 
 ### Related information & further reading
