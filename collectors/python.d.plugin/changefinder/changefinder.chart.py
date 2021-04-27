@@ -99,16 +99,13 @@ class Service(UrlService):
 
         return score, flag
 
-    def update_chart(self, chart, data, algo='absolute', multiplier=1, divisor=1):
-        """Add dimensions found in data to chart if needed. Delete those not found in `data`.
+    def validate_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
+        """If dimension not in chart then add it.
         """
-        if not self.charts:
-            return
-
         for dim in data:
             if dim not in self.collected_dims[chart]:
                 self.collected_dims[chart].add(dim)
-                self.charts[chart].add_dimension([dim, dim, algo, multiplier, divisor])
+                self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
 
         for dim in list(self.collected_dims[chart]):
             if dim not in data:
@@ -173,9 +170,9 @@ class Service(UrlService):
 
         if self.show_scores:
             data_score['average_score'] = sum(data_score.values()) / len(data_score)
-            self.update_chart('scores', data_score, divisor=100)
+            self.validate_charts('scores', data_score, divisor=100)
 
-        self.update_chart('flags', data_flag)
+        self.validate_charts('flags', data_flag)
 
         data = {**data_score, **data_flag}
 
