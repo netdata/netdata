@@ -1300,6 +1300,11 @@ static inline char *cgroup_chart_id_strdupz(const char *s) {
     char *r = strdupz(s);
     netdata_fix_chart_id(r);
 
+    for (char *d = r; *d; d++) {
+        if (*d == '.')
+            *d = '-';
+    }
+
     return r;
 }
 
