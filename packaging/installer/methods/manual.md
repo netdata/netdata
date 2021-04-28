@@ -217,25 +217,13 @@ cd netdata
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
 
-### Claim your node during installation
+### Claim node to Netdata Cloud during installation
 
-The `netdata-installer.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to
-Netdata Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
-Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md) or
+[`kickstart-static64.sh`](/packaging/installer/methods/kickstart-64.md) methods, the `netdata-installer.sh` script does
+not allow you to automatically [claim](/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-- `--claim-token`: The unique token associated with your Space in Netdata Cloud.
-- `--claim-rooms`: A comma-separated list of tokens for each War Room this node should appear in.
-- `--claim-proxy`: Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or
-  `http://[user:pass@]host:ip` for an HTTP(S) proxy.See [claiming through a
-  proxy](/claim/README.md#claim-through-a-proxy) for details.
-- `--claim-url`: Defaults to `https://app.netdata.cloud`.
-
-For example:
-
-```bash
-./netdata-installer.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
-```
+See the [claiming](/claim/README.md) doc for details on claiming a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 

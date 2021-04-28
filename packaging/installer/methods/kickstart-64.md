@@ -71,7 +71,7 @@ your installation. Here are a few important parameters:
     kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
     this _and_ `--stable-channel`, Netdata will use the local files.
 
-### Claim your node during installation
+### Claim node to Netdata Cloud during installation
 
 The `kickstart.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to Netdata
 Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
