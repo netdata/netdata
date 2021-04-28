@@ -484,7 +484,7 @@ static void ebpf_create_filesystem_charts()
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files listed inside directory cache",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_FILESYSTEM_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,
@@ -493,7 +493,7 @@ static void ebpf_create_filesystem_charts()
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
-                      EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
+                      EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_FILESYSTEM_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21201,
