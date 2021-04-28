@@ -38,30 +38,16 @@ struct sqlite_cmdqueue {
 };
 
 struct sqlite_worker_config {
-    //struct rrdengine_instance *ctx;
-
     uv_thread_t thread;
-    uv_loop_t* loop;
+    char uuid_str[GUID_LEN + 1];
+    uv_loop_t *loop;
+    RRDHOST *host;
     uv_async_t async;
-
-    /* file deletion thread */
-    //uv_thread_t *now_deleting_files;
-    //unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
-
-    /* dirty page deletion thread */
-    //uv_thread_t *now_invalidating_dirty_pages;
-    /* set to 0 when now_invalidating_dirty_pages is still running */
-    //unsigned long cleanup_thread_invalidating_dirty_pages;
-    //unsigned inflight_dirty_pages;
-
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct sqlite_cmdqueue cmd_queue;
-
-    //struct extent_cache xt_cache;
-
     int error;
 };
 

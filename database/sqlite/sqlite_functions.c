@@ -191,10 +191,10 @@ int sql_init_database(void)
         }
     }
     info("SQLite database initialization completed");
-    uv_thread_t   sqlite_event_loop_t;
-    struct sqlite_worker_config worker_config;
-    memset(&worker_config, 0, sizeof(worker_config));
-    fatal_assert(0 == uv_thread_create(&sqlite_event_loop_t, sqlite_worker, &worker_config));
+//    uv_thread_t   sqlite_event_loop_t;
+//    struct sqlite_worker_config worker_config;
+//    memset(&worker_config, 0, sizeof(worker_config));
+//    fatal_assert(0 == uv_thread_create(&sqlite_event_loop_t, sqlite_worker, &worker_config));
     return 0;
 }
 

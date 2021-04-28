@@ -84,10 +84,10 @@ static void timer_cb(uv_timer_t* handle)
 
 #define MAX_CMD_BATCH_SIZE (256)
 
-void sqlite_worker(void* arg)
+void sqlite_worker(void *arg)
 {
-    struct sqlite_worker_config* wc = arg;
-    uv_loop_t* loop;
+    struct sqlite_worker_config *wc = arg;
+    uv_loop_t *loop;
     int shutdown, ret;
     enum sqlite_opcode opcode;
     uv_timer_t timer_req;
@@ -95,6 +95,7 @@ void sqlite_worker(void* arg)
     unsigned cmd_batch_size;
 
     sqlite_init_cmd_queue(wc);
+    uv_thread_set_name_np(wc->thread, "Test");
 
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
@@ -127,6 +128,9 @@ void sqlite_worker(void* arg)
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
+        if (netdata_exit)
+            shutdown = 1;
+
         /* wait for commands */
         cmd_batch_size = 0;
         do {
@@ -147,6 +151,7 @@ void sqlite_worker(void* arg)
                     break;
                 case SQLITEOP_CLEANUP:
                     //sql_maint_database();
+//                    info("dbsync for ACLK %s", wc->uuid_str);
                     break;
                 case SQLITEOP_SHUTDOWN:
                     shutdown = 1;
