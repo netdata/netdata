@@ -144,6 +144,34 @@ void sql_queue_chart_to_aclk(RRDSET *st, int cmd)
 // Load nodes on startup (ask those that do not have node id)
 // Start thread event loop (R/W)
 
+
+// HOST is locked in this case
+
+static void dbsync_thread_cleanup(void *ptr) {
+    char *uuid_str = ptr;
+
+    info("ACLK dbsync thread is cleaning up on uuid %s", uuid_str);
+
+
+    freez(uuid_str);
+}
+
+
+void *dbsync_thread(void *ptr) {
+    char  *uuid_str = ptr;
+    //s->task_id = gettid();
+    netdata_thread_cleanup_push(dbsync_thread_cleanup, ptr);
+
+    info("ACLK dbsync thread starting on uuid %s", uuid_str);
+    while (!netdata_exit) {
+        sleep_usec(2 * USEC_PER_SEC);
+        info("PROCESSING ....");
+
+    }
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+
 void sql_create_aclk_table(RRDHOST *host)
 {
     char uuid_str[37];
@@ -166,4 +194,21 @@ void sql_create_aclk_table(RRDHOST *host)
     sprintf(sql,"create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
                  "date_created, date_updated, unique_id);", uuid_str);
     db_execute(sql);
+
+    // Spawn db thread for processing (event loop)
+
+    if (!host->dbsync_thread_spawn) {
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "ACLKSYNC[%s]", host->hostname);
+
+        if (netdata_thread_create(
+                &host->dbsync_thread,
+                tag,
+                NETDATA_THREAD_OPTION_JOINABLE,
+                dbsync_thread,
+                (void *) strdupz(uuid_str)))
+            error_report("Failed to create dbsync thread for %s", host->hostname);
+        else
+            host->dbsync_thread_spawn = 1;
+    }
 }
