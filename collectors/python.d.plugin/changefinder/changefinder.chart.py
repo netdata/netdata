@@ -102,6 +102,9 @@ class Service(UrlService):
     def validate_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
         """If dimension not in chart then add it.
         """
+        if not self.charts:
+            return
+
         for dim in data:
             if dim not in self.collected_dims[chart]:
                 self.collected_dims[chart].add(dim)
