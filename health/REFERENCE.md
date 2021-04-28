@@ -180,14 +180,15 @@ module: isc_dhcpd
 
 #### Alarm line `charts`
 
-The `charts` line filters which chart this alarm should apply to. It is only available with [`template`](#alarm-line-alarm-or-template).
+The `charts` line filters which chart this alarm should apply to. It is only available on entities using the 
+[`template`](#alarm-line-alarm-or-template) line.
 The value is a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). For
-example, you can create a template that applies on `disk.svctm` (Average Service Time) context, but you exclude
-alarms for the disk `sdb`:
+example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alarms:
 
 ```yaml
-    on: disk.svctm
-charts: !*sdb* *
+template: disk_svctm_alarm
+      on: disk.svctm
+  charts: !*sdb* *
 ```
 
 #### Alarm line `families`
