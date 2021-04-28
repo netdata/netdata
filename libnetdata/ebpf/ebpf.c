@@ -416,6 +416,50 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
     return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
+static char *ebpf_update_name(char *search)
+{
+    char filename[FILENAME_MAX + 1];
+    char *ret = NULL;
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) {
+        error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+        return ret;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return ret;
+
+    unsigned long i, lines = procfile_lines(ff);
+    size_t length = strlen(search);
+    for(i = 0; i < lines ; i++) {
+        char *cmp = procfile_lineword(ff, i,2);;
+        if (!strncmp(search, cmp, length)) {
+            ret = strdupz(cmp);
+            break;
+        }
+    }
+
+    procfile_close(ff);
+
+    return ret;
+}
+
+void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em)
+{
+    int mode = em->mode;
+    em->names = opt;
+
+    size_t i = 0;
+    while (opt[i].program_name) {
+        opt[i].retprobe = (mode == MODE_RETURN);
+        opt[i].optional = ebpf_update_name(opt[i].function_to_attach);
+
+        i++;
+    }
+}
+
 //----------------------------------------------------------------------------------------------------------------------
 
 void ebpf_mount_config_name(char *filename, size_t length, char *path, char *config)

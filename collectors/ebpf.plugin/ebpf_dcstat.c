@@ -34,6 +34,12 @@ static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_pid", .internal_input
                                            .user_input = 0},
                                           {.name = NULL, .internal_input = 0, .user_input = 0}};
 
+static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_lookup_fast",
+                                                  .function_to_attach = "lookup_fast",
+                                                   .optional = NULL,
+                                                   .retprobe = CONFIG_BOOLEAN_NO},
+                                                  {.program_name = NULL}};
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
@@ -78,6 +84,20 @@ void clean_dcstat_pid_structures() {
 }
 
 /**
+ *  Clean names
+ *
+ *  Clean the optional names allocated during startup.
+ */
+void ebpf_dcstat_clean_names()
+{
+    size_t i = 0;
+    while (dc_optional_name[i].program_name) {
+        freez(dc_optional_name[i].optional);
+        i++;
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -99,6 +119,8 @@ static void ebpf_dcstat_cleanup(void *ptr)
     freez(dcstat_vector);
 
     ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
+
+    ebpf_dcstat_clean_names();
 
     struct bpf_program *prog;
     size_t i = 0 ;
@@ -526,6 +548,7 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
  *
  *****************************************************************/
 
+
 /**
  * Directory Cache thread
  *
@@ -545,6 +568,8 @@ void *ebpf_dcstat_thread(void *ptr)
 
     ebpf_update_module(em, &dcstat_config, NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE);
     ebpf_update_pid_table(&dcstat_maps[0], em);
+
+    ebpf_update_names(dc_optional_name, em);
 
     if (!em->enabled)
         goto enddcstat;
