@@ -1300,6 +1300,12 @@ static inline char *cgroup_chart_id_strdupz(const char *s) {
     char *r = strdupz(s);
     netdata_fix_chart_id(r);
 
+    // dots are used to distinguish chart type and id in streaming, so we should replace them
+    for (char *d = r; *d; d++) {
+        if (*d == '.')
+            *d = '-';
+    }
+
     return r;
 }
 
