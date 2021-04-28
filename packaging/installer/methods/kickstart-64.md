@@ -22,9 +22,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 
 > This script installs Netdata at `/opt/netdata`.
 
-> See our [installation guide](/packaging/installer/README.md) for details about [automatic
-> updates](/packaging/installer/README.md#automatic-updates) or [nightly vs. stable
-> releases](/packaging/installer/README.md#nightly-vs-stable-releases).
+> See the [installation reference](/docs/installation/reference-installer.mdx) for details about [automatic
+> updates](/docs/installation/reference-installer.mdx#automatic-updates) or [nightly vs. stable
+> releases](/docs/installation/reference-installer.mdx#nightly-vs-stable-releases).
 
 ## What does `kickstart-static64.sh` do?
 
@@ -55,21 +55,28 @@ sh /tmp/kickstart-static64.sh
 ## Optional parameters to alter your installation
 
 The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, which you can use to customize
-your installation. Here are a few important parameters:
+your installation. Read about these parameters in the [installation
+reference](/docs/installation/reference-installer.mdx#parameters).
 
--   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
--   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
--   `--stable-channel`: Automatically update only on the release of new major versions.
--   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
-    Netdata better.
--   `--no-updates`: Prevent automatic updates of any kind.
--   `--reinstall`: If an existing installation is detected, reinstall instead of attempting to update it. Note
-    that this cannot be used to switch between installation types.
--   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths:
-    the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force
-    kickstart run the process using those files. This option conflicts with the `--stable-channel` option. If you set
-    this _and_ `--stable-channel`, Netdata will use the local files.
+### Claim node to Netdata Cloud during installation
+
+The `kickstart.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to Netdata
+Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
+Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+- `--claim-token`: The unique token associated with your Space in Netdata Cloud.
+- `--claim-rooms`: A comma-separated list of tokens for each War Room this node should appear in.
+- `--claim-proxy`: Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or
+  `http://[user:pass@]host:ip` for an HTTP(S) proxy.See [claiming through a
+  proxy](/claim/README.md#claim-through-a-proxy) for details.
+- `--claim-url`: Defaults to `https://app.netdata.cloud`.
+
+For example:
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
+```
 
 ### Claim node to Netdata Cloud during installation
 

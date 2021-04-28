@@ -1,6 +1,6 @@
 ---
 title: Installer reference
-description: ''
+description: 'Netdata offers many installation methods to support all your physical/virtual servers. Learn about all the ways to configure your Netdata experience or find a method that works best for you.'
 type: reference
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/installation/reference-installer.mdx
 ---
@@ -9,11 +9,32 @@ import { Install, InstallBox } from '../../src/components/Install/'
 
 # Installer reference
 
+Netdata offers many installation methods to support all your physical/virtual servers.
 
+The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our [one-line
+installer script (`kickstart.sh`)](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended), which
+automatically installs dependencies and builds Netdata from its source code. For those who don't want to install Netdata
+directly, we also recommend [running Netdata with Docker](/docs/get-started.mdx#run-netdata-with-docker).
 
-## Supported installation methods
+## Supported operating systems
 
+We run automated checks on every PR to ensure that Netdata installs and runs properly on the following Linux
+distributions:
 
+- Ubuntu `21.04`, `20.10`, `20.04`, `18.04`, `16.04`
+- Debian `10`, `9`
+- Alpine `edge`, `3.13`, `3.12`, `3.11`, `3.10`
+- Arch Linux `latest`
+- Fedora `34`, `33`, `32`
+- CentOS `8`, `7`
+- OpenSUSE `tumbleweed:latest`, `leap:15.2`
+- Clear Linux `latest`
+
+Netdata runs on other distributions and operating systems as well, but they aren't officially supported by our team.
+
+## Installation methods
+
+Click on any of the boxes to jump to the reference doc for that installation method.
 
 <Install>
   <InstallBox
@@ -56,8 +77,8 @@ import { Install, InstallBox } from '../../src/components/Install/'
 
 ## `netdata-installer.sh`
 
-Many installation methods are a wrapper around a single script, `netdata-installer.sh`, which handles the installation
-process itself. This is true of the following methods:
+The following installation methods are a wrapper around a single script, `netdata-installer.sh`, which handles the
+installation process itself:
 
 - [One-line installer (`kickstart.sh`)](/packaging/installer/methods/kickstart.md)
 - [Pre-compiled static binary (`kickstart-static64.sh`)](/packaging/installer/methods/kickstart64.md)
@@ -82,22 +103,6 @@ The `netdata-install.sh` script takes the following parameters to customize any 
 | `--disable-telemetry` | Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make Netdata better.                                                                                     |
 | `--reinstall`         | If an existing install is detected, reinstall instead of trying to update it. See the [reinstall](/docs/installation/reinstall.mdx) doc for details.                                |
 | `--local-files`       | Used for [offline installations](offline.md). This option conflicts with the `--stable-channel` option. If you set this _and_ `--stable-channel`, Netdata will use the local files. |
-
-### Claim to Netdata Cloud during installation
-
-`netdata-installer.sh` accepts additional parameters to automatically [claim](/claim/README.md) your node to Netdata
-Cloud immediately after installation. Using any of the supported methods listed above.
-
-Find the `token` and `rooms` strings by [signing in to Netdata
-Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
-
-| Parameter       | Description                                                                                                                                                                                                             |
-| :-------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--claim-token` | The unique token associated with your Space in Netdata Cloud.                                                                                                                                                           |
-| `--claim-rooms` | A comma-separated list of tokens for each War Room this node should appear in.                                                                                                                                          |
-| `--claim-proxy` | Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [claiming through a proxy](/claim/README.md#claim-through-a-proxy) for details. |
-| `--claim-url`   | Defaults to `https://app.netdata.cloud`.                                                                                                                                                                                |
 
 ## Automatic updates
 
