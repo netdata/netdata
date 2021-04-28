@@ -796,8 +796,7 @@ struct rrdhost {
     struct sender_state *sender;
     volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
-    volatile unsigned int dbsync_thread_spawn:1;          // 1 when the dbthread thread has been spawn
-    netdata_thread_t dbsync_thread;                 // the database aclk sync thread
+    void *dbsync_worker;
 
     volatile unsigned int rrdpush_sender_connected:1; // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
