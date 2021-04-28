@@ -11,28 +11,6 @@ concurrency:
   group: builder-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  static-build:
-    name: Static Build
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch:
-          - x86_64
-          - armv7l
-          - aarch64
-    steps:
-      - name: Git clone repository
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Build
-        run: .github/scripts/build-static.sh ${{ matrix.arch }}
-      - name: Save Packages
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{ matrix.arch }}-static-builds
-          path: ${{ github.workspace }}/artifacts/*
   source-build:
     name: Build & Install
     strategy:

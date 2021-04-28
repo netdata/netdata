@@ -1,6 +1,11 @@
 ---
+# Ci code for building release artifacts.
 name: Release Build
 on:
+  push: # Master branch checks only validate the build and generate artifacts for testing.
+    branches:
+      - master
+  pull_request: null # PR checks only validate the build and generate artifacts for testing.
   workflow_dispatch:
     inputs:
       type:
@@ -15,16 +20,17 @@ concurrency:
   group: release-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  build-dist:
+  build-dist: # Build the distribution tarball and store it as an artifact.
+    name: Build Distribution Tarball
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          submodules: true
+          submodules: recursive
       - name: Mark Stable
-        if: github.event.inputs.version != "nightly"
+        if: gitub.event_name == 'workflow_dispatch' && github.event.inputs.version != "nightly"
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
       - name: Build
@@ -40,6 +46,10 @@ jobs:
                       --with-user=netdata
           make dist
           mv "netdata$(git describe).tar.gz" artifacts/
+      - name: Test
+        run: |
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          .github/scripts/run_install_with_dist_file.sh "artifacts/netdata$(git describe).tar.gz"
       - name: Store
         uses: actions/upload-artifact@v2
         with:
@@ -50,7 +60,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Distribution tarball build failed:'
           SLACK_USERNAME: 'GitHub Actions'
@@ -60,23 +70,30 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
           }}
 
-  build-static:
+  build-static: # Build the static binary archives, and store them as artifacts.
+    name: Build Static
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - 'x86_64'
+          - 'armv7l'
+          - 'aarch64'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          submodules: true
+          submodules: recursive
       - name: Mark Stable
-        if: github.event.inputs.version != "nightly"
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != "nightly"
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Build
-        run: |
-          packages/makeself/build-x86_64-static.sh
+        run: .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         uses: actions/upload-artifact@v2
         with:
@@ -87,29 +104,27 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Static build failed:'
+          SLACK_TITLE: 'Static build for ${{ matrix.arch }} failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "Static build failed."
+          SLACK_MESSAGE: "Static build for ${{ matrix.arch }} failed."
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
           }}
 
-  prepare-upload:
+  prepare-upload: # Consolidate the artifacts for uploading or releasing.
+    name: Prepare Artifacts
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     needs:
       - build-dist
       - build-static
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          submodules: true
       - name: Prepare Environment
         run: mkdir -p artifacts
       - name: Retrieve Artifacts
@@ -131,7 +146,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to prepare release artifacts for upload:'
           SLACK_USERNAME: 'GitHub Actions'
@@ -141,9 +156,11 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
           }}
 
-  upload-nightly:
+  upload-nightly: # Upload the nightly build artifacts to GCS.
+    name: Upload Nightly Artifacts
     runs-on: ubuntu-latest
     if: github.event_name == "workflow_dispatch" && github.event.inputs.type == "nightly"
     needs:
@@ -169,7 +186,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to upload nightly release artifacts:'
           SLACK_USERNAME: 'GitHub Actions'
@@ -179,9 +196,11 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
           }}
 
-  upload-release:
+  upload-release: # Create the draft release and upload the build artifacts.
+    name: Create Release Draft
     runs-on: ubuntu-latest
     if: github.event_name == "workflow_dispatch" && github.event.inputs.type == "release"
     needs:
@@ -206,7 +225,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Failed to draft release:'
           SLACK_USERNAME: 'GitHub Actions'
@@ -216,4 +235,5 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name == 'wworkflow_dispatch'
           }}
