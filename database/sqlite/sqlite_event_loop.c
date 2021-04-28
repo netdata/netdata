@@ -146,7 +146,7 @@ void sqlite_worker(void* arg)
                     /* the command queue was empty, do nothing */
                     break;
                 case SQLITEOP_CLEANUP:
-                    sql_maint_database();
+                    //sql_maint_database();
                     break;
                 case SQLITEOP_SHUTDOWN:
                     shutdown = 1;
