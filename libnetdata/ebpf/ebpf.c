@@ -324,7 +324,61 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
     }
 }
 
-struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string, struct bpf_object **obj, int *map_fd)
+size_t ebpf_count_programs(struct bpf_object *obj)
+{
+    size_t tot = 0;
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, obj)
+    {
+        tot++;
+    }
+
+    return tot;
+}
+
+static ebpf_specify_name_t *ebpf_find_names(ebpf_specify_name_t *names, const char *prog_name)
+{
+    size_t i = 0;
+    while (names[i].program_name) {
+        if (!strcmp(prog_name, names[i].program_name))
+            return &names[i];
+
+        i++;
+    }
+
+    return NULL;
+}
+
+static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t length, ebpf_specify_name_t *names)
+{
+    struct bpf_link **links = callocz(length , sizeof(struct bpf_link *));
+    size_t i = 0;
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, obj)
+    {
+        links[i] = bpf_program__attach(prog);
+        if (libbpf_get_error(links[i]) && names) {
+            const char *name = bpf_program__name(prog);
+            ebpf_specify_name_t *w = ebpf_find_names(names, name);
+            if (w) {
+                enum bpf_prog_type type = bpf_program__get_type(prog);
+                if (type == BPF_PROG_TYPE_KPROBE)
+                    links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
+            }
+        }
+
+        if (libbpf_get_error(links[i])) {
+            links[i] = NULL;
+        }
+
+        i++;
+    }
+
+    return links;
+}
+
+struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
+                                    struct bpf_object **obj, int *map_fd)
 {
     char lpath[4096];
     char lname[128];
@@ -357,16 +411,9 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         i++;
     }
 
-    struct bpf_program *prog;
-    struct bpf_link **links = callocz(NETDATA_MAX_PROBES , sizeof(struct bpf_link *));
-    i = 0;
-    bpf_object__for_each_program(prog, *obj)
-    {
-        links[i] = bpf_program__attach(prog);
-        i++;
-    }
+    size_t count_programs =  ebpf_count_programs(*obj);
 
-    return links;
+    return ebpf_attach_programs(*obj, count_programs, em->names);
 }
 
 //----------------------------------------------------------------------------------------------------------------------

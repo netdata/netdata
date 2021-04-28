@@ -104,6 +104,13 @@ typedef struct ebpf_local_maps {
     uint32_t user_input;
 } ebpf_local_maps_t;
 
+typedef struct ebpf_specify_name {
+    char *program_name;
+    char *function_to_attach;
+    char *optional;
+    bool retprobe;
+} ebpf_specify_name_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -117,10 +124,9 @@ typedef struct ebpf_module {
     int optional;
     void (*apps_routine)(struct ebpf_module *em, void *ptr);
     ebpf_local_maps_t *maps;
+    ebpf_specify_name_t *names;
     uint32_t pid_map_size;
 } ebpf_module_t;
-
-#define NETDATA_MAX_PROBES 64
 
 extern int get_kernel_version(char *out, int size);
 extern int get_redhat_release();
