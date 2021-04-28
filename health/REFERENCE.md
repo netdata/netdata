@@ -62,6 +62,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
 | [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
 | [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
+| [`charts`](#alarm-line-charts)                      | no              | Restrict an alarm or template to specified charts.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
@@ -175,6 +176,18 @@ example, you can create an alarm that applies only on the `isc_dhcpd` module sta
 ```yaml
 plugin: python.d.plugin
 module: isc_dhcpd
+```
+
+#### Alarm line `charts`
+
+The `charts` line filters which chart this alarm should apply to. It is only available with [`template`](#alarm-line-alarm-or-template).
+The value is a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+example, you can create a template that applies on `disk.svctm` (Average Service Time) context, but you exclude
+alarms for the disk `sdb`:
+
+```yaml
+    on: disk.svctm
+charts: !*sdb*
 ```
 
 #### Alarm line `families`
