@@ -78,4 +78,5 @@ extern int get_node_id(uuid_t *host_id, uuid_t *node_id);
 extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
+extern int execute_insert(sqlite3_stmt *res);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
