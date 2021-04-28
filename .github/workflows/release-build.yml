@@ -46,10 +46,11 @@ jobs:
                       --with-math \
                       --with-user=netdata
           make dist
-          mv "netdata$(git describe).tar.gz" artifacts/
+          cp netdata-*.tar.gz artifacts/
+          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
       - name: Test
         run: |
-          .github/scripts/run_install_with_dist_file.sh "artifacts/netdata$(git describe).tar.gz"
+          .github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
       - name: Store
         uses: actions/upload-artifact@v2
         with:
