@@ -23,6 +23,7 @@ jobs:
     name: Build & Install
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         distro:
           - 'alpine:edge'
