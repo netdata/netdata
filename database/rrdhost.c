@@ -900,6 +900,7 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->labels.labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
+    freez(host->node_id);
 
     freez(host);
 
