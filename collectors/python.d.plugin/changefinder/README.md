@@ -165,7 +165,7 @@ sudo su -s /bin/bash netdata
   typical behaviour in terms of the trained models and scores you will see in the normal running of your node. Mainly
   this is because it can take a while to build up a proper distribution of previous scores in over to convert the raw
   score returned by the ChangeFinder algorithim into a percentile based on the most recent `n_score_samples` that have
-  already been produced. So when you first turn the collector on, it will have a lot of flags in the begining and then
+  already been produced. So when you first turn the collector on, it will have a lot of flags in the beginning and then
   should 'settle down' once it has built up enough history. This is a typical characteristic of online machine learning
   approaches which need some initial window of time before they can be useful.
 - As this collector does most of the work in Python itself, you may want to try it out first on a test or development
