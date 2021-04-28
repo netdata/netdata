@@ -187,8 +187,8 @@ sudo su -s /bin/bash netdata
     - Kawahara Y, Sugiyama M. Sequential Change-Point Detection Based on Direct Density-Ratio Estimation. SIAM
       International Conference on Data Mining. 2009:
       389–400. ([pdf](https://onlinelibrary.wiley.com/doi/epdf/10.1002/sam.10124))
-    - Liu S, Yamada M, Collier N, Sugiyama M. Change-point detection in time-series data by relative densityratio
-      estimation. Neural Netw. Jul.2013 43:72–83. [PubMed: 23500502] ([pdf](https://arxiv.org/pdf/1203.0453.pdf))
+    - Liu S, Yamada M, Collier N, Sugiyama M. Change-point detection in time-series data by relative density-ratio
+      estimation. Neural Networks. Jul.2013 43:72–83. [PubMed: 23500502] ([pdf](https://arxiv.org/pdf/1203.0453.pdf))
     - T. Iwata, K. Nakamura, Y. Tokusashi, and H. Matsutani, “Accelerating Online Change-Point Detection Algorithm using
       10 GbE FPGA NIC,” Proc. International European Conference on Parallel and Distributed Computing (Euro-Par’18)
       Workshops, vol.11339, pp.506–517, Aug.
