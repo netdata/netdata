@@ -140,14 +140,14 @@ jobs:
         distro:
           - 'centos:8'
           - 'debian:buster'
-          - 'fedora:32'
+          - 'fedora:34'
           - 'ubuntu:20.04'
         include:
           - distro: 'centos:8'
             pre: >-
-              yum -y update &&
-              yum -y groupinstall 'Development Tools' &&
-              yum -y install libcurl-devel openssl-devel libuuid-devel
+              dnf -y update &&
+              dnf -y groupinstall 'Development Tools' &&
+              dnf -y install libcurl-devel openssl-devel libuuid-devel
             build_kinesis: >-
               git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
@@ -167,11 +167,11 @@ jobs:
               ./aws-sdk-cpp &&
               make &&
               make install
-          - distro: 'fedora:32'
+          - distro: 'fedora:34'
             pre: >-
               dnf -y update &&
               dnf -y groupinstall 'Development Tools' &&
-              dnf -y install libcurl-devel openssl-devel libuuid-devel
+              dnf -y install libcurl-devel openssl-devel libuuid-devel gcc-c++
             build_kinesis: >-
               git clone --branch 1.8.186 --depth 1 https://github.com/aws/aws-sdk-cpp.git &&
               cmake -DCMAKE_INSTALL_PREFIX=/usr
