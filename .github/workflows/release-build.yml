@@ -36,6 +36,7 @@ jobs:
       - name: Build
         run: |
           mkdir -p artifacts
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           autoreconf -ivf
           ./configure --prefix=/usr \
                       --sysconfdir=/etc \
@@ -48,7 +49,6 @@ jobs:
           mv "netdata$(git describe).tar.gz" artifacts/
       - name: Test
         run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           .github/scripts/run_install_with_dist_file.sh "artifacts/netdata$(git describe).tar.gz"
       - name: Store
         uses: actions/upload-artifact@v2
