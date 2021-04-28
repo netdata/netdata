@@ -607,6 +607,12 @@ netdataDashboard.menu = {
         'A special <code>failed</code> state is available as well, which is very similar to <code>inactive</code> and is entered when the service failed in some way (process returned error code on exit, or crashed, an operation timed out, or after too many restarts). ' +
         'For detailes, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.html" target="_blank"> systemd(1)</a>.'
     },
+    
+    'changefinder': {
+        title: 'ChangeFinder',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Online changepoint detection using machine learning. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/changefinder/README.md" target="_blank">here</a>.'
+    },
 
     'zscores': {
         title: 'Z-Scores',
