@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove dots in cgroup ids [\#11050](https://github.com/netdata/netdata/pull/11050) ([vlvkobal](https://github.com/vlvkobal))
 - health/vernemq: use `average` instead of  `sum` [\#11037](https://github.com/netdata/netdata/pull/11037) ([ilyam8](https://github.com/ilyam8))
 - Fix storing an NULL claim id on a parent node [\#11036](https://github.com/netdata/netdata/pull/11036) ([stelfrag](https://github.com/stelfrag))
+- Load names [\#11034](https://github.com/netdata/netdata/pull/11034) ([thiagoftsm](https://github.com/thiagoftsm))
+- Create ebpf.d directory in PLUGINDIR for debian and rpm package\(netdata\#11017\) [\#11031](https://github.com/netdata/netdata/pull/11031) ([wangpei-nice](https://github.com/wangpei-nice))
 - proc/mdstat: add raid level to the family [\#11024](https://github.com/netdata/netdata/pull/11024) ([ilyam8](https://github.com/ilyam8))
 - bump to netdata-pandas==0.0.38 [\#11022](https://github.com/netdata/netdata/pull/11022) ([andrewm4894](https://github.com/andrewm4894))
 - Provide more agent analytics to posthog [\#11020](https://github.com/netdata/netdata/pull/11020) ([MrZammler](https://github.com/MrZammler))
@@ -72,10 +76,12 @@
 - Improvements to dash-example.html [\#10870](https://github.com/netdata/netdata/pull/10870) ([tnyeanderson](https://github.com/tnyeanderson))
 - Replace references to Google Analytics with Posthog where relevant [\#10868](https://github.com/netdata/netdata/pull/10868) ([andrewm4894](https://github.com/andrewm4894))
 - ACLK Passwd endpoint update [\#10859](https://github.com/netdata/netdata/pull/10859) ([underhood](https://github.com/underhood))
+- Dashboard version 2.17.0 [\#10856](https://github.com/netdata/netdata/pull/10856) ([allelos](https://github.com/allelos))
 - prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 - implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
 - implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
 - Zscores python collector [\#10673](https://github.com/netdata/netdata/pull/10673) ([andrewm4894](https://github.com/andrewm4894))
+- add python changefinder collector [\#10672](https://github.com/netdata/netdata/pull/10672) ([andrewm4894](https://github.com/andrewm4894))
 - Report porcelain output [\#10494](https://github.com/netdata/netdata/pull/10494) ([jsoref](https://github.com/jsoref))
 - Add docs on Nginx with IPv6 listen for certbot to work [\#10473](https://github.com/netdata/netdata/pull/10473) ([jilleJr](https://github.com/jilleJr))
 
@@ -309,10 +315,6 @@
 - Fixes for SEO housekeeping/improvements [\#10468](https://github.com/netdata/netdata/pull/10468) ([joelhans](https://github.com/joelhans))
 - Update README.md [\#10467](https://github.com/netdata/netdata/pull/10467) ([OdysLam](https://github.com/OdysLam))
 - Update pfsense.md [\#10466](https://github.com/netdata/netdata/pull/10466) ([OdysLam](https://github.com/OdysLam))
-- Fixed function name in updater script. [\#10462](https://github.com/netdata/netdata/pull/10462) ([Ferroin](https://github.com/Ferroin))
-- Fixed bundling of libwebsockets in binary packages. [\#10460](https://github.com/netdata/netdata/pull/10460) ([Ferroin](https://github.com/Ferroin))
-- Anomalies collector custom model bugfix for issue \#10456 [\#10459](https://github.com/netdata/netdata/pull/10459) ([andrewm4894](https://github.com/andrewm4894))
-- Add missing section to Netdata style guide [\#10453](https://github.com/netdata/netdata/pull/10453) ([joelhans](https://github.com/joelhans))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
