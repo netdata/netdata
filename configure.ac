@@ -1340,7 +1340,7 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -Iexporting/prometheus/remote_write"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -I src/exporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
 else
@@ -1577,16 +1577,6 @@ AC_CONFIG_FILES([
     database/engine/Makefile
     database/engine/metadata_log/Makefile
     diagrams/Makefile
-    exporting/Makefile
-    exporting/graphite/Makefile
-    exporting/json/Makefile
-    exporting/opentsdb/Makefile
-    exporting/prometheus/Makefile
-    exporting/prometheus/remote_write/Makefile
-    exporting/aws_kinesis/Makefile
-    exporting/pubsub/Makefile
-    exporting/mongodb/Makefile
-    exporting/tests/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
@@ -1648,6 +1638,16 @@ AC_CONFIG_FILES([
     src/backends/mongodb/Makefile
     src/claim/Makefile
     src/cli/Makefile
+    src/exporting/Makefile
+    src/exporting/graphite/Makefile
+    src/exporting/json/Makefile
+    src/exporting/opentsdb/Makefile
+    src/exporting/prometheus/Makefile
+    src/exporting/prometheus/remote_write/Makefile
+    src/exporting/aws_kinesis/Makefile
+    src/exporting/pubsub/Makefile
+    src/exporting/mongodb/Makefile
+    src/exporting/tests/Makefile
     src/health/Makefile
     src/health/notifications/Makefile
     src/parser/Makefile

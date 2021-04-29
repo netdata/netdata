@@ -105,12 +105,12 @@ SUBDIRS += \
     collectors \
     daemon \
     database \
-    exporting \
     libnetdata \
     web \
     src/backends \
     src/claim \
 	src/cli \
+    src/exporting \
     src/health \
     src/parser \
     src/registry \
@@ -598,50 +598,50 @@ SPAWN_PLUGIN_FILES = \
     $(NULL)
 
 EXPORTING_ENGINE_FILES = \
-    exporting/exporting_engine.c \
-    exporting/exporting_engine.h \
-    exporting/graphite/graphite.c \
-    exporting/graphite/graphite.h \
-    exporting/json/json.c \
-    exporting/json/json.h \
-    exporting/opentsdb/opentsdb.c \
-    exporting/opentsdb/opentsdb.h \
-    exporting/prometheus/prometheus.c \
-    exporting/prometheus/prometheus.h \
-    exporting/read_config.c \
-    exporting/clean_connectors.c \
-    exporting/init_connectors.c \
-    exporting/process_data.c \
-    exporting/check_filters.c \
-    exporting/send_data.c \
-    exporting/send_internal_metrics.c \
+    src/exporting/exporting_engine.c \
+    src/exporting/exporting_engine.h \
+    src/exporting/graphite/graphite.c \
+    src/exporting/graphite/graphite.h \
+    src/exporting/json/json.c \
+    src/exporting/json/json.h \
+    src/exporting/opentsdb/opentsdb.c \
+    src/exporting/opentsdb/opentsdb.h \
+    src/exporting/prometheus/prometheus.c \
+    src/exporting/prometheus/prometheus.h \
+    src/exporting/read_config.c \
+    src/exporting/clean_connectors.c \
+    src/exporting/init_connectors.c \
+    src/exporting/process_data.c \
+    src/exporting/check_filters.c \
+    src/exporting/send_data.c \
+    src/exporting/send_internal_metrics.c \
     $(NULL)
 
 PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES = \
-    exporting/prometheus/remote_write/remote_write.c \
-    exporting/prometheus/remote_write/remote_write.h \
-    exporting/prometheus/remote_write/remote_write_request.cc \
-    exporting/prometheus/remote_write/remote_write_request.h \
-    exporting/prometheus/remote_write/remote_write.proto \
+    src/exporting/prometheus/remote_write/remote_write.c \
+    src/exporting/prometheus/remote_write/remote_write.h \
+    src/exporting/prometheus/remote_write/remote_write_request.cc \
+    src/exporting/prometheus/remote_write/remote_write_request.h \
+    src/exporting/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
 KINESIS_EXPORTING_FILES = \
-    exporting/aws_kinesis/aws_kinesis.c \
-    exporting/aws_kinesis/aws_kinesis.h \
-    exporting/aws_kinesis/aws_kinesis_put_record.cc \
-    exporting/aws_kinesis/aws_kinesis_put_record.h \
+    src/exporting/aws_kinesis/aws_kinesis.c \
+    src/exporting/aws_kinesis/aws_kinesis.h \
+    src/exporting/aws_kinesis/aws_kinesis_put_record.cc \
+    src/exporting/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
 PUBSUB_EXPORTING_FILES = \
-    exporting/pubsub/pubsub.c \
-    exporting/pubsub/pubsub.h \
-    exporting/pubsub/pubsub_publish.cc \
-    exporting/pubsub/pubsub_publish.h \
+    src/exporting/pubsub/pubsub.c \
+    src/exporting/pubsub/pubsub.h \
+    src/exporting/pubsub/pubsub_publish.cc \
+    src/exporting/pubsub/pubsub_publish.h \
     $(NULL)
 
 MONGODB_EXPORTING_FILES = \
-    exporting/mongodb/mongodb.c \
-    exporting/mongodb/mongodb.h \
+    src/exporting/mongodb/mongodb.c \
+    src/exporting/mongodb/mongodb.h \
     $(NULL)
 
 KINESIS_BACKEND_FILES = \
@@ -883,13 +883,13 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
     BUILT_SOURCES = \
-        exporting/prometheus/remote_write/remote_write.pb.cc \
-        exporting/prometheus/remote_write/remote_write.pb.h \
+        src/exporting/prometheus/remote_write/remote_write.pb.cc \
+        src/exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
     nodist_netdata_SOURCES = $(BUILT_SOURCES)
 
 exporting/prometheus/remote_write/remote_write.pb.cc \
-exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
+exporting/prometheus/remote_write/remote_write.pb.h: src/exporting/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
 endif
@@ -903,7 +903,7 @@ if ENABLE_UNITTESTS
     check_PROGRAMS = \
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
-        exporting/tests/exporting_engine_testdriver \
+        src/exporting/tests/exporting_engine_testdriver \
         web/api/tests/web_api_testdriver \
         web/api/tests/valid_urls_testdriver \
         collectors/cgroups_plugin/tests/cgroups_testdriver \
@@ -970,23 +970,23 @@ if ENABLE_UNITTESTS
     libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
     EXPORTING_ENGINE_TEST_FILES = \
-        exporting/tests/test_exporting_engine.c \
-        exporting/tests/test_exporting_engine.h \
-        exporting/tests/exporting_fixtures.c \
-        exporting/tests/exporting_doubles.c \
-        exporting/tests/netdata_doubles.c \
-        exporting/tests/system_doubles.c \
+        src/exporting/tests/test_exporting_engine.c \
+        src/exporting/tests/test_exporting_engine.h \
+        src/exporting/tests/exporting_fixtures.c \
+        src/exporting/tests/exporting_doubles.c \
+        src/exporting/tests/netdata_doubles.c \
+        src/exporting/tests/system_doubles.c \
         $(NULL)
-    exporting_tests_exporting_engine_testdriver_SOURCES = \
+    src_exporting_tests_exporting_engine_testdriver_SOURCES = \
         $(EXPORTING_ENGINE_TEST_FILES) \
         $(EXPORTING_ENGINE_FILES) \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    exporting_tests_exporting_engine_testdriver_CFLAGS = \
+    src_exporting_tests_exporting_engine_testdriver_CFLAGS = \
         $(AM_CFLAGS) \
         -DUNIT_TESTING \
         $(NULL)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS = \
+    src_exporting_tests_exporting_engine_testdriver_LDFLAGS = \
         -Wl,--wrap=read_exporting_config \
         -Wl,--wrap=init_connectors \
         -Wl,--wrap=mark_scheduled_instances \
@@ -1012,22 +1012,22 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=simple_connector_end_batch \
         $(TEST_LDFLAGS) \
         $(NULL)
-    exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
-    exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+    src_exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
+    src_exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    src_exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=init_write_request \
         -Wl,--wrap=add_host_info \
         -Wl,--wrap=add_label \
         -Wl,--wrap=add_metric \
         $(NULL)
-    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+    nodist_src_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
 endif
 if ENABLE_BACKEND_KINESIS
-    exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+    src_exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)
+    src_exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_KINESIS_LIBS)
+    src_exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=aws_sdk_init \
         -Wl,--wrap=kinesis_init \
         -Wl,--wrap=kinesis_put_record \
@@ -1035,9 +1035,9 @@ if ENABLE_BACKEND_KINESIS
         $(NULL)
 endif
 if ENABLE_EXPORTING_PUBSUB
-    exporting_tests_exporting_engine_testdriver_SOURCES += $(PUBSUB_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PUBSUB_LIBS)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+    src_exporting_tests_exporting_engine_testdriver_SOURCES += $(PUBSUB_EXPORTING_FILES)
+    src_exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PUBSUB_LIBS)
+    src_exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=pubsub_init \
         -Wl,--wrap=pubsub_add_message \
         -Wl,--wrap=pubsub_publish \
@@ -1045,9 +1045,9 @@ if ENABLE_EXPORTING_PUBSUB
         $(NULL)
 endif
 if ENABLE_BACKEND_MONGODB
-    exporting_tests_exporting_engine_testdriver_SOURCES += $(MONGODB_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_MONGOC_LIBS)
-    exporting_tests_exporting_engine_testdriver_LDFLAGS += \
+    src_exporting_tests_exporting_engine_testdriver_SOURCES += $(MONGODB_EXPORTING_FILES)
+    src_exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_MONGOC_LIBS)
+    src_exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=mongoc_init \
         -Wl,--wrap=mongoc_uri_new_with_error \
         -Wl,--wrap=mongoc_uri_get_option_as_int32 \
