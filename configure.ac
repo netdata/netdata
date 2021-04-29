@@ -1651,7 +1651,7 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     aclk/legacy/Makefile
     spawn/Makefile
-    parser/Makefile
+    src/parser/Makefile
     src/claim/Makefile
     src/cli/Makefile
 ])

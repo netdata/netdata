@@ -112,8 +112,8 @@ SUBDIRS += \
     registry \
     streaming \
     web \
-    parser \
     spawn \
+    src/parser \
     src/claim \
 	src/cli \
     $(NULL)
@@ -536,8 +536,8 @@ CLAIM_FILES = \
     $(NULL)
 
 PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
+    src/parser/parser.c \
+    src/parser/parser.h \
     $(NULL)
 
 if ACLK_NG
