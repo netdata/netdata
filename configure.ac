@@ -1549,29 +1549,6 @@ AC_CONFIG_FILES([
     netdata.spec
     daemon/Makefile
     diagrams/Makefile
-    libnetdata/Makefile
-    libnetdata/tests/Makefile
-    libnetdata/adaptive_resortable_list/Makefile
-    libnetdata/avl/Makefile
-    libnetdata/buffer/Makefile
-    libnetdata/clocks/Makefile
-    libnetdata/config/Makefile
-    libnetdata/dictionary/Makefile
-    libnetdata/ebpf/Makefile
-    libnetdata/eval/Makefile
-    libnetdata/locks/Makefile
-    libnetdata/log/Makefile
-    libnetdata/popen/Makefile
-    libnetdata/procfile/Makefile
-    libnetdata/simple_pattern/Makefile
-    libnetdata/socket/Makefile
-    libnetdata/statistical/Makefile
-    libnetdata/storage_number/Makefile
-    libnetdata/storage_number/tests/Makefile
-    libnetdata/threads/Makefile
-    libnetdata/url/Makefile
-    libnetdata/json/Makefile
-    libnetdata/health/Makefile
     system/Makefile
     tests/Makefile
     aclk/legacy/Makefile
@@ -1625,6 +1602,29 @@ AC_CONFIG_FILES([
     src/exporting/tests/Makefile
     src/health/Makefile
     src/health/notifications/Makefile
+    src/libnetdata/Makefile
+    src/libnetdata/tests/Makefile
+    src/libnetdata/adaptive_resortable_list/Makefile
+    src/libnetdata/avl/Makefile
+    src/libnetdata/buffer/Makefile
+    src/libnetdata/clocks/Makefile
+    src/libnetdata/config/Makefile
+    src/libnetdata/dictionary/Makefile
+    src/libnetdata/ebpf/Makefile
+    src/libnetdata/eval/Makefile
+    src/libnetdata/locks/Makefile
+    src/libnetdata/log/Makefile
+    src/libnetdata/popen/Makefile
+    src/libnetdata/procfile/Makefile
+    src/libnetdata/simple_pattern/Makefile
+    src/libnetdata/socket/Makefile
+    src/libnetdata/statistical/Makefile
+    src/libnetdata/storage_number/Makefile
+    src/libnetdata/storage_number/tests/Makefile
+    src/libnetdata/threads/Makefile
+    src/libnetdata/url/Makefile
+    src/libnetdata/json/Makefile
+    src/libnetdata/health/Makefile
     src/parser/Makefile
     src/registry/Makefile
     src/spawn/Makefile

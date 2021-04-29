@@ -103,7 +103,6 @@ dist_noinst_SCRIPTS = \
 
 SUBDIRS += \
     daemon \
-    libnetdata \
     src/backends \
     src/claim \
 	src/cli \
@@ -111,6 +110,7 @@ SUBDIRS += \
     src/database \
     src/exporting \
     src/health \
+    src/libnetdata \
     src/parser \
     src/registry \
     src/spawn \
@@ -146,63 +146,63 @@ sbin_PROGRAMS =
 plugins_PROGRAMS =
 
 LIBNETDATA_FILES = \
-    libnetdata/adaptive_resortable_list/adaptive_resortable_list.c \
-    libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
-    libnetdata/config/appconfig.c \
-    libnetdata/config/appconfig.h \
-    libnetdata/avl/avl.c \
-    libnetdata/avl/avl.h \
-    libnetdata/buffer/buffer.c \
-    libnetdata/buffer/buffer.h \
-    libnetdata/circular_buffer/circular_buffer.c \
-    libnetdata/circular_buffer/circular_buffer.h \
-    libnetdata/clocks/clocks.c \
-    libnetdata/clocks/clocks.h \
-    libnetdata/dictionary/dictionary.c \
-    libnetdata/dictionary/dictionary.h \
-    libnetdata/eval/eval.c \
-    libnetdata/eval/eval.h \
-    libnetdata/inlined.h \
-    libnetdata/libnetdata.c \
-    libnetdata/libnetdata.h \
-    libnetdata/required_dummies.h \
-    libnetdata/locks/locks.c \
-    libnetdata/locks/locks.h \
-    libnetdata/log/log.c \
-    libnetdata/log/log.h \
-    libnetdata/popen/popen.c \
-    libnetdata/popen/popen.h \
-    libnetdata/procfile/procfile.c \
-    libnetdata/procfile/procfile.h \
-    libnetdata/os.c \
-    libnetdata/os.h \
-    libnetdata/simple_pattern/simple_pattern.c \
-    libnetdata/simple_pattern/simple_pattern.h \
-    libnetdata/socket/socket.c \
-    libnetdata/socket/socket.h \
-    libnetdata/socket/security.c \
-    libnetdata/socket/security.h \
-    libnetdata/statistical/statistical.c \
-    libnetdata/statistical/statistical.h \
-    libnetdata/storage_number/storage_number.c \
-    libnetdata/storage_number/storage_number.h \
-    libnetdata/threads/threads.c \
-    libnetdata/threads/threads.h \
-    libnetdata/url/url.c \
-    libnetdata/url/url.h \
-    libnetdata/json/json.c \
-    libnetdata/json/json.h \
-    libnetdata/json/jsmn.c \
-    libnetdata/json/jsmn.h \
-    libnetdata/health/health.c \
-    libnetdata/health/health.h \
-    libnetdata/string/utf8.h \
+    src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c \
+    src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
+    src/libnetdata/config/appconfig.c \
+    src/libnetdata/config/appconfig.h \
+    src/libnetdata/avl/avl.c \
+    src/libnetdata/avl/avl.h \
+    src/libnetdata/buffer/buffer.c \
+    src/libnetdata/buffer/buffer.h \
+    src/libnetdata/circular_buffer/circular_buffer.c \
+    src/libnetdata/circular_buffer/circular_buffer.h \
+    src/libnetdata/clocks/clocks.c \
+    src/libnetdata/clocks/clocks.h \
+    src/libnetdata/dictionary/dictionary.c \
+    src/libnetdata/dictionary/dictionary.h \
+    src/libnetdata/eval/eval.c \
+    src/libnetdata/eval/eval.h \
+    src/libnetdata/inlined.h \
+    src/libnetdata/libnetdata.c \
+    src/libnetdata/libnetdata.h \
+    src/libnetdata/required_dummies.h \
+    src/libnetdata/locks/locks.c \
+    src/libnetdata/locks/locks.h \
+    src/libnetdata/log/log.c \
+    src/libnetdata/log/log.h \
+    src/libnetdata/popen/popen.c \
+    src/libnetdata/popen/popen.h \
+    src/libnetdata/procfile/procfile.c \
+    src/libnetdata/procfile/procfile.h \
+    src/libnetdata/os.c \
+    src/libnetdata/os.h \
+    src/libnetdata/simple_pattern/simple_pattern.c \
+    src/libnetdata/simple_pattern/simple_pattern.h \
+    src/libnetdata/socket/socket.c \
+    src/libnetdata/socket/socket.h \
+    src/libnetdata/socket/security.c \
+    src/libnetdata/socket/security.h \
+    src/libnetdata/statistical/statistical.c \
+    src/libnetdata/statistical/statistical.h \
+    src/libnetdata/storage_number/storage_number.c \
+    src/libnetdata/storage_number/storage_number.h \
+    src/libnetdata/threads/threads.c \
+    src/libnetdata/threads/threads.h \
+    src/libnetdata/url/url.c \
+    src/libnetdata/url/url.h \
+    src/libnetdata/json/json.c \
+    src/libnetdata/json/json.h \
+    src/libnetdata/json/jsmn.c \
+    src/libnetdata/json/jsmn.h \
+    src/libnetdata/health/health.c \
+    src/libnetdata/health/health.h \
+    src/libnetdata/string/utf8.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
     LIBNETDATA_FILES += \
-        libnetdata/ebpf/ebpf.c \
-        libnetdata/ebpf/ebpf.h \
+        src/libnetdata/ebpf/ebpf.c \
+        src/libnetdata/ebpf/ebpf.h \
         $(NULL)
 endif
 
@@ -901,8 +901,8 @@ endif
 
 if ENABLE_UNITTESTS
     check_PROGRAMS = \
-        libnetdata/tests/str2ld_testdriver \
-        libnetdata/storage_number/tests/storage_number_testdriver \
+        src/libnetdata/tests/str2ld_testdriver \
+        src/libnetdata/storage_number/tests/storage_number_testdriver \
         src/exporting/tests/exporting_engine_testdriver \
         src/web/api/tests/web_api_testdriver \
         src/web/api/tests/valid_urls_testdriver \
@@ -957,17 +957,17 @@ if ENABLE_UNITTESTS
         $(NULL)
     src_web_api_tests_web_api_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
-    libnetdata_tests_str2ld_testdriver_SOURCES = \
-        libnetdata/tests/test_str2ld.c \
+    src_libnetdata_tests_str2ld_testdriver_SOURCES = \
+        src/libnetdata/tests/test_str2ld.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    libnetdata_tests_str2ld_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_libnetdata_tests_str2ld_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
-    libnetdata_storage_number_tests_storage_number_testdriver_SOURCES = \
-        libnetdata/storage_number/tests/test_storage_number.c \
+    src_libnetdata_storage_number_tests_storage_number_testdriver_SOURCES = \
+        src/libnetdata/storage_number/tests/test_storage_number.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
     EXPORTING_ENGINE_TEST_FILES = \
         src/exporting/tests/test_exporting_engine.c \
