@@ -124,7 +124,7 @@ SUBDIRS += \
     $(NULL)
 else
 SUBDIRS += \
-    aclk/legacy \
+    src/aclk/legacy \
     $(NULL)
 endif
 
@@ -542,50 +542,50 @@ PARSER_FILES = \
 
 if ACLK_NG
 ACLK_FILES = \
-    aclk/aclk.c \
-    aclk/aclk.h \
-    aclk/aclk_util.c \
-    aclk/aclk_util.h \
-    aclk/aclk_stats.c \
-    aclk/aclk_stats.h \
-    aclk/aclk_query.c \
-    aclk/aclk_query.h \
-    aclk/aclk_query_queue.c \
-    aclk/aclk_query_queue.h \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
-    aclk/aclk_otp.c \
-    aclk/aclk_otp.h \
-    aclk/aclk_tx_msgs.c \
-    aclk/aclk_tx_msgs.h \
-    aclk/aclk_rx_msgs.c \
-    aclk/aclk_rx_msgs.h \
-    aclk/https_client.c \
-    aclk/https_client.h \
+    src/aclk/aclk.c \
+    src/aclk/aclk.h \
+    src/aclk/aclk_util.c \
+    src/aclk/aclk_util.h \
+    src/aclk/aclk_stats.c \
+    src/aclk/aclk_stats.h \
+    src/aclk/aclk_query.c \
+    src/aclk/aclk_query.h \
+    src/aclk/aclk_query_queue.c \
+    src/aclk/aclk_query_queue.h \
+    src/aclk/aclk_collector_list.c \
+    src/aclk/aclk_collector_list.h \
+    src/aclk/aclk_otp.c \
+    src/aclk/aclk_otp.h \
+    src/aclk/aclk_tx_msgs.c \
+    src/aclk/aclk_tx_msgs.h \
+    src/aclk/aclk_rx_msgs.c \
+    src/aclk/aclk_rx_msgs.h \
+    src/aclk/https_client.c \
+    src/aclk/https_client.h \
     $(NULL)
 else #ACLK_NG
 ACLK_FILES = \
-    aclk/legacy/aclk_rrdhost_state.h \
-    aclk/legacy/aclk_common.c \
-    aclk/legacy/aclk_common.h \
-    aclk/legacy/aclk_stats.c \
-    aclk/legacy/aclk_stats.h \
+    src/aclk/legacy/aclk_rrdhost_state.h \
+    src/aclk/legacy/aclk_common.c \
+    src/aclk/legacy/aclk_common.h \
+    src/aclk/legacy/aclk_stats.c \
+    src/aclk/legacy/aclk_stats.h \
     $(NULL)
 
 if ENABLE_ACLK
 ACLK_FILES += \
-    aclk/legacy/agent_cloud_link.c \
-    aclk/legacy/agent_cloud_link.h \
-    aclk/legacy/aclk_query.c \
-    aclk/legacy/aclk_query.h \
-    aclk/legacy/mqtt.c \
-    aclk/legacy/mqtt.h \
-    aclk/legacy/aclk_rx_msgs.c \
-    aclk/legacy/aclk_rx_msgs.h \
-    aclk/legacy/aclk_lws_wss_client.c \
-    aclk/legacy/aclk_lws_wss_client.h \
-    aclk/legacy/aclk_lws_https_client.c \
-    aclk/legacy/aclk_lws_https_client.h \
+    src/aclk/legacy/agent_cloud_link.c \
+    src/aclk/legacy/agent_cloud_link.h \
+    src/aclk/legacy/aclk_query.c \
+    src/aclk/legacy/aclk_query.h \
+    src/aclk/legacy/mqtt.c \
+    src/aclk/legacy/mqtt.h \
+    src/aclk/legacy/aclk_rx_msgs.c \
+    src/aclk/legacy/aclk_rx_msgs.h \
+    src/aclk/legacy/aclk_lws_wss_client.c \
+    src/aclk/legacy/aclk_lws_wss_client.h \
+    src/aclk/legacy/aclk_lws_https_client.c \
+    src/aclk/legacy/aclk_lws_https_client.h \
     $(NULL)
 endif #ENABLE_ACLK
 endif #ACLK_NG

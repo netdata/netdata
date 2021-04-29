@@ -1550,7 +1550,7 @@ AC_CONFIG_FILES([
     diagrams/Makefile
     system/Makefile
     tests/Makefile
-    aclk/legacy/Makefile
+    src/aclk/legacy/Makefile
     src/backends/graphite/Makefile
     src/backends/json/Makefile
     src/backends/Makefile
