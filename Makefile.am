@@ -112,7 +112,7 @@ SUBDIRS += \
     registry \
     streaming \
     web \
-    spawn \
+    src/spawn \
     src/parser \
     src/claim \
 	src/cli \
@@ -591,10 +591,10 @@ endif #ENABLE_ACLK
 endif #ACLK_NG
 
 SPAWN_PLUGIN_FILES = \
-    spawn/spawn.c \
-    spawn/spawn_server.c \
-    spawn/spawn_client.c \
-    spawn/spawn.h \
+    src/spawn/spawn.c \
+    src/spawn/spawn_server.c \
+    src/spawn/spawn_client.c \
+    src/spawn/spawn.h \
     $(NULL)
 
 EXPORTING_ENGINE_FILES = \
