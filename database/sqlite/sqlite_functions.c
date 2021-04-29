@@ -24,7 +24,7 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
 
     "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
-    "family text, context text, title text, unit text, plugin text, module text, priority integer);",
+    "family text, context text, title text, unit text, plugin text, module text, priority integer, last_used);",
 
     "delete from chart_active;",
     "delete from dimension_active;",
@@ -1355,8 +1355,9 @@ failed:
  */
 
 #define SQL_STORE_CHART_HASH "insert into chart_hash (hash_id, type, id, " \
-    "name, family, context, title, unit, plugin, module, priority) " \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11) on conflict(hash_id) do nothing;"
+    "name, family, context, title, unit, plugin, module, priority, last_used) " \
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, strftime('%s')) " \
+    "on conflict(hash_id) do update set last_used = strftime('%s');"
 
 int sql_store_chart_hash(
     uuid_t *hash_id, const char *type, const char *id, const char *name, const char *family,
