@@ -1548,9 +1548,6 @@ AC_CONFIG_FILES([
     Makefile
     netdata.spec
     daemon/Makefile
-    database/Makefile
-    database/engine/Makefile
-    database/engine/metadata_log/Makefile
     diagrams/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
@@ -1613,6 +1610,9 @@ AC_CONFIG_FILES([
     src/collectors/tc.plugin/Makefile
     src/collectors/xenstat.plugin/Makefile
     src/collectors/perf.plugin/Makefile
+    src/database/Makefile
+    src/database/engine/Makefile
+    src/database/engine/metadata_log/Makefile
     src/exporting/Makefile
     src/exporting/graphite/Makefile
     src/exporting/json/Makefile

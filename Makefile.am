@@ -103,12 +103,12 @@ dist_noinst_SCRIPTS = \
 
 SUBDIRS += \
     daemon \
-    database \
     libnetdata \
     src/backends \
     src/claim \
 	src/cli \
     src/collectors \
+    src/database \
     src/exporting \
     src/health \
     src/parser \
@@ -374,56 +374,56 @@ PLUGINSD_PLUGIN_FILES = \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
-    database/rrdcalc.c \
-    database/rrdcalc.h \
-    database/rrdcalctemplate.c \
-    database/rrdcalctemplate.h \
-    database/rrddim.c \
-    database/rrddimvar.c \
-    database/rrddimvar.h \
-    database/rrdfamily.c \
-    database/rrdhost.c \
-    database/rrdlabels.c \
-    database/rrd.c \
-    database/rrd.h \
-    database/rrdset.c \
-    database/rrdsetvar.c \
-    database/rrdsetvar.h \
-    database/rrdvar.c \
-    database/rrdvar.h \
-    database/sqlite/sqlite_functions.c \
-    database/sqlite/sqlite_functions.h \
-    database/sqlite/sqlite3.c \
-    database/sqlite/sqlite3.h \
+    src/database/rrdcalc.c \
+    src/database/rrdcalc.h \
+    src/database/rrdcalctemplate.c \
+    src/database/rrdcalctemplate.h \
+    src/database/rrddim.c \
+    src/database/rrddimvar.c \
+    src/database/rrddimvar.h \
+    src/database/rrdfamily.c \
+    src/database/rrdhost.c \
+    src/database/rrdlabels.c \
+    src/database/rrd.c \
+    src/database/rrd.h \
+    src/database/rrdset.c \
+    src/database/rrdsetvar.c \
+    src/database/rrdsetvar.h \
+    src/database/rrdvar.c \
+    src/database/rrdvar.h \
+    src/database/sqlite/sqlite_functions.c \
+    src/database/sqlite/sqlite_functions.h \
+    src/database/sqlite/sqlite3.c \
+    src/database/sqlite/sqlite3.h \
     $(NULL)
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
-        database/engine/rrdengine.c \
-        database/engine/rrdengine.h \
-        database/engine/rrddiskprotocol.h \
-        database/engine/datafile.c \
-        database/engine/datafile.h \
-        database/engine/journalfile.c \
-        database/engine/journalfile.h \
-        database/engine/rrdenginelib.c \
-        database/engine/rrdenginelib.h \
-        database/engine/rrdengineapi.c \
-        database/engine/rrdengineapi.h \
-        database/engine/pagecache.c \
-        database/engine/pagecache.h \
-        database/engine/rrdenglocking.c \
-        database/engine/rrdenglocking.h \
-        database/engine/metadata_log/metadatalog.h \
-        database/engine/metadata_log/metadatalogapi.c \
-        database/engine/metadata_log/metadatalogapi.h \
-        database/engine/metadata_log/logfile.h \
-        database/engine/metadata_log/logfile.c \
-        database/engine/metadata_log/metadatalogprotocol.h \
-        database/engine/metadata_log/metalogpluginsd.c \
-        database/engine/metadata_log/metalogpluginsd.h \
-        database/engine/metadata_log/compaction.c \
-        database/engine/metadata_log/compaction.h \
+        src/database/engine/rrdengine.c \
+        src/database/engine/rrdengine.h \
+        src/database/engine/rrddiskprotocol.h \
+        src/database/engine/datafile.c \
+        src/database/engine/datafile.h \
+        src/database/engine/journalfile.c \
+        src/database/engine/journalfile.h \
+        src/database/engine/rrdenginelib.c \
+        src/database/engine/rrdenginelib.h \
+        src/database/engine/rrdengineapi.c \
+        src/database/engine/rrdengineapi.h \
+        src/database/engine/pagecache.c \
+        src/database/engine/pagecache.h \
+        src/database/engine/rrdenglocking.c \
+        src/database/engine/rrdenglocking.h \
+        src/database/engine/metadata_log/metadatalog.h \
+        src/database/engine/metadata_log/metadatalogapi.c \
+        src/database/engine/metadata_log/metadatalogapi.h \
+        src/database/engine/metadata_log/logfile.h \
+        src/database/engine/metadata_log/logfile.c \
+        src/database/engine/metadata_log/metadatalogprotocol.h \
+        src/database/engine/metadata_log/metalogpluginsd.c \
+        src/database/engine/metadata_log/metalogpluginsd.h \
+        src/database/engine/metadata_log/compaction.c \
+        src/database/engine/metadata_log/compaction.h \
         $(NULL)
 endif
 
@@ -1065,8 +1065,8 @@ endif
         src/collectors/cgroups.plugin/tests/test_cgroups_plugin.h \
         src/collectors/cgroups.plugin/tests/test_doubles.c \
         $(CGROUPS_PLUGIN_FILES) \
-        database/rrdlabels.c \
-        database/rrd.h \
+        src/database/rrdlabels.c \
+        src/database/rrd.h \
         $(LIBNETDATA_FILES) \
         $(NULL)
     src_collectors_cgroups_plugin_tests_cgroups_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)

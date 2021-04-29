@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_FUNCTIONS_H
 #define NETDATA_SQLITE_FUNCTIONS_H
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "sqlite3.h"
 
 #define SQLITE_INSERT_DELAY (50)        // Insert delay in case of lock
