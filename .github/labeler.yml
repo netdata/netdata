@@ -11,16 +11,16 @@
 # Please keep the labels sorted and deduplicated.
 
 ACLK:
-  - aclk/*
-  - aclk/**/*
+  - src/aclk/*
+  - src/aclk/**/*
 
 area/backends:
-  - backends/*
-  - backends/**/*
+  - src/backends/*
+  - src/backends/**/*
 
 area/exporting:
-  - exporting/*
-  - exporting/**/*
+  - src/exporting/*
+  - src/exporting/**/*
 
 area/build:
   - build/*
@@ -39,16 +39,16 @@ area/ci:
   - .github/**/*
 
 area/collectors:
-  - collectors/*
-  - collectors/**/*
+  - src/collectors/*
+  - src/collectors/**/*
 
 area/daemon:
-  - daemon/*
-  - daemon/**/*
+  - src/daemon/*
+  - src/daemon/**/*
 
 area/database:
-  - database/*
-  - database/**/*
+  - src/database/*
+  - src/database/**/*
 
 area/docs:
   - "**/*.md"
@@ -56,18 +56,18 @@ area/docs:
   - diagrams/**/*
 
 area/external/python:
-  - collectors/python.d.plugin/*
-  - collectors/python.d.plugin/**/*
+  - src/collectors/python.d.plugin/*
+  - src/collectors/python.d.plugin/**/*
 
 area/external:
-  - collectors/charts.d.plugin/*
-  - collectors/charts.d.plugin/**/*
-  - collectors/node.d.plugin/*
-  - collectors/node.d.plugin/**/*
+  - src/collectors/charts.d.plugin/*
+  - src/collectors/charts.d.plugin/**/*
+  - src/collectors/node.d.plugin/*
+  - src/collectors/node.d.plugin/**/*
 
 area/health:
-  - health/*
-  - health/**/*
+  - src/health/*
+  - src/health/**/*
 
 area/packaging:
   - contrib/*
@@ -81,12 +81,12 @@ area/packaging:
   - netdata.spec.in
 
 area/registry:
-  - registry/*
-  - registry/**/*
+  - src/registry/*
+  - src/registry/**/*
 
 area/streaming:
-  - streaming/*
-  - streaming/**/*
+  - src/streaming/*
+  - src/streaming/**/*
 
 area/tests:
   - tests/*
@@ -97,5 +97,5 @@ area/tests:
   - netdata.cppcheck
 
 area/web:
-  - web/*
-  - web/**/*
+  - src/web/*
+  - src/web/**/*
