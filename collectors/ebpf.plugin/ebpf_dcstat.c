@@ -35,7 +35,7 @@ static ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_pid", .internal_input
                                           {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_lookup_fast",
-                                                  .function_to_attach = "lookup_fast",
+                                                   .function_to_attach = "lookup_fast",
                                                    .optional = NULL,
                                                    .retprobe = CONFIG_BOOLEAN_NO},
                                                   {.program_name = NULL}};
@@ -152,7 +152,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "Percentage of files listed inside directory cache",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_APPS_DCSTAT_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NETDATA_EBPF_CHART_TYPE_LINE,
                                20100,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
@@ -547,7 +547,6 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
  *  MAIN THREAD
  *
  *****************************************************************/
-
 
 /**
  * Directory Cache thread
