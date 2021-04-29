@@ -8,9 +8,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/store/chang
 
 import { Calculator } from '../../src/components/agent/dbCalc/'
 
-The [database engine](/database/engine/README.md) uses RAM to store recent metrics. When metrics reach a certain age,
-and based on how much system RAM you allocate toward storing metrics in memory, they are compressed and "spilled" to
-disk for long-term storage.
+The Netdata Agent uses a time-series database (TSDB), named the [database engine
+(`dbengine`)](/database/engine/README.md), to store metrics data. The most recently-collected metrics are stored in RAM,
+and when metrics reach a certain age, and based on how much system RAM you allocate toward storing metrics in memory,
+they are compressed and "spilled" to disk for long-term storage.
 
 The default settings retain about two day's worth of metrics on a system collecting 2,000 metrics every second, but the
 Netdata Agent is highly configurable if you want your nodes to store days, weeks, or months worth of per-second data.
@@ -59,15 +60,17 @@ method](/docs/configure/start-stop-restart.md) for your system, to change the da
 
 ## What's next?
 
-For more information about the database engine, see our [database reference doc](/database/engine/README.md).
+If you have multiple nodes with the Netdata Agent installed, you can [stream metrics](/docs/store/stream-metrics.md)
+from any number of _child_ nodes to a _parent_ node and store metrics using a centralized time-series database.Streaming
+allows you to centralize your data, run Agents as headless collectors, replicate data, and more.
 
 Storing metrics with the database engine is completely interoperable with [exporting to other time-series
 databases](/docs/export/external-databases.md). With exporting, you can use the node's resources to surface metrics
 when [viewing dashboards](/docs/visualize/interact-dashboards-charts.md), while also archiving metrics elsewhere for
 further analysis, visualization, or correlation with other tools. 
 
-If you don't want to always store metrics on the node that collects them or run ephemeral nodes without dedicated
-storage, you can use [streaming](/streaming/README.md). Streaming allows you to centralize your data, run Agents as
-headless collectors, replicate data, and more.
+### Related reference documentation
+
+- [Netdata Agent · Database engine](/database/engine/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fstore%2Fchange-metrics-storage&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
