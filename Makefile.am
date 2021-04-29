@@ -108,7 +108,6 @@ SUBDIRS += \
     exporting \
     health \
     libnetdata \
-    streaming \
     web \
     src/backends \
     src/claim \
@@ -116,6 +115,7 @@ SUBDIRS += \
     src/parser \
     src/registry \
     src/spawn \
+    src/streaming \
     $(NULL)
 
 if ACLK_NG
@@ -479,10 +479,10 @@ API_PLUGIN_FILES = \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
-    streaming/rrdpush.c \
-    streaming/sender.c \
-    streaming/receiver.c \
-    streaming/rrdpush.h \
+    src/streaming/rrdpush.c \
+    src/streaming/sender.c \
+    src/streaming/receiver.c \
+    src/streaming/rrdpush.h \
     $(NULL)
 
 REGISTRY_PLUGIN_FILES = \
