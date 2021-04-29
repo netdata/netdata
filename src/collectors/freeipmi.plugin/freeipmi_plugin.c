@@ -15,7 +15,7 @@
  *  UCRL-CODE-222073
  */
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_TIMEX_H
 #define NETDATA_PLUGIN_TIMEX_H
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #if (TARGET_OS == OS_LINUX)
 

@@ -102,7 +102,6 @@ dist_noinst_SCRIPTS = \
 # Compile netdata binaries
 
 SUBDIRS += \
-    collectors \
     daemon \
     database \
     libnetdata \
@@ -110,6 +109,7 @@ SUBDIRS += \
     src/backends \
     src/claim \
 	src/cli \
+    src/collectors \
     src/exporting \
     src/health \
     src/parser \
@@ -207,26 +207,26 @@ if ENABLE_PLUGIN_EBPF
 endif
 
 APPS_PLUGIN_FILES = \
-    collectors/apps.plugin/apps_plugin.c \
+    src/collectors/apps.plugin/apps_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 CHECKS_PLUGIN_FILES = \
-    collectors/checks.plugin/plugin_checks.c \
-    collectors/checks.plugin/plugin_checks.h \
+    src/collectors/checks.plugin/plugin_checks.c \
+    src/collectors/checks.plugin/plugin_checks.h \
     $(NULL)
 
 FREEBSD_PLUGIN_FILES = \
-    collectors/freebsd.plugin/plugin_freebsd.c \
-    collectors/freebsd.plugin/plugin_freebsd.h \
-    collectors/freebsd.plugin/freebsd_sysctl.c \
-    collectors/freebsd.plugin/freebsd_getmntinfo.c \
-    collectors/freebsd.plugin/freebsd_getifaddrs.c \
-    collectors/freebsd.plugin/freebsd_devstat.c \
-    collectors/freebsd.plugin/freebsd_kstat_zfs.c \
-    collectors/freebsd.plugin/freebsd_ipfw.c \
-    collectors/proc.plugin/zfs_common.c \
-    collectors/proc.plugin/zfs_common.h \
+    src/collectors/freebsd.plugin/plugin_freebsd.c \
+    src/collectors/freebsd.plugin/plugin_freebsd.h \
+    src/collectors/freebsd.plugin/freebsd_sysctl.c \
+    src/collectors/freebsd.plugin/freebsd_getmntinfo.c \
+    src/collectors/freebsd.plugin/freebsd_getifaddrs.c \
+    src/collectors/freebsd.plugin/freebsd_devstat.c \
+    src/collectors/freebsd.plugin/freebsd_kstat_zfs.c \
+    src/collectors/freebsd.plugin/freebsd_ipfw.c \
+    src/collectors/proc.plugin/zfs_common.c \
+    src/collectors/proc.plugin/zfs_common.h \
     $(NULL)
 
 HEALTH_PLUGIN_FILES = \
@@ -238,139 +238,139 @@ HEALTH_PLUGIN_FILES = \
     $(NULL)
 
 IDLEJITTER_PLUGIN_FILES = \
-    collectors/idlejitter.plugin/plugin_idlejitter.c \
-    collectors/idlejitter.plugin/plugin_idlejitter.h \
+    src/collectors/idlejitter.plugin/plugin_idlejitter.c \
+    src/collectors/idlejitter.plugin/plugin_idlejitter.h \
     $(NULL)
 
 CGROUPS_PLUGIN_FILES = \
-    collectors/cgroups.plugin/sys_fs_cgroup.c \
-    collectors/cgroups.plugin/sys_fs_cgroup.h \
+    src/collectors/cgroups.plugin/sys_fs_cgroup.c \
+    src/collectors/cgroups.plugin/sys_fs_cgroup.h \
     $(NULL)
 
 CGROUP_NETWORK_FILES = \
-    collectors/cgroups.plugin/cgroup-network.c \
+    src/collectors/cgroups.plugin/cgroup-network.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 DISKSPACE_PLUGIN_FILES = \
-    collectors/diskspace.plugin/plugin_diskspace.h \
-    collectors/diskspace.plugin/plugin_diskspace.c \
+    src/collectors/diskspace.plugin/plugin_diskspace.h \
+    src/collectors/diskspace.plugin/plugin_diskspace.c \
     $(NULL)
 
 TIMEX_PLUGIN_FILES = \
-    collectors/timex.plugin/plugin_timex.h \
-    collectors/timex.plugin/plugin_timex.c \
+    src/collectors/timex.plugin/plugin_timex.h \
+    src/collectors/timex.plugin/plugin_timex.c \
     $(NULL)
 
 FREEIPMI_PLUGIN_FILES = \
-    collectors/freeipmi.plugin/freeipmi_plugin.c \
+    src/collectors/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
-    collectors/cups.plugin/cups_plugin.c \
+    src/collectors/cups.plugin/cups_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 NFACCT_PLUGIN_FILES = \
-    collectors/nfacct.plugin/plugin_nfacct.c \
+    src/collectors/nfacct.plugin/plugin_nfacct.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 SLABINFO_PLUGIN_FILES = \
-    collectors/slabinfo.plugin/slabinfo.c \
+    src/collectors/slabinfo.plugin/slabinfo.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 XENSTAT_PLUGIN_FILES = \
-    collectors/xenstat.plugin/xenstat_plugin.c \
+    src/collectors/xenstat.plugin/xenstat_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 PERF_PLUGIN_FILES = \
-    collectors/perf.plugin/perf_plugin.c \
+    src/collectors/perf.plugin/perf_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 EBPF_PLUGIN_FILES = \
-    collectors/ebpf.plugin/ebpf.c \
-    collectors/ebpf.plugin/ebpf_cachestat.c \
-    collectors/ebpf.plugin/ebpf_cachestat.h \
-    collectors/ebpf.plugin/ebpf_process.c \
-    collectors/ebpf.plugin/ebpf_process.h \
-    collectors/ebpf.plugin/ebpf_socket.c \
-    collectors/ebpf.plugin/ebpf_socket.h \
-    collectors/ebpf.plugin/ebpf_sync.c \
-    collectors/ebpf.plugin/ebpf_sync.h \
-    collectors/ebpf.plugin/ebpf.h \
-    collectors/ebpf.plugin/ebpf_apps.c \
-    collectors/ebpf.plugin/ebpf_apps.h \
+    src/collectors/ebpf.plugin/ebpf.c \
+    src/collectors/ebpf.plugin/ebpf_cachestat.c \
+    src/collectors/ebpf.plugin/ebpf_cachestat.h \
+    src/collectors/ebpf.plugin/ebpf_process.c \
+    src/collectors/ebpf.plugin/ebpf_process.h \
+    src/collectors/ebpf.plugin/ebpf_socket.c \
+    src/collectors/ebpf.plugin/ebpf_socket.h \
+    src/collectors/ebpf.plugin/ebpf_sync.c \
+    src/collectors/ebpf.plugin/ebpf_sync.h \
+    src/collectors/ebpf.plugin/ebpf.h \
+    src/collectors/ebpf.plugin/ebpf_apps.c \
+    src/collectors/ebpf.plugin/ebpf_apps.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
-    collectors/proc.plugin/ipc.c \
-    collectors/proc.plugin/plugin_proc.c \
-    collectors/proc.plugin/plugin_proc.h \
-    collectors/proc.plugin/proc_diskstats.c \
-    collectors/proc.plugin/proc_mdstat.c \
-    collectors/proc.plugin/proc_interrupts.c \
-    collectors/proc.plugin/proc_softirqs.c \
-    collectors/proc.plugin/proc_loadavg.c \
-    collectors/proc.plugin/proc_meminfo.c \
-    collectors/proc.plugin/proc_pagetypeinfo.c \
-    collectors/proc.plugin/proc_pressure.c \
-    collectors/proc.plugin/proc_pressure.h \
-    collectors/proc.plugin/proc_net_dev.c \
-    collectors/proc.plugin/proc_net_wireless.c \
-    collectors/proc.plugin/proc_net_ip_vs_stats.c \
-    collectors/proc.plugin/proc_net_netstat.c \
-    collectors/proc.plugin/proc_net_rpc_nfs.c \
-    collectors/proc.plugin/proc_net_rpc_nfsd.c \
-    collectors/proc.plugin/proc_net_snmp.c \
-    collectors/proc.plugin/proc_net_snmp6.c \
-    collectors/proc.plugin/proc_net_sctp_snmp.c \
-    collectors/proc.plugin/proc_net_sockstat.c \
-    collectors/proc.plugin/proc_net_sockstat6.c \
-    collectors/proc.plugin/proc_net_softnet_stat.c \
-    collectors/proc.plugin/proc_net_stat_conntrack.c \
-    collectors/proc.plugin/proc_net_stat_synproxy.c \
-    collectors/proc.plugin/proc_self_mountinfo.c \
-    collectors/proc.plugin/proc_self_mountinfo.h \
-    collectors/proc.plugin/zfs_common.c \
-    collectors/proc.plugin/zfs_common.h \
-    collectors/proc.plugin/proc_spl_kstat_zfs.c \
-    collectors/proc.plugin/proc_stat.c \
-    collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
-    collectors/proc.plugin/proc_vmstat.c \
-    collectors/proc.plugin/proc_uptime.c \
-    collectors/proc.plugin/sys_kernel_mm_ksm.c \
-    collectors/proc.plugin/sys_block_zram.c \
-    collectors/proc.plugin/sys_devices_system_edac_mc.c \
-    collectors/proc.plugin/sys_devices_system_node.c \
-    collectors/proc.plugin/sys_fs_btrfs.c \
-    collectors/proc.plugin/sys_class_power_supply.c \
-    collectors/proc.plugin/sys_class_infiniband.c \
+    src/collectors/proc.plugin/ipc.c \
+    src/collectors/proc.plugin/plugin_proc.c \
+    src/collectors/proc.plugin/plugin_proc.h \
+    src/collectors/proc.plugin/proc_diskstats.c \
+    src/collectors/proc.plugin/proc_mdstat.c \
+    src/collectors/proc.plugin/proc_interrupts.c \
+    src/collectors/proc.plugin/proc_softirqs.c \
+    src/collectors/proc.plugin/proc_loadavg.c \
+    src/collectors/proc.plugin/proc_meminfo.c \
+    src/collectors/proc.plugin/proc_pagetypeinfo.c \
+    src/collectors/proc.plugin/proc_pressure.c \
+    src/collectors/proc.plugin/proc_pressure.h \
+    src/collectors/proc.plugin/proc_net_dev.c \
+    src/collectors/proc.plugin/proc_net_wireless.c \
+    src/collectors/proc.plugin/proc_net_ip_vs_stats.c \
+    src/collectors/proc.plugin/proc_net_netstat.c \
+    src/collectors/proc.plugin/proc_net_rpc_nfs.c \
+    src/collectors/proc.plugin/proc_net_rpc_nfsd.c \
+    src/collectors/proc.plugin/proc_net_snmp.c \
+    src/collectors/proc.plugin/proc_net_snmp6.c \
+    src/collectors/proc.plugin/proc_net_sctp_snmp.c \
+    src/collectors/proc.plugin/proc_net_sockstat.c \
+    src/collectors/proc.plugin/proc_net_sockstat6.c \
+    src/collectors/proc.plugin/proc_net_softnet_stat.c \
+    src/collectors/proc.plugin/proc_net_stat_conntrack.c \
+    src/collectors/proc.plugin/proc_net_stat_synproxy.c \
+    src/collectors/proc.plugin/proc_self_mountinfo.c \
+    src/collectors/proc.plugin/proc_self_mountinfo.h \
+    src/collectors/proc.plugin/zfs_common.c \
+    src/collectors/proc.plugin/zfs_common.h \
+    src/collectors/proc.plugin/proc_spl_kstat_zfs.c \
+    src/collectors/proc.plugin/proc_stat.c \
+    src/collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
+    src/collectors/proc.plugin/proc_vmstat.c \
+    src/collectors/proc.plugin/proc_uptime.c \
+    src/collectors/proc.plugin/sys_kernel_mm_ksm.c \
+    src/collectors/proc.plugin/sys_block_zram.c \
+    src/collectors/proc.plugin/sys_devices_system_edac_mc.c \
+    src/collectors/proc.plugin/sys_devices_system_node.c \
+    src/collectors/proc.plugin/sys_fs_btrfs.c \
+    src/collectors/proc.plugin/sys_class_power_supply.c \
+    src/collectors/proc.plugin/sys_class_infiniband.c \
     $(NULL)
 
 TC_PLUGIN_FILES = \
-    collectors/tc.plugin/plugin_tc.c \
-    collectors/tc.plugin/plugin_tc.h \
+    src/collectors/tc.plugin/plugin_tc.c \
+    src/collectors/tc.plugin/plugin_tc.h \
     $(NULL)
 
 MACOS_PLUGIN_FILES = \
-    collectors/macos.plugin/plugin_macos.c \
-    collectors/macos.plugin/plugin_macos.h \
-    collectors/macos.plugin/macos_sysctl.c \
-    collectors/macos.plugin/macos_mach_smi.c \
-    collectors/macos.plugin/macos_fw.c \
+    src/collectors/macos.plugin/plugin_macos.c \
+    src/collectors/macos.plugin/plugin_macos.h \
+    src/collectors/macos.plugin/macos_sysctl.c \
+    src/collectors/macos.plugin/macos_mach_smi.c \
+    src/collectors/macos.plugin/macos_fw.c \
     $(NULL)
 
 PLUGINSD_PLUGIN_FILES = \
-    collectors/plugins.d/plugins_d.c \
-    collectors/plugins.d/plugins_d.h \
-    collectors/plugins.d/pluginsd_parser.c \
-    collectors/plugins.d/pluginsd_parser.h \
+    src/collectors/plugins.d/plugins_d.c \
+    src/collectors/plugins.d/plugins_d.h \
+    src/collectors/plugins.d/pluginsd_parser.c \
+    src/collectors/plugins.d/pluginsd_parser.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
@@ -502,8 +502,8 @@ REGISTRY_PLUGIN_FILES = \
     $(NULL)
 
 STATSD_PLUGIN_FILES = \
-    collectors/statsd.plugin/statsd.c \
-    collectors/statsd.plugin/statsd.h \
+    src/collectors/statsd.plugin/statsd.c \
+    src/collectors/statsd.plugin/statsd.h \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
@@ -683,7 +683,7 @@ DAEMON_FILES = \
     $(NULL)
 
 NETDATA_FILES = \
-    collectors/all.h \
+    src/collectors/all.h \
     $(DAEMON_FILES) \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
@@ -906,7 +906,7 @@ if ENABLE_UNITTESTS
         src/exporting/tests/exporting_engine_testdriver \
         web/api/tests/web_api_testdriver \
         web/api/tests/valid_urls_testdriver \
-        collectors/cgroups_plugin/tests/cgroups_testdriver \
+        src/collectors/cgroups_plugin/tests/cgroups_testdriver \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
@@ -1060,17 +1060,17 @@ if ENABLE_BACKEND_MONGODB
         $(NULL)
 endif
 
-    collectors_cgroups_plugin_tests_cgroups_testdriver_SOURCES = \
-        collectors/cgroups.plugin/tests/test_cgroups_plugin.c \
-        collectors/cgroups.plugin/tests/test_cgroups_plugin.h \
-        collectors/cgroups.plugin/tests/test_doubles.c \
+    src_collectors_cgroups_plugin_tests_cgroups_testdriver_SOURCES = \
+        src/collectors/cgroups.plugin/tests/test_cgroups_plugin.c \
+        src/collectors/cgroups.plugin/tests/test_cgroups_plugin.h \
+        src/collectors/cgroups.plugin/tests/test_doubles.c \
         $(CGROUPS_PLUGIN_FILES) \
         database/rrdlabels.c \
         database/rrd.h \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    collectors_cgroups_plugin_tests_cgroups_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
-    collectors_cgroups_plugin_tests_cgroups_testdriver_LDFLAGS = \
+    src_collectors_cgroups_plugin_tests_cgroups_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_collectors_cgroups_plugin_tests_cgroups_testdriver_LDFLAGS = \
         -Wl,--wrap=add_label_to_list \
         $(NULL)
 

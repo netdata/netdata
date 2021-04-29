@@ -67,7 +67,7 @@ cgroup-network
 !cgroup-network/
 
 ebpf.plugin
-collectors/ebpf.plugin/reset_netdata_trace.sh
+src/collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 
 # protoc generated files
@@ -126,14 +126,14 @@ daemon/get-kubernetes-labels.sh
 
 src/health/notifications/alarm-notify.sh
 src/claim/netdata-claim.sh
-collectors/cgroups.plugin/cgroup-name.sh
-collectors/tc.plugin/tc-qos-helper.sh
-collectors/charts.d.plugin/charts.d.plugin
-collectors/node.d.plugin/node.d.plugin
-collectors/python.d.plugin/python.d.plugin
-collectors/fping.plugin/fping.plugin
-collectors/ioping.plugin/ioping.plugin
-collectors/go.d.plugin
+src/collectors/cgroups.plugin/cgroup-name.sh
+src/collectors/tc.plugin/tc-qos-helper.sh
+src/collectors/charts.d.plugin/charts.d.plugin
+src/collectors/node.d.plugin/node.d.plugin
+src/collectors/python.d.plugin/python.d.plugin
+src/collectors/fping.plugin/fping.plugin
+src/collectors/ioping.plugin/ioping.plugin
+src/collectors/go.d.plugin
 web/netdata-switch-dashboard.sh
 
 # installer generated files

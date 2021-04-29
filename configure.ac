@@ -1547,31 +1547,6 @@ AC_DEFINE_UNQUOTED(
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    collectors/Makefile
-    collectors/apps.plugin/Makefile
-    collectors/cgroups.plugin/Makefile
-    collectors/charts.d.plugin/Makefile
-    collectors/checks.plugin/Makefile
-    collectors/diskspace.plugin/Makefile
-    collectors/timex.plugin/Makefile
-    collectors/fping.plugin/Makefile
-    collectors/ioping.plugin/Makefile
-    collectors/freebsd.plugin/Makefile
-    collectors/freeipmi.plugin/Makefile
-    collectors/cups.plugin/Makefile
-    collectors/idlejitter.plugin/Makefile
-    collectors/macos.plugin/Makefile
-    collectors/nfacct.plugin/Makefile
-    collectors/node.d.plugin/Makefile
-    collectors/plugins.d/Makefile
-    collectors/proc.plugin/Makefile
-    collectors/python.d.plugin/Makefile
-    collectors/slabinfo.plugin/Makefile
-    collectors/statsd.plugin/Makefile
-    collectors/ebpf.plugin/Makefile
-    collectors/tc.plugin/Makefile
-    collectors/xenstat.plugin/Makefile
-    collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
@@ -1638,6 +1613,31 @@ AC_CONFIG_FILES([
     src/backends/mongodb/Makefile
     src/claim/Makefile
     src/cli/Makefile
+    src/collectors/Makefile
+    src/collectors/apps.plugin/Makefile
+    src/collectors/cgroups.plugin/Makefile
+    src/collectors/charts.d.plugin/Makefile
+    src/collectors/checks.plugin/Makefile
+    src/collectors/diskspace.plugin/Makefile
+    src/collectors/timex.plugin/Makefile
+    src/collectors/fping.plugin/Makefile
+    src/collectors/ioping.plugin/Makefile
+    src/collectors/freebsd.plugin/Makefile
+    src/collectors/freeipmi.plugin/Makefile
+    src/collectors/cups.plugin/Makefile
+    src/collectors/idlejitter.plugin/Makefile
+    src/collectors/macos.plugin/Makefile
+    src/collectors/nfacct.plugin/Makefile
+    src/collectors/node.d.plugin/Makefile
+    src/collectors/plugins.d/Makefile
+    src/collectors/proc.plugin/Makefile
+    src/collectors/python.d.plugin/Makefile
+    src/collectors/slabinfo.plugin/Makefile
+    src/collectors/statsd.plugin/Makefile
+    src/collectors/ebpf.plugin/Makefile
+    src/collectors/tc.plugin/Makefile
+    src/collectors/xenstat.plugin/Makefile
+    src/collectors/perf.plugin/Makefile
     src/exporting/Makefile
     src/exporting/graphite/Makefile
     src/exporting/json/Makefile
