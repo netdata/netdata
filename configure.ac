@@ -1620,7 +1620,6 @@ AC_CONFIG_FILES([
     libnetdata/url/Makefile
     libnetdata/json/Makefile
     libnetdata/health/Makefile
-    registry/Makefile
     streaming/Makefile
     system/Makefile
     tests/Makefile
@@ -1650,10 +1649,11 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     aclk/legacy/Makefile
-    src/spawn/Makefile
-    src/parser/Makefile
     src/claim/Makefile
     src/cli/Makefile
+    src/parser/Makefile
+    src/registry/Makefile
+    src/spawn/Makefile
 ])
 
 AC_OUTPUT

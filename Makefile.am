@@ -109,13 +109,13 @@ SUBDIRS += \
     exporting \
     health \
     libnetdata \
-    registry \
     streaming \
     web \
-    src/spawn \
-    src/parser \
     src/claim \
 	src/cli \
+    src/parser \
+    src/registry \
+    src/spawn \
     $(NULL)
 
 if ACLK_NG
@@ -486,19 +486,19 @@ STREAMING_PLUGIN_FILES = \
     $(NULL)
 
 REGISTRY_PLUGIN_FILES = \
-    registry/registry.c \
-    registry/registry.h \
-    registry/registry_db.c \
-    registry/registry_init.c \
-    registry/registry_internals.c \
-    registry/registry_internals.h \
-    registry/registry_log.c \
-    registry/registry_machine.c \
-    registry/registry_machine.h \
-    registry/registry_person.c \
-    registry/registry_person.h \
-    registry/registry_url.c \
-    registry/registry_url.h \
+    src/registry/registry.c \
+    src/registry/registry.h \
+    src/registry/registry_db.c \
+    src/registry/registry_init.c \
+    src/registry/registry_internals.c \
+    src/registry/registry_internals.h \
+    src/registry/registry_log.c \
+    src/registry/registry_machine.c \
+    src/registry/registry_machine.h \
+    src/registry/registry_person.c \
+    src/registry/registry_person.h \
+    src/registry/registry_url.c \
+    src/registry/registry_url.h \
     $(NULL)
 
 STATSD_PLUGIN_FILES = \
