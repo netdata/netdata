@@ -194,3 +194,9 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
 
     return 0;
 }
+
+int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt) {
+    (void)dt;
+
+    return 0;
+}
