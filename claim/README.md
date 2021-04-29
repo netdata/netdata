@@ -30,8 +30,8 @@ data is encrypted by TLS while it is in transit. We use the RSA keypair created 
 identity of the Agent when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way
 from Agents to the browser, we do not store or log it.
 
-You can claim a node during the Cloud onboarding process, or after you created a Space by clicking on the **USER's
-Space** dropdown, then **Manage claimed nodes**.
+You can claim a node during the Netdata Cloud onboarding process, or after you created a Space by clicking on **Claim
+Nodes** in the [Spaces management area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 
 There are two important notes regarding claiming:
 
