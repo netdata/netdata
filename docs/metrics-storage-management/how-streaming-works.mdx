@@ -11,11 +11,11 @@ Each node running Netdata can stream the metrics it collects, in real time, to a
 replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database
 (TSDB).
 
-When one node streams metrics to another, the node receiving metrics can can visualize them on the
-[dashboard](/docs/visualize/interact-dashboard-charts.md), run health checks to [trigger
+When one node streams metrics to another, the node receiving metrics can visualize them on the
+[dashboard](/docs/visualize/interact-dashboards-charts.md), run health checks to [trigger
 alarms](/docs/monitor/view-active-alarms.md) and [send notifications](/docs/monitor/enable-notifications.md), and
 [export](/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
-Netdata, the receiving one is able to perform everything a Netdata instance is capable of:
+Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
 
 Streaming lets you decide exactly how you want to store and maintain metrics data. While we believe Netdata's
 [distributed architecture](/docs/store/distributed-data-architecture.md) is ideal for speed and scale, streaming
@@ -71,7 +71,7 @@ in the top navigation. The parent node, plus any child nodes, appear here. Click
 between parent and child dashboards, all served by the parent's [web server](/web/server/README.md).
 
 ![Switching between
-](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif))
+](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
 
 Each child dashboard is also available directly at the following URL pattern:
 `http://PARENT-NODE:19999/host/CHILD-HOSTNAME`.
