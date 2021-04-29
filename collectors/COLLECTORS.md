@@ -526,10 +526,11 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 -   [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls CyberPower UPS data using
     PowerPanel® Personal Linux.
 -   [Logged-in users](https://github.com/veksh/netdata-numsessions): Collect the number of currently logged-on users.
+-   [nextcloud](https://github.com/arnowelzel/netdata-nextcloud): Monitor Nextcloud servers.
 -   [nim-netdata-plugin](https://github.com/FedericoCeratto/nim-netdata-plugin): A helper to create native Netdata
     plugins using Nim.
 -   [Nvidia GPUs](https://github.com/coraxx/netdata_nv_plugin): Monitor Nvidia GPUs.
--   [Teamspeak 3](https://github.com/coraxx/netdata_ts3_plugin): Plls active users and bandwidth from TeamSpeak 3
+-   [Teamspeak 3](https://github.com/coraxx/netdata_ts3_plugin): Pulls active users and bandwidth from TeamSpeak 3
     servers.
 -   [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 
