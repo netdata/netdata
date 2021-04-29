@@ -31,7 +31,7 @@ void aclk_database_enq_cmd_nowake(struct aclk_database_worker_config *wc, struct
     while ((queue_size = wc->queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
         uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
     }
-    fatal_assert(queue_size < SQLITE_CMD_Q_MAX_SIZE);
+    fatal_assert(queue_size < ACLK_DATABASE_CMD_Q_MAX_SIZE);
     /* enqueue command */
     wc->cmd_queue.cmd_array[wc->cmd_queue.tail] = *cmd;
     wc->cmd_queue.tail = wc->cmd_queue.tail != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
@@ -49,7 +49,7 @@ void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_d
     while ((queue_size = wc->queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
         uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
     }
-    fatal_assert(queue_size < SQLITE_CMD_Q_MAX_SIZE);
+    fatal_assert(queue_size < ACLK_DATABASE_CMD_Q_MAX_SIZE);
     /* enqueue command */
     wc->cmd_queue.cmd_array[wc->cmd_queue.tail] = *cmd;
     wc->cmd_queue.tail = wc->cmd_queue.tail != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
@@ -345,7 +345,6 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
 {
     if (!aclk_architecture)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
-
 
     if (unlikely(!st->rrdhost->dbsync_worker))
         return;
