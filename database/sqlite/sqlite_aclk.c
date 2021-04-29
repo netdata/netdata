@@ -304,37 +304,39 @@ void aclk_add_chart_event(RRDSET *st, char *payload_type)
 
     buffer_free(tmp_buffer);
 
-    if (unlikely(rc))
-        return;
-
-    sprintf(sql,"insert into aclk_chart_%s (chart_id, unique_id, status, date_created) " \
-                 "values (@chart_uuid, @unique_id, 'pending', strftime('%%s')) " \
-                 "on conflict(chart_id, status) do update set unique_id = @unique_id, update_count = update_count + 1;" , uuid_str);
-
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_chart, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to store chart event data");
-        return;
-    }
-
-    rc = sqlite3_bind_blob(res_chart, 1, st->chart_uuid , sizeof(*st->chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_blob(res_chart, 2, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = execute_insert(res_chart);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed store chart event, rc = %d", rc);
-
-bind_fail:
-    rc = sqlite3_finalize(res_chart);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement in store dimension, rc = %d", rc);
-
     return;
+//
+//    if (unlikely(rc))
+//        return;
+//
+//    sprintf(sql,"insert into aclk_chart_%s (chart_id, unique_id, status, date_created) " \
+//                 "values (@chart_uuid, @unique_id, 'pending', strftime('%%s')) " \
+//                 "on conflict(chart_id, status) do update set unique_id = @unique_id, update_count = update_count + 1;" , uuid_str);
+//
+//    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_chart, 0);
+//    if (unlikely(rc != SQLITE_OK)) {
+//        error_report("Failed to prepare statement to store chart event data");
+//        return;
+//    }
+//
+//    rc = sqlite3_bind_blob(res_chart, 1, st->chart_uuid , sizeof(*st->chart_uuid), SQLITE_STATIC);
+//    if (unlikely(rc != SQLITE_OK))
+//        goto bind_fail;
+//
+//    rc = sqlite3_bind_blob(res_chart, 2, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
+//    if (unlikely(rc != SQLITE_OK))
+//        goto bind_fail;
+//
+//    rc = execute_insert(res_chart);
+//    if (unlikely(rc != SQLITE_DONE))
+//        error_report("Failed store chart event, rc = %d", rc);
+//
+//bind_fail:
+//    rc = sqlite3_finalize(res_chart);
+//    if (unlikely(rc != SQLITE_OK))
+//        error_report("Failed to reset statement in store dimension, rc = %d", rc);
+//
+//    return;
 }
 
 
@@ -370,7 +372,7 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
 void sql_create_aclk_table(RRDHOST *host)
 {
     char uuid_str[37];
-    char sql[256];
+    char sql[2048];
 
     if (unlikely(host->dbsync_worker))
         return;
@@ -397,6 +399,16 @@ void sql_create_aclk_table(RRDHOST *host)
     sprintf(sql,"create table if not exists aclk_payload_%s (unique_id blob primary key, " \
                  "chart_id, type, date_created, payload);", uuid_str);
     db_execute(sql);
+
+    sprintf(sql,"create trigger if not exists aclk_tr_payload_%s after insert on aclk_payload_%s begin insert into aclk_chart_%s " \
+        "(chart_id, unique_id, status, date_created) " \
+        " values (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
+        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
+        " end;", uuid_str, uuid_str, uuid_str);
+
+    info("%s", sql);
+    db_execute(sql);
+
     sprintf(sql,"create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
                  "date_created, date_updated, unique_id);", uuid_str);
     db_execute(sql);
