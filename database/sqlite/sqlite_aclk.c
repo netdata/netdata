@@ -173,8 +173,6 @@ void aclk_database_worker(void *arg)
                     info("Cleanup for %s", wc->uuid_str);
                     break;
                 case ACLK_DATABASE_ADD_CHART:
-                    //sql_maint_database();
-                    info("Adding chart %s (queue size = %d)", wc->uuid_str, wc->queue_size);
                     aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param);
                     freez(cmd.data_param);
                     break;
@@ -272,19 +270,17 @@ bind_fail:
 }
 
 
-void aclk_add_chart_event(RRDSET *st, char *payload_type)
+int aclk_add_chart_event(RRDSET *st, char *payload_type)
 {
-    char uuid_str[37];
-    char sql[1024];
-    sqlite3_stmt *res_chart = NULL;
+    char uuid_str[GUID_LEN + 1];
     int rc;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-            return;
+            return 1;
         }
         error_report("Database has not been initialized");
-        return;
+        return 1;
     }
 
     uuid_unparse_lower(st->rrdhost->host_uuid, uuid_str);
@@ -304,39 +300,7 @@ void aclk_add_chart_event(RRDSET *st, char *payload_type)
 
     buffer_free(tmp_buffer);
 
-    return;
-//
-//    if (unlikely(rc))
-//        return;
-//
-//    sprintf(sql,"insert into aclk_chart_%s (chart_id, unique_id, status, date_created) " \
-//                 "values (@chart_uuid, @unique_id, 'pending', strftime('%%s')) " \
-//                 "on conflict(chart_id, status) do update set unique_id = @unique_id, update_count = update_count + 1;" , uuid_str);
-//
-//    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_chart, 0);
-//    if (unlikely(rc != SQLITE_OK)) {
-//        error_report("Failed to prepare statement to store chart event data");
-//        return;
-//    }
-//
-//    rc = sqlite3_bind_blob(res_chart, 1, st->chart_uuid , sizeof(*st->chart_uuid), SQLITE_STATIC);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = sqlite3_bind_blob(res_chart, 2, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = execute_insert(res_chart);
-//    if (unlikely(rc != SQLITE_DONE))
-//        error_report("Failed store chart event, rc = %d", rc);
-//
-//bind_fail:
-//    rc = sqlite3_finalize(res_chart);
-//    if (unlikely(rc != SQLITE_OK))
-//        error_report("Failed to reset statement in store dimension, rc = %d", rc);
-//
-//    return;
+    return rc;
 }
 
 
@@ -370,8 +334,7 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
 
 void sql_create_aclk_table(RRDHOST *host)
 {
-    char uuid_str[37];
-    char sql[2048];
+    char uuid_str[GUID_LEN + 1];
 
     uuid_unparse_lower(host->host_uuid, uuid_str);
     uuid_str[8] = '_';
@@ -379,37 +342,67 @@ void sql_create_aclk_table(RRDHOST *host)
     uuid_str[18] = '_';
     uuid_str[23] = '_';
 
-    sprintf(sql, "create table if not exists aclk_chart_%s (sequence_id integer primary key, " \
-        "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
-        "update_count default 1, unique(chart_id, status));", uuid_str);
+    BUFFER *sql = buffer_create(1024);
 
-    db_execute(sql);
-    sprintf(sql,"create table if not exists aclk_chart_payload_%s (unique_id blob primary key, " \
-                 "chart_id, type, date_created, payload);", uuid_str);
-    db_execute(sql);
+    buffer_sprintf(sql, TABLE_ACLK_CHART, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
 
-    sprintf(sql,"create trigger if not exists aclk_tr_payload_%s after insert on aclk_chart_payload_%s begin insert into aclk_chart_%s " \
-        "(chart_id, unique_id, status, date_created) " \
-        " values (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
-        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
-        " end;", uuid_str, uuid_str, uuid_str);
+    buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
 
-    info("%s", sql);
-    db_execute(sql);
+    buffer_sprintf(sql,TRIGGER_ACLK_CHART_PAYLOAD, uuid_str, uuid_str, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
 
-    sprintf(sql,"create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
-                 "date_created, date_updated, unique_id);", uuid_str);
-    db_execute(sql);
+    buffer_sprintf(sql,TABLE_ACLK_ALERT, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
 
+    buffer_sprintf(sql,TABLE_ACLK_ALERT_PAYLOAD, uuid_str);
+    db_execute(buffer_tostring(sql));
+
+
+    buffer_free(sql);
 
     // Spawn db thread for processing (event loop)
     if (unlikely(host->dbsync_worker))
         return;
 
-    struct sqlite_worker_config *wc = NULL;
+    struct aclk_database_worker_config *wc = NULL;
     host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
-    wc = (struct sqlite_worker_config *) host->dbsync_worker;
+    wc = (struct aclk_database_worker_config *) host->dbsync_worker;
     strcpy(wc->uuid_str, uuid_str);
     wc->host = host;
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
+}
+
+void sql_drop_aclk_table_list(RRDHOST *host)
+{
+    char uuid_str[GUID_LEN + 1];
+
+    uuid_unparse_lower(host->host_uuid, uuid_str);
+    uuid_str[8] = '_';
+    uuid_str[13] = '_';
+    uuid_str[18] = '_';
+    uuid_str[23] = '_';
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql, "drop table if exists aclk_chart_%s;", uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_sprintf(sql, "drop table if exists aclk_chart_payload_%s;", uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_sprintf(sql,"drop trigger if exists aclk_tr_chart_payload_%s;", uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_sprintf(sql,"drop table if exists aclk_alert_%s;", uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_sprintf(sql,"drop table if exists aclk_alert_payload_%s;", uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_free(sql);
 }

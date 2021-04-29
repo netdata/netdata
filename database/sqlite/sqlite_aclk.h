@@ -5,6 +5,28 @@
 
 #include "sqlite3.h"
 
+
+#define TABLE_ACLK_CHART "create table if not exists aclk_chart_%s (sequence_id integer primary key, " \
+        "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
+        "update_count default 1, unique(chart_id, status));"
+
+#define TABLE_ACLK_CHART_PAYLOAD "create table if not exists aclk_chart_payload_%s (unique_id blob primary key, " \
+        "chart_id, type, date_created, payload);"
+
+#define TRIGGER_ACLK_CHART_PAYLOAD "create trigger if not exists aclk_tr_chart_payload_%s " \
+        "after insert on aclk_chart_payload_%s " \
+        "begin insert into aclk_chart_%s (chart_id, unique_id, status, date_created) values " \
+        " (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
+        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
+        "end;"
+
+#define TABLE_ACLK_ALERT "create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
+                 "date_created, date_updated, unique_id);"
+
+#define TABLE_ACLK_ALERT_PAYLOAD "create table if not exists aclk_alert_payload_%s (unique_id blob primary key, " \
+                 "chart_id, type, date_created, payload);"
+
+
 enum aclk_database_opcode {
     /* can be used to return empty status or flush the command queue */
     ACLK_DATABASE_NOOP = 0,
@@ -60,7 +82,8 @@ extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct
 extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host);
-void aclk_add_chart_event(RRDSET *st, char *payload_type);
+extern void sql_create_aclk_table(RRDHOST *host);
+int aclk_add_chart_event(RRDSET *st, char *payload_type);
 
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H
