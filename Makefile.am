@@ -102,7 +102,6 @@ dist_noinst_SCRIPTS = \
 # Compile netdata binaries
 
 SUBDIRS += \
-    backends \
     collectors \
     daemon \
     database \
@@ -111,6 +110,7 @@ SUBDIRS += \
     libnetdata \
     streaming \
     web \
+    src/backends \
     src/claim \
 	src/cli \
     src/parser \
@@ -518,16 +518,16 @@ WEB_PLUGIN_FILES = \
     $(NULL)
 
 BACKENDS_PLUGIN_FILES = \
-    backends/backends.c \
-    backends/backends.h \
-    backends/graphite/graphite.c \
-    backends/graphite/graphite.h \
-    backends/json/json.c \
-    backends/json/json.h \
-    backends/opentsdb/opentsdb.c \
-    backends/opentsdb/opentsdb.h \
-    backends/prometheus/backend_prometheus.c \
-    backends/prometheus/backend_prometheus.h \
+    src/backends/backends.c \
+    src/backends/backends.h \
+    src/backends/graphite/graphite.c \
+    src/backends/graphite/graphite.h \
+    src/backends/json/json.c \
+    src/backends/json/json.h \
+    src/backends/opentsdb/opentsdb.c \
+    src/backends/opentsdb/opentsdb.h \
+    src/backends/prometheus/backend_prometheus.c \
+    src/backends/prometheus/backend_prometheus.h \
     $(NULL)
 
 CLAIM_FILES = \
@@ -645,20 +645,20 @@ MONGODB_EXPORTING_FILES = \
     $(NULL)
 
 KINESIS_BACKEND_FILES = \
-    backends/aws_kinesis/aws_kinesis.c \
-    backends/aws_kinesis/aws_kinesis.h \
-    backends/aws_kinesis/aws_kinesis_put_record.cc \
-    backends/aws_kinesis/aws_kinesis_put_record.h \
+    src/backends/aws_kinesis/aws_kinesis.c \
+    src/backends/aws_kinesis/aws_kinesis.h \
+    src/backends/aws_kinesis/aws_kinesis_put_record.cc \
+    src/backends/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
 PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
-    backends/prometheus/remote_write/remote_write.cc \
-    backends/prometheus/remote_write/remote_write.h \
+    src/backends/prometheus/remote_write/remote_write.cc \
+    src/backends/prometheus/remote_write/remote_write.h \
     $(NULL)
 
 MONGODB_BACKEND_FILES = \
-    backends/mongodb/mongodb.c \
-    backends/mongodb/mongodb.h \
+    src/backends/mongodb/mongodb.c \
+    src/backends/mongodb/mongodb.h \
     $(NULL)
 
 DAEMON_FILES = \

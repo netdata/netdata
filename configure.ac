@@ -1547,14 +1547,6 @@ AC_DEFINE_UNQUOTED(
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    backends/graphite/Makefile
-    backends/json/Makefile
-    backends/Makefile
-    backends/opentsdb/Makefile
-    backends/prometheus/Makefile
-    backends/prometheus/remote_write/Makefile
-    backends/aws_kinesis/Makefile
-    backends/mongodb/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
@@ -1649,6 +1641,14 @@ AC_CONFIG_FILES([
     web/server/Makefile
     web/server/static/Makefile
     aclk/legacy/Makefile
+    src/backends/graphite/Makefile
+    src/backends/json/Makefile
+    src/backends/Makefile
+    src/backends/opentsdb/Makefile
+    src/backends/prometheus/Makefile
+    src/backends/prometheus/remote_write/Makefile
+    src/backends/aws_kinesis/Makefile
+    src/backends/mongodb/Makefile
     src/claim/Makefile
     src/cli/Makefile
     src/parser/Makefile
