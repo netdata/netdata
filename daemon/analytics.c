@@ -727,7 +727,7 @@ static void get_system_timezone(void)
                 mm[1] = isdigit(zone[4]) ? zone[4] : '0';
                 mm[2] = '\0';
 
-                netdata_configured_utc_offset = (atoi(hh) * 60 * 60) + (atoi(mm) * 60);
+                netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);
                 netdata_configured_utc_offset =
                     sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
             }
