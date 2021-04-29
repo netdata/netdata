@@ -1008,7 +1008,7 @@ failed:
     return host;
 }
 
-void db_execute(char *cmd)
+void db_execute(const char *cmd)
 {
     int rc;
     char *err_msg;
