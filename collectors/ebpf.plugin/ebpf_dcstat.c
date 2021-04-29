@@ -159,9 +159,9 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 
     ebpf_create_charts_on_apps(NETDATA_DC_REFERENCE_CHART,
                                "Count file access.",
-                               EBPF_CACHESTAT_DIMENSION_HITS,
+                               EBPF_COMMON_DIMENSION_FILES,
                                NETDATA_APPS_DCSTAT_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NETDATA_EBPF_CHART_TYPE_LINE,
                                20101,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
