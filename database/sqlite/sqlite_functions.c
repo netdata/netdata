@@ -1438,7 +1438,7 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
-    rc = sqlite3_changes(res);
+    rc = sqlite3_changes(db_meta);
 
     char host_guid[GUID_LEN + 1];
     uuid_unparse_lower(*host_id, host_guid);
