@@ -13,6 +13,7 @@ jobs:
     name: Install, Build & Update
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         distro:
           - 'alpine:3.12'
