@@ -44,8 +44,11 @@ A **context** is a way of grouping charts by the types of metrics collected and 
 a machine-readable naming and organization scheme.
 
 For example, the **Apps CPU Time** has the context `apps.cpu`. A little further down on the dashboard is a similar
-chart, **Apps Real Memory (w/o shared)** with the context `apps.mem`. Because these two charts share the `apps.` portion
-of their context, they're grouped together into the **Applications** section on the dashboard.
+chart, **Apps Real Memory (w/o shared)** with the context `apps.mem`. The `apps` portion of the context is the **type**,
+whereas anything after the `.` is specified either by the chart's developer or by the [family](#family). 
+
+Because these two charts share the `apps` type as part of their context, they're grouped together into the
+**Applications** section on the dashboard.
 
 Netdata also uses contexts for [alarm configuration](/docs/monitor/configure-alarms.md) (the [`on`
 line](/health/REFERENCE.md#alarm-line-on)).
