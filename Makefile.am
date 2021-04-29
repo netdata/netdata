@@ -888,8 +888,8 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
         $(NULL)
     nodist_netdata_SOURCES = $(BUILT_SOURCES)
 
-exporting/prometheus/remote_write/remote_write.pb.cc \
-exporting/prometheus/remote_write/remote_write.pb.h: src/exporting/prometheus/remote_write/remote_write.proto
+src/exporting/prometheus/remote_write/remote_write.pb.cc \
+src/exporting/prometheus/remote_write/remote_write.pb.h: src/exporting/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
 endif
