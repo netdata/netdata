@@ -1587,8 +1587,6 @@ AC_CONFIG_FILES([
     exporting/pubsub/Makefile
     exporting/mongodb/Makefile
     exporting/tests/Makefile
-    health/Makefile
-    health/notifications/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
@@ -1650,6 +1648,8 @@ AC_CONFIG_FILES([
     src/backends/mongodb/Makefile
     src/claim/Makefile
     src/cli/Makefile
+    src/health/Makefile
+    src/health/notifications/Makefile
     src/parser/Makefile
     src/registry/Makefile
     src/spawn/Makefile

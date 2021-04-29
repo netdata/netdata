@@ -124,7 +124,7 @@ system/netdata.crontab
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh
 
-health/notifications/alarm-notify.sh
+src/health/notifications/alarm-notify.sh
 src/claim/netdata-claim.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh

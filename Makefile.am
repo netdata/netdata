@@ -106,12 +106,12 @@ SUBDIRS += \
     daemon \
     database \
     exporting \
-    health \
     libnetdata \
     web \
     src/backends \
     src/claim \
 	src/cli \
+    src/health \
     src/parser \
     src/registry \
     src/spawn \
@@ -230,11 +230,11 @@ FREEBSD_PLUGIN_FILES = \
     $(NULL)
 
 HEALTH_PLUGIN_FILES = \
-    health/health.c \
-    health/health.h \
-    health/health_config.c \
-    health/health_json.c \
-    health/health_log.c \
+    src/health/health.c \
+    src/health/health.h \
+    src/health/health_config.c \
+    src/health/health_json.c \
+    src/health/health_log.c \
     $(NULL)
 
 IDLEJITTER_PLUGIN_FILES = \
