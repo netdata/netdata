@@ -720,8 +720,8 @@ set(BACKENDS_PLUGIN_FILES
         )
 
 set(CLAIM_PLUGIN_FILES
-        claim/claim.c
-        claim/claim.h
+        src/claim/claim.c
+        src/claim/claim.h
         aclk/legacy/aclk_rrdhost_state.h
         aclk/legacy/aclk_common.c
         aclk/legacy/aclk_common.h
@@ -862,8 +862,7 @@ set(NETDATA_FILES
 
 set(NETDATACLI_FILES
         daemon/commands.h
-        cli/cli.c
-        cli/cli.h
+        src/cli/cli.c
         )
 
 include_directories(AFTER .)

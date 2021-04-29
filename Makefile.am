@@ -112,9 +112,10 @@ SUBDIRS += \
     registry \
     streaming \
     web \
-    claim \
     parser \
     spawn \
+    src/claim \
+	src/cli \
     $(NULL)
 
 if ACLK_NG
@@ -128,6 +129,7 @@ SUBDIRS += \
 endif
 
 AM_CFLAGS = \
+	-I$(top_srcdir)/src \
     $(OPTIONAL_MATH_CFLAGS) \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
@@ -529,8 +531,8 @@ BACKENDS_PLUGIN_FILES = \
     $(NULL)
 
 CLAIM_FILES = \
-    claim/claim.c \
-    claim/claim.h \
+    src/claim/claim.c \
+    src/claim/claim.h \
     $(NULL)
 
 PARSER_FILES = \
@@ -746,8 +748,7 @@ endif
 NETDATACLI_FILES = \
     daemon/commands.h \
     $(LIBNETDATA_FILES) \
-    cli/cli.c \
-    cli/cli.h \
+    src/cli/cli.c \
     $(NULL)
 
 sbin_PROGRAMS += netdata
