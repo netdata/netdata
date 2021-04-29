@@ -105,7 +105,6 @@ SUBDIRS += \
     daemon \
     database \
     libnetdata \
-    web \
     src/backends \
     src/claim \
 	src/cli \
@@ -116,6 +115,7 @@ SUBDIRS += \
     src/registry \
     src/spawn \
     src/streaming \
+    src/web \
     $(NULL)
 
 if ACLK_NG
@@ -428,54 +428,54 @@ if ENABLE_DBENGINE
 endif
 
 API_PLUGIN_FILES = \
-    web/api/badges/web_buffer_svg.c \
-    web/api/badges/web_buffer_svg.h \
-    web/api/exporters/allmetrics.c \
-    web/api/exporters/allmetrics.h \
-    web/api/exporters/shell/allmetrics_shell.c \
-    web/api/exporters/shell/allmetrics_shell.h \
-    web/api/queries/average/average.c \
-    web/api/queries/average/average.h \
-    web/api/queries/des/des.c \
-    web/api/queries/des/des.h \
-    web/api/queries/incremental_sum/incremental_sum.c \
-    web/api/queries/incremental_sum/incremental_sum.h \
-    web/api/queries/max/max.c \
-    web/api/queries/max/max.h \
-    web/api/queries/median/median.c \
-    web/api/queries/median/median.h \
-    web/api/queries/min/min.c \
-    web/api/queries/min/min.h \
-    web/api/queries/query.c \
-    web/api/queries/query.h \
-    web/api/queries/rrdr.c \
-    web/api/queries/rrdr.h \
-    web/api/queries/ses/ses.c \
-    web/api/queries/ses/ses.h \
-    web/api/queries/stddev/stddev.c \
-    web/api/queries/stddev/stddev.h \
-    web/api/queries/sum/sum.c \
-    web/api/queries/sum/sum.h \
-    web/api/formatters/rrd2json.c \
-    web/api/formatters/rrd2json.h \
-    web/api/formatters/csv/csv.c \
-    web/api/formatters/csv/csv.h \
-    web/api/formatters/json/json.c \
-    web/api/formatters/json/json.h \
-    web/api/formatters/ssv/ssv.c \
-    web/api/formatters/ssv/ssv.h \
-    web/api/formatters/value/value.c \
-    web/api/formatters/value/value.h \
-    web/api/formatters/json_wrapper.c \
-    web/api/formatters/json_wrapper.h \
-    web/api/formatters/charts2json.c \
-    web/api/formatters/charts2json.h \
-    web/api/formatters/rrdset2json.c \
-    web/api/formatters/rrdset2json.h \
-    web/api/health/health_cmdapi.c \
-    web/api/health/health_cmdapi.h \
-    web/api/web_api_v1.c \
-    web/api/web_api_v1.h \
+    src/web/api/badges/web_buffer_svg.c \
+    src/web/api/badges/web_buffer_svg.h \
+    src/web/api/exporters/allmetrics.c \
+    src/web/api/exporters/allmetrics.h \
+    src/web/api/exporters/shell/allmetrics_shell.c \
+    src/web/api/exporters/shell/allmetrics_shell.h \
+    src/web/api/queries/average/average.c \
+    src/web/api/queries/average/average.h \
+    src/web/api/queries/des/des.c \
+    src/web/api/queries/des/des.h \
+    src/web/api/queries/incremental_sum/incremental_sum.c \
+    src/web/api/queries/incremental_sum/incremental_sum.h \
+    src/web/api/queries/max/max.c \
+    src/web/api/queries/max/max.h \
+    src/web/api/queries/median/median.c \
+    src/web/api/queries/median/median.h \
+    src/web/api/queries/min/min.c \
+    src/web/api/queries/min/min.h \
+    src/web/api/queries/query.c \
+    src/web/api/queries/query.h \
+    src/web/api/queries/rrdr.c \
+    src/web/api/queries/rrdr.h \
+    src/web/api/queries/ses/ses.c \
+    src/web/api/queries/ses/ses.h \
+    src/web/api/queries/stddev/stddev.c \
+    src/web/api/queries/stddev/stddev.h \
+    src/web/api/queries/sum/sum.c \
+    src/web/api/queries/sum/sum.h \
+    src/web/api/formatters/rrd2json.c \
+    src/web/api/formatters/rrd2json.h \
+    src/web/api/formatters/csv/csv.c \
+    src/web/api/formatters/csv/csv.h \
+    src/web/api/formatters/json/json.c \
+    src/web/api/formatters/json/json.h \
+    src/web/api/formatters/ssv/ssv.c \
+    src/web/api/formatters/ssv/ssv.h \
+    src/web/api/formatters/value/value.c \
+    src/web/api/formatters/value/value.h \
+    src/web/api/formatters/json_wrapper.c \
+    src/web/api/formatters/json_wrapper.h \
+    src/web/api/formatters/charts2json.c \
+    src/web/api/formatters/charts2json.h \
+    src/web/api/formatters/rrdset2json.c \
+    src/web/api/formatters/rrdset2json.h \
+    src/web/api/health/health_cmdapi.c \
+    src/web/api/health/health_cmdapi.h \
+    src/web/api/web_api_v1.c \
+    src/web/api/web_api_v1.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
@@ -507,14 +507,14 @@ STATSD_PLUGIN_FILES = \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
-    web/server/web_client.c \
-    web/server/web_client.h \
-    web/server/web_server.c \
-    web/server/web_server.h \
-    web/server/web_client_cache.c \
-    web/server/web_client_cache.h \
-    web/server/static/static-threaded.c \
-    web/server/static/static-threaded.h \
+    src/web/server/web_client.c \
+    src/web/server/web_client.h \
+    src/web/server/web_server.c \
+    src/web/server/web_server.h \
+    src/web/server/web_client_cache.c \
+    src/web/server/web_client_cache.h \
+    src/web/server/static/static-threaded.c \
+    src/web/server/static/static-threaded.h \
     $(NULL)
 
 BACKENDS_PLUGIN_FILES = \
@@ -904,14 +904,14 @@ if ENABLE_UNITTESTS
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
         src/exporting/tests/exporting_engine_testdriver \
-        web/api/tests/web_api_testdriver \
-        web/api/tests/valid_urls_testdriver \
+        src/web/api/tests/web_api_testdriver \
+        src/web/api/tests/valid_urls_testdriver \
         src/collectors/cgroups_plugin/tests/cgroups_testdriver \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
 
-    web_api_tests_valid_urls_testdriver_LDFLAGS = \
+    src_web_api_tests_valid_urls_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \
         -Wl,--wrap=finished_web_request_statistics \
         -Wl,--wrap=config_get \
@@ -928,14 +928,14 @@ if ENABLE_UNITTESTS
         -DREMOVE_MYSENDFILE \
         $(TEST_LDFLAGS) \
         $(NULL)
-    web_api_tests_valid_urls_testdriver_SOURCES = \
-        web/api/tests/valid_urls.c \
-        web/server/web_client.c \
+    src_web_api_tests_valid_urls_testdriver_SOURCES = \
+        src/web/api/tests/valid_urls.c \
+        src/web/server/web_client.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    web_api_tests_valid_urls_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_web_api_tests_valid_urls_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
-    web_api_tests_web_api_testdriver_LDFLAGS = \
+    src_web_api_tests_web_api_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \
         -Wl,--wrap=finished_web_request_statistics \
         -Wl,--wrap=config_get \
@@ -950,12 +950,12 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=fatal_int \
         $(TEST_LDFLAGS) \
         $(NULL)
-    web_api_tests_web_api_testdriver_SOURCES = \
-        web/api/tests/web_api.c \
-        web/server/web_client.c \
+    src_web_api_tests_web_api_testdriver_SOURCES = \
+        src/web/api/tests/web_api.c \
+        src/web/server/web_client.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    web_api_tests_web_api_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    src_web_api_tests_web_api_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
     libnetdata_tests_str2ld_testdriver_SOURCES = \
         libnetdata/tests/test_str2ld.c \

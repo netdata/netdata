@@ -96,12 +96,12 @@ README
 TODO.md
 TODO.txt
 
-web/gui/chart-info/
-web/gui/control.html
-web/gui/datasource.css
-web/gui/gadget.xml
-web/gui/index_new.html
-web/gui/version.txt
+src/web/gui/chart-info/
+src/web/gui/control.html
+src/web/gui/datasource.css
+src/web/gui/gadget.xml
+src/web/gui/index_new.html
+src/web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/
@@ -134,7 +134,7 @@ src/collectors/python.d.plugin/python.d.plugin
 src/collectors/fping.plugin/fping.plugin
 src/collectors/ioping.plugin/ioping.plugin
 src/collectors/go.d.plugin
-web/netdata-switch-dashboard.sh
+src/web/netdata-switch-dashboard.sh
 
 # installer generated files
 /netdata-uninstaller.sh

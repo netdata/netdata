@@ -1577,31 +1577,6 @@ AC_CONFIG_FILES([
     libnetdata/health/Makefile
     system/Makefile
     tests/Makefile
-    web/Makefile
-    web/api/Makefile
-    web/api/badges/Makefile
-    web/api/exporters/Makefile
-    web/api/exporters/shell/Makefile
-    web/api/exporters/prometheus/Makefile
-    web/api/formatters/Makefile
-    web/api/formatters/csv/Makefile
-    web/api/formatters/json/Makefile
-    web/api/formatters/ssv/Makefile
-    web/api/formatters/value/Makefile
-    web/api/queries/Makefile
-    web/api/queries/average/Makefile
-    web/api/queries/des/Makefile
-    web/api/queries/incremental_sum/Makefile
-    web/api/queries/max/Makefile
-    web/api/queries/median/Makefile
-    web/api/queries/min/Makefile
-    web/api/queries/ses/Makefile
-    web/api/queries/stddev/Makefile
-    web/api/queries/sum/Makefile
-    web/api/health/Makefile
-    web/gui/Makefile
-    web/server/Makefile
-    web/server/static/Makefile
     aclk/legacy/Makefile
     src/backends/graphite/Makefile
     src/backends/json/Makefile
@@ -1654,6 +1629,31 @@ AC_CONFIG_FILES([
     src/registry/Makefile
     src/spawn/Makefile
     src/streaming/Makefile
+    src/web/Makefile
+    src/web/api/Makefile
+    src/web/api/badges/Makefile
+    src/web/api/exporters/Makefile
+    src/web/api/exporters/shell/Makefile
+    src/web/api/exporters/prometheus/Makefile
+    src/web/api/formatters/Makefile
+    src/web/api/formatters/csv/Makefile
+    src/web/api/formatters/json/Makefile
+    src/web/api/formatters/ssv/Makefile
+    src/web/api/formatters/value/Makefile
+    src/web/api/queries/Makefile
+    src/web/api/queries/average/Makefile
+    src/web/api/queries/des/Makefile
+    src/web/api/queries/incremental_sum/Makefile
+    src/web/api/queries/max/Makefile
+    src/web/api/queries/median/Makefile
+    src/web/api/queries/min/Makefile
+    src/web/api/queries/ses/Makefile
+    src/web/api/queries/stddev/Makefile
+    src/web/api/queries/sum/Makefile
+    src/web/api/health/Makefile
+    src/web/gui/Makefile
+    src/web/server/Makefile
+    src/web/server/static/Makefile
 ])
 
 AC_OUTPUT
