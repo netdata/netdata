@@ -102,11 +102,11 @@ dist_noinst_SCRIPTS = \
 # Compile netdata binaries
 
 SUBDIRS += \
-    daemon \
     src/backends \
     src/claim \
 	src/cli \
     src/collectors \
+    src/daemon \
     src/database \
     src/exporting \
     src/health \
@@ -662,24 +662,24 @@ MONGODB_BACKEND_FILES = \
     $(NULL)
 
 DAEMON_FILES = \
-    daemon/buildinfo.c \
-    daemon/buildinfo.h \
-    daemon/common.c \
-    daemon/common.h \
-    daemon/daemon.c \
-    daemon/daemon.h \
-    daemon/global_statistics.c \
-    daemon/global_statistics.h \
-    daemon/analytics.c \
-    daemon/analytics.h \
-    daemon/main.c \
-    daemon/main.h \
-    daemon/signals.c \
-    daemon/signals.h \
-    daemon/commands.c \
-    daemon/commands.h \
-    daemon/unit_test.c \
-    daemon/unit_test.h \
+    src/daemon/buildinfo.c \
+    src/daemon/buildinfo.h \
+    src/daemon/common.c \
+    src/daemon/common.h \
+    src/daemon/daemon.c \
+    src/daemon/daemon.h \
+    src/daemon/global_statistics.c \
+    src/daemon/global_statistics.h \
+    src/daemon/analytics.c \
+    src/daemon/analytics.h \
+    src/daemon/main.c \
+    src/daemon/main.h \
+    src/daemon/signals.c \
+    src/daemon/signals.h \
+    src/daemon/commands.c \
+    src/daemon/commands.h \
+    src/daemon/unit_test.c \
+    src/daemon/unit_test.h \
     $(NULL)
 
 NETDATA_FILES = \
@@ -746,7 +746,7 @@ if LINK_STATIC_JSONC
 endif
 
 NETDATACLI_FILES = \
-    daemon/commands.h \
+    src/daemon/commands.h \
     $(LIBNETDATA_FILES) \
     src/cli/cli.c \
     src/cli/cli.h \

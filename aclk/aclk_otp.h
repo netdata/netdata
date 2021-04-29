@@ -3,7 +3,7 @@
 #ifndef ACLK_OTP_H
 #define ACLK_OTP_H
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 #include "https_client.h"
 

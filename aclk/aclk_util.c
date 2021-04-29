@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 // CentOS 7 has older version that doesn't define this
 // same goes for MacOS

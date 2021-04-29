@@ -25,7 +25,7 @@ AC_SUBST([PACKAGE_RPM_VERSION])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
-AC_CONFIG_SRCDIR([daemon/main.c])
+AC_CONFIG_SRCDIR([src/daemon/main.c])
 define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [
     define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
@@ -1547,7 +1547,6 @@ AC_DEFINE_UNQUOTED(
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    daemon/Makefile
     diagrams/Makefile
     system/Makefile
     tests/Makefile
@@ -1587,6 +1586,7 @@ AC_CONFIG_FILES([
     src/collectors/tc.plugin/Makefile
     src/collectors/xenstat.plugin/Makefile
     src/collectors/perf.plugin/Makefile
+    src/daemon/Makefile
     src/database/Makefile
     src/database/engine/Makefile
     src/database/engine/metadata_log/Makefile

@@ -121,8 +121,8 @@ system/netdata-freebsd
 system/edit-config
 system/netdata.crontab
 
-daemon/anonymous-statistics.sh
-daemon/get-kubernetes-labels.sh
+src/daemon/anonymous-statistics.sh
+src/daemon/get-kubernetes-labels.sh
 
 src/health/notifications/alarm-notify.sh
 src/claim/netdata-claim.sh

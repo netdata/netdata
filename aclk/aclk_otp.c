@@ -3,7 +3,7 @@
 
 #include "aclk_otp.h"
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 #include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
