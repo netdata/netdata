@@ -37,8 +37,10 @@ Cloud](https://user-images.githubusercontent.com/1153921/108564813-f08d2000-72c0
 
 ## Local Netdata Agent dashboard
 
-Find the bell 🔔 icon in the top navigation to bring up a modal that shows currently raised alarms, all running alarms,
-and the alarms log. Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
+Find the alarms icon ![Alarms
+icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
+in the top navigation to bring up a modal that shows currently raised alarms, all running alarms, and the alarms log.
+Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
 
 ![Animated GIF of looking at raised alarms and the alarm
 log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)

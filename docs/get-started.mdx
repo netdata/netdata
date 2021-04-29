@@ -70,7 +70,8 @@ Copy the script, paste it into your node's terminal, and hit `Enter` to begin th
 
 <OneLineInstall />
 
-Next, [open and explore the dashboard](#open-and-explore-the-dashboard).
+Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+troubleshooting with Netdata.
 
 ## Run Netdata with Docker
 
@@ -94,58 +95,23 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-Next, [open and explore the dashboard](#open-and-explore-the-dashboard).
-
-## Open and explore the dashboard
+## What's next?
 
 To start using Netdata, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
 the hostname/IP address of a remote node.
 
-![Animated GIF of navigating to the
-dashboard](https://user-images.githubusercontent.com/1153921/80825153-abaec600-8b94-11ea-8b17-1b770a2abaa9.gif)
-
-Netdata's dashboard is a single page with hundreds of preconfigured charts and thousands of metrics that update every
-second. Everything you see is autodetected and organized with zero configuration required.
-
-To see more charts, scroll down or use the **menu** on the right-hand side of the dashboard to navigate between
-**sections**, which are groups of closely related charts.
-
-![Animated GIF of using the menus and
-submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8ba1-11ea-8140-d0a17a62009b.gif)
-
-## Interact with charts
-
-Every chart in the Netdata dashboard is fully interactive, and Netdata synchronizes your interactions to help you
-understand exactly how a node behaved in any timeframe, whether that's seconds or days.
-
-![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing
-charts](https://user-images.githubusercontent.com/1153921/80839230-b034a800-8baf-11ea-9cb2-99c1e10f0f85.gif)
-
-Let's cover two of the most important ways to interact with charts: panning through time and zooming.
-
-To pan through time, **click and hold** (or touch and hold) on any chart, then **drag your mouse** (or finger) to the
-left or right. Dragging to the right pans backward through time, while dragging to the left pans forward in time. Think
-of it like pushing the current timeframe off the screen so you can see what came before or after.
-
-To zoom, press and hold `Shift`, then use your mouse's scroll wheel, or a two-finger pinch if you're using a touchpad.
-
-## What's next?
-
-You've now installed Netdata, visited the dashboard at `http://NODE:19999`, learned the basics of getting around, and
-learned how to interact with charts by zooming and panning through time.
-
 Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting.
+
+### Dashboard
+
+Learn more about [how the dashboard works](/docs/dashboard/how-dashboard-works.mdx), or dive directly into the many ways
+to [interact with charts](/docs/dashboard/interact-charts.mdx).
 
 ### Configuration
 
 Discover the recommended way to [configure Netdata's settings or behavior](/docs/configure/nodes.md) using our built-in
 `edit-config` script, then apply that knowledge to mission-critical tweaks, such as [changing how long Netdata stores
 metrics](/docs/store/change-metrics-storage.md).
-
-### Dashboard
-
-Learn even more about [navigating Netdata's dashboard and interacting with
-charts](/docs/visualize/interact-dashboards-charts.md).
 
 ### Data collection
 
