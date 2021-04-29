@@ -235,7 +235,7 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *unique_id, uuid_t *chart_id, 
     sqlite3_stmt *res_chart = NULL;
     int rc;
 
-    sprintf(sql,"insert into aclk_payload_%s (unique_id, chart_id, date_created, type, payload) " \
+    sprintf(sql,"insert into aclk_chart_payload_%s (unique_id, chart_id, date_created, type, payload) " \
                  "values (@unique_id, @chart_id, strftime('%%s'), @type, @payload);", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_chart, 0);
@@ -373,33 +373,22 @@ void sql_create_aclk_table(RRDHOST *host)
     char uuid_str[37];
     char sql[2048];
 
-    if (unlikely(host->dbsync_worker))
-        return;
-
     uuid_unparse_lower(host->host_uuid, uuid_str);
     uuid_str[8] = '_';
     uuid_str[13] = '_';
     uuid_str[18] = '_';
     uuid_str[23] = '_';
 
-    struct sqlite_worker_config *wc = NULL;
-
-    host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
-
-    wc = (struct sqlite_worker_config *) host->dbsync_worker;
-    strcpy(wc->uuid_str, uuid_str);
-    wc->host = host;
-
     sprintf(sql, "create table if not exists aclk_chart_%s (sequence_id integer primary key, " \
         "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
         "update_count default 1, unique(chart_id, status));", uuid_str);
 
     db_execute(sql);
-    sprintf(sql,"create table if not exists aclk_payload_%s (unique_id blob primary key, " \
+    sprintf(sql,"create table if not exists aclk_chart_payload_%s (unique_id blob primary key, " \
                  "chart_id, type, date_created, payload);", uuid_str);
     db_execute(sql);
 
-    sprintf(sql,"create trigger if not exists aclk_tr_payload_%s after insert on aclk_payload_%s begin insert into aclk_chart_%s " \
+    sprintf(sql,"create trigger if not exists aclk_tr_payload_%s after insert on aclk_chart_payload_%s begin insert into aclk_chart_%s " \
         "(chart_id, unique_id, status, date_created) " \
         " values (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
@@ -412,7 +401,15 @@ void sql_create_aclk_table(RRDHOST *host)
                  "date_created, date_updated, unique_id);", uuid_str);
     db_execute(sql);
 
-    // Spawn db thread for processing (event loop)
 
+    // Spawn db thread for processing (event loop)
+    if (unlikely(host->dbsync_worker))
+        return;
+
+    struct sqlite_worker_config *wc = NULL;
+    host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
+    wc = (struct sqlite_worker_config *) host->dbsync_worker;
+    strcpy(wc->uuid_str, uuid_str);
+    wc->host = host;
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
 }
