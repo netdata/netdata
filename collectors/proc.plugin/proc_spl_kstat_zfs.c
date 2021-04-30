@@ -254,11 +254,11 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
         if (!pool->disabled) {
             if (unlikely(!pool->st)) {
                 pool->st = rrdset_create_localhost(
-                    "disk_zfs_pool_state",
+                    "zfspool_state",
                     name,
                     NULL,
                     name,
-                    "disk_zfs_pool->state",
+                    "zfspool.state",
                     "ZFS pool state",
                     "boolean",
                     PLUGIN_PROC_NAME,
