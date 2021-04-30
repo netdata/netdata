@@ -4,6 +4,9 @@
 #include "zfs_common.h"
 
 #define ZFS_PROC_ARCSTATS "/proc/spl/kstat/zfs/arcstats"
+#define ZFS_PROC_POOLS "/proc/spl/kstat/zfs"
+
+#define STATE_SIZE 8
 
 extern struct arcstats arcstats;
 
@@ -195,8 +198,95 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     return 0;
 }
 
+struct zfs_pool {
 int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt) {
+    int updated;
+    int disabled;
+
+    int online;
+    int degraded;
+    int faulted;
+    int offline;
+    int removed;
+    int unavail;
+};
+
+int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
+{
     (void)dt;
+
+    static int do_zfs_pool_state = -1;
+    static char *dirname = NULL;
+
+    int pool_found = 0, state_file_found = 0;
+
+    if (unlikely(do_zfs_pool_state == -1)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
+        dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
+
+        do_zfs_pool_state = 1;
+    }
+
+    if (likely(do_zfs_pool_state)) {
+        DIR *dir = opendir(dirname);
+        if (unlikely(!dir)) {
+            error("Cannot read directory '%s'", dirname);
+            return 1;
+        }
+
+        struct dirent *de = NULL;
+        while (likely(de = readdir(dir))) {
+            if (likely(
+                    de->d_type == DT_DIR && ((de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                                             (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))))
+                continue;
+
+            if (unlikely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
+                pool_found = 1;
+
+                static struct zfs_pool pool = {};
+
+                if (pool.disabled)
+                    continue;
+
+                char filename[FILENAME_MAX + 1];
+                snprintfz(
+                    filename, FILENAME_MAX, "%s%s/%s/state", netdata_configured_host_prefix, ZFS_PROC_POOLS, de->d_name);
+
+                char state[STATE_SIZE + 1];
+                int ret = read_file(filename, state, STATE_SIZE);
+
+                if (!ret) {
+                    state_file_found = 1;
+
+                    if (!strcmp(state, "ONLINE\n")) {
+                        pool.online = 1;
+                    } else if (!strcmp(state, "DEGRADED\n")) {
+                        pool.degraded = 1;
+                    } else if (!strcmp(state, "FAULTED\n")) {
+                        pool.faulted = 1;
+                    } else if (!strcmp(state, "OFFLINE\n")) {
+                        pool.offline = 1;
+                    } else if (!strcmp(state, "REMOVED\n")) {
+                        pool.removed = 1;
+                    } else if (!strcmp(state, "UNAVAIL\n")) {
+                        pool.unavail = 1;
+                    } else {
+                        pool.disabled = 1;
+                        error("ZFS POOLS: Undefined state for zpool %s", de->d_name);
+                    }
+                }
+            }
+        }
+
+        closedir(dir);
+    }
+
+    if (do_zfs_pool_state && pool_found && !state_file_found) {
+        info("ZFS POOLS: State files not found. Disabling the module.");
+        do_zfs_pool_state = 0;
+    }
 
     return 0;
 }
