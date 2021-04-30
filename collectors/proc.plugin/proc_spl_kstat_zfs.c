@@ -219,6 +219,23 @@ struct zfs_pool {
     int unavail;
 };
 
+void disable_zfs_pool_state(struct zfs_pool *pool)
+{
+    if (pool->st)
+        rrdset_is_obsolete(pool->st);
+
+    pool->st = NULL;
+
+    pool->rd_online = NULL;
+    pool->rd_degraded = NULL;
+    pool->rd_faulted = NULL;
+    pool->rd_offline = NULL;
+    pool->rd_removed = NULL;
+    pool->rd_unavail = NULL;
+
+    pool->disabled = 1;
+}
+
 int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
 {
     (void)dt;
@@ -281,7 +298,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                     } else if (!strcmp(state, "UNAVAIL\n")) {
                         pool.unavail = 1;
                     } else {
-                        pool.disabled = 1;
+                        disable_zfs_pool_state(&pool);
                         error("ZFS POOLS: Undefined state for zpool %s", de->d_name);
                     }
                 }
