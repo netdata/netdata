@@ -219,6 +219,11 @@ struct zfs_pool {
     int unavail;
 };
 
+struct deleted_zfs_pool {
+    char *name;
+    struct deleted_zfs_pool *next;
+} *deleted_zfs_pools = NULL;
+
 DICTIONARY *zfs_pools = NULL;
 
 void disable_zfs_pool_state(struct zfs_pool *pool)
@@ -244,6 +249,8 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
     int update_every = *(int *)update_every_p;
 
     if (pool->updated) {
+        pool->updated = 0;
+
         if (!pool->disabled) {
             if (unlikely(!pool->st)) {
                 pool->st = rrdset_create_localhost(
@@ -279,7 +286,9 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
         }
     } else {
         disable_zfs_pool_state(pool);
-        dictionary_del(zfs_pools, name);
+        struct deleted_zfs_pool *new = calloc(1, sizeof(struct deleted_zfs_pool));
+        new->name = strdupz(name);
+        new->next = deleted_zfs_pools;
     }
 
     return 0;
@@ -373,6 +382,17 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
 
     if (do_zfs_pool_state)
         dictionary_get_all_name_value(zfs_pools, update_zfs_pool_state_chart, &update_every);
+
+    while (deleted_zfs_pools) {
+        struct deleted_zfs_pool *current_pool = deleted_zfs_pools;
+
+        dictionary_del(zfs_pools, current_pool->name);
+
+        deleted_zfs_pools = deleted_zfs_pools->next;
+        
+        freez(current_pool->name);
+        freez(current_pool);
+    }
 
     return 0;
 }
