@@ -301,6 +301,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     char *chart = NULL;
 
     buffer_flush(w->response.data);
+    int ping = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -314,10 +315,39 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         // they are not null and not empty
 
         if(!strcmp(name, "chart")) chart = value;
+        if(!strcmp(name, "ping")) ping = 1;
         //else {
         /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
         //}
+    }
+
+    if (ping) {
+        struct aclk_database_cmd cmd;
+        struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_FETCH_CHART;
+        cmd.data = (void *) &result;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl);
+        destroy_completion(&compl);
+        //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
+        int count = 0;
+        while (result) {
+            tmp_result = result->next;
+            if (count)
+                buffer_strcat(w->response.data,",\n");
+            buffer_sprintf(w->response.data, "{\"sequence_id\": %ld,\n \"payload\": %s", result->sequence_id, result->payload);
+            freez(result->payload);
+            freez(result);
+            result = tmp_result;
+            count++;
+        }
+        return HTTP_RESP_OK;
     }
 
     if(!chart || !*chart) {

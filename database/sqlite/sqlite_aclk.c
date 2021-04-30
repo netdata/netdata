@@ -172,8 +172,15 @@ void aclk_database_worker(void *arg)
                     //sql_maint_database();
                     info("Cleanup for %s", wc->uuid_str);
                     break;
+                case ACLK_DATABASE_FETCH_CHART:
+                    // Fetch one or more charts
+                    info("Fetching one chart!!!!!");
+                    aclk_fetch_chart_event(wc, cmd);
+                    //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
+                    //freez(cmd.data_param);
+                    break;
                 case ACLK_DATABASE_ADD_CHART:
-                    aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param);
+                    aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     freez(cmd.data_param);
                     break;
                 case ACLK_DATABASE_TIMER:
@@ -270,7 +277,7 @@ bind_fail:
 }
 
 
-int aclk_add_chart_event(RRDSET *st, char *payload_type)
+int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion)
 {
     char uuid_str[GUID_LEN + 1];
     int rc;
@@ -299,8 +306,62 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type)
         uuid_str, &unique_uuid, st->chart_uuid, payload_type, buffer_tostring(tmp_buffer), strlen(buffer_tostring(tmp_buffer)));
 
     buffer_free(tmp_buffer);
+    info("Added %s completed", st->name);
+
+    if (completion)
+       complete(completion);
 
     return rc;
+}
+
+
+void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc;
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql, "update aclk_chart_%s set status = 'processing' where status = 'pending' order by sequence_id limit 1;", wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_flush(sql);
+    buffer_sprintf(sql, "select ac.sequence_id, acp.payload from aclk_chart_%s ac, aclk_chart_payload_%s acp " \
+        " where ac.status = 'processing' and ac.unique_id = acp.unique_id order by ac.sequence_id desc;", wc->uuid_str, wc->uuid_str);
+
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+       error_report("Failed to prepare statement to lookup chart UUID in the database");
+       goto fail;
+    }
+
+    struct aclk_chart_payload_t *head = NULL;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        struct aclk_chart_payload_t *chart_payload = callocz(1, sizeof(*chart_payload));
+        chart_payload->sequence_id = sqlite3_column_int64(res, 0);
+        chart_payload->payload = sqlite3_column_bytes(res, 1) ? strdupz((char *) sqlite3_column_text(res, 1)) : NULL;
+        chart_payload->next =  head;
+        head = chart_payload;
+    }
+    *(struct aclk_chart_payload_t **) cmd.data = head;
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
+
+fail:
+    buffer_flush(sql);
+    buffer_sprintf(sql, "update aclk_chart_%s set status = NULL, date_submitted=strftime('%%s') " \
+                        "where status = 'processing';", wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+
+    buffer_free(sql);
+    if (cmd.completion)
+        complete(cmd.completion);
+
+    return;
 }
 
 
@@ -317,7 +378,15 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
     cmd.opcode = ACLK_DATABASE_ADD_CHART;
     cmd.data = st;
     cmd.data_param = strdupz("JSON");
-    aclk_database_enq_cmd_nowake((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
+    cmd.completion = NULL;
+//    struct completion compl;
+    //init_completion(&compl);
+    //cmd.completion = &compl;
+    info("Adding %s", st->name);
+    aclk_database_enq_cmd((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
+    //wait_for_completion(&compl);
+    //destroy_completion(&compl);
+    info("Adding %s done", st->name);
 
     return;
 }
@@ -374,7 +443,6 @@ void sql_create_aclk_table(RRDHOST *host)
     host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
     wc = (struct aclk_database_worker_config *) host->dbsync_worker;
     strcpy(wc->uuid_str, uuid_str);
-    wc->host = host;
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
 }
 
