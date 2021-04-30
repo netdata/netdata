@@ -199,7 +199,15 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
 }
 
 struct zfs_pool {
-int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt) {
+    RRDSET *st;
+
+    RRDDIM *rd_online;
+    RRDDIM *rd_degraded;
+    RRDDIM *rd_faulted;
+    RRDDIM *rd_offline;
+    RRDDIM *rd_removed;
+    RRDDIM *rd_unavail;
+
     int updated;
     int disabled;
 
@@ -277,6 +285,38 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                         error("ZFS POOLS: Undefined state for zpool %s", de->d_name);
                     }
                 }
+
+                if(unlikely(!pool.st)) {
+                    pool.st = rrdset_create_localhost(
+                        "disk_zfs_pool_state",
+                        de->d_name,
+                        NULL,
+                        de->d_name,
+                        "disk_zfs_pool.state",
+                        "ZFS pool state",
+                        "boolean",
+                        PLUGIN_PROC_NAME,
+                        ZFS_PROC_POOLS,
+                        NETDATA_CHART_PRIO_ZFS_POOL_STATE,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                    pool.rd_online = rrddim_add(pool.st, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool.rd_degraded = rrddim_add(pool.st, "degraded", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool.rd_faulted = rrddim_add(pool.st, "faulted", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool.rd_offline = rrddim_add(pool.st, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool.rd_removed = rrddim_add(pool.st, "removed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool.rd_unavail = rrddim_add(pool.st, "unavail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                } else
+                    rrdset_next(pool.st);
+
+                rrddim_set_by_pointer(pool.st, pool.rd_online, pool.online);
+                rrddim_set_by_pointer(pool.st, pool.rd_degraded, pool.degraded);
+                rrddim_set_by_pointer(pool.st, pool.rd_faulted, pool.faulted);
+                rrddim_set_by_pointer(pool.st, pool.rd_offline, pool.offline);
+                rrddim_set_by_pointer(pool.st, pool.rd_removed, pool.removed);
+                rrddim_set_by_pointer(pool.st, pool.rd_unavail, pool.unavail);
+                rrdset_done(pool.st);
             }
         }
 
