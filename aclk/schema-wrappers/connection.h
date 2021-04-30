@@ -9,11 +9,11 @@ extern "C" {
 
 typedef struct {
     const char *claim_id;
-    int reachable:1;
+    unsigned int reachable:1;
 
     int64_t session_id;
 
-    int lwt:1;
+    unsigned int lwt:1;
 
 // TODO in future optional fields
 // > 15 optional fields:
