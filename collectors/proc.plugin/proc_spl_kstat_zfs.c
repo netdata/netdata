@@ -357,6 +357,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 if (!ret) {
                     state_file_found = 1;
 
+                    // ZFS pool states are described at https://docs.oracle.com/cd/E19253-01/819-5461/gamno/index.html
                     if (!strcmp(state, "ONLINE\n")) {
                         pool->online = 1;
                     } else if (!strcmp(state, "DEGRADED\n")) {
