@@ -62,9 +62,6 @@
 // netdata unit tests
 #include "unit_test.h"
 
-// netdata agent claiming
-#include "claim/claim.h"
-
 // netdata agent cloud link
 #ifndef ACLK_NG
 #include "aclk/legacy/agent_cloud_link.h"
