@@ -11,8 +11,8 @@ typedef struct {
     const char* claim_id;
     const char* node_id;
 
-    int live:1;
-    int queriable:1;
+    unsigned int live:1;
+    unsigned int queriable:1;
 
     int64_t session_id;
 
