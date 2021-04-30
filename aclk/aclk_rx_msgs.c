@@ -270,19 +270,23 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
         rrdhost_aclk_state_unlock(localhost);
 
-        // TODO make this a fnc
         RRDHOST *host = rrdhost_find_by_guid(res.machine_guid, 0);
         query->data.node_update.live = 0;
 
         if (host) {
             // not all host must have RRDHOST struct created for them
             // if they never connected during runtime of agent
-            netdata_mutex_lock(&host->receiver_lock);
-            query->data.node_update.live = (host->receiver != NULL);
-            netdata_mutex_unlock(&host->receiver_lock);
+            if (host == localhost) {
+                query->data.node_update.live = 1;
+                query->data.node_update.hops = 0;
+            } else {
+                netdata_mutex_lock(&host->receiver_lock);
+                query->data.node_update.live = (host->receiver != NULL);
+                netdata_mutex_unlock(&host->receiver_lock);
+            }
         }
 
-        query->data.node_update.node_id = res.node_id; // query will free it
+        query->data.node_update.node_id = res.node_id; // aclk_query_free will free it
         query->data.node_update.queriable = 1;
         query->data.node_update.session_id = aclk_session_newarch;
         aclk_queue_query(query);
