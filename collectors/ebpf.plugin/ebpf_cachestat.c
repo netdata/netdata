@@ -283,7 +283,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "The ratio is calculated dividing the Hit pages per total cache accesses without counting dirties.",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
                                NETDATA_APPS_CACHESTAT_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NETDATA_EBPF_CHART_TYPE_LINE,
                                20090,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
