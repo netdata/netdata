@@ -245,10 +245,14 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
 
     int pool_found = 0, state_file_found = 0;
 
+    static DICTIONARY *pools = NULL;
+
     if (unlikely(do_zfs_pool_state == -1)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
         dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
+
+        pools = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
         do_zfs_pool_state = 1;
     }
@@ -270,9 +274,16 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
             if (unlikely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
                 pool_found = 1;
 
-                static struct zfs_pool pool = {};
+                struct zfs_pool *pool = dictionary_get(pools, de->d_name);
 
-                if (pool.disabled)
+                if (unlikely(!pool)) {
+                    struct zfs_pool new_zfs_pool = {};
+                    pool = dictionary_set(pools, de->d_name, &new_zfs_pool, sizeof(struct zfs_pool));
+                };
+
+                pool->updated = 1;
+
+                if (pool->disabled)
                     continue;
 
                 char filename[FILENAME_MAX + 1];
@@ -286,30 +297,30 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                     state_file_found = 1;
 
                     if (!strcmp(state, "ONLINE\n")) {
-                        pool.online = 1;
+                        pool->online = 1;
                     } else if (!strcmp(state, "DEGRADED\n")) {
-                        pool.degraded = 1;
+                        pool->degraded = 1;
                     } else if (!strcmp(state, "FAULTED\n")) {
-                        pool.faulted = 1;
+                        pool->faulted = 1;
                     } else if (!strcmp(state, "OFFLINE\n")) {
-                        pool.offline = 1;
+                        pool->offline = 1;
                     } else if (!strcmp(state, "REMOVED\n")) {
-                        pool.removed = 1;
+                        pool->removed = 1;
                     } else if (!strcmp(state, "UNAVAIL\n")) {
-                        pool.unavail = 1;
+                        pool->unavail = 1;
                     } else {
-                        disable_zfs_pool_state(&pool);
-                        error("ZFS POOLS: Undefined state for zpool %s", de->d_name);
+                        disable_zfs_pool_state(pool);
+                        error("ZFS POOLS: Undefined state for zpool %s, disabling the chart", de->d_name);
                     }
                 }
 
-                if(unlikely(!pool.st)) {
-                    pool.st = rrdset_create_localhost(
+                if (unlikely(!pool->st)) {
+                    pool->st = rrdset_create_localhost(
                         "disk_zfs_pool_state",
                         de->d_name,
                         NULL,
                         de->d_name,
-                        "disk_zfs_pool.state",
+                        "disk_zfs_pool->state",
                         "ZFS pool state",
                         "boolean",
                         PLUGIN_PROC_NAME,
@@ -318,22 +329,22 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    pool.rd_online = rrddim_add(pool.st, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    pool.rd_degraded = rrddim_add(pool.st, "degraded", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    pool.rd_faulted = rrddim_add(pool.st, "faulted", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    pool.rd_offline = rrddim_add(pool.st, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    pool.rd_removed = rrddim_add(pool.st, "removed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    pool.rd_unavail = rrddim_add(pool.st, "unavail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_online = rrddim_add(pool->st, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_degraded = rrddim_add(pool->st, "degraded", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_faulted = rrddim_add(pool->st, "faulted", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_offline = rrddim_add(pool->st, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_removed = rrddim_add(pool->st, "removed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    pool->rd_unavail = rrddim_add(pool->st, "unavail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 } else
-                    rrdset_next(pool.st);
+                    rrdset_next(pool->st);
 
-                rrddim_set_by_pointer(pool.st, pool.rd_online, pool.online);
-                rrddim_set_by_pointer(pool.st, pool.rd_degraded, pool.degraded);
-                rrddim_set_by_pointer(pool.st, pool.rd_faulted, pool.faulted);
-                rrddim_set_by_pointer(pool.st, pool.rd_offline, pool.offline);
-                rrddim_set_by_pointer(pool.st, pool.rd_removed, pool.removed);
-                rrddim_set_by_pointer(pool.st, pool.rd_unavail, pool.unavail);
-                rrdset_done(pool.st);
+                rrddim_set_by_pointer(pool->st, pool->rd_online, pool->online);
+                rrddim_set_by_pointer(pool->st, pool->rd_degraded, pool->degraded);
+                rrddim_set_by_pointer(pool->st, pool->rd_faulted, pool->faulted);
+                rrddim_set_by_pointer(pool->st, pool->rd_offline, pool->offline);
+                rrddim_set_by_pointer(pool->st, pool->rd_removed, pool->removed);
+                rrddim_set_by_pointer(pool->st, pool->rd_unavail, pool->unavail);
+                rrdset_done(pool->st);
             }
         }
 
