@@ -7,6 +7,7 @@
 #define ZFS_PROC_POOLS "/proc/spl/kstat/zfs"
 
 #define STATE_SIZE 8
+#define MAX_CHART_ID 256
 
 extern struct arcstats arcstats;
 
@@ -253,9 +254,12 @@ int update_zfs_pool_state_chart(char *name, void *pool_p, void *update_every_p)
 
         if (!pool->disabled) {
             if (unlikely(!pool->st)) {
+                char chart_id[MAX_CHART_ID + 1];
+                snprintf(chart_id, MAX_CHART_ID, "state_%s", name);
+
                 pool->st = rrdset_create_localhost(
-                    "zfspool_state",
-                    name,
+                    "zfspool",
+                    chart_id,
                     NULL,
                     name,
                     "zfspool.state",
