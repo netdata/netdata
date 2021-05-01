@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
 - Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
 - Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -312,8 +313,6 @@
 - Fix memory allocation when computing standard deviation [\#10484](https://github.com/netdata/netdata/pull/10484) ([stelfrag](https://github.com/stelfrag))
 - Support multiple chart label keys in data queries [\#10483](https://github.com/netdata/netdata/pull/10483) ([stelfrag](https://github.com/stelfrag))
 - Claiming retry/backoff [\#10482](https://github.com/netdata/netdata/pull/10482) ([underhood](https://github.com/underhood))
-- Add guide: Monitor and visualize anomalies with Netdata [\#10480](https://github.com/netdata/netdata/pull/10480) ([joelhans](https://github.com/joelhans))
-- Truncate excessive information from titles for apps and cgroups [\#10479](https://github.com/netdata/netdata/pull/10479) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
