@@ -31,8 +31,10 @@ void netdata_cleanup_and_exit(int ret) {
     analytics_free_data();
 
     char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
     snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
-    (void) unlink(agent_crash_file);
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
@@ -68,6 +70,7 @@ void netdata_cleanup_and_exit(int ret) {
     security_clean_openssl();
 #endif
     info("EXIT: all done - netdata is now exiting - bye bye...");
+    (void) unlink(agent_incomplete_shutdown_file);
     exit(ret);
 }
 
@@ -1271,6 +1274,9 @@ int main(int argc, char **argv) {
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
     snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
     int crash_detected = (unlink(agent_crash_file) == 0);
     int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
@@ -1324,6 +1330,8 @@ int main(int argc, char **argv) {
     send_statistics("START", "-",  "-");
     if (crash_detected)
         send_statistics("CRASH", "-", "-");
+    if (incomplete_shutdown_detected)
+        send_statistics("INCOMPLETE_SHUTDOWN", "-", "-");
 
     //check if ANALYTICS needs to start
     if (netdata_anonymous_statistics_enabled == 1) {
