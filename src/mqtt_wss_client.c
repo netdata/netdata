@@ -295,7 +295,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     SSL *ssl;
     X509 *err_cert;
     mqtt_wss_client client;
-    int err, depth;
+    int err = 0, depth;
     char *err_str;
 
     ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
