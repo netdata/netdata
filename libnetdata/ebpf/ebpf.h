@@ -7,6 +7,7 @@
 #include <bpf/libbpf.h>
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
+#define NETDATA_KALLSYMS "/proc/kallsyms"
 
 // Config files
 #define EBPF_GLOBAL_SECTION "global"
@@ -143,5 +144,6 @@ extern void ebpf_mount_config_name(char *filename, size_t length, char *path, ch
 extern int ebpf_load_config(struct config *config, char *filename);
 extern void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg);
 extern void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file);
+extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */

@@ -200,6 +200,9 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
+-   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
+    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and 
+    files are not found.
 -   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
@@ -221,6 +224,7 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 The following configuration files are available:
 
 - `cachestat.conf`: Configuration for the `cachestat` thread.
+- `dcstat.conf`: Configuration for the `dcstat` thread.
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
   also lets you specify which network the eBPF collector monitors.
