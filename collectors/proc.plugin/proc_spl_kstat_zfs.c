@@ -372,7 +372,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                         pool->unavail = 1;
                     } else {
                         disable_zfs_pool_state(pool);
-                        error("ZFS POOLS: Undefined state for zpool %s, disabling the chart", de->d_name);
+                        error("ZFS POOLS: Undefined state %s for zpool %s, disabling the chart", state, de->d_name);
                     }
                 }
             }
