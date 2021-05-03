@@ -753,7 +753,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
             AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
             enable_aclk="yes"
             AC_MSG_RESULT([yes])
-            OPTIONAL_MQTT_WSS_CFLAGS="-Imqtt_websockets/src/include"
+            OPTIONAL_MQTT_WSS_CFLAGS="-Imqtt_websockets/src/include -Imqtt_websockets/c-rbuf/include -Imqtt_websockets/MQTT-C/include"
         fi
     fi
 fi
