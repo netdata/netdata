@@ -19,7 +19,7 @@ resources you need to invest in, and the complexity of, monitoring your infrastr
 Netdata Cloud unifies infrastructure monitoring by _centralizing the interface_ you use to query and visualize your
 nodes' metrics, not the data. By streaming metrics values to your browser, with Netdata Cloud acting as the secure proxy
 between them, you can monitor your infrastructure using customizable, interactive, and real-time visualizations from any
-numbe of distributed nodes.
+number of distributed nodes.
 
 In this quickstart guide, you'll learn the basics of using Netdata Cloud to monitor an infrastructure with dashboards,
 composite charts, and alarm viewing. You'll then learn about the most critical ways to configure the Agent on each of
