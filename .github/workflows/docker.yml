@@ -75,4 +75,4 @@ jobs:
           repo: netdata/helmchart
           workflow: Agent Version PR
           ref: refs/heads/master
-          inputs: {"agent_version": "${{ github.event.inputs.version }}"}
+          inputs: '{"agent_version": "${{ github.event.inputs.version }}"}'
