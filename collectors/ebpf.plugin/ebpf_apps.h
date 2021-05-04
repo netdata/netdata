@@ -114,6 +114,7 @@ struct target {
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
+    netdata_publish_swap_t swap;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;
