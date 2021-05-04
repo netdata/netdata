@@ -7,6 +7,11 @@ static char *swap_dimension_name[NETDATA_SWAP_END] = { "write", "read" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
+static int read_thread_closed = 1;
+static int *map_fd = NULL;
+
+static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
+
 netdata_publish_swap_t **swap_pid = NULL;
 
 static ebpf_data_t swap_data;
@@ -22,6 +27,9 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
 
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
+
+struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
+                                             NULL, NULL,  NULL};
 
 /*****************************************************************
  *
@@ -52,6 +60,16 @@ static void ebpf_swap_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 2 * USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
+
+    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
+
     struct bpf_program *prog;
     size_t i = 0 ;
     bpf_object__for_each_program(prog, objects) {
@@ -59,6 +77,101 @@ static void ebpf_swap_cleanup(void *ptr)
         i++;
     }
     bpf_object__close(objects);
+}
+
+/*****************************************************************
+ *
+ *  COLLECTOR THREAD
+ *
+ *****************************************************************/
+
+/**
+* Send global
+*
+* Send global charts to Netdata
+*/
+static void swap_send_global()
+{
+    write_io_chart(NETDATA_MEM_SWAP_CHART, NETDATA_EBPF_SYSTEM_GROUP,
+                   swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL].dimension,
+                   (long long) swap_hash_values[NETDATA_KEY_SWAP_WRITEPAGE_CALL],
+                   swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].dimension,
+                   (long long) swap_hash_values[NETDATA_KEY_SWAP_READPAGE_CALL]);
+}
+
+/**
+ * Read global counter
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_global_table()
+{
+    uint64_t stored;
+    netdata_idx_t *val = swap_hash_values;
+    int fd = map_fd[NETDATA_SWAP_GLOBAL_TABLE];
+
+    uint32_t i, end = NETDATA_SWAP_END;
+    for (i = NETDATA_KEY_SWAP_READPAGE_CALL; i < end; i++) {
+        if (!bpf_map_lookup_elem(fd, &i, &stored)) {
+            val[i] = stored;
+        }
+    }
+}
+
+/**
+ * Socket read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_swap_read_hash(void *ptr)
+{
+    read_thread_closed = 0;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_time;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        read_global_table();
+    }
+
+    read_thread_closed = 1;
+    return NULL;
+}
+
+/**
+* Main loop for this collector.
+*/
+static void swap_collector(ebpf_module_t *em)
+{
+    swap_threads.thread = mallocz(sizeof(netdata_thread_t));
+    swap_threads.start_routine = ebpf_swap_read_hash;
+
+    map_fd = swap_data.map_fd;
+
+    netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+                          ebpf_swap_read_hash, em);
+
+    while (!close_ebpf_plugin) {
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        pthread_mutex_lock(&lock);
+
+        swap_send_global();
+
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&collect_data_mutex);
+    }
 }
 
 /*****************************************************************
@@ -156,6 +269,8 @@ void *ebpf_swap_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_swap_charts();
     pthread_mutex_unlock(&lock);
+
+    swap_collector(em);
 
 endswap:
     netdata_thread_cleanup_pop(1);

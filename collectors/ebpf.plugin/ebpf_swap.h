@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_SWAP_H
 #define NETDATA_EBPF_SWAP_H 1
 
+#define NETDATA_SWAP_SLEEP_MS 850000ULL
+
 // charts
 #define NETDATA_MEM_SWAP_CHART "swapcalls"
 
@@ -13,6 +15,11 @@ typedef struct netdata_publish_swap {
     uint64_t read;
     uint64_t write;
 } netdata_publish_swap_t;
+
+enum swap_tables {
+    NETDATA_PID_SWAP_TABLE,
+    NETDATA_SWAP_GLOBAL_TABLE
+};
 
 enum swap_counters {
     NETDATA_KEY_SWAP_READPAGE_CALL,
