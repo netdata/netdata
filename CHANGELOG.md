@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fixed a single typo in documentation [\#11082](https://github.com/netdata/netdata/pull/11082) ([yavin87](https://github.com/yavin87))
 - Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
 - Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
@@ -83,6 +84,7 @@
 - Replace references to Google Analytics with Posthog where relevant [\#10868](https://github.com/netdata/netdata/pull/10868) ([andrewm4894](https://github.com/andrewm4894))
 - ACLK Passwd endpoint update [\#10859](https://github.com/netdata/netdata/pull/10859) ([underhood](https://github.com/underhood))
 - Dashboard version 2.17.0 [\#10856](https://github.com/netdata/netdata/pull/10856) ([allelos](https://github.com/allelos))
+- Ebpf directory cache [\#10855](https://github.com/netdata/netdata/pull/10855) ([thiagoftsm](https://github.com/thiagoftsm))
 - prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 - implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
 - implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
@@ -310,9 +312,6 @@
 - Bump ini from 1.3.5 to 1.3.8 [\#10489](https://github.com/netdata/netdata/pull/10489) ([dependabot[bot]](https://github.com/apps/dependabot))
 - health: make mdstat\_mismatch\_cnt alarm less strict [\#10488](https://github.com/netdata/netdata/pull/10488) ([ilyam8](https://github.com/ilyam8))
 - Mention PostgreSQL Prometheus Adapter in the documentation [\#10487](https://github.com/netdata/netdata/pull/10487) ([vlvkobal](https://github.com/vlvkobal))
-- Fix memory allocation when computing standard deviation [\#10484](https://github.com/netdata/netdata/pull/10484) ([stelfrag](https://github.com/stelfrag))
-- Support multiple chart label keys in data queries [\#10483](https://github.com/netdata/netdata/pull/10483) ([stelfrag](https://github.com/stelfrag))
-- Claiming retry/backoff [\#10482](https://github.com/netdata/netdata/pull/10482) ([underhood](https://github.com/underhood))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
