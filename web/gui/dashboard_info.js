@@ -863,6 +863,10 @@ netdataDashboard.context = {
         info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of the metrics <code>in</code> or <code>out</code> is not shown in the chart, the reason is that the metric is zero. - you can change the page settings to always render all the available dimensions on all charts).'
     },
 
+    'system.swapcalls': {
+        info: 'Total Swap Calls. (netdata measures calls for <code>write</code> and <code>read</code>. If either of the metrics <code>write</code> or <code>read</code> is not shown in the chart, the reason is that the metric is zero. - you can change the page settings to always render all the available dimensions on all charts). This chart is made for <code>ebpf.plugin</code>'
+    },
+
     'system.pgfaults': {
         info: 'Total page faults. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#menu_apps">Applications Monitoring</a> section.'
     },
@@ -3484,6 +3488,16 @@ netdataDashboard.context = {
     'ebpf.process_status': {
         title : 'Task status',
         info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
+    },
+
+    'ebpf.swap_read_call': {
+        title : 'SWAP read page',
+        info: 'Monitor when a software read a page from memory swap.'
+    },
+
+    'ebpf.swap_write_call': {
+        title : 'SWAP write page',
+        info: 'Monitor when a software write on page in memory swap.'
     },
 
     // ------------------------------------------------------------------------
