@@ -69,6 +69,7 @@ jobs:
           }}
       - name: Trigger Helmchart PR
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        uses: benc-uk/workflow-dispatch@v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/helmchart
