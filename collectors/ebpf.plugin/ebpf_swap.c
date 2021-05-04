@@ -3,6 +3,70 @@
 #include "ebpf.h"
 #include "ebpf_swap.h"
 
+static char *swap_dimension_name[NETDATA_SWAP_END] = { "write", "read" };
+static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
+static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
+
+netdata_publish_swap_t **swap_pid = NULL;
+
+static ebpf_data_t swap_data;
+struct config swap_config = { .first_section = NULL,
+    .last_section = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+        .rwlock = AVL_LOCK_INITIALIZER } };
+
+static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                         .user_input = 0},
+                                        {.name = NULL, .internal_input = 0, .user_input = 0}};
+
+static struct bpf_link **probe_links = NULL;
+static struct bpf_object *objects = NULL;
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO CLOSE THE THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Clean swap strcuture
+ */
+void clean_swap_pid_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(swap_pid[pids->pid]);
+
+        pids = pids->next;
+    }
+}
+
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_swap_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em->enabled)
+        return;
+
+    struct bpf_program *prog;
+    size_t i = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[i]);
+        i++;
+    }
+    bpf_object__close(objects);
+}
+
+/*****************************************************************
+ *
+ *  INITIALIZE THREAD
+ *
+ *****************************************************************/
+
 /**
  * Create apps charts
  *
@@ -16,6 +80,42 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 }
 
 /**
+ * Allocate vectors used with this thread.
+ *
+ * We are not testing the return, because callocz does this and shutdown the software
+ * case it was not possible to allocate.
+ *
+ * @param length is the length for the vectors used inside the collector.
+ */
+static void ebpf_swap_allocate_global_vectors()
+{
+    dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+}
+
+/*****************************************************************
+ *
+ *  MAIN THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Create global charts
+ *
+ * Call ebpf_create_chart to create the charts for the collector.
+ */
+static void ebpf_create_swap_charts()
+{
+    ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_MEM_SWAP_CHART,
+                      "Calls for internal functions used to access swap.",
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      202,
+                      ebpf_create_global_dimension,
+                      swap_publish_aggregated, NETDATA_SWAP_END);
+}
+
+/**
  * SWAP thread
  *
  * Thread used to make swap thread
@@ -26,5 +126,38 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 void *ebpf_swap_thread(void *ptr)
 {
+    netdata_thread_cleanup_push(ebpf_swap_cleanup, ptr);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = swap_maps;
+    fill_ebpf_data(&swap_data);
+
+    ebpf_update_module(em, &swap_config, NETDATA_DIRECTORY_SWAP_CONFIG_FILE);
+    ebpf_update_pid_table(&swap_maps[0], em);
+
+    if (!em->enabled)
+        goto endswap;
+
+    if (ebpf_update_kernel(&swap_data)) {
+        goto endswap;
+    }
+
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, swap_data.map_fd);
+    if (!probe_links) {
+        goto endswap;
+    }
+
+    ebpf_swap_allocate_global_vectors();
+
+    int algorithms[NETDATA_SWAP_END] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
+    ebpf_global_labels(swap_aggregated_data, swap_publish_aggregated, swap_dimension_name, swap_dimension_name,
+                       algorithms, NETDATA_SWAP_END);
+
+    pthread_mutex_lock(&lock);
+    ebpf_create_swap_charts();
+    pthread_mutex_unlock(&lock);
+
+endswap:
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

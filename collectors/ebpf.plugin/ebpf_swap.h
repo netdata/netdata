@@ -3,7 +3,29 @@
 #ifndef NETDATA_EBPF_SWAP_H
 #define NETDATA_EBPF_SWAP_H 1
 
+// charts
+#define NETDATA_MEM_SWAP_CHART "swapcalls"
+
+// configuration file
+#define NETDATA_DIRECTORY_SWAP_CONFIG_FILE "swap.conf"
+
+typedef struct netdata_publish_swap {
+    uint64_t read;
+    uint64_t write;
+} netdata_publish_swap_t;
+
+enum swap_counters {
+    NETDATA_KEY_SWAP_READPAGE_CALL,
+    NETDATA_KEY_SWAP_WRITEPAGE_CALL,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_SWAP_END
+};
+
+extern netdata_publish_swap_t **swap_pid;
+
 extern void *ebpf_swap_thread(void *ptr);
 extern void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern void clean_swap_pid_structures();
 
 #endif
