@@ -47,9 +47,10 @@ to the same chart, Netdata will use the alarm.
 
 Netdata parses the following lines. Beneath the table is an in-depth explanation of each line's purpose and syntax.
 
--   The `on` and `lookup` lines are **always required**.
--   Each entity **must** have one of the following lines: `calc`, `warn`, or `crit`.
 -   The `alarm` or `template` line must be the first line of any entity.
+-   The `on` line is **always required**.
+-   The `every` line is **required** if not using `lookup`.
+-   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
     `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
     more examples.
