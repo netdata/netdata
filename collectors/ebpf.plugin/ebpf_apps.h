@@ -22,6 +22,7 @@
 #include "ebpf_dcstat.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_sync.h"
+#include "ebpf_swap.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
