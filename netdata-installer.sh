@@ -650,10 +650,15 @@ EOF
       -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
       -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
       -D LWS_WITH_SOCKS5:bool=ON \
+      -D LWS_IPV6:bool=ON \
       $CMAKE_FLAGS \
       .
   else
-    run ${env_cmd} cmake -D LWS_WITH_SOCKS5:bool=ON $CMAKE_FLAGS .
+    run ${env_cmd} cmake \
+      -D LWS_WITH_SOCKS5:bool=ON \
+      -D LWS_IPV6:bool=ON \
+      $CMAKE_FLAGS \
+      .
   fi
   run ${env_cmd} make
   popd > /dev/null || exit 1
