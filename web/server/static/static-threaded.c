@@ -454,49 +454,59 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 
 void *socket_listen_main_static_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_cleanup, ptr);
-            web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
+    web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
-            if(!api_sockets.opened)
-                fatal("LISTENER: no listen sockets available.");
+    if(!api_sockets.opened)
+        fatal("LISTENER: no listen sockets available.");
 
 #ifdef ENABLE_HTTPS
-            security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
+    security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
 #endif
-            // 6 threads is the optimal value
-            // since 6 are the parallel connections browsers will do
-            // so, if the machine has more CPUs, avoid using resources unnecessarily
-            int def_thread_count = (processors > 6)?6:processors;
+    // 6 threads is the optimal value
+    // since 6 are the parallel connections browsers will do
+    // so, if the machine has more CPUs, avoid using resources unnecessarily
+    int def_thread_count = (processors > 6) ? 6 : processors;
 
-            if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
+    if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
                 info("Running web server with one thread, because mode is single-threaded");
                 config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
                 def_thread_count = 1;
-            }
-            static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
+    }
+    static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
 
-            if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
+    if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
+#ifdef ENABLE_HTTPS
+    // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
+    if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
+        static_threaded_workers_count = 1;
+        info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
+    }
+#endif
 
-            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
+    size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets",
+                                                   (long long int)(rlimit_nofile.rlim_cur / 4));
 
-            static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
+    static_workers_private_data = callocz((size_t)static_threaded_workers_count,
+                                          sizeof(struct web_server_static_threaded_worker));
 
-            web_server_is_multithreaded = (static_threaded_workers_count > 1);
+    web_server_is_multithreaded = (static_threaded_workers_count > 1);
 
-            int i;
-            for(i = 1; i < static_threaded_workers_count; i++) {
-                static_workers_private_data[i].id = i;
-                static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
+    int i;
+    for (i = 1; i < static_threaded_workers_count; i++) {
+        static_workers_private_data[i].id = i;
+        static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
 
-                char tag[50 + 1];
-                snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
+        char tag[50 + 1];
+        snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
 
-                info("starting worker %d", i+1);
-                netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
-            }
+        info("starting worker %d", i+1);
+        netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,
+                              socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
+    }
 
-            // and the main one
-            static_workers_private_data[0].max_sockets = max_sockets / static_threaded_workers_count;
-            socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
+    // and the main one
+    static_workers_private_data[0].max_sockets = max_sockets / static_threaded_workers_count;
+    socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
