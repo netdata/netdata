@@ -348,6 +348,13 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                     state_file_found = 1;
                     continue;
                 }
+                
+                pool->online = 0;
+                pool->degraded = 0;
+                pool->faulted = 0;
+                pool->offline = 0;
+                pool->removed = 0;
+                pool->unavail = 0;
 
                 char filename[FILENAME_MAX + 1];
                 snprintfz(
