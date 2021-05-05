@@ -26,6 +26,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 -   `/proc/loadavg` (system load and total processes running)
 -   `/proc/pressure/{cpu,memory,io}` (pressure stall information)
 -   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
+-   `/proc/spl/kstat/zfs/arcstats` (status of ZFS adaptive replacement cache)
+-   `/proc/spl/kstat/zfs/pool/state` (state of ZFS pools)
 -   `/sys/class/power_supply` (power supply properties)
 -   `/sys/class/infiniband` (infiniband interconnect)
 -   `ipc` (IPC semaphores and message queues)

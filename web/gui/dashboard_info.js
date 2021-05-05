@@ -163,6 +163,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
     },
 
+    'zfspool': {
+        title: 'ZFS pools',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'State of ZFS pools.'
+    },
+
     'btrfs': {
         title: 'BTRFS filesystem',
         icon: '<i class="fas fa-folder-open"></i>',
@@ -1517,6 +1523,13 @@ netdataDashboard.context = {
     },
     'disk.inodes': {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ZFS pools
+    'zfspool.state': {
+        info: 'ZFS pool state. The overall health of a pool, as reported by <code>zpool status</code>, is determined by the aggregate state of all devices within the pool. ' +
+            'For details, see <a href="https://openzfs.github.io/openzfs-docs/man/8/zpoolconcepts.8.html?#Device_Failure_and_Recovery" target="_blank"> ZFS documentation</a>.'
     },
 
     // ------------------------------------------------------------------------
