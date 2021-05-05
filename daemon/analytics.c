@@ -841,7 +841,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_host_cloud_available, analytics_data.netdata_host_aclk_available,
         analytics_data.netdata_host_aclk_implementation, analytics_data.netdata_host_agent_claimed);
 
-    info("%s", command_to_run);
+    info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
     FILE *fp = mypopen(command_to_run, &command_pid);
     if (fp) {
