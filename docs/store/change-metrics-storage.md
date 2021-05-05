@@ -60,9 +60,10 @@ method](/docs/configure/start-stop-restart.md) for your system, to change the da
 
 ## What's next?
 
-If you have multiple nodes with the Netdata Agent installed, you can [stream metrics](/docs/store/stream-metrics.md)
-from any number of _child_ nodes to a _parent_ node and store metrics using a centralized time-series database.Streaming
-allows you to centralize your data, run Agents as headless collectors, replicate data, and more.
+If you have multiple nodes with the Netdata Agent installed, you can [stream
+metrics](/docs/metrics-storage-management/how-streaming-works.mdx) from any number of _child_ nodes to a _parent_ node
+and store metrics using a centralized time-series database. Streaming allows you to centralize your data, run Agents as
+headless collectors, replicate data, and more.
 
 Storing metrics with the database engine is completely interoperable with [exporting to other time-series
 databases](/docs/export/external-databases.md). With exporting, you can use the node's resources to surface metrics
