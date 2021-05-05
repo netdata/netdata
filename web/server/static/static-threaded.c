@@ -475,6 +475,13 @@ void *socket_listen_main_static_threaded(void *ptr) {
     static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
 
     if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
+#ifdef ENABLE_HTTPS
+    // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
+    if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
+        static_threaded_workers_count = 1;
+        info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
+    }
+#endif
 
     size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets",
                                                    (long long int)(rlimit_nofile.rlim_cur / 4));
@@ -493,7 +500,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
         snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
 
         info("starting worker %d", i+1);
-        netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
+        netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,
+                              socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
     }
 
     // and the main one
