@@ -169,7 +169,7 @@ virsh_find_all_interfaces_for_cgroup() {
         local d
         d="$(virsh_cgroup_to_domain_name "${c}")"
         # convert hex to character
-        # e.g.: vm01\x2dweb => vm01-dweb (https://github.com/netdata/netdata/issues/11088#issuecomment-832618149)
+        # e.g.: vm01\x2dweb => vm01-web (https://github.com/netdata/netdata/issues/11088#issuecomment-832618149)
         d="$(printf '%b' "${d}")"
 
         if [ ! -z "${d}" ]
@@ -179,7 +179,7 @@ virsh_find_all_interfaces_for_cgroup() {
             # 'virsh -r domiflist <domain>' example output
             # Interface  Type       Source     Model       MAC
             #--------------------------------------------------------------
-            # vnet3       bridge    br0        virtio   52:54:00xx:xx:xx
+            # vnet3       bridge    br0        virtio   52:54:00:xx:xx:xx
             # vnet4       network   default    virtio   52:54:00:yy:yy:yy
 
             # match only 'network' interfaces from virsh output
