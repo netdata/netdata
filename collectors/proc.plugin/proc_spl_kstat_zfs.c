@@ -311,7 +311,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     if (unlikely(do_zfs_pool_state == -1)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
-        dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
+        dirname = config_get("plugin:proc:" ZFS_PROC_POOLS, "directory to monitor", filename);
 
         zfs_pools = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
@@ -344,12 +344,14 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
 
                 pool->updated = 1;
 
-                if (pool->disabled)
+                if (pool->disabled) {
+                    state_file_found = 1;
                     continue;
+                }
 
                 char filename[FILENAME_MAX + 1];
                 snprintfz(
-                    filename, FILENAME_MAX, "%s%s/%s/state", netdata_configured_host_prefix, ZFS_PROC_POOLS, de->d_name);
+                    filename, FILENAME_MAX, "%s%s/%s/state", netdata_configured_host_prefix, dirname, de->d_name);
 
                 char state[STATE_SIZE + 1];
                 int ret = read_file(filename, state, STATE_SIZE);
