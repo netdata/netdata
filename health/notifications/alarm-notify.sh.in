@@ -596,6 +596,9 @@ filter_recipient_by_criticality() {
 # check prowl
 [ -z "${DEFAULT_RECIPIENT_PROWL}" ] && SEND_PROWL="NO"
 
+# check custom
+[ -z "${DEFAULT_RECIPIENT_CUSTOM}" ] && SEND_CUSTOM="NO"
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_SLACK}" = "YES" ] ||
   [ "${SEND_ROCKETCHAT}" = "YES" ] ||
