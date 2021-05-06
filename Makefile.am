@@ -117,11 +117,7 @@ SUBDIRS += \
     spawn \
     $(NULL)
 
-if ACLK_NG
-SUBDIRS += \
-    mqtt_websockets \
-    $(NULL)
-else
+if !ACLK_NG
 SUBDIRS += \
     aclk/legacy \
     $(NULL)
@@ -562,6 +558,17 @@ ACLK_FILES = \
     aclk/aclk_rx_msgs.h \
     aclk/https_client.c \
     aclk/https_client.h \
+    mqtt_websockets/src/mqtt_wss_client.c \
+    mqtt_websockets/src/include/mqtt_wss_client.h \
+    mqtt_websockets/src/mqtt_wss_log.c \
+    mqtt_websockets/src/include/mqtt_wss_log.h \
+    mqtt_websockets/src/ws_client.c \
+    mqtt_websockets/src/include/ws_client.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer.c \
+    mqtt_websockets/c-rbuf/include/ringbuffer.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
+    mqtt_websockets/MQTT-C/src/mqtt.c \
+    mqtt_websockets/MQTT-C/include/mqtt.h \
     $(NULL)
 else #ACLK_NG
 ACLK_FILES = \
@@ -755,21 +762,17 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
-if ACLK_NG
+
 netdata_LDADD = \
-    mqtt_websockets/libmqttwebsockets.a \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-else #ACLK_NG
+
+if !ACLK_NG
 if ENABLE_ACLK
-netdata_LDADD = \
+netdata_LDADD += \
     externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
-    $(NETDATA_COMMON_LIBS) \
-    $(NULL)
-else #ENABLE_ACLK
-netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 endif #ENABLE_ACLK
