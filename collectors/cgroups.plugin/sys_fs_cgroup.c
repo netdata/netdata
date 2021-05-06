@@ -162,8 +162,10 @@ static enum cgroups_type cgroups_try_detect_version()
 
 #if defined CGROUP2_SUPER_MAGIC
     // 2. check filesystem type for the default mountpoint
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/cgroup");
     struct statfs fsinfo;
-    if (!statfs("/sys/fs/cgroup", &fsinfo)) {
+    if (!statfs(filename, &fsinfo)) {
         if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
             return CGROUPS_V2;
         if (fsinfo.f_type == CGROUP_SUPER_MAGIC)
