@@ -590,6 +590,9 @@ filter_recipient_by_criticality() {
 # check msteams
 [ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
 
+# also check msteam
+[ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAM="NO"
+
 # check pd
 [ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
 
