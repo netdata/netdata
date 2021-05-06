@@ -123,7 +123,7 @@ static void aclk_stats_write_q(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_write_q", NULL, "aclk", NULL, "Write Queue Mosq->Libwebsockets", "kB/s",
+            "netdata", "aclk_write_q", NULL, "aclk", NULL, "Write Queue Mosq->Libwebsockets", "KiB/s",
             "netdata", "stats", 200003, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_wq_add = rrddim_add(st, "added", NULL, 1, 1024 * localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
@@ -145,7 +145,7 @@ static void aclk_stats_read_q(struct aclk_metrics_per_sample *per_sample)
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_read_q", NULL, "aclk", NULL, "Read Queue Libwebsockets->Mosq", "kB/s",
+            "netdata", "aclk_read_q", NULL, "aclk", NULL, "Read Queue Libwebsockets->Mosq", "KiB/s",
             "netdata", "stats", 200004, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rd_rq_add = rrddim_add(st, "added", NULL, 1, 1024 * localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
