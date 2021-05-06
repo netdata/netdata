@@ -69,6 +69,7 @@ include httpcheck/Makefile.inc
 include hpssa/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
+include iperf3/Makefile.inc
 include isc_dhcpd/Makefile.inc
 include litespeed/Makefile.inc
 include logind/Makefile.inc
