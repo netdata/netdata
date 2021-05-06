@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Reduce send statistics logging [\#11091](https://github.com/netdata/netdata/pull/11091) ([MrZammler](https://github.com/MrZammler))
+- fix SSL random failures when using multithreaded web server with OpenSSL \< 1.1.0 [\#11089](https://github.com/netdata/netdata/pull/11089) ([thiagoftsm](https://github.com/thiagoftsm))
 - health: clarify which health configuration entities are required / optional [\#11086](https://github.com/netdata/netdata/pull/11086) ([ilyam8](https://github.com/ilyam8))
 - Fixed a single typo in documentation [\#11082](https://github.com/netdata/netdata/pull/11082) ([yavin87](https://github.com/yavin87))
+- netdata-installer.sh: Enable IPv6 support in libwebsockets [\#11080](https://github.com/netdata/netdata/pull/11080) ([pjakuszew](https://github.com/pjakuszew))
+- Add an event when an incomplete agent shutdown is detected [\#11078](https://github.com/netdata/netdata/pull/11078) ([stelfrag](https://github.com/stelfrag))
 - Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add a module for ZFS pool state [\#11071](https://github.com/netdata/netdata/pull/11071) ([vlvkobal](https://github.com/vlvkobal))
+- Improve dashboard documentation \(part 2\) [\#11065](https://github.com/netdata/netdata/pull/11065) ([joelhans](https://github.com/joelhans))
 - Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
 - Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
 - Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -92,7 +98,6 @@
 - Overhaul streaming documentation [\#10709](https://github.com/netdata/netdata/pull/10709) ([joelhans](https://github.com/joelhans))
 - Zscores python collector [\#10673](https://github.com/netdata/netdata/pull/10673) ([andrewm4894](https://github.com/andrewm4894))
 - add python changefinder collector [\#10672](https://github.com/netdata/netdata/pull/10672) ([andrewm4894](https://github.com/andrewm4894))
-- Report porcelain output [\#10494](https://github.com/netdata/netdata/pull/10494) ([jsoref](https://github.com/jsoref))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -226,7 +231,6 @@
 - Fix wrong count for entries [\#10564](https://github.com/netdata/netdata/pull/10564) ([thiagoftsm](https://github.com/thiagoftsm))
 - Try to keep all pages from extents read from disk in the cache. [\#10558](https://github.com/netdata/netdata/pull/10558) ([mfundul](https://github.com/mfundul))
 - Remove unreachable \#else directives in plugins. [\#10523](https://github.com/netdata/netdata/pull/10523) ([vkalintiris](https://github.com/vkalintiris))
-- Fixed handling of permissions for some plugins. [\#10490](https://github.com/netdata/netdata/pull/10490) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
@@ -309,9 +313,6 @@
 - Fix broken dbengine stress tests. [\#10502](https://github.com/netdata/netdata/pull/10502) ([mfundul](https://github.com/mfundul))
 - add `\_is\_k8s\_node` label to the host labels [\#10501](https://github.com/netdata/netdata/pull/10501) ([ilyam8](https://github.com/ilyam8))
 - Fix segmentation fault in the agent [\#10498](https://github.com/netdata/netdata/pull/10498) ([mfundul](https://github.com/mfundul))
-- Fixed handling of TLS config so that cURL works in all cases. [\#10491](https://github.com/netdata/netdata/pull/10491) ([Ferroin](https://github.com/Ferroin))
-- Bump ini from 1.3.5 to 1.3.8 [\#10489](https://github.com/netdata/netdata/pull/10489) ([dependabot[bot]](https://github.com/apps/dependabot))
-- health: make mdstat\_mismatch\_cnt alarm less strict [\#10488](https://github.com/netdata/netdata/pull/10488) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
