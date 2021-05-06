@@ -53,6 +53,7 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
     debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
 }
 
 /*
@@ -91,6 +92,7 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_host_aclk_available);
     freez(analytics_data.netdata_host_aclk_implementation);
     freez(analytics_data.netdata_host_agent_claimed);
+    freez(analytics_data.netdata_host_cloud_enabled);
 }
 
 /*
@@ -565,7 +567,15 @@ void set_late_global_environment()
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
-    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", 1) ? "true" : "false");
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
+
+#ifdef DISABLE_CLOUD
+    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
+#else
+    analytics_set_data(
+        &analytics_data.netdata_host_cloud_enabled,
+        appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_YES) ? "true" : "false");
+#endif
 
 #ifdef ENABLE_DBENGINE
     {
@@ -742,6 +752,7 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
+    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -823,23 +834,43 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
-        as_script, action, action_result, action_data, analytics_data.netdata_config_stream_enabled,
-        analytics_data.netdata_config_memory_mode, analytics_data.netdata_config_exporting_enabled,
-        analytics_data.netdata_exporting_connectors, analytics_data.netdata_allmetrics_prometheus_used,
-        analytics_data.netdata_allmetrics_shell_used, analytics_data.netdata_allmetrics_json_used,
-        analytics_data.netdata_dashboard_used, analytics_data.netdata_collectors,
-        analytics_data.netdata_collectors_count, analytics_data.netdata_buildinfo,
-        analytics_data.netdata_config_page_cache_size, analytics_data.netdata_config_multidb_disk_quota,
-        analytics_data.netdata_config_https_enabled, analytics_data.netdata_config_web_enabled,
-        analytics_data.netdata_config_release_channel, analytics_data.netdata_mirrored_host_count,
-        analytics_data.netdata_mirrored_hosts_reachable, analytics_data.netdata_mirrored_hosts_unreachable,
-        analytics_data.netdata_notification_methods, analytics_data.netdata_alarms_normal,
-        analytics_data.netdata_alarms_warning, analytics_data.netdata_alarms_critical,
-        analytics_data.netdata_charts_count, analytics_data.netdata_metrics_count,
-        analytics_data.netdata_config_is_parent, analytics_data.netdata_config_hosts_available,
-        analytics_data.netdata_host_cloud_available, analytics_data.netdata_host_aclk_available,
-        analytics_data.netdata_host_aclk_implementation, analytics_data.netdata_host_agent_claimed);
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        as_script,
+        action,
+        action_result,
+        action_data,
+        analytics_data.netdata_config_stream_enabled,
+        analytics_data.netdata_config_memory_mode,
+        analytics_data.netdata_config_exporting_enabled,
+        analytics_data.netdata_exporting_connectors,
+        analytics_data.netdata_allmetrics_prometheus_used,
+        analytics_data.netdata_allmetrics_shell_used,
+        analytics_data.netdata_allmetrics_json_used,
+        analytics_data.netdata_dashboard_used,
+        analytics_data.netdata_collectors,
+        analytics_data.netdata_collectors_count,
+        analytics_data.netdata_buildinfo,
+        analytics_data.netdata_config_page_cache_size,
+        analytics_data.netdata_config_multidb_disk_quota,
+        analytics_data.netdata_config_https_enabled,
+        analytics_data.netdata_config_web_enabled,
+        analytics_data.netdata_config_release_channel,
+        analytics_data.netdata_mirrored_host_count,
+        analytics_data.netdata_mirrored_hosts_reachable,
+        analytics_data.netdata_mirrored_hosts_unreachable,
+        analytics_data.netdata_notification_methods,
+        analytics_data.netdata_alarms_normal,
+        analytics_data.netdata_alarms_warning,
+        analytics_data.netdata_alarms_critical,
+        analytics_data.netdata_charts_count,
+        analytics_data.netdata_metrics_count,
+        analytics_data.netdata_config_is_parent,
+        analytics_data.netdata_config_hosts_available,
+        analytics_data.netdata_host_cloud_available,
+        analytics_data.netdata_host_aclk_available,
+        analytics_data.netdata_host_aclk_implementation,
+        analytics_data.netdata_host_agent_claimed,
+        analytics_data.netdata_host_cloud_enabled);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
