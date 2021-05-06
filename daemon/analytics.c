@@ -52,8 +52,8 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
-    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
     debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
+    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
 }
 
 /*
@@ -91,8 +91,8 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_host_cloud_available);
     freez(analytics_data.netdata_host_aclk_available);
     freez(analytics_data.netdata_host_aclk_implementation);
-    freez(analytics_data.netdata_host_cloud_enabled);
     freez(analytics_data.netdata_host_agent_claimed);
+    freez(analytics_data.netdata_host_cloud_enabled);
 }
 
 /*
@@ -753,8 +753,8 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
     analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
-    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
+    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
