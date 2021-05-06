@@ -188,7 +188,7 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
             }
             topic->topic_id = topic_name_to_id(json_object_get_string(json_object_iter_peek_value(&it)));
             if (topic->topic_id == ACLK_TOPICID_UNKNOWN) {
-                info("topic dictionary has unkown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
+                info("topic dictionary has unknown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
             }
             json_object_iter_next(&it);
             continue;
