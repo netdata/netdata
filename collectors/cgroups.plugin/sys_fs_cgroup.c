@@ -4002,9 +4002,10 @@ static void cgroup_main_cleanup(void *ptr) {
         uv_mutex_unlock(&discovery_thread.mutex);
     }
 
+    info("waiting for discovery thread to finish...");
+    
     while (!discovery_thread.exited && max > 0) {
         max -= step;
-        info("waiting for discovery thread to finish...");
         sleep_usec(step);
     }
 
