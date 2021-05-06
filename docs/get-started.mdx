@@ -6,7 +6,7 @@ sidebar_label: "Get started"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/get-started.mdx
 ---
 
-import { OneLineInstall } from '@site//src/components/OneLineInstall/'
+import { OneLineInstall } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install'
 
 # Get started with Netdata
@@ -64,7 +64,8 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
 
 The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
 [installer script (`kickstart.sh`)](/packaging/installer/methods/kickstart.md). This script automatically installs
-dependencies and builds Netdata from its source code.
+dependencies and builds Netdata from its source code with [automatic nightly
+updates](/docs/installation/reference-installer.mdx) and [anonymous statistics](/docs/anonymous-statistics.md) enabled.
 
 Copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
 

@@ -1,9 +1,8 @@
-<!--
 ---
 title: "Anonymous statistics"
+description: "etdata collects anonymous usage information by default using the open-source product analytics platform PostHog for quality assurance and usage statistics"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
 ---
--->
 
 # Anonymous statistics
 
@@ -24,7 +23,7 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 ## Agent Dashboard - PostHog JavaScript
 
-When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initialiszes a PostHog session and masks various event attributes.
+When you kick off an Agent dashboard session by visiting `http://NODE:19999`, Netdata will initializes a PostHog session and masks various event attributes.
 
 _Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.  
 
