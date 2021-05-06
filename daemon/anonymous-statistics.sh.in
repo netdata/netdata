@@ -59,6 +59,7 @@ NETDATA_HOST_CLOUD_AVAILABLE="${31}"
 NETDATA_HOST_ACLK_AVAILABLE="${32}"
 NETDATA_HOST_ACLK_IMPLEMENTATION="${33}"
 NETDATA_HOST_AGENT_CLAIMED="${34}"
+NETDATA_HOST_CLOUD_ENABLED="${35}"
 
 # define body of request to be sent
 REQ_BODY="$(cat << EOF
@@ -132,6 +133,7 @@ REQ_BODY="$(cat << EOF
         "host_allmetrics_json_used": ${NETDATA_ALLMETRICS_JSON_USED},
         "host_dashboard_used": ${NETDATA_DASHBOARD_USED},
         "host_cloud_available": ${NETDATA_HOST_CLOUD_AVAILABLE},
+        "host_cloud_enabled": ${NETDATA_HOST_CLOUD_ENABLED},
         "host_agent_claimed": ${NETDATA_HOST_AGENT_CLAIMED},
         "host_aclk_available": ${NETDATA_HOST_ACLK_AVAILABLE},
         "host_aclk_implementation": ${NETDATA_HOST_ACLK_IMPLEMENTATION},
