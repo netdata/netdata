@@ -249,6 +249,7 @@ AC_HEADER_RESOLV
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
 AC_CHECK_HEADERS_ONCE([sys/vfs.h])
 AC_CHECK_HEADERS_ONCE([sys/statfs.h])
+AC_CHECK_HEADERS_ONCE([linux/magic.h])
 AC_CHECK_HEADERS_ONCE([sys/statvfs.h])
 AC_CHECK_HEADERS_ONCE([sys/mount.h])
 

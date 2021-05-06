@@ -118,6 +118,10 @@ extern "C" {
 #include <sys/statfs.h>
 #endif
 
+#ifdef HAVE_LINUX_MAGIC_H
+#include <linux/magic.h>
+#endif
+
 #ifdef HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
