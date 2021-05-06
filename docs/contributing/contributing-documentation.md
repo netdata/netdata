@@ -37,7 +37,7 @@ Netdata's documentation is separated into four sections.
 - **Netdata Agent reference**: Reference documentation for the open-source Netdata Agent.
   - Stored in various `.md` files within the `netdata/netdata` repository alongside the code responsible for that
     feature. For example, the database engine's reference documentation is at `/database/engine/README.md`.
-  - Published at [`https://learn.netdata.cloud/docs/agent`](https://learn.netdata.cloud/docs/agent).
+  - Published under the **Reference** section in the Netdata Learn sidebar.
 - **Netdata Cloud reference**: Reference documentation for the closed-source Netdata Cloud web application.
   - Stored in a private GitHub repository and not editable by the community.
   - Published at [`https://learn.netdata.cloud/docs/cloud`](https://learn.netdata.cloud/docs/cloud).
