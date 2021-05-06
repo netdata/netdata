@@ -1,6 +1,6 @@
 ---
 title: "Anonymous statistics"
-description: "etdata collects anonymous usage information by default using the open-source product analytics platform PostHog for quality assurance and usage statistics"
+description: "Netdata collects anonymous usage information by default using the open-source product analytics platform PostHog for quality assurance and usage statistics"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
 ---
 
