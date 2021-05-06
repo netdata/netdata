@@ -601,6 +601,11 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         mqtt_flags |= MQTT_CONNECT_WILL_RETAIN;
     mqtt_flags |= MQTT_CONNECT_CLEAN_SESSION;
 
+    if (mqtt_flags &= MQTT_CONNECT_CLEAN_SESSION)
+        mqtt_reinit(client->mqtt_client, client,
+            client->mqtt_send_buf, MQTT_BUFFER_SIZE,
+            client->mqtt_recv_buf, MQTT_BUFFER_SIZE);
+
     enum MQTTErrors ret = mqtt_connect(client->mqtt_client,
                                        mqtt_params->clientid,
                                        mqtt_params->will_topic,
