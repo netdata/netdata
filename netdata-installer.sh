@@ -660,7 +660,7 @@ EOF
       $CMAKE_FLAGS \
       .
   fi
-  run ${env_cmd} make
+  run ${env_cmd} make -j$(find_processors)
   popd > /dev/null || exit 1
 }
 
