@@ -382,11 +382,11 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
 //    struct completion compl;
     //init_completion(&compl);
     //cmd.completion = &compl;
-    info("Adding %s", st->name);
+    //info("Adding %s", st->name);
     aclk_database_enq_cmd((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
     //wait_for_completion(&compl);
     //destroy_completion(&compl);
-    info("Adding %s done", st->name);
+    //info("Adding %s done", st->name);
 
     return;
 }
