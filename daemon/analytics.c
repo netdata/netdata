@@ -305,7 +305,7 @@ void analytics_alarms_notifications(void)
 
     pid_t command_pid;
 
-    info("Executing %s", script);
+    debug(D_ANALYTICS, "Executing %s", script);
 
     BUFFER *b = buffer_create(1000);
     int cnt = 0;
