@@ -577,6 +577,8 @@ ACLK_FILES = \
     aclk/schema-wrappers/node_connection.h \
     aclk/schema-wrappers/node_creation.cc \
     aclk/schema-wrappers/node_creation.h \
+    aclk/schema-wrappers/chart_stream.cc \
+    aclk/schema-wrappers/chart_stream.h \
     aclk/schema-wrappers/schema_wrappers.h \
     $(NULL)
 
@@ -586,6 +588,8 @@ BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
     $(NULL)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
@@ -598,6 +602,10 @@ aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-sc
 
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+	$(PROTOC) --cpp_out=$(builddir) $^
+
+aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
 	$(PROTOC) --cpp_out=$(builddir) $^
 
 else #ACLK_NG
