@@ -28,6 +28,14 @@ typedef struct {
 
 chart_and_dim_ack_t parse_chart_and_dimensions_ack(const char *data, size_t len);
 
+typedef enum {
+    DB_EMPTY,
+    SEQ_ID_NOT_EXISTS,
+    TIMESTAMP_MISMATCH
+} chart_reset_reason_t;
+
+char *generate_reset_chart_messages(size_t *len, const chart_reset_reason_t reason);
+
 #ifdef __cplusplus
 }
 #endif
