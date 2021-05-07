@@ -23,3 +23,18 @@ stream_charts_and_dims_t parse_stream_charts_and_dims(const char *data, size_t l
 
     return res;
 }
+
+chart_and_dim_ack_t parse_chart_and_dimensions_ack(const char *data, size_t len)
+{
+    chart::v1::ChartsAndDimensionsAck msg;
+    chart_and_dim_ack_t res = { .claim_id = NULL, .node_id = NULL };
+
+    if (!msg.ParseFromArray(data, len))
+        return res;
+
+    res.node_id = strdup(msg.node_id().c_str());
+    res.claim_id = strdup(msg.claim_id().c_str());
+    res.last_seq_id = msg.last_sequence_id();
+
+    return res;
+}

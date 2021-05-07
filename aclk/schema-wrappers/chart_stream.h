@@ -19,6 +19,15 @@ typedef struct {
 
 stream_charts_and_dims_t parse_stream_charts_and_dims(const char *data, size_t len);
 
+typedef struct {
+    char* claim_id;
+    char* node_id;
+
+    uint64_t last_seq_id;
+} chart_and_dim_ack_t;
+
+chart_and_dim_ack_t parse_chart_and_dimensions_ack(const char *data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif
