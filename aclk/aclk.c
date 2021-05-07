@@ -362,7 +362,7 @@ static inline void queue_connect_payloads(void)
 
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
-    const char *topic = aclk_get_topic(aclk_use_new_cloud_arch ? ACLK_TOPICID_CMD_V2 : ACLK_TOPICID_COMMAND);
+    const char *topic = aclk_get_topic(aclk_use_new_cloud_arch ? ACLK_TOPICID_CMD_NG_V1 : ACLK_TOPICID_COMMAND);
 
     if (!topic)
         error("Unable to fetch topic for COMMAND (to subscribe)");
