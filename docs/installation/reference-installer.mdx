@@ -77,18 +77,21 @@ Click on any of the boxes to jump to the reference doc for that installation met
 
 ## `netdata-installer.sh`
 
-The following installation methods are a wrapper around a single script,
+The following installation methods are based around
 [`netdata-installer.sh`](https://raw.githubusercontent.com/netdata/netdata/master/netdata-installer.sh), which handles
 the installation process itself:
 
 - [One-line installer (`kickstart.sh`)](/packaging/installer/methods/kickstart.md)
-- [Pre-compiled static binary (`kickstart-static64.sh`)](/packaging/installer/methods/kickstart64.md)
 - [Manual from Git](/packaging/installer/methods/manual.md)
 - [Build from source](/packaging/installer/methods/source.md)
 - [Offline nodes](/packaging/installer/methods/offline.md)
 
 `netdata-installer.sh` is, essentially, an automated version of the [manual from
 Git](/packaging/installer/methods/manual.md) method.
+
+Both the [pre-compiled static binary (`kickstart-static64.sh`)](/packaging/installer/methods/kickstart64.md) and
+[Docker](/packaging/installer/docker/README.md) installation methods use bundles that are _built_ using
+`netdata-installer.sh`, but none of the code is run on your system.
 
 ### Parameters
 
