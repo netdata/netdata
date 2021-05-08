@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- analytics: reduce alarms notifications dump logging [\#11116](https://github.com/netdata/netdata/pull/11116) ([ilyam8](https://github.com/ilyam8))
+- Check configuration for CUSTOM and MSTEAM [\#11113](https://github.com/netdata/netdata/pull/11113) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in ACLK-NG log [\#11107](https://github.com/netdata/netdata/pull/11107) ([underhood](https://github.com/underhood))
 - Update mqtt\_websockets [\#11105](https://github.com/netdata/netdata/pull/11105) ([underhood](https://github.com/underhood))
 - packaging: update go.d.plugin version to v0.28.2 [\#11104](https://github.com/netdata/netdata/pull/11104) ([ilyam8](https://github.com/ilyam8))
@@ -312,8 +314,6 @@
 - Spelling python plugin [\#10525](https://github.com/netdata/netdata/pull/10525) ([jsoref](https://github.com/jsoref))
 - Reduce the number of alarm updates on ACLK [\#10524](https://github.com/netdata/netdata/pull/10524) ([stelfrag](https://github.com/stelfrag))
 - dashboard@v2.12.5 [\#10520](https://github.com/netdata/netdata/pull/10520) ([jacekkolasa](https://github.com/jacekkolasa))
-- Remove unused entries from structures [\#10519](https://github.com/netdata/netdata/pull/10519) ([stelfrag](https://github.com/stelfrag))
-- Mark internal functions as static in health code. [\#10518](https://github.com/netdata/netdata/pull/10518) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
