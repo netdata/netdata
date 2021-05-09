@@ -348,6 +348,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int ping = 0;
     int sequence_reset = 0;
     int status = 0;
+    int nodelist = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -363,6 +364,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "fetch")) ping = atoi(value);
         if(!strcmp(name, "reset")) sequence_reset = atoi(value);
         if(!strcmp(name, "status")) status = atoi(value);
+        if(!strcmp(name, "nodelist")) nodelist = 1;
         //else {
         // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
@@ -463,6 +465,23 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         }
         destroy_completion(&compl);
         rrd_unlock();
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (nodelist) {
+        struct node_instance_list *node_list = get_node_list();
+        for (int i=0; !uuid_is_null(node_list[i].node_id); ++i) {
+            char uuid_node[GUID_LEN + 1];
+            char uuid_agent[GUID_LEN + 1];
+            uuid_unparse_lower(node_list[i].node_id, uuid_node);
+            uuid_unparse_lower(node_list[i].host_id, uuid_agent);
+
+            buffer_sprintf(w->response.data, "Host GUID = %s, node_instance_id = %36s (hostname= %s)\n",
+                           uuid_agent, uuid_node, node_list[i].hostname);
+            freez(node_list[i].hostname);
+        }
+        freez(node_list);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
