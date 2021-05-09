@@ -455,7 +455,8 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select count(*) from aclk_chart_%s where date_submitted is null;", wc->uuid_str);
+    buffer_sprintf(sql, "select count(*) from aclk_chart_%s where status is null and date_submitted is null;",
+                   wc->uuid_str);
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement count sequence ids in the database");
