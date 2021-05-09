@@ -350,6 +350,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int status = 0;
     int nodelist = 0;
     char *reset_node = NULL;
+    int resync_nodes = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -367,6 +368,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "status")) status = atoi(value);
         if(!strcmp(name, "nodelist")) nodelist = 1;
         if(!strcmp(name, "reset_node")) reset_node = value;
+        if(!strcmp(name, "resync_nodes")) resync_nodes = 1;
         //else {
         // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
@@ -506,6 +508,13 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         wait_for_completion(&compl );
         destroy_completion(&compl );
         buffer_sprintf(w->response.data, "Resetting node instance id of host %s", reset_node);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (resync_nodes) {
+        buffer_sprintf(w->response.data, "Resyncing all nodes with the cloud");
+        aclk_send_node_instances();
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
