@@ -505,8 +505,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
         wait_for_completion(&compl );
         destroy_completion(&compl );
-        buffer_sprintf(
-            w->response.data, "Chart sequence id for host %s has been reset to %d", host->hostname, sequence_reset);
+        buffer_sprintf(w->response.data, "Resetting node instance id of host %s", reset_node);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
