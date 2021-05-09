@@ -186,6 +186,13 @@ void aclk_database_worker(void *arg)
                     //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     //freez(cmd.data_param);
                     break;
+                case ACLK_DATABASE_RESET_NODE:
+                    // Fetch one or more charts
+                    info("Resetting the node instance id of host with guid %s", (char *) cmd.data);
+                    aclk_reset_node_event(wc, cmd);
+                    //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
+                    //freez(cmd.data_param);
+                    break;
                 case ACLK_DATABASE_STATUS_CHART:
                     // Fetch one or more charts
                     info("Requesting chart status for host %s", wc->uuid_str);
@@ -339,6 +346,49 @@ void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
+    if (cmd.completion)
+        complete(cmd.completion);
+
+    return;
+}
+
+void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc;
+    uuid_t  host_id;
+
+    rc = uuid_parse((char *) cmd.data, host_id);
+    if (unlikely(rc))
+        goto fail1;
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql, "update node_instance set node_id = null where host_id = @host_id;");
+
+    sqlite3_stmt *res = NULL;
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to lookup chart UUID in the database");
+        goto fail;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host_id , sizeof(host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to reset the node instance id of host %s, rc = %d", (char *) cmd.data, rc);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
+
+fail:
+    buffer_free(sql);
+
+fail1:
     if (cmd.completion)
         complete(cmd.completion);
 

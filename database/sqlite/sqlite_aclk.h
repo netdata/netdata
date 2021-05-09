@@ -36,6 +36,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_FETCH_CHART,
     ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_STATUS_CHART,
+    ACLK_DATABASE_RESET_NODE,
     ACLK_DATABASE_UPD_CHART,
     ACLK_DATABASE_UPD_ALERT,
     ACLK_DATABASE_SHUTDOWN,
@@ -99,6 +100,7 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H

@@ -349,6 +349,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int sequence_reset = 0;
     int status = 0;
     int nodelist = 0;
+    char *reset_node = NULL;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -365,6 +366,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "reset")) sequence_reset = atoi(value);
         if(!strcmp(name, "status")) status = atoi(value);
         if(!strcmp(name, "nodelist")) nodelist = 1;
+        if(!strcmp(name, "reset_node")) reset_node = value;
         //else {
         // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
@@ -471,10 +473,14 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
 
     if (nodelist) {
         struct node_instance_list *node_list = get_node_list();
-        for (int i=0; !uuid_is_null(node_list[i].node_id); ++i) {
+        for (int i=0; !uuid_is_null(node_list[i].host_id); ++i) {
             char uuid_node[GUID_LEN + 1];
             char uuid_agent[GUID_LEN + 1];
-            uuid_unparse_lower(node_list[i].node_id, uuid_node);
+            if (!uuid_is_null(node_list[i].node_id))
+                uuid_unparse_lower(node_list[i].node_id, uuid_node);
+            else
+                strcpy(uuid_node,"(empty)");
+
             uuid_unparse_lower(node_list[i].host_id, uuid_agent);
 
             buffer_sprintf(w->response.data, "Host GUID = %s, node_instance_id = %36s (hostname= %s)\n",
@@ -485,7 +491,26 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
-cleanup:
+
+    if (reset_node) {
+        struct aclk_database_cmd cmd;
+        //struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_RESET_NODE;
+        cmd.data = (void *) reset_node;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl );
+        destroy_completion(&compl );
+        buffer_sprintf(
+            w->response.data, "Chart sequence id for host %s has been reset to %d", host->hostname, sequence_reset);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
     return ret;
 }
 
