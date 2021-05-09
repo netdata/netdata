@@ -450,6 +450,8 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 
     int limit = cmd.count > 0 ? cmd.count : 1;
     int available = 0;
+    long first_sequence = 0;
+    long last_sequence  = 0;
 
     BUFFER *sql = buffer_create(1024);
 
@@ -466,6 +468,8 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
         available = sqlite3_column_int64(res, 0);
     }
     rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement counting pending events, rc = %d", rc);
     buffer_flush(sql);
 
     info("Available %d limit = %d", available, limit);
@@ -497,8 +501,6 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
        goto fail;
     }
 
-    long first_sequence = 0;
-    long last_sequence  = 0;
     struct aclk_chart_payload_t *head = NULL;
     struct aclk_chart_payload_t *tail = NULL;
     while (sqlite3_step(res) == SQLITE_ROW) {
