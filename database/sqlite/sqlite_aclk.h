@@ -34,6 +34,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_TIMER,
     ACLK_DATABASE_ADD_CHART,
     ACLK_DATABASE_FETCH_CHART,
+    ACLK_DATABASE_RESET_CHART,
+    ACLK_DATABASE_STATUS_CHART,
     ACLK_DATABASE_UPD_CHART,
     ACLK_DATABASE_UPD_ALERT,
     ACLK_DATABASE_SHUTDOWN,
@@ -42,6 +44,7 @@ enum aclk_database_opcode {
 
 struct aclk_chart_payload_t {
     long sequence_id;
+    long last_sequence_id;
     char *payload;
     struct aclk_chart_payload_t *next;
 };
@@ -51,6 +54,7 @@ struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *data;
     void *data_param;
+    int count;
     union {
 //        struct rrdeng_read_page {
 //            struct rrdeng_page_descr *page_cache_descr;
@@ -93,6 +97,8 @@ extern void sql_create_aclk_table(RRDHOST *host);
 extern void sql_create_aclk_table(RRDHOST *host);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H
