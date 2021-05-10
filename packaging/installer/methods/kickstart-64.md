@@ -73,10 +73,10 @@ your installation. Here are a few important parameters:
 
 ### Claim node to Netdata Cloud during installation
 
-The `kickstart.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to Netdata
-Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
-Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+The `kickstart.sh` script accepts additional parameters to automatically [claim](/claim/README.md) your node to [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud) immediately after installation. Find the `TOKEN` and `ROOMS` strings by
+[signing in to Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in
+the [Spaces management area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 
 - `--claim-token`: The unique token associated with your Space in Netdata Cloud.
 - `--claim-rooms`: A comma-separated list of tokens for each War Room this node should appear in.

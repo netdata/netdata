@@ -1,24 +1,24 @@
 <!--
-title: "Install Netdata with Docker"
-date: 2020-04-23
+title: "Run Netdata with Docker"
+description: ""
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
 -->
 
-# Install the Netdata Agent with Docker
+# Run Netdata with Docker
 
-Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
-you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
+Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set
+up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
-page.
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog
+instance within the Netdata infrastructure. Read about the information collected, and learn how to-opt, on our
+[anonymous statistics](/docs/anonymous-statistics.md) page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
-## Limitations running the Agent in Docker
+## Limitations running Netdata in Docker
 
 For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
 performance or status, is not accessible or not as detailed in a container as when running the Agent directly on the
@@ -32,7 +32,7 @@ directive, not a COMMAND directive. Please adapt your execution scripts accordin
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-## Create a new Netdata Agent container
+## Create a new Netdata container
 
 You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
@@ -87,6 +87,77 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+### Create a new container and claim the node to Netdata Cloud
+
+If you want to monitor the node running this container using [Netdata Cloud](https://learn.netdata.cloud/docs/cloud),
+it's easiest to create the container and immediately [claim](/claim/README.md) the node in a single step. Find the
+`TOKEN` and `ROOMS` strings by [signing in to Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then
+clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+If you already created the container using one of the methods above, see the [claim](/claim/README.md#using-docker-exec)
+doc for how to use `docker exec`.
+
+**`docker run`**:
+
+```bash
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
+  -v netdatalib:/var/lib/netdata \
+  -v netdatacache:/var/cache/netdata \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
+  --restart unless-stopped \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  -e NETDATA_CLAIM_TOKEN = "TOKEN" \
+  -e NETDATA_CLAIM_URL = "ROOMS" \
+  -e NETDATA_CLAIM_ROOMS = "https://app.netdata.cloud" \
+  -e NETDATA_CLAIM_PROXY = "PROXY" \ 
+  netdata/netdata
+```
+
+**Docker Compose**:
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+    environment:
+      NETDATA_CLAIM_TOKEN: "TOKEN"
+      NETDATA_CLAIM_URL: "ROOMS"
+      NETDATA_CLAIM_ROOMS: "https://app.netdata.cloud"
+      NETDATA_CLAIM_PROXY: "PROXY"
 
 volumes:
   netdataconfig:
