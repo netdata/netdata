@@ -169,10 +169,10 @@ volumes:
 
 The official `netdata/netdata` Docker image provides the following named tags:
 
-* `stable`: The `stable` tag will always point to the most recently published stable build.
-* `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
+- `stable`: The `stable` tag will always point to the most recently published stable build.
+- `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
   updated daily at around 01:00 UTC.
-* `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
+- `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
   or a nightly build. This is what Docker will use by default if you do not specify a tag.
 
 Additionally, for each stable release, three tags are pushed, one with the full version of the release (for example,
