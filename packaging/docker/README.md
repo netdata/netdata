@@ -121,10 +121,10 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  -e NETDATA_CLAIM_TOKEN = "TOKEN" \
-  -e NETDATA_CLAIM_URL = "ROOMS" \
-  -e NETDATA_CLAIM_ROOMS = "https://app.netdata.cloud" \
-  -e NETDATA_CLAIM_PROXY = "PROXY" \ 
+  -e NETDATA_CLAIM_TOKEN="TOKEN" \
+  -e NETDATA_CLAIM_ROOMS="ROOMS" \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
+  -e NETDATA_CLAIM_PROXY="PROXY" \ 
   netdata/netdata
 ```
 
@@ -155,8 +155,8 @@ services:
       - /etc/os-release:/host/etc/os-release:ro
     environment:
       NETDATA_CLAIM_TOKEN: "TOKEN"
-      NETDATA_CLAIM_URL: "ROOMS"
-      NETDATA_CLAIM_ROOMS: "https://app.netdata.cloud"
+      NETDATA_CLAIM_ROOMS: ROOMS
+      NETDATA_CLAIM_URL: "https://app.netdata.cloud"
       NETDATA_CLAIM_PROXY: "PROXY"
 
 volumes:

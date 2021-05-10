@@ -116,8 +116,8 @@ docker run -d --name=netdata \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
   -e NETDATA_CLAIM_TOKEN=TOKEN \
-  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
   -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
