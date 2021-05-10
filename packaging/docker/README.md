@@ -154,10 +154,10 @@ services:
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
     environment:
-      NETDATA_CLAIM_TOKEN: TOKEN
-      NETDATA_CLAIM_URL: ROOMS
-      NETDATA_CLAIM_ROOMS: https://app.netdata.cloud
-      NETDATA_CLAIM_PROXY: PROXY
+      NETDATA_CLAIM_TOKEN: "TOKEN"
+      NETDATA_CLAIM_URL: "ROOMS"
+      NETDATA_CLAIM_ROOMS: "https://app.netdata.cloud"
+      NETDATA_CLAIM_PROXY: "PROXY"
 
 volumes:
   netdataconfig:
