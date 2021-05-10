@@ -596,8 +596,6 @@ BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
-    aclk/aclk-schemas/proto/aclk/v1/envelope.pb.cc \
-    aclk/aclk-schemas/proto/aclk/v1/envelope.pb.h \
     $(NULL)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
@@ -626,10 +624,6 @@ aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v
 
 aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
 aclk/aclk-schemas/proto/aclk/v1/lib.pb.h: aclk/aclk-schemas/proto/aclk/v1/lib.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/aclk/v1/envelope.pb.cc \
-aclk/aclk-schemas/proto/aclk/v1/envelope.pb.h: aclk/aclk-schemas/proto/aclk/v1/envelope.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 else #ACLK_NG
