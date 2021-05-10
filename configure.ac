@@ -820,7 +820,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
         enable_aclk="yes"
-        OPTIONAL_ACLK_NG_CFLAGS="-Imqtt_websockets/src/include -Imqtt_websockets/c-rbuf/include -Imqtt_websockets/MQTT-C/include"
+        OPTIONAL_ACLK_NG_CFLAGS="-Imqtt_websockets/src/include -Imqtt_websockets/c-rbuf/include -Imqtt_websockets/MQTT-C/include -Iaclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
         CXX11FLAG="-std=c++11"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"

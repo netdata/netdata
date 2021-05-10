@@ -590,23 +590,47 @@ BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
     aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
     aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
+    aclk/aclk-schemas/proto/aclk/v1/envelope.pb.cc \
+    aclk/aclk-schemas/proto/aclk/v1/envelope.pb.h \
     $(NULL)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
-	$(PROTOC) --cpp_out=$(builddir) $^
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
-	$(PROTOC) --cpp_out=$(builddir) $^
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
-	$(PROTOC) --cpp_out=$(builddir) $^
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
 aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
-	$(PROTOC) --cpp_out=$(builddir) $^
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/instance.pb.h: aclk/aclk-schemas/proto/chart/v1/instance.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v1/dimension.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.h: aclk/aclk-schemas/proto/aclk/v1/lib.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/aclk/v1/envelope.pb.cc \
+aclk/aclk-schemas/proto/aclk/v1/envelope.pb.h: aclk/aclk-schemas/proto/aclk/v1/envelope.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 else #ACLK_NG
 ACLK_FILES = \
