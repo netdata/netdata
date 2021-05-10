@@ -72,8 +72,8 @@ extern time_t rrdset_free_obsolete_time;
 
 #define RRD_ID_LENGTH_MAX 200
 
-#define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
-#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
+#define RRDSET_MAGIC        "NETDATA RRD SET FILE V020"
+#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V020"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
