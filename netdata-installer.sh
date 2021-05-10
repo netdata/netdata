@@ -1362,40 +1362,6 @@ fi
 
 # -----------------------------------------------------------------------------
 
-copy_react_dashboard() {
-  run cp -a $(find ${1} -mindepth 1 -maxdepth 1) "${NETDATA_WEB_DIR}"
-  run chown -R "${NETDATA_WEB_USER}:${NETDATA_WEB_GROUP}" "${NETDATA_WEB_DIR}"
-}
-
-install_react_dashboard() {
-  progress "Fetching and installing dashboard"
-
-  DASHBOARD_PACKAGE_VERSION="$(cat packaging/dashboard.version)"
-
-  tmp="$(mktemp -d -t netdata-dashboard-XXXXXX)"
-  DASHBOARD_PACKAGE_BASENAME="dashboard.tar.gz"
-
-  if fetch_and_verify "dashboard" \
-    "https://github.com/netdata/dashboard/releases/download/${DASHBOARD_PACKAGE_VERSION}/${DASHBOARD_PACKAGE_BASENAME}" \
-    "${DASHBOARD_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_DASHBOARD}"; then
-    if run tar -xf "${tmp}/${DASHBOARD_PACKAGE_BASENAME}" -C "${tmp}" &&
-      copy_react_dashboard "${tmp}/build" &&
-      rm -rf "${tmp}"; then
-      run_ok "React dashboard installed."
-    else
-      run_failed "Failed to install React dashboard. The install process will continue, but you will not be able to use the new dashboard."
-    fi
-  else
-    run_failed "Unable to fetch React dashboard. The install process will continue, but you will not be able to use the new dashboard."
-  fi
-}
-
-install_react_dashboard
-
-# -----------------------------------------------------------------------------
-
 # govercomp compares go.d.plugin versions. Exit codes:
 # 0 - version1 == version2
 # 1 - version1 > version2

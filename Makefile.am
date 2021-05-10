@@ -57,7 +57,6 @@ dist_noinst_DATA = \
     netdata.cppcheck \
     netdata.spec \
     package.json \
-    packaging/bundle-dashboard.sh \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
