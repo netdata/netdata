@@ -187,6 +187,22 @@ static int alarm_state_update_query(mqtt_wss_client client, aclk_query_t query)
     return 0;
 }
 
+static int register_node(mqtt_wss_client client, aclk_query_t query) {
+    // TODO create a pending registrations list
+    // with some timeouts to detect registration requests that
+    // go unanswered from the cloud
+    aclk_generate_node_registration(client, &query->data.node_creation);
+    return 0;
+}
+
+static int node_state_update(mqtt_wss_client client, aclk_query_t query) {
+    // TODO create a pending registrations list
+    // with some timeouts to detect registration requests that
+    // go unanswered from the cloud
+    aclk_generate_node_state_update(client, &query->data.node_update);
+    return 0;
+}
+
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,        .name = "http api request v2", .fnc = http_api_v2              },
     { .type = ALARM_STATE_UPDATE, .name = "alarm state update",  .fnc = alarm_state_update_query },
@@ -194,6 +210,8 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = METADATA_ALARMS,    .name = "alarms metadata",     .fnc = alarms_metadata          },
     { .type = CHART_NEW,          .name = "chart new",           .fnc = chart_query              },
     { .type = CHART_DEL,          .name = "chart delete",        .fnc = info_metadata            },
+    { .type = REGISTER_NODE,      .name = "register node",       .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,  .name = "node state update",   .fnc = node_state_update        },
     { .type = UNKNOWN,            .name = NULL,                  .fnc = NULL                     }
 };
 
