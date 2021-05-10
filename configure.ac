@@ -428,15 +428,14 @@ test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
 
-AC_ARG_WITH([libJudy],
-            [AS_HELP_STRING([--with-libJudy=PREFIX],[Use a specific Judy library (default is system-library)])],
+AC_ARG_WITH([bundled-libJudy],
+            [AS_HELP_STRING([--with-bundled-libJudy],[Use the bundled version of Judy library (default is system-library)])],
             [
-                libJudy_dir="$withval"
                 AC_MSG_CHECKING(for libJudy in $withval)
-                if test -f "${libJudy_dir}/libJudy.a" -a -f "${libJudy_dir}/Judy.h"; then
+                if test -f "externaldeps/libJudy/libJudy.a" -a -f "externaldeps/libJudy/Judy.h"; then
                     LIBS_BACKUP="${LIBS}"
-                    LIBS="${libJudy_dir}/libJudy.a"
-                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "${libJudy_dir}/Judy.h"
+                    LIBS="externaldeps/libJudy/libJudy.a"
+                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/libJudy/Judy.h"
                                                      int main (int argc, char **argv) {
                                                         Pvoid_t PJLArray = (Pvoid_t) NULL;
                                                         Word_t * PValue;
@@ -446,8 +445,8 @@ AC_ARG_WITH([libJudy],
                                                      [HAVE_libJudy_a="yes"],
                                                      [HAVE_libJudy_a="no"])
                     LIBS="${LIBS_BACKUP}"
-                    JUDY_LIBS="${libJudy_dir}/libJudy.a"
-                    JUDY_CFLAGS="-I${libJudy_dir}"
+                    JUDY_LIBS="externaldeps/libJudy/libJudy.a"
+                    JUDY_CFLAGS="-I externaldeps/libJudy"
                     AC_MSG_RESULT([$HAVE_libJudy_a])
                 else
                     libjudy_dir=""
