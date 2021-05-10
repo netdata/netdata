@@ -174,12 +174,8 @@ AC_ARG_ENABLE(
 )
 AC_ARG_WITH(
     [bundled-lws],
-    [AS_HELP_STRING([--with-bundled-lws=DIR], [Use a specific Libwebsockets static library @<:@default use system library@:>@])],
-    [
-        with_bundled_lws="yes"
-        bundled_lws_dir="${withval}"
-    ],
-    [with_bundled_lws="no"]
+    [AS_HELP_STRING([--with-bundled-lws], [Use the bundled version of libwebsockets library @<:@default use system library@:>@])],
+    [with_bundled_lws="yes"], [with_bundled_lws="no"]
 )
 
 # -----------------------------------------------------------------------------
@@ -671,9 +667,9 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
 
     if test "${with_bundled_lws}" = "yes"; then
         AC_MSG_CHECKING([if libwebsockets static lib is present])
-        if test -f "${bundled_lws_dir}/libwebsockets.a"; then
-            LWS_CFLAGS="-I ${bundled_lws_dir}/include"
-            OPTIONAL_LWS_LIBS="${bundled_lws_dir}/libwebsockets.a"
+        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+            LWS_CFLAGS="-I externaldeps/libwebsockets/include"
+            OPTIONAL_LWS_LIBS="externaldeps/libwebsockets/libwebsockets.a"
             AC_MSG_RESULT([yes])
             AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
         else
