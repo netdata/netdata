@@ -2,7 +2,7 @@
 #define ACLK_COMMON_H
 
 #include "aclk_rrdhost_state.h"
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 extern netdata_mutex_t aclk_shared_state_mutex;
 #define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)

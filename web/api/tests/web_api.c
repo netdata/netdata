@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../../libnetdata/libnetdata.h"
-#include "../../../libnetdata/required_dummies.h"
-#include "../../../database/rrd.h"
-#include "../../../web/server/web_client.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
+#include "database/rrd.h"
+#include "web/server/web_client.h"
 #include <setjmp.h>
 #include <cmocka.h>
 #include <stdbool.h>

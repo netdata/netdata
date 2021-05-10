@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "spawn.h"
-#include "../database/engine/rrdenginelib.h"
+#include "database/engine/rrdenginelib.h"
 
 static uv_process_t process;
 static uv_pipe_t spawn_channel;

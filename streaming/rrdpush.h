@@ -3,8 +3,8 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "../database/rrd.h"
-#include "../libnetdata/libnetdata.h"
+#include "database/rrd.h"
+#include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 

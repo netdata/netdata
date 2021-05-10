@@ -49,7 +49,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
-#include "../collectors/plugins.d/pluginsd_parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
 PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {

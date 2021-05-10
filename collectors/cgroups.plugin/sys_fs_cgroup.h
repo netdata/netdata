@@ -3,7 +3,7 @@
 #ifndef NETDATA_SYS_FS_CGROUP_H
 #define NETDATA_SYS_FS_CGROUP_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #if (TARGET_OS == OS_LINUX)
 

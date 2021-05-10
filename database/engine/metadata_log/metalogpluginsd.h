@@ -3,9 +3,9 @@
 #ifndef NETDATA_METALOGPLUGINSD_H
 #define NETDATA_METALOGPLUGINSD_H
 
-#include "../../../collectors/plugins.d/pluginsd_parser.h"
-#include "../../../collectors/plugins.d/plugins_d.h"
-#include "../../../parser/parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
+#include "collectors/plugins.d/plugins_d.h"
+#include "parser/parser.h"
 
 struct metalog_pluginsd_state {
     struct metalog_instance *ctx;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "aclk_tx_msgs.h"
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "aclk_util.h"
 #include "aclk_stats.h"
 
