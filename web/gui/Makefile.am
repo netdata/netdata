@@ -67,7 +67,6 @@ dist_web_DATA = \
     refresh-badges.js \
     sitemap.xml \
     tv.html \
-    dash-example.html \
     version.txt \
     $(NULL)
 
