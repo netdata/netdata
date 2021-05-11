@@ -2310,7 +2310,7 @@ int alert_hash_and_store_config(
     char uuid_str[36 + 1];
     uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
     info("Calculating HASH %s for alert %s", uuid_str, alarm);
-    //uuid_copy(hash_id, *((uuid_t *)&hash_value)); //not needed?
+    uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
     /* store everything, so it can be recreated when not in memory or just a subset ? */
     (void)sql_store_alert_hash(

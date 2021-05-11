@@ -178,10 +178,14 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         }
     }
 
+    char config_hash_id[GUID_LEN + 1];
+    uuid_unparse_lower(rc->config_hash_id, config_hash_id);
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
                     "\t\t\t\"name\": \"%s\",\n"
+                    "\t\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
                     "\t\t\t\"class\": \"%s\",\n"
@@ -213,6 +217,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
                    , rc->name
+                   , config_hash_id
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
                    , rc->classification?rc->classification:"Unknown"
