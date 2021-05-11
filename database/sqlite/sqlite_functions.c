@@ -2217,7 +2217,7 @@ failed:
 int alert_hash_and_store_config(
     uuid_t hash_id,
     const char *alarm,
-    const char *template,
+    const char *template_key,
     const char *os,
     const char *host,
     const char *on,
@@ -2251,8 +2251,8 @@ int alert_hash_and_store_config(
 
     if (alarm) {
         EVP_DigestUpdate(evpctx, alarm, strlen(alarm));
-    } else if (template)
-        EVP_DigestUpdate(evpctx, template, strlen(template));
+    } else if (template_key)
+        EVP_DigestUpdate(evpctx, template_key, strlen(template_key));
 
     if (os)
         EVP_DigestUpdate(evpctx, os, strlen(os));
@@ -2316,7 +2316,7 @@ int alert_hash_and_store_config(
     (void)sql_store_alert_hash(
         (uuid_t *)&hash_value,
         alarm,
-        template,
+        template_key,
         on,
         classification,
         component,
