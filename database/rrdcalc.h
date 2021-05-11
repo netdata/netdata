@@ -48,6 +48,7 @@ struct rrdcalc {
 
     char *chart;                    // the chart id this should be linked to
     uint32_t hash_chart;
+    uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
 
     char *plugin_match;             //the plugin name that should be linked to
     SIMPLE_PATTERN *plugin_pattern;

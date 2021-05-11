@@ -555,6 +555,21 @@ static int health_readfile(const char *filename, void *data) {
     RRDCALC *rc = NULL;
     RRDCALCTEMPLATE *rt = NULL;
 
+    //FREE THEM!!!!
+    char *config_os = NULL;
+    char *config_host = NULL;
+    char *config_lookup = NULL;
+    char *config_calc = NULL;
+    char *config_warn = NULL;
+    char *config_crit = NULL;
+    char *config_every = NULL;
+    char *config_green = NULL; //check if rc->green is ok
+    char *config_red = NULL; //check if rc->green is ok
+    char *config_delay = NULL;
+    char *config_options = NULL;
+    char *config_repeat = NULL;
+    char *config_host_label = NULL;
+
     int ignore_this = 0;
     size_t line = 0, append = 0;
     char *s;
@@ -603,15 +618,126 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if (ignore_this ||
+                    !alert_hash_and_store_config(
+                        rc->config_hash_id,
+                        rc->name,
+                        NULL,
+                        config_os,
+                        config_host,
+                        rc->chart,
+                        NULL,
+                        rc->plugin_match,
+                        rc->module_match,
+                        config_lookup,
+                        config_calc,
+                        config_every,
+                        config_green,
+                        config_red,
+                        config_warn,
+                        config_crit,
+                        rc->exec,
+                        rc->recipient,
+                        rc->units,
+                        rc->info,
+                        rc->classification,
+                        rc->component,
+                        rc->type,
+                        config_delay,
+                        config_options,
+                        config_repeat,
+                        config_host_label) ||
+                    !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
+                    freez(config_os);
+                    config_os = NULL;
+                    freez(config_host);
+                    config_host = NULL;
+                    freez(config_lookup);
+                    config_lookup = NULL;
+                    freez(config_calc);
+                    config_calc = NULL;
+                    freez(config_warn);
+                    config_warn = NULL;
+                    freez(config_crit);
+                    config_crit = NULL;
+                    freez(config_every);
+                    config_every = NULL;
+                    freez(config_green);
+                    config_green = NULL;
+                    freez(config_red);
+                    config_red = NULL;
+                    freez(config_delay);
+                    config_delay = NULL;
+                    freez(config_options);
+                    config_options = NULL;
+                    freez(config_repeat);
+                    config_repeat = NULL;
+                    freez(config_host_label);
+                    config_host_label = NULL;
                 }
                // health_add_alarms_loop(host, rc, ignore_this) ;
             }
 
             if(rt) {
-                if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
+                if (ignore_this ||
+                    !alert_hash_and_store_config(
+                        rt->config_hash_id,
+                        NULL,
+                        rt->name,
+                        config_os,
+                        config_host,
+                        rt->context,
+                        rt->family_match,
+                        rt->plugin_match,
+                        rt->module_match,
+                        config_lookup,
+                        config_calc,
+                        config_every,
+                        config_green,
+                        config_red,
+                        config_warn,
+                        config_crit,
+                        rt->exec,
+                        rt->recipient,
+                        rt->units,
+                        rt->info,
+                        rt->classification,
+                        rt->component,
+                        rt->type,
+                        config_delay,
+                        config_options,
+                        config_repeat,
+                        config_host_label) ||
+                    !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
+                    freez(config_os);
+                    config_os = NULL;
+                    freez(config_host);
+                    config_host = NULL;
+                    freez(config_lookup);
+                    config_lookup = NULL;
+                    freez(config_calc);
+                    config_calc = NULL;
+                    freez(config_warn);
+                    config_warn = NULL;
+                    freez(config_crit);
+                    config_crit = NULL;
+                    freez(config_every);
+                    config_every = NULL;
+                    freez(config_green);
+                    config_green = NULL;
+                    freez(config_red);
+                    config_red = NULL;
+                    freez(config_delay);
+                    config_delay = NULL;
+                    freez(config_options);
+                    config_options = NULL;
+                    freez(config_repeat);
+                    config_repeat = NULL;
+                    freez(config_host_label);
+                    config_host_label = NULL;
+                }
 
                 rt = NULL;
             }
@@ -636,18 +762,129 @@ static int health_readfile(const char *filename, void *data) {
             ignore_this = 0;
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
+            //                health_add_alarms_loop(host, rc, ignore_this) ;
             if(rc) {
-//                health_add_alarms_loop(host, rc, ignore_this) ;
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                if (ignore_this ||
+                    !alert_hash_and_store_config(
+                        rc->config_hash_id,
+                        rc->name,
+                        NULL,
+                        config_os,
+                        config_host,
+                        rc->chart,
+                        NULL,
+                        rc->plugin_match,
+                        rc->module_match,
+                        config_lookup,
+                        config_calc,
+                        config_every,
+                        config_green,
+                        config_red,
+                        config_warn,
+                        config_crit,
+                        rc->exec,
+                        rc->recipient,
+                        rc->units,
+                        rc->info,
+                        rc->classification,
+                        rc->component,
+                        rc->type,
+                        config_delay,
+                        config_options,
+                        config_repeat,
+                        config_host_label) ||
+                    !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
+                    freez(config_os);
+                    config_os = NULL;
+                    freez(config_host);
+                    config_host = NULL;
+                    freez(config_lookup);
+                    config_lookup = NULL;
+                    freez(config_calc);
+                    config_calc = NULL;
+                    freez(config_warn);
+                    config_warn = NULL;
+                    freez(config_crit);
+                    config_crit = NULL;
+                    freez(config_every);
+                    config_every = NULL;
+                    freez(config_green);
+                    config_green = NULL;
+                    freez(config_red);
+                    config_red = NULL;
+                    freez(config_delay);
+                    config_delay = NULL;
+                    freez(config_options);
+                    config_options = NULL;
+                    freez(config_repeat);
+                    config_repeat = NULL;
+                    freez(config_host_label);
+                    config_host_label = NULL;
                 }
 
                 rc = NULL;
             }
 
             if(rt) {
-                if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
+                if (ignore_this ||
+                    !alert_hash_and_store_config(
+                        rt->config_hash_id,
+                        NULL,
+                        rt->name,
+                        config_os,
+                        config_host,
+                        rt->context,
+                        rt->family_match,
+                        rt->plugin_match,
+                        rt->module_match,
+                        config_lookup,
+                        config_calc,
+                        config_every,
+                        config_green,
+                        config_red,
+                        config_warn,
+                        config_crit,
+                        rt->exec,
+                        rt->recipient,
+                        rt->units,
+                        rt->info,
+                        rt->classification,
+                        rt->component,
+                        rt->type,
+                        config_delay,
+                        config_options,
+                        config_repeat,
+                        config_host_label) ||
+                    !rrdcalctemplate_add_template_from_config(host, rt)) {
                     rrdcalctemplate_free(rt);
+                    freez(config_os);
+                    config_os = NULL;
+                    freez(config_host);
+                    config_host = NULL;
+                    freez(config_lookup);
+                    config_lookup = NULL;
+                    freez(config_calc);
+                    config_calc = NULL;
+                    freez(config_warn);
+                    config_warn = NULL;
+                    freez(config_crit);
+                    config_crit = NULL;
+                    freez(config_every);
+                    config_every = NULL;
+                    freez(config_green);
+                    config_green = NULL;
+                    freez(config_red);
+                    config_red = NULL;
+                    freez(config_delay);
+                    config_delay = NULL;
+                    freez(config_options);
+                    config_options = NULL;
+                    freez(config_repeat);
+                    config_repeat = NULL;
+                    freez(config_host_label);
+                    config_host_label = NULL;
+                }
             }
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
@@ -678,7 +915,7 @@ static int health_readfile(const char *filename, void *data) {
 
                 ignore_this = 1;
             }
-
+            config_os = strdupz(value);
             simple_pattern_free(os_pattern);
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
@@ -694,7 +931,7 @@ static int health_readfile(const char *filename, void *data) {
 
                 ignore_this = 1;
             }
-
+            config_host = strdupz(value);
             simple_pattern_free(host_pattern);
         }
         else if(rc) {
@@ -748,11 +985,13 @@ static int health_readfile(const char *filename, void *data) {
                 if(rc->foreachdim) {
                     rc->spdim = health_pattern_from_foreach(rc->foreachdim);
                 }
+                config_lookup = strdupz(value);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!config_parse_duration(value, &rc->update_every))
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rc->name, key, value);
+                config_every = strdupz(value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
@@ -761,6 +1000,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, filename, rc->name, key, e);
                 }
+                config_green = strdupz(value);
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
@@ -769,6 +1009,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, filename, rc->name, key, e);
                 }
+                config_red = strdupz(value);
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
                 const char *failed_at = NULL;
@@ -778,6 +1019,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_calc = strdupz(value);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 const char *failed_at = NULL;
@@ -787,6 +1029,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_warn = strdupz(value);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 const char *failed_at = NULL;
@@ -796,6 +1039,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_crit = strdupz(value);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rc->exec) {
@@ -841,14 +1085,17 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
                 health_parse_delay(line, filename, value, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
+                config_delay = strdupz(value);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
+                config_options = strdupz(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
                 health_parse_repeat(line, filename, value,
                                     &rc->warn_repeat_every,
                                     &rc->crit_repeat_every);
+                config_repeat = strdupz(value);
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
                 if(rc->labels) {
@@ -859,7 +1106,7 @@ static int health_readfile(const char *filename, void *data) {
                     freez(rc->labels);
                     simple_pattern_free(rc->splabels);
                 }
-
+                config_host_label = strdupz(value);
                 rc->labels = simple_pattern_trim_around_equal(value);
                 rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
@@ -961,11 +1208,13 @@ static int health_readfile(const char *filename, void *data) {
                 if(rt->foreachdim) {
                     rt->spdim = health_pattern_from_foreach(rt->foreachdim);
                 }
+                config_lookup = strdupz(value);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!config_parse_duration(value, &rt->update_every))
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rt->name, key, value);
+                config_every = strdupz(value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
@@ -974,6 +1223,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, filename, rt->name, key, e);
                 }
+                config_green = strdupz(value);
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
@@ -982,6 +1232,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, filename, rt->name, key, e);
                 }
+                config_red = strdupz(value);
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
                 const char *failed_at = NULL;
@@ -991,6 +1242,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_calc = strdupz(value);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 const char *failed_at = NULL;
@@ -1000,6 +1252,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_warn = strdupz(value);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 const char *failed_at = NULL;
@@ -1009,6 +1262,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
+                config_crit = strdupz(value);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rt->exec) {
@@ -1054,14 +1308,17 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
                 health_parse_delay(line, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
+                config_delay = strdupz(value);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rt->options |= health_parse_options(value);
+                config_options = strdupz(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
                 health_parse_repeat(line, filename, value,
                                     &rt->warn_repeat_every,
                                     &rt->crit_repeat_every);
+                config_repeat = strdupz(value);
             }
             else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
                 if(rt->labels) {
@@ -1072,7 +1329,7 @@ static int health_readfile(const char *filename, void *data) {
                     freez(rt->labels);
                     simple_pattern_free(rt->splabels);
                 }
-
+                config_host_label = strdupz(value);
                 rt->labels = simple_pattern_trim_around_equal(value);
                 rt->splabels = simple_pattern_create(rt->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
@@ -1089,14 +1346,125 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+        if (ignore_this ||
+            !alert_hash_and_store_config(
+                rc->config_hash_id,
+                rc->name,
+                NULL,
+                config_os,
+                config_host,
+                rc->chart,
+                NULL,
+                rc->plugin_match,
+                rc->module_match,
+                config_lookup,
+                config_calc,
+                config_every,
+                config_green,
+                config_red,
+                config_warn,
+                config_crit,
+                rc->exec,
+                rc->recipient,
+                rc->units,
+                rc->info,
+                rc->classification,
+                rc->component,
+                rc->type,
+                config_delay,
+                config_options,
+                config_repeat,
+                config_host_label) ||
+            !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
+            freez(config_os);
+            config_os = NULL;
+            freez(config_host);
+            config_host = NULL;
+            freez(config_lookup);
+            config_lookup = NULL;
+            freez(config_calc);
+            config_calc = NULL;
+            freez(config_warn);
+            config_warn = NULL;
+            freez(config_crit);
+            config_crit = NULL;
+            freez(config_every);
+            config_every = NULL;
+            freez(config_green);
+            config_green = NULL;
+            freez(config_red);
+            config_red = NULL;
+            freez(config_delay);
+            config_delay = NULL;
+            freez(config_options);
+            config_options = NULL;
+            freez(config_repeat);
+            config_repeat = NULL;
+            freez(config_host_label);
+            config_host_label = NULL;
         }
     }
 
     if(rt) {
-        if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
+        if (ignore_this ||
+            !alert_hash_and_store_config(
+                rt->config_hash_id,
+                NULL,
+                rt->name,
+                config_os,
+                config_host,
+                rt->context,
+                rt->family_match,
+                rt->plugin_match,
+                rt->module_match,
+                config_lookup,
+                config_calc,
+                config_every,
+                config_green,
+                config_red,
+                config_warn,
+                config_crit,
+                rt->exec,
+                rt->recipient,
+                rt->units,
+                rt->info,
+                rt->classification,
+                rt->component,
+                rt->type,
+                config_delay,
+                config_options,
+                config_repeat,
+                config_host_label) ||
+            !rrdcalctemplate_add_template_from_config(host, rt)) {
             rrdcalctemplate_free(rt);
+            freez(config_os);
+            config_os = NULL;
+            freez(config_host);
+            config_host = NULL;
+            freez(config_lookup);
+            config_lookup = NULL;
+            freez(config_calc);
+            config_calc = NULL;
+            freez(config_warn);
+            config_warn = NULL;
+            freez(config_crit);
+            config_crit = NULL;
+            freez(config_every);
+            config_every = NULL;
+            freez(config_green);
+            config_green = NULL;
+            freez(config_red);
+            config_red = NULL;
+            freez(config_delay);
+            config_delay = NULL;
+            freez(config_options);
+            config_options = NULL;
+            freez(config_repeat);
+            config_repeat = NULL;
+            freez(config_host_label);
+            config_host_label = NULL;
+        }
     }
 
     fclose(fp);
