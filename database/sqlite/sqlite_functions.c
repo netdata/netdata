@@ -2141,67 +2141,91 @@ void sql_select_alert(char *hash_str, BUFFER *wb)
         char uuid_str[36 + 1];
         uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res_alert, 0)), uuid_str);
 
-        buffer_sprintf(
-            wb,
-            "\t{\n"
-            "\t\t\"config_hash_id\": \"%s\",\n"
-            "\t\t\"alarm\": \"%s\",\n"
-            "\t\t\"template\": \"%s\",\n"
-            "\t\t\"on\": \"%s\",\n"
-            "\t\t\"class\": \"%s\",\n"
-            "\t\t\"component\": \"%s\",\n"
-            "\t\t\"type\": \"%s\",\n"
-            "\t\t\"os\": \"%s\",\n"
-            "\t\t\"hosts\": \"%s\",\n"
-            "\t\t\"lookup\": \"%s\",\n"
-            "\t\t\"every\": \"%s\",\n"
-            "\t\t\"units\": \"%s\",\n"
-            "\t\t\"calc\": \"%s\",\n"
-            "\t\t\"families\": \"%s\",\n"
-            "\t\t\"plugin\": \"%s\",\n"
-            "\t\t\"module\": \"%s\",\n"
-            "\t\t\"green\": \"%s\",\n"
-            "\t\t\"red\": \"%s\",\n"
-            "\t\t\"warn\": \"%s\",\n"
-            "\t\t\"crit\": \"%s\",\n"
-            "\t\t\"exec\": \"%s\",\n"
-            "\t\t\"to\": \"%s\",\n"
-            "\t\t\"info\": \"%s\",\n"
-            "\t\t\"delay\": \"%s\",\n"
-            "\t\t\"options\": \"%s\",\n"
-            "\t\t\"repeat\": \"%s\",\n"
-            "\t\t\"host_labels\": \"%s\"\n",
-            uuid_str,
-            sqlite3_column_text(res_alert, 1),
-            sqlite3_column_text(res_alert, 2),
-            sqlite3_column_text(res_alert, 3),
-            sqlite3_column_text(res_alert, 4),
-            sqlite3_column_text(res_alert, 5),
-            sqlite3_column_text(res_alert, 6),
-            sqlite3_column_text(res_alert, 7),
-            sqlite3_column_text(res_alert, 8),
-            sqlite3_column_text(res_alert, 9),
-            sqlite3_column_text(res_alert, 10),
-            sqlite3_column_text(res_alert, 11),
-            sqlite3_column_text(res_alert, 12),
-            sqlite3_column_text(res_alert, 13),
-            sqlite3_column_text(res_alert, 14),
-            sqlite3_column_text(res_alert, 15),
-            sqlite3_column_text(res_alert, 16),
-            sqlite3_column_text(res_alert, 17),
-            sqlite3_column_text(res_alert, 18),
-            sqlite3_column_text(res_alert, 19),
-            sqlite3_column_text(res_alert, 20),
-            sqlite3_column_text(res_alert, 21),
-            sqlite3_column_text(res_alert, 22),
-            sqlite3_column_text(res_alert, 23),
-            sqlite3_column_text(res_alert, 24),
-            sqlite3_column_text(res_alert, 25),
-            sqlite3_column_text(res_alert, 26));
+        buffer_sprintf(wb, "\t{\n");
+        buffer_sprintf(wb, "\t\t\"config_hash_id\": \"%s\"", uuid_str);
+
+        if (sqlite3_column_type(res_alert, 1) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"alarm\": \"%s\"", sqlite3_column_text(res_alert, 1));
+        }
+        if (sqlite3_column_type(res_alert, 2) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"template\": \"%s\"", sqlite3_column_text(res_alert, 2));
+        }
+        if (sqlite3_column_type(res_alert, 3) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"on\": \"%s\"", sqlite3_column_text(res_alert, 3));
+        }
+        if (sqlite3_column_type(res_alert, 4) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"class\": \"%s\"", sqlite3_column_text(res_alert, 4));
+        }
+        if (sqlite3_column_type(res_alert, 5) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"component\": \"%s\"", sqlite3_column_text(res_alert, 5));
+        }
+        if (sqlite3_column_type(res_alert, 6) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"type\": \"%s\"", sqlite3_column_text(res_alert, 6));
+        }
+        if (sqlite3_column_type(res_alert, 7) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"os\": \"%s\"", sqlite3_column_text(res_alert, 7));
+        }
+        if (sqlite3_column_type(res_alert, 8) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"hosts\": \"%s\"", sqlite3_column_text(res_alert, 8));
+        }
+        if (sqlite3_column_type(res_alert, 9) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"lookup\": \"%s\"", sqlite3_column_text(res_alert, 9));
+        }
+        if (sqlite3_column_type(res_alert, 10) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"every\": \"%s\"", sqlite3_column_text(res_alert, 10));
+        }
+        if (sqlite3_column_type(res_alert, 11) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"units\": \"%s\"", sqlite3_column_text(res_alert, 11));
+        }
+        if (sqlite3_column_type(res_alert, 12) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"calc\": \"%s\"", sqlite3_column_text(res_alert, 12));
+        }
+        if (sqlite3_column_type(res_alert, 13) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"families\": \"%s\"", sqlite3_column_text(res_alert, 13));
+        }
+        if (sqlite3_column_type(res_alert, 14) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"plugin\": \"%s\"", sqlite3_column_text(res_alert, 14));
+        }
+        if (sqlite3_column_type(res_alert, 15) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"module\": \"%s\"", sqlite3_column_text(res_alert, 15));
+        }
+        if (sqlite3_column_type(res_alert, 16) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"green\": \"%s\"", sqlite3_column_text(res_alert, 16));
+        }
+        if (sqlite3_column_type(res_alert, 17) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"red\": \"%s\"", sqlite3_column_text(res_alert, 17));
+        }
+        if (sqlite3_column_type(res_alert, 18) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"warn\": \"%s\"", sqlite3_column_text(res_alert, 18));
+        }
+        if (sqlite3_column_type(res_alert, 19) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"crit\": \"%s\"", sqlite3_column_text(res_alert, 19));
+        }
+        if (sqlite3_column_type(res_alert, 20) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"exec\": \"%s\"", sqlite3_column_text(res_alert, 20));
+        }
+        if (sqlite3_column_type(res_alert, 21) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"to\": \"%s\"", sqlite3_column_text(res_alert, 21));
+        }
+        if (sqlite3_column_type(res_alert, 22) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"info\": \"%s\"", sqlite3_column_text(res_alert, 22));
+        }
+        if (sqlite3_column_type(res_alert, 23) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"delay\": \"%s\"", sqlite3_column_text(res_alert, 23));
+        }
+        if (sqlite3_column_type(res_alert, 24) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"options\": \"%s\"", sqlite3_column_text(res_alert, 24));
+        }
+        if (sqlite3_column_type(res_alert, 25) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"repeat\": \"%s\"", sqlite3_column_text(res_alert, 25));
+        }
+        if (sqlite3_column_type(res_alert, 26) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"host_labels\": \"%s\"", sqlite3_column_text(res_alert, 26));
+        }
 
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to reset the prepared statement when reading chart config with hash");
-        buffer_strcat(wb, "\t}");
+        buffer_strcat(wb, "\n\t}");
     }
 
     buffer_sprintf(wb, "\n]");
