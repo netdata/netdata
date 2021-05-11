@@ -764,6 +764,7 @@ struct rrdhost {
     const char *os;                                 // the O/S type of the host
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
+    long    obsolete_count;
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
