@@ -445,7 +445,7 @@ AC_ARG_WITH([bundled-libJudy],
                                                      [HAVE_libJudy_a="yes"],
                                                      [HAVE_libJudy_a="no"])
                     LIBS="${LIBS_BACKUP}"
-                    JUDY_LIBS="externaldeps/libJudy/libJudy.a"
+                    JUDY_LIBS="\$(abs_top_srcdir)/externaldeps/libJudy/libJudy.a"
                     JUDY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libJudy"
                     AC_MSG_RESULT([$HAVE_libJudy_a])
                 else
@@ -668,7 +668,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
         AC_MSG_CHECKING([if libwebsockets static lib is present])
         if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
             LWS_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libwebsockets/include"
-            OPTIONAL_LWS_LIBS="externaldeps/libwebsockets/libwebsockets.a"
+            OPTIONAL_LWS_LIBS="\$(abs_top_srcdir)/externaldeps/libwebsockets/libwebsockets.a"
             AC_MSG_RESULT([yes])
             AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
         else
@@ -1083,7 +1083,7 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
         OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include"
-        OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
+        OPTIONAL_BPF_LIBS="\$(abs_top_srcdir)/externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
         AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
         enable_ebpf="yes"
     else
