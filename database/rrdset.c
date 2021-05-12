@@ -932,10 +932,14 @@ RRDSET *rrdset_create_custom(
 
     store_active_chart(st->chart_uuid);
 
+#ifdef ENABLE_ACLK
     host->obsolete_count = 0;
+#endif
     rrdhost_cleanup_obsolete_charts(host);
+#ifdef ENABLE_ACLK
     if (host->obsolete_count)
         aclk_update_chart(st->rrdhost, "dummy-chart", ACLK_CMD_CHARTDEL);
+#endif
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
