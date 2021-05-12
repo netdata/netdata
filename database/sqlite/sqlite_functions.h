@@ -109,5 +109,5 @@ extern int alert_hash_and_store_config(
     const char *options,
     const char *repeat,
     const char *host_labels);
-extern void sql_select_alert(char *hash_str, BUFFER *wb);
+extern void sql_select_alert_config(char *hash_str, BUFFER *wb);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

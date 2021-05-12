@@ -1886,8 +1886,8 @@ failed:
 /*
  * Store an alert hash in the database
  */
-#define SQL_STORE_ALERT_HASH "insert into alert_hash (hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27) on conflict(hash_id) do nothing;"
-int sql_store_alert_hash(
+#define SQL_STORE_ALERT_CONFIG_HASH "insert into alert_hash (hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27) on conflict(hash_id) do nothing;"
+int sql_store_alert_config_hash(
     uuid_t *hash_id,
     const char *alarm,
     const char *template,
@@ -1927,7 +1927,7 @@ int sql_store_alert_hash(
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_STORE_ALERT_HASH, &res);
+        rc = prepare_statement(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store alert configuration, rc = %d", rc);
             return 1;
@@ -2096,9 +2096,9 @@ bind_fail:
 /*
  * Select an alert config
  */
-#define SQL_SELECT_ALERT_WITH_HASH "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels from alert_hash where hash_id = @hash_id;"
-#define SQL_SELECT_ALERT "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels from alert_hash;"
-void sql_select_alert(char *hash_str, BUFFER *wb)
+#define SQL_SELECT_ALERT_CONFIG_WITH_HASH "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels from alert_hash where hash_id = @hash_id;"
+#define SQL_SELECT_ALERT_CONFIG "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels from alert_hash;"
+void sql_select_alert_config(char *hash_str, BUFFER *wb) //POC: check to pass uuid, dont do constant uuid->str, etc
 {
     int rc;
     sqlite3_stmt *res_alert = NULL;
@@ -2108,9 +2108,9 @@ void sql_select_alert(char *hash_str, BUFFER *wb)
         uuid_parse(hash_str, hash_id);
 
     if (hash_str)
-        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_WITH_HASH, -1, &res_alert, 0);
+        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG_WITH_HASH, -1, &res_alert, 0);
     else
-        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT, -1, &res_alert, 0);
+        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG, -1, &res_alert, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart config with hash");
         return;
@@ -2337,7 +2337,7 @@ int alert_hash_and_store_config(
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
     /* store everything, so it can be recreated when not in memory or just a subset ? */
-    (void)sql_store_alert_hash(
+    (void)sql_store_alert_config_hash(
         (uuid_t *)&hash_value,
         alarm,
         template_key,

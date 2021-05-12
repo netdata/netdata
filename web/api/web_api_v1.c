@@ -313,7 +313,7 @@ int web_client_api_request_v1_alarm_config (RRDHOST *host __maybe_unused, struct
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    sql_select_alert(config_hash_id, w->response.data);
+    sql_select_alert_config(config_hash_id, w->response.data);
     return HTTP_RESP_OK;
 }
 

@@ -14,12 +14,16 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 }
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char config_hash_id[GUID_LEN + 1]; //POC, do it better
+    uuid_unparse_lower(ae->config_hash_id, config_hash_id);
+
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
                     "\t\t\"alarm_id\": %u,\n"
                     "\t\t\"alarm_event_id\": %u,\n"
+                    "\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\"name\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
@@ -52,6 +56,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
+                   , config_hash_id
                    , ae->name
                    , ae->chart
                    , ae->family
