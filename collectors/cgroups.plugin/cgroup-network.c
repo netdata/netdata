@@ -453,7 +453,7 @@ void detect_veth_interfaces(pid_t pid) {
 
     if(!eligible_ifaces(host)) {
         errno = 0;
-        error("there are no double-linked host interfaces available.");
+        info("there are no double-linked host interfaces available.");
         goto cleanup;
     }
 

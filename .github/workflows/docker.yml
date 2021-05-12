@@ -67,3 +67,12 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
           }}
+      - name: Trigger Helmchart PR
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/helmchart
+          workflow: Agent Version PR
+          ref: refs/heads/master
+          inputs: '{"agent_version": "${{ github.event.inputs.version }}"}'

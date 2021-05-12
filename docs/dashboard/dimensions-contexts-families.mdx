@@ -7,14 +7,14 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboard/d
 
 # Chart dimensions, contexts, and families
 
-While Netdata's charts require no configuration and are [easy to interact with](/docs/dashboards/interact-charts.mdx),
+While Netdata's charts require no configuration and are [easy to interact with](/docs/dashboard/interact-charts.mdx),
 they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in
 your nodes, Netdata uses the concepts of **dimensions**, **contexts**, and **families**. 
 
 Understanding how these work will help you more easily navigate the dashboard, [write new
-alarms](/docs/monitor/configure-alars.md), or play around with the [API](/web/api/README.md).
+alarms](/docs/monitor/configure-alarms.md), or play around with the [API](/web/api/README.md).
 
-For a refresher on the anatomy of a chart, see [dashboards and charts](/docs/dashboards/dashboards-charts.mdx).
+For a refresher on the anatomy of a chart, see [dashboards and charts](/docs/dashboard/dashboards-charts.mdx).
 
 ## Dimension
 
@@ -23,8 +23,7 @@ average (the default), minimum, or maximum. These values can then be given any t
 utilization is represented as a percentage, disk I/O as `MiB/s`, and available RAM as an absolute value in `MiB` or
 `GiB`.
 
-Beneath every chart (or on the right-side if you [configure the
-dashboard](/docs/dashboards/customize.mdx#change-chart-legend-position)) is a legend of dimensions. When there are
+Beneath every chart (or on the right-side if you configure the dashboard) is a legend of dimensions. When there are
 multiple dimensions, you'll see a different entry in the legend for each dimension.
 
 The **Apps CPU Time** chart (with the [context](#contexts) `apps.cpu`), which visualizes CPU utilization of
@@ -37,7 +36,7 @@ dimensions](https://user-images.githubusercontent.com/1153921/114207816-a5cb7400
 The chart shows 13 unique dimensions, such as `httpd` for the CPU utilization for web servers, `kernel` for anything
 related to the Linux kernel, and so on. In your dashboard, these specific dimensions will almost certainly be different.
 
-Dimensions can be [hidden](/docs/dashboards/interact-charts.mdx#show-and-hide-dimensions) to help you focus your
+Dimensions can be [hidden](/docs/dashboard/interact-charts.mdx#show-and-hide-dimensions) to help you focus your
 attention.
 
 ## Context
@@ -80,7 +79,7 @@ names:
 ## What's next?
 
 With an understanding of a chart's dimensions, context, and family, you're now ready to dig even deeper into Netdata's
-dashboard. We recommend looking into [using the timeframe selector](/docs/dashboards/select-timeframes.mdx).
+dashboard. We recommend looking into [using the timeframe selector](/docs/dashboard/select-timeframes.mdx).
 
 If you feel comfortable with the [dashboard](/docs/dashboard/how-dashboard-works.mdx) and interacting with charts, we
 recommend learning about [configuration](/docs/configure/nodes.md). While Netdata doesn't _require_ a complicated setup
