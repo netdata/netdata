@@ -63,8 +63,6 @@ dist_noinst_DATA = \
     packaging/bundle-lws.sh \
     packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
-    packaging/dashboard.checksums \
-    packaging/dashboard.version \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
     packaging/go.d.checksums \

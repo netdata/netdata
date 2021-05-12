@@ -8,7 +8,6 @@ dist_noinst_DATA = \
     README.md
 
 dist_web_DATA = \
-    Makefile.am \
     asset-manifest.json \
     console.html \
     dash-example.html \
