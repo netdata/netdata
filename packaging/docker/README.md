@@ -94,76 +94,14 @@ volumes:
   netdatacache:
 ```
 
-### Create a new container and claim the node to Netdata Cloud
+### Claim a new or running Netdata container to Netdata Cloud
 
 If you want to monitor the node running this container using [Netdata Cloud](https://learn.netdata.cloud/docs/cloud),
-it's easiest to create the container and immediately [claim](/claim/README.md) the node in a single step. Find the
-`TOKEN` and `ROOMS` strings by [signing in to Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then
-clicking on **Claim Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+it's easiest to create the container and immediately [claim](/claim/README.md) it in a single step using [`docker run`
+or Docker Compose](/claim/README.md#new-containers-using-docker-run).
 
-If you already created the container using one of the methods above, see the [claim](/claim/README.md#using-docker-exec)
-doc for how to use `docker exec`.
-
-**`docker run`**:
-
-```bash
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -v netdataconfig:/etc/netdata \
-  -v netdatalib:/var/lib/netdata \
-  -v netdatacache:/var/cache/netdata \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --restart unless-stopped \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  -e NETDATA_CLAIM_TOKEN="TOKEN" \
-  -e NETDATA_CLAIM_ROOMS="ROOMS" \
-  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
-  -e NETDATA_CLAIM_PROXY="PROXY" \ 
-  netdata/netdata
-```
-
-**Docker Compose**:
-
-```yaml
-version: '3'
-services:
-  netdata:
-    image: netdata/netdata
-    container_name: netdata
-    hostname: example.com # set to fqdn of host
-    ports:
-      - 19999:19999
-    restart: unless-stopped
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
-    volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
-    environment:
-      NETDATA_CLAIM_TOKEN: "TOKEN"
-      NETDATA_CLAIM_ROOMS: ROOMS
-      NETDATA_CLAIM_URL: "https://app.netdata.cloud"
-      NETDATA_CLAIM_PROXY: "PROXY"
-
-volumes:
-  netdataconfig:
-  netdatalib:
-  netdatacache:
-```
+If you already created the container using one of the methods above, see the
+[claim](/claim/README.md#running-containers-using-docker-exec) doc for how to use `docker exec`.
 
 ## Docker tags
 

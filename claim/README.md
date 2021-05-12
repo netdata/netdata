@@ -6,13 +6,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
 
 # Agent claiming
 
-Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to Netdata Cloud. A Space's
-administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
-(ACLK)](/aclk/README.md).
+Agent claiming allows a Netdata Agent, running on a distributed node, to securely connect to [Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud/). A Space's administrator creates a **claiming token**, which is used to
+add a node to their Space via the [Agent-Cloud link (ACLK)](/aclk/README.md).
 
-Are you just starting out with Netdata Cloud? See our [get started with
-Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide for a walkthrough of the process and simplified
-instructions.
+This is a reference document. If you're looking for simplified instructions, see the [Get started with Netdata
+Cloud](https://learn.netdata.cloud/docs/cloud/get-started) doc.
 
 Claiming nodes is a security feature in Netdata Cloud. Through the process of claiming, you demonstrate in a few ways
 that you have administrative access to that node and the configuration settings for its Agent. By logging into the node,
@@ -39,14 +38,19 @@ There are two important notes regarding claiming:
     within that one Space.
 -   You must repeat the claiming process on every node you want to add to Netdata Cloud.
 
-## How to claim a node
+## Claim a node
 
-To claim a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
-given by Cloud into your node's terminal. Hit **Enter**.
+Find your claiming script by [signing in to Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then
+clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+Copy and paste the script given by Netdata Cloud into your node's terminal. 
 
 ```bash
 sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
+
+Hit **Enter**.
 
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). If you prefer not to
@@ -55,7 +59,7 @@ use root privileges via `sudo` to run the claiming script, see the next section.
 Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
 finished onboarding.
 
-### Claim an agent without root privileges
+### Claim an node without root privileges
 
 If you don't want to run the claiming script with root privileges, you can discover which user is running the Agent,
 switch to that user, and run the claiming script.
@@ -78,36 +82,49 @@ netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
 you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). 
 
-### Claim an Agent running in Docker
+### Claim Netdata running in Docker
 
-To claim an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
-variables in the container to have it automatically claimed on startup or restart, or use `docker exec` to manually
-claim an already running container.
+To claim an instance of Netdata running inside of a Docker container, either set claiming environment variables in the
+container to have it automatically claimed on startup or restart when using `docker run` or Docker Compose, or use
+`docker exec` to manually claim an already running container.
 
-For claiming to work, the contents of `/var/lib/netdata` _must_ be preserved across container
-restarts using a persistent volume.  See our [recommended `docker run` and Docker Compose
-examples](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
+Using environment variables to handle claiming is the preferred method of claiming Docker containers, as it works in the
+widest variety of situations and simplifies configuration management.
 
-#### Using environment variables
+Find the `TOKEN` and `ROOMS` strings for your Space by [signing in to Netdata
+Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Claim Nodes** in the [Spaces management
+area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+
+For claiming to work, the contents of `/var/lib/netdata` _must_ be preserved across container restarts using a
+persistent volume.
+
+#### New containers, using `docker run`
 
 The Netdata Docker container looks for the following environment variables on startup:
 
 - `NETDATA_CLAIM_TOKEN`
-- `NETDATA_CLAIM_URL`
 - `NETDATA_CLAIM_ROOMS`
+- `NETDATA_CLAIM_URL`
 - `NETDATA_CLAIM_PROXY`
 
-If the token and URL are specified in their corresponding variables _and_ the container is not already claimed,
-it will use these values to attempt to claim the container, automatically adding the node to the specified War
-Rooms. If a proxy is specified, it will be used for the claiming process and for connecting to Netdata Cloud.
+If the `NETDATA_CLAIM_TOKEN` and `NETDATA_CLAIM_URL` are specified in their corresponding variables _and_ the container
+is not already claimed, it will use these values to attempt to claim the container, automatically adding the node to the
+specified War Rooms. 
+
+The `NETDATA_CLAIM_PROXY` variable is _optional_. If a proxy is specified, it will be used for the claiming process and
+for connecting to Netdata Cloud.
 
 These variables can be specified using any mechanism supported by your container tooling for setting environment
-variables inside containers. For example, when creating a new Netdata continer using `docker run`, the following
-modified version of the command can be used to set the variables:
+variables inside containers. 
+
+For example, to create a new Netdata container using `docker run` or Docker Compose and immediately claim it:
+
+**`docker run`**:
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
@@ -115,24 +132,57 @@ docker run -d --name=netdata \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
-  -e NETDATA_CLAIM_TOKEN=TOKEN \
-  -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
-  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
+  -e NETDATA_CLAIM_TOKEN="TOKEN" \
+  -e NETDATA_CLAIM_ROOMS="ROOMS" \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
+  -e NETDATA_CLAIM_PROXY="PROXY" \ 
   netdata/netdata
 ```
 
-Output that would be seen from the claiming script when using other methods will be present in the container logs.
+**Docker Compose**:
 
-Using the environment variables like this to handle claiming is the preferred method of claiming Docker containers
-as it works in the widest variety of situations and simplifies configuration management.
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    hostname: example.com # set to fqdn of host
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+    environment:
+      NETDATA_CLAIM_TOKEN: "TOKEN"
+      NETDATA_CLAIM_ROOMS: ROOMS
+      NETDATA_CLAIM_URL: "https://app.netdata.cloud"
+      NETDATA_CLAIM_PROXY: "PROXY"
 
-#### Using docker exec
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
 
-Claim a _running Netdata Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing
-`netdata` with the name of your running container:
+#### Running containers, using `docker exec`
+
+Claim a _running Netdata Agent container_ by appending the script offered by Cloud to a `docker exec ...` command,
+replacing `netdata` with the name of your running container:
 
 ```bash
 docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
