@@ -3,7 +3,7 @@
 #include "ebpf.h"
 #include "ebpf_swap.h"
 
-static char *swap_dimension_name[NETDATA_SWAP_END] = { "write", "read" };
+static char *swap_dimension_name[NETDATA_SWAP_END] = { "read", "write" };
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
