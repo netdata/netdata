@@ -452,7 +452,7 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
 #ifdef ENABLE_ACLK
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
         aclk_del_collector(st->rrdhost, st->plugin_name, st->module_name);
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHARTDEL);
+        st->rrdhost->obsolete_count++;
     }
 #endif
 
@@ -932,7 +932,14 @@ RRDSET *rrdset_create_custom(
 
     store_active_chart(st->chart_uuid);
 
+#ifdef ENABLE_ACLK
+    host->obsolete_count = 0;
+#endif
     rrdhost_cleanup_obsolete_charts(host);
+#ifdef ENABLE_ACLK
+    if (host->obsolete_count)
+        aclk_update_chart(st->rrdhost, "dummy-chart", ACLK_CMD_CHARTDEL);
+#endif
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK
