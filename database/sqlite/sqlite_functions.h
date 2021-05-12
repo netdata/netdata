@@ -110,4 +110,7 @@ extern int alert_hash_and_store_config(
     const char *repeat,
     const char *host_labels);
 extern void sql_select_alert_config(char *hash_str, BUFFER *wb);
+extern void sql_create_health_log_table(RRDHOST *host);
+extern void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+extern void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_id, RRDHOST *host);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

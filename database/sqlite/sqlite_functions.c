@@ -1884,7 +1884,7 @@ failed:
 };
 
 /*
- * Store an alert hash in the database
+ * Store an alert config hash in the database
  */
 #define SQL_STORE_ALERT_CONFIG_HASH "insert into alert_hash (hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27) on conflict(hash_id) do nothing;"
 int sql_store_alert_config_hash(
@@ -2367,4 +2367,688 @@ int alert_hash_and_store_config(
         host_labels);
 
     return 1;
+}
+
+#define SQL_CREATE_HEALTH_LOG_TABLE(guid) "CREATE TABLE IF NOT EXISTS health_log_%s(hostname text, unique_id int, alarm_id int, alarm_event_id int, config_hash_id blob, updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, flags int, exec_run_timestamp int, delay_up_to_timestamp int, name text, chart text, family text, exec text, recipient text, source text, units text, info text, exec_code int, new_status real, old_status real, delay int, new_value int, old_value int, last_repeat int, classification text, component text, type text);", guid
+void sql_create_health_log_table(RRDHOST *host) {
+    int rc;
+    char *err_msg = NULL, command[1000]; //POC, change!
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower(host->host_uuid, uuid_str);
+    uuid_str[8] = '_';
+    uuid_str[13] = '_';
+    uuid_str[18] = '_';
+    uuid_str[23] = '_';
+
+    sprintf(command, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    rc = sqlite3_exec(db_meta, command, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
+        sqlite3_free(err_msg);
+        return;
+    }
+}
+
+#define SQL_UPDATE_HEALTH_LOG(guid) "UPDATE health_log_%s set updated_by_id = ?, when_key = ?, duration = ?, non_clear_duration = ?, flags = ?, exec_run_timestamp = ?, delay_up_to_timestamp = ?, name = ?, chart= ?, family= ?, exec= ?, recipient= ?, source = ?, units = ?, info = ?, exec_code= ?, new_status= ?, old_status= ?, delay= ?, new_value= ?, old_value= ?, last_repeat= ?, classification= ?, component= ?, type = ? where unique_id = ?;", guid //POC: this can be better, some items need no update?
+void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
+    //sql_create_health_log(host);
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char *guid = NULL, command[1000]; //POC CHANGE
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    guid = strdupz(host->machine_guid);
+
+    guid[8]='_';
+    guid[13]='_';
+    guid[18]='_';
+    guid[23]='_';
+
+    sprintf(command, SQL_UPDATE_HEALTH_LOG(guid));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 1, ae->updated_by_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 2, ae->when);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 3, ae->duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 4, ae->non_clear_duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 5, ae->flags);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 6, ae->exec_run_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 7, ae->delay_up_to_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 8, ae->name, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 8");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 9, ae->chart, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 9");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 10, ae->family, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 10");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 11, ae->exec, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 11");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 12, ae->recipient, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 12");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 13, ae->source, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 13");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 14, ae->units, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 14");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 15, ae->info, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 15");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 16, ae->exec_code);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 16");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 17, ae->new_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 17");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 18, ae->old_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 18");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 19, ae->delay);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 19");
+        return;
+    }
+
+    //is double ok?
+    rc = sqlite3_bind_double(res, 20, ae->new_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 20");
+        return;
+    }
+
+    //is double ok?
+    rc = sqlite3_bind_double(res, 21, ae->old_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host 21");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 22, ae->last_repeat);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 23, ae->classification, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 24, ae->component, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 25, ae->type, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 26, ae->unique_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to store node instance information, rc = %d", rc);
+        debug(D_HEALTH, "GREPME: Failed to store");
+    }
+
+    return;
+}
+
+#define SQL_INSERT_HEALTH_LOG(guid) "INSERT INTO health_log_%s(hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, classification, component, type) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
+
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char *guid = NULL, command[1000];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    guid = strdupz(host->machine_guid);
+
+    guid[8]='_';
+    guid[13]='_';
+    guid[18]='_';
+    guid[23]='_';
+
+    if (ae->flags & HEALTH_ENTRY_FLAG_SAVED_SQLITE) {
+        sql_health_alarm_log_update(host, ae);
+        return;
+    }
+
+    sprintf(command, SQL_INSERT_HEALTH_LOG(guid));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement store chart labels");
+        debug(D_HEALTH, "GREPME: Failed to prepare statement");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 1, host->hostname, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+
+    rc = sqlite3_bind_int(res, 2, ae->unique_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 3, ae->alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 4, ae->alarm_event_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 5, ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 6, ae->updated_by_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 7, ae->updates_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 8, ae->when);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 9, ae->duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 10, ae->non_clear_duration);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 11, ae->flags);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 12, ae->exec_run_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 13, ae->delay_up_to_timestamp);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 14, ae->name, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 15, ae->chart, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 16, ae->family, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 17, ae->exec, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 18, ae->recipient, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 19, ae->source, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 20, ae->units, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 21, ae->info, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 22, ae->exec_code);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 23, ae->new_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 24, ae->old_status);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 25, ae->delay);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    //is double ok?
+    rc = sqlite3_bind_double(res, 26, ae->new_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    //is double ok?
+    rc = sqlite3_bind_double(res, 27, ae->old_value);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 28, ae->last_repeat);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind claim_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind unique_id");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 29, ae->classification, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 30, ae->component, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = sqlite3_bind_text(res, 31, ae->type, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to store node instance information");
+        debug(D_HEALTH, "GREPME: Failed to bind host");
+        return;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to store node instance information, rc = %d", rc);
+        debug(D_HEALTH, "GREPME: Failed to store");
+    }
+
+    ae->flags |= HEALTH_ENTRY_FLAG_SAVED_SQLITE;
+
+
+    return;
+}
+
+#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, classification, component, type FROM health_log_%s where unique_id = ? and alarm_id = ?;", guid
+void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_id, RRDHOST *host) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+    char *guid = NULL, command[1000];
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("Database has not been initialized");
+        return;
+    }
+
+    guid = strdupz(host->machine_guid);
+
+    guid[8]='_';
+    guid[13]='_';
+    guid[18]='_';
+    guid[23]='_';
+
+    sprintf(command, SQL_SELECT_HEALTH_LOG(guid));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement select alarm entry");
+        debug(D_HEALTH, "GREPME2: Failed to prepare statement");
+        return;
+    }
+
+    rc = sqlite3_bind_int(res, 1, unique_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch chart config with hash");
+        debug(D_HEALTH, "GREPME2: Failed to bind 1");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_int(res, 2, alarm_id);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch chart config with hash");
+        debug(D_HEALTH, "GREPME2: Failed to 2");
+        goto failed;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+
+        char old_value_string[100 + 1];
+        char new_value_string[100 + 1];
+
+        char uuid_str[GUID_LEN + 1];
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), uuid_str);
+
+        buffer_sprintf(
+            wb,
+            "\n\t{\n"
+            "\t\t\"hostname\": \"%s\",\n"
+            "\t\t\"unique_id\": %u,\n"
+            "\t\t\"alarm_id\": %u,\n"
+            "\t\t\"alarm_event_id\": %u,\n"
+            "\t\t\"config_hash_id\": \"%s\",\n"
+            "\t\t\"name\": \"%s\",\n"
+            "\t\t\"chart\": \"%s\",\n"
+            "\t\t\"family\": \"%s\",\n"
+            "\t\t\"class\": \"%s\",\n"
+            "\t\t\"component\": \"%s\",\n"
+            "\t\t\"type\": \"%s\",\n"
+            "\t\t\"processed\": %s,\n"
+            "\t\t\"updated\": %s,\n"
+            "\t\t\"exec_run\": %lu,\n"
+            "\t\t\"exec_failed\": %s,\n"
+            "\t\t\"exec\": \"%s\",\n"
+            "\t\t\"recipient\": \"%s\",\n"
+            "\t\t\"exec_code\": %d,\n"
+            "\t\t\"source\": \"%s\",\n"
+            "\t\t\"units\": \"%s\",\n"
+            "\t\t\"when\": %lu,\n"
+            "\t\t\"duration\": %lu,\n"
+            "\t\t\"non_clear_duration\": %lu,\n"
+            "\t\t\"status\": \"%s\",\n"
+            "\t\t\"old_status\": \"%s\",\n"
+            "\t\t\"delay\": %d,\n"
+            "\t\t\"delay_up_to_timestamp\": %lu,\n"
+            "\t\t\"updated_by_id\": %u,\n"
+            "\t\t\"updates_id\": %u,\n"
+            "\t\t\"value_string\": \"%s\",\n"
+            "\t\t\"old_value_string\": \"%s\",\n"
+            "\t\t\"last_repeat\": \"%lu\",\n"
+            "\t\t\"silenced\": \"%s\",\n",
+            sqlite3_column_text(res, 0),
+            sqlite3_column_int(res, 1),
+            sqlite3_column_int(res, 2),
+            sqlite3_column_int(res, 3),
+            uuid_str,
+            sqlite3_column_text(res, 13),
+            sqlite3_column_text(res, 14),
+            sqlite3_column_text(res, 15),
+            sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
+            sqlite3_column_text(res, 29) ? (const char *) sqlite3_column_text(res, 29) : (char *) "Unknown",
+            sqlite3_column_text(res, 30) ? (const char *) sqlite3_column_text(res, 30) : (char *) "Unknown",
+            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
+            (long unsigned int)sqlite3_column_int(res, 11),
+            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
+            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : host->health_default_exec,
+            sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : host->health_default_recipient,
+            sqlite3_column_int(res, 21),
+            sqlite3_column_text(res, 18),
+            sqlite3_column_text(res, 19),
+            (long unsigned int)sqlite3_column_int(res, 7),
+            (long unsigned int)sqlite3_column_int(res, 8),
+            (long unsigned int)sqlite3_column_int(res, 9),
+            rrdcalc_status2string(sqlite3_column_int(res, 22)),
+            rrdcalc_status2string(sqlite3_column_int(res, 23)),
+            sqlite3_column_int(res, 24),
+            (long unsigned int)sqlite3_column_int(res, 12),
+            (unsigned int)sqlite3_column_int(res, 5),
+            (unsigned int)sqlite3_column_int(res, 6),
+            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
+
+            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
+            (long unsigned int)sqlite3_column_int(res, 27),
+            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
+
+            char *replaced_info = NULL;
+            if (likely(sqlite3_column_text(res, 20))) {
+                char *m = NULL;
+                replaced_info = strdupz(sqlite3_column_text(res, 20));
+                size_t pos = 0;
+                while ((m = strstr(replaced_info + pos, "$family"))) {
+                    char *buf = NULL;
+                    pos = m - replaced_info;
+                    buf = find_and_replace(replaced_info, "$family", sqlite3_column_text(res, 20) ? (const char *)sqlite3_column_text(res, 20) : "", m);
+                    freez(replaced_info);
+                    replaced_info = strdupz(buf);
+                    freez(buf);
+                }
+            }
+
+            buffer_strcat(wb, "\t\t\"info\":\"");
+            buffer_strcat(wb, replaced_info);
+            buffer_strcat(wb, "\",\n");
+
+            if(unlikely(sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+                buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
+            }
+
+            buffer_strcat(wb, "\t\t\"value\":");
+            if (sqlite3_column_type(res, 25) == SQLITE_NULL)
+                buffer_strcat(wb, "null");
+            else
+                buffer_rrd_value(wb, sqlite3_column_double(res, 25)); //int instead of double, alarm_log rounds?
+            buffer_strcat(wb, ",\n");
+
+            buffer_strcat(wb, "\t\t\"old_value\":");
+            if (sqlite3_column_type(res, 26) == SQLITE_NULL)
+                buffer_strcat(wb, "null");
+            else
+                buffer_rrd_value(wb, sqlite3_column_double(res, 26)); //int instead of double, alarm_log rounds?
+            buffer_strcat(wb, "\n");
+
+            buffer_strcat(wb, "\t}");
+
+            freez(replaced_info);
+
+            if (unlikely(rc != SQLITE_OK))
+                error_report("Failed to reset the prepared statement when reading chart config with hash");
+    }
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading chart config with hash");
 }

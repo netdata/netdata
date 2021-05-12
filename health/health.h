@@ -27,6 +27,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      0x00000040
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
+#define HEALTH_ENTRY_FLAG_SAVED_SQLITE          0x20000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 #ifndef HEALTH_LISTEN_PORT
@@ -51,6 +52,7 @@ extern void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, 
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart);
+extern void health_alarm_log_sql2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
