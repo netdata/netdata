@@ -12,7 +12,7 @@
 # If not, see <https://www.gnu.org/licenses/>.
 
 CC = gcc -std=gnu99
-CFLAGS = -Wextra -Wall `pkg-config --cflags openssl`
+CFLAGS = -Wextra -Wall `pkg-config --cflags openssl` `pkg-config --cflags libcrypto`
 BUILD_DIR = build
 
 # dir having our version of mqtt_pal.h must preceede dir of MQTT-C to override this hdr
