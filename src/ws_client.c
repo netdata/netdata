@@ -14,7 +14,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-#include <endian.h>
 #include <errno.h>
 #include <ctype.h>
 

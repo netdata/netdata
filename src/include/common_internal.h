@@ -18,4 +18,6 @@
 #define OPENSSL_VERSION_110 0x10100000L
 #define OPENSSL_VERSION_111 0x10101000L
 
+#include "endian_compat.h"
+
 #endif /* COMMON_INTERNAL_H */
