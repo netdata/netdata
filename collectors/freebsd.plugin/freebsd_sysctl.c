@@ -969,7 +969,7 @@ int do_system_ram(int update_every, usec_t dt) {
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
                mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
-    int vfs_bufspace_count;
+    size_t vfs_bufspace_count;
 
 #if defined(NETDATA_COLLECT_LAUNDRY)
     static int mib_laundry_count[4] = {0, 0, 0, 0};
