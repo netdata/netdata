@@ -196,7 +196,11 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
 
     client->log = log;
 
+#ifdef __APPLE__
+    if (pipe(client->write_notif_pipe)) {
+#else
     if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
+#endif
         mws_error(log, "Couldn't create pipe");
         goto fail_2;
     }
@@ -640,7 +644,11 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
 static inline uint64_t boottime_usec(mqtt_wss_client client) {
     struct timespec ts;
-    if(clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
+#ifdef __APPLE__
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+#else
+    if (clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
+#endif
         mws_error(client->log, "clock_gettimte failed");
         return 0;
     }
