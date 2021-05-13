@@ -39,7 +39,7 @@ struct netdata_static_thread swap_threads = {"SWAP KERNEL", NULL, NULL, 1,
  *****************************************************************/
 
 /**
- * Clean swap strcuture
+ * Clean swap structure
  */
 void clean_swap_pid_structures() {
     struct pid_stat *pids = root_of_pids;
