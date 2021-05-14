@@ -114,6 +114,17 @@ void aclk_query_free(aclk_query_t query)
     if (query->type == ALARM_STATE_UPDATE && query->data.alarm_update)
         json_object_put(query->data.alarm_update);
 
+    if (query->type == NODE_STATE_UPDATE) {
+        freez((void*)query->data.node_update.claim_id);
+        freez((void*)query->data.node_update.node_id);
+    }
+
+    if (query->type == REGISTER_NODE) {
+        freez((void*)query->data.node_creation.claim_id);
+        freez((void*)query->data.node_creation.hostname);
+        freez((void*)query->data.node_creation.machine_guid);
+    }
+
     freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
