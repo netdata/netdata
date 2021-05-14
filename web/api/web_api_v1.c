@@ -319,10 +319,8 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         //  goto cleanup;
         //}
     }
-
     if(!chart || !*chart) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
-        goto cleanup;
     }
 
     RRDSET *st = rrdset_find(host, chart);
