@@ -3490,13 +3490,11 @@ netdataDashboard.context = {
         info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
     },
 
-    'ebpf.swap_read_call': {
-        title : 'SWAP read page',
+    'apps.swap_read_call': {
         info: 'Monitor when a software read a page from memory swap.'
     },
 
-    'ebpf.swap_write_call': {
-        title : 'SWAP write page',
+    'apps.swap_write_call': {
         info: 'Monitor when a software write on page in memory swap.'
     },
 
