@@ -227,7 +227,7 @@ void *ebpf_swap_read_hash(void *ptr)
  * @param swap
  * @param root
  */
-static void ebpf_swap_sump_pids(netdata_publish_swap_t *swap, struct pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
@@ -257,7 +257,7 @@ void ebpf_swap_send_apps_data(struct target *root)
     struct target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            ebpf_swap_sump_pids(&w->swap, w->root_pid);
+            ebpf_swap_sum_pids(&w->swap, w->root_pid);
         }
     }
 
