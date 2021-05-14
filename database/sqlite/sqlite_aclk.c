@@ -455,7 +455,7 @@ fail:
 }
 
 
-void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     int rc;
 
@@ -497,7 +497,7 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
     buffer_sprintf(sql, "select ac.sequence_id, (select sequence_id from aclk_chart_%s " \
         "lac where lac.sequence_id < ac.sequence_id and (status is NULL or status = 'processing')  " \
         "order by lac.sequence_id desc limit 1), " \
-        "acp.payload from aclk_chart_%s ac, aclk_chart_payload_%s acp " \
+        "acp.payload, ac.date_created from aclk_chart_%s ac, aclk_chart_payload_%s acp " \
         "where (ac.status = 'processing' or (ac.status is NULL and ac.date_submitted is null)) " \
         "and ac.unique_id = acp.unique_id order by ac.sequence_id asc limit %d;",
                    wc->uuid_str, wc->uuid_str, wc->uuid_str, limit);
@@ -506,36 +506,57 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 
     //sqlite3_stmt *res = NULL;
 
+    *(charts_and_dims_updated_t **) cmd.data = NULL;
+
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
        error_report("Failed to prepare statement to get sequence id list for charts");
        goto fail;
     }
 
-    struct aclk_chart_payload_t *head = NULL;
-    struct aclk_chart_payload_t *tail = NULL;
-    while (sqlite3_step(res) == SQLITE_ROW) {
-        struct aclk_chart_payload_t *chart_payload = callocz(1, sizeof(*chart_payload));
-        chart_payload->sequence_id = sqlite3_column_int64(res, 0);
-        if (!first_sequence)
-            first_sequence = chart_payload->sequence_id;
-        if (sqlite3_column_bytes(res, 1) > 0)
-            chart_payload->last_sequence_id = sqlite3_column_int64(res, 1);
-        else
-            chart_payload->last_sequence_id = 0;
-        chart_payload->payload = sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
-        if (!head) {
-            head = chart_payload;
-            tail = head;
-        }
-        else {
-            tail->next = chart_payload;
-            tail = chart_payload;
-        }
+    charts_and_dims_updated_t *head = callocz(1, sizeof(*head));
+    struct chart_instance_updated *chart_instance = callocz(limit, sizeof(*chart_instance));
+    head->charts = chart_instance;
 
-        last_sequence = chart_payload->sequence_id;
+//    struct chart_instance_updated {
+//        const char *id;
+//        const char *claim_id;
+//        const char *node_id;
+//        const char *name;
+//        struct label *label_head;
+//        RRD_MEMORY_MODE memory_mode;
+//        uint32_t update_every;
+//        const char * config_hash;
+//        struct aclk_message_position position;
+//    };
+
+//    struct aclk_chart_payload_t *head = NULL;
+//    struct aclk_chart_payload_t *tail = NULL;
+    int i = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        struct chart_instance_updated *chart_payload;
+        chart_payload = &chart_instance[i];
+        chart_payload->position.sequence_id = sqlite3_column_int64(res, 0);
+        chart_payload->position.previous_sequence_id =
+            sqlite3_column_bytes(res, 1) > 0 ? sqlite3_column_int64(res, 1) : 0;
+        chart_payload->position.seq_id_creation_time.tv_sec = sqlite3_column_int64(res, 3);
+        chart_payload->position.seq_id_creation_time.tv_usec = 0;
+        chart_payload->config_hash = strdupz("DEADBEEF");
+        chart_payload->update_every = 1;
+        chart_payload->memory_mode = 1;
+        chart_payload->name = strdupz("Name");
+        chart_payload->node_id = strdupz("node_id");
+        chart_payload->claim_id = strdupz("claim_id");
+        chart_payload->id = strdupz("id");
+
+        if (!first_sequence)
+            first_sequence = chart_payload->position.sequence_id;
+        last_sequence = chart_payload->position.sequence_id;
+        i++;
     }
-    *(struct aclk_chart_payload_t **) cmd.data = head;
+    head->chart_count = i;
+    head->dim_count = 0;
+    *(charts_and_dims_updated_t **) cmd.data = head;
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -555,7 +576,7 @@ fail:
     return;
 }
 
-void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     int rc;
 
@@ -667,7 +688,7 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
     struct aclk_database_cmd cmd;
     cmd.opcode = ACLK_DATABASE_ADD_CHART;
     cmd.data = st;
-    cmd.data_param = strdupz("JSON");
+    cmd.data_param = strdupz("BINARY");
     cmd.completion = NULL;
 //    struct completion compl;
     //init_completion(&compl);
@@ -769,6 +790,50 @@ void sql_drop_aclk_table_list(RRDHOST *host)
     buffer_free(sql);
 }
 
+// Start streaming charts / dimensions for node_id
+void aclk_start_streaming(char *node_id)
+{
+    //char uuid_str[GUID_LEN + 1];
+    //uuid_unparse_lower(*node_id, uuid_str);
+    info("START streaming for %s received", node_id);
+    return;
+}
+
+/*
+ * struct aclk_message_position {
+    uint64_t sequence_id;
+    struct timeval seq_id_creation_time;
+    uint64_t previous_sequence_id;
+};
+struct chart_instance_updated {
+    const char *id;
+    const char *claim_id;
+    const char *node_id;
+    const char *name;
+    struct label *label_head;
+    RRD_MEMORY_MODE memory_mode;
+    uint32_t update_every;
+    const char * config_hash;
+    struct aclk_message_position position;
+};
+struct chart_dimension_updated {
+    const char *id;
+    const char *chart_id;
+    const char *node_id;
+    const char *claim_id;
+    const char *name;
+    struct timeval created_at;
+    struct timeval last_timestamp;
+    struct aclk_message_position position;
+};
+typedef struct {
+    struct chart_instance_updated *charts;
+    uint16_t chart_count;
+    struct chart_dimension_updated *dims;
+    uint16_t dim_count;
+    uint64_t batch_id;
+} charts_and_dims_updated_t;
+ */
 int aclk_add_alarm_payload(char *uuid_str, uuid_t *unique_id, uint32_t ae_unique_id, uint32_t alarm_id, char *payload_type, const char *payload, size_t payload_size)
 {
     char sql[1024];

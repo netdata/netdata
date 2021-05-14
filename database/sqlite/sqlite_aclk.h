@@ -5,6 +5,8 @@
 
 #include "sqlite3.h"
 
+#include "../../aclk/schema-wrappers/chart_stream.h"
+
 
 #define TABLE_ACLK_CHART "create table if not exists aclk_chart_%s (sequence_id integer primary key, " \
         "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
@@ -115,5 +117,7 @@ void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_start_streaming(char *node_id);
+
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H
