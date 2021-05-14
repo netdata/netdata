@@ -12,6 +12,8 @@ const char *database_config[] = {
     "chart_type int, memory_mode int, history_entries);",
     "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
     "multiplier int, divisor int , algorithm int, options text);",
+    "DROP TABLE IF EXISTS chart_active;",
+    "DROP TABLE IF EXISTS dimension_active;",
     "CREATE TABLE IF NOT EXISTS chart_active(chart_id blob PRIMARY KEY, date_created int);",
     "CREATE TABLE IF NOT EXISTS dimension_active(dim_id blob primary key, date_created int);",
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
@@ -36,7 +38,7 @@ sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_transaction_lock;
 
-static int execute_insert(sqlite3_stmt *res)
+int execute_insert(sqlite3_stmt *res)
 {
     int rc;
 
@@ -193,6 +195,10 @@ int sql_init_database(void)
         }
     }
     info("SQLite database initialization completed");
+//    uv_thread_t   sqlite_event_loop_t;
+//    struct sqlite_worker_config worker_config;
+//    memset(&worker_config, 0, sizeof(worker_config));
+//    fatal_assert(0 == uv_thread_create(&sqlite_event_loop_t, sqlite_worker, &worker_config));
     return 0;
 }
 
@@ -1006,7 +1012,7 @@ failed:
     return host;
 }
 
-void db_execute(char *cmd)
+void db_execute(const char *cmd)
 {
     int rc;
     char *err_msg;

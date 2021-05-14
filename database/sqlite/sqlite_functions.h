@@ -5,6 +5,7 @@
 
 #include "../../daemon/common.h"
 #include "sqlite3.h"
+#include "sqlite_event_loop.h"
 
 // return a node list
 struct node_instance_list {
@@ -63,7 +64,7 @@ extern int find_uuid_type(uuid_t *uuid);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
-extern void db_execute(char *cmd);
+extern void db_execute(const char *cmd);
 extern int file_is_migrated(char *path);
 extern void add_migrated_file(char *path, uint64_t file_size);
 extern void db_unlock(void);
@@ -77,6 +78,7 @@ extern int get_node_id(uuid_t *host_id, uuid_t *node_id);
 extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
+extern int execute_insert(sqlite3_stmt *res);
 extern void compute_chart_hash(RRDSET *st);
 extern void sql_chart_from_hash_id(char *hash_str, BUFFER *wb);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
