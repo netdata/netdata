@@ -81,4 +81,39 @@ extern void sql_load_node_id(RRDHOST *host);
 extern int execute_insert(sqlite3_stmt *res);
 extern void compute_chart_hash(RRDSET *st);
 extern void sql_chart_from_hash_id(char *hash_str, BUFFER *wb);
+extern int alert_hash_and_store_config(
+    uuid_t config_hash_id,
+    const char *alarm,
+    const char *template_key,
+    const char *os,
+    const char *host,
+    const char *on,
+    const char *families,
+    const char *plugin,
+    const char *module,
+    const char *lookup,
+    const char *calc,
+    const char *every,
+    const char *green,
+    const char *red,
+    const char *warn,
+    const char *crit,
+    const char *exec,
+    const char *to,
+    const char *units,
+    const char *info,
+    const char *classification,
+    const char *component,
+    const char *type,
+    const char *delay,
+    const char *options,
+    const char *repeat,
+    const char *host_labels);
+extern void sql_select_alert_config(char *hash_str, BUFFER *wb);
+extern void sql_create_health_log_table(RRDHOST *host);
+extern void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+extern void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_id, RRDHOST *host);
+extern int execute_insert(sqlite3_stmt *res);
+extern void compute_chart_hash(RRDSET *st);
+extern void sql_chart_from_hash_id(char *hash_str, BUFFER *wb);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

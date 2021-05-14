@@ -358,6 +358,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
+    sql_health_alarm_log_save(host, ae);
+
     debug(D_HEALTH, "executing command '%s'", command_to_run);
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
@@ -366,6 +368,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     return; //health_alarm_wait_for_execution
 done:
     health_alarm_log_save(host, ae);
+    sql_health_alarm_log_save(host, ae);
 }
 
 static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
@@ -929,7 +932,7 @@ void *health_main(void *ptr) {
 
                         if(likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
-                                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                    host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                     rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
                                     rc->delay_last,
@@ -979,7 +982,7 @@ void *health_main(void *ptr) {
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
-                                host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                host, rc->id, rc->next_event_id++, rc->config_hash_id, now, rc->name, rc->rrdset->id,
                                 rc->rrdset->family, rc->classification, rc->component, rc->type, rc->exec, rc->recipient, now - rc->last_status_change,
                                 rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
                                 rc->delay_last,

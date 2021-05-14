@@ -21,6 +21,7 @@ struct rrdcalctemplate {
 
     char *context;
     uint32_t hash_context;
+    uuid_t config_hash_id;           // a predictable hash_id based on specific alert configuration
 
     char *family_match;
     SIMPLE_PATTERN *family_pattern;

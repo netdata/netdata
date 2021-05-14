@@ -21,10 +21,18 @@
         "end;"
 
 #define TABLE_ACLK_ALERT "create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
-                 "date_created, date_updated, unique_id);"
+                 "date_created, date_updated, date_submitted, status, alarm_id, unique_id, " \
+                 "update_count default 1, unique(alarm_id, status));"
 
 #define TABLE_ACLK_ALERT_PAYLOAD "create table if not exists aclk_alert_payload_%s (unique_id blob primary key, " \
-                 "chart_id, type, date_created, payload);"
+                 "ae_unique_id, alarm_id, type, date_created, payload);"
+
+#define TRIGGER_ACLK_ALERT_PAYLOAD "create trigger if not exists aclk_tr_alert_payload_%s " \
+        "after insert on aclk_alert_payload_%s " \
+        "begin insert into aclk_alert_%s (alarm_id, unique_id, status, date_created) values " \
+        " (new.alarm_id, new.unique_id, 'pending', strftime('%%s')) on conflict(alarm_id, status) " \
+        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
+        "end;"
 
 
 enum aclk_database_opcode {
@@ -42,6 +50,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_UPD_ALERT,
     ACLK_DATABASE_SHUTDOWN,
     ACLK_DATABASE_MAX_OPCODE
+    ACLK_DATABASE_MAX_OPCODE,
+    ACLK_DATABASE_ADD_ALARM
 };
 
 struct aclk_chart_payload_t {
@@ -55,6 +65,7 @@ struct aclk_chart_payload_t {
 struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *data;
+    void *data1;
     void *data_param;
     int count;
     union {
@@ -94,10 +105,12 @@ struct aclk_database_worker_config {
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
 extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
+extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host);
 extern void sql_create_aclk_table(RRDHOST *host);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
+int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

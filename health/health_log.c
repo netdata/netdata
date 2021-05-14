@@ -160,7 +160,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     if (netdata_cloud_setting) {
         if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
-            aclk_update_alarm(host, ae);
+            //aclk_update_alarm(host, ae);
+            sql_queue_alarm_to_aclk(host, ae);
         }
     }
 #endif
@@ -323,6 +324,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+            ae->flags |= HEALTH_ENTRY_FLAG_SAVED_SQLITE; //assume it's also saved there.
 
             ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
             ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
@@ -456,6 +458,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
+        uuid_t config_hash_id,
         time_t when,
         const char *name,
         const char *chart,
@@ -486,6 +489,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         ae->chart = strdupz(chart);
         ae->hash_chart = simple_hash(ae->chart);
     }
+
+    uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
 
     if(family)
         ae->family = strdupz(family);
@@ -580,6 +585,7 @@ inline void health_alarm_log(
                     ae->non_clear_duration += t->non_clear_duration;
 
                 health_alarm_log_save(host, t);
+                sql_health_alarm_log_save(host, t);
             }
 
             // no need to continue
@@ -589,6 +595,7 @@ inline void health_alarm_log(
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     health_alarm_log_save(host, ae);
+    sql_health_alarm_log_save(host, ae);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
