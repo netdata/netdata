@@ -298,6 +298,32 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         aclk_send_node_instances();
         return;
     }
+    if (!strcmp(message_type, "StreamChartsAndDimensions")) {
+        stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        //stelfrag TODO... call your fnc here with params from res
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "ChartsAndDimensionsAck")) {
+        chart_and_dim_ack_t res = parse_chart_and_dimensions_ack(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        //stelfrag TODO... call your fnc here with params from res
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
 
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
