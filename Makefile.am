@@ -57,15 +57,12 @@ dist_noinst_DATA = \
     netdata.cppcheck \
     netdata.spec \
     package.json \
-    packaging/bundle-dashboard.sh \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
     packaging/bundle-lws.sh \
     packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
-    packaging/dashboard.checksums \
-    packaging/dashboard.version \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
     packaging/go.d.checksums \

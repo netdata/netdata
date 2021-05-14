@@ -1667,6 +1667,7 @@ AC_CONFIG_FILES([
     web/api/queries/sum/Makefile
     web/api/health/Makefile
     web/gui/Makefile
+    web/gui/dashboard/Makefile
     web/server/Makefile
     web/server/static/Makefile
     claim/Makefile

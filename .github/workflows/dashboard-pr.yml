@@ -27,14 +27,11 @@ jobs:
           git push -u origin dashboard-${{ github.event.inputs.dashboard_version }}
       - name: Update Files
         run: |
-          curl -o dashboard.tar.gz https://github.com/netdata/dashboard/releases/download/${{ github.event.inputs.dashboard_version }}/dashboard.tar.gz
-          echo ${{ github.event.inputs.dashboard_version }} > packaging/dashboard.version
-          sha256sum dashboard.tar.gz > packaging/dashboard.checksums
-          rm dashboard.tar.gz
+          web/gui/bundle_dashboard.py ${{ github.event.inputs.dashboard_version }}
       - name: Commit Changes
         uses: swinton/commit@v2.x
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
         with:
           files: |
             packaging/dashboard.version
@@ -47,4 +44,4 @@ jobs:
           source_branch: dashboard-${{ github.event.inputs.dashboard_version }}
           pr_title: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
           pr_body: 'See https://github.com/netdata/dashboard/releases/tag/${{ github.event.inputs.dashboard_version }} for changes.'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
