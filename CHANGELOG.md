@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix broken link in dimensions/contexts/families doc [\#11148](https://github.com/netdata/netdata/pull/11148) ([joelhans](https://github.com/joelhans))
+- Add info on other memory modes to performance.md [\#11144](https://github.com/netdata/netdata/pull/11144) ([cakrit](https://github.com/cakrit))
 - Use size\_t instead of int for vfs\_bufspace\_count in FreeBSD plugin [\#11142](https://github.com/netdata/netdata/pull/11142) ([diizzyy](https://github.com/diizzyy))
+- Bundle the react dashboard code into the agent repo directly. [\#11139](https://github.com/netdata/netdata/pull/11139) ([Ferroin](https://github.com/Ferroin))
 - Reduce the number of ACLK chart updates during chart obsoletion [\#11133](https://github.com/netdata/netdata/pull/11133) ([stelfrag](https://github.com/stelfrag))
 - Update k6.md [\#11127](https://github.com/netdata/netdata/pull/11127) ([OdysLam](https://github.com/OdysLam))
 - Fix broken link in doc [\#11122](https://github.com/netdata/netdata/pull/11122) ([forest0](https://github.com/forest0))
@@ -311,7 +314,6 @@
 - fix minor vulnerability alert, updating socket-io dependency [\#10557](https://github.com/netdata/netdata/pull/10557) ([jacekkolasa](https://github.com/jacekkolasa))
 - Fix values in Prometheus export for metrics, collected by the Prometheus collector [\#10551](https://github.com/netdata/netdata/pull/10551) ([vlvkobal](https://github.com/vlvkobal))
 - Properly handle saved temporary directory on updates. [\#10550](https://github.com/netdata/netdata/pull/10550) ([Ferroin](https://github.com/Ferroin))
-- installer: update go.d.plugin version to v0.27.0 [\#10544](https://github.com/netdata/netdata/pull/10544) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
