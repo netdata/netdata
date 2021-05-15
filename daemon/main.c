@@ -388,20 +388,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-// TODO: Remove this function with the nix major release.
-void remove_option(int opt_index, int *argc, char **argv) {
-    int i;
-
-    // remove the options.
-    do {
-        *argc = *argc - 1;
-        for(i = opt_index; i < *argc; i++) {
-            argv[i] = argv[i+1];
-        }
-        i = opt_index;
-    } while(argv[i][0] != '-' && opt_index >= *argc);
-}
-
 #ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
@@ -733,34 +719,6 @@ int main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
-    // parse deprecated options
-    // TODO: Remove this block with the next major release.
-    {
-        i = 1;
-        while(i < argc) {
-            if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
-                strncpyz(pidfile, argv[i+1], FILENAME_MAX);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
-                dont_fork = 1;
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "host access prefix", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "history", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else i++;
-        }
-    }
     if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
         // don't run netdata, this is the spawn server
         spawn_server();
