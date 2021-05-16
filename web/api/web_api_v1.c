@@ -296,9 +296,55 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return HTTP_RESP_OK;
 }
 
+inline int web_client_api_request_v1_alarm_log_sql(RRDHOST *host, struct web_client *w, char *url) {
+    uint32_t after = 0;
+    char *chart = NULL;
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "chart")) chart = value;
+    }
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    health_alarm_log_sql2json(host, w->response.data, after, chart);
+    return HTTP_RESP_OK;
+}
+
+int web_client_api_request_v1_alarm_config (RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    char *config_hash_id = NULL;
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "config_hash_id"))
+            config_hash_id = value;
+    }
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    sql_select_alert_config(config_hash_id, w->response.data);
+    return HTTP_RESP_OK;
+}
+
+
+
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
+    char *hash_str = NULL;
 
     buffer_flush(w->response.data);
 
@@ -314,15 +360,21 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         // they are not null and not empty
 
         if(!strcmp(name, "chart")) chart = value;
+        if(!strcmp(name, "hash")) hash_str = value;
         //else {
         /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
         //}
     }
 
+    if (hash_str && *hash_str) {
+        sql_chart_from_hash_id(hash_str, w->response.data);
+        return HTTP_RESP_OK;
+    }
+
     if(!chart || !*chart) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
-        goto cleanup;
+        return HTTP_RESP_OK;
     }
 
     RRDSET *st = rrdset_find(host, chart);
@@ -342,6 +394,235 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     cleanup:
     return ret;
 }
+
+inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client *w, char *url) {
+    int ret = HTTP_RESP_BAD_REQUEST;
+    buffer_flush(w->response.data);
+    int ping = 0;
+    int fetch_proto = 0;
+    int sequence_reset = 0;
+    int status = 0;
+    int nodelist = 0;
+    char *reset_node = NULL;
+    int resync_nodes = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "fetch")) ping = atoi(value);
+        if(!strcmp(name, "reset")) sequence_reset = atoi(value);
+        if(!strcmp(name, "status")) status = atoi(value);
+        if(!strcmp(name, "nodelist")) nodelist = 1;
+        if(!strcmp(name, "reset_node")) reset_node = value;
+        if(!strcmp(name, "resync_nodes")) resync_nodes = 1;
+        if(!strcmp(name, "fetch_proto")) fetch_proto = atoi(value);
+        //else {
+        // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
+        //  goto cleanup;
+        ///}
+    }
+
+    if (fetch_proto) {
+        struct aclk_database_cmd cmd;
+        charts_and_dims_updated_t *head = NULL;
+        struct chart_instance_updated *result;
+        cmd.opcode = ACLK_DATABASE_FETCH_CHART_PROTO;
+        cmd.data = (void *)&head;
+        cmd.count = fetch_proto;
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl );
+        destroy_completion(&compl );
+
+        int count = 0;
+
+        if (head) {
+            while (count < head->chart_count) {
+                result = &(head->charts[count]);
+                if (count)
+                    buffer_strcat(w->response.data,"\n");
+                buffer_sprintf(
+                    w->response.data,
+                    "sequence_id=%ld\nlast_sequence_id=%ld\n"
+                    "id=%s\nname=%s\nnode_id=%s\nclaim_id=%s\nconfig_hash=%s\n",
+                    result->position.sequence_id,
+                    result->position.previous_sequence_id,
+                    result->id,
+                    result->name,
+                    result->node_id,
+                    result->claim_id,
+                    result->config_hash);
+                freez(result->id);
+                freez(result->name);
+                freez(result->claim_id);
+                freez(result->config_hash);
+                freez(result->node_id);
+                count++;
+            }
+            freez(head->charts);
+            freez(head);
+        }
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (ping) {
+        struct aclk_database_cmd cmd;
+        struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_FETCH_CHART;
+        cmd.data = (void *) &result;
+        cmd.count = ping;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl);
+        destroy_completion(&compl);
+        //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
+        int count = 0;
+        while (result) {
+            tmp_result = result->next;
+            if (count)
+                buffer_strcat(w->response.data,",\n");
+            buffer_sprintf(w->response.data, "{\"sequence_id\": %ld,\n \"last_sequence_id\": %ld, \n\"payload\": %s",
+                           result->sequence_id, result->last_sequence_id, result->payload);
+            freez(result->payload);
+            freez(result);
+            result = tmp_result;
+            count++;
+        }
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (sequence_reset) {
+        struct aclk_database_cmd cmd;
+        //struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_RESET_CHART;
+        //cmd.data = (void *) &result;
+        cmd.count = sequence_reset;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl);
+        destroy_completion(&compl);
+        buffer_sprintf(w->response.data, "Chart sequence id for host %s has been reset to %d",
+                       host->hostname, sequence_reset);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (status) {
+        struct aclk_database_cmd cmd;
+        struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_STATUS_CHART;
+        cmd.data = (void *) &result;
+        cmd.count = sequence_reset;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+
+        rrd_wrlock();
+        RRDHOST *this_host = localhost;
+
+        while (this_host) {
+            if (status != 2 && this_host != host) {
+                this_host = this_host->next;
+                continue;
+            }
+            compl.completed = 0;
+            aclk_database_enq_cmd((struct aclk_database_worker_config *)this_host->dbsync_worker, &cmd);
+            wait_for_completion(&compl);
+
+            //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
+            int count = 0;
+            char uuid_str[GUID_LEN + 1];
+            uuid_unparse_lower(this_host->host_uuid, uuid_str);
+            buffer_sprintf(w->response.data, "Sync for host:  %s (guid = %s)\n", this_host->hostname, uuid_str);
+            while (result) {
+                tmp_result = result->next;
+                buffer_sprintf(w->response.data, " %s\n", result->payload);
+                freez(result->payload);
+                freez(result);
+                result = tmp_result;
+                count++;
+            }
+            this_host = this_host->next;
+            if (status == 1)
+                break;
+        }
+        destroy_completion(&compl);
+        rrd_unlock();
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (nodelist) {
+        struct node_instance_list *node_list = get_node_list();
+        for (int i=0; !uuid_is_null(node_list[i].host_id); ++i) {
+            char uuid_node[GUID_LEN + 1];
+            char uuid_agent[GUID_LEN + 1];
+            if (!uuid_is_null(node_list[i].node_id))
+                uuid_unparse_lower(node_list[i].node_id, uuid_node);
+            else
+                strcpy(uuid_node,"(empty)");
+
+            uuid_unparse_lower(node_list[i].host_id, uuid_agent);
+
+            buffer_sprintf(w->response.data, "Host GUID = %s, node_instance_id = %36s (hostname= %s)\n",
+                           uuid_agent, uuid_node, node_list[i].hostname);
+            freez(node_list[i].hostname);
+        }
+        freez(node_list);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (reset_node) {
+        struct aclk_database_cmd cmd;
+        //struct aclk_chart_payload_t *result, *tmp_result;
+        cmd.opcode = ACLK_DATABASE_RESET_NODE;
+        cmd.data = (void *) reset_node;
+        cmd.completion = NULL;
+
+        struct completion compl ;
+        init_completion(&compl );
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl );
+        destroy_completion(&compl );
+        buffer_sprintf(w->response.data, "Resetting node instance id of host %s", reset_node);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (resync_nodes) {
+        buffer_sprintf(w->response.data, "Resyncing all nodes with the cloud");
+        aclk_send_node_instances();
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    return ret;
+}
+
 
 inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
@@ -1111,10 +1392,13 @@ static struct api_command {
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms_values   },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
+        { "alarm_log_sql",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log_sql   },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
+        { "alarm_config",    0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_config    },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
+        { "aclk_sync",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_sync       },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };

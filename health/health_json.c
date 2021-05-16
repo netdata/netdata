@@ -14,12 +14,16 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 }
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char config_hash_id[GUID_LEN + 1]; //POC, do it better
+    uuid_unparse_lower(ae->config_hash_id, config_hash_id);
+
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
                     "\t\t\"alarm_id\": %u,\n"
                     "\t\t\"alarm_event_id\": %u,\n"
+                    "\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\"name\": \"%s\",\n"
                     "\t\t\"chart\": \"%s\",\n"
                     "\t\t\"family\": \"%s\",\n"
@@ -52,6 +56,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
+                   , config_hash_id
                    , ae->name
                    , ae->chart
                    , ae->family
@@ -140,6 +145,30 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
+void health_alarm_log_sql2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+
+    buffer_strcat(wb, "[");
+
+    unsigned int max = host->health_log.max;
+    unsigned int count = 0;
+    uint32_t hash_chart = 0;
+    if (chart) hash_chart = simple_hash(chart);
+    ALARM_ENTRY *ae;
+    for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
+        if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) {
+            if (likely(count))
+                buffer_strcat(wb, ",");
+            health_alarm_entry_sql2json(wb, ae->unique_id, ae->alarm_id, host);
+            count++;
+        }
+    }
+
+    buffer_strcat(wb, "\n]\n");
+
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+}
+
 static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
     (void)host;
     buffer_sprintf(wb,
@@ -178,10 +207,14 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         }
     }
 
+    char config_hash_id[GUID_LEN + 1];
+    uuid_unparse_lower(rc->config_hash_id, config_hash_id);
+
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"
                     "\t\t\t\"id\": %lu,\n"
                     "\t\t\t\"name\": \"%s\",\n"
+                    "\t\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
                     "\t\t\t\"class\": \"%s\",\n"
@@ -213,6 +246,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
                    , rc->name
+                   , config_hash_id
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
                    , rc->classification?rc->classification:"Unknown"

@@ -54,6 +54,7 @@ struct context_param {
     uint8_t flags;
 };
 
+#define RRDSET_MINIMUM_LIVE_COUNT 3
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2
 #define META_MODULE_UPDATED 4
@@ -167,7 +168,8 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 3)
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
+    RRDDIM_FLAG_ACLK                            = (1 << 4)
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -427,6 +429,7 @@ struct rrddim_volatile {
 struct rrdset_volatile {
     char *old_title;
     char *old_context;
+    uuid_t  hash_id;
     struct label *new_labels;
     struct label_index labels;
 };
@@ -655,6 +658,7 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    uuid_t config_hash_id;
 
     time_t when;
     time_t duration;
@@ -795,6 +799,7 @@ struct rrdhost {
     struct sender_state *sender;
     volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    void *dbsync_worker;
 
     volatile unsigned int rrdpush_sender_connected:1; // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
@@ -1344,5 +1349,6 @@ extern void set_host_properties(
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
+#include "sqlite/sqlite_aclk.h"
 
 #endif /* NETDATA_RRD_H */

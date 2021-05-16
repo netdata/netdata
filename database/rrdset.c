@@ -931,6 +931,7 @@ RRDSET *rrdset_create_custom(
         update_chart_metadata(st->chart_uuid, st, id, name);
 
     store_active_chart(st->chart_uuid);
+    compute_chart_hash(st);
 
 #ifdef ENABLE_ACLK
     host->obsolete_count = 0;
@@ -1383,8 +1384,10 @@ void rrdset_done(RRDSET *st) {
 
 #ifdef ENABLE_ACLK
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
+            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+            sql_queue_chart_to_aclk(st, 0);
+        }
     }
 #endif
 
