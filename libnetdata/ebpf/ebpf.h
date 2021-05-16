@@ -127,6 +127,8 @@ typedef struct ebpf_module {
     ebpf_local_maps_t *maps;
     ebpf_specify_name_t *names;
     uint32_t pid_map_size;
+    struct config *cfg;
+    const char *config_file;
 } ebpf_module_t;
 
 extern int get_kernel_version(char *out, int size);
