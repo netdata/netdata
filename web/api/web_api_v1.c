@@ -436,7 +436,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         struct chart_instance_updated *result;
         cmd.opcode = ACLK_DATABASE_FETCH_CHART_PROTO;
         cmd.data = (void *)&head;
-        cmd.count = ping;
+        cmd.count = fetch_proto;
         struct completion compl ;
         init_completion(&compl);
         cmd.completion = &compl ;
@@ -449,10 +449,12 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if (head) {
             while (count < head->chart_count) {
                 result = &(head->charts[count]);
+                if (count)
+                    buffer_strcat(w->response.data,"\n");
                 buffer_sprintf(
                     w->response.data,
-                    "{\"sequence_id\": %ld,\n \"last_sequence_id\": %ld, \n\"payload\": "
-                    "id=%s, name=%s node_id=%s claim_id=%s config_hash=%s",
+                    "sequence_id=%ld\nlast_sequence_id=%ld\n"
+                    "id=%s\nname=%s\nnode_id=%s\nclaim_id=%s\nconfig_hash=%s\n",
                     result->position.sequence_id,
                     result->position.previous_sequence_id,
                     result->id,

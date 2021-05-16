@@ -29,8 +29,21 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text);",
 
+    "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob PRIMARY KEY, hash_id blob);",
+
+    "CREATE INDEX IF NOT EXISTS ind_chm_hash_id ON chart_hash_map (hash_id);",
+
     "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority integer, last_used);",
+
+    "CREATE VIEW IF NOT EXISTS v_chart_hash as SELECT ch.*, chm.chart_id FROM chart_hash ch, chart_hash_map chm "
+    "WHERE ch.hash_id = chm.hash_id;",
+
+    "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
+    "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, module, priority, last_used) "
+    "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
+    "new.module, new.priority, strftime('%s')) ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
+    "INSERT OR REPLACE INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id); END; ",
 
     "delete from chart_active;",
     "delete from dimension_active;",
@@ -1017,13 +1030,21 @@ failed:
 void db_execute(const char *cmd)
 {
     int rc;
+    int cnt = 0;
     char *err_msg;
-    rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to execute '%s', rc = %d (%s)", cmd, rc, err_msg);
-        sqlite3_free(err_msg);
+#define SQL_MAX_RETRY 10
+    while (cnt < SQL_MAX_RETRY) {
+        rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
+            sqlite3_free(err_msg);
+            if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            }
+            else break;
+        }
+        ++cnt;
     }
-
     return;
 }
 
@@ -1356,13 +1377,12 @@ failed:
  * Store a chart hash in the database
  */
 
-#define SQL_STORE_CHART_HASH "insert into chart_hash (hash_id, type, id, " \
-    "name, family, context, title, unit, plugin, module, priority, last_used) " \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, strftime('%s')) " \
-    "on conflict(hash_id) do update set last_used = strftime('%s');"
+#define SQL_STORE_CHART_HASH "insert into v_chart_hash (hash_id, type, id, " \
+    "name, family, context, title, unit, plugin, module, priority, last_used, chart_id) " \
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, strftime('%s'), ?12);"
 
 int sql_store_chart_hash(
-    uuid_t *hash_id, const char *type, const char *id, const char *name, const char *family,
+    uuid_t *hash_id, uuid_t *chart_id, const char *type, const char *id, const char *name, const char *family,
     const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -1441,6 +1461,11 @@ int sql_store_chart_hash(
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    param++;
+    rc = sqlite3_bind_blob(res, 12, chart_id, sizeof(*chart_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store chart hash_id, rc = %d", rc);
@@ -1493,6 +1518,7 @@ void compute_chart_hash(RRDSET *st)
 
     (void)sql_store_chart_hash(
         (uuid_t *)&hash_value,
+        st->chart_uuid,
         st->type,
         st->id,
         st->name,
