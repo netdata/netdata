@@ -142,7 +142,7 @@ Class can be used to indicate the broader area of the system that the alarm appl
 class: Database
 ```
 <details>
-<summary>Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:</summary>
+<summary>Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements.</summary>
 
 | Class                    | Description                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
