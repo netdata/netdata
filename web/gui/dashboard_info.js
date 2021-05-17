@@ -3487,11 +3487,11 @@ netdataDashboard.context = {
     },
 
     'apps.swap_read_call': {
-        info: 'Monitor when a software read a page from memory swap.'
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory.'
     },
 
     'apps.swap_write_call': {
-        info: 'Monitor when a software write on page in memory swap.'
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
     },
 
     // ------------------------------------------------------------------------

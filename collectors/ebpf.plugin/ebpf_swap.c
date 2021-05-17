@@ -330,7 +330,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_READ_CHART,
-                               "Calls for function <code>swap_readpage.</code>",
+                               "Calls for function <code>swap_readpage</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_SWAP_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -339,7 +339,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                root);
 
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_WRITE_CHART,
-                               "Calls for function <code>swap_writepage.</code>",
+                               "Calls for function <code>swap_writepage</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_SWAP_SUBMENU,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
