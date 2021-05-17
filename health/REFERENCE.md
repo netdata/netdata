@@ -172,7 +172,7 @@ class: Database
 
 </details>
 
-If an alarm configuration is missing the `class` line, it's value will default to `Unknown`.
+If an alarm configuration is missing the `class` line, its value will default to `Unknown`.
 
 #### Alarm line `component`
 
