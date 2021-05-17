@@ -70,9 +70,6 @@ dist_noinst_DATA = \
     packaging/ebpf.version \
     packaging/go.d.checksums \
     packaging/go.d.version \
-    packaging/installer/README.md \
-    packaging/installer/UNINSTALL.md \
-    packaging/installer/UPDATE.md \
     packaging/jsonc.checksums \
     packaging/jsonc.version \
     packaging/judy.checksums \
