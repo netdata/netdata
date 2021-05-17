@@ -143,31 +143,31 @@ class: Database
 ```
 Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:
 
-| Class                    | Groups alarms for:                              |
-| ------------------------ | ----------------------------------------------- |
-| Ad Filtering             | Services related to Ad Filtering (like pi-hole) |
-| Certificates             | 
-| Cgroups                  |
-| Computing                | 
-| Containers               |
-| Database                 | Database systems (e.g. MySQL, Postgress, etc)   |
-| Data Sharing             |
-| DHCP                     |
-| DNS                      | 
-| Kubernetes               |
-| KV Storage               |
-| Linux                    | Services specific to Linux (e.g. systemd)       |
-| Messaging                |
-| Netdata                  | Internal Netdata components monitoring          |
-| Other                    |
-| Power Supply             |
-| Search engine            |
-| Storage                  |
-| System                   | General system alarms (e.g. cpu, network, etc.) |
-| Virtual Machine          | Virtual Machine software                        |
-| Web Proxy                |
-| Web Server               | Web server software (e.g. Apache, ngnix, etc.)  |
-| Windows                  |                                                 |
+| Class                    | Description                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Ad Filtering             | Services related to Ad Filtering (like pi-hole)                                                  |
+| Certificates             | Certificates monitoring related                                                                  |
+| Cgroups                  | Alerts for cpu and memory usage of control groups                                                |
+| Computing                | Alerts for shared computing applications (e.g. boinc)                                            |
+| Containers               | Container related alerts (e.g. docker instances)                                                 |
+| Database                 | Database systems (e.g. MySQL, Postgress, etc)                                                    |
+| Data Sharing             | Used to group together alerts for data sharing applications                                      |
+| DHCP                     | Alerts for dhcp related services                                                                 |
+| DNS                      | Alerts for dns related services                                                                  |
+| Kubernetes               | Alerts for kubernetes nodes monitoring                                                           |
+| KV Storage               | Key-Value pairs services alerts (e.g. memcached)                                                 |
+| Linux                    | Services specific to Linux (e.g. systemd)                                                        |
+| Messaging                | Alerts for message passing services (e.g. vernemq)                                               |
+| Netdata                  | Internal Netdata components monitoring                                                           |
+| Other                    | Use as a general class of alerts                                                                 |
+| Power Supply             | Alerts from power supply related services (e.g. apcupsd)                                         |
+| Search engine            | Alerts for search services (e.g. elasticsearch)                                                  |
+| Storage                  | Class for alerts dealing with storage services (storage devices typically live under `System`)   |
+| System                   | General system alarms (e.g. cpu, network, etc.)                                                  |
+| Virtual Machine          | Virtual Machine software                                                                         |
+| Web Proxy                | Web proxy software (e.g. squid)                                                                  |
+| Web Server               | Web server software (e.g. Apache, ngnix, etc.)                                                   |
+| Windows                  | Alerts for monitor of wmi services                                                               |
 
 If an alarm configuration is missing the `class` line, it's value will default to `Unknown`.
 
