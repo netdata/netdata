@@ -141,7 +141,8 @@ Class can be used to indicate the broader area of the system that the alarm appl
 ```yaml
 class: Database
 ```
-Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:
+<details>
+<summary>Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:</summary>
 
 | Class                    | Description                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
@@ -168,6 +169,8 @@ Netdata's stock alarms use the following `class` attributes by default, but feel
 | Web Proxy                | Web proxy software (e.g. squid)                                                                  |
 | Web Server               | Web server software (e.g. Apache, ngnix, etc.)                                                   |
 | Windows                  | Alerts for monitor of wmi services                                                               |
+
+</details>
 
 If an alarm configuration is missing the `class` line, it's value will default to `Unknown`.
 
