@@ -185,7 +185,7 @@ As with the `class` line, if `component` is missing from the configuration, its 
 
 #### Alarm line `type`
 
-This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues, be it in network interfaces, web servers, or database systems. Example:
+This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues in network interfaces, web servers, or database systems. Example:
 
 ```yaml
 type: Latency
