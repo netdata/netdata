@@ -5,6 +5,10 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 
 # Install Netdata on macOS
 
+**Disclaimer:** Currently the Netdata Agent can't connect to the Netdata Cloud when used in MacOS. To experience the full feature-set of Netdata:
+1) Download [Docker Desktop for Mac](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
+2) Follow the instructions for [installing Netdata using Docker](../docker/../../../README.md).
+
 Netdata works on macOS, albeit with some limitations. The number of charts displaying system metrics is limited, but you
 can use any of Netdata's [external plugins](../../../collectors/plugins.d/README.md) to monitor any services you might
 have installed on your macOS system. You could also use a macOS system as the parent node in a [streaming
@@ -13,8 +17,10 @@ configuration](/streaming/README.md).
 We recommend installing Netdata with the community-created and -maintained [**Homebrew
 package**](#install-netdata-with-the-homebrew-package). 
 
--   [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
--   [Install Netdata from source](#install-netdata-from-source)
+- [Install Netdata on macOS](#install-netdata-on-macos)
+  - [Install Netdata with the Homebrew package](#install-netdata-with-the-homebrew-package)
+  - [Install Netdata from source](#install-netdata-from-source)
+  - [What's next?](#whats-next)
 
 ## Install Netdata with the Homebrew package
 
