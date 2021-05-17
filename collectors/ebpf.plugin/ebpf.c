@@ -1168,6 +1168,19 @@ static void parse_args(int argc, char **argv)
  *****************************************************************/
 
 /**
+ * Load collector config
+ *
+ * @param lmode  the mode that will be used for them.
+ */
+static inline void ebpf_load_thread_config()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_update_module(&ebpf_modules[i]);
+    }
+}
+
+/**
  * Entry point
  *
  * @param argc the number of arguments
@@ -1179,6 +1192,7 @@ int main(int argc, char **argv)
 {
     set_global_variables();
     parse_args(argc, argv);
+    ebpf_load_thread_config();
 
     running_on_kernel = get_kernel_version(kernel_string, 63);
     if (!has_condition_to_run(running_on_kernel)) {

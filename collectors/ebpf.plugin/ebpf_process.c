@@ -1044,7 +1044,6 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
-    ebpf_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();

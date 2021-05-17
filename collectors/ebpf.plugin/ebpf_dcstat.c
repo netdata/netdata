@@ -565,7 +565,6 @@ void *ebpf_dcstat_thread(void *ptr)
     em->maps = dcstat_maps;
     fill_ebpf_data(&dcstat_data);
 
-    ebpf_update_module(em, &dcstat_config, NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE);
     ebpf_update_pid_table(&dcstat_maps[0], em);
 
     ebpf_update_names(dc_optional_name, em);

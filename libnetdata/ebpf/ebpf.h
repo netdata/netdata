@@ -142,10 +142,10 @@ extern struct bpf_link **ebpf_load_program(char *plugins_dir,
                              struct bpf_object **obj,
                              int *map_fd);
 
-extern void ebpf_mount_config_name(char *filename, size_t length, char *path, char *config);
+extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 extern int ebpf_load_config(struct config *config, char *filename);
-extern void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg);
-extern void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file);
+extern void ebpf_update_module_using_config(ebpf_module_t *modules);
+extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */

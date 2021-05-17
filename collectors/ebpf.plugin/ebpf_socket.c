@@ -2862,7 +2862,6 @@ void *ebpf_socket_thread(void *ptr)
     em->maps = socket_maps;
     fill_ebpf_data(&socket_data);
 
-    ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
     parse_table_size_options(&socket_config);

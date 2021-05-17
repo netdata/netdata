@@ -359,7 +359,6 @@ void *ebpf_sync_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     fill_ebpf_data(&sync_data);
 
-    ebpf_update_module(em, &sync_config, NETDATA_SYNC_CONFIG_FILE);
     ebpf_sync_parse_syscalls();
 
     if (!em->enabled)
