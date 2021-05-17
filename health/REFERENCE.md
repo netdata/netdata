@@ -181,7 +181,7 @@ Component can be used to narrow down what the previous `class` value specifies f
 ```yaml
 component: MySQL
 ```
-As with the `class` line, if `component` is missing from the configuration, it's value will default to `Unknown`.
+As with the `class` line, if `component` is missing from the configuration, its value will default to `Unknown`.
 
 #### Alarm line `type`
 
