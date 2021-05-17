@@ -141,7 +141,6 @@ Class can be used to indicate the broader area of the system that the alarm appl
 ```yaml
 class: Database
 ```
-
 Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements:
 
 | Class                    | Groups alarms for:                              |
@@ -170,6 +169,8 @@ Netdata's stock alarms use the following `class` attributes by default, but feel
 | Web Server               | Web server software (e.g. Apache, ngnix, etc.)  |
 | Windows                  |                                                 |
 
+If an alarm configuration is missing the `class` line, it's value will default to `Unknown`.
+
 #### Alarm line `component`
 
 Component can be used to narrow down what the previous `class` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` classification. Example:
@@ -177,6 +178,7 @@ Component can be used to narrow down what the previous `class` value specifies f
 ```yaml
 component: MySQL
 ```
+As with the `class` line, if `component` is missing from the configuration, it's value will default to `Unknown`.
 
 #### Alarm line `type`
 
@@ -185,6 +187,8 @@ This indicates the type of error (or general problem area) that the alarm or tem
 ```yaml
 type: Latency
 ```
+
+`type` will also (as with `class` and `component`) default to `Unknown` if the line is missing from the alarm configuration.
 
 #### Alarm line `os`
 
