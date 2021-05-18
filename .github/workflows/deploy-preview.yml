@@ -2,11 +2,6 @@
 name: Deploy preview
 on:
   pull_request:
-env:
-  run_eslint: 0
-  run_hadolint: 0
-  run_shellcheck: 0
-  run_yamllint: 0
 jobs:
   deploy:
     # Operating system to run job on
@@ -19,14 +14,23 @@ jobs:
         with:
           repository: netdata/learn
           path: './build'
+
       - name: Use Node.js 12
+        working-directory: ./build
         uses: actions/setup-node@v1.4.4
         with:
           node-version: 12
-      - run: yarn install
-      - run: node ./build/ingest.js
+
+      - name: Install dependencies
+        working-directory: ./build
+        run: yarn install
+
+      - name: Run ingest script
+        working-directory: ./build
+        run: node ./build/ingest.js
         env:
           GITHUB_TOKEN: ${{ secrets.INGEST_TOKEN }}
+
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v1.2
         with:
