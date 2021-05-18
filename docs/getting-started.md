@@ -226,7 +226,8 @@ Netdata.
 
 Take a look at some more advanced features and configurations:
 
--   Centralize Netdata metrics from many systems with [streaming](/streaming/README.md)
+-   Centralize Netdata metrics from many systems with
+    [streaming](/docs/metrics-storage-management/how-streaming-works.mdx)
 -   Enable long-term archiving of Netdata metrics via [exporting engine](/exporting/README.md) to time-series databases.
 -   Improve security by putting Netdata behind an [Nginx proxy with SSL](/docs/Running-behind-nginx.md).
 

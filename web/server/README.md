@@ -47,7 +47,9 @@ Using the above, Netdata will bind to:
 -   IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 -   IPv4 10.1.1.1 at port 19998. The management API and `netdata.conf` will be accessible on this port.
 -   All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
--   All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. child nodes also need to be [configured for TLS](/streaming/README.md).
+-   All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port.
+    Only encrypted streams will be allowed (i.e. child nodes also need to be [configured for
+    TLS](/docs/metrics-storage-management/reference-streaming.mdx#securing-streaming-with-tlsssl).
 -   All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 -   All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
 -   Unix domain socket `/run/netdata/netdata.sock`. All requests are serviceable on this socket. Note that in some OSs like Fedora, every service sees a different `/tmp`, so don't create a Unix socket under `/tmp`. `/run` or `/var/run` is suggested.
@@ -136,7 +138,10 @@ Example:
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
 
-For information how to configure the child to use TLS, check [securing the communication](/streaming/README.md#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
+For information how to configure the child to use TLS, check [securing the
+communication](/docs/metrics-storage-management/reference-streaming.mdx#securing-streaming-with-tlsssl) in the streaming
+documentation. There you will find additional details on the expected behavior for client and server nodes, when their
+respective TLS options are enabled.
 
 When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
@@ -225,7 +230,7 @@ present that may match DNS FQDNs.
 |web files group|`netdata`|If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.|
 |disconnect idle clients after seconds|`60`|The time in seconds to disconnect web clients after being totally idle.|
 |timeout for first request|`60`|How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.|
-|accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](/streaming/README.md)|
+|accept a streaming request every seconds|`0`|Can be used to set a limit on how often a parent node will accept streaming requests from child nodes in a [streaming and replication setup](/docs/metrics-storage-management/how-streaming-works.mdx)|
 |respect do not track policy|`no`|If set to `yes`, Netdata will respect the user's browser preferences for [Do Not Track](https://www.eff.org/issues/do-not-track) (DNT) and storing cookies. If DNT is _enabled_ in the browser, and this option is set to `yes`, users will not be able to sign in to Netdata Cloud via their local Agent dashboard, and their node will not connect to any [registry](/registry/README.md). For certain browsers, users must disable DNT and change this option to `yes` for full functionality.|
 |x-frame-options response header||[Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).|
 |enable gzip compression|`yes`|When set to `yes`, Netdata web responses will be GZIP compressed, if the web client accepts such responses.|

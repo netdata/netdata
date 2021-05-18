@@ -55,8 +55,8 @@ its behavior based on your needs or the type of infrastructure you manage.
 To archive metrics to an external time-series database, such as InfluxDB, Graphite, OpenTSDB, Elasticsearch,
 TimescaleDB, and many others, see details on [integrating Netdata via exporting](/docs/export/external-databases.md).
 
-You can also stream between nodes using [streaming](/streaming/README.md), allowing to replicate databases and create
-your own centralized data lake of metrics, if you choose to do so.
+You can also stream between nodes using [streaming](/docs/metrics-storage-management/how-streaming-works.mdx), allowing
+to replicate databases and create your own centralized data lake of metrics, if you choose to do so.
 
 When you use the database engine to store your metrics, you can always perform a quick backup of a node's
 `/var/cache/netdata/dbengine/` folder using the tool of your choice.

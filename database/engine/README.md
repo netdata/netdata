@@ -66,6 +66,9 @@ calculator**](/docs/store/change-metrics-storage.md#calculate-the-system-resourc
 helps you properly set `page cache size` and `dbengine multihost disk space` on your parent node to allocate enough
 resources based on your metrics retention policy and how many child nodes you have.
 
+For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
+[streaming](/docs/metrics-storage-management/reference-streaming.mdx#default-memory-mode).
+
 #### Legacy mode
 
 _For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and
@@ -85,11 +88,6 @@ All new child nodes are automatically transferred to the multihost dbengine inst
 space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
 must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
 Agent.
-
-##### Information
-
-For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
-[streaming](/streaming/README.md).
 
 ### Memory requirements
 
