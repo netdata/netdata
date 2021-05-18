@@ -7,6 +7,7 @@
 #include "../../aclk/legacy/agent_cloud_link.h"
 #else
 #include "../../aclk/aclk.h"
+#include "../../aclk/aclk_charts.h"
 #endif
 
 int aclk_architecture = 0;
@@ -109,9 +110,11 @@ static void timer_cb(uv_timer_t* handle)
     cmd.opcode = ACLK_DATABASE_TIMER;
     aclk_database_enq_cmd(wc, &cmd);
 
-    cmd.opcode = ACLK_DATABASE_PUSH_CHART;
-    cmd.count = 2;
-    aclk_database_enq_cmd(wc, &cmd);
+    if (wc->chart_updates) {
+        cmd.opcode = ACLK_DATABASE_PUSH_CHART;
+        cmd.count = 2;
+        aclk_database_enq_cmd(wc, &cmd);
+    }
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -125,6 +128,9 @@ void aclk_database_worker(void *arg)
     uv_timer_t timer_req;
     struct aclk_database_cmd cmd;
     unsigned cmd_batch_size;
+
+    wc->chart_updates = 0;
+    wc->alert_updates = 0;
 
     aclk_database_init_cmd_queue(wc);
     uv_thread_set_name_np(wc->thread, "Test");
@@ -323,13 +329,13 @@ bind_fail:
     return (rc != SQLITE_DONE);
 }
 
-static void store_entry(BUFFER *buf, char *item)
-{
-    char wstr[256];
-    sprintf(wstr,"%04d", strlen(item));
-    buffer_strcat(buf, wstr);
-    buffer_strcat(buf, item);
-}
+//static void store_entry(BUFFER *buf, char *item)
+//{
+//    char wstr[256];
+//    sprintf(wstr,"%04lu", strlen(item));
+//    buffer_strcat(buf, wstr);
+//    buffer_strcat(buf, item);
+//}
 
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion)
 {
@@ -344,33 +350,33 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         return 1;
     }
 
-    BUFFER  *buf = buffer_create(1024);
+    //BUFFER  *buf = buffer_create(1024);
 
-    store_entry(buf, st->id);
-    store_entry(buf, st->rrdhost->aclk_state.claimed_id);
-    uuid_unparse_lower(st->rrdhost->host_uuid, uuid_str);  //node_id
-    store_entry(buf, uuid_str);
-    store_entry(buf, st->name);
-    //memory mode
-    buffer_sprintf(buf,"%01d", st->rrd_memory_mode);
-    buffer_sprintf(buf,"%06d", st->update_every);
-    uuid_unparse_lower(st->state->hash_id, uuid_str);
-    store_entry(buf, uuid_str);
-    // labels
-    {
-        struct label_index *labels = &st->state->labels;
-        netdata_rwlock_wrlock(&labels->labels_rwlock);
-        struct label *lbl = labels->head;
-        while (lbl) {
-            buffer_sprintf(buf,"%01d", (int)lbl->label_source);
-            store_entry(buf, lbl->key);
-            store_entry(buf, lbl->value);
-            lbl = lbl->next;
-        }
-        netdata_rwlock_unlock(&labels->labels_rwlock);
-    }
-
-    info("DEBUG: Store [%s]", buffer_tostring(buf));
+//    store_entry(buf, st->id);
+//    store_entry(buf, st->rrdhost->aclk_state.claimed_id);
+//    uuid_unparse_lower(st->rrdhost->host_uuid, uuid_str);  //node_id
+//    store_entry(buf, uuid_str);
+//    store_entry(buf, (char *) st->name);
+//    //memory mode
+//    buffer_sprintf(buf,"%01u", st->rrd_memory_mode);
+//    buffer_sprintf(buf,"%06d", st->update_every);
+//    uuid_unparse_lower(st->state->hash_id, uuid_str);
+//    store_entry(buf, uuid_str);
+//    // labels
+//    {
+//        struct label_index *labels = &st->state->labels;
+//        netdata_rwlock_wrlock(&labels->labels_rwlock);
+//        struct label *lbl = labels->head;
+//        while (lbl) {
+//            buffer_sprintf(buf,"%01d", (int)lbl->label_source);
+//            store_entry(buf, lbl->key);
+//            store_entry(buf, lbl->value);
+//            lbl = lbl->next;
+//        }
+//        netdata_rwlock_unlock(&labels->labels_rwlock);
+//    }
+//
+//    info("DEBUG: Store [%s]", buffer_tostring(buf));
 
     uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
 
@@ -414,6 +420,8 @@ void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_d
 {
     int rc;
     uuid_t  host_id;
+
+    UNUSED(wc);
 
     rc = uuid_parse((char *) cmd.data, host_id);
     if (unlikely(rc))
@@ -1223,29 +1231,8 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     buffer_free(sql);
 
     if (head) {
-        int count = 0;
-        struct chart_instance_updated *result;
         info("DEBUG: SENDING CHART UPDATE %d charts", head->chart_count);
-        while (count < head->chart_count) {
-            result = &(head->charts[count]);
-            info("  DEBUG: SENDING CHART sequence_id=%ld last_sequence_id=%ld id=%s name=%s node_id=%s claim_id=%s config_hash=%s",
-                result->position.sequence_id,
-                result->position.previous_sequence_id,
-                result->id,
-                result->name,
-                result->node_id,
-                result->claim_id,
-                result->config_hash);
-            freez(result->id);
-            freez(result->name);
-            freez(result->claim_id);
-            freez(result->config_hash);
-            freez(result->node_id);
-            count++;
-        }
-        info("DEBUG: SENDING CHART UPDATE done");
-        freez(head->charts);
-        freez(head);
+        aclk_chart_dim_update(head);
     }
     else
         info("DEBUG: NO CHARTS FOUND");

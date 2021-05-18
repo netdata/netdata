@@ -5,6 +5,7 @@
 
 #include "sqlite3.h"
 
+//#include "../../aclk/aclk.h"
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
@@ -137,6 +138,8 @@ struct aclk_database_worker_config {
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
     int error;
+    int chart_updates;
+    int alert_updates;
 };
 
 //extern void sqlite_worker(void* arg);
