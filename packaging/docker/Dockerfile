@@ -25,6 +25,7 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
+   echo "oci-$(uname -m)" > ./system/.install-type && \
    ./netdata-installer.sh --dont-wait --dont-start-it ${EXTRA_INSTALL_OPTS} \
    "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
