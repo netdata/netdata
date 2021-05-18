@@ -26,7 +26,7 @@ jobs:
 
       - name: Run ingest script
         working-directory: ./build
-        run: node ./build/ingest.js
+        run: node ingest.js
         env:
           GITHUB_TOKEN: ${{ secrets.INGEST_TOKEN }}
 
