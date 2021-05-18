@@ -27,4 +27,6 @@ char *aclk_generate_lwt(size_t *size);
 void aclk_generate_node_registration(mqtt_wss_client client, node_instance_creation_t *node_creation);
 void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_connection_t *node_connection);
 
+void aclk_generate_chart_dim_update(mqtt_wss_client client, charts_and_dims_updated_t *data);
+
 #endif

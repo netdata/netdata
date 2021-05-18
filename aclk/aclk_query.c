@@ -203,6 +203,11 @@ static int node_state_update(mqtt_wss_client client, aclk_query_t query) {
     return 0;
 }
 
+static int chart_dim_update(mqtt_wss_client client, aclk_query_t query) {
+    aclk_generate_chart_dim_update(client, query->data.chart_dim_update);
+    return 0;
+}
+
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,        .name = "http api request v2", .fnc = http_api_v2              },
     { .type = ALARM_STATE_UPDATE, .name = "alarm state update",  .fnc = alarm_state_update_query },
@@ -212,6 +217,7 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = CHART_DEL,          .name = "chart delete",        .fnc = info_metadata            },
     { .type = REGISTER_NODE,      .name = "register node",       .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,  .name = "node state update",   .fnc = node_state_update        },
+    { .type = CHART_DIM_UPDATE,   .name = "chart and dim update",.fnc = chart_dim_update         },
     { .type = UNKNOWN,            .name = NULL,                  .fnc = NULL                     }
 };
 

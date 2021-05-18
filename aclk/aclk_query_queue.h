@@ -16,7 +16,8 @@ typedef enum {
     CHART_DEL,
     ALARM_STATE_UPDATE,
     REGISTER_NODE,
-    NODE_STATE_UPDATE
+    NODE_STATE_UPDATE,
+    CHART_DIM_UPDATE
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
@@ -60,6 +61,7 @@ struct aclk_query {
         struct aclk_query_chart_add_del chart_add_del;
         node_instance_creation_t node_creation;
         node_instance_connection_t node_update;
+        charts_and_dims_updated_t *chart_dim_update;
         json_object *alarm_update;
     } data;
 };
