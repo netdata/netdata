@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 # Send alert notifications to PagerDuty
 
-[PagerDuty](https://www.pagerduty.com/company/) is the enterprise incident resolution service that integrates with ITOps
+[PagerDuty](https://www.pagerduty.com/company/) is an enterprise incident resolution service that integrates with ITOps
 and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to
 correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and
 resolution times.
@@ -22,7 +22,7 @@ notifications](https://user-images.githubusercontent.com/1153921/118317133-872a4
 - An installation of the open-source [Netdata](/docs/get-netdata.mdx) monitoring agent
 - An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
   running Netdata
-- A PagerDuty `Generic API` service using either 
+- A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`
 
 ## Setup
 
