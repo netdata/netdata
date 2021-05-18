@@ -5,6 +5,7 @@
 
 #include "sqlite3.h"
 
+//#include "../../aclk/aclk.h"
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
@@ -81,6 +82,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_FETCH_CHART,
     ACLK_DATABASE_FETCH_CHART_PROTO,
+    ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_STATUS_CHART,
     ACLK_DATABASE_RESET_NODE,
@@ -136,6 +138,8 @@ struct aclk_database_worker_config {
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
     int error;
+    int chart_updates;
+    int alert_updates;
 };
 
 //extern void sqlite_worker(void* arg);
@@ -155,6 +159,7 @@ void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_start_streaming(char *node_id);
 void sql_aclk_drop_all_table_list();
 extern void aclk_set_architecture(int mode);

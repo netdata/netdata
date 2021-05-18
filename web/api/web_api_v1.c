@@ -405,6 +405,8 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int nodelist = 0;
     char *reset_node = NULL;
     int resync_nodes = 0;
+    int chart_updates = 0;
+    int alert_updates = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -424,10 +426,28 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "reset_node")) reset_node = value;
         if(!strcmp(name, "resync_nodes")) resync_nodes = 1;
         if(!strcmp(name, "fetch_proto")) fetch_proto = atoi(value);
+        if(!strcmp(name, "chart_updates")) chart_updates = atoi(value);
+        if(!strcmp(name, "alert_updates")) alert_updates = atoi(value);
         //else {
         // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
         ///}
+    }
+
+    if (chart_updates) {
+        struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+        wc->chart_updates = !wc->chart_updates;
+        buffer_sprintf(w->response.data, "ACLK_SYNC: Chart updates now %d", wc->chart_updates);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (alert_updates) {
+        struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+        wc->alert_updates = !wc->alert_updates;
+        buffer_sprintf(w->response.data, "ACLK_SYNC: Alert updates now %d", wc->alert_updates);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
     }
 
     if (fetch_proto) {
