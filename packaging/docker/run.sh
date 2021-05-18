@@ -53,6 +53,15 @@ else
   create_group=1
 fi
 
+if [ -n "${remove_group}" ]; then
+  delgroup netdata netdata
+  delgroup netdata || exit 1
+fi
+
+if [ -n "${create_group}" ]; then
+  addgroup -g "${NETDATA_GID}" -S netdata || exit 1
+fi
+
 if [ "${NETDATA_USER}" = "netdata" ]; then
   if getent passwd netdata > /dev/null; then
     existing_user="$(getent passwd netdata)"
@@ -73,15 +82,6 @@ if [ "${NETDATA_USER}" = "netdata" ]; then
   else
     echo "Netdata user not found, preparing to create one with UID=${NETDATA_UID}."
     create_user=1
-  fi
-
-  if [ -n "${remove_group}" ]; then
-    delgroup netdata netdata
-    delgroup netdata || exit 1
-  fi
-
-  if [ -n "${create_group}" ]; then
-    addgroup -g "${NETDATA_GID}" -S netdata || exit 1
   fi
 
   if [ -n "${remove_user}" ]; then
