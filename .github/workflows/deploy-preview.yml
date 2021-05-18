@@ -16,7 +16,6 @@ jobs:
           path: './build'
 
       - name: Use Node.js 12
-        working-directory: ./build
         uses: actions/setup-node@v1.4.4
         with:
           node-version: 12
