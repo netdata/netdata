@@ -477,6 +477,19 @@ void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_conne
     freez(msg);
 }
 
+void aclk_generate_chart_dim_update(mqtt_wss_client client, charts_and_dims_updated_t *data) {
+    size_t len;
+    char *msg = generate_charts_and_dimensions_updated(&len, data);
+    if (!msg) {
+        error ("Error generating chart::v1::ChartsAndDimensionsUpdated");
+        return;
+    }
+
+    //TODO topic
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
+    freez(msg);
+}
+
 #ifndef __GNUC__
 #pragma endregion
 #endif
