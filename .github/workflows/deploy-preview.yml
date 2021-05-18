@@ -13,6 +13,7 @@ jobs:
         uses: actions/checkout@master
         with:
           repository: netdata/learn
+          ref: 'deploy-preview'
           path: './build'
 
       - name: Use Node.js 12
@@ -26,7 +27,7 @@ jobs:
 
       - name: Run ingest script
         working-directory: ./build
-        run: node ingest.js
+        run: node ingest.js ${{ github.actor }} ${GITHUB_REF##*/}
         env:
           GITHUB_TOKEN: ${{ secrets.INGEST_TOKEN }}
 
