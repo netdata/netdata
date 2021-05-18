@@ -23,6 +23,7 @@
 - Check the version of the default cgroup mountpoint [\#11102](https://github.com/netdata/netdata/pull/11102) ([vlvkobal](https://github.com/vlvkobal))
 - Don't repeat the cgroup discovery cleanup info message [\#11101](https://github.com/netdata/netdata/pull/11101) ([vlvkobal](https://github.com/vlvkobal))
 - Add host\_cloud\_enabled attribute to analytics [\#11100](https://github.com/netdata/netdata/pull/11100) ([MrZammler](https://github.com/MrZammler))
+- Improve dashboard documentation \(part 3\) [\#11099](https://github.com/netdata/netdata/pull/11099) ([joelhans](https://github.com/joelhans))
 - cgroups: fix network interfaces detection when using `virsh` [\#11096](https://github.com/netdata/netdata/pull/11096) ([ilyam8](https://github.com/ilyam8))
 - Reduce send statistics logging [\#11091](https://github.com/netdata/netdata/pull/11091) ([MrZammler](https://github.com/MrZammler))
 - fix SSL random failures when using multithreaded web server with OpenSSL \< 1.1.0 [\#11089](https://github.com/netdata/netdata/pull/11089) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -66,6 +67,7 @@
 - Move global stats to a separate thread [\#10991](https://github.com/netdata/netdata/pull/10991) ([vlvkobal](https://github.com/vlvkobal))
 - adds missing SPDX license info into ACLK-NG [\#10990](https://github.com/netdata/netdata/pull/10990) ([underhood](https://github.com/underhood))
 - K6 quality of life updates [\#10985](https://github.com/netdata/netdata/pull/10985) ([OdysLam](https://github.com/OdysLam))
+- Add sections for class, component and type. [\#10984](https://github.com/netdata/netdata/pull/10984) ([MrZammler](https://github.com/MrZammler))
 - Update eBPF documentation [\#10982](https://github.com/netdata/netdata/pull/10982) ([thiagoftsm](https://github.com/thiagoftsm))
 - remove vneg from ACLK-NG [\#10980](https://github.com/netdata/netdata/pull/10980) ([underhood](https://github.com/underhood))
 - Remove outdated privacy policy and terms of use [\#10979](https://github.com/netdata/netdata/pull/10979) ([joelhans](https://github.com/joelhans))
@@ -312,8 +314,6 @@
 - bytes after last '}' trip JSON parser [\#10563](https://github.com/netdata/netdata/pull/10563) ([underhood](https://github.com/underhood))
 - Fix prometheus remote write header [\#10560](https://github.com/netdata/netdata/pull/10560) ([vlvkobal](https://github.com/vlvkobal))
 - fix minor vulnerability alert, updating socket-io dependency [\#10557](https://github.com/netdata/netdata/pull/10557) ([jacekkolasa](https://github.com/jacekkolasa))
-- Fix values in Prometheus export for metrics, collected by the Prometheus collector [\#10551](https://github.com/netdata/netdata/pull/10551) ([vlvkobal](https://github.com/vlvkobal))
-- Properly handle saved temporary directory on updates. [\#10550](https://github.com/netdata/netdata/pull/10550) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 
