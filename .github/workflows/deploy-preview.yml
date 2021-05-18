@@ -17,7 +17,7 @@ jobs:
       - name: Check out netdata/learn
         uses: actions/checkout@master
         with:
-          name: netdata/learn
+          repository: netdata/learn
           path: './build'
       - name: Use Node.js 12
         uses: actions/setup-node@v1.4.4
@@ -31,12 +31,8 @@ jobs:
         uses: nwtgck/actions-netlify@v1.2
         with:
           publish-dir: './build'
-          production-branch: master
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deploy-message: "Deploy from GitHub Actions"
-          enable-pull-request-comment: false
-          enable-commit-comment: true
-          overwrites-pull-request-comment: true
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
