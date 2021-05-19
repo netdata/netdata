@@ -67,7 +67,6 @@ dist_healthconfig_DATA = \
     health.d/net.conf \
     health.d/netfilter.conf \
     health.d/pihole.conf \
-    health.d/phpfpm.conf \
     health.d/portcheck.conf \
     health.d/postgres.conf \
     health.d/processes.conf \
