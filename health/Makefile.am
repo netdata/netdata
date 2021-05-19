@@ -68,7 +68,6 @@ dist_healthconfig_DATA = \
     health.d/netfilter.conf \
     health.d/pihole.conf \
     health.d/portcheck.conf \
-    health.d/postgres.conf \
     health.d/processes.conf \
     health.d/pulsar.conf \
     health.d/python.d.plugin.conf \
