@@ -390,7 +390,7 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         uuid_str, &unique_uuid, st->chart_uuid, payload_type, buffer_tostring(tmp_buffer), strlen(buffer_tostring(tmp_buffer)));
 
     buffer_free(tmp_buffer);
-    buffer_free(buf);
+//    buffer_free(buf);
     //info("Added %s completed", st->name);
 
     if (completion)
