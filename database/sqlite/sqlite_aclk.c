@@ -314,7 +314,7 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *unique_id, uuid_t *chart_id, 
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res_chart, 4, payload, payload_size, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res_chart, 4, payload, payload_size, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -346,14 +346,20 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
 
     uuid_t unique_uuid;
     uuid_generate(unique_uuid);
-    BUFFER *tmp_buffer = NULL;
-    tmp_buffer = buffer_create(4096);
-    rrdset2json(st, tmp_buffer, NULL, NULL, 1);
 
-    rc = aclk_add_chart_payload(
-        uuid_str, &unique_uuid, st->chart_uuid, payload_type, buffer_tostring(tmp_buffer), strlen(buffer_tostring(tmp_buffer)));
+    struct chart_instance_updated *chart_payload = callocz(1, sizeof(*chart_payload));
+    chart_payload->config_hash = get_str_from_uuid(&st->state->hash_id);
+    chart_payload->update_every = st->update_every;
+    chart_payload->memory_mode = st->rrd_memory_mode;
+    chart_payload->name = strdupz((char *) st->name);
+    chart_payload->node_id = get_str_from_uuid(st->rrdhost->node_id);
+    chart_payload->claim_id = strdupz(st->rrdhost->aclk_state.claimed_id);
+    chart_payload->id = strdupz(st->id);
 
-    buffer_free(tmp_buffer);
+    size_t payload_size;
+    char *payload = generate_chart_instance_updated(&payload_size, chart_payload);
+    rc = aclk_add_chart_payload(uuid_str, &unique_uuid, st->chart_uuid, payload_type, payload, payload_size);
+    freez(payload);
 
     if (completion)
        complete(completion);
