@@ -51,6 +51,7 @@ dist_healthconfig_DATA = \
     health.d/ioping.conf \
     health.d/fronius.conf \
     health.d/gearman.conf \
+    health.d/go.d.plugin.conf \
     health.d/haproxy.conf \
     health.d/hdfs.conf \
     health.d/httpcheck.conf \
@@ -79,6 +80,7 @@ dist_healthconfig_DATA = \
     health.d/postgres.conf \
     health.d/processes.conf \
     health.d/pulsar.conf \
+    health.d/python.d.plugin.conf \
     health.d/qos.conf \
     health.d/ram.conf \
     health.d/redis.conf \
