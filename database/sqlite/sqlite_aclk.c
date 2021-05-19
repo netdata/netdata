@@ -341,11 +341,14 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
     }
 
 #ifdef ACLK_NG
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
+    char *claim_id = is_agent_claimed();
 
-    uuid_t unique_uuid;
-    uuid_generate(unique_uuid);
+    if (likely(claim_id)) {
+        char uuid_str[GUID_LEN + 1];
+        uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
+
+        uuid_t unique_uuid;
+        uuid_generate(unique_uuid);
 
     struct chart_instance_updated chart_payload;
     memset(&chart_payload, 0, sizeof(chart_payload));
