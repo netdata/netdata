@@ -57,7 +57,6 @@ dist_healthconfig_DATA = \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
     health.d/kubelet.conf \
-    health.d/lighttpd.conf \
     health.d/linux_power_supply.conf \
     health.d/load.conf \
     health.d/mdstat.conf \
