@@ -34,7 +34,10 @@ run ./netdata-installer.sh \
   --dont-scrub-cflags-even-though-it-may-break-things
 
 # Properly mark the install type
-echo "manual-static-$(uname -m)" > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type"
+cat > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type" <<-EOF
+	INSTALL_TYPE='manual-static'
+	PREBUILT_ARCH='$(uname -m)'
+	EOF
 
 # Remove the netdata.conf file from the tree. It has hard-coded sensible defaults builtin.
 run rm -f "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
