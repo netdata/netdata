@@ -63,7 +63,6 @@ dist_healthconfig_DATA = \
     health.d/megacli.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
-    health.d/mongodb.conf \
     health.d/mysql.conf \
     health.d/named.conf \
     health.d/net.conf \
