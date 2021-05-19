@@ -27,7 +27,7 @@ jobs:
 
       - name: Run ingest script
         working-directory: ./build
-        run: node ingest.js ${{ github.actor }} ${GITHUB_REF##*/}
+        run: node ingest.js ${{ github.actor }} netlify-deploys
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
