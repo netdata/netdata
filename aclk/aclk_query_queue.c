@@ -102,27 +102,36 @@ aclk_query_t aclk_query_new(aclk_query_type_t type)
 
 void aclk_query_free(aclk_query_t query)
 {
-    if (query->type == HTTP_API_V2) {
+    switch (query->type) {
+    case HTTP_API_V2:
         freez(query->data.http_api_v2.payload);
         if (query->data.http_api_v2.query != query->dedup_id)
             freez(query->data.http_api_v2.query);
-    }
+        break;
 
-    if (query->type == CHART_NEW)
+    case CHART_NEW:
         freez(query->data.chart_add_del.chart_name);
-    
-    if (query->type == ALARM_STATE_UPDATE && query->data.alarm_update)
-        json_object_put(query->data.alarm_update);
+        break;
 
-    if (query->type == NODE_STATE_UPDATE) {
+    case ALARM_STATE_UPDATE:
+        if (query->data.alarm_update)
+            json_object_put(query->data.alarm_update);
+        break;
+
+    case NODE_STATE_UPDATE:
         freez((void*)query->data.node_update.claim_id);
         freez((void*)query->data.node_update.node_id);
-    }
+        break;
 
-    if (query->type == REGISTER_NODE) {
+    case REGISTER_NODE:
         freez((void*)query->data.node_creation.claim_id);
         freez((void*)query->data.node_creation.hostname);
         freez((void*)query->data.node_creation.machine_guid);
+        break;
+
+    case CHART_DIM_UPDATE_BIN:
+        freez(query->data.bin_payload.payload);
+        break;
     }
 
     freez(query->dedup_id);

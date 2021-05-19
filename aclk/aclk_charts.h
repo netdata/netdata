@@ -6,4 +6,6 @@
 
 void aclk_chart_dim_update(charts_and_dims_updated_t *update);
 
+void aclk_chart_inst_update(char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions);
+
 #endif /* ACLK_CHARTS_H */
