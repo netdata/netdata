@@ -329,14 +329,6 @@ bind_fail:
     return (rc != SQLITE_DONE);
 }
 
-//static void store_entry(BUFFER *buf, char *item)
-//{
-//    char wstr[256];
-//    sprintf(wstr,"%04lu", strlen(item));
-//    buffer_strcat(buf, wstr);
-//    buffer_strcat(buf, item);
-//}
-
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion)
 {
     char uuid_str[GUID_LEN + 1];
@@ -350,34 +342,6 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         return 1;
     }
 
-    //BUFFER  *buf = buffer_create(1024);
-
-//    store_entry(buf, st->id);
-//    store_entry(buf, st->rrdhost->aclk_state.claimed_id);
-//    uuid_unparse_lower(st->rrdhost->host_uuid, uuid_str);  //node_id
-//    store_entry(buf, uuid_str);
-//    store_entry(buf, (char *) st->name);
-//    //memory mode
-//    buffer_sprintf(buf,"%01u", st->rrd_memory_mode);
-//    buffer_sprintf(buf,"%06d", st->update_every);
-//    uuid_unparse_lower(st->state->hash_id, uuid_str);
-//    store_entry(buf, uuid_str);
-//    // labels
-//    {
-//        struct label_index *labels = &st->state->labels;
-//        netdata_rwlock_wrlock(&labels->labels_rwlock);
-//        struct label *lbl = labels->head;
-//        while (lbl) {
-//            buffer_sprintf(buf,"%01d", (int)lbl->label_source);
-//            store_entry(buf, lbl->key);
-//            store_entry(buf, lbl->value);
-//            lbl = lbl->next;
-//        }
-//        netdata_rwlock_unlock(&labels->labels_rwlock);
-//    }
-//
-//    info("DEBUG: Store [%s]", buffer_tostring(buf));
-
     uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
 
     uuid_t unique_uuid;
@@ -390,8 +354,6 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         uuid_str, &unique_uuid, st->chart_uuid, payload_type, buffer_tostring(tmp_buffer), strlen(buffer_tostring(tmp_buffer)));
 
     buffer_free(tmp_buffer);
-//    buffer_free(buf);
-    //info("Added %s completed", st->name);
 
     if (completion)
        complete(completion);
