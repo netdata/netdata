@@ -486,7 +486,7 @@ void aclk_generate_chart_dim_update(mqtt_wss_client client, charts_and_dims_upda
     }
 
     //TODO topic
-    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
+    aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_CHART_DIMS, "ChartsAndDimensionsUpdated");
     freez(msg);
 }
 

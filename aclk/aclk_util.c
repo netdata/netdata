@@ -119,6 +119,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_CMD_NG_V1,   .name = "inbox-cmd-v1"             },
     { .id = ACLK_TOPICID_CREATE_NODE, .name = "create-node-instance"     },
     { .id = ACLK_TOPICID_NODE_CONN,   .name = "node-instance-connection" },
+    { .id = ACLK_TOPICID_CHART_DIMS,  .name = "chart-and-dims-updated"   },
     { .id = ACLK_TOPICID_UNKNOWN,     .name = NULL                       }
 };
 
@@ -140,6 +141,7 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_CMD_NG_V1,
     ACLK_TOPICID_CREATE_NODE,
     ACLK_TOPICID_NODE_CONN,
+    ACLK_TOPICID_CHART_DIMS,
     ACLK_TOPICID_UNKNOWN
 };
 
