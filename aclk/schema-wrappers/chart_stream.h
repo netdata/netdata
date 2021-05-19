@@ -60,6 +60,8 @@ struct chart_instance_updated {
     struct aclk_message_position position;
 };
 
+void chart_instance_updated_destroy(struct chart_instance_updated *instance);
+
 struct chart_dimension_updated {
     const char *id;
     const char *chart_id;

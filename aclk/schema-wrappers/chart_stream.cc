@@ -65,6 +65,18 @@ char *generate_reset_chart_messages(size_t *len, const chart_reset_reason_t reas
     return bin;
 }
 
+void chart_instance_updated_destroy(struct chart_instance_updated *instance)
+{
+    freez((char*)instance->id);
+    freez((char*)instance->claim_id);
+    freez((char*)instance->node_id);
+    freez((char*)instance->name);
+
+    free_label_list(instance->label_head);
+
+    freez((char*)instance->config_hash);
+}
+
 static int set_chart_instance_updated(chart::v1::ChartInstanceUpdated *chart, const struct chart_instance_updated *update)
 {
     google::protobuf::Map<std::string, std::string> *map;
