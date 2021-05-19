@@ -634,8 +634,12 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     }
 
     if (resync_nodes) {
+#ifdef ACLK_NG
         buffer_sprintf(w->response.data, "Resyncing all nodes with the cloud");
         aclk_send_node_instances();
+#else
+        buffer_sprintf(w->response.data, "Not supported with legacy ACLK");
+#endif
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
