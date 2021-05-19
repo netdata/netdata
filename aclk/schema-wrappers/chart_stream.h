@@ -82,6 +82,7 @@ typedef struct {
 } charts_and_dims_updated_t;
 
 char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_updated_t *updates);
+char *generate_chart_instance_updated(size_t *len, const struct chart_instance_updated *update);
 
 #ifdef __cplusplus
 }
