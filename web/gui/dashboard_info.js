@@ -128,7 +128,8 @@ netdataDashboard.menu = {
     },
 
     'mdstat': {
-        icon: '<i class="fas fa-hdd"></i>',
+        title: 'MD arrays',
+        icon: '<i class="fas fa-hdd"></i>'
     },
 
     'sensors': {
