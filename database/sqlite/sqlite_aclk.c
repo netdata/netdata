@@ -846,9 +846,27 @@ fail:
 // Start streaming charts / dimensions for node_id
 void aclk_start_streaming(char *node_id)
 {
-    //char uuid_str[GUID_LEN + 1];
-    //uuid_unparse_lower(*node_id, uuid_str);
+    if (unlikely(!node_id))
+        return;
+
     info("START streaming for %s received", node_id);
+    uuid_t node_uuid;
+    uuid_parse(node_id, node_uuid);
+
+    struct aclk_database_worker_config *wc  = NULL;
+    rrd_wrlock();
+    RRDHOST *host = localhost;
+    while(host) {
+        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+            wc->chart_updates = 1;
+            info("START streaming for %s started", node_id);
+            break;
+        }
+        host = host->next;
+    }
+    rrd_unlock();
+
     return;
 }
 
