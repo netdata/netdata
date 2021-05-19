@@ -68,6 +68,11 @@ Following charts are drawn:
 
     -   locks
 
+12. **Standby lag**
+
+    - WAL offset
+    - replication lag in seconds
+
 ## Configuration
 
 Edit the `python.d/postgres.conf` configuration file using `edit-config` from the Netdata [config
