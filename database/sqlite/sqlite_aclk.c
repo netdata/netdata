@@ -350,22 +350,22 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         uuid_t unique_uuid;
         uuid_generate(unique_uuid);
 
-    struct chart_instance_updated chart_payload;
-    memset(&chart_payload, 0, sizeof(chart_payload));
-    chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
-    chart_payload.update_every = st->update_every;
-    chart_payload.memory_mode = st->rrd_memory_mode;
-    chart_payload.name = strdupz((char *) st->name);
-    chart_payload.node_id = get_str_from_uuid(st->rrdhost->node_id);
-    chart_payload.claim_id = strdupz(st->rrdhost->aclk_state.claimed_id);
-    chart_payload.id = strdupz(st->id);
+        struct chart_instance_updated chart_payload;
+        memset(&chart_payload, 0, sizeof(chart_payload));
+        chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
+        chart_payload.update_every = st->update_every;
+        chart_payload.memory_mode = st->rrd_memory_mode;
+        chart_payload.name = strdupz((char *)st->name);
+        chart_payload.node_id = get_str_from_uuid(st->rrdhost->node_id);
+        chart_payload.claim_id = claim_id;
+        chart_payload.id = strdupz(st->id);
 
-
-    size_t payload_size;
-    char *payload = generate_chart_instance_updated(&payload_size, &chart_payload);
-    rc = aclk_add_chart_payload(uuid_str, &unique_uuid, st->chart_uuid, payload_type, payload, payload_size);
-    chart_instance_updated_destroy(&chart_payload);
-    freez(payload);
+        size_t payload_size;
+        char *payload = generate_chart_instance_updated(&payload_size, &chart_payload);
+        rc = aclk_add_chart_payload(uuid_str, &unique_uuid, st->chart_uuid, payload_type, payload, payload_size);
+        chart_instance_updated_destroy(&chart_payload);
+        freez(payload);
+    }
 #else
     UNUSED(st);
     UNUSED(payload_type);
