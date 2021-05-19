@@ -64,7 +64,6 @@ dist_healthconfig_DATA = \
     health.d/memcached.conf \
     health.d/memory.conf \
     health.d/mysql.conf \
-    health.d/named.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
     health.d/nginx.conf \
