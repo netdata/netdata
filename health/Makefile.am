@@ -77,7 +77,6 @@ dist_healthconfig_DATA = \
     health.d/riakkv.conf \
     health.d/scaleio.conf \
     health.d/softnet.conf \
-    health.d/squid.conf \
     health.d/stiebeleltron.conf \
     health.d/synchronization.conf \
     health.d/swap.conf \
