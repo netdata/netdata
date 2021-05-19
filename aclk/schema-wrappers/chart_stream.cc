@@ -77,55 +77,75 @@ char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_
         return NULL;
     }
 
+static int set_chart_instance_updated(chart::v1::ChartInstanceUpdated *chart, const struct chart_instance_updated *update)
+{
+    google::protobuf::Map<std::string, std::string> *map;
+    aclk_lib::v1::ACLKMessagePosition *pos;
+    struct label *label;
+
+    chart->set_id(update->id);
+    chart->set_claim_id(update->claim_id);
+    chart->set_node_id(update->node_id);
+    chart->set_name(update->name);
+
+    map = chart->mutable_chart_labels();
+    label = update->label_head;
+    while (label) {
+        map->insert({label->key, label->value});
+        label = label->next;
+    }
+
+    switch (update->memory_mode) {
+    case RRD_MEMORY_MODE_NONE:
+        chart->set_memory_mode(chart::v1::NONE);
+        break;
+    case RRD_MEMORY_MODE_RAM:
+        chart->set_memory_mode(chart::v1::RAM);
+        break;
+    case RRD_MEMORY_MODE_MAP:
+        chart->set_memory_mode(chart::v1::MAP);
+        break;
+    case RRD_MEMORY_MODE_SAVE:
+        chart->set_memory_mode(chart::v1::SAVE);
+        break;
+    case RRD_MEMORY_MODE_ALLOC:
+        chart->set_memory_mode(chart::v1::ALLOC);
+        break;
+    case RRD_MEMORY_MODE_DBENGINE:
+        chart->set_memory_mode(chart::v1::DB_ENGINE);
+        break;
+    default:
+        return 1;
+        break;
+    }
+
+    chart->set_update_every_interval(update->update_every);
+    chart->set_config_hash(update->config_hash);
+
+    pos = chart->mutable_position();
+    pos->set_sequence_id(update->position.sequence_id);
+    pos->set_previous_sequence_id(update->position.previous_sequence_id);
+    pos->mutable_seq_id_created_at()->set_seconds(update->position.seq_id_creation_time.tv_sec);
+    pos->mutable_seq_id_created_at()->set_nanos(update->position.seq_id_creation_time.tv_sec * 1000);
+
+    return 0;
+}
+
+char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_updated_t *updates)
+{
+    chart::v1::ChartsAndDimensionsUpdated msg;
+    aclk_lib::v1::ACLKMessagePosition *pos;
+
+    if (!updates->chart_count && !updates->dim_count) {
+        return NULL;
+    }
+
     msg.set_batch_id(updates->batch_id);
 
     for (int i = 0; i < updates->chart_count; i++) {
         chart::v1::ChartInstanceUpdated *chart = msg.add_charts();
-        struct chart_instance_updated *c_chart = &updates->charts[i];
-        chart->set_id(c_chart->id);
-        chart->set_claim_id(c_chart->claim_id);
-        chart->set_node_id(c_chart->node_id);
-        chart->set_name(c_chart->name);
-
-        map = chart->mutable_chart_labels();
-        label = c_chart->label_head;
-        while (label) {
-            map->insert({label->key, label->value});
-            label = label->next;
-        }
-
-        switch (c_chart->memory_mode) {
-        case RRD_MEMORY_MODE_NONE:
-            chart->set_memory_mode(chart::v1::NONE);
-            break;
-        case RRD_MEMORY_MODE_RAM:
-            chart->set_memory_mode(chart::v1::RAM);
-            break;
-        case RRD_MEMORY_MODE_MAP:
-            chart->set_memory_mode(chart::v1::MAP);
-            break;
-        case RRD_MEMORY_MODE_SAVE:
-            chart->set_memory_mode(chart::v1::SAVE);
-            break;
-        case RRD_MEMORY_MODE_ALLOC:
-            chart->set_memory_mode(chart::v1::ALLOC);
-            break;
-        case RRD_MEMORY_MODE_DBENGINE:
-            chart->set_memory_mode(chart::v1::DB_ENGINE);
-            break;
-        default:
+        if (set_chart_instance_updated(chart, &updates->charts[i]))
             return NULL;
-            break;
-        }
-
-        chart->set_update_every_interval(c_chart->update_every);
-        chart->set_config_hash(c_chart->config_hash);
-
-        pos = chart->mutable_position();
-        pos->set_sequence_id(c_chart->position.sequence_id);
-        pos->set_previous_sequence_id(c_chart->position.previous_sequence_id);
-        pos->mutable_seq_id_created_at()->set_seconds(c_chart->position.seq_id_creation_time.tv_sec);
-        pos->mutable_seq_id_created_at()->set_nanos(c_chart->position.seq_id_creation_time.tv_sec * 1000);
     }
 
     for (int i = 0; i < updates->dim_count; i++) {
@@ -157,5 +177,20 @@ char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_
     if (bin)
         msg.SerializeToArray(bin, *len);
 
+    return bin;
+}
+
+char *generate_chart_instance_updated(size_t *len, const struct chart_instance_updated *update)
+{
+    chart::v1::ChartInstanceUpdated *chart = new chart::v1::ChartInstanceUpdated();
+
+    if (set_chart_instance_updated(chart, update))
+        return NULL;
+
+    *len = chart->ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    chart->SerializeToArray(bin, *len);
+
+    delete chart;
     return bin;
 }
