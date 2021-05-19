@@ -14,7 +14,6 @@ context('Assertions', () => {
         cy.get('[data-target="#saveSnapshotModal"][title="Export a snapshot"]')
         cy.get('[data-target="#loadSnapshotModal"][title="Import a snapshot"]')
         cy.get('[data-target="#printPreflightModal"][title="Print dashboard"]')
-        cy.get('[data-target="#alarmsModal"][title="Alarms"]')
         cy.get('[data-target="#optionsModal"][title="Settings"]')
 
         // Assert presence of gauges
