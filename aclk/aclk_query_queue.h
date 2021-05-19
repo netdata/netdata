@@ -17,7 +17,8 @@ typedef enum {
     ALARM_STATE_UPDATE,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
-    CHART_DIM_UPDATE
+    CHART_DIM_UPDATE,
+    CHART_DIM_UPDATE_BIN
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
@@ -33,6 +34,11 @@ struct aclk_query_chart_add_del {
 struct aclk_query_http_api_v2 {
     char *payload;
     char *query;
+};
+
+struct aclk_bin_payload { 
+    char *payload;
+    size_t size;
 };
 
 typedef struct aclk_query *aclk_query_t;
@@ -62,6 +68,7 @@ struct aclk_query {
         node_instance_creation_t node_creation;
         node_instance_connection_t node_update;
         charts_and_dims_updated_t *chart_dim_update;
+        struct aclk_bin_payload bin_payload;
         json_object *alarm_update;
     } data;
 };
