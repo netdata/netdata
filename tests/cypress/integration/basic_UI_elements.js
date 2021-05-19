@@ -80,18 +80,15 @@ context('Assertions', () => {
         // tcp
         cy.get('h2#menu_ipv4_submenu_tcp').contains('tcp');
         cy.get('[data-netdata="ipv4.tcppackets"][id="chart_ipv4_tcppackets"]')
-        cy.get('[data-netdata="ipv4.tcperrors"][id="chart_ipv4_tcperrors"]')
         cy.get('[data-netdata="ipv4.tcphandshake"][id="chart_ipv4_tcphandshake"]')
 
         // udp
         cy.get('h2#menu_ipv4_submenu_udp').contains('udp');
         cy.get('[data-netdata="ipv4.udppackets"][id="chart_ipv4_udppackets"]')
-        cy.get('[data-netdata="ipv4.udperrors"][id="chart_ipv4_udperrors"]')
 
         // icmp
         cy.get('h2#menu_ipv4_submenu_icmp').contains('icmp');
         cy.get('[data-netdata="ipv4.icmp"][id="chart_ipv4_icmp"]')
-        cy.get('[data-netdata="ipv4.icmp_errors"][id="chart_ipv4_icmp_errors"]')
         cy.get('[data-netdata="ipv4.icmpmsg"][id="chart_ipv4_icmpmsg"]')
 
         // packets
