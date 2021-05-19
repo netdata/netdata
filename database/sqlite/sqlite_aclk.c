@@ -331,9 +331,7 @@ bind_fail:
 
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion)
 {
-    char uuid_str[GUID_LEN + 1];
-    int rc;
-
+    int rc = 0;
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return 1;
@@ -342,10 +340,15 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         return 1;
     }
 
-    uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
+#ifdef ACLK_NG
+    char *claim_id = is_agent_claimed();
 
-    uuid_t unique_uuid;
-    uuid_generate(unique_uuid);
+    if (likely(claim_id)) {
+        char uuid_str[GUID_LEN + 1];
+        uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
+
+        uuid_t unique_uuid;
+        uuid_generate(unique_uuid);
 
     struct chart_instance_updated chart_payload;
     memset(&chart_payload, 0, sizeof(chart_payload));
@@ -357,12 +360,16 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
     chart_payload.claim_id = strdupz(st->rrdhost->aclk_state.claimed_id);
     chart_payload.id = strdupz(st->id);
 
+
     size_t payload_size;
     char *payload = generate_chart_instance_updated(&payload_size, &chart_payload);
     rc = aclk_add_chart_payload(uuid_str, &unique_uuid, st->chart_uuid, payload_type, payload, payload_size);
     chart_instance_updated_destroy(&chart_payload);
     freez(payload);
-
+#else
+    UNUSED(st);
+    UNUSED(payload_type);
+#endif
     if (completion)
        complete(completion);
 
@@ -699,6 +706,8 @@ void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_
 // ST is read locked
 void sql_queue_chart_to_aclk(RRDSET *st, int mode)
 {
+    UNUSED(mode);
+
     if (!aclk_architecture)
         aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 
@@ -1114,6 +1123,11 @@ void sql_queue_dimension_to_aclk(RRDHOST *host, RRDDIM *rd)
 
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
+
+#ifndef ACLK_NG
+    UNUSED (wc);
+    UNUSED(cmd);
+#else
     int rc;
 
     int limit = cmd.count > 0 ? cmd.count : 1;
@@ -1207,6 +1221,7 @@ fail:
 
 fail_complete:
     buffer_free(sql);
+#endif
 
     return;
 }
