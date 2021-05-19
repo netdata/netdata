@@ -65,18 +65,6 @@ char *generate_reset_chart_messages(size_t *len, const chart_reset_reason_t reas
     return bin;
 }
 
-char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_updated_t *updates)
-{
-    chart::v1::ChartsAndDimensionsUpdated msg;
-    aclk_lib::v1::ACLKMessagePosition *pos;
-
-    google::protobuf::Map<std::string, std::string> *map;
-    struct label *label;
-
-    if (!updates->chart_count && !updates->dim_count) {
-        return NULL;
-    }
-
 static int set_chart_instance_updated(chart::v1::ChartInstanceUpdated *chart, const struct chart_instance_updated *update)
 {
     google::protobuf::Map<std::string, std::string> *map;
