@@ -876,8 +876,12 @@ void aclk_start_streaming(char *node_id)
     while(host) {
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-            wc->chart_updates = 1;
-            info("START streaming for %s started", node_id);
+            if (likely(wc)) {
+                wc->chart_updates = 1;
+                info("START streaming for %s started", node_id);
+            }
+            else
+                error("ACLK synchronization thread is not active for host %s", host->hostname);
             break;
         }
         host = host->next;
