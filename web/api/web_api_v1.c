@@ -436,16 +436,24 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
 
     if (chart_updates) {
         struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
-        wc->chart_updates = !wc->chart_updates;
-        buffer_sprintf(w->response.data, "ACLK_SYNC: Chart updates now %d", wc->chart_updates);
+        if (unlikely(!wc))
+            buffer_sprintf(w->response.data, "ACLK_SYNC: synchonization thread is not active for host %s", host->hostname);
+        else {
+            wc->chart_updates = !wc->chart_updates;
+            buffer_sprintf(w->response.data, "ACLK_SYNC: Chart updates now %d", wc->chart_updates);
+        }
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
 
     if (alert_updates) {
         struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
-        wc->alert_updates = !wc->alert_updates;
-        buffer_sprintf(w->response.data, "ACLK_SYNC: Alert updates now %d", wc->alert_updates);
+        if (unlikely(!wc))
+            buffer_sprintf(w->response.data, "ACLK_SYNC: synchonization thread is not active for host %s", host->hostname);
+        else {
+            wc->alert_updates = !wc->alert_updates;
+            buffer_sprintf(w->response.data, "ACLK_SYNC: Alert updates now %d", wc->alert_updates);
+        }
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
