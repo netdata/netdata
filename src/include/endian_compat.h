@@ -31,7 +31,11 @@
     #define be64toh(x) OSSwapBigToHostInt64(x)
     #define le64toh(x) OSSwapLittleToHostInt64(x)
 #else
+#ifdef __FreeBSD__
+    #include <sys/endian.h>
+#else
     #include <endian.h>
+#endif
 #endif
 
 #endif /* MQTT_WSS_ENDIAN_COMPAT_H */

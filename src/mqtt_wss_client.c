@@ -644,7 +644,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
 static inline uint64_t boottime_usec(mqtt_wss_client client) {
     struct timespec ts;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
 #else
     if (clock_gettime(CLOCK_BOOTTIME, &ts) == -1) {
