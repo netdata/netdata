@@ -325,6 +325,17 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         freez(res.node_id);
         return;
     }
+    if (!strcmp(message_type, "UpdateChartConfigs")) {
+        struct update_chart_config res = parse_update_chart_config(msg, msg_len);
+        if (!res.claim_id || !res.node_id || !res.hashes)
+        {
+            error("Error parsing UpdateChartConfigs msg");
+            destroy_update_chart_config(&res);
+        }
+        //stelfrag TODO... call your fnc here
+        destroy_update_chart_config(&res);
+        return;
+    }
 
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
