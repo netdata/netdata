@@ -964,7 +964,7 @@ CHARTS = {
         ]
     },
     'standby_lag': {
-        'options': [None, 'Standby lag', 's', 'replication lag', 'postgres.standby_lag', 'line'],
+        'options': [None, 'Standby lag', 'seconds', 'replication lag', 'postgres.standby_lag', 'line'],
         'lines': [
             ['write_lag', 'write lag', 'absolute'],
             ['flush_lag', 'flush lag', 'absolute'],
@@ -1212,14 +1212,14 @@ class Service(SimpleService):
                 definitions=self.definitions,
                 name='standby_delta',
                 application_name=application_name,
-                chart_description='replication delta',
+                chart_family='replication delta',
             )
             add_replication_standby_chart(
                 order=self.order,
                 definitions=self.definitions,
                 name='standby_lag',
                 application_name=application_name,
-                chart_description='replication lag',
+                chart_family='replication lag',
             )
 
         for slot_name in self.replication_slots[::-1]:
@@ -1298,7 +1298,7 @@ def add_database_stat_chart(order, definitions, name, database_name):
         'lines': create_lines(database_name, chart_template['lines'])}
 
 
-def add_replication_standby_chart(order, definitions, name, application_name, chart_description):
+def add_replication_standby_chart(order, definitions, name, application_name, chart_family):
     def create_lines(standby, lines):
         result = list()
         for line in lines:
@@ -1312,7 +1312,7 @@ def add_replication_standby_chart(order, definitions, name, application_name, ch
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-        'options': [name, title + ': ' + application_name, units, chart_description, context, chart_type],
+        'options': [name, title + ': ' + application_name, units, chart_family, context, chart_type],
         'lines': create_lines(application_name, chart_template['lines'])}
 
 
