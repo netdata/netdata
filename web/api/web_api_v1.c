@@ -407,6 +407,9 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int resync_nodes = 0;
     int chart_updates = 0;
     int alert_updates = 0;
+    int drop_tables = 0;
+    int create_tables = 0;
+    int stop_thread = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -428,10 +431,42 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "fetch_proto")) fetch_proto = atoi(value);
         if(!strcmp(name, "chart_updates")) chart_updates = atoi(value);
         if(!strcmp(name, "alert_updates")) alert_updates = atoi(value);
+        if(!strcmp(name, "drop_tables")) drop_tables = atoi(value);
+        if(!strcmp(name, "stop_thread")) stop_thread = atoi(value);
+        if(!strcmp(name, "create_tables")) create_tables = atoi(value);
+
         //else {
         // buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
         ///}
+    }
+
+    if (drop_tables) {
+        sql_drop_host_aclk_table_list(&host->host_uuid);
+        buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK related tables dropped for host %s", host->hostname);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (stop_thread) {
+        struct aclk_database_cmd cmd;
+        cmd.opcode = ACLK_DATABASE_SHUTDOWN;
+        struct completion compl ;
+        init_completion(&compl);
+        cmd.completion = &compl ;
+        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+        wait_for_completion(&compl );
+        destroy_completion(&compl );
+        buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK thread shutdown for host %s", host->hostname);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
+    }
+
+    if (create_tables) {
+        sql_create_aclk_table(host);
+        buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK related tables created for host %s", host->hostname);
+        buffer_no_cacheable(w->response.data);
+        return HTTP_RESP_OK;
     }
 
     if (chart_updates) {
