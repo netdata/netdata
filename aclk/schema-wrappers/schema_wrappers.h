@@ -9,5 +9,6 @@
 #include "node_connection.h"
 #include "node_creation.h"
 #include "chart_stream.h"
+#include "chart_config.h"
 
 #endif /* SCHEMA_WRAPPERS_H */
