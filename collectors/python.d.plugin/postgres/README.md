@@ -68,10 +68,22 @@ Following charts are drawn:
 
     -   locks
 
-12. **Standby lag**
+12. **Standby delta** KB
 
-    - WAL offset
-    - replication lag in seconds
+    - sent delta
+    - write delta
+    - flush delta
+    - replay delta
+
+13. **Standby lag** seconds
+
+    - write lag
+    - flush lag
+    - replay lag
+
+14. **Average number of blocking transactions in db** processes
+
+    - blocking
 
 ## Configuration
 

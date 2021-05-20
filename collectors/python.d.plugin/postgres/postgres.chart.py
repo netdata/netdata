@@ -825,7 +825,7 @@ CHARTS = {
         ]
     },
     'db_stat_blocking_pids_avg': {
-        'options': [None, 'Average number of blocking transactions', 'processes', 'db statistics',
+        'options': [None, 'Average number of blocking transactions in db', 'processes', 'db statistics',
                     'postgres.db_stat_blocking_pids_avg', 'line'],
         'lines': [
             ['blocking_pids_avg', 'blocking', 'absolute']
