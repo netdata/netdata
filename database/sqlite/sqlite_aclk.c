@@ -242,6 +242,10 @@ void aclk_database_worker(void *arg)
                     break;
                 case ACLK_DATABASE_SHUTDOWN:
                     shutdown = 1;
+                    fatal_assert(0 == uv_timer_stop(&timer_req));
+                    uv_close((uv_handle_t *)&timer_req, NULL);
+                    if (cmd.completion)
+                        complete(cmd.completion);
                     break;
                 default:
                     debug(D_METADATALOG, "%s: default.", __func__);
@@ -251,7 +255,7 @@ void aclk_database_worker(void *arg)
     }
 
     /* cleanup operations of the event loop */
-    info("Shutting down ACLK_DATABASE  engine event loop.");
+    info("Shutting down ACLK_DATABASE engine event loop.");
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -268,6 +272,10 @@ void aclk_database_worker(void *arg)
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
+    rrd_wrlock();
+    freez(wc->host->dbsync_worker);
+    wc->host->dbsync_worker = NULL;
+    rrd_unlock();
     return;
 
     error_after_timer_init:
@@ -830,6 +838,7 @@ void sql_create_aclk_table(RRDHOST *host)
     struct aclk_database_worker_config *wc = NULL;
     host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
     wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+    wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
 }
