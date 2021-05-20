@@ -1238,3 +1238,36 @@ fail_complete:
 
     return;
 }
+
+// Start streaming charts / dimensions for node_id
+void aclk_get_chart_config(char **hash_id)
+{
+    if (unlikely(!hash_id))
+        return;
+
+    for (int i=0; hash_id[i]; ++i)
+        info("Request for chart config %d -- %s received", i, hash_id[i]);
+//    uuid_t node_uuid;
+//    uuid_parse(node_id, node_uuid);
+//
+//    struct aclk_database_worker_config *wc  = NULL;
+//    rrd_wrlock();
+//    RRDHOST *host = localhost;
+//    while(host) {
+//        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+//            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+//            if (likely(wc)) {
+//                wc->chart_updates = 1;
+//                info("START streaming for %s started", node_id);
+//            }
+//            else
+//                error("ACLK synchronization thread is not active for host %s", host->hostname);
+//            break;
+//        }
+//        host = host->next;
+//    }
+//    rrd_unlock();
+
+    return;
+}
+
