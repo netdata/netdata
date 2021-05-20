@@ -333,6 +333,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             destroy_update_chart_config(&res);
         }
         //stelfrag TODO... call your fnc here
+        aclk_get_chart_config(res.hashes);
         destroy_update_chart_config(&res);
         return;
     }
