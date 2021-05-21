@@ -25,3 +25,42 @@ jobs:
           use-verbose-mode: 'yes'
           check-modified-files-only: 'yes'
           config-file: '.mlc_config.json'
+
+  netlify-deploy:
+    # Operating system to run job on
+    runs-on: ubuntu-latest
+
+    # Steps in job
+    steps:
+      - name: Check out netdata/learn
+        uses: actions/checkout@master
+        with:
+          repository: netdata/learn
+          ref: 'deploy-preview'
+          path: './build'
+
+      - name: Use Node.js 12
+        uses: actions/setup-node@v1.4.4
+        with:
+          node-version: 12
+
+      - name: Install dependencies
+        working-directory: ./build
+        run: yarn install
+
+      - name: Run ingest script
+        working-directory: ./build
+        run: node ingest.js ${{ github.actor }} netlify-deploys
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v1.2
+        with:
+          publish-dir: './build'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 1
