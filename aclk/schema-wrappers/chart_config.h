@@ -39,6 +39,7 @@ struct chart_config_updated {
 };
 
 void destroy_update_chart_config(struct update_chart_config *cfg);
+void destroy_chart_config_updated(struct chart_config_updated *cfg);
 
 struct update_chart_config parse_update_chart_config(const char *data, size_t len);
 

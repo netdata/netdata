@@ -11,6 +11,20 @@ void destroy_update_chart_config(struct update_chart_config *cfg)
     freez(cfg->hashes);
 }
 
+void destroy_chart_config_updated(struct chart_config_updated *cfg)
+{
+    freez(cfg->id);
+    freez(cfg->name);
+    freez(cfg->type);
+    freez(cfg->family);
+    freez(cfg->context);
+    freez(cfg->title);
+    freez(cfg->plugin);
+    freez(cfg->module);
+    freez(cfg->units);
+    freez(cfg->config_hash);
+}
+
 struct update_chart_config parse_update_chart_config(const char *data, size_t len)
 {
     chart::v1::UpdateChartConfigs cfgs;
