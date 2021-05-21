@@ -130,7 +130,10 @@ void aclk_query_free(aclk_query_t query)
         break;
 
     case CHART_DIMS_UPDATE_BIN:
+    case CHART_CONFIG_UPDATED:
         freez(query->data.bin_payload.payload);
+        break;
+    default:
         break;
     }
 

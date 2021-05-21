@@ -11,6 +11,20 @@ void destroy_update_chart_config(struct update_chart_config *cfg)
     freez(cfg->hashes);
 }
 
+void destroy_chart_config_updated(struct chart_config_updated *cfg)
+{
+    freez(cfg->id);
+    freez(cfg->name);
+    freez(cfg->type);
+    freez(cfg->family);
+    freez(cfg->context);
+    freez(cfg->title);
+    freez(cfg->plugin);
+    freez(cfg->module);
+    freez(cfg->units);
+    freez(cfg->config_hash);
+}
+
 struct update_chart_config parse_update_chart_config(const char *data, size_t len)
 {
     chart::v1::UpdateChartConfigs cfgs;
@@ -47,4 +61,44 @@ struct update_chart_config parse_update_chart_config(const char *data, size_t le
     }
 
     return res;
+}
+
+char *generate_chart_configs_updated(size_t *len, const struct chart_config_updated *config_list, int list_size)
+{
+    chart::v1::ChartConfigsUpdated configs;
+    for (int i = 0; i < list_size; i++) {
+        chart::v1::ChartConfigUpdated *config = configs.add_configs();
+        config->set_id(config_list[i].id);
+        config->set_name(config_list[i].name);
+        config->set_type(config_list[i].type);
+        config->set_family(config_list[i].family);
+        config->set_context(config_list[i].context);
+        config->set_title(config_list[i].title);
+        config->set_priority(config_list[i].priority);
+        config->set_plugin(config_list[i].plugin);
+        config->set_module(config_list[i].module);
+
+        switch (config_list[i].chart_type) {
+        case RRDSET_TYPE_LINE:
+            config->set_chart_type(chart::v1::LINE);
+            break;
+        case RRDSET_TYPE_AREA:
+            config->set_chart_type(chart::v1::AREA);
+            break;
+        case RRDSET_TYPE_STACKED:
+            config->set_chart_type(chart::v1::STACKED);
+            break;
+        default:
+            return NULL;
+        }
+
+        config->set_units(config_list[i].units);
+        config->set_config_hash(config_list[i].config_hash);
+    }
+
+    *len = configs.ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    configs.SerializeToArray(bin, *len);
+
+    return bin;
 }

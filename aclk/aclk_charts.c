@@ -24,3 +24,11 @@ void aclk_chart_dim_update(char **payloads, size_t *payload_sizes, struct aclk_m
     if (query->data.bin_payload.payload)
         aclk_queue_query(query);
 }
+
+void aclk_chart_config_updated(struct chart_config_updated *config_list, int list_size)
+{
+    aclk_query_t query = aclk_query_new(CHART_CONFIG_UPDATED);
+    query->data.bin_payload.payload = generate_chart_configs_updated(&query->data.bin_payload.size, config_list, list_size);
+    if (query->data.bin_payload.payload)
+        aclk_queue_query(query);
+}
