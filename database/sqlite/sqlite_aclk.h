@@ -83,6 +83,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_FETCH_CHART,
     ACLK_DATABASE_FETCH_CHART_PROTO,
     ACLK_DATABASE_PUSH_CHART,
+    ACLK_DATABASE_PUSH_CHART_CONFIG,
+    ACLK_DATABASE_ADD_CHART_CONFIG,
     ACLK_DATABASE_PUSH_DIMENSION,
     ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_STATUS_CHART,
@@ -153,6 +155,7 @@ extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host);
 extern void sql_create_aclk_table(RRDHOST *host);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
+int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_dimension_event(RRDDIM *st, char *payload_type, struct completion *completion);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

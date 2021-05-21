@@ -208,6 +208,13 @@ void aclk_database_worker(void *arg)
                     //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     //freez(cmd.data_param);
                     break;
+                case ACLK_DATABASE_PUSH_CHART_CONFIG:
+                    // Fetch one or more charts
+                    info("Pushing chart config to the cloud");
+                    aclk_push_chart_config_event(wc, cmd);
+                    //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
+                    //freez(cmd.data_param);
+                    break;
                 case ACLK_DATABASE_PUSH_DIMENSION:
                     // Fetch one or more charts
                     info("Pushing chart config to the cloud");
@@ -1265,8 +1272,21 @@ void aclk_get_chart_config(char **hash_id)
     if (unlikely(!hash_id))
         return;
 
-    for (int i=0; hash_id[i]; ++i)
+    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) localhost->dbsync_worker;
+
+    if (unlikely(!wc)) {
+        return;
+    }
+
+    struct aclk_database_cmd cmd;
+    cmd.opcode = ACLK_DATABASE_PUSH_CHART_CONFIG;
+
+    for (int i=0; hash_id[i]; ++i) {
         info("Request for chart config %d -- %s received", i, hash_id[i]);
+        cmd.data_param = (void *) strdupz(hash_id[i]);
+        cmd.count = 1;
+        aclk_database_enq_cmd(wc, &cmd);
+    }
 
     return;
 }
@@ -1373,4 +1393,72 @@ void aclk_push_dimension_event(struct aclk_database_worker_config *wc, struct ac
 #endif
 
     return;
+}
+
+
+int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc = 0;
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            return 1;
+        }
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    UNUSED(wc);
+
+    char *hash_id = (char *) cmd.data_param;
+
+    BUFFER *sql = buffer_create(1024);
+
+    sqlite3_stmt *res = NULL;
+
+    buffer_sprintf(sql, "select id, name, type, family, context, title, priority, plugin, module, unit from chart_hash where hash_id = @hash_id;");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to fetch a chart hash configuration");
+        goto fail;
+    }
+
+    uuid_t hash_uuid;
+    uuid_parse(hash_id, hash_uuid);
+    rc = sqlite3_bind_blob(res, 1, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    struct chart_config_updated chart_config;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        chart_config.id = strdupz((char *)sqlite3_column_text(res, 0));
+        chart_config.name = strdupz((char *)sqlite3_column_text(res, 1));
+        chart_config.type = strdupz((char *)sqlite3_column_text(res, 2));
+        chart_config.family = strdupz((char *)sqlite3_column_text(res, 3));
+        chart_config.context = strdupz((char *)sqlite3_column_text(res, 4));
+        chart_config.title = strdupz((char *)sqlite3_column_text(res, 5));
+        chart_config.priority = sqlite3_column_int64(res, 6);
+        chart_config.plugin = strdupz((char *)sqlite3_column_text(res, 7));
+        chart_config.module = sqlite3_column_bytes(res, 8) > 0 ? strdupz((char *)sqlite3_column_text(res, 8)) : strdupz("NULL");
+        chart_config.chart_type = RRDSET_TYPE_AREA;
+        chart_config.units = strdupz((char *)sqlite3_column_text(res, 9));
+        chart_config.config_hash = strdupz(hash_id);
+    }
+
+    info("SENDING CHART HASH CONFIG for %s", hash_id);
+
+    aclk_chart_config_updated(&chart_config, 1);
+    destroy_chart_config_updated(&chart_config);
+    freez((char *) cmd.data_param);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when pushing chart config hash, rc = %d", rc);
+
+fail:
+    buffer_free(sql);
+
+    return rc;
 }
