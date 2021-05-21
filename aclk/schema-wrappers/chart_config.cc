@@ -37,7 +37,7 @@ struct update_chart_config parse_update_chart_config(const char *data, size_t le
         total_strlen //strings themselves incl. 1 null byte each
     );
 
-    char* dest = ((char*)res.hashes) + (hash_count + 1) * sizeof(char *) /* NULL ptr */;
+    char* dest = ((char*)res.hashes) + (hash_count + 1 /* NULL ptr */) * sizeof(char *);
     // now copy them strings
     // null bytes handled by callocz
     for (int i = 0; i < hash_count; i++) {
