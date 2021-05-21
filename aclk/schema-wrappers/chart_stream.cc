@@ -205,10 +205,10 @@ char *generate_charts_updated(size_t *len, char **payloads, size_t *payload_size
         }
 
         pos = db_msg.mutable_position();
-        pos->set_sequence_id(new_positions->sequence_id);
-        pos->set_previous_sequence_id(new_positions->previous_sequence_id);
-        pos->mutable_seq_id_created_at()->set_seconds(new_positions->seq_id_creation_time.tv_sec);
-        pos->mutable_seq_id_created_at()->set_nanos(new_positions->seq_id_creation_time.tv_usec * 1000);
+        pos->set_sequence_id(new_positions[i].sequence_id);
+        pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
+        pos->mutable_seq_id_created_at()->set_seconds(new_positions[i].seq_id_creation_time.tv_sec);
+        pos->mutable_seq_id_created_at()->set_nanos(new_positions[i].seq_id_creation_time.tv_usec * 1000);
 
         chart = msg.add_charts();
         *chart = db_msg;
