@@ -129,7 +129,7 @@ void aclk_query_free(aclk_query_t query)
         freez((void*)query->data.node_creation.machine_guid);
         break;
 
-    case CHART_DIM_UPDATE_BIN:
+    case CHART_DIMS_UPDATE_BIN:
         freez(query->data.bin_payload.payload);
         break;
     }

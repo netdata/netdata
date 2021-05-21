@@ -131,10 +131,36 @@ static int set_chart_instance_updated(chart::v1::ChartInstanceUpdated *chart, co
     return 0;
 }
 
+static int set_chart_dim_updated(chart::v1::ChartDimensionUpdated *dim, const struct chart_dimension_updated *c_dim)
+{
+    aclk_lib::v1::ACLKMessagePosition *pos;
+
+    dim->set_id(c_dim->id);
+    dim->set_chart_id(c_dim->chart_id);
+    dim->set_node_id(c_dim->node_id);
+    dim->set_claim_id(c_dim->claim_id);
+    dim->set_name(c_dim->name);
+
+    google::protobuf::Timestamp *tv = dim->mutable_created_at();
+    tv->set_seconds(c_dim->created_at.tv_sec);
+    tv->set_nanos(c_dim->created_at.tv_usec * 1000);
+
+    tv = dim->mutable_last_timestamp();
+    tv->set_seconds(c_dim->last_timestamp.tv_sec);
+    tv->set_nanos(c_dim->last_timestamp.tv_usec * 1000);
+
+    pos = dim->mutable_position();
+    pos->set_sequence_id(c_dim->position.sequence_id);
+    pos->set_previous_sequence_id(c_dim->position.previous_sequence_id);
+    pos->mutable_seq_id_created_at()->set_seconds(c_dim->position.seq_id_creation_time.tv_sec);
+    pos->mutable_seq_id_created_at()->set_nanos(c_dim->position.seq_id_creation_time.tv_usec * 1000);
+
+    return 0;
+}
+
 char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_updated_t *updates)
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
-    aclk_lib::v1::ACLKMessagePosition *pos;
 
     if (!updates->chart_count && !updates->dim_count) {
         return NULL;
@@ -150,26 +176,8 @@ char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_
 
     for (int i = 0; i < updates->dim_count; i++) {
         chart::v1::ChartDimensionUpdated *dim = msg.add_dimensions();
-        struct chart_dimension_updated *c_dim = &updates->dims[i];
-        dim->set_id(c_dim->id);
-        dim->set_chart_id(c_dim->chart_id);
-        dim->set_node_id(c_dim->node_id);
-        dim->set_claim_id(c_dim->claim_id);
-        dim->set_name(c_dim->name);
-
-        google::protobuf::Timestamp *tv = dim->mutable_created_at();
-        tv->set_seconds(c_dim->created_at.tv_sec);
-        tv->set_nanos(c_dim->created_at.tv_usec * 1000);
-
-        tv = dim->mutable_last_timestamp();
-        tv->set_seconds(c_dim->last_timestamp.tv_sec);
-        tv->set_nanos(c_dim->last_timestamp.tv_usec * 1000);
-
-        pos = dim->mutable_position();
-        pos->set_sequence_id(c_dim->position.sequence_id);
-        pos->set_previous_sequence_id(c_dim->position.previous_sequence_id);
-        pos->mutable_seq_id_created_at()->set_seconds(c_dim->position.seq_id_creation_time.tv_sec);
-        pos->mutable_seq_id_created_at()->set_nanos(c_dim->position.seq_id_creation_time.tv_usec * 1000);
+        if (set_chart_dim_updated(dim, &updates->dims[i]))
+            return NULL;
     }
 
     *len = msg.ByteSizeLong();
@@ -197,13 +205,46 @@ char *generate_charts_updated(size_t *len, char **payloads, size_t *payload_size
         }
 
         pos = db_msg.mutable_position();
-        pos->set_sequence_id(new_positions->sequence_id);
-        pos->set_previous_sequence_id(new_positions->previous_sequence_id);
-        pos->mutable_seq_id_created_at()->set_seconds(new_positions->seq_id_creation_time.tv_sec);
-        pos->mutable_seq_id_created_at()->set_nanos(new_positions->seq_id_creation_time.tv_usec * 1000);
+        pos->set_sequence_id(new_positions[i].sequence_id);
+        pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
+        pos->mutable_seq_id_created_at()->set_seconds(new_positions[i].seq_id_creation_time.tv_sec);
+        pos->mutable_seq_id_created_at()->set_nanos(new_positions[i].seq_id_creation_time.tv_usec * 1000);
 
         chart = msg.add_charts();
         *chart = db_msg;
+    }
+
+    *len = msg.ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    msg.SerializeToArray(bin, *len);
+
+    return bin;
+}
+
+char *generate_chart_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions)
+{
+    chart::v1::ChartsAndDimensionsUpdated msg;
+
+    msg.set_batch_id(1); //TODO
+
+    for (int i = 0; payloads[i]; i++) {
+        chart::v1::ChartDimensionUpdated db_msg;
+        chart::v1::ChartDimensionUpdated *dim;
+        aclk_lib::v1::ACLKMessagePosition *pos;
+
+        if (!db_msg.ParseFromArray(payloads[i], payload_sizes[i])) {
+            error("[ACLK] Could not parse chart::v1::chart_dimension_updated");
+            return NULL;
+        }
+
+        pos = db_msg.mutable_position();
+        pos->set_sequence_id(new_positions[i].sequence_id);
+        pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
+        pos->mutable_seq_id_created_at()->set_seconds(new_positions[i].seq_id_creation_time.tv_sec);
+        pos->mutable_seq_id_created_at()->set_nanos(new_positions[i].seq_id_creation_time.tv_usec * 1000);
+
+        dim = msg.add_dimensions();
+        *dim = db_msg;
     }
 
     *len = msg.ByteSizeLong();
@@ -225,5 +266,20 @@ char *generate_chart_instance_updated(size_t *len, const struct chart_instance_u
     chart->SerializeToArray(bin, *len);
 
     delete chart;
+    return bin;
+}
+
+char *generate_chart_dimension_updated(size_t *len, const struct chart_dimension_updated *dim)
+{
+    chart::v1::ChartDimensionUpdated *proto_dim = new chart::v1::ChartDimensionUpdated();
+
+    if (set_chart_dim_updated(proto_dim, dim))
+        return NULL;
+
+    *len = proto_dim->ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    proto_dim->SerializeToArray(bin, *len);
+
+    delete proto_dim;
     return bin;
 }

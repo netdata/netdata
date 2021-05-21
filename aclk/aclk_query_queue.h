@@ -17,8 +17,8 @@ typedef enum {
     ALARM_STATE_UPDATE,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
-    CHART_DIM_UPDATE,
-    CHART_DIM_UPDATE_BIN
+    CHART_DIMS_UPDATE,
+    CHART_DIMS_UPDATE_BIN
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
