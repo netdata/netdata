@@ -214,17 +214,17 @@ static int chart_dim_update_bin(mqtt_wss_client client, aclk_query_t query) {
 }
 
 aclk_query_handler aclk_query_handlers[] = {
-    { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
-    { .type = ALARM_STATE_UPDATE,   .name = "alarm state update",       .fnc = alarm_state_update_query },
-    { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
-    { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
-    { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
-    { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
-    { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
-    { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
-    { .type = CHART_DIM_UPDATE,     .name = "chart and dim update",     .fnc = chart_dim_update         },
-    { .type = CHART_DIM_UPDATE_BIN, .name = "chart and dim update bin", .fnc = chart_dim_update_bin     },
-    { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
+    { .type = HTTP_API_V2,           .name = "http api request v2",      .fnc = http_api_v2              },
+    { .type = ALARM_STATE_UPDATE,    .name = "alarm state update",       .fnc = alarm_state_update_query },
+    { .type = METADATA_INFO,         .name = "info metadata",            .fnc = info_metadata            },
+    { .type = METADATA_ALARMS,       .name = "alarms metadata",          .fnc = alarms_metadata          },
+    { .type = CHART_NEW,             .name = "chart new",                .fnc = chart_query              },
+    { .type = CHART_DEL,             .name = "chart delete",             .fnc = info_metadata            },
+    { .type = REGISTER_NODE,         .name = "register node",            .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,     .name = "node state update",        .fnc = node_state_update        },
+    { .type = CHART_DIMS_UPDATE,     .name = "chart and dim update",     .fnc = chart_dim_update         },
+    { .type = CHART_DIMS_UPDATE_BIN, .name = "chart and dim update bin", .fnc = chart_dim_update_bin     },
+    { .type = UNKNOWN,               .name = NULL,                       .fnc = NULL                     }
 };
 
 
