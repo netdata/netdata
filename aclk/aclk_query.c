@@ -215,7 +215,7 @@ static int chart_dim_update_bin(mqtt_wss_client client, aclk_query_t query) {
 
 static int chart_config_updated(mqtt_wss_client client, aclk_query_t query)
 {
-    aclk_send_bin_message_subtopic_pid(client, query->data.bin_payload.payload, query->data.bin_payload.size, ACLK_TOPICID_CHART_DIMS, "ChartConfigsUpdated");
+    aclk_send_bin_message_subtopic_pid(client, query->data.bin_payload.payload, query->data.bin_payload.size, ACLK_TOPICID_CHART_CONFIGS_UPDATED, "ChartConfigsUpdated");
     return 0;
 }
 

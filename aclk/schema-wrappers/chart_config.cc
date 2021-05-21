@@ -76,7 +76,9 @@ char *generate_chart_configs_updated(size_t *len, const struct chart_config_upda
         config->set_title(config_list[i].title);
         config->set_priority(config_list[i].priority);
         config->set_plugin(config_list[i].plugin);
-        config->set_module(config_list[i].module);
+
+        if (config_list[i].module)
+            config->set_module(config_list[i].module);
 
         switch (config_list[i].chart_type) {
         case RRDSET_TYPE_LINE:
