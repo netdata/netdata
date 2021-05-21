@@ -111,16 +111,17 @@ struct topic_name {
     // in answer to /password endpoint
     const char *name;
 } topic_names[] = {
-    { .id = ACLK_TOPICID_CHART,       .name = "chart"                    },
-    { .id = ACLK_TOPICID_ALARMS,      .name = "alarms"                   },
-    { .id = ACLK_TOPICID_METADATA,    .name = "meta"                     },
-    { .id = ACLK_TOPICID_COMMAND,     .name = "inbox-cmd"                },
-    { .id = ACLK_TOPICID_AGENT_CONN,  .name = "agent-connection"         },
-    { .id = ACLK_TOPICID_CMD_NG_V1,   .name = "inbox-cmd-v1"             },
-    { .id = ACLK_TOPICID_CREATE_NODE, .name = "create-node-instance"     },
-    { .id = ACLK_TOPICID_NODE_CONN,   .name = "node-instance-connection" },
-    { .id = ACLK_TOPICID_CHART_DIMS,  .name = "chart-and-dims-updated"   },
-    { .id = ACLK_TOPICID_UNKNOWN,     .name = NULL                       }
+    { .id = ACLK_TOPICID_CHART,                 .name = "chart"                    },
+    { .id = ACLK_TOPICID_ALARMS,                .name = "alarms"                   },
+    { .id = ACLK_TOPICID_METADATA,              .name = "meta"                     },
+    { .id = ACLK_TOPICID_COMMAND,               .name = "inbox-cmd"                },
+    { .id = ACLK_TOPICID_AGENT_CONN,            .name = "agent-connection"         },
+    { .id = ACLK_TOPICID_CMD_NG_V1,             .name = "inbox-cmd-v1"             },
+    { .id = ACLK_TOPICID_CREATE_NODE,           .name = "create-node-instance"     },
+    { .id = ACLK_TOPICID_NODE_CONN,             .name = "node-instance-connection" },
+    { .id = ACLK_TOPICID_CHART_DIMS,            .name = "chart-and-dims-updated"   },
+    { .id = ACLK_TOPICID_CHART_CONFIGS_UPDATED, .name = "chart-configs-updated"    },
+    { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
 enum aclk_topics compulsory_topics_legacy[] = {
@@ -142,6 +143,7 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_CREATE_NODE,
     ACLK_TOPICID_NODE_CONN,
     ACLK_TOPICID_CHART_DIMS,
+    ACLK_TOPICID_CHART_CONFIGS_UPDATED,
     ACLK_TOPICID_UNKNOWN
 };
 
