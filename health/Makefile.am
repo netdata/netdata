@@ -91,6 +91,7 @@ dist_healthconfig_DATA = \
     health.d/synchronization.conf \
     health.d/swap.conf \
     health.d/systemdunits.conf \
+    health.d/timex.conf \
     health.d/tcp_conn.conf \
     health.d/tcp_listen.conf \
     health.d/tcp_mem.conf \
