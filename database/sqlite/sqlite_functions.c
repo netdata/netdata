@@ -29,21 +29,23 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text);",
 
-    "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob PRIMARY KEY, hash_id blob);",
-
-    "CREATE INDEX IF NOT EXISTS ind_chm_hash_id ON chart_hash_map (hash_id);",
+    "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
 
     "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
-    "family text, context text, title text, unit text, plugin text, module text, priority integer, last_used);",
+    "family text, context text, title text, unit text, plugin text, "
+    "module text, priority integer, chart_type, last_used);",
 
     "CREATE VIEW IF NOT EXISTS v_chart_hash as SELECT ch.*, chm.chart_id FROM chart_hash ch, chart_hash_map chm "
     "WHERE ch.hash_id = chm.hash_id;",
 
     "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
-    "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, module, priority, last_used) "
+    "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, "
+    "module, priority, chart_type, last_used) "
     "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
-    "new.module, new.priority, strftime('%s')) ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
-    "INSERT OR REPLACE INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id); END; ",
+    "new.module, new.priority, new.chart_type, strftime('%s')) "
+    "ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
+    "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
+    "on conflict (chart_id, hash_id) do nothing; END; ",
 
     "delete from chart_active;",
     "delete from dimension_active;",
@@ -1378,12 +1380,13 @@ failed:
  */
 
 #define SQL_STORE_CHART_HASH "insert into v_chart_hash (hash_id, type, id, " \
-    "name, family, context, title, unit, plugin, module, priority, last_used, chart_id) " \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, strftime('%s'), ?12);"
+    "name, family, context, title, unit, plugin, module, priority, chart_type, last_used, chart_id) " \
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11, ?12, strftime('%s'), ?13);"
 
 int sql_store_chart_hash(
     uuid_t *hash_id, uuid_t *chart_id, const char *type, const char *id, const char *name, const char *family,
-    const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority)
+    const char *context, const char *title, const char *units, const char *plugin, const char *module, long priority,
+    RRDSET_TYPE chart_type)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
@@ -1462,7 +1465,12 @@ int sql_store_chart_hash(
         goto bind_fail;
 
     param++;
-    rc = sqlite3_bind_blob(res, 12, chart_id, sizeof(*chart_id), SQLITE_STATIC);
+    rc = sqlite3_bind_int(res, 12, chart_type);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_blob(res, 13, chart_id, sizeof(*chart_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1505,8 +1513,9 @@ void compute_chart_hash(RRDSET *st)
     EVP_DigestUpdate(evpctx, st->plugin_name, strlen(st->plugin_name));
     if (st->module_name)
         EVP_DigestUpdate(evpctx, st->module_name, strlen(st->module_name));
-    EVP_DigestUpdate(evpctx, priority_str, strlen(priority_str));
-    //EVP_DigestUpdate(evpctx, st->chart_type, strlen(st->chart_type));
+//    EVP_DigestUpdate(evpctx, priority_str, strlen(priority_str));
+    EVP_DigestUpdate(evpctx, &st->priority, sizeof(st->priority));
+    EVP_DigestUpdate(evpctx, &st->chart_type, sizeof(st->chart_type));
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
     fatal_assert(hash_len > sizeof(uuid_t));
@@ -1528,7 +1537,8 @@ void compute_chart_hash(RRDSET *st)
         st->units,
         st->plugin_name,
         st->module_name,
-        st->priority);
+        st->priority,
+        st->chart_type);
     return;
 }
 
