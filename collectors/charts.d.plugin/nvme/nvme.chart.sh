@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
