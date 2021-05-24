@@ -57,6 +57,13 @@
 #define NETDATA_EBPF_KERNEL_5_10 330240
 
 /**
+ *  Kernel 5.0
+ *
+ *  327680 = 5*65536 +256*0
+ */
+#define NETDATA_EBPF_KERNEL_5_0 327680
+
+/**
  *  Kernel 4.17
  *
  *  266496 = 4*65536 + 17*256
