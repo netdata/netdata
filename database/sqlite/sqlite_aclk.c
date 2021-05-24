@@ -115,11 +115,11 @@ static void timer_cb(uv_timer_t* handle)
         cmd.count = 2;
         aclk_database_enq_cmd(wc, &cmd);
     }
-    if (wc->chart_updates) {
-        cmd.opcode = ACLK_DATABASE_PUSH_DIMENSION;
-        cmd.count = 1;
-        aclk_database_enq_cmd(wc, &cmd);
-    }
+//    if (wc->chart_updates) {
+//        cmd.opcode = ACLK_DATABASE_PUSH_DIMENSION;
+//        cmd.count = 1;
+//        aclk_database_enq_cmd(wc, &cmd);
+//    }
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
