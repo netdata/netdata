@@ -25,9 +25,7 @@ install-exec-local:
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
-    health.d/am2320.conf \
     health.d/anomalies.conf \
-    health.d/apache.conf \
     health.d/apcupsd.conf \
     health.d/backend.conf \
     health.d/bcache.conf \
@@ -39,7 +37,6 @@ dist_healthconfig_DATA = \
     health.d/cgroups.conf \
     health.d/cpu.conf \
     health.d/cockroachdb.conf \
-    health.d/couchdb.conf \
     health.d/disks.conf \
     health.d/dnsmasq_dhcp.conf \
     health.d/dns_query.conf \
@@ -51,6 +48,7 @@ dist_healthconfig_DATA = \
     health.d/ioping.conf \
     health.d/fronius.conf \
     health.d/gearman.conf \
+    health.d/go.d.plugin.conf \
     health.d/haproxy.conf \
     health.d/hdfs.conf \
     health.d/httpcheck.conf \
@@ -59,26 +57,19 @@ dist_healthconfig_DATA = \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
     health.d/kubelet.conf \
-    health.d/lighttpd.conf \
     health.d/linux_power_supply.conf \
     health.d/load.conf \
     health.d/mdstat.conf \
     health.d/megacli.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
-    health.d/mongodb.conf \
     health.d/mysql.conf \
-    health.d/named.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
-    health.d/nginx.conf \
-    health.d/nginx_plus.conf \
     health.d/pihole.conf \
-    health.d/phpfpm.conf \
     health.d/portcheck.conf \
-    health.d/postgres.conf \
     health.d/processes.conf \
-    health.d/pulsar.conf \
+    health.d/python.d.plugin.conf \
     health.d/qos.conf \
     health.d/ram.conf \
     health.d/redis.conf \
@@ -86,7 +77,6 @@ dist_healthconfig_DATA = \
     health.d/riakkv.conf \
     health.d/scaleio.conf \
     health.d/softnet.conf \
-    health.d/squid.conf \
     health.d/stiebeleltron.conf \
     health.d/synchronization.conf \
     health.d/swap.conf \
@@ -107,6 +97,5 @@ dist_healthconfig_DATA = \
     health.d/wmi.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
-    health.d/zookeeper.conf \
     health.d/dbengine.conf \
     $(NULL)
