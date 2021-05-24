@@ -477,7 +477,7 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
 
 /* Attempts to make a connection to MQTT broker over WSS
  * @param client instance of mqtt_wss_client
- * @return  0 - Successfull Connection,
+ * @return  0 - Successful Connection,
  *          <0 - Irrecoverable Error -> Kill ACLK,
  *          >0 - netdata_exit
  */
