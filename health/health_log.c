@@ -453,38 +453,6 @@ inline void health_alarm_log_load(RRDHOST *host) {
         fclose(fp);
     }
 
-    /* int count=0; */
-    /* unsigned int max = host->health_log.max; */
-    /* BUFFER *wb = buffer_create(10000); */
-    /* /\* ALARM_ENTRY *ae; *\/ */
-    /* /\* for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) { *\/ */
-    /* /\*     if (likely(count)) *\/ */
-    /* /\*             buffer_strcat(wb, ","); *\/ */
-    /* /\*     health_alarm_entry2json_nolock(wb, ae, host); *\/ */
-    /* /\*     count++; *\/ */
-    /* /\* } *\/ */
-    /* health_alarm_log2json(host, wb, 0, NULL); */
-
-    /* error_report("health_log.alarms has [%d]", count); */
-
-    /* //error_report(buffer_tostring(wb)); */
-    /* char *lala; */
-    /* lala = strdupz(buffer_tostring(wb)); */
-    
-    /* FILE *fp_loge = fopen("/home/evas/stuff/netdata/scrap/check_health_log/part_2/alarm_log", "w"); */
-    /* fprintf(fp_loge, "%s", lala); */
-    /* fclose(fp_loge); */
-
-    /* //do the same from sqlite */
-    /* BUFFER *wb2 = buffer_create(10000); */
-    /* sql_health_alarm_log_select_all(wb2, host); */
-    /* char *lala2; */
-    /* lala2 = strdupz(buffer_tostring(wb2)); */
-    
-    /* FILE *fp_loge2 = fopen("/home/evas/stuff/netdata/scrap/check_health_log/part_2/alarm_log_sql", "w"); */
-    /* fprintf(fp_loge2, "%s", lala2); */
-    /* fclose(fp_loge2); */
-    
     add_migrated_file(host->health_log_filename, 0);
     //health_alarm_log_open(host);
 }
