@@ -226,10 +226,10 @@ void aclk_database_worker(void *arg)
                     break;
                 case ACLK_DATABASE_RESET_CHART:
                     // Fetch one or more charts
-                    info("Resetting chart to  sequence id %d", cmd.count);
-                    aclk_reset_chart_event(wc, cmd);
-                    //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
-                    //freez(cmd.data_param);
+                    info("Resetting chart to sequence id %d", cmd.count);
+                    sql_reset_chart_event(wc, cmd);
+                    if (cmd.completion)
+                        complete(cmd.completion);
                     break;
                 case ACLK_DATABASE_RESET_NODE:
                     // Fetch one or more charts
@@ -405,20 +405,15 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
     return rc;
 }
 
-void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-//    int rc;
-
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql, "update aclk_chart_%s set date_submitted = NULL where sequence_id >= %d",
-                        wc->uuid_str, cmd.count < 0 ? 0 : cmd.count);
+                        wc->uuid_str, cmd.param1 < 0 ? 0 : cmd.param1);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
-    if (cmd.completion)
-        complete(cmd.completion);
-
     return;
 }
 
@@ -1384,36 +1379,47 @@ prepare_fail:
 }
 
 
+void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param)
+{
+    if (unlikely(!node_id))
+        return;
+
+    struct aclk_database_worker_config *wc  = NULL;
+    rrd_wrlock();
+    RRDHOST *host = find_host_by_node_id(node_id);
+    if (likely(host)) {
+        wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+        rrd_unlock();
+        if (likely(wc)) {
+            struct aclk_database_cmd cmd;
+            cmd.opcode = aclk_command;
+            cmd.param1 = param;
+            cmd.completion = NULL;
+            aclk_database_enq_cmd(wc, &cmd);
+        } else
+            error("ACLK synchronization thread is not active for host %s", host->hostname);
+    }
+    else
+        rrd_unlock();
+    return;
+}
+
 void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
 {
     if (unlikely(!node_id))
         return;
 
     info("NODE %s reports last sequence id received %"PRIu64 , node_id, last_sequence_id);
-    uuid_t node_uuid;
-    uuid_parse(node_id, node_uuid);
+    aclk_submit_param_command(node_id, ACLK_DATABASE_CHART_ACK, last_sequence_id);
+    return;
+}
 
-    struct aclk_database_worker_config *wc  = NULL;
-    rrd_wrlock();
-    RRDHOST *host = localhost;
-    while(host) {
-        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
-            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-            if (likely(wc)) {
-                info("ACK last sequence ID received for %s = %"PRIu64, node_id, last_sequence_id);
-                struct aclk_database_cmd cmd;
-                cmd.opcode = ACLK_DATABASE_CHART_ACK;
-                cmd.param1 = last_sequence_id;
-                cmd.completion = NULL;
-                aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-            }
-            else
-                error("ACLK synchronization thread is not active for host %s", host->hostname);
-            break;
-        }
-        host = host->next;
-    }
-    rrd_unlock();
+void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
+{
+    if (unlikely(!node_id))
+        return;
 
+    info("NODE %s wants to resync from %"PRIu64 , node_id, last_sequence_id);
+    aclk_submit_param_command(node_id, ACLK_DATABASE_RESET_CHART, last_sequence_id);
     return;
 }

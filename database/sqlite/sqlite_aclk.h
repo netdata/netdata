@@ -146,6 +146,24 @@ struct aclk_database_worker_config {
     int alert_updates;
 };
 
+static inline RRDHOST *find_host_by_node_id(char *node_id)
+{
+    uuid_t node_uuid;
+    if (unlikely(!node_id))
+        return NULL;
+
+    uuid_parse(node_id, node_uuid);
+
+    RRDHOST *host = localhost;
+    while(host) {
+        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid)))
+            return host;
+        host = host->next;
+    }
+    return NULL;
+}
+
+
 //extern void sqlite_worker(void* arg);
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
@@ -160,7 +178,8 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
 int aclk_add_dimension_event(RRDDIM *st, char *payload_type, struct completion *completion);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void aclk_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id);
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
@@ -172,5 +191,6 @@ void aclk_get_chart_config(char **hash_id_list);
 void aclk_start_streaming(char *node_id);
 void sql_aclk_drop_all_table_list();
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param);
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H
