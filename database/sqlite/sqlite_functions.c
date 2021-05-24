@@ -2433,8 +2433,6 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         return;
     }
 
-    error_report("alarm_log_update");
-
     guid = strdupz(host->machine_guid);
 
     guid[8]='_';
@@ -2647,8 +2645,6 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     int rc;
     char *guid = NULL, command[1000];
 
-    error_report("Called alarm log save");
-    
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
@@ -2666,8 +2662,6 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
         sql_health_alarm_log_update(host, ae);
         return;
     }
-
-    error_report("Going for insert");
 
     sprintf(command, SQL_INSERT_HEALTH_LOG(guid));
 
