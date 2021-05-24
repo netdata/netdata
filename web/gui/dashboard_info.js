@@ -3504,6 +3504,14 @@ netdataDashboard.context = {
         info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
     },
 
+    'apps.swap_read_call': {
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory.'
+    },
+
+    'apps.swap_write_call': {
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
+    },
+
     // ------------------------------------------------------------------------
     // ACLK Internal Stats
     'netdata.aclk_status': {

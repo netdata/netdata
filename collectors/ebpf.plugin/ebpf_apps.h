@@ -22,6 +22,7 @@
 #include "ebpf_dcstat.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_sync.h"
+#include "ebpf_swap.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
@@ -113,6 +114,7 @@ struct target {
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
+    netdata_publish_swap_t swap;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;

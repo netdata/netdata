@@ -78,7 +78,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_CACHESTAT_IDX,
     EBPF_MODULE_SYNC_IDX,
-    EBPF_MODULE_DCSTAT_IDX
+    EBPF_MODULE_DCSTAT_IDX,
+    EBPF_MODULE_SWAP_IDX
 };
 
 // Copied from musl header
@@ -96,6 +97,8 @@ enum ebpf_module_indexes {
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
+#define NETDATA_EBPF_SYSTEM_GROUP "system"
+#define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
