@@ -309,28 +309,6 @@ RRDHOST *rrdhost_create(const char *hostname,
             } else {
                 //continue from sqlite
                 sql_health_alarm_log_load(host);
-
-                /* int count=0; */
-                /* unsigned int max = host->health_log.max; */
-                /* BUFFER *wb = buffer_create(10000); */
-                /* /\* ALARM_ENTRY *ae; *\/ */
-                /* /\* for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) { *\/ */
-                /* /\*     if (likely(count)) *\/ */
-                /* /\*         buffer_strcat(wb, ","); *\/ */
-                /* /\*     health_alarm_entry_sql2json(wb, ae->unique_id, ae->alarm_id, host); *\/ */
-                /* /\*     count++; *\/ */
-                /* /\* } *\/ */
-
-                /* health_alarm_log2json(host, wb, 0, NULL); */
-                /* error_report("health_log.alarms has [%d]", count); */
-
-                /* //error_report(buffer_tostring(wb)); */
-                /* char *lala; */
-                /* lala = strdupz(buffer_tostring(wb)); */
-    
-                /* FILE *fp_loge = fopen("/home/evas/stuff/netdata/scrap/check_health_log/part_2/alarm_log_loaded_from_sql", "w"); */
-                /* fprintf(fp_loge, "%s", lala); */
-                /* fclose(fp_loge); */
             }
         }
     }
