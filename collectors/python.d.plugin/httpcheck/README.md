@@ -25,7 +25,7 @@ Following charts are drawn per job:
 
 ## Configuration
 
-Edit the `python.d/httpcheck.conf` configuration file using `edit-config` from the Netdata [config
+Edit the `python.d/httpcheck.conf` configuration file ([example here](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/httpcheck/httpcheck.conf)) using `edit-config` from the Netdata [config
 directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
