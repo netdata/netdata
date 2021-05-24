@@ -3143,7 +3143,7 @@ static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *
     return 1;
 }
 
-#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, classification, component, type FROM health_log_%s order by unique_id asc;", guid //ADD A LIMIT (1000?)
+#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, classification, component, type FROM health_log_%s order by unique_id asc;", guid //ADD A LIMIT (1000? host->something limit)
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -3180,8 +3180,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         /* char *s, *buf = mallocz(65536 + 1); */
         /* size_t line = 0, len = 0; */
         ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
-
-        netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
         
         ALARM_ENTRY *ae = NULL;
 
@@ -3294,7 +3292,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         //do we need config hash ids for old health log entries?
         uuid_copy(ae->config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 4)));                 
             
-        //ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
         ae->alarm_event_id = sqlite3_column_int(res, 3);
         ae->updated_by_id           = sqlite3_column_int(res, 5);
         ae->updates_id              = sqlite3_column_int(res, 6);
@@ -3310,18 +3307,14 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->exec_run_timestamp      = sqlite3_column_int(res, 11);
         ae->delay_up_to_timestamp   = sqlite3_column_int(res, 12);
 
-        //freez(ae->name); ??
         ae->name = strdupz(sqlite3_column_text(res, 13));
         ae->hash_name = simple_hash(ae->name);
 
-            /* freez(ae->chart); */
         ae->chart = strdupz(sqlite3_column_text(res, 14));
         ae->hash_chart = simple_hash(ae->chart);
 
-            /* freez(ae->family); */
         ae->family = strdupz(sqlite3_column_text(res, 15));
 
-            /* freez(ae->exec); */
         if (sqlite3_column_type(res, 16) != SQLITE_NULL)
             ae->exec = strdupz(sqlite3_column_text(res, 16));
         else
@@ -3378,37 +3371,20 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
         ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
-            /* // add it to host if not already there */
-            /* if(unlikely(*pointers[0] == 'A')) { */
-            /*     ae->next = host->health_log.alarms; */
-            /*     host->health_log.alarms = ae; */
-            /*     loaded++; */
-            /*     sql_health_alarm_log_save(host, ae); */
-            /* } */
-            /* else { */
-            /*     updated++; */
-            /*     sql_health_alarm_log_update(host, ae); */
-            /* } */
-
-        
         ae->next = host->health_log.alarms;
         host->health_log.alarms = ae;
 
-            if(unlikely(ae->unique_id > host->health_max_unique_id))
-                host->health_max_unique_id = ae->unique_id;
+        if(unlikely(ae->unique_id > host->health_max_unique_id))
+            host->health_max_unique_id = ae->unique_id;
 
-            if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
-                host->health_max_alarm_id = ae->alarm_id;
-        /* } */
-        /* else { */
-        /*     error("HEALTH [%s]: line %zu of file '%s' is invalid (unrecognized entry type '%s').", host->hostname, line, filename, pointers[0]); */
-        /*     errored++; */
-        /* } */
+        if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
+            host->health_max_alarm_id = ae->alarm_id;
+
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-//freez(buf);
+
 
     if(!host->health_max_unique_id) host->health_max_unique_id = (uint32_t)now_realtime_sec();
     if(!host->health_max_alarm_id)  host->health_max_alarm_id  = (uint32_t)now_realtime_sec();
@@ -3420,10 +3396,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     //debug(D_HEALTH, "HEALTH [%s]: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", host->hostname, filename, loaded, updated, errored, duplicate);
     //return loaded;
         
-    /* if (unlikely(rc != SQLITE_OK)) */
-    /*     error_report("Failed to reset the prepared statement when reading chart config with hash"); */
-    /* } */
-
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading chart config with hash");
