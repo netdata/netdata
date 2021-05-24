@@ -285,9 +285,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
-
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
     }
 
     RRDHOST *t = rrdhost_index_add(host);
@@ -304,10 +301,44 @@ RRDHOST *rrdhost_create(const char *hostname,
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
         sql_create_aclk_table(host);
-        sql_create_health_log_table(host);
+        if (host->health_enabled) {
+            if (!file_is_migrated(host->health_log_filename)) {
+                sql_create_health_log_table(host);
+                health_alarm_log_load(host);
+                //health_alarm_log_open(host);
+            } else {
+                //continue from sqlite
+                sql_health_alarm_log_load(host);
+
+                /* int count=0; */
+                /* unsigned int max = host->health_log.max; */
+                /* BUFFER *wb = buffer_create(10000); */
+                /* /\* ALARM_ENTRY *ae; *\/ */
+                /* /\* for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) { *\/ */
+                /* /\*     if (likely(count)) *\/ */
+                /* /\*         buffer_strcat(wb, ","); *\/ */
+                /* /\*     health_alarm_entry_sql2json(wb, ae->unique_id, ae->alarm_id, host); *\/ */
+                /* /\*     count++; *\/ */
+                /* /\* } *\/ */
+
+                /* health_alarm_log2json(host, wb, 0, NULL); */
+                /* error_report("health_log.alarms has [%d]", count); */
+
+                /* //error_report(buffer_tostring(wb)); */
+                /* char *lala; */
+                /* lala = strdupz(buffer_tostring(wb)); */
+    
+                /* FILE *fp_loge = fopen("/home/evas/stuff/netdata/scrap/check_health_log/part_2/alarm_log_loaded_from_sql", "w"); */
+                /* fprintf(fp_loge, "%s", lala); */
+                /* fclose(fp_loge); */
+            }
+        }
     }
+
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
+
+    //fatal("Exiting ok");
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -496,8 +527,13 @@ void rrdhost_update(RRDHOST *host
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
             rrdhost_unlock(host);
 
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
+            if (!file_is_migrated(host->health_log_filename)) {
+                sql_create_health_log_table(host); //already ok?
+                health_alarm_log_load(host);
+            } else {
+                //continue from sqlite
+                sql_health_alarm_log_load(host);
+            }
         }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
@@ -1247,6 +1283,7 @@ void reload_host_labels(void)
     rrdhost_rdlock(localhost);
     replace_label_list(&localhost->labels, new_labels);
 
+    //??? Should we migrate this too?
     health_label_log_save(localhost);
     rrdhost_unlock(localhost);
 

@@ -744,7 +744,7 @@ void sql_create_aclk_table(RRDHOST *host)
 {
     char uuid_str[GUID_LEN + 1];
 
-    sql_drop_host_aclk_table_list(&host->host_uuid);
+    //sql_drop_host_aclk_table_list(&host->host_uuid);
 
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
