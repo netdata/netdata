@@ -215,6 +215,15 @@ void aclk_database_worker(void *arg)
                     //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     //freez(cmd.data_param);
                     break;
+                case ACLK_DATABASE_CHART_ACK:
+                    // Fetch one or more charts
+                    info("Setting last chart sequence ACK");
+                    sql_set_chart_ack(wc, cmd);
+                    //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
+                    //freez(cmd.data_param);
+                    if (cmd.completion)
+                        complete(cmd.completion);
+                    break;
                 case ACLK_DATABASE_PUSH_DIMENSION:
                     // Fetch one or more charts
                     info("Pushing chart config to the cloud");
@@ -1461,4 +1470,74 @@ fail:
     buffer_free(sql);
 
     return rc;
+}
+
+void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc;
+
+    BUFFER *sql = buffer_create(1024);
+
+    sqlite3_stmt *res = NULL;
+
+    buffer_sprintf(sql, "delete from aclk_chart_%s where sequence_id < @sequence_id and date_submitted is not null;",
+                   wc->uuid_str);
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement count sequence ids in the database");
+        goto prepare_fail;
+    }
+
+    rc = sqlite3_bind_int64(res, 1, (uint64_t) cmd.param1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (rc)
+        error_report("Failed to delete sequence ids, rc = %d", rc);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement to delete older sequence ids, rc = %d", rc);
+
+prepare_fail:
+    buffer_free(sql);
+
+    return;
+}
+
+
+void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
+{
+    if (unlikely(!node_id))
+        return;
+
+    info("NODE %s reports last sequence id received %"PRIu64 , node_id, last_sequence_id);
+    uuid_t node_uuid;
+    uuid_parse(node_id, node_uuid);
+
+    struct aclk_database_worker_config *wc  = NULL;
+    rrd_wrlock();
+    RRDHOST *host = localhost;
+    while(host) {
+        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+            if (likely(wc)) {
+                info("ACK last sequence ID received for %s = %"PRIu64, node_id, last_sequence_id);
+                struct aclk_database_cmd cmd;
+                cmd.opcode = ACLK_DATABASE_CHART_ACK;
+                cmd.param1 = last_sequence_id;
+                cmd.completion = NULL;
+                aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+            }
+            else
+                error("ACLK synchronization thread is not active for host %s", host->hostname);
+            break;
+        }
+        host = host->next;
+    }
+    rrd_unlock();
+
+    return;
 }
