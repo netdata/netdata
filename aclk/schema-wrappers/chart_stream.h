@@ -30,13 +30,20 @@ typedef struct {
 
 chart_and_dim_ack_t parse_chart_and_dimensions_ack(const char *data, size_t len);
 
-typedef enum {
+enum chart_reset_reason {
     DB_EMPTY,
     SEQ_ID_NOT_EXISTS,
     TIMESTAMP_MISMATCH
-} chart_reset_reason_t;
+};
 
-char *generate_reset_chart_messages(size_t *len, const chart_reset_reason_t reason);
+typedef struct {
+    char *claim_id;
+    char *node_id;
+
+    enum chart_reset_reason reason;
+} chart_reset_t;
+
+char *generate_reset_chart_messages(size_t *len, const chart_reset_t reset);
 
 struct aclk_message_position {
     uint64_t sequence_id;
