@@ -6,7 +6,7 @@ typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
 } aclk_rrdhost_state;
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "aclk_util.h"
 
 // version for aclk legacy (old cloud arch)

@@ -3,7 +3,7 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration

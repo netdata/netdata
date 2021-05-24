@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_IDLEJITTER_H
 #define NETDATA_PLUGIN_IDLEJITTER_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #define NETDATA_PLUGIN_HOOK_IDLEJITTER \
     { \

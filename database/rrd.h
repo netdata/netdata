@@ -26,17 +26,17 @@ struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "rrdvar.h"
 #include "rrdsetvar.h"
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
-#include "../streaming/rrdpush.h"
+#include "streaming/rrdpush.h"
 
 #ifndef ACLK_NG
-#include "../aclk/legacy/aclk_rrdhost_state.h"
+#include "aclk/legacy/aclk_rrdhost_state.h"
 #else
 #include "aclk/aclk.h"
 #endif

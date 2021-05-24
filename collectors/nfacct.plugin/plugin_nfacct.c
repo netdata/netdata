@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 #include <linux/netfilter/nfnetlink_conntrack.h>
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>

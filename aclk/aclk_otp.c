@@ -3,9 +3,9 @@
 
 #include "aclk_otp.h"
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
-#include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
 // CentOS 7 has older version that doesn't define this
 // same goes for MacOS

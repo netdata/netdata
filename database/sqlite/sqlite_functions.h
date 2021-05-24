@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_FUNCTIONS_H
 #define NETDATA_SQLITE_FUNCTIONS_H
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "sqlite3.h"
 
 // return a node list

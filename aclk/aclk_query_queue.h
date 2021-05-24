@@ -4,7 +4,7 @@
 #define NETDATA_ACLK_QUERY_QUEUE_H
 
 #include "libnetdata/libnetdata.h"
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 typedef enum {
     UNKNOWN,
