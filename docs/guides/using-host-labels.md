@@ -27,7 +27,7 @@ sudo ./edit-config netdata.conf
 ```
 
 Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
-to violate any of the [host label naming rules](/docs/configuration-guide.md#netdata-labels).
+to violate any of the [host label naming rules](/docs/configure/common-changes.md#organize-nodes-with-host-labels).
 
 ```conf
 [host labels]

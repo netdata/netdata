@@ -7,7 +7,11 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notificat
 
 Netdata allows you to send custom notifications to any endpoint you choose.
 
-To configure custom notifications, you will need to customize `health_alarm_notify.conf`. You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`. Ensure you follow the instructions of changing any configuration file to [persist your configuration](/docs/configuration-guide.md#persist-my-configuration).
+To configure custom notifications, you will need to customize `health_alarm_notify.conf`. Open the file for editing
+using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config
+directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
+
+You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`.
 
 As with other notifications, you will also need to define the recipient list in `DEFAULT_RECIPIENT_CUSTOM` and/or the `role_recipients_custom` array.
 
