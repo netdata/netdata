@@ -39,11 +39,13 @@ chart_and_dim_ack_t parse_chart_and_dimensions_ack(const char *data, size_t len)
     return res;
 }
 
-char *generate_reset_chart_messages(size_t *len, const chart_reset_reason_t reason)
+char *generate_reset_chart_messages(size_t *len, chart_reset_t reset)
 {
     chart::v1::ResetChartMessages msg;
 
-    switch (reason) {
+    msg.set_claim_id(reset.claim_id);
+    msg.set_node_id(reset.node_id);
+    switch (reset.reason) {
         case DB_EMPTY:
             msg.set_reason(chart::v1::ResetReason::DB_EMPTY);
             break;

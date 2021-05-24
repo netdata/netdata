@@ -12,4 +12,6 @@ void aclk_chart_dim_update(char **payloads, size_t *payload_sizes, struct aclk_m
 
 void aclk_chart_config_updated(struct chart_config_updated *config_list, int list_size);
 
+void aclk_chart_reset(chart_reset_t reset);
+
 #endif /* ACLK_CHARTS_H */

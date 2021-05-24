@@ -32,3 +32,11 @@ void aclk_chart_config_updated(struct chart_config_updated *config_list, int lis
     if (query->data.bin_payload.payload)
         aclk_queue_query(query);
 }
+
+void aclk_chart_reset(chart_reset_t reset)
+{
+    aclk_query_t query = aclk_query_new(CHART_RESET);
+    query->data.bin_payload.payload = generate_reset_chart_messages(&query->data.bin_payload.size, reset);
+    if (query->data.bin_payload.payload)
+        aclk_queue_query(query);
+}
