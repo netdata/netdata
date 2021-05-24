@@ -168,8 +168,6 @@ static enum cgroups_type cgroups_try_detect_version()
     if (!statfs(filename, &fsinfo)) {
         if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
             return CGROUPS_V2;
-        if (fsinfo.f_type == CGROUP_SUPER_MAGIC)
-            return CGROUPS_V1;
     }
 #endif
 
