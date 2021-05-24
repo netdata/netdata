@@ -511,18 +511,14 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
 void ebpf_update_module(ebpf_module_t *em)
 {
     char filename[FILENAME_MAX+1];
-    int read_from_user = 1;
     ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, em->config_file);
     if (!ebpf_load_config(em->cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, em->config_file);
-        read_from_user--;
         if (!ebpf_load_config(em->cfg, filename)) {
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
     }
 
-    // We only update when information is read from /etc/netdata/
-    if (read_from_user)
-        ebpf_update_module_using_config(em);
+    ebpf_update_module_using_config(em);
 }
