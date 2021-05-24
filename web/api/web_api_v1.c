@@ -546,22 +546,14 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     }
 
     if (sequence_reset) {
-        struct aclk_database_cmd cmd;
-        //struct aclk_chart_payload_t *result, *tmp_result;
-        cmd.opcode = ACLK_DATABASE_RESET_CHART;
-        //cmd.data = (void *) &result;
-        cmd.count = sequence_reset;
-        cmd.completion = NULL;
+        char node_str[GUID_LEN + 1];
+        uuid_unparse_lower(*host->node_id, node_str);
 
-        struct completion compl ;
-        init_completion(&compl);
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl);
-        destroy_completion(&compl);
+        aclk_reset_chart_event(node_str, (uint64_t) sequence_reset);
+
         buffer_sprintf(w->response.data, "Chart sequence id for host %s has been reset to %d",
-                       host->hostname, sequence_reset);
-        buffer_no_cacheable(w->response.data);
+                      host->hostname, sequence_reset);
+       buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
 
