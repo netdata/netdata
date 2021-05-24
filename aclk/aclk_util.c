@@ -121,6 +121,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_NODE_CONN,             .name = "node-instance-connection" },
     { .id = ACLK_TOPICID_CHART_DIMS,            .name = "chart-and-dims-updated"   },
     { .id = ACLK_TOPICID_CHART_CONFIGS_UPDATED, .name = "chart-configs-updated"    },
+    { .id = ACLK_TOPICID_CHART_RESET,           .name = "reset-charts"             },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 

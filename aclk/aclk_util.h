@@ -63,7 +63,8 @@ enum aclk_topics {
     ACLK_TOPICID_CREATE_NODE           = 7,
     ACLK_TOPICID_NODE_CONN             = 8,
     ACLK_TOPICID_CHART_DIMS            = 9,
-    ACLK_TOPICID_CHART_CONFIGS_UPDATED = 10
+    ACLK_TOPICID_CHART_CONFIGS_UPDATED = 10,
+    ACLK_TOPICID_CHART_RESET           = 11
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);
