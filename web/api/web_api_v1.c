@@ -399,7 +399,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     int ret = HTTP_RESP_BAD_REQUEST;
     buffer_flush(w->response.data);
     int ping = 0;
-    int fetch_proto = 0;
     int sequence_reset = 0;
     int status = 0;
     int nodelist = 0;
@@ -429,7 +428,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         if(!strcmp(name, "nodelist")) nodelist = 1;
         if(!strcmp(name, "reset_node")) reset_node = value;
         if(!strcmp(name, "resync_nodes")) resync_nodes = 1;
-        if(!strcmp(name, "fetch_proto")) fetch_proto = atoi(value);
         if(!strcmp(name, "chart_updates")) chart_updates = atoi(value);
         if(!strcmp(name, "alert_updates")) alert_updates = atoi(value);
         if(!strcmp(name, "drop_tables")) drop_tables = atoi(value);
@@ -511,52 +509,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         else {
             wc->alert_updates = !wc->alert_updates;
             buffer_sprintf(w->response.data, "ACLK_SYNC: Alert updates now %d", wc->alert_updates);
-        }
-        buffer_no_cacheable(w->response.data);
-        return HTTP_RESP_OK;
-    }
-
-    if (fetch_proto) {
-        struct aclk_database_cmd cmd;
-        charts_and_dims_updated_t *head = NULL;
-        struct chart_instance_updated *result;
-        cmd.opcode = ACLK_DATABASE_FETCH_CHART_PROTO;
-        cmd.data = (void *)&head;
-        cmd.count = fetch_proto;
-        struct completion compl ;
-        init_completion(&compl);
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl );
-        destroy_completion(&compl );
-
-        int count = 0;
-
-        if (head) {
-            while (count < head->chart_count) {
-                result = &(head->charts[count]);
-                if (count)
-                    buffer_strcat(w->response.data,"\n");
-                buffer_sprintf(
-                    w->response.data,
-                    "sequence_id=%ld\nlast_sequence_id=%ld\n"
-                    "id=%s\nname=%s\nnode_id=%s\nclaim_id=%s\nconfig_hash=%s\n",
-                    result->position.sequence_id,
-                    result->position.previous_sequence_id,
-                    result->id,
-                    result->name,
-                    result->node_id,
-                    result->claim_id,
-                    result->config_hash);
-                freez(result->id);
-                freez(result->name);
-                freez(result->claim_id);
-                freez(result->config_hash);
-                freez(result->node_id);
-                count++;
-            }
-            freez(head->charts);
-            freez(head);
         }
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
