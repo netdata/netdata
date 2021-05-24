@@ -192,6 +192,8 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
+    error_report("In log read");
+
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -324,7 +326,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-            ae->flags |= HEALTH_ENTRY_FLAG_SAVED_SQLITE; //assume it's also saved there.
+            //ae->flags |= HEALTH_ENTRY_FLAG_SAVED_SQLITE; //assume it's also saved there.
 
             ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
             ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
@@ -395,8 +397,12 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 ae->next = host->health_log.alarms;
                 host->health_log.alarms = ae;
                 loaded++;
+                sql_health_alarm_log_save(host, ae);
             }
-            else updated++;
+            else {
+                updated++;
+                sql_health_alarm_log_update(host, ae);
+            }
 
             if(unlikely(ae->unique_id > host->health_max_unique_id))
                 host->health_max_unique_id = ae->unique_id;
@@ -447,9 +453,9 @@ inline void health_alarm_log_load(RRDHOST *host) {
         fclose(fp);
     }
 
-    health_alarm_log_open(host);
+    add_migrated_file(host->health_log_filename, 0);
+    //health_alarm_log_open(host);
 }
-
 
 // ----------------------------------------------------------------------------
 // health alarm log management
@@ -584,7 +590,7 @@ inline void health_alarm_log(
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
-                health_alarm_log_save(host, t);
+                //health_alarm_log_save(host, t);
                 sql_health_alarm_log_save(host, t);
             }
 
@@ -594,7 +600,7 @@ inline void health_alarm_log(
     }
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    health_alarm_log_save(host, ae);
+    //health_alarm_log_save(host, ae);
     sql_health_alarm_log_save(host, ae);
 }
 

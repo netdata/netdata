@@ -60,6 +60,7 @@ void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 extern int health_alarm_log_open(RRDHOST *host);
 extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 extern void health_alarm_log_load(RRDHOST *host);
+extern void health_alarm_log_migrate_to_sql(RRDHOST *host);
 
 extern ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
