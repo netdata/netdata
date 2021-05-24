@@ -84,6 +84,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_FETCH_CHART_PROTO,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
+    ACLK_DATABASE_CHART_ACK,
     ACLK_DATABASE_ADD_CHART_CONFIG,
     ACLK_DATABASE_PUSH_DIMENSION,
     ACLK_DATABASE_RESET_CHART,
@@ -110,6 +111,7 @@ struct aclk_database_cmd {
     void *data1;
     void *data_param;
     int count;
+    uint64_t param1;
     union {
 //        struct rrdeng_read_page {
 //            struct rrdeng_page_descr *page_cache_descr;
@@ -166,8 +168,10 @@ void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_push_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
+void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id);
 void aclk_get_chart_config(char **hash_id_list);
 void aclk_start_streaming(char *node_id);
 void sql_aclk_drop_all_table_list();
+void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 extern void aclk_set_architecture(int mode);
 #endif //NETDATA_SQLITE_ACLK_H

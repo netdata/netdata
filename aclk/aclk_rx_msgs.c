@@ -306,7 +306,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             freez(res.node_id);
             return;
         }
-        //stelfrag TODO... call your fnc here with params from res
         aclk_start_streaming(res.node_id);
         freez(res.claim_id);
         freez(res.node_id);
@@ -320,7 +319,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             freez(res.node_id);
             return;
         }
-        //stelfrag TODO... call your fnc here with params from res
+        aclk_ack_chart_sequence_id(res.node_id, res.last_seq_id);
         freez(res.claim_id);
         freez(res.node_id);
         return;
@@ -332,7 +331,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             error("Error parsing UpdateChartConfigs msg");
             destroy_update_chart_config(&res);
         }
-        //stelfrag TODO... call your fnc here
         aclk_get_chart_config(res.hashes);
         destroy_update_chart_config(&res);
         return;
