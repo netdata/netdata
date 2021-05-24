@@ -132,7 +132,7 @@ To understand what this section is and how it should be configured, please refer
 
 ### [backend]
 
-The backends system is deprecated. Refer to [exporting](/exporting/README.md) for details on sending metrics to external
+The backend system is deprecated. Refer to [exporting](/exporting/README.md) for details on sending metrics to external
 databases.
 
 ## Per-plugin configuration
