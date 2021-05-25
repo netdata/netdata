@@ -404,7 +404,6 @@ void *ebpf_swap_thread(void *ptr)
     em->maps = swap_maps;
     fill_ebpf_data(&swap_data);
 
-    ebpf_update_module(em, &swap_config, NETDATA_DIRECTORY_SWAP_CONFIG_FILE);
     ebpf_update_pid_table(&swap_maps[0], em);
 
     if (!em->enabled)

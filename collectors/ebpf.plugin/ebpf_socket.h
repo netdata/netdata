@@ -312,5 +312,6 @@ extern void parse_service_name_section(struct config *cfg);
 extern void clean_socket_apps_structures();
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
+extern struct config socket_config;
 
 #endif

@@ -2862,7 +2862,6 @@ void *ebpf_socket_thread(void *ptr)
     em->maps = socket_maps;
     fill_ebpf_data(&socket_data);
 
-    ebpf_update_module(em, &socket_config, NETDATA_NETWORK_CONFIG_FILE);
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
     parse_table_size_options(&socket_config);
@@ -2885,6 +2884,9 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     set_local_pointers();
+    if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
+        em->mode = MODE_ENTRY;
+
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);

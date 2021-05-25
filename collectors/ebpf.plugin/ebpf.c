@@ -78,29 +78,36 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
-      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL},
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &process_config,
+      .config_file = NETDATA_PROCESS_CONFIG_FILE},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
-      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL},
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &socket_config,
+      .config_file = NETDATA_NETWORK_CONFIG_FILE},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
-      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL},
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &cachestat_config,
+      .config_file = NETDATA_CACHESTAT_CONFIG_FILE},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL },
+      .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &sync_config,
+      .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = "dc", .config_name = "dc", .enabled = 0, .start_routine = ebpf_dcstat_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_dcstat_create_apps_charts, .maps = NULL,
-      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL },
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &dcstat_config,
+      .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE},
     { .thread_name = "swap", .config_name = "swap", .enabled = 0, .start_routine = ebpf_swap_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
-      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL },
+      .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
+      .cfg = NULL, .config_name = NULL},
 };
 
 // Link with apps.plugin
@@ -1161,6 +1168,19 @@ static void parse_args(int argc, char **argv)
  *****************************************************************/
 
 /**
+ * Load collector config
+ *
+ * @param lmode  the mode that will be used for them.
+ */
+static inline void ebpf_load_thread_config()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_update_module(&ebpf_modules[i]);
+    }
+}
+
+/**
  * Entry point
  *
  * @param argc the number of arguments
@@ -1172,6 +1192,7 @@ int main(int argc, char **argv)
 {
     set_global_variables();
     parse_args(argc, argv);
+    ebpf_load_thread_config();
 
     running_on_kernel = get_kernel_version(kernel_string, 63);
     if (!has_condition_to_run(running_on_kernel)) {

@@ -790,10 +790,9 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
  *
- * @param em   a pointer to the structure with the default values.
  * @param root a pointer for the targets.
  */
-static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
+static void ebpf_create_apps_charts(struct target *root)
 {
     struct target *w;
     int newly_added = 0;
@@ -831,7 +830,7 @@ static void ebpf_create_apps_charts(ebpf_module_t *em, struct target *root)
     for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
         ebpf_module_t *current = &ebpf_modules[counter];
         if (current->enabled && current->apps_charts && current->apps_routine)
-            current->apps_routine(em, root);
+            current->apps_routine(current, root);
     }
 }
 
@@ -864,7 +863,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         cleanup_exited_pids();
         collect_data_for_all_processes(pid_fd);
 
-        ebpf_create_apps_charts(em, apps_groups_root_target);
+        ebpf_create_apps_charts(apps_groups_root_target);
 
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -1045,7 +1044,6 @@ void *ebpf_process_thread(void *ptr)
         goto endprocess;
     }
 
-    ebpf_update_module(em, &process_config, NETDATA_PROCESS_CONFIG_FILE);
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
