@@ -160,32 +160,52 @@ static int set_chart_dim_updated(chart::v1::ChartDimensionUpdated *dim, const st
     return 0;
 }
 
-char *generate_charts_and_dimensions_updated(size_t *len, const charts_and_dims_updated_t *updates)
+char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions)
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
+    chart::v1::ChartInstanceUpdated db_chart;
+    chart::v1::ChartInstanceUpdated *chart;
+    chart::v1::ChartDimensionUpdated db_dim;
+    chart::v1::ChartDimensionUpdated *dim;
+    aclk_lib::v1::ACLKMessagePosition *pos;
 
-    if (!updates->chart_count && !updates->dim_count) {
-        return NULL;
-    }
+    msg.set_batch_id(1); //TODO
 
-    msg.set_batch_id(updates->batch_id);
+    for (int i = 0; payloads[i]; i++) {
+        if (is_dim[i]) {
+            if (!db_dim.ParseFromArray(payloads[i], payload_sizes[i])) {
+                error("[ACLK] Could not parse chart::v1::chart_dimension_updated");
+                return NULL;
+            }
 
-    for (int i = 0; i < updates->chart_count; i++) {
-        chart::v1::ChartInstanceUpdated *chart = msg.add_charts();
-        if (set_chart_instance_updated(chart, &updates->charts[i]))
-            return NULL;
-    }
+            pos = db_dim.mutable_position();
+            pos->set_sequence_id(new_positions[i].sequence_id);
+            pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
+            pos->mutable_seq_id_created_at()->set_seconds(new_positions[i].seq_id_creation_time.tv_sec);
+            pos->mutable_seq_id_created_at()->set_nanos(new_positions[i].seq_id_creation_time.tv_usec * 1000);
 
-    for (int i = 0; i < updates->dim_count; i++) {
-        chart::v1::ChartDimensionUpdated *dim = msg.add_dimensions();
-        if (set_chart_dim_updated(dim, &updates->dims[i]))
-            return NULL;
+            dim = msg.add_dimensions();
+            *dim = db_dim;
+        } else {
+            if (!db_chart.ParseFromArray(payloads[i], payload_sizes[i])) {
+                error("[ACLK] Could not parse chart::v1::ChartInstanceUpdated");
+                return NULL;
+            }
+
+            pos = db_chart.mutable_position();
+            pos->set_sequence_id(new_positions[i].sequence_id);
+            pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
+            pos->mutable_seq_id_created_at()->set_seconds(new_positions[i].seq_id_creation_time.tv_sec);
+            pos->mutable_seq_id_created_at()->set_nanos(new_positions[i].seq_id_creation_time.tv_usec * 1000);
+
+            chart = msg.add_charts();
+            *chart = db_chart;
+        }
     }
 
     *len = msg.ByteSizeLong();
-    char *bin = (char*)malloc(*len);
-    if (bin)
-        msg.SerializeToArray(bin, *len);
+    char *bin = (char*)mallocz(*len);
+    msg.SerializeToArray(bin, *len);
 
     return bin;
 }

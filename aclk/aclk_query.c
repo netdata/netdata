@@ -203,11 +203,6 @@ static int node_state_update(mqtt_wss_client client, aclk_query_t query) {
     return 0;
 }
 
-static int chart_dim_update(mqtt_wss_client client, aclk_query_t query) {
-    aclk_generate_chart_dim_update(client, query->data.chart_dim_update);
-    return 0;
-}
-
 static int chart_dim_update_bin(mqtt_wss_client client, aclk_query_t query) {
     aclk_send_bin_message_subtopic_pid(client, query->data.bin_payload.payload, query->data.bin_payload.size, ACLK_TOPICID_CHART_DIMS, "ChartsAndDimensionsUpdated");
     return 0;
@@ -234,7 +229,6 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = CHART_DEL,             .name = "chart delete",             .fnc = info_metadata            },
     { .type = REGISTER_NODE,         .name = "register node",            .fnc = register_node            },
     { .type = NODE_STATE_UPDATE,     .name = "node state update",        .fnc = node_state_update        },
-    { .type = CHART_DIMS_UPDATE,     .name = "chart and dim update",     .fnc = chart_dim_update         },
     { .type = CHART_DIMS_UPDATE_BIN, .name = "chart and dim update bin", .fnc = chart_dim_update_bin     },
     { .type = CHART_CONFIG_UPDATED,  .name = "chart config updated",     .fnc = chart_config_updated     },
     { .type = CHART_RESET,           .name = "reset chart messages",     .fnc = chart_reset              },
