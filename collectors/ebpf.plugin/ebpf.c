@@ -107,7 +107,8 @@ ebpf_module_t ebpf_modules[] = {
     { .thread_name = "vfs", .config_name = "swap", .enabled = 0, .start_routine = ebpf_vfs_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
-      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL },
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
+      .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE },
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -174,6 +175,11 @@ static void ebpf_exit(int sig)
         ebpf_modules[EBPF_MODULE_SWAP_IDX].enabled = 0;
         clean_swap_pid_structures();
         freez(swap_pid);
+    }
+
+    if (ebpf_modules[EBPF_MODULE_VFS_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_VFS_IDX].enabled = 0;
+        freez(vfs_pid);
     }
 
     /*
