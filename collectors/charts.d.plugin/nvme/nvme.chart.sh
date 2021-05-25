@@ -15,11 +15,11 @@ nvme_update_every=5
 nvme_priority=49000
 
 # global variables to store our collected data
-declare -A critical_warning
-declare -A percentage_used
-declare -A temperature
-declare -A power_cycles
-declare -A power_on_hours
+critical_warning=
+percentage_used=
+temperature=
+power_cycles=
+power_on_hours=
 
 nvme_get() {
   # do all the work to collect / calculate the values
