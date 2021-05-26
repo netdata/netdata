@@ -3414,6 +3414,28 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Filesystem
+    'filesystem.deleted_objects': {
+        title : 'VFS remove',
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. '
+    },
+
+    'filesystem.io': {
+        title : 'VFS IO',
+        info: 'Successful or failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all file system events if it uses other functions to store data on disk.'
+    },
+
+    'filesystem.io_bytes': {
+        title : 'VFS bytes written',
+        info: 'Total of bytes read or written with success using the functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+    },
+
+    'filesystem.io_error': {
+        title : 'VFS IO error',
+        info: 'Failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+    },
+
+    // ------------------------------------------------------------------------
     // eBPF
 
     'ebpf.tcp_functions': {
@@ -3462,26 +3484,6 @@ netdataDashboard.context = {
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
             ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
-    },
-
-    'ebpf.deleted_objects': {
-        title : 'VFS remove',
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. '
-    },
-
-    'ebpf.io': {
-        title : 'VFS IO',
-        info: 'Successful or failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all file system events if it uses other functions to store data on disk.'
-    },
-
-    'ebpf.io_bytes': {
-        title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
-    },
-
-    'ebpf.io_error': {
-        title : 'VFS IO error',
-        info: 'Failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
     },
 
     'ebpf.process_thread': {
