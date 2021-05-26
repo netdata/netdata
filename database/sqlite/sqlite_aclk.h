@@ -193,4 +193,6 @@ void sql_aclk_drop_all_table_list();
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param);
 extern void aclk_set_architecture(int mode);
+//char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t *current_size);
+char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t  *total);
 #endif //NETDATA_SQLITE_ACLK_H
