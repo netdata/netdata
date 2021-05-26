@@ -116,6 +116,7 @@ struct target {
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
     netdata_publish_swap_t swap;
+    netdata_publish_vfs_t vfs;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;

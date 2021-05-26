@@ -19,6 +19,22 @@
 #define NETDATA_VFS_CREATE "create"
 #define NETDATA_VFS_CREATE_ERR "create_error"
 
+// Charts created on Apps submenu
+#define NETDATA_SYSCALL_APPS_FILE_DELETED "file_deleted"
+#define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS "vfs_write_call"
+#define NETDATA_SYSCALL_APPS_VFS_READ_CALLS "vfs_read_call"
+#define NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES "vfs_write_bytes"
+#define NETDATA_SYSCALL_APPS_VFS_READ_BYTES "vfs_read_bytes"
+#define NETDATA_SYSCALL_APPS_VFS_FSYNC "vfs_fsync"
+#define NETDATA_SYSCALL_APPS_VFS_OPEN "vfs_open"
+#define NETDATA_SYSCALL_APPS_VFS_CREATE "vfs_create"
+
+#define NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR "vfs_write_error"
+#define NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR "vfs_read_error"
+#define NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR "vfs_fsync_error"
+#define NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR "vfs_open_error"
+#define NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR "vfs_create_error"
+
 // Group used on Dashboard
 #define NETDATA_VFS_GROUP "VFS (eBPF)"
 
@@ -107,6 +123,7 @@ extern netdata_publish_vfs_t **vfs_pid;
 
 extern void *ebpf_vfs_thread(void *ptr);
 extern void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern void clean_vfs_pid_structures();
 
 extern struct config vfs_config;
 

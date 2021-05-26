@@ -46,6 +46,20 @@ static int read_thread_closed = 1;
  *****************************************************************/
 
 /**
+ * Clean PID structures
+ *
+ * Clean the allocated structures.
+ */
+void clean_vfs_pid_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(vfs_pid[pids->pid]);
+
+        pids = pids->next;
+    }
+}
+
+/**
 * Clean up the main thread.
 *
 * @param ptr thread data.
@@ -203,6 +217,304 @@ static void read_global_table()
 }
 
 /**
+ * Sum PIDs
+ *
+ * Sum values for all targets.
+ *
+ * @param swap output structure
+ * @param root link list with structure to be used
+ */
+static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *root)
+{
+    uint32_t local_write_call = 0;
+    uint32_t local_writev_call = 0;
+    uint32_t local_read_call = 0;
+    uint32_t local_readv_call = 0;
+    uint32_t local_unlink_call = 0;
+    uint32_t local_fsync_call = 0;
+    uint32_t local_open_call = 0;
+    uint32_t local_create_call = 0;
+
+    uint64_t local_write_bytes = 0;
+    uint64_t local_writev_bytes = 0;
+    uint64_t local_read_bytes = 0;
+    uint64_t local_readv_bytes = 0;
+
+    uint32_t local_write_err = 0;
+    uint32_t local_writev_err = 0;
+    uint32_t local_read_err = 0;
+    uint32_t local_readv_err = 0;
+    uint32_t local_unlink_err = 0;
+    uint32_t local_fsync_err = 0;
+    uint32_t local_open_err = 0;
+    uint32_t local_create_err = 0;
+
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_publish_vfs_t *w = vfs_pid[pid];
+        if (w) {
+            local_write_call += w->write_call;
+            local_writev_call += w->writev_call;
+            local_read_call += w->read_call;
+            local_readv_call += w->readv_call;
+            local_unlink_call += w->unlink_call;
+            local_fsync_call += w->fsync_call;
+            local_open_call += w->open_call;
+            local_create_call += w->create_call;
+
+            local_write_bytes += w->write_bytes;
+            local_writev_bytes += w->writev_bytes;
+            local_read_bytes += w->read_bytes;
+            local_readv_bytes += w->readv_bytes;
+
+            local_write_err += w->write_err;
+            local_writev_err += w->writev_err;
+            local_read_err += w->read_err;
+            local_readv_err += w->readv_err;
+            local_unlink_err += w->unlink_err;
+            local_fsync_err += w->fsync_err;
+            local_open_err += w->open_err;
+            local_create_err += w->create_err;
+        }
+        root = root->next;
+    }
+
+    // These conditions were added, because we are using incremental algorithm
+    vfs->write_call = (local_write_call >= vfs->write_call) ? local_write_call : vfs->write_call;
+    vfs->writev_call = (local_writev_call >= vfs->writev_call) ? local_writev_call : vfs->writev_call;
+    vfs->read_call = (local_read_call >= vfs->read_call) ? local_read_call : vfs->read_call;
+    vfs->readv_call = (local_readv_call >= vfs->readv_call) ? local_readv_call : vfs->readv_call;
+    vfs->unlink_call = (local_unlink_call >= vfs->unlink_call) ? local_unlink_call : vfs->unlink_call;
+    vfs->fsync_call = (local_fsync_call >= vfs->fsync_call) ? local_fsync_call : vfs->fsync_call;
+    vfs->open_call = (local_open_call >= vfs->open_call) ? local_open_call : vfs->open_call;
+    vfs->create_call = (local_create_call >= vfs->create_call) ? local_create_call : vfs->create_call;
+
+    vfs->write_bytes = (local_write_bytes >= vfs->write_bytes) ? local_write_bytes : vfs->write_bytes;
+    vfs->writev_bytes = (local_writev_bytes >= vfs->writev_bytes) ? local_writev_bytes : vfs->writev_bytes;
+    vfs->read_bytes = (local_read_bytes >= vfs->read_bytes) ? local_read_bytes : vfs->read_bytes;
+    vfs->readv_bytes = (local_readv_bytes >= vfs->readv_bytes) ? local_readv_bytes : vfs->readv_bytes;
+
+    vfs->write_err = (local_write_err >= vfs->write_err) ? local_write_err : vfs->write_err;
+    vfs->writev_err = (local_writev_err >= vfs->writev_err) ? local_writev_err : vfs->writev_err;
+    vfs->read_err = (local_read_err >= vfs->read_err) ? local_read_err : vfs->read_err;
+    vfs->readv_err = (local_readv_err >= vfs->readv_err) ? local_readv_err : vfs->readv_err;
+    vfs->unlink_err = (local_unlink_err >= vfs->unlink_err) ? local_unlink_err : vfs->unlink_err;
+    vfs->fsync_err = (local_fsync_err >= vfs->fsync_err) ? local_fsync_err : vfs->fsync_err;
+    vfs->open_err = (local_open_err >= vfs->open_err) ? local_open_err : vfs->open_err;
+    vfs->create_err = (local_create_err >= vfs->create_err) ? local_create_err : vfs->create_err;
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em   the structure with thread information
+ * @param root the target list.
+ */
+void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct target *root)
+{
+    struct target *w;
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
+        }
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.unlink_call);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.write_call + w->vfs.writev_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->vfs.write_err + w->vfs.writev_err);
+            }
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.read_call + w->vfs.readv_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->vfs.read_err + w->vfs.readv_err);
+            }
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.write_bytes + w->vfs.writev_bytes);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.read_bytes + w->vfs.readv_bytes);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_FSYNC);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.fsync_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->vfs.fsync_err);
+            }
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_OPEN);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.open_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->vfs.open_err);
+            }
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_CREATE);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->vfs.create_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->vfs.create_err);
+            }
+        }
+        write_end_chart();
+    }
+}
+
+/**
+ * Apps Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ */
+static void vfs_apps_accumulator(netdata_publish_vfs_t *out)
+{
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    netdata_publish_vfs_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        netdata_publish_vfs_t *w = &out[i];
+
+        total->write_call += w->write_call;
+        total->writev_call += w->writev_call;
+        total->read_call += w->read_call;
+        total->readv_call += w->readv_call;
+        total->unlink_call += w->unlink_call;
+
+        total->write_bytes += w->write_bytes;
+        total->writev_bytes += w->writev_bytes;
+        total->read_bytes += w->read_bytes;
+        total->readv_bytes += w->readv_bytes;
+
+        total->write_err += w->write_err;
+        total->writev_err += w->writev_err;
+        total->read_err += w->read_err;
+        total->readv_err += w->readv_err;
+        total->unlink_err += w->unlink_err;
+    }
+}
+
+/**
+ * Fill PID
+ *
+ * Fill PID structures
+ *
+ * @param current_pid pid that we are collecting data
+ * @param out         values read from hash tables;
+ */
+static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
+{
+    netdata_publish_vfs_t *curr = vfs_pid[current_pid];
+    if (!curr) {
+        curr = callocz(1, sizeof(netdata_publish_vfs_t));
+        vfs_pid[current_pid] = curr;
+    }
+
+    memcpy(curr, &publish[0], sizeof(netdata_publish_vfs_t));
+}
+
+/**
+ * Read the hash table and store data to allocated vectors.
+ */
+static void ebpf_vfs_read_apps()
+{
+    struct pid_stat *pids = root_of_pids;
+    netdata_publish_vfs_t *vv = vfs_vector;
+    int fd = map_fd[NETDATA_VFS_PID];
+    size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
+    while (pids) {
+        uint32_t key = pids->pid;
+
+        if (bpf_map_lookup_elem(fd, &key, vv)) {
+            pids = pids->next;
+            continue;
+        }
+
+        vfs_apps_accumulator(vv);
+
+        vfs_fill_pid(key, vv);
+
+        // We are cleaning to avoid passing data read from one process to other.
+        memset(vv, 0, length);
+
+        pids = pids->next;
+    }
+}
+
+/**
  * VFS read hash
  *
  * This is the thread callback.
@@ -250,14 +562,21 @@ static void vfs_collector(ebpf_module_t *em)
     netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_vfs_read_hash, em);
 
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        if (apps)
+            ebpf_vfs_read_apps();
 
         pthread_mutex_lock(&lock);
 
         ebpf_vfs_send_data(em);
         fflush(stdout);
+
+        if (apps)
+            ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -442,6 +761,129 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  **/
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
+    struct target *root = ptr;
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
+                               "Files deleted",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20065,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                               "Write to disk",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20066,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               apps_groups_root_target);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
+                                   "Fails to write",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20067,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                               "Read from disk",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20068,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
+                                   "Fails to read",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20069,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
+                               "Bytes written on disk", EBPF_COMMON_DIMENSION_BYTES,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20070,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
+                               "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20071,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC,
+                               "Calls for <code>vfs_fsync</code>", EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20072,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
+                                   "Sync error",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20073,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN,
+                               "Calls for <code>vfs_open</code>", EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20074,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
+                                   "Open error",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20075,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE,
+                               "Calls for <code>vfs_create</code>", EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_VFS_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20076,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
+                                   "Create error",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_VFS_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20077,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root);
+    }
 }
 
 /*****************************************************************
