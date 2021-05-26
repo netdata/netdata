@@ -195,7 +195,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 33, entries = 0, non_ascii = 0;
+        int max_entries = 33, entries = 0;
         char *pointers[max_entries];
 
         char *c = buf;
@@ -206,13 +206,12 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                     host->hostname,
                     line,
                     filename);
-                non_ascii = 1;
                 break;
             }
             c++;
         }
 
-        if (unlikely(non_ascii == 1))
+        if (unlikely(c))
             continue;
 
         pointers[entries++] = s++;
