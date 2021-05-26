@@ -195,8 +195,25 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 33, entries = 0;
+        int max_entries = 33, entries = 0, non_ascii = 0;
         char *pointers[max_entries];
+
+        char *c = buf;
+        while (*c) {
+            if (unlikely(!isascii(*c))) {
+                error(
+                    "HEALTH [%s]: line %zu of file '%s' contains a non-ascii character, ignoring.",
+                    host->hostname,
+                    line,
+                    filename);
+                non_ascii = 1;
+                break;
+            }
+            c++;
+        }
+
+        if (unlikely(non_ascii == 1))
+            continue;
 
         pointers[entries++] = s++;
         while(*s) {
@@ -368,7 +385,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->last_repeat = last_repeat;
 
-            if (likely(entries > 28)) {
+            if (likely(entries > 30)) {
                 freez(ae->classification);
                 ae->classification = strdupz(pointers[28]);
                 if(!*ae->classification) { freez(ae->classification); ae->classification = NULL; }
