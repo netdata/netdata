@@ -5,6 +5,23 @@
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
+#define NETDATA_LATENCY_VFS_SLEEP_MS 750000ULL
+
+// Global chart name
+#define NETDATA_VFS_FILE_CLEAN_COUNT "deleted_objects"
+#define NETDATA_VFS_FILE_IO_COUNT "io"
+#define NETDATA_VFS_FILE_ERR_COUNT "io_error"
+#define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
+#define NETDATA_VFS_FSYNC "fsync"
+#define NETDATA_VFS_FSYNC_ERR "fsync_error"
+#define NETDATA_VFS_OPEN "open"
+#define NETDATA_VFS_OPEN_ERR "open_error"
+#define NETDATA_VFS_CREATE "create"
+#define NETDATA_VFS_CREATE_ERR "create_error"
+
+// Group used on Dashboard
+#define NETDATA_VFS_GROUP "VFS (eBPF)"
+
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
     uint32_t pid;
@@ -46,6 +63,44 @@ enum netdata_publish_vfs_list {
     NETDATA_KEY_PUBLISH_VFS_CREATE,
 
     NETDATA_KEY_PUBLISH_VFS_END
+};
+
+enum vfs_counters {
+    NETDATA_KEY_CALLS_VFS_WRITE,
+    NETDATA_KEY_ERROR_VFS_WRITE,
+    NETDATA_KEY_BYTES_VFS_WRITE,
+
+    NETDATA_KEY_CALLS_VFS_WRITEV,
+    NETDATA_KEY_ERROR_VFS_WRITEV,
+    NETDATA_KEY_BYTES_VFS_WRITEV,
+
+    NETDATA_KEY_CALLS_VFS_READ,
+    NETDATA_KEY_ERROR_VFS_READ,
+    NETDATA_KEY_BYTES_VFS_READ,
+
+    NETDATA_KEY_CALLS_VFS_READV,
+    NETDATA_KEY_ERROR_VFS_READV,
+    NETDATA_KEY_BYTES_VFS_READV,
+
+    NETDATA_KEY_CALLS_VFS_UNLINK,
+    NETDATA_KEY_ERROR_VFS_UNLINK,
+
+    NETDATA_KEY_CALLS_VFS_FSYNC,
+    NETDATA_KEY_ERROR_VFS_FSYNC,
+
+    NETDATA_KEY_CALLS_VFS_OPEN,
+    NETDATA_KEY_ERROR_VFS_OPEN,
+
+    NETDATA_KEY_CALLS_VFS_CREATE,
+    NETDATA_KEY_ERROR_VFS_CREATE,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_VFS_COUNTER
+};
+
+enum netdata_vfs_tables {
+    NETDATA_VFS_PID,
+    NETDATA_VFS_ALL
 };
 
 extern netdata_publish_vfs_t **vfs_pid;
