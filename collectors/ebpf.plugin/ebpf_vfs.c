@@ -106,7 +106,7 @@ static void ebpf_vfs_send_data(ebpf_module_t *em)
 {
     netdata_publish_vfs_common_t pvc;
 
-    pvc.write = ((long)vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].bytes);
+    pvc.write = (long)vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].bytes;
     pvc.read = (long)vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].bytes;
 
     write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_FILESYSTEM_FAMILY,
