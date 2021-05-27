@@ -3436,6 +3436,30 @@ netdataDashboard.context = {
         info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
+    'filesystem.vfs_fsync': {
+        info: 'Successful or failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_fsync_error': {
+        info: 'Failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_open': {
+        info: 'Successful or failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_open_error': {
+        info: 'Failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_create': {
+        info: 'Successful or failed calls to functions <code>vfs_create</code>.'
+    },
+
+    'filesystem.vfs_create_error': {
+        info: 'Failed calls to functions <code>vfs_create</code>.'
+    },
+
     // ------------------------------------------------------------------------
     // eBPF
 
