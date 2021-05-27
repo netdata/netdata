@@ -3416,22 +3416,22 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Filesystem
 
-    'filesystem.deleted_objects': {
+    'filesystem.vfs_deleted_objects': {
         title : 'VFS remove',
         info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
     },
 
-    'filesystem.io': {
+    'filesystem.vfs_io': {
         title : 'VFS IO',
         info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
     },
 
-    'filesystem.io_bytes': {
+    'filesystem.vfs_io_bytes': {
         title : 'VFS bytes written',
         info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },
 
-    'filesystem.io_error': {
+    'filesystem.vfs_io_error': {
         title : 'VFS IO error',
         info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
     },

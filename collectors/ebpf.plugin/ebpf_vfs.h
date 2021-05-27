@@ -8,16 +8,16 @@
 #define NETDATA_LATENCY_VFS_SLEEP_MS 750000ULL
 
 // Global chart name
-#define NETDATA_VFS_FILE_CLEAN_COUNT "deleted_objects"
-#define NETDATA_VFS_FILE_IO_COUNT "io"
-#define NETDATA_VFS_FILE_ERR_COUNT "io_error"
-#define NETDATA_VFS_IO_FILE_BYTES "io_bytes"
-#define NETDATA_VFS_FSYNC "fsync"
-#define NETDATA_VFS_FSYNC_ERR "fsync_error"
-#define NETDATA_VFS_OPEN "open"
-#define NETDATA_VFS_OPEN_ERR "open_error"
-#define NETDATA_VFS_CREATE "create"
-#define NETDATA_VFS_CREATE_ERR "create_error"
+#define NETDATA_VFS_FILE_CLEAN_COUNT "vfs_deleted_objects"
+#define NETDATA_VFS_FILE_IO_COUNT "vfs_io"
+#define NETDATA_VFS_FILE_ERR_COUNT "vfs_io_error"
+#define NETDATA_VFS_IO_FILE_BYTES "vfs_io_bytes"
+#define NETDATA_VFS_FSYNC "vfs_fsync"
+#define NETDATA_VFS_FSYNC_ERR "vfs_fsync_error"
+#define NETDATA_VFS_OPEN "vfs_open"
+#define NETDATA_VFS_OPEN_ERR "vfs_open_error"
+#define NETDATA_VFS_CREATE "vfs_create"
+#define NETDATA_VFS_CREATE_ERR "vfs_create_error"
 
 // Charts created on Apps submenu
 #define NETDATA_SYSCALL_APPS_FILE_DELETED "file_deleted"
