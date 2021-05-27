@@ -268,8 +268,10 @@ void aclk_database_worker(void *arg)
                     //info("Cleanup for %s", wc->uuid_str);
                     if (unlikely(!wc->host)) {
                         wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
-                        if (wc->host)
+                        if (wc->host) {
                             info("HOST %s detected as active !!!", wc->host->hostname);
+                            wc->host->dbsync_worker = wc;
+                        }
                     }
                     break;
                 case ACLK_DATABASE_DEDUP_CHART:
