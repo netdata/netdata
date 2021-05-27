@@ -994,14 +994,22 @@ char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size
    char *claim_id = is_agent_claimed();
    dim_payload.node_id = node_id;
    dim_payload.claim_id = claim_id;
+   time_t now = now_realtime_sec();
    rrddim_foreach_read(rd, st)
    {
+       //int find_dimension_first_last_t(char *machine_guid, char *chart_id, char *dim_id,
+       //       uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t, uuid_t *rrdeng_uuid)
        dim_payload.chart_id = rd->rrdset->name;
        dim_payload.created_at = rd->last_collected_time; //TODO: Fix with creation time
-       dim_payload.last_timestamp = rd->last_collected_time;
+       if ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every)) {
+           dim_payload.last_timestamp.tv_usec = 0;
+           dim_payload.last_timestamp.tv_sec = 0;
+       }
+       else
+            dim_payload.last_timestamp = rd->last_collected_time;
        dim_payload.name = rd->name;
        dim_payload.id = rd->id;
-//       info("DEBUG: Dimension %d (chart %s) --> %s", i, rd->rrdset->name, rd->name);
+//       info("DEBUG: Dimension %d (chart %s) --> %s live status = %d", i, rd->rrdset->name, rd->name, dim_payload.last_timestamp.tv_sec ? 0 :1);
        payload_list[i] = generate_chart_dimension_updated(&((*payload_list_size)[i]), &dim_payload);
        ++i;
    }
