@@ -109,28 +109,6 @@ static void ebpf_vfs_send_data(ebpf_module_t *em)
     pvc.write = ((long)vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].bytes);
     pvc.read = (long)vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].bytes;
 
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].ncall =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_UNLINK].call;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE].ncall =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].call;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].ncall = vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].call;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC].ncall =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_FSYNC].call;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN].ncall = vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_OPEN].call;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE].ncall =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_CREATE].call;
-
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].nerr =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_UNLINK].ecall;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE].nerr =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].ecall;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].nerr = vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].ecall;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC].nerr =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_FSYNC].ecall;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN].nerr = vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_OPEN].ecall;
-    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE].nerr =
-        vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_CREATE].ecall;
-
     write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_FILESYSTEM_FAMILY,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK], 1);
 
@@ -194,19 +172,23 @@ static void read_global_table()
         res[idx] = total;
     }
 
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_UNLINK].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_FSYNC].call = res[NETDATA_KEY_CALLS_VFS_FSYNC];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_OPEN].call = res[NETDATA_KEY_CALLS_VFS_OPEN];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_CREATE].call = res[NETDATA_KEY_CALLS_VFS_CREATE];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].ncall = res[NETDATA_KEY_CALLS_VFS_UNLINK];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].ncall = res[NETDATA_KEY_CALLS_VFS_READ] +
+                                                             res[NETDATA_KEY_CALLS_VFS_READV];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE].ncall = res[NETDATA_KEY_CALLS_VFS_WRITE] +
+                                                              res[NETDATA_KEY_CALLS_VFS_WRITEV];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC].ncall = res[NETDATA_KEY_CALLS_VFS_FSYNC];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN].ncall = res[NETDATA_KEY_CALLS_VFS_OPEN];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE].ncall = res[NETDATA_KEY_CALLS_VFS_CREATE];
 
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_UNLINK].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_FSYNC].ecall = res[NETDATA_KEY_ERROR_VFS_FSYNC];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_OPEN].ecall = res[NETDATA_KEY_ERROR_VFS_OPEN];
-    vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_CREATE].ecall = res[NETDATA_KEY_ERROR_VFS_CREATE];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].nerr = res[NETDATA_KEY_ERROR_VFS_UNLINK];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].nerr = res[NETDATA_KEY_ERROR_VFS_READ] +
+                                                                res[NETDATA_KEY_ERROR_VFS_READV];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE].nerr = res[NETDATA_KEY_ERROR_VFS_WRITE] +
+                                                                 res[NETDATA_KEY_ERROR_VFS_WRITEV];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC].nerr = res[NETDATA_KEY_ERROR_VFS_FSYNC];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN].nerr = res[NETDATA_KEY_ERROR_VFS_OPEN];
+    vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE].nerr = res[NETDATA_KEY_ERROR_VFS_CREATE];
 
     vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_WRITE].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] +
                                                                (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
