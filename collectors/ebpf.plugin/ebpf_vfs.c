@@ -206,82 +206,62 @@ static void read_global_table()
  */
 static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *root)
 {
-    uint32_t local_write_call = 0;
-    uint32_t local_writev_call = 0;
-    uint32_t local_read_call = 0;
-    uint32_t local_readv_call = 0;
-    uint32_t local_unlink_call = 0;
-    uint32_t local_fsync_call = 0;
-    uint32_t local_open_call = 0;
-    uint32_t local_create_call = 0;
-
-    uint64_t local_write_bytes = 0;
-    uint64_t local_writev_bytes = 0;
-    uint64_t local_read_bytes = 0;
-    uint64_t local_readv_bytes = 0;
-
-    uint32_t local_write_err = 0;
-    uint32_t local_writev_err = 0;
-    uint32_t local_read_err = 0;
-    uint32_t local_readv_err = 0;
-    uint32_t local_unlink_err = 0;
-    uint32_t local_fsync_err = 0;
-    uint32_t local_open_err = 0;
-    uint32_t local_create_err = 0;
+    netdata_publish_vfs_t accumulator;
+    memset(&accumulator, 0, sizeof(accumulator));
 
     while (root) {
         int32_t pid = root->pid;
         netdata_publish_vfs_t *w = vfs_pid[pid];
         if (w) {
-            local_write_call += w->write_call;
-            local_writev_call += w->writev_call;
-            local_read_call += w->read_call;
-            local_readv_call += w->readv_call;
-            local_unlink_call += w->unlink_call;
-            local_fsync_call += w->fsync_call;
-            local_open_call += w->open_call;
-            local_create_call += w->create_call;
+            accumulator.write_call += w->write_call;
+            accumulator.writev_call += w->writev_call;
+            accumulator.read_call += w->read_call;
+            accumulator.readv_call += w->readv_call;
+            accumulator.unlink_call += w->unlink_call;
+            accumulator.fsync_call += w->fsync_call;
+            accumulator.open_call += w->open_call;
+            accumulator.create_call += w->create_call;
 
-            local_write_bytes += w->write_bytes;
-            local_writev_bytes += w->writev_bytes;
-            local_read_bytes += w->read_bytes;
-            local_readv_bytes += w->readv_bytes;
+            accumulator.write_bytes += w->write_bytes;
+            accumulator.writev_bytes += w->writev_bytes;
+            accumulator.read_bytes += w->read_bytes;
+            accumulator.readv_bytes += w->readv_bytes;
 
-            local_write_err += w->write_err;
-            local_writev_err += w->writev_err;
-            local_read_err += w->read_err;
-            local_readv_err += w->readv_err;
-            local_unlink_err += w->unlink_err;
-            local_fsync_err += w->fsync_err;
-            local_open_err += w->open_err;
-            local_create_err += w->create_err;
+            accumulator.write_err += w->write_err;
+            accumulator.writev_err += w->writev_err;
+            accumulator.read_err += w->read_err;
+            accumulator.readv_err += w->readv_err;
+            accumulator.unlink_err += w->unlink_err;
+            accumulator.fsync_err += w->fsync_err;
+            accumulator.open_err += w->open_err;
+            accumulator.create_err += w->create_err;
         }
         root = root->next;
     }
 
     // These conditions were added, because we are using incremental algorithm
-    vfs->write_call = (local_write_call >= vfs->write_call) ? local_write_call : vfs->write_call;
-    vfs->writev_call = (local_writev_call >= vfs->writev_call) ? local_writev_call : vfs->writev_call;
-    vfs->read_call = (local_read_call >= vfs->read_call) ? local_read_call : vfs->read_call;
-    vfs->readv_call = (local_readv_call >= vfs->readv_call) ? local_readv_call : vfs->readv_call;
-    vfs->unlink_call = (local_unlink_call >= vfs->unlink_call) ? local_unlink_call : vfs->unlink_call;
-    vfs->fsync_call = (local_fsync_call >= vfs->fsync_call) ? local_fsync_call : vfs->fsync_call;
-    vfs->open_call = (local_open_call >= vfs->open_call) ? local_open_call : vfs->open_call;
-    vfs->create_call = (local_create_call >= vfs->create_call) ? local_create_call : vfs->create_call;
+    vfs->write_call = (accumulator.write_call >= vfs->write_call) ? accumulator.write_call : vfs->write_call;
+    vfs->writev_call = (accumulator.writev_call >= vfs->writev_call) ? accumulator.writev_call : vfs->writev_call;
+    vfs->read_call = (accumulator.read_call >= vfs->read_call) ? accumulator.read_call : vfs->read_call;
+    vfs->readv_call = (accumulator.readv_call >= vfs->readv_call) ? accumulator.readv_call : vfs->readv_call;
+    vfs->unlink_call = (accumulator.unlink_call >= vfs->unlink_call) ? accumulator.unlink_call : vfs->unlink_call;
+    vfs->fsync_call = (accumulator.fsync_call >= vfs->fsync_call) ? accumulator.fsync_call : vfs->fsync_call;
+    vfs->open_call = (accumulator.open_call >= vfs->open_call) ? accumulator.open_call : vfs->open_call;
+    vfs->create_call = (accumulator.create_call >= vfs->create_call) ? accumulator.create_call : vfs->create_call;
 
-    vfs->write_bytes = (local_write_bytes >= vfs->write_bytes) ? local_write_bytes : vfs->write_bytes;
-    vfs->writev_bytes = (local_writev_bytes >= vfs->writev_bytes) ? local_writev_bytes : vfs->writev_bytes;
-    vfs->read_bytes = (local_read_bytes >= vfs->read_bytes) ? local_read_bytes : vfs->read_bytes;
-    vfs->readv_bytes = (local_readv_bytes >= vfs->readv_bytes) ? local_readv_bytes : vfs->readv_bytes;
+    vfs->write_bytes = (accumulator.write_bytes >= vfs->write_bytes) ? accumulator.write_bytes : vfs->write_bytes;
+    vfs->writev_bytes = (accumulator.writev_bytes >= vfs->writev_bytes) ? accumulator.writev_bytes : vfs->writev_bytes;
+    vfs->read_bytes = (accumulator.read_bytes >= vfs->read_bytes) ? accumulator.read_bytes : vfs->read_bytes;
+    vfs->readv_bytes = (accumulator.readv_bytes >= vfs->readv_bytes) ? accumulator.readv_bytes : vfs->readv_bytes;
 
-    vfs->write_err = (local_write_err >= vfs->write_err) ? local_write_err : vfs->write_err;
-    vfs->writev_err = (local_writev_err >= vfs->writev_err) ? local_writev_err : vfs->writev_err;
-    vfs->read_err = (local_read_err >= vfs->read_err) ? local_read_err : vfs->read_err;
-    vfs->readv_err = (local_readv_err >= vfs->readv_err) ? local_readv_err : vfs->readv_err;
-    vfs->unlink_err = (local_unlink_err >= vfs->unlink_err) ? local_unlink_err : vfs->unlink_err;
-    vfs->fsync_err = (local_fsync_err >= vfs->fsync_err) ? local_fsync_err : vfs->fsync_err;
-    vfs->open_err = (local_open_err >= vfs->open_err) ? local_open_err : vfs->open_err;
-    vfs->create_err = (local_create_err >= vfs->create_err) ? local_create_err : vfs->create_err;
+    vfs->write_err = (accumulator.write_err >= vfs->write_err) ? accumulator.write_err : vfs->write_err;
+    vfs->writev_err = (accumulator.writev_err >= vfs->writev_err) ? accumulator.writev_err : vfs->writev_err;
+    vfs->read_err = (accumulator.read_err >= vfs->read_err) ? accumulator.read_err : vfs->read_err;
+    vfs->readv_err = (accumulator.readv_err >= vfs->readv_err) ? accumulator.readv_err : vfs->readv_err;
+    vfs->unlink_err = (accumulator.unlink_err >= vfs->unlink_err) ? accumulator.unlink_err : vfs->unlink_err;
+    vfs->fsync_err = (accumulator.fsync_err >= vfs->fsync_err) ? accumulator.fsync_err : vfs->fsync_err;
+    vfs->open_err = (accumulator.open_err >= vfs->open_err) ? accumulator.open_err : vfs->open_err;
+    vfs->create_err = (accumulator.create_err >= vfs->create_err) ? accumulator.create_err : vfs->create_err;
 }
 
 /**
