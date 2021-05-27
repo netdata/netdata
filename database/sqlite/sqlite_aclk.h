@@ -126,6 +126,7 @@ struct aclk_database_cmdqueue {
 struct aclk_database_worker_config {
     uv_thread_t thread;
     char uuid_str[GUID_LEN + 1];
+    char host_guid[GUID_LEN + 1];
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;
@@ -163,8 +164,7 @@ extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct
 extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
-extern void sql_create_aclk_table(RRDHOST *host);
-extern void sql_create_aclk_table(RRDHOST *host);
+extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);

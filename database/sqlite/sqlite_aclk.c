@@ -170,6 +170,10 @@ void aclk_database_worker(void *arg)
     cmd.opcode = ACLK_DATABASE_DEDUP_CHART;
     aclk_database_enq_cmd(wc, &cmd);
 
+    info(
+        "Starting ACLK sync event loop for host with GUID %s (Host is '%s')",
+        wc->host_guid,
+        wc->host ? "connected" : "not connected");
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -262,6 +266,11 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_TIMER:
                     //sql_maint_database();
                     //info("Cleanup for %s", wc->uuid_str);
+                    if (unlikely(!wc->host)) {
+                        wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
+                        if (wc->host)
+                            info("HOST %s detected as active !!!", wc->host->hostname);
+                    }
                     break;
                 case ACLK_DATABASE_DEDUP_CHART:
                     sql_chart_deduplicate(wc, cmd);
@@ -300,8 +309,9 @@ void aclk_database_worker(void *arg)
     freez(loop);
 
     rrd_wrlock();
-    freez(wc->host->dbsync_worker);
-    wc->host->dbsync_worker = NULL;
+    if (likely(wc->host))
+        wc->host->dbsync_worker = NULL;
+    freez(wc);
     rrd_unlock();
     return;
 
@@ -690,13 +700,16 @@ fail:
     buffer_free(sql);
 }
 
-void sql_create_aclk_table(RRDHOST *host)
+void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid)
 {
     char uuid_str[GUID_LEN + 1];
+    char host_guid[GUID_LEN + 1];
 
-    //sql_drop_host_aclk_table_list(&host->host_uuid);
+    uuid_unparse_lower(*host_uuid, host_guid);
+    uuid_unparse_lower_fix(host_uuid, uuid_str);
 
-    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+//    if (unlikely(!host))
+//        host = rrdhost_find_by_guid(host_guid, 0);
 
     BUFFER *sql = buffer_create(1024);
 
@@ -739,14 +752,15 @@ void sql_create_aclk_table(RRDHOST *host)
     buffer_free(sql);
 
     // Spawn db thread for processing (event loop)
-    if (unlikely(host->dbsync_worker))
+    if (likely(host) && unlikely(host->dbsync_worker))
         return;
 
-    struct aclk_database_worker_config *wc = NULL;
-    host->dbsync_worker = mallocz(sizeof(struct aclk_database_worker_config));
-    wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+    struct aclk_database_worker_config *wc = callocz(1, sizeof(struct aclk_database_worker_config));
+    if (likely(host))
+         host->dbsync_worker = (void *) wc;
     wc->host = host;
     strcpy(wc->uuid_str, uuid_str);
+    strcpy(wc->host_guid, host_guid);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
 }
 

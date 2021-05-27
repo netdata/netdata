@@ -182,6 +182,15 @@ void store_active_dimension(uuid_t *dimension_uuid)
     return;
 }
 
+int aclk_start_sync_thread(void *date, int argc, char **argv, char **column)
+{
+    char uuid_str[GUID_LEN + 1];
+
+    uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
+    info("DEBUG: Start thread for %s", uuid_str);
+    sql_create_aclk_table(NULL, (uuid_t *) argv[0]);
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -216,6 +225,10 @@ int sql_init_database(void)
         }
     }
     info("SQLite database initialization completed");
+
+//    sql_create_aclk_table(host, &host->host_uuid);
+    rc = sqlite3_exec(db_meta, "select host_id from host;", aclk_start_sync_thread, NULL, NULL);
+
     return 0;
 }
 
