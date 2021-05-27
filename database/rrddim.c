@@ -457,7 +457,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_unlock(st);
 #ifdef ENABLE_ACLK
     rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-    sql_queue_dimension_to_aclk(st->rrdhost, rd);
 #endif
     return(rd);
 }
@@ -580,7 +579,6 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 #ifdef ENABLE_ACLK
     rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-    sql_queue_dimension_to_aclk(st->rrdhost, rd);
 #endif
 }
 
@@ -592,7 +590,6 @@ inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 #ifdef ENABLE_ACLK
     rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-    sql_queue_dimension_to_aclk(st->rrdhost, rd);
 #endif
 }
 

@@ -44,19 +44,11 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
-#define TABLE_ACLK_DIMENSION "create table if not exists aclk_dimension_%s (sequence_id integer primary key, " \
-        "date_created, date_updated, date_submitted, status, dim_id, unique_id, " \
-        "update_count default 1, unique(dim_id, status));"
+#define TABLE_ACLK_DIMENSION "DROP TABLE IF EXISTS aclk_dimension_%s;"
 
-#define TABLE_ACLK_DIMENSION_PAYLOAD "create table if not exists aclk_dimension_payload_%s (unique_id blob primary key, " \
-        "dim_id, type, date_created, payload);"
+#define TABLE_ACLK_DIMENSION_PAYLOAD "DROP TABLE IF EXISTS aclk_dimension_payload_%s;"
 
-#define TRIGGER_ACLK_DIMENSION_PAYLOAD "create trigger if not exists aclk_tr_dimension_payload_%s " \
-        "after insert on aclk_dimension_payload_%s " \
-        "begin insert into aclk_dimension_%s (dim_id, unique_id, status, date_created) values " \
-        " (new.dim_id, new.unique_id, 'pending', strftime('%%s')) on conflict(dim_id, status) " \
-        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
-        "end;"
+#define TRIGGER_ACLK_DIMENSION_PAYLOAD "DROP TRIGGER IF EXISTS aclk_tr_dimension_payload_%s;"
 
 #define TABLE_ACLK_ALERT "create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
                  "date_created, date_updated, date_submitted, status, alarm_id, unique_id, " \
@@ -79,7 +71,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_TIMER,
     ACLK_DATABASE_ADD_CHART,
-    ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_FETCH_CHART,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
@@ -168,23 +159,19 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
 extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
-void sql_queue_dimension_to_aclk(RRDHOST *host, RRDDIM *rd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host);
 extern void sql_create_aclk_table(RRDHOST *host);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-int aclk_add_dimension_event(RRDDIM *st, char *payload_type, struct completion *completion);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
 void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id);
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-//void aclk_fetch_chart_event_proto(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void aclk_push_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id);
 void aclk_get_chart_config(char **hash_id_list);
@@ -193,6 +180,5 @@ void sql_aclk_drop_all_table_list();
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param);
 extern void aclk_set_architecture(int mode);
-//char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t *current_size);
 char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t  *total);
 #endif //NETDATA_SQLITE_ACLK_H
