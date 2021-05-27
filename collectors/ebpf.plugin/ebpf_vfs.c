@@ -194,8 +194,6 @@ static void read_global_table()
                                                                (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
     vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] +
                                                               (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
-
-
 }
 
 /**
@@ -923,6 +921,11 @@ void *ebpf_vfs_thread(void *ptr)
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, vfs_data.map_fd);
     if (!probe_links) {
+        goto endvfs;
+    }
+
+    if (ebpf_update_kernel(&vfs_data)) {
+        pthread_mutex_unlock(&lock);
         goto endvfs;
     }
 
