@@ -593,7 +593,7 @@ static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web
            vfs_id_names[NETDATA_KEY_PUBLISH_VFS_READ],
            vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_READ],
            ebpf_algorithms[algorithm]);
-    printf("DIMENSION %s %s %s 1 1\n",
+    printf("DIMENSION %s %s %s -1 1\n",
            vfs_id_names[NETDATA_KEY_PUBLISH_VFS_WRITE],
            vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_WRITE],
            ebpf_algorithms[algorithm]);
