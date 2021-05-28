@@ -328,7 +328,7 @@ update() {
     fi
 
     if [ -e "${NETDATA_PREFIX}/etc/netdata/.install-type" ] ; then
-      install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
+      install_type="$(cat "${NETDATA_PREFIX}"/etc/netdata/.install-type)"
     else
       install_type="INSTALL_TYPE='legacy-build'"
     fi
