@@ -220,6 +220,13 @@ static int chart_reset(mqtt_wss_client client, aclk_query_t query)
     return 0;
 }
 
+static int send_bin_msg(mqtt_wss_client client, aclk_query_t query)
+{
+    // TODO move all bin_payload messages to this fnc
+    aclk_send_bin_message_subtopic_pid(client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
+    return 0;
+}
+
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,           .name = "http api request v2",      .fnc = http_api_v2              },
     { .type = ALARM_STATE_UPDATE,    .name = "alarm state update",       .fnc = alarm_state_update_query },
@@ -232,6 +239,7 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = CHART_DIMS_UPDATE_BIN, .name = "chart and dim update bin", .fnc = chart_dim_update_bin     },
     { .type = CHART_CONFIG_UPDATED,  .name = "chart config updated",     .fnc = chart_config_updated     },
     { .type = CHART_RESET,           .name = "reset chart messages",     .fnc = chart_reset              },
+    { .type = ALARM_LOG_HEALTH,      .name = "alarm log health",         .fnc = send_bin_msg             },
     { .type = UNKNOWN,               .name = NULL,                       .fnc = NULL                     }
 };
 

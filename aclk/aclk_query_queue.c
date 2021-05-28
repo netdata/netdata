@@ -132,6 +132,7 @@ void aclk_query_free(aclk_query_t query)
     case CHART_DIMS_UPDATE_BIN:
     case CHART_CONFIG_UPDATED:
     case CHART_RESET:
+    case ALARM_LOG_HEALTH:
         freez(query->data.bin_payload.payload);
         break;
     default:

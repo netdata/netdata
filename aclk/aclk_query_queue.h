@@ -19,7 +19,8 @@ typedef enum {
     NODE_STATE_UPDATE,
     CHART_DIMS_UPDATE_BIN,
     CHART_CONFIG_UPDATED,
-    CHART_RESET
+    CHART_RESET,
+    ALARM_LOG_HEALTH
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
@@ -40,6 +41,8 @@ struct aclk_query_http_api_v2 {
 struct aclk_bin_payload { 
     char *payload;
     size_t size;
+    enum aclk_topics topic;
+    const char *msg_name;
 };
 
 typedef struct aclk_query *aclk_query_t;
