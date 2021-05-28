@@ -44,7 +44,8 @@ The `alarms` specific part of the `alarms.conf` file should look like this:
 
 ```yaml
 # what url to pull data from
-local:
+alarms:
+  name: 'Alarms'
   url: 'http://127.0.0.1:19999/api/v1/alarms?all'
   # define how to map alarm status to numbers for the chart
   status_map:
