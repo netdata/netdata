@@ -587,6 +587,10 @@ ACLK_FILES = \
     aclk/schema-wrappers/chart_stream.h \
     aclk/schema-wrappers/chart_config.cc \
     aclk/schema-wrappers/chart_config.h \
+    aclk/schema-wrappers/alarm_stream.cc \
+    aclk/schema-wrappers/alarm_stream.h \
+    aclk/schema-wrappers/alarm_config.cc \
+    aclk/schema-wrappers/alarm_config.h \
     aclk/schema-wrappers/schema_wrappers.h \
     $(NULL)
 

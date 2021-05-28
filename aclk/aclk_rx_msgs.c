@@ -335,6 +335,16 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         destroy_update_chart_config(&res);
         return;
     }
+    if (!strcmp(message_type, "StartAlarmStreaming")) {
+        struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
+        if (!res.node_id)
+        {
+            error("Error parsing StartAlarmStreaming");
+            freez(res.node_id);
+        }
+        //TODO stelfrag/MrZammler call your handler here
+        freez(res.node_id);
+    }
 
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
