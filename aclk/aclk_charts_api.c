@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "aclk_charts.h"
+#include "aclk_charts_api.h"
 
 #include "aclk_query_queue.h"
 
