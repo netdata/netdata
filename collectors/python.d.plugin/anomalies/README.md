@@ -82,8 +82,8 @@ The default configuration should look something like this. Here you can see each
 # JOBS (data collection sources)
 
 # Pull data from local Netdata node.
-local:
-    name: 'local'
+anomalies:
+    name: 'Anomalies'
 
     # Host to pull data from.
     host: '127.0.0.1:19999'
