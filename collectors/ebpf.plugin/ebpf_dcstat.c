@@ -122,13 +122,15 @@ static void ebpf_dcstat_cleanup(void *ptr)
 
     ebpf_dcstat_clean_names();
 
-    struct bpf_program *prog;
-    size_t i = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[i]);
-        i++;
+    if (probe_links) {
+        struct bpf_program *prog;
+        size_t i = 0 ;
+        bpf_object__for_each_program(prog, objects) {
+            bpf_link__destroy(probe_links[i]);
+            i++;
+        }
+        bpf_object__close(objects);
     }
-    bpf_object__close(objects);
 }
 
 /*****************************************************************
