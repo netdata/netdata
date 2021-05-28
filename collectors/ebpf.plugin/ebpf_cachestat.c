@@ -80,13 +80,15 @@ static void ebpf_cachestat_cleanup(void *ptr)
     freez(cachestat_vector);
     freez(cachestat_hash_values);
 
-    struct bpf_program *prog;
-    size_t i = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[i]);
-        i++;
+    if (probe_links) {
+        struct bpf_program *prog;
+        size_t i = 0 ;
+        bpf_object__for_each_program(prog, objects) {
+            bpf_link__destroy(probe_links[i]);
+            i++;
+        }
+        bpf_object__close(objects);
     }
-    bpf_object__close(objects);
 }
 
 /*****************************************************************
