@@ -79,7 +79,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_CACHESTAT_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_DCSTAT_IDX,
-    EBPF_MODULE_SWAP_IDX
+    EBPF_MODULE_SWAP_IDX,
+    EBPF_MODULE_VFS_IDX
 };
 
 // Copied from musl header

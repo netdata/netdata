@@ -11,11 +11,10 @@
  *
  *****************************************************************/
 
-static char *process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "open", "close", "delete",  "read",  "write",
-                                                                     "process", "task",  "process", "thread" };
-static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open",  "__close_fd", "vfs_unlink",
-                                                              "vfs_read",     "vfs_write",  "do_exit",
-                                                              "release_task", "_do_fork",   "sys_clone" };
+static char *process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "open", "close", "process",
+                                                                          "task",  "process", "thread" };
+static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open",  "__close_fd", "do_exit",
+                                                                   "release_task", "_do_fork",   "sys_clone" };
 static char *status[] = { "process", "zombie" };
 
 static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
@@ -56,16 +55,16 @@ struct config process_config = { .first_section = NULL,
  * @param pvc      the second output structure with correlated dimensions
  * @param input    the structure with the input data.
  */
-static void ebpf_update_global_publish(
-    netdata_publish_syscall_t *publish, netdata_publish_vfs_common_t *pvc, netdata_syscall_stat_t *input)
+static void ebpf_update_global_publish(netdata_publish_syscall_t *publish, netdata_publish_vfs_common_t *pvc,
+                                       netdata_syscall_stat_t *input)
 {
     netdata_publish_syscall_t *move = publish;
     int selector = NETDATA_KEY_PUBLISH_PROCESS_OPEN;
     while (move) {
-        // Until NETDATA_KEY_PUBLISH_PROCESS_READ we are creating accumulators, so it is possible
+        // Until NETDATA_KEY_PUBLISH_PROCESS_EXIT we are creating accumulators, so it is possible
         // to use incremental charts, but after this we will do some math with the values, so we are storing
         // absolute values
-        if (selector < NETDATA_KEY_PUBLISH_PROCESS_READ) {
+        if (selector < NETDATA_KEY_PUBLISH_PROCESS_EXIT) {
             move->ncall = input->call;
             move->nbyte = input->bytes;
             move->nerr = input->ecall;
@@ -84,12 +83,11 @@ static void ebpf_update_global_publish(
         selector++;
     }
 
-    pvc->write = -((long)publish[NETDATA_KEY_PUBLISH_PROCESS_WRITE].nbyte);
-    pvc->read = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_READ].nbyte;
-
-    pvc->running = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_FORK].ncall - (long)publish[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ncall;
+    pvc->running = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_FORK].ncall -
+                   (long)publish[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ncall;
     publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall = -publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
-    pvc->zombie = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_EXIT].ncall + (long)publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
+    pvc->zombie = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_EXIT].ncall +
+                  (long)publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
 }
 
 /**
@@ -118,33 +116,20 @@ static void ebpf_process_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t pvc;
     ebpf_update_global_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
-    write_count_chart(
-        NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
+    write_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
 
-    write_count_chart(
-        NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_DEL_START], 1);
-
-    write_count_chart(
-        NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_IN_START_BYTE], 2);
-
-    write_count_chart(
-        NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_EXIT_START], 2);
-    write_count_chart(
-        NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_PROCESS_START], 2);
+    write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY,
+                      &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT], 2);
+    write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY,
+                      &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK], 2);
 
     write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(
-            NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY, process_publish_aggregated, 2);
-        write_err_chart(
-            NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, &process_publish_aggregated[2], NETDATA_VFS_ERRORS);
-        write_err_chart(
-            NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &process_publish_aggregated[NETDATA_PROCESS_START], 2);
+        write_err_chart(NETDATA_FILE_OPEN_ERR_COUNT, NETDATA_EBPF_FAMILY,
+                        process_publish_aggregated, 2);
+        write_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY,
+                        &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK], 2);
     }
-
-    write_io_chart(NETDATA_VFS_IO_FILE_BYTES, NETDATA_EBPF_FAMILY,
-                   process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE], (long long) pvc.write,
-                   process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ], (long long)pvc.read);
 }
 
 /**
@@ -220,8 +205,8 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                value = ebpf_process_sum_values_for_pids(
-                    w->root_pid, offsetof(ebpf_process_publish_apps_t, ecall_sys_open));
+                value = ebpf_process_sum_values_for_pids(w->root_pid,
+                                                         offsetof(ebpf_process_publish_apps_t, ecall_sys_open));
                 write_chart_dimension(w->name, value);
             }
         }
@@ -231,8 +216,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value =
-                ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_close_fd));
+            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_close_fd));
             write_chart_dimension(w->name, value);
         }
     }
@@ -242,93 +226,18 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                value = ebpf_process_sum_values_for_pids(
-                    w->root_pid, offsetof(ebpf_process_publish_apps_t, ecall_close_fd));
+                value = ebpf_process_sum_values_for_pids(w->root_pid,
+                                                         offsetof(ebpf_process_publish_apps_t, ecall_close_fd));
                 write_chart_dimension(w->name, value);
             }
         }
         write_end_chart();
     }
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value =
-                ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_vfs_unlink));
-            write_chart_dimension(w->name, value);
-        }
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_process_sum_values_for_pids(
-                w->root_pid, offsetof(ebpf_process_publish_apps_t, call_write));
-            write_chart_dimension(w->name, value);
-        }
-    }
-    write_end_chart();
-
-    if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes)) {
-                value = ebpf_process_sum_values_for_pids(
-                    w->root_pid, offsetof(ebpf_process_publish_apps_t, ecall_write));
-                write_chart_dimension(w->name, value);
-            }
-        }
-        write_end_chart();
-    }
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value =
-                ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_read));
-            write_chart_dimension(w->name, value);
-        }
-    }
-    write_end_chart();
-
-    if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes)) {
-                value = ebpf_process_sum_values_for_pids(
-                    w->root_pid, offsetof(ebpf_process_publish_apps_t, ecall_read));
-                write_chart_dimension(w->name, value);
-            }
-        }
-        write_end_chart();
-    }
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_process_sum_values_for_pids(
-                w->root_pid, offsetof(ebpf_process_publish_apps_t, bytes_written));
-            write_chart_dimension(w->name, value);
-        }
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_process_sum_values_for_pids(
-                w->root_pid, offsetof(ebpf_process_publish_apps_t, bytes_read));
-            write_chart_dimension(w->name, value);
-        }
-    }
-    write_end_chart();
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value =
-                ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_do_fork));
+            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_do_fork));
             write_chart_dimension(w->name, value);
         }
     }
@@ -337,8 +246,7 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value =
-                ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_sys_clone));
+            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_sys_clone));
             write_chart_dimension(w->name, value);
         }
     }
@@ -369,10 +277,10 @@ void ebpf_process_send_apps_data(ebpf_module_t *em, struct target *root)
 static void read_hash_global_tables()
 {
     uint64_t idx;
-    netdata_idx_t res[NETDATA_GLOBAL_VECTOR];
+    netdata_idx_t res[NETDATA_KEY_END_VECTOR];
 
     netdata_idx_t *val = process_hash_values;
-    for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
+    for (idx = 0; idx < NETDATA_KEY_END_VECTOR; idx++) {
         if (!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
             uint64_t total = 0;
             int i;
@@ -388,9 +296,6 @@ static void read_hash_global_tables()
 
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_OPEN].call = res[NETDATA_KEY_CALLS_DO_SYS_OPEN];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLOSE].call = res[NETDATA_KEY_CALLS_CLOSE_FD];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_UNLINK].call = res[NETDATA_KEY_CALLS_VFS_UNLINK];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].call = res[NETDATA_KEY_CALLS_VFS_READ] + res[NETDATA_KEY_CALLS_VFS_READV];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].call = res[NETDATA_KEY_CALLS_VFS_WRITE] + res[NETDATA_KEY_CALLS_VFS_WRITEV];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_EXIT].call = res[NETDATA_KEY_CALLS_DO_EXIT];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_FORK].call = res[NETDATA_KEY_CALLS_DO_FORK];
@@ -398,16 +303,8 @@ static void read_hash_global_tables()
 
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_OPEN].ecall = res[NETDATA_KEY_ERROR_DO_SYS_OPEN];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLOSE].ecall = res[NETDATA_KEY_ERROR_CLOSE_FD];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_UNLINK].ecall = res[NETDATA_KEY_ERROR_VFS_UNLINK];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].ecall = res[NETDATA_KEY_ERROR_VFS_READ] + res[NETDATA_KEY_ERROR_VFS_READV];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].ecall = res[NETDATA_KEY_ERROR_VFS_WRITE] + res[NETDATA_KEY_ERROR_VFS_WRITEV];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_FORK].ecall = res[NETDATA_KEY_ERROR_DO_FORK];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ecall = res[NETDATA_KEY_ERROR_SYS_CLONE];
-
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_WRITE].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITE] +
-                                       (uint64_t)res[NETDATA_KEY_BYTES_VFS_WRITEV];
-    process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_READ].bytes = (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] +
-                                       (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
 
 /**
@@ -433,9 +330,6 @@ static void ebpf_process_update_apps_data()
         //Read data
         cad->call_sys_open = ps->open_call;
         cad->call_close_fd = ps->close_call;
-        cad->call_vfs_unlink = ps->unlink_call;
-        cad->call_read = ps->read_call + ps->readv_call;
-        cad->call_write = ps->write_call + ps->writev_call;
         cad->call_do_exit = ps->exit_call;
         cad->call_release_task = ps->release_call;
         cad->call_do_fork = ps->fork_call;
@@ -443,14 +337,8 @@ static void ebpf_process_update_apps_data()
 
         cad->ecall_sys_open = ps->open_err;
         cad->ecall_close_fd = ps->close_err;
-        cad->ecall_vfs_unlink = ps->unlink_err;
-        cad->ecall_read = ps->read_err + ps->readv_err;
-        cad->ecall_write = ps->write_err + ps->writev_err;
         cad->ecall_do_fork = ps->fork_err;
         cad->ecall_sys_clone = ps->clone_err;
-
-        cad->bytes_written = (uint64_t)ps->write_bytes + (uint64_t)ps->write_bytes;
-        cad->bytes_read = (uint64_t)ps->read_bytes + (uint64_t)ps->readv_bytes;
 
         pids = pids->next;
     }
@@ -461,36 +349,6 @@ static void ebpf_process_update_apps_data()
  *  FUNCTIONS TO CREATE CHARTS
  *
  *****************************************************************/
-
-/**
- * Create IO chart
- *
- * @param family the chart family
- * @param name   the chart name
- * @param axis   the axis label
- * @param web    the group name used to attach the chart on dashboard
- * @param order  the order number of the specified chart
- * @param algorithm the algorithm used to make the charts.
- */
-static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order, int algorithm)
-{
-    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d\n",
-           family,
-           name,
-           axis,
-           web,
-           order,
-           update_every);
-
-    printf("DIMENSION %s %s %s 1 1\n",
-           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
-           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_READ],
-           ebpf_algorithms[algorithm]);
-    printf("DIMENSION %s %s %s 1 1\n",
-           process_id_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
-           process_dimension_names[NETDATA_KEY_PUBLISH_PROCESS_WRITE],
-           ebpf_algorithms[algorithm]);
-}
 
 /**
  * Create process status chart
@@ -552,59 +410,15 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
     }
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_VFS_FILE_CLEAN_COUNT,
-                      "Remove files",
-                      EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_VFS_GROUP,
-                      NULL,
-                      NETDATA_EBPF_CHART_TYPE_LINE,
-                      21002,
-                      ebpf_create_global_dimension,
-                      &process_publish_aggregated[NETDATA_DEL_START],
-                      1);
-
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                      NETDATA_VFS_FILE_IO_COUNT,
-                      "Calls to IO",
-                      EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_VFS_GROUP,
-                      NULL,
-                      NETDATA_EBPF_CHART_TYPE_LINE,
-                      21003,
-                      ebpf_create_global_dimension,
-                      &process_publish_aggregated[NETDATA_IN_START_BYTE],
-                      2);
-
-    ebpf_create_io_chart(NETDATA_EBPF_FAMILY,
-                         NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
-                         NETDATA_VFS_GROUP,
-                         21004,
-                         NETDATA_EBPF_ABSOLUTE_IDX);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
-                          NETDATA_VFS_FILE_ERR_COUNT,
-                          "Fails to write or read",
-                          EBPF_COMMON_DIMENSION_CALL,
-                          NETDATA_VFS_GROUP,
-                          NULL,
-                          NETDATA_EBPF_CHART_TYPE_LINE,
-                          21005,
-                          ebpf_create_global_dimension,
-                          &process_publish_aggregated[2],
-                          NETDATA_VFS_ERRORS);
-    }
-
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
                       NETDATA_PROCESS_SYSCALL,
                       "Start process",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_PROCESS_GROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21006,
+                      21002,
                       ebpf_create_global_dimension,
-                      &process_publish_aggregated[NETDATA_PROCESS_START],
+                      &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                       2);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -614,9 +428,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_PROCESS_GROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      21007,
+                      21003,
                       ebpf_create_global_dimension,
-                      &process_publish_aggregated[NETDATA_EXIT_START],
+                      &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                       2);
 
     ebpf_process_status_chart(NETDATA_EBPF_FAMILY,
@@ -624,7 +438,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_DIMENSION_DIFFERENCE,
                               NETDATA_PROCESS_GROUP,
                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                              21008);
+                              21004);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -634,9 +448,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_PROCESS_GROUP,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
-                          21009,
+                          21005,
                           ebpf_create_global_dimension,
-                          &process_publish_aggregated[NETDATA_PROCESS_START],
+                          &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                           2);
     }
 }
@@ -692,77 +506,12 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    root);
     }
 
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
-                               "Files deleted",
-                               EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_VFS_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20065,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
-
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
-                               "Write to disk",
-                               EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_VFS_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20066,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               apps_groups_root_target);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
-                                   "Fails to write",
-                                   EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_VFS_GROUP,
-                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                   20067,
-                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
-    }
-
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
-                               "Read from disk",
-                               EBPF_COMMON_DIMENSION_CALL,
-                               NETDATA_APPS_VFS_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20068,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
-                                   "Fails to read",
-                                   EBPF_COMMON_DIMENSION_CALL,
-                                   NETDATA_APPS_VFS_GROUP,
-                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                   20069,
-                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
-    }
-
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
-                               "Bytes written on disk", EBPF_COMMON_DIMENSION_BYTES,
-                               NETDATA_APPS_VFS_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20070,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
-
-    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
-                               "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
-                               NETDATA_APPS_VFS_GROUP,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20071,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
-
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
                                "Process started",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20072,
+                               20065,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
@@ -771,7 +520,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20073,
+                               20066,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 
@@ -780,7 +529,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_PROCESS_GROUP,
                                NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20074,
+                               20067,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root);
 }
@@ -971,7 +720,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
 static void change_syscalls()
 {
     static char *lfork = { "do_fork" };
-    process_id_names[7] = lfork;
+    process_id_names[NETDATA_KEY_PUBLISH_PROCESS_FORK] = lfork;
 }
 
 /**
@@ -1056,8 +805,7 @@ void *ebpf_process_thread(void *ptr)
     }
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
-        NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX, //open, close, unlink
-        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
+        NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
     };
 

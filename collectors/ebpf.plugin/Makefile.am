@@ -38,4 +38,5 @@ dist_ebpfconfig_DATA = \
     ebpf.d/process.conf \
     ebpf.d/sync.conf \
     ebpf.d/swap.conf \
+    ebpf.d/vfs.conf \
     $(NULL)

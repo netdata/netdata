@@ -23,6 +23,7 @@
 #include "ebpf_cachestat.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
+#include "ebpf_vfs.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
@@ -115,6 +116,7 @@ struct target {
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
     netdata_publish_swap_t swap;
+    netdata_publish_vfs_t vfs;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;
@@ -344,30 +346,14 @@ typedef struct ebpf_process_stat {
 
     //Counter
     uint32_t open_call;
-    uint32_t write_call;
-    uint32_t writev_call;
-    uint32_t read_call;
-    uint32_t readv_call;
-    uint32_t unlink_call;
     uint32_t exit_call;
     uint32_t release_call;
     uint32_t fork_call;
     uint32_t clone_call;
     uint32_t close_call;
 
-    //Accumulator
-    uint64_t write_bytes;
-    uint64_t writev_bytes;
-    uint64_t readv_bytes;
-    uint64_t read_bytes;
-
     //Counter
     uint32_t open_err;
-    uint32_t write_err;
-    uint32_t writev_err;
-    uint32_t read_err;
-    uint32_t readv_err;
-    uint32_t unlink_err;
     uint32_t fork_err;
     uint32_t clone_err;
     uint32_t close_err;
