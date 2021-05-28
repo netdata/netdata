@@ -4,7 +4,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len) {
+struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len)
+{
     struct start_alarm_streaming ret;
     memset(&ret, 0, sizeof(ret));
 

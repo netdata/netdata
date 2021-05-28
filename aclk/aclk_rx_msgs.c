@@ -341,9 +341,11 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         {
             error("Error parsing StartAlarmStreaming");
             freez(res.node_id);
+            return;
         }
         //TODO stelfrag/MrZammler call your handler here
         freez(res.node_id);
+        return;
     }
 
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
