@@ -18,6 +18,7 @@ struct start_alarm_streaming {
 };
 
 struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len);
+char *parse_send_alarm_log_health(const char *data, size_t len);
 
 #ifdef __cplusplus
 }

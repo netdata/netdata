@@ -20,3 +20,11 @@ struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_
 
     return ret;
 }
+
+char *parse_send_alarm_log_health(const char *data, size_t len)
+{
+    alarmstream::v1::SendAlarmLogHealth msg;
+    if (!msg.ParseFromArray(data, len))
+        return NULL;
+    return strdupz(msg.node_id().c_str());
+}
