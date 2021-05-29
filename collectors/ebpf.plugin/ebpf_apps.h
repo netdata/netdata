@@ -20,6 +20,7 @@
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
+#include "ebpf_filesystem.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
