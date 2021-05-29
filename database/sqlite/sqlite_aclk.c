@@ -7,7 +7,7 @@
 #include "../../aclk/legacy/agent_cloud_link.h"
 #else
 #include "../../aclk/aclk.h"
-#include "../../aclk/aclk_charts.h"
+#include "../../aclk/aclk_charts_api.h"
 #endif
 
 int aclk_architecture = 0;

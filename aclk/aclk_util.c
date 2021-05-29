@@ -122,6 +122,9 @@ struct topic_name {
     { .id = ACLK_TOPICID_CHART_DIMS,            .name = "chart-and-dims-updated"   },
     { .id = ACLK_TOPICID_CHART_CONFIGS_UPDATED, .name = "chart-configs-updated"    },
     { .id = ACLK_TOPICID_CHART_RESET,           .name = "reset-charts"             },
+    { .id = ACLK_TOPICID_ALARM_LOG,             .name = "alarm-log"                },
+    { .id = ACLK_TOPICID_ALARM_HEALTH,          .name = "alarm-health"             },
+    { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
