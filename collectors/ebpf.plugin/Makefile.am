@@ -34,6 +34,7 @@ dist_ebpfconfig_DATA = \
     ebpf.d/ebpf_kernel_reject_list.txt \
     ebpf.d/cachestat.conf \
     ebpf.d/dcstat.conf \
+    ebpf.d/filesystem.conf \
     ebpf.d/network.conf \
     ebpf.d/process.conf \
     ebpf.d/sync.conf \
