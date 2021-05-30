@@ -522,3 +522,42 @@ void ebpf_update_module(ebpf_module_t *em)
 
     ebpf_update_module_using_config(em);
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Load Address
+ *
+ * Helper used to get address from /proc/kallsym
+ *
+ * @param fa address structure
+ * @param fd file descriptor loaded inside kernel.
+ */
+void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
+{
+    if (fa->addr)
+        return ;
+
+    procfile *ff = procfile_open("/proc/kallsyms", " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff)
+        return;
+
+    ff = procfile_readall(ff);
+    if (!ff)
+        return;
+
+    fa->hash = simple_hash(fa->function);
+
+    size_t lines = procfile_lines(ff), l;
+    for(l = 0; l < lines ;l++) {
+        char *fcnt = procfile_lineword(ff, l, 2);
+        uint32_t hash = simple_hash(fcnt);
+        if (fa->hash == hash && !strcmp(fcnt, fa->function)) {
+            char addr[128];
+            snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
+            fa->addr = (unsigned long) strtoul(addr, NULL, 16);
+            uint32_t key = 0;
+            bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+        }
+    }
+}
