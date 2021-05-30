@@ -11,6 +11,20 @@
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
 #define NETDATA_FILESYSTEM_READ_SLEEP_MS 600000ULL
 
+typedef struct netdata_fs_hist {
+    uint32_t hist_id;
+    uint32_t bin;
+} netdata_fs_hist_t;
+
+enum filesystem_counters {
+    NETDATA_KEY_CALLS_READ,
+    NETDATA_KEY_CALLS_WRITE,
+    NETDATA_KEY_CALLS_OPEN,
+    NETDATA_KEY_CALLS_SYNC,
+
+    NETDATA_FS_END
+};
+
 enum netdata_filesystem_flags {
     NETDATA_FILESYSTEM_FLAG_NO_PARTITION = 0,
     NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM = 1,

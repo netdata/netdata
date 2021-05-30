@@ -293,6 +293,88 @@ static void ebpf_filesystem_cleanup(void *ptr)
  *****************************************************************/
 
 /**
+ * Select hist
+ *
+ * Select a histogram to store data.
+ *
+ * @param efp pointer for the structure with pointers.
+ * @param id  histogram selector
+ *
+ * @return It returns a pointer for the histogram
+ */
+static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t *efp, uint32_t id)
+{
+    switch (id) {
+        case NETDATA_KEY_CALLS_READ: {
+            return &efp->hread;
+        }
+        case NETDATA_KEY_CALLS_WRITE: {
+            return &efp->hwrite;
+        }
+        case NETDATA_KEY_CALLS_OPEN: {
+            return &efp->hopen;
+        }
+        case NETDATA_KEY_CALLS_SYNC: {
+            return &efp->hsync;
+        }
+        default: {
+            return NULL;
+        }
+    }
+}
+
+/**
+ * Read hard disk table
+ *
+ * @param table index for the hash table
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
+{
+    netdata_idx_t *values = filesystem_hash_values;
+    netdata_fs_hist_t key = {};
+    netdata_fs_hist_t next_key;
+    int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        int test = bpf_map_lookup_elem(fd, &key, values);
+        if (test < 0) {
+            key = next_key;
+            continue;
+        }
+
+        netdata_ebpf_histogram_t *w = select_hist(efp, key.hist_id);
+        uint64_t total = 0;
+        int i;
+        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        for (i = 0; i < end; i++) {
+            total += values[i];
+        }
+
+        w->histogram[key.bin] = total;
+        key = next_key;
+    }
+}
+
+/**
+ * Read hard disk table
+ *
+ * @param table index for the hash table
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_filesystem_tables()
+{
+    int i;
+    for (i = 0; localfs[i].filesystem; i++) {
+        ebpf_filesystem_partitions_t *efp = &localfs[i];
+        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
+            read_filesystem_table(efp);
+        }
+    }
+}
+
+/**
  * Socket read hash
  *
  * This is the thread callback.
@@ -318,6 +400,8 @@ void *ebpf_filesystem_read_hash(void *ptr)
         // No more partitions, stopping everything
         if (em->optional)
             break;
+
+        read_filesystem_tables();
     }
 
     read_thread_closed = 1;
@@ -341,6 +425,8 @@ static void filesystem_collector(ebpf_module_t *em)
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
+
+        ebpf_create_fs_charts();
 
         pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&lock);
