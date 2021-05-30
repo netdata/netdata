@@ -25,22 +25,25 @@ pkg install -y pkgconf bash e2fsprogs-libuuid libuv nano
 Then run the following commands to download various dependencies from the FreeBSD repository.
 
 ```sh
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/json-c-0.15_1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-certifi-2020.6.20.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-asn1crypto-1.3.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pycparser-2.20.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cffi-1.14.3.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-six-1.15.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-cryptography-2.6.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-idna-2.10.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-openssl-19.0.0.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-pysocks-1.7.1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-urllib3-1.25.11,1.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/py37-yaml-5.3.1.txz
+	1. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/Judy-1.0.5_2.txz
+	2. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-certifi-2020.12.5.txz
+	3. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-asn1crypto-1.4.0.txz
+	4. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-pycparser-2.20.txz
+	5. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-cffi-1.14.5.txz
+	6. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-six-1.15.0.tx
+	7. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-cryptography-3.3.2.txz
+	8. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-idna-2.10.txz
+	9. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-openssl-20.0.1.txz
+	10. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-pysocks-1.7.1.txz
+	11. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-urllib3-1.25.11,1.txz
+	12. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/libyaml-0.2.5.txz
+	13. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/py37-yaml-5.3.1_1.txz
+  14. pkg add https://pkg.freebsd.org/FreeBSD:12:amd64/quarterly/All/netdata-1.29.2.txz
 ```
+> ⚠️ If any of the above commands return a `Not Found` error, you need to manually search for the latest package:
+> [pkgs.org](https://freebsd.pkgs.org/12/freebsd-amd64/)
 
-> ⚠️ If any of the above commands return a `Not Found` error, you need to manually search for the latest package in the
+> ⚠️ Alternatively to pkgs.org: If any of the above commands return a `Not Found` error, you need to manually search for the latest package in the
 > [FreeBSD repository](https://www.freebsd.org/ports/). Search for the package's name, such as `py37-cffi`, find the
 > latest version number, and update the command accordingly.
 
