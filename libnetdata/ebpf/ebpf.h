@@ -164,5 +164,8 @@ extern void ebpf_update_module_using_config(ebpf_module_t *modules);
 extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
+extern void ebpf_set_unique_dimension(int *algorithms, size_t length, int algorithm);
+extern char **ebpf_fill_histogram_dimension(size_t maximum);
+extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 #endif /* NETDATA_EBPF_H */

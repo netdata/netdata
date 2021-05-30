@@ -29,12 +29,77 @@ struct netdata_static_thread filesystem_threads = {"EBPF FS READ",
                                                    NULL, NULL };
 
 static int read_thread_closed = 1;
+static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_FILESYSTEM_MAX_BINS];
+static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_FILESYSTEM_MAX_BINS];
+
+char **dimensions = NULL;
+static netdata_idx_t *filesystem_hash_values = NULL;
 
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
  *
  *****************************************************************/
+
+/**
+ * Create Filesystem chart
+ *
+ * Create latency charts
+ */
+static void ebpf_create_fs_charts()
+{
+    static int order = NETDATA_CHART_PRIO_EBPF_FILESYSTEM_CHARTS;
+    char chart_name[64], title[256], family[64];
+    int i;
+    for (i = 0; localfs[i].filesystem; i++) {
+        ebpf_filesystem_partitions_t *efp = &localfs[i];
+        uint32_t flags = efp->flags;
+        if (flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION && !(flags & NETDATA_FILESYSTEM_FLAG_CHART_CREATED)) {
+            snprintfz(title, 255, "%s latency for each read request.", efp->filesystem);
+            snprintfz(family, 63, "%s latency (eBPF)", efp->family);
+            snprintfz(chart_name, 63, "%s_read_latency", efp->filesystem);
+            efp->hread.name = strdupz(chart_name);
+
+            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
+                              title,
+                              EBPF_COMMON_DIMENSION_CALL, family,
+                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              filesystem_publish_aggregated, NETDATA_FILESYSTEM_MAX_BINS);
+            order++;
+
+            snprintfz(title, 255, "%s latency for each write request.", efp->filesystem);
+            snprintfz(chart_name, 63, "%s_write_latency", efp->filesystem);
+            efp->hwrite.name = strdupz(chart_name);
+            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
+                              title,
+                              EBPF_COMMON_DIMENSION_CALL, family,
+                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              filesystem_publish_aggregated, NETDATA_FILESYSTEM_MAX_BINS);
+            order++;
+
+            snprintfz(title, 255, "%s latency for each open request.", efp->filesystem);
+            snprintfz(chart_name, 63, "%s_open_latency", efp->filesystem);
+            efp->hopen.name = strdupz(chart_name);
+            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
+                              title,
+                              EBPF_COMMON_DIMENSION_CALL, family,
+                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              filesystem_publish_aggregated, NETDATA_FILESYSTEM_MAX_BINS);
+            order++;
+
+            snprintfz(title, 255, "%s latency for each sync request.", efp->filesystem);
+            snprintfz(chart_name, 63, "%s_sync_latency", efp->filesystem);
+            efp->hsync.name = strdupz(chart_name);
+            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hsync.name,
+                              title,
+                              EBPF_COMMON_DIMENSION_CALL, family,
+                              NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              filesystem_publish_aggregated, NETDATA_FILESYSTEM_MAX_BINS);
+            order++;
+            efp->flags |= NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
+        }
+    }
+}
 
 /**
  * Initialize eBPF data
@@ -75,7 +140,6 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     }
     em->thread_name = saved_name;
 
-    /*
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_FILESYSTEM_MAX_BINS);
 
@@ -84,7 +148,6 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 
         filesystem_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     }
-     */
 
     return 0;
 }
@@ -120,7 +183,6 @@ static int ebpf_read_local_partitions()
         for (i = 0; localfs[i].filesystem; i++) {
             ebpf_filesystem_partitions_t *w = &localfs[i];
             if (w->enabled && !strcmp(fs, w->filesystem)) {
-                error("KILLME INSIDE");
                 localfs[i].flags |= NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
                 count++;
                 break;
@@ -179,12 +241,10 @@ void ebpf_filesystem_cleanup_ebpf_data()
         if (efp->probe_links) {
             freez(efp->kernel_info.map_fd);
 
-            /*
             freez(efp->hread.name);
             freez(efp->hwrite.name);
             freez(efp->hopen.name);
             freez(efp->hsync.name);
-             */
 
             struct bpf_link **probe_links = efp->probe_links;
             size_t j = 0 ;
@@ -194,6 +254,9 @@ void ebpf_filesystem_cleanup_ebpf_data()
                 j++;
             }
             bpf_object__close(efp->objects);
+
+            ebpf_histogram_dimension_cleanup(dimensions, NETDATA_FILESYSTEM_MAX_BINS);
+            freez(filesystem_hash_values);
         }
     }
 }
@@ -218,6 +281,7 @@ static void ebpf_filesystem_cleanup(void *ptr)
     }
 
     freez(filesystem_threads.thread);
+    ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
     ebpf_filesystem_cleanup_ebpf_data();
 }
@@ -332,6 +396,15 @@ void *ebpf_filesystem_thread(void *ptr)
         em->enabled = 0;
         goto endfilesystem;
     }
+
+    int algorithms[NETDATA_FILESYSTEM_MAX_BINS];
+    ebpf_set_unique_dimension(algorithms, NETDATA_FILESYSTEM_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
+    ebpf_global_labels(filesystem_aggregated_data, filesystem_publish_aggregated, dimensions, dimensions,
+                       algorithms, NETDATA_FILESYSTEM_MAX_BINS);
+
+    pthread_mutex_lock(&lock);
+    ebpf_create_fs_charts();
+    pthread_mutex_unlock(&lock);
 
     filesystem_collector(em);
 

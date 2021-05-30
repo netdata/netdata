@@ -561,3 +561,79 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
         }
     }
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Set unique dimension
+ *
+ * Set one unique dimension for all vector position.
+ *
+ * @param algorithms the output vector
+ * @param length     number of elements of algorithms vector
+ * @param algortihm  algorithm used on charts.
+*/
+void ebpf_set_unique_dimension(int *algorithms, size_t length, int algorithm)
+{
+    size_t i;
+    for (i = 0; i < length; i++) {
+        algorithms[i] = algorithm;
+    }
+}
+
+/**
+ * Fill Histogram dimension
+ *
+ * Fill the histogram dimension with the specified ranges
+ */
+char **ebpf_fill_histogram_dimension(size_t maximum)
+{
+    char *dimensions[] = { "us", "ms", "s"};
+    int previous_dim = 0, now_dim = 0;
+    uint32_t previous_level = 1000, now_level = 1000;
+    uint32_t previous_divisor = 1, now_divisor = 1;
+    uint32_t now = 1, previous = 0;
+    uint32_t selector;
+    char **out = callocz(maximum, sizeof(char *));
+    char range[128];
+    for (selector = 0; selector < maximum; selector++) {
+        snprintf(range, 127, "%u%s->%u%s", previous/previous_divisor, dimensions[previous_dim],
+                 now/now_divisor, dimensions[now_dim]);
+        out[selector] = strdupz(range);
+        previous = (now < 2)?now:now + 1;
+        now <<= 1;
+
+        if (previous_dim != 2 && previous > previous_level) {
+            previous_dim++;
+
+            previous_divisor *= 1000;
+            previous_level *= 1000;
+        }
+
+        if (now_dim != 2 && now > now_level) {
+            now_dim++;
+
+            now_divisor *= 1000;
+            now_level *= 1000;
+        }
+    }
+
+    return out;
+}
+
+/**
+ * Histogram dimension cleanup
+ *
+ * Cleanup dimensions allocated with function ebpf_fill_histogram_dimension
+ *
+ * @param ptr
+ * @param length
+ */
+void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
+{
+    size_t i;
+    for (i = 0; i < length; i++) {
+        freez(ptr[i]);
+    }
+    freez(ptr);
+}
