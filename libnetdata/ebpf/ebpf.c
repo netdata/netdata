@@ -596,7 +596,8 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
     uint32_t selector;
     char **out = callocz(maximum, sizeof(char *));
     char range[128];
-    for (selector = 0; selector < maximum; selector++) {
+    size_t end = maximum - 1;
+    for (selector = 0; selector < end; selector++) {
         snprintf(range, 127, "%u%s->%u%s", previous/previous_divisor, dimensions[previous_dim],
                  now/now_divisor, dimensions[now_dim]);
         out[selector] = strdupz(range);
@@ -617,6 +618,8 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
             now_level *= 1000;
         }
     }
+    snprintf(range, 127, "%u%s->+Inf", previous/previous_divisor, dimensions[previous_dim]);
+    out[selector] = strdupz(range);
 
     return out;
 }
