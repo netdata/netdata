@@ -876,10 +876,15 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     FILE *fp = mypopen(command_to_run, &command_pid);
     if (fp) {
-        char buffer[100 + 1];
-        while (fgets(buffer, 100, fp) != NULL)
-            ;
-        mypclose(fp, command_pid);
+        char buffer[4 + 1];
+        char *s = fgets(buffer, 4, fp);
+        int exit_code = mypclose(fp, command_pid);
+        if (exit_code)
+            error("Execution of anonymous statistics script returned %s.", strerror(exit_code));
+        if (s && strncmp(buffer, "200", 3))
+            error("Execution of anonymous statistics script returned http code %s.", buffer);
+    } else {
+        error("Failed to run anonymous statistics script %s.", as_script);
     }
     freez(command_to_run);
 }
