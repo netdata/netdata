@@ -71,6 +71,7 @@ notification platform.
 -   [**Kavenegar**](/health/notifications/kavenegar/README.md)
 -   [**Matrix**](/health/notifications/matrix/README.md)
 -   [**Messagebird**](/health/notifications/messagebird/README.md)
+-   [**Microsoft Teams**](/health/notifications/msteams/README.md)
 -   [**Netdata Agent dashboard**](/health/notifications/web/README.md)
 -   [**Opsgenie**](/health/notifications/opsgenie/README.md)
 -   [**PagerDuty**](/health/notifications/pagerduty/README.md)
