@@ -14,9 +14,13 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 }
 
 void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
+
     buffer_sprintf(wb,
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
+                    "\t\t\"utc_offset\": %d,\n"
+                    "\t\t\"timezone\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
                     "\t\t\"alarm_id\": %u,\n"
                     "\t\t\"alarm_event_id\": %u,\n"
@@ -34,6 +38,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"recipient\": \"%s\",\n"
                     "\t\t\"exec_code\": %d,\n"
                     "\t\t\"source\": \"%s\",\n"
+                    "\t\t\"command\": \"%s\",\n"
                     "\t\t\"units\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                     "\t\t\"duration\": %lu,\n"
@@ -49,6 +54,8 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
                    , host->hostname
+                   , host->utc_offset
+                   , host->abbrev_timezone
                    , ae->unique_id
                    , ae->alarm_id
                    , ae->alarm_event_id
@@ -66,6 +73,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
+                   , edit_command
                    , ae->units?ae->units:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
@@ -114,6 +122,7 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     buffer_strcat(wb, "\t}");
 
     freez(replaced_info);
+    freez(edit_command);
 }
 
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {

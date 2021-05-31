@@ -214,7 +214,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&tags=%s&ver=%u"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -250,6 +250,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , default_rrd_update_every
                  , host->os
                  , host->timezone
+                 , host->abbrev_timezone
+                 , host->utc_offset
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
                  , se.os_name

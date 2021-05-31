@@ -764,9 +764,13 @@ struct rrdhost {
     const char *os;                                 // the O/S type of the host
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
+
 #ifdef ENABLE_ACLK
     long    obsolete_count;
 #endif
+
+    const char *abbrev_timezone;                    // the abbriviated timezone of the host
+    int32_t utc_offset;                             // the offset in seconds from utc
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
@@ -938,6 +942,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *guid
         , const char *os
         , const char *timezone
+        , const char *abbrev_timezone
+        , int32_t utc_offset
         , const char *tags
         , const char *program_name
         , const char *program_version
@@ -958,6 +964,8 @@ extern void rrdhost_update(RRDHOST *host
     , const char *guid
     , const char *os
     , const char *timezone
+    , const char *abbrev_timezone
+    , int32_t utc_offset
     , const char *tags
     , const char *program_name
     , const char *program_version
@@ -1325,17 +1333,17 @@ extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
 extern RRDHOST *rrdhost_create(
     const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
-    const char *tags, const char *program_name, const char *program_version, int update_every, long entries,
-    RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled, char *rrdpush_destination,
-    char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
+    const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
+    int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
+    char *rrdpush_destination, char *rrdpush_api_key, char *rrdpush_send_charts_matching, struct rrdhost_system_info *system_info,
     int is_localhost); //TODO: Remove , int is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
 extern void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname, const char *registry_hostname,
-    const char *guid, const char *os, const char *tags, const char *tzone, const char *program_name,
-    const char *program_version);
+    const char *guid, const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
+    const char *program_name, const char *program_version);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

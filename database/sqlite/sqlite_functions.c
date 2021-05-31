@@ -984,7 +984,7 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     set_host_properties(host, sqlite3_column_int(res, 2), RRD_MEMORY_MODE_DBENGINE, hostname,
                         (char *) sqlite3_column_text(res, 1), (const char *) uuid_str,
                         (char *) sqlite3_column_text(res, 3), (char *) sqlite3_column_text(res, 5),
-                        (char *) sqlite3_column_text(res, 4), NULL, NULL);
+                        (char *) sqlite3_column_text(res, 4), NULL, 0, NULL, NULL);
 
     uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
 

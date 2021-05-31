@@ -696,6 +696,46 @@ static void get_system_timezone(void)
         timezone = "unknown";
 
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+
+    //get the utc offset, and the timezone as returned by strftime
+    //will be sent to the cloud
+    //Note: This will need an agent restart to get new offset on time change (dst, etc).
+    {
+        time_t t;
+        struct tm *tmp, tmbuf;
+        char zone[FILENAME_MAX + 1];
+        char sign[2], hh[3], mm[3];
+
+        t = now_realtime_sec();
+        tmp = localtime_r(&t, &tmbuf);
+
+        if (tmp != NULL) {
+            if (strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
+                netdata_configured_abbrev_timezone = strdupz("UTC");
+            } else
+                netdata_configured_abbrev_timezone = strdupz(zone);
+
+            if (strftime(zone, FILENAME_MAX, "%z", tmp) == 0) {
+                netdata_configured_utc_offset = 0;
+            } else {
+                sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
+                sign[1] = '\0';
+                hh[0] = isdigit(zone[1]) ? zone[1] : '0';
+                hh[1] = isdigit(zone[2]) ? zone[2] : '0';
+                hh[2] = '\0';
+                mm[0] = isdigit(zone[3]) ? zone[3] : '0';
+                mm[1] = isdigit(zone[4]) ? zone[4] : '0';
+                mm[2] = '\0';
+
+                netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);
+                netdata_configured_utc_offset =
+                    sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
+            }
+        } else {
+            netdata_configured_abbrev_timezone = strdupz("UTC");
+            netdata_configured_utc_offset = 0;
+        }
+    }
 }
 
 void set_global_environment()

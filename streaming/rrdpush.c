@@ -464,7 +464,8 @@ void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     info("clients wants to STREAM metrics.");
 
-    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
+    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *abbrev_timezone = "UTC", *tags = NULL;
+    int32_t utc_offset = 0;
     int update_every = default_rrd_update_every;
     uint32_t stream_version = UINT_MAX;
     char buf[GUID_LEN + 1];
@@ -493,6 +494,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             os = value;
         else if(!strcmp(name, "timezone"))
             timezone = value;
+        else if(!strcmp(name, "abbrev_timezone"))
+            abbrev_timezone = value;
+        else if(!strcmp(name, "utc_offset"))
+            utc_offset = (int32_t)strtol(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))
@@ -680,6 +685,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->machine_guid      = strdupz(machine_guid);
     rpt->os                = strdupz(os);
     rpt->timezone          = strdupz(timezone);
+    rpt->abbrev_timezone   = strdupz(abbrev_timezone);
+    rpt->utc_offset        = utc_offset;
     rpt->tags              = (tags)?strdupz(tags):NULL;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
