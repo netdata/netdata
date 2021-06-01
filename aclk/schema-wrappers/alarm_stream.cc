@@ -71,3 +71,61 @@ char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data)
 
     return bin;
 }
+
+static alarmstream::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status status)
+{
+    switch (status) {
+        case ALARM_STATUS_NULL:
+            return alarmstream::v1::ALARM_STATUS_NULL;
+        case ALARM_STATUS_UNKNOWN:
+            return alarmstream::v1::ALARM_STATUS_UNKNOWN;
+        case ALARM_STATUS_REMOVED:
+            return alarmstream::v1::ALARM_STATUS_REMOVED;
+        case ALARM_STATUS_NOT_A_NUMBER:
+            return alarmstream::v1::ALARM_STATUS_NOT_A_NUMBER;
+        case ALARM_STATUS_CLEAR:
+            return alarmstream::v1::ALARM_STATUS_CLEAR;
+        case ALARM_STATUS_WARNING:
+            return alarmstream::v1::ALARM_STATUS_WARNING;
+        case ALARM_STATUS_CRITICAL:
+            return alarmstream::v1::ALARM_STATUS_CRITICAL;
+        default:
+            error("Unknown alarm status");
+            return alarmstream::v1::ALARM_STATUS_UNKNOWN;
+    }
+}
+
+char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
+{
+    alarmstream::v1::AlarmLogEntry le;
+
+    le.set_node_id(data->node_id);
+    le.set_claim_id(data->claim_id);
+
+    le.set_chart(data->chart);
+    le.set_name(data->name);
+    le.set_batch_id(data->batch_id);
+    le.set_sequence_id(data->sequence_id);
+    le.set_when(data->when);
+
+    le.set_config_hash(data->config_hash);
+    le.set_status(aclk_alarm_status_to_proto(data->status));
+    le.set_old_status(aclk_alarm_status_to_proto(data->old_status));
+
+    le.set_delay_up_to_timestamp(data->delay_up_to_timestamp);
+    le.set_last_repeat(data->last_repeat);
+    le.set_silenced(data->silenced);
+
+    le.set_value(data->value);
+    le.set_old_value(data->old_value);
+
+    le.set_updated(data->updated);
+    le.set_rendered_info(data->rendered_info);
+
+    *len = le.ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    if (!le.SerializeToArray(bin, *len))
+        return NULL;
+
+    return bin;
+}

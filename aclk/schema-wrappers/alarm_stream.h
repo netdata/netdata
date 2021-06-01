@@ -38,6 +38,46 @@ struct alarm_log_health {
 
 char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data);
 
+enum aclk_alarm_status {
+    ALARM_STATUS_NULL = 0,
+    ALARM_STATUS_UNKNOWN = 1,
+    ALARM_STATUS_REMOVED = 2,
+    ALARM_STATUS_NOT_A_NUMBER = 3,
+    ALARM_STATUS_CLEAR = 4,
+    ALARM_STATUS_WARNING = 5,
+    ALARM_STATUS_CRITICAL = 6
+};
+
+struct alarm_log_entry {
+    char *node_id;
+    char *claim_id;
+
+    char *chart;
+    char *name;
+    uint64_t batch_id;
+    uint64_t sequence_id;
+    uint64_t when;
+
+    char *config_hash;
+
+    enum aclk_alarm_status status;
+    enum aclk_alarm_status old_status;
+    uint64_t delay_up_to_timestamp;
+
+    uint64_t last_repeat;
+    bool silenced;
+    double value;
+    double old_value;
+
+    // updated alarm entry, when the status of the alarm has been updated by a later entry
+    int updated;
+
+    // rendered_info 
+    char *rendered_info;
+};
+
+char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data);
+
 #ifdef __cplusplus
 }
 #endif
