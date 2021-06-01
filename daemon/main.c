@@ -542,7 +542,6 @@ static void get_netdata_configured_variables() {
     // get default memory mode for the database
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
-
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
@@ -567,7 +566,11 @@ static void get_netdata_configured_variables() {
         error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
         default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
     }
-
+#else
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use memory mode ram instead.");
+       default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    }
 #endif
     // ------------------------------------------------------------------------
 
