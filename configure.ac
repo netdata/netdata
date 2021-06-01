@@ -722,7 +722,7 @@ if test "$enable_cloud" != "no" -a "$aclk_legacy" != "yes"; then
 fi
 
 if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no" -a "$enable_aclk" != "yes"; then
-    if test "$aclk_legacy" != "yes"
+    if test "$aclk_legacy" != "yes"; then
         AC_MSG_NOTICE([ACLK-NG could not be built. Trying Legacy ACLK as fallback.])
     fi
 
