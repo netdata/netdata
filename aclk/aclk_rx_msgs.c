@@ -265,7 +265,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         update_node_id(&host_id, &node_id);
 
         aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-        query->data.node_update.hops = 1; //TODO
+        query->data.node_update.hops = 1; //TODO - real hop count instead of hardcoded
         rrdhost_aclk_state_lock(localhost);
         query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
         rrdhost_aclk_state_unlock(localhost);
