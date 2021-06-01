@@ -655,10 +655,6 @@ AS_IF(
     [have_CXX_compiler=yes]
 )
 
-#AC_MSG_WARN([${have_libprotobuf}])
-#AC_MSG_WARN([${PROTOBUF_CFLAGS}])
-#AC_MSG_ERROR([${PROTOBUF_LIBS}])
-
 AC_MSG_CHECKING([if cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
 if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
