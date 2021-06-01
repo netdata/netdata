@@ -211,8 +211,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             c++;
         }
 
-        if (unlikely(c))
+        if (unlikely(*c)) {
+            errored++;
             continue;
+        }
 
         pointers[entries++] = s++;
         while(*s) {
