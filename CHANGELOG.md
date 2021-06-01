@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
 - fix ebpf.plugin segfault when ebpf\_load\_program return null pointer [\#11203](https://github.com/netdata/netdata/pull/11203) ([wangpei-nice](https://github.com/wangpei-nice))
 - fix `install\_type` detection during update [\#11199](https://github.com/netdata/netdata/pull/11199) ([ilyam8](https://github.com/ilyam8))
+- claiming: exit 0 when daemon not running and the claim was successful [\#11195](https://github.com/netdata/netdata/pull/11195) ([ilyam8](https://github.com/ilyam8))
+- Check return status of execution of anonymous statistics script [\#11188](https://github.com/netdata/netdata/pull/11188) ([MrZammler](https://github.com/MrZammler))
 - VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
 - add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
 - rename default from job 'local' to 'anomalies' [\#11178](https://github.com/netdata/netdata/pull/11178) ([andrewm4894](https://github.com/andrewm4894))
@@ -29,6 +32,7 @@
 - Remove unecessary relative paths when including headers. [\#11124](https://github.com/netdata/netdata/pull/11124) ([vkalintiris](https://github.com/vkalintiris))
 - Move mdstat charts near to Disks [\#11119](https://github.com/netdata/netdata/pull/11119) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ebpf swap [\#11090](https://github.com/netdata/netdata/pull/11090) ([thiagoftsm](https://github.com/thiagoftsm))
+- Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
@@ -308,7 +312,6 @@
 - Add ACLK proxy setting as host label [\#10619](https://github.com/netdata/netdata/pull/10619) ([underhood](https://github.com/underhood))
 - dashboard@v2.13.6 [\#10618](https://github.com/netdata/netdata/pull/10618) ([jacekkolasa](https://github.com/jacekkolasa))
 - Disable stock alarms [\#10617](https://github.com/netdata/netdata/pull/10617) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fixes \#10597 raw binary data should never be printed [\#10603](https://github.com/netdata/netdata/pull/10603) ([rda0](https://github.com/rda0))
 
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
