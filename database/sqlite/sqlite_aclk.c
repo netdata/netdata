@@ -1255,7 +1255,7 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select id, name, type, family, context, title, priority, plugin, module, unit from chart_hash where hash_id = @hash_id;");
+    buffer_sprintf(sql, "select type, family, context, title, priority, plugin, module, unit from chart_hash where hash_id = @hash_id;");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -1272,17 +1272,15 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
     struct chart_config_updated chart_config;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        chart_config.id = strdupz((char *)sqlite3_column_text(res, 0));
-        chart_config.name = strdupz((char *)sqlite3_column_text(res, 1));
-        chart_config.type = strdupz((char *)sqlite3_column_text(res, 2));
-        chart_config.family = strdupz((char *)sqlite3_column_text(res, 3));
-        chart_config.context = strdupz((char *)sqlite3_column_text(res, 4));
-        chart_config.title = strdupz((char *)sqlite3_column_text(res, 5));
-        chart_config.priority = sqlite3_column_int64(res, 6);
-        chart_config.plugin = strdupz((char *)sqlite3_column_text(res, 7));
-        chart_config.module = sqlite3_column_bytes(res, 8) > 0 ? strdupz((char *)sqlite3_column_text(res, 8)) : strdupz("NULL");
+        chart_config.type = strdupz((char *)sqlite3_column_text(res, 0));
+        chart_config.family = strdupz((char *)sqlite3_column_text(res, 1));
+        chart_config.context = strdupz((char *)sqlite3_column_text(res, 2));
+        chart_config.title = strdupz((char *)sqlite3_column_text(res, 3));
+        chart_config.priority = sqlite3_column_int64(res, 4);
+        chart_config.plugin = strdupz((char *)sqlite3_column_text(res, 5));
+        chart_config.module = sqlite3_column_bytes(res, 6) > 0 ? strdupz((char *)sqlite3_column_text(res, 6)) : NULL;
         chart_config.chart_type = RRDSET_TYPE_AREA;
-        chart_config.units = strdupz((char *)sqlite3_column_text(res, 9));
+        chart_config.units = strdupz((char *)sqlite3_column_text(res, 7));
         chart_config.config_hash = strdupz(hash_id);
     }
 
