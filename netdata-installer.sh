@@ -321,7 +321,6 @@ while [ -n "${1}" ]; do
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
     "--aclk-legacy")
-      NETDATA_ACLK_LEGACY=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-legacy/} --with-aclk-legacy"
       ;;
     "--disable-cloud")
@@ -572,7 +571,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -z "${NETDATA_ACLK_LEGACY}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     echo "Skipping libmosquitto"
     return 0
   fi
@@ -674,7 +673,7 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ] || [ -z "${NETDATA_ACLK_LEGACY}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ]; then
     echo "Skipping libwebsockets"
     return 0
   fi
