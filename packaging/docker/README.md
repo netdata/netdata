@@ -248,10 +248,9 @@ how you created the container.
 
 ### Custom agent UID/GID
 
-By default, the Netdata Agent in the container will run with a user ID and group ID of 201, matching the default
-IDs used on normal installations of Netdata. In the unlikely event that you need to use a different UID or GID
-for netdata for some reason, you can set the `NETDATA_UID` and/or `NETDATA_GID` environment variables for the
-container to thedesired UID/GID.
+By default, Netdata in the container will run with a user ID and group ID of `201`, matching the default IDs used
+on normal installations of Netdata. In the unlikely event that you need to use a different UID or GID for netdata,
+set the `NETDATA_UID` and/or `NETDATA_GID` environment variables for the container to the desired UID/GID.
 
 ### Add or remove other volumes
 
