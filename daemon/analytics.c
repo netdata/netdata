@@ -920,7 +920,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         char *s = fgets(buffer, 4, fp);
         int exit_code = mypclose(fp, command_pid);
         if (exit_code)
-            error("Execution of anonymous statistics script returned %s.", strerror(exit_code));
+            error("Execution of anonymous statistics script returned %d.", exit_code);
         if (s && strncmp(buffer, "200", 3))
             error("Execution of anonymous statistics script returned http code %s.", buffer);
     } else {
