@@ -13,8 +13,6 @@ void destroy_update_chart_config(struct update_chart_config *cfg)
 
 void destroy_chart_config_updated(struct chart_config_updated *cfg)
 {
-    freez(cfg->id);
-    freez(cfg->name);
     freez(cfg->type);
     freez(cfg->family);
     freez(cfg->context);
@@ -68,8 +66,6 @@ char *generate_chart_configs_updated(size_t *len, const struct chart_config_upda
     chart::v1::ChartConfigsUpdated configs;
     for (int i = 0; i < list_size; i++) {
         chart::v1::ChartConfigUpdated *config = configs.add_configs();
-        config->set_id(config_list[i].id);
-        config->set_name(config_list[i].name);
         config->set_type(config_list[i].type);
         config->set_family(config_list[i].family);
         config->set_context(config_list[i].context);

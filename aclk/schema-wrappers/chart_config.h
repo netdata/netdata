@@ -24,8 +24,6 @@ enum chart_config_chart_type {
 };
 
 struct chart_config_updated {
-    char *id;
-    char *name;
     char *type;
     char *family;
     char *context;
