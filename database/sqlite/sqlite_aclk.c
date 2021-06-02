@@ -1255,7 +1255,7 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select type, family, context, title, priority, plugin, module, unit from chart_hash where hash_id = @hash_id;");
+    buffer_sprintf(sql, "select type, family, context, title, priority, plugin, module, unit, chart_type from chart_hash where hash_id = @hash_id;");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -1279,7 +1279,7 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
         chart_config.priority = sqlite3_column_int64(res, 4);
         chart_config.plugin = strdupz((char *)sqlite3_column_text(res, 5));
         chart_config.module = sqlite3_column_bytes(res, 6) > 0 ? strdupz((char *)sqlite3_column_text(res, 6)) : NULL;
-        chart_config.chart_type = RRDSET_TYPE_AREA;
+        chart_config.chart_type = (RRDSET_TYPE) sqlite3_column_int(res,8);
         chart_config.units = strdupz((char *)sqlite3_column_text(res, 7));
         chart_config.config_hash = strdupz(hash_id);
     }
