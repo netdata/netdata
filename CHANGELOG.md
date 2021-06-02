@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Only report the exit code when anonymous statistics script fails [\#11215](https://github.com/netdata/netdata/pull/11215) ([MrZammler](https://github.com/MrZammler))
+- Reduce memory needed per dimension [\#11212](https://github.com/netdata/netdata/pull/11212) ([stelfrag](https://github.com/stelfrag))
+- Ignore dbengine journal files that can not be read [\#11210](https://github.com/netdata/netdata/pull/11210) ([stelfrag](https://github.com/stelfrag))
+- Use memory mode RAM if memory mode dbengine is specified but not available [\#11207](https://github.com/netdata/netdata/pull/11207) ([stelfrag](https://github.com/stelfrag))
 - Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
 - fix ebpf.plugin segfault when ebpf\_load\_program return null pointer [\#11203](https://github.com/netdata/netdata/pull/11203) ([wangpei-nice](https://github.com/wangpei-nice))
 - fix `install\_type` detection during update [\#11199](https://github.com/netdata/netdata/pull/11199) ([ilyam8](https://github.com/ilyam8))
@@ -29,6 +33,7 @@
 - Fixes mqtt\_websockets on MacOS [\#11145](https://github.com/netdata/netdata/pull/11145) ([underhood](https://github.com/underhood))
 - Removed Fedora 32 from CI. [\#11143](https://github.com/netdata/netdata/pull/11143) ([Ferroin](https://github.com/Ferroin))
 - Remove an unnecessary check for cgroup v1 [\#11137](https://github.com/netdata/netdata/pull/11137) ([vlvkobal](https://github.com/vlvkobal))
+- Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
 - Remove unecessary relative paths when including headers. [\#11124](https://github.com/netdata/netdata/pull/11124) ([vkalintiris](https://github.com/vkalintiris))
 - Move mdstat charts near to Disks [\#11119](https://github.com/netdata/netdata/pull/11119) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ebpf swap [\#11090](https://github.com/netdata/netdata/pull/11090) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -281,7 +286,6 @@
 - Revamp statsd docs [\#10637](https://github.com/netdata/netdata/pull/10637) ([OdysLam](https://github.com/OdysLam))
 - replace GA with PostHog for backend telemetry events. [\#10636](https://github.com/netdata/netdata/pull/10636) ([andrewm4894](https://github.com/andrewm4894))
 - cpu stats per query thread [\#10634](https://github.com/netdata/netdata/pull/10634) ([MrZammler](https://github.com/MrZammler))
-- Assorted updater fixes. [\#10613](https://github.com/netdata/netdata/pull/10613) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
@@ -316,10 +320,6 @@
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.0...v1.29.1)
-
-**Merged pull requests:**
-
-- Fix crash during shutdown of cgroups internal plugin. [\#10614](https://github.com/netdata/netdata/pull/10614) ([mfundul](https://github.com/mfundul))
 
 ## [v1.29.0](https://github.com/netdata/netdata/tree/v1.29.0) (2021-02-03)
 
