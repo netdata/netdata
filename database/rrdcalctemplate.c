@@ -45,9 +45,7 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 }
 
 static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
-    if (rt->charts_pattern &&
-        !(simple_pattern_matches(rt->charts_pattern, st->id) ||
-         simple_pattern_matches(rt->charts_pattern, st->name)))
+    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, st->name))
         return 0;
 
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
