@@ -75,6 +75,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_CHART_ACK,
+    ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_ADD_CHART_CONFIG,
     ACLK_DATABASE_PUSH_DIMENSION,
     ACLK_DATABASE_RESET_CHART,
@@ -174,8 +175,10 @@ void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_d
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id);
+void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_get_chart_config(char **hash_id_list);
 void aclk_start_streaming(char *node_id);
+void aclk_start_alert_streaming(char *node_id);
 void sql_aclk_drop_all_table_list();
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param);
