@@ -165,6 +165,11 @@ void aclk_database_worker(void *arg)
     wc->error = 0;
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
+
+    // RUn a chart deduplication
+    cmd.opcode = ACLK_DATABASE_DEDUP_CHART;
+    aclk_database_enq_cmd(wc, &cmd);
+
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -256,6 +261,9 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_TIMER:
                     //sql_maint_database();
                     //info("Cleanup for %s", wc->uuid_str);
+                    break;
+                case ACLK_DATABASE_DEDUP_CHART:
+                    sql_chart_deduplicate(wc, cmd);
                     break;
                 case ACLK_DATABASE_SHUTDOWN:
                     shutdown = 1;
@@ -1581,5 +1589,30 @@ fail_complete:
         buffer_free(sql);
 #endif
 
+    return;
+}
+
+
+void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    UNUSED(cmd);
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s; "
+                        "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
+                        "(SELECT unique_id from aclk_chart_%s WHERE status IS NOT NULL AND date_submitted IS NULL); "
+                        "DELETE FROM aclk_chart_payload_%s WHERE "
+                        "unique_id IN (SELECT unique_id FROM t_%s); "
+                        "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); "
+                        "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
+                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str,
+                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str);
+
+    //info("DEBUG: %s", buffer_tostring(sql));
+
+    db_execute(buffer_tostring(sql));
+
+    buffer_free(sql);
     return;
 }
