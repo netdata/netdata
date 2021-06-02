@@ -271,12 +271,6 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
     },
 
-    'nvme': {
-        title: 'NVMe',
-        icon: '<i class="fas fa-hdd"></i>',
-        info: 'Monitoring of <b>NVMe<b> disks.'
-    },
-
     'postgres': {
         title: 'Postgres',
         icon: '<i class="fas fa-database"></i>',
@@ -1621,41 +1615,6 @@ netdataDashboard.context = {
         info: 'The number of locally running transactions which have been registered inside the wsrep provider. ' +
             'This means transactions which have made operations which have caused write set population to happen. ' +
             'Transactions which are read only are not counted.'
-    },
-
-    // ------------------------------------------------------------------------
-    // NVMe
-
-    'nvme.critical_warning': {
-        info: 'Number of Critical Warnings.<ul>' +
-            '<li><strong>0 :</strong> This is Ok.</li>' +
-            '<li><strong>1 or more:</strong> There is a problem with the nvme disk.</li>' +
-            '</ul>' +
-            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
-    },
-
-    'nvme.percentage_used': {
-        info: 'Percentage of disk space used.<ul>' +
-            '</ul>' +
-            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
-    },
-
-    'nvme.temperature': {
-        info: 'Disk temperature.<ul>' +
-            '</ul>' +
-            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
-    },
-
-    'nvme.power_cycles': {
-        info: 'Power Cycles indicates the count of full hard disk power on/off cycles.<ul>' +
-            '</ul>' +
-            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
-    },
-
-    'nvme.power_on_hours': {
-        info: 'Power on hours indicates the total time the drive was running (powered).<ul>' +
-            '</ul>' +
-            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
     },
 
     // ------------------------------------------------------------------------
