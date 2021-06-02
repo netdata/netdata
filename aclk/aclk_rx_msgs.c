@@ -344,6 +344,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             return;
         }
         //TODO stelfrag/MrZammler call your handler here
+        aclk_start_alert_streaming(res.node_id);
         freez(res.node_id);
         return;
     }
