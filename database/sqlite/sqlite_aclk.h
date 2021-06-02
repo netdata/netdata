@@ -85,6 +85,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_UPD_ALERT,
     ACLK_DATABASE_SHUTDOWN,
     ACLK_DATABASE_ADD_ALARM,
+    ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_MAX_OPCODE
 };
 
@@ -184,4 +185,5 @@ void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_datab
 void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_command, uint64_t param);
 extern void aclk_set_architecture(int mode);
 char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t  *total);
+void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 #endif //NETDATA_SQLITE_ACLK_H
