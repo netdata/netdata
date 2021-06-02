@@ -368,7 +368,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
 
             ae->last_repeat = last_repeat;
 
-            if (likely(entries > 28)) {
+            if (likely(entries > 30)) {
                 freez(ae->classification);
                 ae->classification = strdupz(pointers[28]);
                 if(!*ae->classification) { freez(ae->classification); ae->classification = NULL; }
