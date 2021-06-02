@@ -77,6 +77,7 @@
 #include "daemon.h"
 #include "main.h"
 #include "signals.h"
+#include "service.h"
 #include "commands.h"
 #include "analytics.h"
 

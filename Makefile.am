@@ -695,6 +695,8 @@ DAEMON_FILES = \
     daemon/main.h \
     daemon/signals.c \
     daemon/signals.h \
+    daemon/service.c \
+    daemon/service.h \
     daemon/commands.c \
     daemon/commands.h \
     daemon/unit_test.c \
