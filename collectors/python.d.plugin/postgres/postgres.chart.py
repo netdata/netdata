@@ -1195,14 +1195,11 @@ class Service(SimpleService):
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
 	
-	if self.server_version >= 100000:
+	    if self.server_version >= 100000:
             self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
         QUERY_STAT_REPLICATION[DEFAULT] = CREATE_STAT_QUERY(self.secondaries)
         self.queries[query_factory(QUERY_NAME_STAT_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_STAT_REPLICATION]
-
-        if self.server_version >= 100000:
-            self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:
