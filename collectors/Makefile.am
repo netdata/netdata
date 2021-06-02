@@ -10,6 +10,7 @@ SUBDIRS = \
     checks.plugin \
     cups.plugin \
     diskspace.plugin \
+    timex.plugin \
     fping.plugin \
     ioping.plugin \
     freebsd.plugin \

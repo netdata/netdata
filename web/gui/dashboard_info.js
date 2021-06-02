@@ -127,6 +127,11 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'mdstat': {
+        title: 'MD arrays',
+        icon: '<i class="fas fa-hdd"></i>'
+    },
+
     'sensors': {
         title: 'Sensors',
         icon: '<i class="fas fa-leaf"></i>',
@@ -161,6 +166,12 @@ netdataDashboard.menu = {
         title: 'ZFS filesystem',
         icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
+    },
+
+    'zfspool': {
+        title: 'ZFS pools',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'State of ZFS pools.'
     },
 
     'btrfs': {
@@ -258,6 +269,12 @@ netdataDashboard.menu = {
         title: 'MySQL',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
+    },
+
+    'nvme': {
+        title: 'NVMe',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: 'Monitoring of <b>NVMe<b> disks.'
     },
 
     'postgres': {
@@ -559,6 +576,11 @@ netdataDashboard.menu = {
         info: 'Monitor system calls, internal functions, bytes read, bytes written and errors using <code>eBPF</code>.'
     },
 
+    'filesystem': {
+        title: 'Filesystem',
+        icon: '<i class="fas fa-hdd"></i>',
+    },
+
     'vernemq': {
         title: 'VerneMQ',
         icon: '<i class="fas fa-comments"></i>',
@@ -581,6 +603,43 @@ netdataDashboard.menu = {
         title: 'Alarms',
         icon: '<i class="fas fa-bell"></i>',
         info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
+    },
+
+    'statsd': { 
+        title: 'StatsD',
+        icon: '<i class="fas fa-chart-line"></i>',
+        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
+    },
+
+    'supervisord': {
+        title: 'Supervisord',
+        icon: '<i class="fas fa-tasks"></i>',
+        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
+        'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
+    },
+
+    'systemdunits': {
+        title: 'systemd units',
+        icon: '<i class="fas fa-cogs"></i>',
+        info: '<b>systemd</b> provides a dependency system between various entities called "units" of 11 different types. ' +
+        'Units encapsulate various objects that are relevant for system boot-up and maintenance. ' +
+        'Units may be <code>active</code> (meaning started, bound, plugged in, depending on the unit type), ' +
+        'or <code>inactive</code> (meaning stopped, unbound, unplugged), ' +
+        'as well as in the process of being activated or deactivated, i.e. between the two states (these states are called <code>activating</code>, <code>deactivating</code>). ' +
+        'A special <code>failed</code> state is available as well, which is very similar to <code>inactive</code> and is entered when the service failed in some way (process returned error code on exit, or crashed, an operation timed out, or after too many restarts). ' +
+        'For detailes, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.html" target="_blank"> systemd(1)</a>.'
+    },
+    
+    'changefinder': {
+        title: 'ChangeFinder',
+        icon: '<i class="fas fa-flask"></i>',
+        info: 'Online changepoint detection using machine learning. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/changefinder/README.md" target="_blank">here</a>.'
+    },
+
+    'zscores': {
+        title: 'Z-Scores',
+        icon: '<i class="fas fa-exclamation"></i>',
+        info: 'Z scores scores relating to key system metrics.'
     },
 
 };
@@ -830,6 +889,10 @@ netdataDashboard.context = {
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
     },
 
+    'system.clock_sync_state': {
+        info: 'State map: 0 - not synchronized, 1 - synchronized'
+    },
+
     'system.forks': {
         colors: '#5555DD',
         info: 'Number of new processes created.'
@@ -1006,11 +1069,63 @@ netdataDashboard.context = {
         info: 'Transparent HugePages (THP) is backing virtual memory with huge pages, supporting automatic promotion and demotion of page sizes. It works for all applications for anonymous memory mappings and tmpfs/shmem.'
     },
 
+    'mem.cachestat_ratio': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. If the entry is not there, a page cache miss has occurred and the kernel allocates a new entry and copies in data from the disk. Netdata calculates the percentage of accessed files that are cached on memory. <a href="https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138" target="_blank">The ratio</a> is calculated counting the accessed cached pages (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages.'
+    },
+
+    'mem.cachestat_dirties': {
+        info: 'Number of <a href="https://en.wikipedia.org/wiki/Page_cache#Memory_conservation" target="_blank">dirty(modified) pages</a> cache. Pages in the page cache modified after being brought in are called dirty pages. Since non-dirty pages in the page cache have identical copies in <a href="https://en.wikipedia.org/wiki/Secondary_storage" target="_blank">secondary storage</a> (e.g. hard disk drive or solid-state drive), discarding and reusing their space is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage and reusing their space.'
+    },
+
+    'mem.cachestat_hits': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. Hits show pages accessed that were not modified (we are excluding dirty pages), this counting also excludes the recent pages inserted for read.'
+    },
+
+    'mem.cachestat_misses': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
+    },
+
+    'mem.sync': {
+        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync.2.html" target="_blank">sync() and syncfs()</a> which flush the file system buffers to storage devices. Performance perturbations might be caused by these calls. The <code>sync()</code> calls are based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/syncsnoop.py" target="_blank">syncsnoop</a> from BCC tools.'
+    },
+
+    'mem.file_sync': {
+        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/fsync.2.html" target="_blank">fsync() and fdatasync()</a> transfer all modified page caches for the files on disk devices. These calls block until the device reports that the transfer has been completed.'
+    },
+
+    'mem.memory_map': {
+        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/msync.2.html" target="_blank">msync()</a> which flushes changes made to the in-core copy of a file that was mapped.'
+    },
+
+    'mem.file_segment': {
+        info: 'System calls for <a href="https://man7.org/linux/man-pages/man2/sync_file_range.2.html" target="_blank">sync_file_range()</a> permits fine control when synchronizing the open file referred to by the file descriptor fd with disk. This system call is extremely dangerous and should not be used in portable programs.'
+    },
+
+    'filesystem.dc_hit_ratio': {
+        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'filesystem.dc_reference': {
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access and the file is not present in the directory cache. <code>Miss</code> is when there is file access and the file is not found in the filesystem. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
     // ------------------------------------------------------------------------
     // network interfaces
 
     'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintented VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
+        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
+    },
+
+    'net.duplex': {
+        info: 'State map: 0 - unknown, 1 - half duplex, 2 - full duplex'
+    },
+
+    'net.operstate': {
+        info: 'State map: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up'
+    },
+
+    'net.carrier': {
+        info: 'State map: 0 - down, 1 - up'
     },
 
     // ------------------------------------------------------------------------
@@ -1115,12 +1230,12 @@ netdataDashboard.context = {
     },
 
     'apps.file_closed': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>, which is called from' +
+        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
     'apps.file_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/latest/source/fs/file.c#L665" target="_blank">__close_fd</a>.'
+        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
     },
 
     'apps.file_deleted': {
@@ -1180,7 +1295,7 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retranstmit_skb</code>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
     },
 
     'apps.bandwidth_udp_send': {
@@ -1189,6 +1304,22 @@ netdataDashboard.context = {
 
     'apps.bandwidth_udp_recv': {
         info: 'Calls for function <code>udp_recvmsg</code>.'
+    },
+
+    'apps.dc_hit_ratio': {
+        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_reference': {
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_not_cache': {
+        info: 'Counters of file accesses. <code>Slow</code> is when there is a file access and the file is not present in the directory cache, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'apps.dc_not_found': {
+        info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
     },
 
     // ------------------------------------------------------------------------
@@ -1338,6 +1469,11 @@ netdataDashboard.context = {
         info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the system always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
     },
 
+    'disk.busy': {
+        colors: '#FF5588',
+        info: 'Disk Busy Time measures the amount of time the disk was busy with something.'
+    },
+    
     'disk.backlog': {
         colors: '#0099CC',
         info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the system is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
@@ -1363,9 +1499,15 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
+    'disk_ext.iotime': {
+        height: 0.5
+    },
     'disk.mops': {
         height: 0.5,
         info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
+    },
+    'disk_ext.mops': {
+        height: 0.5
     },
     'disk.svctm': {
         height: 0.5,
@@ -1375,9 +1517,16 @@ netdataDashboard.context = {
         height: 0.5,
         info: 'The average I/O operation size.'
     },
+    'disk_ext.avgsz': {
+        height: 0.5
+    },
     'disk.await': {
         height: 0.5,
         info: 'The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
+    },
+    'disk_ext.await': {
+        height: 0.5,
+        info: 'The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
     'disk.space': {
@@ -1387,12 +1536,19 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
-    'mysql.net': {
-        info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
+    // ------------------------------------------------------------------------
+    // ZFS pools
+    'zfspool.state': {
+        info: 'ZFS pool state. The overall health of a pool, as reported by <code>zpool status</code>, is determined by the aggregate state of all devices within the pool. ' +
+            'For details, see <a href="https://openzfs.github.io/openzfs-docs/man/8/zpoolconcepts.8.html?#Device_Failure_and_Recovery" target="_blank"> ZFS documentation</a>.'
     },
 
     // ------------------------------------------------------------------------
     // MYSQL
+
+    'mysql.net': {
+        info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
+    },
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +
@@ -1444,11 +1600,12 @@ netdataDashboard.context = {
 
     'mysql.galera_cluster_state': {
         info:
-            '<code>0</code>: undefined, ' +
-            '<code>1</code>: joining, ' +
-            '<code>2</code>: donor/desynced, ' +
-            '<code>3</code>: joined, ' +
-            '<code>4</code>: synced.'
+            '<code>0</code>: Undefined, ' +
+            '<code>1</code>: Joining, ' +
+            '<code>2</code>: Donor/Desynced, ' +
+            '<code>3</code>: Joined, ' +
+            '<code>4</code>: Synced, ' +
+            '<code>5</code>: Inconsistent.'
     },
 
     'mysql.galera_cluster_weight': {
@@ -1466,6 +1623,40 @@ netdataDashboard.context = {
             'Transactions which are read only are not counted.'
     },
 
+    // ------------------------------------------------------------------------
+    // NVMe
+
+    'nvme.critical_warning': {
+        info: 'Number of Critical Warnings.<ul>' +
+            '<li><strong>0 :</strong> This is Ok.</li>' +
+            '<li><strong>1 or more:</strong> There is a problem with the nvme disk.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
+    },
+
+    'nvme.percentage_used': {
+        info: 'Percentage of disk space used.<ul>' +
+            '</ul>' +
+            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
+    },
+
+    'nvme.temperature': {
+        info: 'Disk temperature.<ul>' +
+            '</ul>' +
+            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
+    },
+
+    'nvme.power_cycles': {
+        info: 'Power Cycles indicates the count of full hard disk power on/off cycles.<ul>' +
+            '</ul>' +
+            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
+    },
+
+    'nvme.power_on_hours': {
+        info: 'Power on hours indicates the total time the drive was running (powered).<ul>' +
+            '</ul>' +
+            'For more information see <a href="https://nvmexpress.org/" target="_blank">nvmexpress</a>.'
+    },
 
     // ------------------------------------------------------------------------
     // POSTGRESQL
@@ -1896,7 +2087,7 @@ netdataDashboard.context = {
     },
 
     'beanstalk.connections_rate': {
-        info: 'Tthe rate of connections opened to beanstalkd.'
+        info: 'The rate of connections opened to beanstalkd.'
     },
 
     'beanstalk.commands_rate': {
@@ -2310,7 +2501,7 @@ netdataDashboard.context = {
     },
 
     'web_log.squid_transport_errors': {
-        info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
+        info: 'These tags are optional and describe some error conditions which occurred during response delivery (if any). ' +
             '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
             '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
@@ -2522,7 +2713,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metadata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
         colors: [NETDATA.colors[12]]
     },
 
@@ -2531,7 +2722,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.metadata': {
-        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem interal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
+        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem internal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
     },
 
     'btrfs.system': {
@@ -2552,7 +2743,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.message_rates': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.'
     },
 
     'rabbitmq.global_counts': {
@@ -2595,7 +2786,7 @@ netdataDashboard.context = {
     },
 
     'rabbitmq.queue_messages_stats': {
-        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.',
+        info: 'Overall messaging rates including acknowledgements, deliveries, redeliveries, and publishes.',
         colors: NETDATA.colors[3]
     },
 
@@ -2703,7 +2894,7 @@ netdataDashboard.context = {
     },
 
     'boinc.tasks': {
-        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partially processed but suspended.'
     },
 
     'boinc.states': {
@@ -2852,7 +3043,7 @@ netdataDashboard.context = {
 
     // VM specific
     'vsphere.vm_mem_usage_percentage': {
-        info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
+        info: 'Percentage of used virtual machine “physical” memory: <code>active</code> / <code>virtual machine configured size</code>.'
     },
 
     'vsphere.vm_mem_usage': {
@@ -3067,7 +3258,7 @@ netdataDashboard.context = {
     },
 
     'squidlog.cache_code_error_tag_requests': {
-        info: 'These tags are optional and describe some error conditions which occured during response delivery.<br>' +
+        info: 'These tags are optional and describe some error conditions which occurred during response delivery.<br>' +
             '<ul>' +
             ' <li><code>ABORTED</code> the response was not completed due to the connection being aborted (usually by the client).</li>' +
             ' <li><code>TIMEOUT</code> the response was not completed due to a connection timeout.</li>' +
@@ -3271,6 +3462,53 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Filesystem
+
+    'filesystem.vfs_deleted_objects': {
+        title : 'VFS remove',
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
+    },
+
+    'filesystem.vfs_io': {
+        title : 'VFS IO',
+        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+    },
+
+    'filesystem.vfs_io_bytes': {
+        title : 'VFS bytes written',
+        info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
+    },
+
+    'filesystem.vfs_io_error': {
+        title : 'VFS IO error',
+        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
+    },
+
+    'filesystem.vfs_fsync': {
+        info: 'Successful or failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_fsync_error': {
+        info: 'Failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_open': {
+        info: 'Successful or failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_open_error': {
+        info: 'Failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_create': {
+        info: 'Successful or failed calls to functions <code>vfs_create</code>.'
+    },
+
+    'filesystem.vfs_create_error': {
+        info: 'Failed calls to functions <code>vfs_create</code>.'
+    },
+
+    // ------------------------------------------------------------------------
     // eBPF
 
     'ebpf.tcp_functions': {
@@ -3285,7 +3523,7 @@ netdataDashboard.context = {
 
     'ebpf.tcp_retransmit': {
         title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retranstmit_skb</code>.'
+        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
     },
 
     'ebpf.tcp_error': {
@@ -3308,7 +3546,7 @@ netdataDashboard.context = {
         info: 'Calls for internal functions on Linux kernel. The open dimension is attached to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
@@ -3317,33 +3555,13 @@ netdataDashboard.context = {
         info: 'Failed calls to the kernel internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from'+
             ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
             ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. ' +
-            ' The close dimension is attached to the function <code>__close_fd</code>, which is called from system call' +
+            ' The close dimension is attached to the function <code>__close_fd</code> or <code>close_fd</code> according to your kernel version, which is called from system call' +
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
-    },
-
-    'ebpf.deleted_objects': {
-        title : 'VFS remove',
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. '
-    },
-
-    'ebpf.io': {
-        title : 'VFS IO',
-        info: 'Successful or failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all file system events if it uses other functions to store data on disk.'
-    },
-
-    'ebpf.io_bytes': {
-        title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
-    },
-
-    'ebpf.io_error': {
-        title : 'VFS IO error',
-        info: 'Failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
     },
 
     'ebpf.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by couting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
+        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
     },
 
     'ebpf.exit': {
@@ -3359,6 +3577,14 @@ netdataDashboard.context = {
     'ebpf.process_status': {
         title : 'Task status',
         info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
+    },
+
+    'apps.swap_read_call': {
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory.'
+    },
+
+    'apps.swap_write_call': {
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
     },
 
     // ------------------------------------------------------------------------
@@ -3711,6 +3937,7 @@ netdataDashboard.context = {
                     + ' data-chart-library="easypiechart"'
                     + ' data-title="Fan Speed"'
                     + ' data-units="percentage"'
+                    + ' data-easypiechart-max-value="100"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -3782,4 +4009,74 @@ netdataDashboard.context = {
             }
         ]
     },
+
+    // ------------------------------------------------------------------------
+    // Supervisor
+
+    'supervisord.process_state_code': {
+        info: '<a href="http://supervisord.org/subprocess.html#process-states" target="_blank">Process states map</a>: ' +
+        '<code>0</code> - stopped, <code>10</code> - starting, <code>20</code> - running, <code>30</code> - backoff,' +
+        '<code>40</code> - stopping, <code>100</code> - exited, <code>200</code> - fatal, <code>1000</code> - unknown.'
+    },
+
+    // ------------------------------------------------------------------------
+    // Systemd units
+
+    'systemd.service_units_state': {
+        info: 'Service units start and control daemons and the processes they consist of. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html#" target="_blank"> systemd.service(5)</a>'
+    },
+
+    'systemd.socket_unit_state': {
+        info: 'Socket units encapsulate local IPC or network sockets in the system, useful for socket-based activation. ' +
+        'For details about socket units, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.socket.html#" target="_blank"> systemd.socket(5)</a>, ' +
+        'for details on socket-based activation and other forms of activation, see <a href="https://www.freedesktop.org/software/systemd/man/daemon.html#" target="_blank"> daemon(7)</a>.'
+    },
+
+    'systemd.target_unit_state': {
+        info: 'Target units are useful to group units, or provide well-known synchronization points during boot-up, ' +
+        'see <a href="https://www.freedesktop.org/software/systemd/man/systemd.target.html#" target="_blank"> systemd.target(5)</a>.'
+    },
+
+    'systemd.path_unit_state': {
+        info: 'Path units may be used to activate other services when file system objects change or are modified. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.path.html#" target="_blank"> systemd.path(5)</a>.'
+    },
+
+    'systemd.device_unit_state': {
+        info: 'Device units expose kernel devices in systemd and may be used to implement device-based activation. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.device.html#" target="_blank"> systemd.device(5)</a>.'
+    },
+
+    'systemd.mount_unit_state': {
+        info: 'Mount units control mount points in the file system. ' +
+        'For details, see <a href="https://www.freedesktop.org/software/systemd/man/systemd.mount.html#" target="_blank"> systemd.mount(5)</a>.'
+    },
+
+    'systemd.automount_unit_state': {
+        info: 'Automount units provide automount capabilities, for on-demand mounting of file systems as well as parallelized boot-up. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.automount.html#" target="_blank"> systemd.automount(5)</a>.'
+    },
+
+    'systemd.swap_unit_state': {
+        info: 'Swap units are very similar to mount units and encapsulate memory swap partitions or files of the operating system. ' +
+        'They are described in <a href="https://www.freedesktop.org/software/systemd/man/systemd.swap.html#" target="_blank"> systemd.swap(5)</a>.'
+    },
+
+    'systemd.timer_unit_state': {
+        info: 'Timer units are useful for triggering activation of other units based on timers. ' +
+        'You may find details in <a href="https://www.freedesktop.org/software/systemd/man/systemd.timer.html#" target="_blank"> systemd.timer(5)</a>.'
+    },
+
+    'systemd.scope_unit_state': {
+        info: 'Slice units may be used to group units which manage system processes (such as service and scope units) ' +
+        'in a hierarchical tree for resource management purposes. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.scope.html#" target="_blank"> systemd.scope(5)</a>.'
+    },
+
+    'systemd.slice_unit_state': {
+        info: 'Scope units are similar to service units, but manage foreign processes instead of starting them as well. ' +
+        'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.slice.html#" target="_blank"> systemd.slice(5)</a>.'
+    },
+
 };

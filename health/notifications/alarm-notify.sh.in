@@ -165,7 +165,7 @@ pd
 fleep
 syslog
 custom
-msteam
+msteams
 kavenegar
 prowl
 irc
@@ -209,6 +209,9 @@ if [[ ${1} = "unittest" ]]; then
   cfgfile="${3}"    # the location of the config file to use for unit testing
   status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+elif [[ ${1} = "dump_methods" ]]; then
+    dump_methods=1
+    status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
   args_host="${2}"           # the host generated this event
@@ -297,8 +300,11 @@ done
 # slack configs
 SLACK_WEBHOOK_URL=
 
-# Microsoft Team configs
-MSTEAM_WEBHOOK_URL=
+# Microsoft Teams configs
+MSTEAMS_WEBHOOK_URL=
+
+# Legacy Microsoft Teams configs for backwards compatability:
+declare -A role_recipients_msteam
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -372,6 +378,7 @@ EMAIL_PLAINTEXT_ONLY=
 IRC_NICKNAME=
 IRC_REALNAME=
 IRC_NETWORK=
+IRC_PORT=6667
 
 # hangouts configs
 declare -A HANGOUTS_WEBHOOK_URI
@@ -411,6 +418,8 @@ else
   done
 fi
 
+OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
+
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
 # should be correct for almost all modern UNIX systems.
@@ -424,6 +433,38 @@ fi
 if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; then
   host="$(hostname -f 2>/dev/null)"
 fi
+
+
+# -----------------------------------------------------------------------------
+# migrate old Microsoft Teams configuration keys after loading configuration
+
+msteams_migration() {
+    SEND_MSTEAMS=${SEND_MSTEAM:-$SEND_MSTEAMS}
+    unset -v SEND_MSTEAM
+    DEFAULT_RECIPIENT_MSTEAMS=${DEFAULT_RECIPIENT_MSTEAM:-$DEFAULT_RECIPIENT_MSTEAMS}
+    MSTEAMS_WEBHOOK_URL=${MSTEAM_WEBHOOK_URL:-$MSTEAMS_WEBHOOK_URL}
+    MSTEAMS_ICON_DEFAULT=${MSTEAM_ICON_DEFAULT:-$MSTEAMS_ICON_DEFAULT}
+    MSTEAMS_ICON_CLEAR=${MSTEAM_ICON_CLEAR:-$MSTEAMS_ICON_CLEAR}
+    MSTEAMS_ICON_WARNING=${MSTEAM_ICON_WARNING:-$MSTEAMS_ICON_WARNING}
+    MSTEAMS_ICON_CRITICAL=${MSTEAM_ICON_CRITICAL:-$MSTEAMS_ICON_CRITICAL}
+    MSTEAMS_COLOR_DEFAULT=${MSTEAM_COLOR_DEFAULT:-$MSTEAMS_COLOR_DEFAULT}
+    MSTEAMS_COLOR_CLEAR=${MSTEAM_COLOR_CLEAR:-$MSTEAMS_COLOR_CLEAR}
+    MSTEAMS_COLOR_WARNING=${MSTEAM_COLOR_WARNING:-$MSTEAMS_COLOR_WARNING}
+    MSTEAMS_COLOR_CRITICAL=${MSTEAM_COLOR_CRITICAL:-$MSTEAMS_COLOR_CRITICAL}
+
+    # migrate role specific recipients:
+    for key in "${!role_recipients_msteam[@]}"; do
+        # Disable check, if role_recipients_msteams is ever used:
+        # The role_recipients_$method are created and used programmatically
+        # by iterating over $methods. shellcheck therefore doesn't realize
+        # that role_recipients_msteams is actually used in the block
+        # "find the recipients' addresses per method".
+        # shellcheck disable=SC2034
+        role_recipients_msteams["$key"]="${role_recipients_msteam["$key"]}"
+    done
+}
+
+msteams_migration
 
 # -----------------------------------------------------------------------------
 # filter a recipient based on alarm event severity
@@ -547,6 +588,18 @@ filter_recipient_by_criticality() {
 # check stackpulse
 [ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
+# check msteams
+[ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
+
+# check pd
+[ -z "${DEFAULT_RECIPIENT_PD}" ] && SEND_PD="NO"
+
+# check prowl
+[ -z "${DEFAULT_RECIPIENT_PROWL}" ] && SEND_PROWL="NO"
+
+# check custom
+[ -z "${DEFAULT_RECIPIENT_CUSTOM}" ] && SEND_CUSTOM="NO"
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_SLACK}" = "YES" ] ||
   [ "${SEND_ROCKETCHAT}" = "YES" ] ||
@@ -566,7 +619,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_HANGOUTS}" = "YES" ] ||
   [ "${SEND_MATRIX}" = "YES" ] ||
   [ "${SEND_CUSTOM}" = "YES" ] ||
-  [ "${SEND_MSTEAM}" = "YES" ] ||
+  [ "${SEND_MSTEAMS}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
   [ "${SEND_STACKPULSE}" = "YES" ] ||
   [ "${SEND_OPSGENIE}" = "YES" ]; then
@@ -580,7 +633,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_PUSHBULLET="NO"
     SEND_TELEGRAM="NO"
     SEND_SLACK="NO"
-    SEND_MSTEAM="NO"
+    SEND_MSTEAMS="NO"
     SEND_ROCKETCHAT="NO"
     SEND_ALERTA="NO"
     SEND_PD="NO"
@@ -635,6 +688,15 @@ if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
     debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
     SEND_AWSSNS="NO"
   fi
+fi
+
+if [ ${dump_methods} ]; then
+    for name in "${!SEND_@}"; do
+        if [ "${!name}" = "YES" ]; then
+            echo "$name"
+        fi
+    done
+    exit
 fi
 
 # -----------------------------------------------------------------------------
@@ -726,7 +788,7 @@ for method in "${SEND_EMAIL}" \
   "${SEND_AWSSNS}" \
   "${SEND_SYSLOG}" \
   "${SEND_SMS}" \
-  "${SEND_MSTEAM}" \
+  "${SEND_MSTEAMS}" \
   "${SEND_DYNATRACE}" \
   "${SEND_STACKPULSE}" \
   "${SEND_OPSGENIE}" ; do
@@ -853,7 +915,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && sendmail --help 2>&1 | grep -q "\-F " && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
@@ -862,14 +924,15 @@ send_email() {
       echo >&2 "--- END sendmail command ---"
     fi
 
-    "${sendmail}" -t "${opts[@]}"
+    local cmd_output
+    cmd_output=$("${sendmail}" -t "${opts[@]}" 2>&1)
     ret=$?
 
     if [ ${ret} -eq 0 ]; then
       info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
       return 0
     else
-      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret} (${cmd_output})."
       return 1
     fi
   fi
@@ -1263,22 +1326,22 @@ send_telegram() {
 # -----------------------------------------------------------------------------
 # Microsoft Team sender
 
-send_msteam() {
+send_msteams() {
 
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-  [ "${SEND_MSTEAM}" != "YES" ] && return 1
+  [ "${SEND_MSTEAMS}" != "YES" ] && return 1
 
   case "${status}" in
-  WARNING) icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}" ;;
-  CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}" ;;
-  CLEAR) icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}" ;;
-  *) icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}" ;;
+  WARNING) icon="${MSTEAMS_ICON_WARNING}" && color="${MSTEAMS_COLOR_WARNING}" ;;
+  CRITICAL) icon="${MSTEAMS_ICON_CRITICAL}" && color="${MSTEAMS_COLOR_CRITICAL}" ;;
+  CLEAR) icon="${MSTEAMS_ICON_CLEAR}" && color="${MSTEAMS_COLOR_CLEAR}" ;;
+  *) icon="${MSTEAMS_ICON_DEFAULT}" && color="${MSTEAMS_COLOR_DEFAULT}" ;;
   esac
 
   for channel in ${channels}; do
     ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
-    ## Online designer : https://acdesignerbeta.azurewebsites.net/
+    ## Online designer : https://adaptivecards.io/designer/
     payload="$(
       cat <<EOF
         {
@@ -1720,9 +1783,9 @@ send_prowl() {
 # irc sender
 
 send_irc() {
-  local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
+  local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" PORT="${5}" SERVERNAME="${6}" MESSAGE="${7}" sent=0 channel color send_alarm reply_codes error
 
-  if [ "${SEND_IRC}" = "YES" ] && [ -n "${NICKNAME}" ] && [ -n "${REALNAME}" ] && [ -n "${CHANNELS}" ] && [ -n "${NETWORK}" ] && [ -n "${SERVERNAME}" ]; then
+  if [ "${SEND_IRC}" = "YES" ] && [ -n "${NICKNAME}" ] && [ -n "${REALNAME}" ] && [ -n "${CHANNELS}" ] && [ -n "${NETWORK}" ] && [ -n "${SERVERNAME}" ] && [ -n "${PORT}" ]; then
     case "${status}" in
     WARNING) color="warning" ;;
     CRITICAL) color="danger" ;;
@@ -1733,7 +1796,7 @@ send_irc() {
     SNDMESSAGE="${MESSAGE//$'\n'/", "}"
     for CHANNEL in ${CHANNELS}; do
       error=0
-      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
+      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" "${PORT}")
       reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
       for code in ${reply_codes}; do
         if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then
@@ -2052,7 +2115,7 @@ send_dynatrace() {
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
   local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
-  
+
   payload=$(cat <<EOF
 {
   "title": "NetData Alarm from ${host}",
@@ -2179,7 +2242,7 @@ send_opsgenie() {
 EOF
 )
 
-  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "https://api.opsgenie.com/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
+  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
@@ -2321,13 +2384,13 @@ send_hangouts "${to_hangouts}"
 SENT_HANGOUTS=$?
 
 # -----------------------------------------------------------------------------
-# send the Microsoft notification
+# send the Microsoft Teams notification
 
-# Microsoft team aggregates posts from the same username
+# Microsoft teams aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
-SENT_MSTEAM=$?
+send_msteams "${MSTEAMS_WEBHOOK_URL}" "${to_msteams}"
+SENT_MSTEAMS=$?
 
 # -----------------------------------------------------------------------------
 # send the rocketchat notification
@@ -2463,7 +2526,7 @@ SENT_PROWL=$?
 # -----------------------------------------------------------------------------
 # send the irc message
 
-send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${IRC_PORT}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
@@ -2744,7 +2807,7 @@ for state in "${SENT_EMAIL}" \
   "${SENT_MATRIX}" \
   "${SENT_SYSLOG}" \
   "${SENT_SMS}" \
-  "${SENT_MSTEAM}" \
+  "${SENT_MSTEAMS}" \
   "${SENT_DYNATRACE}" \
   "${SENT_STACKPULSE}" \
   "${SENT_OPSGENIE}"; do

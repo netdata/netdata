@@ -11,7 +11,7 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -26,7 +26,7 @@
 
 #endif /* NETDATA_RRD_INTERNALS */
 
-/* Forward declerations */
+/* Forward declarations */
 struct rrdengine_instance;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
@@ -56,16 +56,20 @@ enum rrdeng_opcode {
     RRDENG_MAX_OPCODE
 };
 
+struct rrdeng_read_page {
+    struct rrdeng_page_descr *page_cache_descr;
+};
+
+struct rrdeng_read_extent {
+    struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
+    int page_count;
+};
+
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
     union {
-        struct rrdeng_read_page {
-            struct rrdeng_page_descr *page_cache_descr;
-        } read_page;
-        struct rrdeng_read_extent {
-            struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
-            int page_count;
-        } read_extent;
+        struct rrdeng_read_page read_page;
+        struct rrdeng_read_extent read_extent;
         struct completion *completion;
     };
 };

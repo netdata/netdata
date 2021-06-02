@@ -82,6 +82,19 @@ The Agent displays the number of bytes written as negative because they are movi
 
 The Agent counts and shows the number of instances where a running program experiences a read or write error.
 
+#### Create
+
+This chart shows the number of calls for `vfs_create`. This function is responsible to create files.
+
+#### Synchronization
+
+This chart shows the number of calls for `vfs_fsync`. This function is responsible to perform a fsync or fdatasync 
+on a file.
+
+#### Open
+
+This chart shows the number of calls for `vfs_open`. This function is responsible to open files.
+
 ### Process
 
 For this group, the eBPF collector monitors process/thread creation and process end, and then displays any errors in the
@@ -123,11 +136,11 @@ To enable the collector, scroll down to the `[plugins]` section ensure the relev
    ebpf = yes
 ```
 
-You can also configure the eBPF collector's behavior by editing `ebpf.conf`.
+You can also configure the eBPF collector's behavior by editing `ebpf.d.conf`.
 
 ```bash
 cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
-./edit-config ebpf.conf
+./edit-config ebpf.d.conf
 ```
 
 ### `[global]`
@@ -148,6 +161,8 @@ accepts the following values: ​
 -   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
     new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
     software, such as failing to close file descriptors or creating zombie processes.
+-   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
+-   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
     
 #### Integration with `apps.plugin`
 
@@ -186,16 +201,56 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
    apps = yes
 ```
 
-### `[ebpf programs]`
+When the integration is enabled, eBPF collector allocates memory for each process running. The total 
+ allocated memory has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, 
+ it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
+ for each processor it runs.
+
+#### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
--   `process`: This eBPF program creates charts that show information about process creation, VFS IO, and files removed.
+-   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+    [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    for each application.
+-   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
+    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and 
+    files are not found.
+-   `process`: This eBPF program creates charts that show information about process creation, calls to open files.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
+-   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
-### `[network connections]`
+## Thread configuration
+
+You can configure each thread of the eBPF data collector by editing either the `cachestat.conf`, `process.conf`, 
+or `network.conf` files. Use [`edit-config`](/docs/configure/nodes.md) from your Netdata config directory:
+
+```bash
+cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config ebpf.d/process.conf
+```
+
+### Configuration files
+
+The following configuration files are available:
+
+- `cachestat.conf`: Configuration for the `cachestat` thread.
+- `dcstat.conf`: Configuration for the `dcstat` thread.
+- `process.conf`: Configuration for the `process` thread.
+- `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
+  also lets you specify which network the eBPF collector monitors.
+- `sync.conf`: Configuration for the `sync` thread.
+- `vfs.conf`: Configuration for the `vfs` thread.
+
+### Network configuration
+
+The network configuration has specific options to configure which network(s) the eBPF collector monitors. These options
+are divided in the following sections:
+
+#### `[network connections]`
 
 You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
 
@@ -232,7 +287,7 @@ The dimensions for the traffic charts are created using the destination IPs of t
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
 the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
-### `[service name]`
+#### `[service name]`
 
 Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
 name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
@@ -243,6 +298,21 @@ service in network connection charts, and thus see the name of the service inste
 ```conf
 [service name]
     19999 = Netdata
+```
+
+### Sync configuration
+
+The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are 
+monitored.
+
+```conf
+[syscalls]
+    sync = yes
+    msync = yes
+    fsync = yes
+    fdatasync = yes
+    syncfs = yes
+    sync_file_range = yes
 ```
 
 ## Troubleshooting
@@ -302,13 +372,16 @@ mount these filesystems on startup. More information can be found in the [ftrace
 
 ## Performance
 
-Because eBPF monitoring is complex, we are evaluating the performance of this new collector in various real-world
-conditions, across various system loads, and when monitoring complex applications.
+eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin 
+significantly increases kernel memory usage by several hundred MB.
 
-Our [initial testing](https://github.com/netdata/netdata/issues/8195) shows the performance of the eBPF collector is
-nearly identical to our [apps.plugin collector](/collectors/apps.plugin/README.md), despite collecting and displaying
-much more sophisticated metrics. You can now use the eBPF to gather deeper insights without affecting the performance of
-your complex applications at any load.
+If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, 
+consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next, 
+[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system 
+memory usage (see the `system.ram` chart) has dropped significantly.
+
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode) 
+in `ebpf.conf`.
 
 ## SELinux
 

@@ -40,7 +40,7 @@
 # - 2.0.1 : Added --copy
 # - 2.1.0 : Allow multiple tarballs to be stored in one archive, and incremental updates.
 #           Added --nochown for archives
-#           Stopped doing redundant checksums when not necesary
+#           Stopped doing redundant checksums when not necessary
 # - 2.1.1 : Work around insane behavior from certain Linux distros with no 'uncompress' command
 #           Cleaned up the code to handle error codes from compress. Simplified the extraction code.
 # - 2.1.2 : Some bug fixes. Use head -n to avoid problems.
@@ -63,7 +63,7 @@
 #           Check for available disk space before extracting to the target directory (Andreas Schweitzer)
 #           Allow extraction to run asynchronously (patch by Peter Hatch)
 #           Use file descriptors internally to avoid error messages (patch by Kay Tiong Khoo)
-# - 2.1.6 : Replaced one dot per file progress with a realtime progress percentage and a spining cursor (Guy Baconniere)
+# - 2.1.6 : Replaced one dot per file progress with a realtime progress percentage and a spinning cursor (Guy Baconniere)
 #           Added --noprogress to prevent showing the progress during the decompression (Guy Baconniere)
 #           Added --target dir to allow extracting directly to a target directory (Guy Baconniere)
 # - 2.2.0 : Many bugfixes, updates and contributions from users. Check out the project page on Github for the details.

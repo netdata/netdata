@@ -276,6 +276,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
+    char *chart = NULL;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -285,12 +286,13 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        else if (!strcmp(name, "chart")) chart = value;
     }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after);
+    health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 
@@ -511,6 +513,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         rrdhost_unlock(host);
         if (likely(context_param_list && context_param_list->rd))  // Just set the first one
             st = context_param_list->rd->rrdset;
+        else {
+            if (!chart_label_key)
+                sql_build_context_param_list(&context_param_list, host, context, NULL);
+        }
     }
     else {
         st = rrdset_find(host, chart);
@@ -518,6 +524,17 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             st = rrdset_find_byname(host, chart);
         if (likely(st))
             st->last_accessed_time = now_realtime_sec();
+        else
+            sql_build_context_param_list(&context_param_list, host, NULL, chart);
+    }
+
+    if (!st) {
+        if (likely(context_param_list && context_param_list->rd && context_param_list->rd->rrdset))
+            st = context_param_list->rd->rrdset;
+        else {
+            free_context_param_list(&context_param_list);
+            context_param_list = NULL;
+        }
     }
 
     if (!st && !context_param_list) {
@@ -733,6 +750,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
+        analytics_log_dashboard();
         if(unlikely(!web_client_can_access_dashboard(w)))
             return web_client_permission_denied(w);
     }
@@ -961,6 +979,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef ENABLE_ACLK
     buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+#ifdef ACLK_NG
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
+#else
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"legacy\",\n");
+#endif
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif
@@ -973,10 +996,82 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     }
 #ifdef ENABLE_ACLK
     if (aclk_connected)
-        buffer_strcat(wb, "\t\"aclk-available\": true\n");
+        buffer_strcat(wb, "\t\"aclk-available\": true,\n");
     else
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false\n");     // Intentionally valid with/without #ifdef above
+        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
+
+    buffer_strcat(wb, "\t\"memory-mode\": ");
+    analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"multidb-disk-quota\": ");
+    analytics_get_data(analytics_data.netdata_config_multidb_disk_quota, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"page-cache-size\": ");
+    analytics_get_data(analytics_data.netdata_config_page_cache_size, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"stream-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"hosts-available\": ");
+    analytics_get_data(analytics_data.netdata_config_hosts_available, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"https-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_https_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"buildinfo\": ");
+    analytics_get_data(analytics_data.netdata_buildinfo, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"release-channel\": ");
+    analytics_get_data(analytics_data.netdata_config_release_channel, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"web-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_web_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"notification-methods\": ");
+    analytics_get_data(analytics_data.netdata_notification_methods, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"exporting-enabled\": ");
+    analytics_get_data(analytics_data.netdata_config_exporting_enabled, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"exporting-connectors\": ");
+    analytics_get_data(analytics_data.netdata_exporting_connectors, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"allmetrics-prometheus-used\": ");
+    analytics_get_data(analytics_data.netdata_allmetrics_prometheus_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"allmetrics-shell-used\": ");
+    analytics_get_data(analytics_data.netdata_allmetrics_shell_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"allmetrics-json-used\": ");
+    analytics_get_data(analytics_data.netdata_allmetrics_json_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"dashboard-used\": ");
+    analytics_get_data(analytics_data.netdata_dashboard_used, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"charts-count\": ");
+    analytics_get_data(analytics_data.netdata_charts_count, wb);
+    buffer_strcat(wb, ",\n");
+
+    buffer_strcat(wb, "\t\"metrics-count\": ");
+    analytics_get_data(analytics_data.netdata_metrics_count, wb);
+    buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "}");
     return 0;

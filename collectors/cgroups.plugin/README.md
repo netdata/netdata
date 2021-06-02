@@ -147,6 +147,33 @@ Support per distribution:
 |AMI|NO|[here](http://pastebin.com/FrxmptjL)|not a systemd system|
 |CentOS 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below|
 
+### Monitored systemd service metrics
+
+- CPU utilization
+- Used memory
+- RSS memory
+- Mapped memory
+- Cache memory
+- Writeback memory
+- Memory minor page faults
+- Memory major page faults
+- Memory charging activity
+- Memory uncharging activity
+- Memory limit failures
+- Swap memory used
+- Disk read bandwidth
+- Disk write bandwidth
+- Disk read operations
+- Disk write operations
+- Throttle disk read bandwidth
+- Throttle disk write bandwidth
+- Throttle disk read operations
+- Throttle disk write operations
+- Queued disk read operations
+- Queued disk write operations
+- Merged disk read operations
+- Merged disk write operations
+
 ### how to enable cgroup accounting on systemd systems that is by default disabled
 
 You can verify there is no accounting enabled, by running `systemd-cgtop`. The program will show only resources for cgroup `/`, but all services will show nothing.
@@ -229,5 +256,32 @@ So, when a network interface or container stops, Netdata might log a few errors 
 5.  existing dashboard sessions will continue to see them, but of course they will not refresh
 6.  obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
 7.  when obsolete charts are removed from memory they are also deleted from disk (configurable with `[global].delete obsolete charts files = yes`)
+
+### Monitored container metrics
+
+- CPU usage
+- CPU usage within the limits
+- CPU usage per core
+- Memory usage
+- Writeback memory
+- Memory activity
+- Memory page faults
+- Used memory
+- Used RAM within the limits
+- Memory utilization
+- Memory limit failures
+- I/O bandwidth (all disks)
+- Serviced I/O operations (all disks)
+- Throttle I/O bandwidth (all disks)
+- Throttle serviced I/O operations (all disks)
+- Queued I/O operations (all disks)
+- Merged I/O operations (all disks)
+- CPU pressure
+- Memory pressure
+- Memory full pressure
+- I/O pressure
+- I/O full pressure
+  
+Network interfaces are monitored by means of the [proc plugin](/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcgroups.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

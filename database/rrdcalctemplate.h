@@ -15,6 +15,10 @@ struct rrdcalctemplate {
     char *exec;
     char *recipient;
 
+    char *classification;
+    char *component;
+    char *type;
+
     char *context;
     uint32_t hash_context;
 
@@ -26,6 +30,9 @@ struct rrdcalctemplate {
 
     char *module_match;
     SIMPLE_PATTERN *module_pattern;
+
+    char *charts_match;
+    SIMPLE_PATTERN *charts_pattern;
 
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm

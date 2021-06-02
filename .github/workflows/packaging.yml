@@ -1,0 +1,150 @@
+---
+# Handles building of binary packages for the agent.
+name: Packages
+on:
+  pull_request:
+    branches:
+      - master
+      - develop
+  workflow_dispatch:
+    inputs:
+      type:
+        name: Package build type
+        default: devel
+        required: true
+      version:
+        name: Package version
+        required: false
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
+    strategy:
+      matrix:
+        include:
+          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
+          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/i386, arch: i386}
+          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
+          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/i386, arch: i386}
+          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
+          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
+          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "20.10", pkgclouddistro: ubuntu/groovy, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+      # We intentiaonally disable the fail-fast behavior so that a
+      # build failure for one version doesn't prevent us from publishing
+      # successfully built and tested packages for another version.
+      fail-fast: false
+      max-parallel: 8
+    steps:
+      - name: Checkout PR # Checkout the PR if it's a PR.
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # We need full history for versioning
+          submodules: true
+      - name: Checkout Tag # Otherwise check out the tag that triggered this.
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.ref }}
+          fetch-depth: 0 # We need full history for versioning
+          submodules: true
+      - name: Check Base Branch
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "runtype=${{ github.event.inputs.type }}" >> $GITHUB_ENV
+            case "${{ github.event.inputs.type }}" in
+              "release")
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}" >> $GITHUB_ENV
+                echo "pkg_version=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+                echo "pkg_retention_days=365" >> $GITHUB_ENV
+                ;;
+              "nightly")
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-edge" >> $GITHUB_ENV
+                echo "pkg_version=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+                echo "pkg_retention_days=30" >> $GITHUB_ENV
+                ;;
+              *)
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-devel" >> $GITHUB_ENV
+                echo "pkg_version=0.${GITHUB_SHA}" >> $GITHUB_ENV
+                echo "pkg_retention_days=30" >> $GITHUB_ENV
+                ;;
+            esac
+          else
+            echo "runtype=test" >> $GITHUB_ENV
+            echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> $GITHUB_ENV
+          fi
+      - name: Setup QEMU
+        if: matrix.platform != 'linux/amd64'
+        uses: docker/setup-qemu-action@v1
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Prepare Docker Environment
+        shell: bash
+        run: |
+          echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
+          sudo service docker restart
+      - name: Build Packages
+        uses: docker/build-push-action@v2
+        with:
+          platforms: ${{ matrix.platform }}
+          file: packaging/Dockerfile.packager
+          tags: local/package-builder:${{ matrix.distro}}${{ matrix.version }}
+          push: false
+          load: true
+          build-args: |
+            ARCH=${{ matrix.arch }}
+            DISTRO=${{ matrix.distro }}
+            TEST_BASE=${{ matrix.base_image }}
+            DISTRO_VERSION=${{ matrix.version }}
+            PKG_VERSION=${{ env.pkg_version }}
+      - name: Extract Packages
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          docker run --platform ${{ matrix.platform }} -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
+      - name: Upload
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
+        run: |
+          echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
+          for pkgfile in artifacts/*.${{ matrix.format }} ; do
+            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile} || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile}
+          done
+      - name: Clean
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          REPO: ${{ env.repo }}
+          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
+          PACKAGE_CLOUD_RETENTION_DAYS: ${{ env.pkg_retention_days }}
+        run: .github/scripts/old_package_purging.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER:
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Package Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}

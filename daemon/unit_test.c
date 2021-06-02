@@ -371,7 +371,7 @@ int unit_test_str2ld() {
                 return -1;
             }
         }
-        else if(mine != sys && abs(mine-sys) > 0.000001) {
+        else if(mine != sys && ABS(mine-sys) > 0.000001) {
             fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ", delta %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
             return -1;
         }
@@ -1500,6 +1500,8 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , name
             , os_type
             , netdata_configured_timezone
+            , netdata_configured_abbrev_timezone
+            , netdata_configured_utc_offset
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , program_name
             , program_version
@@ -1515,7 +1517,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
     );
 }
 
-// costants for test_dbengine
+// constants for test_dbengine
 static const int CHARTS = 64;
 static const int DIMS = 16; // That gives us 64 * 16 = 1024 metrics
 #define REGIONS  (3) // 3 regions of update_every

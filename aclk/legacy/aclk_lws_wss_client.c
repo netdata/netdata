@@ -3,7 +3,7 @@
 #include "aclk_lws_wss_client.h"
 
 #include "libnetdata/libnetdata.h"
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "aclk_common.h"
 #include "aclk_stats.h"
 
@@ -348,6 +348,7 @@ static inline int received_data_to_ringbuff(struct lws_ring *buffer, void *data,
     return 1;
 }
 
+#ifdef ACLK_TRP_DEBUG_VERBOSE
 static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
 {
     switch (reason) {
@@ -381,6 +382,7 @@ static const char *aclk_lws_callback_name(enum lws_callback_reasons reason)
             return "unknown";
     }
 }
+#endif
 
 void aclk_lws_wss_fail_report()
 {
@@ -426,7 +428,7 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
 
     // Callback servicing is forced when we are closed from above.
     if (engine_instance->upstream_reconnect_request) {
-        error("Closing lws connectino due to libmosquitto error.");
+        error("Closing lws connection due to libmosquitto error.");
         char *upstream_connection_error = "MQTT protocol error. Closing underlying wss connection.";
         lws_close_reason(
             wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, (unsigned char *)upstream_connection_error,
@@ -489,7 +491,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
         case LWS_CALLBACK_OPENSSL_PERFORM_SERVER_CERT_VERIFICATION:
             // Expected and safe to ignore.
+#ifdef ACLK_TRP_DEBUG_VERBOSE
             debug(D_ACLK, "Ignoring expected callback from LWS: %s", aclk_lws_callback_name(reason));
+#endif
             return retval;
 
         default:
@@ -497,7 +501,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
     }
     // Log to info - volume is proportional to connection attempts.
+#ifdef ACLK_TRP_DEBUG_VERBOSE
     info("Processing callback %s", aclk_lws_callback_name(reason));
+#endif
     switch (reason) {
         case LWS_CALLBACK_PROTOCOL_INIT:
             aclk_lws_wss_connect(engine_instance->host, engine_instance->port); // Makes the outgoing connection
@@ -531,7 +537,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
             break;
 
         default:
+#ifdef ACLK_TRP_DEBUG_VERBOSE
             error("Unexpected callback from libwebsockets %s", aclk_lws_callback_name(reason));
+#endif
             break;
     }
     return retval; //0-OK, other connection should be closed!
@@ -601,7 +609,7 @@ void aclk_lws_wss_service_loop()
 // in case the MQTT connection disconnect while lws transport is still operational
 // we should drop connection and reconnect
 // this function should be called when that happens to notify lws of that situation
-void aclk_lws_wss_mqtt_layer_disconect_notif()
+void aclk_lws_wss_mqtt_layer_disconnect_notif()
 {
     if (!engine_instance)
         return;

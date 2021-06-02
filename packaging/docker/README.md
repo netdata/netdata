@@ -11,7 +11,7 @@ you get set up quickly, and doesn't install anything permanent on the system, wh
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
 page.
 
@@ -93,6 +93,22 @@ volumes:
   netdatalib:
   netdatacache:
 ```
+
+## Docker tags
+
+The official `netdata/netdata` Docker image provides the following named tags:
+
+* `stable`: The `stable` tag will always point to the most recently published stable build.
+* `edge`: The `edge` tag will always point ot the most recently published nightly build. In most cases, this is
+  updated daily at around 01:00 UTC.
+* `latest`: The `latest` tag will always point to the most recently published build, whether it’s a stable build
+  or a nightly build. This is what Docker will use by default if you do not specify a tag.
+
+Additionally, for each stable release, three tags are pushed, one with the full version of the release (for example,
+`v1.30.0`), one with just the major and minor version (for example, `v1.30`), and one with just the major version
+(for example, `v1`). The tags for the minor versions and major versions are updated whenever a release is published
+that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
+point to that instead of `v1.30.0`).
 
 ## Health Checks
 
@@ -338,9 +354,8 @@ services:
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](https://learn.netdata.cloud/docs/agent/daemon/#command-line-options) such as the
-IP address Netdata will be running on, using the [command
-instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+[Netdata daemon command line options](/daemon/README.md#command-line-options) such as the IP address Netdata will be
+running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
 ## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 

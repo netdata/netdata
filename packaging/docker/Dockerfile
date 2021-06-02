@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # author  : paulfantom
 
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 # hadolint ignore=DL3007
 FROM netdata/builder:latest as builder
 
@@ -25,6 +25,7 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
+   /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
    ./netdata-installer.sh --dont-wait --dont-start-it ${EXTRA_INSTALL_OPTS} \
    "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
@@ -52,7 +53,7 @@ RUN mkdir -p /app/usr/sbin/ \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
-# This image contains preinstalled dependecies
+# This image contains preinstalled dependencies
 # hadolint ignore=DL3007
 FROM netdata/base:latest as base
 

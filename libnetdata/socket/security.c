@@ -201,7 +201,7 @@ static SSL_CTX * security_initialize_openssl_server() {
  * @param selector informs the context that must be initialized, the following list has the valid values:
  *      NETDATA_SSL_CONTEXT_SERVER - the server context
  *      NETDATA_SSL_CONTEXT_STREAMING - Starts the streaming context.
- *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB contextv
+ *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
 void security_start_ssl(int selector) {
     switch (selector) {
@@ -218,7 +218,7 @@ void security_start_ssl(int selector) {
         case NETDATA_SSL_CONTEXT_STREAMING: {
             netdata_client_ctx = security_initialize_openssl_client();
             //This is necessary for the stream, because it is working sometimes with nonblock socket.
-            //It returns the bitmask afte to change, there is not any description of errors in the documentation
+            //It returns the bitmask after to change, there is not any description of errors in the documentation
             SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }

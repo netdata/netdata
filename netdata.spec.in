@@ -221,7 +221,7 @@ happened, on your systems and applications.
 %prep
 %setup -q -n %{name}-%{version}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-mosquitto.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%if 0%{?centos_ver} >= 8 || 0%{?fedora}
+%if 0%{?centos_ver} < 8 || 0%{!?fedora:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-lws.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
 # Only bundle libJudy if this isn't Fedora or SUSE
@@ -237,10 +237,10 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 autoreconf -ivf
 %configure \
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
-	--with-libJudy=externaldeps/libJudy \
+	--with-bundled-libJudy \
 	%endif
-	%if 0%{?centos_ver} >= 8 || 0%{?fedora}
-	--with-bundled-lws=externaldeps/libwebsockets \
+	%if 0%{?centos_ver} < 8 || 0%{!?fedora:1}
+	--with-bundled-lws \
 	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
@@ -320,7 +320,7 @@ install -m 755 system/netdata-init-d \
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
 safe_sha256sum() {
-	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# Within the context of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
 		sha256sum $@
@@ -411,7 +411,6 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
-${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-dashboard.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_datadir}/%{name}/web
 %if 0%{?have_bpf}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
 %endif
@@ -474,18 +473,20 @@ rm -rf "${RPM_BUILD_ROOT}"
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+# This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
+# %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
-%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory

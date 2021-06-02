@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "../database/engine/rrdenginelib.h"
+#include "database/engine/rrdenginelib.h"
 
 static uv_thread_t thread;
 static uv_loop_t* loop;

@@ -40,6 +40,7 @@ struct registry {
     char *cloud_base_url;
     time_t persons_expiration; // seconds to expire idle persons
     int verify_cookies_redirects;
+    int enable_cookies_samesite_secure;
 
     size_t max_url_length;
     size_t max_name_length;

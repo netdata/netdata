@@ -16,6 +16,7 @@ jobs:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
+          submodules: recursive
           fetch-depth: 0
       - name: Check files
         run: |
@@ -57,6 +58,7 @@ jobs:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
+          submodules: recursive
           fetch-depth: 0
       - name: Check files
         run: |
@@ -80,6 +82,7 @@ jobs:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
+          submodules: recursive
           fetch-depth: 0
       - name: Check files
         run: |

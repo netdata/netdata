@@ -3,7 +3,7 @@
 #ifndef NETDATA_LWS_HTTPS_CLIENT_H
 #define NETDATA_LWS_HTTPS_CLIENT_H
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 
 #define DATAMAXLEN 1024*16

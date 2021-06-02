@@ -38,14 +38,12 @@ echo ${NETDATA_SYSTEM_CPU_VISIBLETOTAL}
 
 # what about alarms?
 set | grep "^NETDATA_ALARM_SYSTEM_SWAP_"
-NETDATA_ALARM_SYSTEM_SWAP_RAM_IN_SWAP_STATUS=CRITICAL
-NETDATA_ALARM_SYSTEM_SWAP_RAM_IN_SWAP_VALUE=53
 NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS=CLEAR
 NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_VALUE=51
 
-# let's get the current status of the alarm 'ram in swap'
-echo ${NETDATA_ALARM_SYSTEM_SWAP_RAM_IN_SWAP_STATUS}
-CRITICAL
+# let's get the current status of the alarm 'used swap'
+echo ${NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS}
+CLEAR
 
 # is it fast?
 time curl -s 'http://localhost:19999/api/v1/allmetrics' >/dev/null

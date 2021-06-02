@@ -100,7 +100,7 @@ inline void rrdr_free(RRDR *r)
 
 RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param_list)
 {
-    if(unlikely(!st)) {
+    if (unlikely(!st)) {
         error("NULL value given!");
         return NULL;
     }
@@ -108,7 +108,10 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
     RRDR *r = callocz(1, sizeof(RRDR));
     r->st = st;
 
-    rrdr_lock_rrdset(r);
+    if (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE)) {
+        rrdr_lock_rrdset(r);
+        r->st_needs_lock = 1;
+    }
 
     RRDDIM *temp_rd =  context_param_list ? context_param_list->rd : NULL;
     RRDDIM *rd;
@@ -130,8 +133,8 @@ RRDR *rrdr_create(struct rrdset *st, long n, struct context_param *context_param
 
     // set the hidden flag on hidden dimensions
     int c;
-    for(c = 0, rd = temp_rd?temp_rd:st->dimensions ; rd ; c++, rd = rd->next) {
-        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
+    for (c = 0, rd = temp_rd ? temp_rd : st->dimensions; rd; c++, rd = rd->next) {
+        if (unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
             r->od[c] = RRDR_DIMENSION_HIDDEN;
         else
             r->od[c] = RRDR_DIMENSION_DEFAULT;

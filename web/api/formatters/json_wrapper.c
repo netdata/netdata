@@ -2,8 +2,16 @@
 
 #include "json_wrapper.h"
 
-void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value, RRDDIM *temp_rd, char *chart_label_key) {
-    rrdset_check_rdlock(r->st);
+void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
+                             struct context_param *context_param_list, char *chart_label_key)
+{
+
+    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
+    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
+    uint8_t context_mode = (!context_param_list || (context_param_list->flags & CONTEXT_FLAGS_CONTEXT));
+
+    if (should_lock)
+        rrdset_check_rdlock(r->st);
 
     long rows = rrdr_rows(r);
     long c, i;
@@ -22,7 +30,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         sq[0] = '"';
     }
 
-    rrdset_rdlock(r->st);
+    if (should_lock)
+        rrdset_rdlock(r->st);
     buffer_sprintf(wb, "{\n"
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
@@ -35,16 +44,17 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %safter%s: %u,\n"
                        "   %sdimension_names%s: ["
                    , kq, kq
-                   , kq, kq, sq, temp_rd?r->st->context:r->st->id, sq
-                   , kq, kq, sq, temp_rd?r->st->context:r->st->name, sq
+                   , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->id, sq
+                   , kq, kq, sq, context_mode && temp_rd?r->st->context:r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t)rrdset_first_entry_t_nolock(r->st)
-                   , kq, kq, (uint32_t)rrdset_last_entry_t_nolock(r->st)
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->first_entry_t : rrdset_first_entry_t_nolock(r->st))
+                   , kq, kq, (uint32_t) (context_param_list ? context_param_list->last_entry_t : rrdset_last_entry_t_nolock(r->st))
                    , kq, kq, (uint32_t)r->before
                    , kq, kq, (uint32_t)r->after
                    , kq, kq);
-    rrdset_unlock(r->st);
+    if (should_lock)
+        rrdset_unlock(r->st);
 
     for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
@@ -89,7 +99,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     buffer_strcat(wb, "],\n");
 
     // Composite charts
-    if (temp_rd) {
+    if (context_mode && temp_rd) {
         buffer_sprintf(
             wb,
             "   %schart_ids%s: [",

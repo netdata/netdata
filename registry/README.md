@@ -176,6 +176,17 @@ There can be up to 2 files:
 
 Both files are machine readable text files.
 
+### How can I disable the SameSite and Secure cookies?
+
+Beginning with `v1.30.0`, when the Netdata Agent's web server processes a request, it delivers the `SameSite=none`
+and `Secure` cookies. If you have problems accessing the local Agent dashboard or Netdata Cloud, disable these
+cookies by [editing `netdata.conf`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files):
+
+```conf
+[registry]
+    enable cookies SameSite and Secure = no
+```
+
 ## The future
 
 The registry opens a whole world of new possibilities for Netdata. Check here what we think:

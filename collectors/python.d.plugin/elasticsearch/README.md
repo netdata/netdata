@@ -80,6 +80,7 @@ Sample:
 local:
   host               : 'ipaddress'    # Elasticsearch server ip address or hostname.
   port               : 'port'         # Port on which elasticsearch listens.
+  scheme             : 'http'         # URL scheme. Use 'https' if your elasticsearch uses TLS.
   node_status        :  yes/no        # Get metrics from "/_nodes/_local/stats". Enabled by default.
   cluster_health     :  yes/no        # Get metrics from "/_cluster/health". Enabled by default.
   cluster_stats      :  yes/no        # Get metrics from "'/_cluster/stats". Enabled by default.

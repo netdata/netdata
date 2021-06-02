@@ -3,7 +3,7 @@
 #ifndef NETDATA_ALL_H
 #define NETDATA_ALL_H 1
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 // netdata internal data collection plugins
 
@@ -12,6 +12,7 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
+#include "timex.plugin/plugin_timex.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -53,6 +54,8 @@
 #define NETDATA_CHART_PRIO_SYSTEM_SOFT_INTR           1100 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_ENTROPY             1000
 #define NETDATA_CHART_PRIO_SYSTEM_UPTIME              1000
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_STATE           1100
+#define NETDATA_CHART_PRIO_CLOCK_SYNC_OFFSET          1110
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES      1200 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1201
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1202
@@ -80,8 +83,9 @@
 // Memory Section - 1xxx
 
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE       1010
-#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED       1020
-#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS        1030
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_OOM_KILL        1020
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED       1030
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS        1040
 #define NETDATA_CHART_PRIO_MEM_KERNEL                 1100
 #define NETDATA_CHART_PRIO_MEM_SLAB                   1200
 #define NETDATA_CHART_PRIO_MEM_HUGEPAGES              1250
@@ -102,15 +106,16 @@
 // Disks
 
 #define NETDATA_CHART_PRIO_DISK_IO                    2000
-#define NETDATA_CHART_PRIO_DISK_OPS                   2001
-#define NETDATA_CHART_PRIO_DISK_QOPS                  2002
-#define NETDATA_CHART_PRIO_DISK_BACKLOG               2003
-#define NETDATA_CHART_PRIO_DISK_UTIL                  2004
-#define NETDATA_CHART_PRIO_DISK_AWAIT                 2005
-#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2006
-#define NETDATA_CHART_PRIO_DISK_SVCTM                 2007
-#define NETDATA_CHART_PRIO_DISK_MOPS                  2021
-#define NETDATA_CHART_PRIO_DISK_IOTIME                2022
+#define NETDATA_CHART_PRIO_DISK_OPS                   2010
+#define NETDATA_CHART_PRIO_DISK_QOPS                  2015
+#define NETDATA_CHART_PRIO_DISK_BACKLOG               2020
+#define NETDATA_CHART_PRIO_DISK_BUSY                  2030
+#define NETDATA_CHART_PRIO_DISK_UTIL                  2040
+#define NETDATA_CHART_PRIO_DISK_AWAIT                 2050
+#define NETDATA_CHART_PRIO_DISK_AVGSZ                 2060
+#define NETDATA_CHART_PRIO_DISK_SVCTM                 2070
+#define NETDATA_CHART_PRIO_DISK_MOPS                  2080
+#define NETDATA_CHART_PRIO_DISK_IOTIME                2090
 #define NETDATA_CHART_PRIO_BCACHE_CACHE_ALLOC         2120
 #define NETDATA_CHART_PRIO_BCACHE_HIT_RATIO           2120
 #define NETDATA_CHART_PRIO_BCACHE_RATES               2121
@@ -123,36 +128,58 @@
 #define NETDATA_CHART_PRIO_DISKSPACE_SPACE            2023
 #define NETDATA_CHART_PRIO_DISKSPACE_INODES           2024
 
+// MDSTAT
+
+#define NETDATA_CHART_PRIO_MDSTAT_HEALTH              2100
+#define NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT        2101
+#define NETDATA_CHART_PRIO_MDSTAT_DISKS               2102 // 5 charts per raid
+#define NETDATA_CHART_PRIO_MDSTAT_MISMATCH            2103
+#define NETDATA_CHART_PRIO_MDSTAT_OPERATION           2104
+#define NETDATA_CHART_PRIO_MDSTAT_FINISH              2105
+#define NETDATA_CHART_PRIO_MDSTAT_SPEED               2106
+
+// Filesystem
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_CLEAN       2150
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_COUNT    2151
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_BYTES    2152
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EBYTES   2153
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_FSYNC    2154
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EFSYNC   2155
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_OPEN     2156
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EOPEN    2157
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_CREATE   2158
+#define NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_ECREATE  2159
+
 // NFS (server)
 
-#define NETDATA_CHART_PRIO_NFSD_READCACHE             2100
-#define NETDATA_CHART_PRIO_NFSD_FILEHANDLES           2101
-#define NETDATA_CHART_PRIO_NFSD_IO                    2102
-#define NETDATA_CHART_PRIO_NFSD_THREADS               2103
-#define NETDATA_CHART_PRIO_NFSD_THREADS_FULLCNT       2104
-#define NETDATA_CHART_PRIO_NFSD_THREADS_HISTOGRAM     2105
-#define NETDATA_CHART_PRIO_NFSD_READAHEAD             2105
-#define NETDATA_CHART_PRIO_NFSD_NET                   2107
-#define NETDATA_CHART_PRIO_NFSD_RPC                   2108
-#define NETDATA_CHART_PRIO_NFSD_PROC2                 2109
-#define NETDATA_CHART_PRIO_NFSD_PROC3                 2110
-#define NETDATA_CHART_PRIO_NFSD_PROC4                 2111
-#define NETDATA_CHART_PRIO_NFSD_PROC4OPS              2112
+#define NETDATA_CHART_PRIO_NFSD_READCACHE             2200
+#define NETDATA_CHART_PRIO_NFSD_FILEHANDLES           2201
+#define NETDATA_CHART_PRIO_NFSD_IO                    2202
+#define NETDATA_CHART_PRIO_NFSD_THREADS               2203
+#define NETDATA_CHART_PRIO_NFSD_THREADS_FULLCNT       2204
+#define NETDATA_CHART_PRIO_NFSD_THREADS_HISTOGRAM     2205
+#define NETDATA_CHART_PRIO_NFSD_READAHEAD             2205
+#define NETDATA_CHART_PRIO_NFSD_NET                   2207
+#define NETDATA_CHART_PRIO_NFSD_RPC                   2208
+#define NETDATA_CHART_PRIO_NFSD_PROC2                 2209
+#define NETDATA_CHART_PRIO_NFSD_PROC3                 2210
+#define NETDATA_CHART_PRIO_NFSD_PROC4                 2211
+#define NETDATA_CHART_PRIO_NFSD_PROC4OPS              2212
 
 // NFS (client)
 
-#define NETDATA_CHART_PRIO_NFS_NET                    2207
-#define NETDATA_CHART_PRIO_NFS_RPC                    2208
-#define NETDATA_CHART_PRIO_NFS_PROC2                  2209
-#define NETDATA_CHART_PRIO_NFS_PROC3                  2210
-#define NETDATA_CHART_PRIO_NFS_PROC4                  2211
+#define NETDATA_CHART_PRIO_NFS_NET                    2307
+#define NETDATA_CHART_PRIO_NFS_RPC                    2308
+#define NETDATA_CHART_PRIO_NFS_PROC2                  2309
+#define NETDATA_CHART_PRIO_NFS_PROC3                  2310
+#define NETDATA_CHART_PRIO_NFS_PROC4                  2311
 
 // BTRFS
 
-#define NETDATA_CHART_PRIO_BTRFS_DISK                 2300
-#define NETDATA_CHART_PRIO_BTRFS_DATA                 2301
-#define NETDATA_CHART_PRIO_BTRFS_METADATA             2302
-#define NETDATA_CHART_PRIO_BTRFS_SYSTEM               2303
+#define NETDATA_CHART_PRIO_BTRFS_DISK                 2400
+#define NETDATA_CHART_PRIO_BTRFS_DATA                 2401
+#define NETDATA_CHART_PRIO_BTRFS_METADATA             2402
+#define NETDATA_CHART_PRIO_BTRFS_SYSTEM               2403
 
 // ZFS
 
@@ -174,6 +201,8 @@
 #define NETDATA_CHART_PRIO_ZFS_LIST_HITS              2600
 #define NETDATA_CHART_PRIO_ZFS_HASH_ELEMENTS          2800
 #define NETDATA_CHART_PRIO_ZFS_HASH_CHAINS            2810
+
+#define NETDATA_CHART_PRIO_ZFS_POOL_STATE             2820
 
 
 // SOFTIRQs
@@ -279,8 +308,8 @@
 #define NETDATA_CHART_PRIO_TC_QOS                     7000
 #define NETDATA_CHART_PRIO_TC_QOS_PACKETS             7010
 #define NETDATA_CHART_PRIO_TC_QOS_DROPPED             7020
-#define NETDATA_CHART_PRIO_TC_QOS_TOCKENS             7030
-#define NETDATA_CHART_PRIO_TC_QOS_CTOCKENS            7040
+#define NETDATA_CHART_PRIO_TC_QOS_TOKENS              7030
+#define NETDATA_CHART_PRIO_TC_QOS_CTOKENS             7040
 
 // Infiniband
 #define NETDATA_CHART_PRIO_INFINIBAND                 7100
@@ -300,16 +329,6 @@
 #define NETDATA_CHART_PRIO_SYNPROXY_COOKIES           8752
 #define NETDATA_CHART_PRIO_SYNPROXY_CONN_OPEN         8753
 #define NETDATA_CHART_PRIO_SYNPROXY_ENTRIES           8754
-
-// MDSTAT
-
-#define NETDATA_CHART_PRIO_MDSTAT_HEALTH              9000
-#define NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT        9001
-#define NETDATA_CHART_PRIO_MDSTAT_DISKS               9002 // 5 charts per raid
-#define NETDATA_CHART_PRIO_MDSTAT_MISMATCH            9003
-#define NETDATA_CHART_PRIO_MDSTAT_OPERATION           9004
-#define NETDATA_CHART_PRIO_MDSTAT_FINISH              9005
-#define NETDATA_CHART_PRIO_MDSTAT_SPEED               9006
 
 // Linux Power Supply
 
@@ -337,6 +356,7 @@
 #define NETDATA_CHART_PRIO_CHECKS                    99999
 
 #define NETDATA_CHART_PRIO_NETDATA_DISKSPACE        132020
+#define NETDATA_CHART_PRIO_NETDATA_TIMEX            132030
 #define NETDATA_CHART_PRIO_NETDATA_TC_CPU           135000
 #define NETDATA_CHART_PRIO_NETDATA_TC_TIME          135001
 

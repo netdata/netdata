@@ -32,7 +32,7 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, char *chart_id, uuid_t *ret
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-/* Transform legacy UUID to be unique across hosts deterministacally */
+/* Transform legacy UUID to be unique across hosts deterministically */
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
@@ -49,7 +49,7 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
+void rrdeng_metric_init(RRDDIM *rd)
 {
     struct page_cache *pg_cache;
     struct rrdengine_instance *ctx;
@@ -68,7 +68,6 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
     pg_cache = &ctx->pg_cache;
 
     rrdeng_generate_legacy_uuid(rd->id, rd->rrdset->id, &legacy_uuid);
-    rd->state->metric_uuid = dim_uuid;
     if (host != localhost && host->rrdeng_ctx == &multidb_ctx)
         is_multihost_child = 1;
 
@@ -82,20 +81,17 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         /* First time we see the legacy UUID or metric belongs to child host in multi-host DB.
          * Drop legacy support, normal path */
 
-        if (unlikely(!rd->state->metric_uuid))
-            rd->state->metric_uuid = create_dimension_uuid(rd->rrdset, rd);
-
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t));
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t));
         if (likely(NULL != PValue)) {
             page_index = *PValue;
         }
         uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
         if (NULL == PValue) {
             uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, rd->state->metric_uuid, sizeof(uuid_t), PJE0);
+            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &rd->state->metric_uuid, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
-            *PValue = page_index = create_page_index(rd->state->metric_uuid);
+            *PValue = page_index = create_page_index(&rd->state->metric_uuid);
             page_index->prev = pg_cache->metrics_index.last_page_index;
             pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
@@ -106,15 +102,12 @@ void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid)
         rrdeng_convert_legacy_uuid_to_multihost(rd->rrdset->rrdhost->machine_guid, &legacy_uuid,
                                                 &multihost_legacy_uuid);
 
-        if (unlikely(!rd->state->metric_uuid))
-            rd->state->metric_uuid = mallocz(sizeof(uuid_t));
+        int need_to_store = uuid_compare(rd->state->metric_uuid, multihost_legacy_uuid);
 
-        int need_to_store = (dim_uuid == NULL || uuid_compare(*rd->state->metric_uuid, multihost_legacy_uuid));
-
-        uuid_copy(*rd->state->metric_uuid, multihost_legacy_uuid);
+        uuid_copy(rd->state->metric_uuid, multihost_legacy_uuid);
 
         if (unlikely(need_to_store))
-            (void)sql_store_dimension(rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
+            (void)sql_store_dimension(&rd->state->metric_uuid, rd->rrdset->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor,
                 rd->algorithm);
 
     }
@@ -359,7 +352,7 @@ static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
  *         reference dimension that that have different data collection intervals and overlap with the time range
  *         [start_time,end_time]. The caller must free (*region_info_arrayp) with freez(). If region_info_arrayp is set
  *         to NULL nothing was allocated.
- * @param max_intervalp is derefenced and set to be the largest data collection interval of all regions.
+ * @param max_intervalp is dereferenced and set to be the largest data collection interval of all regions.
  * @return number of regions with different data collection intervals.
  */
 unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
@@ -689,6 +682,36 @@ time_t rrdeng_metric_oldest_time(RRDDIM *rd)
     page_index = rd->state->page_index;
 
     return page_index->oldest_time / USEC_PER_SEC;
+}
+
+int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
+{
+    struct page_cache *pg_cache;
+    struct rrdengine_instance *ctx;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index = NULL;
+
+    ctx = get_rrdeng_ctx_from_host(localhost);
+    if (unlikely(!ctx)) {
+        error("Failed to fetch multidb context");
+        return 1;
+    }
+    pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, dim_uuid, sizeof(uuid_t));
+    if (likely(NULL != PValue)) {
+        page_index = *PValue;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (likely(page_index)) {
+        *first_entry_t = page_index->oldest_time / USEC_PER_SEC;
+        *last_entry_t = page_index->latest_time / USEC_PER_SEC;
+        return 0;
+    }
+
+    return 1;
 }
 
 /* Also gets a reference for the page */

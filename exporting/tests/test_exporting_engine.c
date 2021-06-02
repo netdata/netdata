@@ -17,6 +17,7 @@ char log_line[MAX_LOG_LINE + 1];
 BACKEND_OPTIONS global_backend_options = 0;
 const char *global_backend_source = "average";
 const char *global_backend_prefix = "netdata";
+const char *global_backend_send_charts_matching = "*";
 
 void init_connectors_in_tests(struct engine *engine)
 {
@@ -268,7 +269,7 @@ static void test_rrdset_is_exportable(void **state)
     assert_int_equal(__real_rrdset_is_exportable(instance, st), 1);
 
     assert_ptr_not_equal(st->exporting_flags, NULL);
-    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_SEND);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_EXPORTING_SEND);
 }
 
 static void test_false_rrdset_is_exportable(void **state)
@@ -285,7 +286,7 @@ static void test_false_rrdset_is_exportable(void **state)
     assert_int_equal(__real_rrdset_is_exportable(instance, st), 0);
 
     assert_ptr_not_equal(st->exporting_flags, NULL);
-    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_IGNORE);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_EXPORTING_IGNORE);
 }
 
 static void test_exporting_calculate_value_from_stored_data(void **state)
@@ -617,6 +618,7 @@ static void test_simple_connector_worker(void **state)
     simple_connector_data->buffer = buffer_create(0);
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
+    strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
@@ -625,8 +627,8 @@ static void test_simple_connector_worker(void **state)
     expect_string(__wrap_connect_to_one_of, destination, "localhost");
     expect_value(__wrap_connect_to_one_of, default_port, 2003);
     expect_not_value(__wrap_connect_to_one_of, reconnects_counter, 0);
-    expect_value(__wrap_connect_to_one_of, connected_to, 0);
-    expect_value(__wrap_connect_to_one_of, connected_to_size, 0);
+    expect_string(__wrap_connect_to_one_of, connected_to, "localhost");
+    expect_value(__wrap_connect_to_one_of, connected_to_size, CONNECTED_TO_MAX);
     will_return(__wrap_connect_to_one_of, 2);
 
     expect_function_call(__wrap_send);
@@ -993,9 +995,9 @@ static void test_can_send_rrdset(void **state)
 
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 1);
 
-    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_set(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, localhost->rrdset_root), 0);
-    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_clear(localhost->rrdset_root, RRDSET_FLAG_EXPORTING_IGNORE);
 
     // TODO: test with a denying simple pattern
 
@@ -1169,6 +1171,7 @@ static void test_prometheus_remote_write_prepare_header(void **state)
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->last_buffer->header = buffer_create(0);
     simple_connector_data->last_buffer->buffer = buffer_create(0);
+    strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
 

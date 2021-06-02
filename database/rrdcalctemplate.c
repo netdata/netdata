@@ -45,6 +45,9 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 }
 
 static inline int rrdcalctemplate_test_additional_restriction(RRDCALCTEMPLATE *rt, RRDSET *st) {
+    if (rt->charts_pattern && !simple_pattern_matches(rt->charts_pattern, st->name))
+        return 0;
+
     if (rt->family_pattern && !simple_pattern_matches(rt->family_pattern, st->family))
         return 0;
 
@@ -110,6 +113,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
 
     freez(rt->module_match);
     simple_pattern_free(rt->module_pattern);
+
+    freez(rt->charts_match);
+    simple_pattern_free(rt->charts_pattern);
 
     freez(rt->name);
     freez(rt->exec);

@@ -1,7 +1,7 @@
 FROM archlinux/base:latest
 
 # There is some redundancy between this file and the archlinux Dockerfile in the helper images
-# repo and also with the clean-install.Dockefile. Once the help image is availabled on Docker
+# repo and also with the clean-install.Dockerfile. Once the help image is available on Docker
 # Hub this file can be deleted.
 
 RUN pacman -Sy

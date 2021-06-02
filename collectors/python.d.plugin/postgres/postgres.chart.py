@@ -274,7 +274,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE backend_type IN ('client backend', 'background worker')
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -288,7 +288,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE query NOT LIKE 'autovacuum: %%'
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -302,7 +302,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE current_query NOT LIKE 'autovacuum: %%'
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -1200,6 +1200,9 @@ class Service(SimpleService):
 
         QUERY_STAT_REPLICATION[DEFAULT] = CREATE_STAT_QUERY(self.secondaries)
         self.queries[query_factory(QUERY_NAME_STAT_REPLICATION, self.server_version)] = METRICS[QUERY_NAME_STAT_REPLICATION]
+
+        if self.server_version >= 100000:
+            self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:

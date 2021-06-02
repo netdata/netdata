@@ -11,36 +11,44 @@ update_every = 10
 disabled_by_default = True
 
 
-def charts_template(sm):
+def charts_template(sm, alarm_status_chart_type='line'):
     order = [
         'alarms',
+        'values'
     ]
 
     mappings = ', '.join(['{0}={1}'.format(k, v) for k, v in sm.items()])
     charts = {
         'alarms': {
-            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'alarms', 'alarms.status', 'line'],
+            'options': [None, 'Alarms ({0})'.format(mappings), 'status', 'status', 'alarms.status', alarm_status_chart_type],
             'lines': [],
             'variables': [
                 ['alarms_num'],
             ]
+        },
+        'values': {
+            'options': [None, 'Alarm Values', 'value', 'value', 'alarms.value', 'line'],
+            'lines': [],
         }
     }
     return order, charts
 
 
 DEFAULT_STATUS_MAP = {'CLEAR': 0, 'WARNING': 1, 'CRITICAL': 2}
-
 DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
+DEFAULT_COLLECT_ALARM_VALUES = False
+DEFAULT_ALARM_STATUS_CHART_TYPE = 'line'
 
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.sm = self.configuration.get('status_map', DEFAULT_STATUS_MAP)
-        self.order, self.definitions = charts_template(self.sm)
+        self.alarm_status_chart_type = self.configuration.get('alarm_status_chart_type', DEFAULT_ALARM_STATUS_CHART_TYPE)
+        self.order, self.definitions = charts_template(self.sm, self.alarm_status_chart_type)
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.collected_alarms = set()
+        self.collect_alarm_values = bool(self.configuration.get('collect_alarm_values', DEFAULT_COLLECT_ALARM_VALUES))
+        self.collected_dims = {'alarms': set(), 'values': set()}
 
     def _get_data(self):
         raw_data = self._get_raw_data()
@@ -51,21 +59,26 @@ class Service(UrlService):
         alarms = raw_data.get('alarms', {})
 
         data = {a: self.sm[alarms[a]['status']] for a in alarms if alarms[a]['status'] in self.sm}
-        self.update_charts(alarms, data)
+        self.update_charts('alarms', data)
         data['alarms_num'] = len(data)
+
+        if self.collect_alarm_values:
+            data_values = {'{}_value'.format(a): alarms[a]['value'] * 100 for a in alarms if 'value' in alarms[a] and alarms[a]['value'] is not None}
+            self.update_charts('values', data_values, divisor=100)
+            data.update(data_values)
 
         return data
 
-    def update_charts(self, alarms, data):
+    def update_charts(self, chart, data, algorithm='absolute', multiplier=1, divisor=1):
         if not self.charts:
             return
 
-        for a in data:
-            if a not in self.collected_alarms:
-                self.collected_alarms.add(a)
-                self.charts['alarms'].add_dimension([a, a, 'absolute', '1', '1'])
+        for dim in data:
+            if dim not in self.collected_dims[chart]:
+                self.collected_dims[chart].add(dim)
+                self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
 
-        for a in list(self.collected_alarms):
-            if a not in alarms:
-                self.collected_alarms.remove(a)
-                self.charts['alarms'].del_dimension(a, hide=False)
+        for dim in list(self.collected_dims[chart]):
+            if dim not in data:
+                self.collected_dims[chart].remove(dim)
+                self.charts[chart].del_dimension(dim, hide=False)

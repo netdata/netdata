@@ -4,20 +4,12 @@ on:
   push:
     branches:
       - master
-    paths:
-      - '.github/workflows/docker.yml'
-      - 'netdata-installer.sh'
-      - 'packaging/**'
   pull_request:
-    paths:
-      - '.github/workflows/docker.yml'
-      - 'netdata-installer.sh'
-      - 'packaging/**'
   workflow_dispatch:
     inputs:
       version:
         name: Version Tag
-        default: latest
+        default: nightly
         required: true
 jobs:
   docker-build:
@@ -26,11 +18,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Determine if we should push changes and which tags to use
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
         run: |
           echo "publish=true" >> $GITHUB_ENV
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,netdata/netdata:${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" >> $GITHUB_ENV
       - name: Determine if we should push changes and which tags to use
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == 'nightly'
         run: |
@@ -57,3 +51,28 @@ jobs:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64
           push: ${{ env.publish }}
           tags: ${{ env.tags }}
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER:
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker Build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Docker image build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}
+      - name: Trigger Helmchart PR
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/helmchart
+          workflow: Agent Version PR
+          ref: refs/heads/master
+          inputs: '{"agent_version": "${{ github.event.inputs.version }}"}'

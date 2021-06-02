@@ -130,7 +130,7 @@ update_every=${minimum_update_frequency} # this will be overwritten by the comma
 charts_create="_create"
 charts_update="_update"
 charts_check="_check"
-charts_undescore="_"
+charts_underscore="_"
 
 # when making iterations, charts.d can loop more frequently
 # to prevent plugins missing iterations.
@@ -345,7 +345,7 @@ float2int() {
 	[ -z "${a}" ] && a="0"
 
 	# strip leading zeros from the integer part
-	# base 10 convertion
+	# base 10 conversion
 	a=$((10#$a))
 
 	# check the length of the decimal part
@@ -361,7 +361,7 @@ float2int() {
 	fi
 
 	# strip leading zeros from the decimal part
-	# base 10 convertion
+	# base 10 conversion
 	b=$((10#$b))
 
 	# store the result
@@ -467,9 +467,9 @@ all_enabled_charts() {
 		# check its config
 		#if [ -f "$userconfd/$chart.conf" ]
 		#then
-		#   if [ ! -z "$( cat "$userconfd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
+		#   if [ ! -z "$( cat "$userconfd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_underscore" )" ]
 		#   then
-		#       error "module's $chart config $userconfd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
+		#       error "module's $chart config $userconfd/$chart.conf should only have lines starting with $chart$charts_underscore . Disabling it."
 		#       continue
 		#   fi
 		#fi

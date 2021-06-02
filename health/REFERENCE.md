@@ -47,9 +47,10 @@ to the same chart, Netdata will use the alarm.
 
 Netdata parses the following lines. Beneath the table is an in-depth explanation of each line's purpose and syntax.
 
--   The `on` and `lookup` lines are **always required**.
--   Each entity **must** have one of the following lines: `calc`, `warn`, or `crit`.
 -   The `alarm` or `template` line must be the first line of any entity.
+-   The `on` line is **always required**.
+-   The `every` line is **required** if not using `lookup`.
+-   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
     `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
     more examples.
@@ -58,10 +59,14 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
 | [`alarm`/`template`](#alarm-line-alarm-or-template) | yes             | Name of the alarm/template.                                                           |
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
+| [`class`](#alarm-line-class)                        | no              | The general classification of the alarm.                                              |
+| [`component`](#alarm-line-component)                | no              | Specify the component of the class of the alarm.                                      |
+| [`type`](#alarm-line-type)                          | no              | The type of error the alarm monitors.                                                 |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
 | [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
 | [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
+| [`charts`](#alarm-line-charts)                      | no              | Restrict an alarm or template to only certain charts.                                             |
 | [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
@@ -72,7 +77,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`exec`](#alarm-line-exec)                          | no              | The script to execute when the alarm changes status.                                  |
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
-| [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
+| [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
 | [`host labels`](#alarm-line-host-labels)            | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
@@ -129,6 +134,67 @@ You're interested in what comes after the comma: `disk.io`. That's the name of t
 
 If you create a template using the `disk.io` context, it will apply an alarm to every disk available on your system.
 
+#### Alarm line `class`
+
+Specify the classification of the alarm or template. 
+
+Class can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` class, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc. Example:
+
+```yaml
+class: Database
+```
+<details>
+<summary>Netdata's stock alarms use the following `class` attributes by default, but feel free to adjust for your own requirements.</summary>
+
+| Class                    | Description                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Ad Filtering             | Services related to Ad Filtering (like pi-hole)                                                  |
+| Certificates             | Certificates monitoring related                                                                  |
+| Cgroups                  | Alerts for cpu and memory usage of control groups                                                |
+| Computing                | Alerts for shared computing applications (e.g. boinc)                                            |
+| Containers               | Container related alerts (e.g. docker instances)                                                 |
+| Database                 | Database systems (e.g. MySQL, Postgress, etc)                                                    |
+| Data Sharing             | Used to group together alerts for data sharing applications                                      |
+| DHCP                     | Alerts for dhcp related services                                                                 |
+| DNS                      | Alerts for dns related services                                                                  |
+| Kubernetes               | Alerts for kubernetes nodes monitoring                                                           |
+| KV Storage               | Key-Value pairs services alerts (e.g. memcached)                                                 |
+| Linux                    | Services specific to Linux (e.g. systemd)                                                        |
+| Messaging                | Alerts for message passing services (e.g. vernemq)                                               |
+| Netdata                  | Internal Netdata components monitoring                                                           |
+| Other                    | Use as a general class of alerts                                                                 |
+| Power Supply             | Alerts from power supply related services (e.g. apcupsd)                                         |
+| Search engine            | Alerts for search services (e.g. elasticsearch)                                                  |
+| Storage                  | Class for alerts dealing with storage services (storage devices typically live under `System`)   |
+| System                   | General system alarms (e.g. cpu, network, etc.)                                                  |
+| Virtual Machine          | Virtual Machine software                                                                         |
+| Web Proxy                | Web proxy software (e.g. squid)                                                                  |
+| Web Server               | Web server software (e.g. Apache, ngnix, etc.)                                                   |
+| Windows                  | Alerts for monitor of wmi services                                                               |
+
+</details>
+
+If an alarm configuration is missing the `class` line, its value will default to `Unknown`.
+
+#### Alarm line `component`
+
+Component can be used to narrow down what the previous `class` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` classification. Example:
+
+```yaml
+component: MySQL
+```
+As with the `class` line, if `component` is missing from the configuration, its value will default to `Unknown`.
+
+#### Alarm line `type`
+
+This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues in network interfaces, web servers, or database systems. Example:
+
+```yaml
+type: Latency
+```
+
+`type` will also (as with `class` and `component`) default to `Unknown` if the line is missing from the alarm configuration.
+
 #### Alarm line `os`
 
 The alarm or template will be used only if the operating system of the host matches this list specified in `os`. The
@@ -175,6 +241,19 @@ example, you can create an alarm that applies only on the `isc_dhcpd` module sta
 ```yaml
 plugin: python.d.plugin
 module: isc_dhcpd
+```
+
+#### Alarm line `charts`
+
+The `charts` line filters which chart this alarm should apply to. It is only available on entities using the 
+[`template`](#alarm-line-alarm-or-template) line.
+The value is a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alarms:
+
+```yaml
+template: disk_svctm_alarm
+      on: disk.svctm
+  charts: !*sdb* *
 ```
 
 #### Alarm line `families`
@@ -386,12 +465,12 @@ repeat: [off] [warning DURATION] [critical DURATION]
 -   `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
     notification for CRITICAL mode.
 
-#### Alarm line `option`
+#### Alarm line `options`
 
-The only possible value for the `option` line is
+The only possible value for the `options` line is
 
 ```yaml
-option: no-clear-notification
+options: no-clear-notification
 ```
 
 For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an

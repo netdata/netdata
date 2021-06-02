@@ -6,11 +6,10 @@ sidebar_label: "SMA Sunny WebBox"
 
 # SMA Sunny WebBox monitoring with Netdata
 
-[SMA Sunny Webbox](http://files.sma.de/dl/4253/WEBBOX-DUS131916W.pdf)
+Montiroing for the [SMA Sunny
+WebBox](https://www.sma-sunny.com/en/questions-and-answers-on-discontinuation-of-the-sunny-webbox/).
 
-Example Netdata configuration for node.d/sma_webbox.conf
-
-The module supports any number of name servers, like this:
+The module supports any number of name servers:
 
 ```json
 {

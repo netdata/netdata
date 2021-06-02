@@ -31,7 +31,7 @@ RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
     strncpyz(tmp.machine_guid, guid, GUID_LEN);
     tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
 
-    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl *) &tmp);
+    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl_t *) &tmp);
 }
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
@@ -53,8 +53,8 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
     return NULL;
 }
 
-#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl *)(rrdhost))
-#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl *)(rrdhost))
+#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
+#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl_t *)(rrdhost))
 
 
 // ----------------------------------------------------------------------------
@@ -88,13 +88,20 @@ static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
     freez(old);
 }
 
-static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone) {
-    if(host->timezone && timezone && !strcmp(host->timezone, timezone))
+static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
+    if (host->timezone && timezone && !strcmp(host->timezone, timezone) && host->abbrev_timezone && abbrev_timezone &&
+        !strcmp(host->abbrev_timezone, abbrev_timezone) && host->utc_offset == utc_offset)
         return;
 
     void *old = (void *)host->timezone;
     host->timezone = strdupz((timezone && *timezone)?timezone:"unknown");
     freez(old);
+
+    old = (void *)host->abbrev_timezone;
+    host->abbrev_timezone = strdupz((abbrev_timezone && *abbrev_timezone) ? abbrev_timezone : "UTC");
+    freez(old);
+
+    host->utc_offset = utc_offset;
 }
 
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
@@ -105,7 +112,8 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 
 void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *hostname,
                          const char *registry_hostname, const char *guid, const char *os, const char *tags,
-                         const char *tzone, const char *program_name, const char *program_version)
+                         const char *tzone, const char *abbrev_tzone, int32_t utc_offset, const char *program_name,
+                         const char *program_version)
 {
 
     host->rrd_update_every = update_every;
@@ -116,7 +124,7 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
     rrdhost_init_machine_guid(host, guid);
 
     rrdhost_init_os(host, os);
-    rrdhost_init_timezone(host, tzone);
+    rrdhost_init_timezone(host, tzone, abbrev_tzone, utc_offset);
     rrdhost_init_tags(host, tags);
 
     host->program_name = strdupz((program_name && *program_name) ? program_name : "unknown");
@@ -133,6 +141,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *guid,
                         const char *os,
                         const char *timezone,
+                        const char *abbrev_timezone,
+                        int32_t utc_offset,
                         const char *tags,
                         const char *program_name,
                         const char *program_version,
@@ -160,7 +170,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
     set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, hostname, registry_hostname, guid, os,
-                        tags, timezone, program_name, program_version);
+                        tags, timezone, abbrev_timezone, utc_offset, program_name, program_version);
 
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
@@ -298,15 +308,17 @@ RRDHOST *rrdhost_create(const char *hostname,
         return NULL;
     }
 
+    if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
+        int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
+        if (unlikely(rc))
+            error_report("Failed to store machine GUID to the database");
+        sql_load_node_id(host);
+    }
+    else
+        error_report("Host machine GUID %s is not valid", host->machine_guid);
+
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
-            int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
-            if (unlikely(rc))
-                error_report("Failed to store machine GUID to the database");
-        }
-        else
-            error_report("Host machine GUID %s is not valid", host->machine_guid);
         char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
@@ -333,6 +345,11 @@ RRDHOST *rrdhost_create(const char *hostname,
 
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
+#endif
+    }
+    else {
+#ifdef ENABLE_DBENGINE
+        host->rrdeng_ctx = &multidb_ctx;
 #endif
     }
 
@@ -401,6 +418,8 @@ void rrdhost_update(RRDHOST *host
                     , const char *guid
                     , const char *os
                     , const char *timezone
+                    , const char *abbrev_timezone
+                    , int32_t utc_offset
                     , const char *tags
                     , const char *program_name
                     , const char *program_version
@@ -428,7 +447,7 @@ void rrdhost_update(RRDHOST *host
     host->system_info = system_info;
 
     rrdhost_init_os(host, os);
-    rrdhost_init_timezone(host, timezone);
+    rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
 
     freez(host->registry_hostname);
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
@@ -503,6 +522,8 @@ RRDHOST *rrdhost_find_or_create(
         , const char *guid
         , const char *os
         , const char *timezone
+        , const char *abbrev_timezone
+        , int32_t utc_offset
         , const char *tags
         , const char *program_name
         , const char *program_version
@@ -534,6 +555,8 @@ RRDHOST *rrdhost_find_or_create(
                 , guid
                 , os
                 , timezone
+                , abbrev_timezone
+                , utc_offset
                 , tags
                 , program_name
                 , program_version
@@ -556,6 +579,8 @@ RRDHOST *rrdhost_find_or_create(
            , guid
            , os
            , timezone
+           , abbrev_timezone
+           , utc_offset
            , tags
            , program_name
            , program_version
@@ -582,8 +607,8 @@ RRDHOST *rrdhost_find_or_create(
 
     return host;
 }
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
-    if(host != protected
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now) {
+    if(host != protected_host
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && host->receiver
@@ -594,14 +619,14 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t n
     return 0;
 }
 
-void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected) {
+void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected_host) {
     time_t now = now_realtime_sec();
 
     RRDHOST *host;
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected, now)) {
+        if(rrdhost_should_be_removed(host, protected_host, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST)
@@ -629,11 +654,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
-#ifdef ENABLE_DBENGINE
     if (unlikely(sql_init_database())) {
-        return 1;
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            fatal("Failed to initialize SQLite");
+        info("Skipping SQLITE metadata initialization since memory mode is not db engine");
     }
-#endif
 
     health_init();
 
@@ -647,6 +672,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
             , registry_get_this_machine_guid()
             , os_type
             , netdata_configured_timezone
+            , netdata_configured_abbrev_timezone
+            , netdata_configured_utc_offset
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , program_name
             , program_version
@@ -682,7 +709,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         rrdhost_free(localhost);
         localhost = NULL;
         rrd_unlock();
-        return 1;
+        fatal("Failed to initialize dbengine");
     }
 #endif
     rrd_unlock();
@@ -876,6 +903,7 @@ void rrdhost_free(RRDHOST *host) {
     free_label_list(host->labels.head);
     freez((void *)host->os);
     freez((void *)host->timezone);
+    freez((void *)host->abbrev_timezone);
     freez(host->program_version);
     freez(host->program_name);
     rrdhost_system_info_free(host->system_info);
@@ -893,6 +921,7 @@ void rrdhost_free(RRDHOST *host) {
     netdata_rwlock_destroy(&host->labels.labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
+    freez(host->node_id);
 
     freez(host);
 
@@ -985,6 +1014,8 @@ static struct label *rrdhost_load_auto_labels(void)
     if (localhost->system_info->is_k8s_node)
         label_list =
             add_label_to_list(label_list, "_is_k8s_node", localhost->system_info->is_k8s_node, LABEL_SOURCE_AUTO);
+
+    label_list = add_aclk_host_labels(label_list);
 
     label_list = add_label_to_list(
         label_list, "_is_parent", (localhost->next || configured_as_parent()) ? "true" : "false", LABEL_SOURCE_AUTO);
@@ -1386,7 +1417,7 @@ restart_after_removal:
                         uint8_t can_delete_metric = rd->state->collect_ops.finalize(rd);
                         if (can_delete_metric) {
                             /* This metric has no data and no references */
-                            delete_dimension_uuid(rd->state->metric_uuid);
+                            delete_dimension_uuid(&rd->state->metric_uuid);
                             rrddim_free(st, rd);
                             if (unlikely(!last)) {
                                 rd = st->dimensions;

@@ -37,11 +37,8 @@ EXTRA_DIST = \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
     README.md \
-    CONTRIBUTORS.md \
-    CODE_OF_CONDUCT.md \
     LICENSE \
     REDISTRIBUTED.md \
-    CONTRIBUTING.md \
     $(NULL)
 
 SUBDIRS = \
@@ -55,37 +52,35 @@ dist_noinst_DATA = \
     cppcheck.sh \
     configs.signatures \
     contrib \
+    docs \
+    mqtt_websockets \
     netdata.cppcheck \
     netdata.spec \
     package.json \
-    docs \
-    packaging/version \
-    packaging/dashboard.version \
-    packaging/dashboard.checksums \
-    packaging/go.d.version \
-    packaging/go.d.checksums \
-    packaging/jsonc.version \
-    packaging/jsonc.checksums \
-    packaging/judy.version \
-    packaging/judy.checksums \
-    packaging/libwebsockets.version \
-    packaging/libwebsockets.checksums \
-    packaging/mosquitto.version \
-    packaging/mosquitto.checksums \
-    packaging/bundle-dashboard.sh \
     packaging/bundle-ebpf.sh \
     packaging/bundle-judy.sh \
     packaging/bundle-libbpf.sh \
+    packaging/bundle-lws.sh \
     packaging/bundle-mosquitto.sh \
     packaging/check-kernel-config.sh \
-    packaging/libbpf.checksums \
-    packaging/libbpf.version \
     packaging/ebpf.checksums \
     packaging/ebpf.version \
-    packaging/bundle-lws.sh \
+    packaging/go.d.checksums \
+    packaging/go.d.version \
     packaging/installer/README.md \
     packaging/installer/UNINSTALL.md \
     packaging/installer/UPDATE.md \
+    packaging/jsonc.checksums \
+    packaging/jsonc.version \
+    packaging/judy.checksums \
+    packaging/judy.version \
+    packaging/libbpf.checksums \
+    packaging/libbpf.version \
+    packaging/libwebsockets.checksums \
+    packaging/libwebsockets.version \
+    packaging/mosquitto.checksums \
+    packaging/mosquitto.version \
+    packaging/version \
     $(NULL)
 
 # until integrated within build
@@ -116,10 +111,14 @@ SUBDIRS += \
     web \
     claim \
     parser \
-    aclk/legacy \
     spawn \
     $(NULL)
 
+if !ACLK_NG
+SUBDIRS += \
+    aclk/legacy \
+    $(NULL)
+endif
 
 AM_CFLAGS = \
     $(OPTIONAL_MATH_CFLAGS) \
@@ -249,6 +248,11 @@ DISKSPACE_PLUGIN_FILES = \
     collectors/diskspace.plugin/plugin_diskspace.c \
     $(NULL)
 
+TIMEX_PLUGIN_FILES = \
+    collectors/timex.plugin/plugin_timex.h \
+    collectors/timex.plugin/plugin_timex.c \
+    $(NULL)
+
 FREEIPMI_PLUGIN_FILES = \
     collectors/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
@@ -281,10 +285,20 @@ PERF_PLUGIN_FILES = \
 
 EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf.c \
+    collectors/ebpf.plugin/ebpf_cachestat.c \
+    collectors/ebpf.plugin/ebpf_cachestat.h \
+    collectors/ebpf.plugin/ebpf_dcstat.c \
+    collectors/ebpf.plugin/ebpf_dcstat.h \
     collectors/ebpf.plugin/ebpf_process.c \
     collectors/ebpf.plugin/ebpf_process.h \
     collectors/ebpf.plugin/ebpf_socket.c \
     collectors/ebpf.plugin/ebpf_socket.h \
+    collectors/ebpf.plugin/ebpf_sync.c \
+    collectors/ebpf.plugin/ebpf_sync.h \
+    collectors/ebpf.plugin/ebpf_swap.c \
+    collectors/ebpf.plugin/ebpf_swap.h \
+    collectors/ebpf.plugin/ebpf_vfs.c \
+    collectors/ebpf.plugin/ebpf_vfs.h \
     collectors/ebpf.plugin/ebpf.h \
     collectors/ebpf.plugin/ebpf_apps.c \
     collectors/ebpf.plugin/ebpf_apps.h \
@@ -374,14 +388,14 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/sqlite/sqlite_functions.c \
+    database/sqlite/sqlite_functions.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
     $(NULL)
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
-        database/sqlite/sqlite_functions.c \
-        database/sqlite/sqlite_functions.h \
-        database/sqlite/sqlite3.c \
-        database/sqlite/sqlite3.h \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
         database/engine/rrddiskprotocol.h \
@@ -523,6 +537,41 @@ PARSER_FILES = \
     parser/parser.h \
     $(NULL)
 
+if ACLK_NG
+ACLK_FILES = \
+    aclk/aclk.c \
+    aclk/aclk.h \
+    aclk/aclk_util.c \
+    aclk/aclk_util.h \
+    aclk/aclk_stats.c \
+    aclk/aclk_stats.h \
+    aclk/aclk_query.c \
+    aclk/aclk_query.h \
+    aclk/aclk_query_queue.c \
+    aclk/aclk_query_queue.h \
+    aclk/aclk_collector_list.c \
+    aclk/aclk_collector_list.h \
+    aclk/aclk_otp.c \
+    aclk/aclk_otp.h \
+    aclk/aclk_tx_msgs.c \
+    aclk/aclk_tx_msgs.h \
+    aclk/aclk_rx_msgs.c \
+    aclk/aclk_rx_msgs.h \
+    aclk/https_client.c \
+    aclk/https_client.h \
+    mqtt_websockets/src/mqtt_wss_client.c \
+    mqtt_websockets/src/include/mqtt_wss_client.h \
+    mqtt_websockets/src/mqtt_wss_log.c \
+    mqtt_websockets/src/include/mqtt_wss_log.h \
+    mqtt_websockets/src/ws_client.c \
+    mqtt_websockets/src/include/ws_client.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer.c \
+    mqtt_websockets/c-rbuf/include/ringbuffer.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
+    mqtt_websockets/MQTT-C/src/mqtt.c \
+    mqtt_websockets/MQTT-C/include/mqtt.h \
+    $(NULL)
+else #ACLK_NG
 ACLK_FILES = \
     aclk/legacy/aclk_rrdhost_state.h \
     aclk/legacy/aclk_common.c \
@@ -546,9 +595,8 @@ ACLK_FILES += \
     aclk/legacy/aclk_lws_https_client.c \
     aclk/legacy/aclk_lws_https_client.h \
     $(NULL)
-endif
-
-
+endif #ENABLE_ACLK
+endif #ACLK_NG
 
 SPAWN_PLUGIN_FILES = \
     spawn/spawn.c \
@@ -630,6 +678,8 @@ DAEMON_FILES = \
     daemon/daemon.h \
     daemon/global_statistics.c \
     daemon/global_statistics.h \
+    daemon/analytics.c \
+    daemon/analytics.h \
     daemon/main.c \
     daemon/main.h \
     daemon/signals.c \
@@ -678,6 +728,7 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
+        $(TIMEX_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -699,7 +750,7 @@ NETDATA_COMMON_LIBS = \
     $(NULL)
 
 if LINK_STATIC_JSONC
-    NETDATA_COMMON_LIBS += externaldeps/jsonc/libjson-c.a
+    NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a
 endif
 
 NETDATACLI_FILES = \
@@ -712,18 +763,21 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
-if ENABLE_ACLK
+
 netdata_LDADD = \
-    externaldeps/mosquitto/libmosquitto.a \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+
+if !ACLK_NG
+if ENABLE_ACLK
+netdata_LDADD += \
+    $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-else
-netdata_LDADD = \
-    $(NETDATA_COMMON_LIBS) \
-    $(NULL)
-endif
+endif #ENABLE_ACLK
+endif #ACLK_NG
 
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@

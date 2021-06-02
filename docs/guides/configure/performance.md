@@ -155,6 +155,12 @@ All the settings are found in the `[global]` section of `netdata.conf`:
     dbengine multihost disk space = 256
 ```
 
+Metric retention is not important in certain use cases, such as:
+ - Data collection nodes stream collected metrics collected to a centralization point.
+ - Data collection nodes export their metrics to another time series DB, or are scraped by Prometheus
+ - Netdata installed only during incidents, to get richer information.
+In such cases, you may not want to use the dbengine at all and instead opt for memory mode `memory mode = ram` or `memory mode = none`.
+
 ## Run Netdata behind Nginx
 
 A dedicated web server like Nginx provides far more robustness than the Agent's internal [web server](/web/README.md).

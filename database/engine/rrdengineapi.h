@@ -36,7 +36,7 @@ extern void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN +
                                                     uuid_t *ret_uuid);
 
 
-extern void rrdeng_metric_init(RRDDIM *rd, uuid_t *dim_uuid);
+extern void rrdeng_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd);
 extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number);
@@ -59,5 +59,6 @@ extern int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *db
 
 extern int rrdeng_exit(struct rrdengine_instance *ctx);
 extern void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
+extern int rrdeng_metric_latest_time_by_uuid(uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

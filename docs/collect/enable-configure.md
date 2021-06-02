@@ -32,7 +32,8 @@ Within this file, you can either disable the orchestrator entirely (`enabled: ye
 enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata daemon reads it on
 start.
 
-After you make your changes, restart the Agent with `service netdata restart`.
+After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 ## Configure a collector
 
@@ -51,7 +52,8 @@ according to your needs. In addition, every collector's documentation shows the 
 configure that collector. Uncomment any line you change to ensure the collector's orchestrator or the Netdata daemon
 read it on start.
 
-After you make your changes, restart the Agent with `service netdata restart`.
+After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 ## What's next?
 

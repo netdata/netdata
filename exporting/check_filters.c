@@ -50,21 +50,21 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 
     RRDSET_FLAGS *flags = &st->exporting_flags[instance->index];
 
-    if(unlikely(*flags & RRDSET_FLAG_BACKEND_IGNORE))
+    if(unlikely(*flags & RRDSET_FLAG_EXPORTING_IGNORE))
         return 0;
 
-    if(unlikely(!(*flags & RRDSET_FLAG_BACKEND_SEND))) {
+    if(unlikely(!(*flags & RRDSET_FLAG_EXPORTING_SEND))) {
         // we have not checked this chart
         if(simple_pattern_matches(instance->config.charts_pattern, st->id) || simple_pattern_matches(instance->config.charts_pattern, st->name))
-            *flags |= RRDSET_FLAG_BACKEND_SEND;
+            *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
-            *flags |= RRDSET_FLAG_BACKEND_IGNORE;
+            *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
             debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, host->hostname);
             return 0;
         }
     }
 
-    if(unlikely(!rrdset_is_available_for_backends(st))) {
+    if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, host->hostname);
         return 0;
     }

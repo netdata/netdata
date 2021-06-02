@@ -68,6 +68,23 @@ Following charts are drawn:
 
     -   locks
 
+12. **Standby delta** KB
+
+    - sent delta
+    - write delta
+    - flush delta
+    - replay delta
+
+13. **Standby lag** seconds
+
+    - write lag
+    - flush lag
+    - replay lag
+
+14. **Average number of blocking transactions in db** processes
+
+    - blocking
+
 ## Configuration
 
 Edit the `python.d/postgres.conf` configuration file using `edit-config` from the Netdata [config

@@ -55,7 +55,7 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
-static inline char *strip_control_characters(char *url) {
+char *strip_control_characters(char *url) {
     char *s = url;
     if(!s) return "";
 
@@ -1374,34 +1374,25 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         uint32_t hash = simple_hash(tok);
 
         host = rrdhost_find_by_hostname(tok, hash);
-        if(!host) host = rrdhost_find_by_guid(tok, hash);
-
-#ifdef ENABLE_DBENGINE
-        int release_host = 0;
+        if (!host)
+            host = rrdhost_find_by_guid(tok, hash);
         if (!host) {
             host = sql_create_host_by_uuid(tok);
             if (likely(host)) {
-                rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
-                release_host = 1;
-            }
-        }
-        if(host) {
-            int rc = web_client_process_url(host, w, url);
-            if (release_host) {
+                int rc = web_client_process_url(host, w, url);
                 freez(host->hostname);
-                freez((char *) host->os);
-                freez((char *) host->tags);
-                freez((char *) host->timezone);
+                freez((char *)host->os);
+                freez((char *)host->tags);
+                freez((char *)host->timezone);
                 freez(host->program_name);
                 freez(host->program_version);
                 freez(host->registry_hostname);
+                freez(host->system_info);
                 freez(host);
+                return rc;
             }
-            return rc;
         }
-#else
         if (host) return web_client_process_url(host, w, url);
-#endif
     }
 
     buffer_flush(w->response.data);

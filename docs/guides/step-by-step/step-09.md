@@ -62,7 +62,8 @@ metrics your Agent collects, and more.
     dbengine disk space = 512
 ```
 
-After you've made your changes, [restart Netdata](/docs/getting-started.md#start-stop-and-restart-netdata).
+After you've made your changes, restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 To confirm the database engine is working, go to your Netdata dashboard and click on the **Netdata Monitoring** menu on
 the right-hand side. You can find `dbengine` metrics after `queries`.
@@ -142,9 +143,10 @@ Add the following section to the file:
     collection = netdata_metrics
 ```
 
-[Restart](/docs/getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB exporting connector.
-Click on the **Netdata Monitoring** menu and check out the **exporting my mongo instance** sub-menu. You should start
-seeing these charts fill up with data about the exporting process!
+Restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system, to enable the MongoDB exporting connector. Click on the
+**Netdata Monitoring** menu and check out the **exporting my mongo instance** sub-menu. You should start seeing these
+charts fill up with data about the exporting process!
 
 ![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
 

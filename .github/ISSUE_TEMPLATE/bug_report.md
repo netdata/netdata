@@ -1,6 +1,6 @@
 ---
 name: "Bug report: Netdata Agent"
-about: Submit a report and help us improve our free and open-source Netdata Agent
+about: "Submit a report and help us improve our free and open-source Netdata Agent"
 labels: bug, needs triage
 ---
 
@@ -11,9 +11,11 @@ When creating a bug report please:
 -->
 
 ##### Bug report summary
+
 <!-- Provide a clear and concise description of the bug you're experiencing. -->
 
 ##### OS / Environment
+
 <!--
 Provide as much information about your environment (which operating system and distribution you're using, if Netdata is running in a container, etc.)
 as possible to allow us reproduce this bug faster.
@@ -25,19 +27,30 @@ To get this information, execute the following commands based on your operating 
 
 Place the output from the command in the code section below.  
  -->
+
 ```
 
 ```
 
 ##### Netdata version
+
 <!--
+Provide output of `netdata -W buildinfo`.
+
+If your Netdata Agent is older, and doesn't support buildinfo, do the following:
 Provide output of `netdata -V`.
  
 If Netdata is running, execute: $(ps aux | grep -E -o "[a-zA-Z/]+netdata ") -V
  -->
- 
+
+##### Installation method
+
+<!--
+Tell us which installation method you used (https://learn.netdata.cloud/docs/agent/packaging/installer#alternative-methods).
+ -->
 
 ##### Component Name
+
 <!--
 Let us know which component is affected by the bug. Our code is structured according to its component,
 so the component name is the same as the top level directory of the repository.
@@ -45,6 +58,7 @@ For example, a bug in the dashboard would be under the web component.
 -->
 
 ##### Steps To Reproduce
+
 <!--
 Describe how you found this bug and how we can reproduce it, preferably with a minimal test-case scenario.
 If you'd like to attach larger files, use gist.github.com and paste in links.
@@ -54,4 +68,5 @@ If you'd like to attach larger files, use gist.github.com and paste in links.
 2. ...
 
 ##### Expected behavior
+
 <!-- Provide a clear and concise description of what you expected to happen. -->

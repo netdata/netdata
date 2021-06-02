@@ -28,14 +28,14 @@
 /* Data structures */
 
 /* One element of the AVL tree */
-typedef struct avl {
-    struct avl *avl_link[2];  /* Subtrees. */
+typedef struct avl_element {
+    struct avl_element *avl_link[2];  /* Subtrees. */
     signed char avl_balance;       /* Balance factor. */
-} avl;
+} avl_t;
 
 /* An AVL tree */
 typedef struct avl_tree_type {
-    avl *root;
+    avl_t *root;
     int (*compar)(void *a, void *b);
 } avl_tree_type;
 
@@ -59,23 +59,23 @@ typedef struct avl_tree_lock {
  * a is linked directly to the tree, so it has to
  * be properly allocated by the caller.
  */
-avl *avl_insert_lock(avl_tree_lock *tree, avl *item) NEVERNULL WARNUNUSED;
-avl *avl_insert(avl_tree_type *tree, avl *item) NEVERNULL WARNUNUSED;
+avl_t *avl_insert_lock(avl_tree_lock *tree, avl_t *item) NEVERNULL WARNUNUSED;
+avl_t *avl_insert(avl_tree_type *tree, avl_t *item) NEVERNULL WARNUNUSED;
 
 /* Remove an element a from the AVL tree t
  * returns a pointer to the removed element
  * or NULL if an element equal to a is not found
  * (equal as returned by t->compar())
  */
-avl *avl_remove_lock(avl_tree_lock *tree, avl *item) WARNUNUSED;
-avl *avl_remove(avl_tree_type *tree, avl *item) WARNUNUSED;
+avl_t *avl_remove_lock(avl_tree_lock *tree, avl_t *item) WARNUNUSED;
+avl_t *avl_remove(avl_tree_type *tree, avl_t *item) WARNUNUSED;
 
 /* Find the element into the tree that equal to a
  * (equal as returned by t->compar())
  * returns NULL is no element is equal to a
  */
-avl *avl_search_lock(avl_tree_lock *tree, avl *item);
-avl *avl_search(avl_tree_type *tree, avl *item);
+avl_t *avl_search_lock(avl_tree_lock *tree, avl_t *item);
+avl_t *avl_search(avl_tree_type *tree, avl_t *item);
 
 /* Initialize the avl_tree_lock
  */

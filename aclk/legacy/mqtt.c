@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <libnetdata/json/json.h>
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "mqtt.h"
 #include "aclk_lws_wss_client.h"
 #include "aclk_stats.h"
@@ -55,7 +55,7 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc)
     UNUSED(obj);
     UNUSED(rc);
 
-    info("Connection to cloud estabilished");
+    info("Connection to cloud established");
     aclk_connect();
 
     return;
@@ -75,7 +75,7 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     }
     aclk_disconnect();
 
-    aclk_lws_wss_mqtt_layer_disconect_notif();
+    aclk_lws_wss_mqtt_layer_disconnect_notif();
 
     return;
 }
@@ -170,7 +170,7 @@ static int _mqtt_create_connection(char *username, char *password)
 
     int rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
-        error("Failed to tune the thread model for libmoquitto (%s)", mosquitto_strerror(rc));
+        error("Failed to tune the thread model for libmosquitto (%s)", mosquitto_strerror(rc));
 
 #if defined(LIBMOSQUITTO_VERSION_NUMBER) >= 1006000
     rc = mosquitto_int_option(mosq, MQTT_PROTOCOL_V311, 0);

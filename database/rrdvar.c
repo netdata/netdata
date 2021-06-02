@@ -27,7 +27,7 @@ int rrdvar_compare(void* a, void* b) {
 }
 
 static inline RRDVAR *rrdvar_index_add(avl_tree_lock *tree, RRDVAR *rv) {
-    RRDVAR *ret = (RRDVAR *)avl_insert_lock(tree, (avl *)(rv));
+    RRDVAR *ret = (RRDVAR *)avl_insert_lock(tree, (avl_t *)(rv));
     if(ret != rv)
         debug(D_VARIABLES, "Request to insert RRDVAR '%s' into index failed. Already exists.", rv->name);
 
@@ -35,7 +35,7 @@ static inline RRDVAR *rrdvar_index_add(avl_tree_lock *tree, RRDVAR *rv) {
 }
 
 static inline RRDVAR *rrdvar_index_del(avl_tree_lock *tree, RRDVAR *rv) {
-    RRDVAR *ret = (RRDVAR *)avl_remove_lock(tree, (avl *)(rv));
+    RRDVAR *ret = (RRDVAR *)avl_remove_lock(tree, (avl_t *)(rv));
     if(!ret)
         error("Request to remove RRDVAR '%s' from index failed. Not Found.", rv->name);
 
@@ -47,7 +47,7 @@ static inline RRDVAR *rrdvar_index_find(avl_tree_lock *tree, const char *name, u
     tmp.name = (char *)name;
     tmp.hash = (hash)?hash:simple_hash(tmp.name);
 
-    return (RRDVAR *)avl_search_lock(tree, (avl *)&tmp);
+    return (RRDVAR *)avl_search_lock(tree, (avl_t *)&tmp);
 }
 
 inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {

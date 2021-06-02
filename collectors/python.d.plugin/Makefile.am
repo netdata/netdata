@@ -48,6 +48,7 @@ include beanstalk/Makefile.inc
 include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
+include changefinder/Makefile.inc
 include chrony/Makefile.inc
 include couchdb/Makefile.inc
 include dnsdist/Makefile.inc
@@ -109,6 +110,7 @@ include uwsgi/Makefile.inc
 include varnish/Makefile.inc
 include w1sensor/Makefile.inc
 include web_log/Makefile.inc
+include zscores/Makefile.inc
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \

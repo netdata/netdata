@@ -54,9 +54,9 @@ case "$1" in
     chown -R root:netdata /usr/libexec/netdata/plugins.d
     chown -R root:netdata /var/lib/netdata/www
     setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin
+    setcap cap_dac_read_search+ep /usr/libexec/netdata/plugins.d/slabinfo.plugin
+    setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin || setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin
 
-    chmod 4750 /usr/libexec/netdata/plugins.d/perf.plugin
-    chmod 4750 /usr/libexec/netdata/plugins.d/slabinfo.plugin
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network
     chmod 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin
 

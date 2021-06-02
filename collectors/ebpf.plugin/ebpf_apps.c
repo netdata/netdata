@@ -265,7 +265,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  * @param path the directory to search apps_%s.conf
  * @param file the word to complement the file name.
  *
- * @return It returns 0 on succcess and -1 otherwise
+ * @return It returns 0 on success and -1 otherwise
  */
 int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
 {
@@ -470,7 +470,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
 /**
  * Get PID entry
  *
- * Get or allocate the PID entry for the specifid pid.
+ * Get or allocate the PID entry for the specified pid.
  *
  * @param pid the pid to search the data.
  *
@@ -664,7 +664,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
  * @param pid the current pid that we are working
  * @param ptr a NULL value
  *
- * @return It returns 1 on succcess and 0 otherwise
+ * @return It returns 1 on success and 0 otherwise
  */
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
@@ -910,6 +910,44 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
+ * Cleanup variable from other threads
+ *
+ * @param pid current pid.
+ */
+void cleanup_variables_from_other_threads(uint32_t pid)
+{
+    // Clean socket structures
+    if (socket_bandwidth_curr) {
+        freez(socket_bandwidth_curr[pid]);
+        socket_bandwidth_curr[pid] = NULL;
+    }
+
+    // Clean cachestat strcture
+    if (cachestat_pid) {
+        freez(cachestat_pid[pid]);
+        cachestat_pid[pid] = NULL;
+    }
+
+    // Clean directory cache structure
+    if (dcstat_pid) {
+        freez(dcstat_pid[pid]);
+        dcstat_pid[pid] = NULL;
+    }
+
+    // Clean swap structure
+    if (swap_pid) {
+        freez(swap_pid[pid]);
+        swap_pid[pid] = NULL;
+    }
+
+    // Clean vfs structure
+    if (vfs_pid) {
+        freez(vfs_pid[pid]);
+        vfs_pid[pid] = NULL;
+    }
+}
+
+/**
  * Remove PIDs when they are not running more.
  */
 void cleanup_exited_pids()
@@ -923,7 +961,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-            del_pid_entry(r);
 
             // Clean process structure
             freez(global_process_stats[r]);
@@ -931,14 +968,10 @@ void cleanup_exited_pids()
 
             freez(current_apps_data[r]);
             current_apps_data[r] = NULL;
-            prev_apps_data[r] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[r]);
-                socket_bandwidth_curr[r] = NULL;
-                socket_bandwidth_prev[r] = NULL;
-            }
+            cleanup_variables_from_other_threads(r);
+
+            del_pid_entry(r);
         } else {
             if (unlikely(p->keep))
                 p->keeploops++;
@@ -1055,14 +1088,8 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
             freez(current_apps_data[key]);
             current_apps_data[key] = NULL;
-            prev_apps_data[key] = NULL;
 
-            // Clean socket structures
-            if (socket_bandwidth_curr) {
-                freez(socket_bandwidth_curr[key]);
-                socket_bandwidth_curr[key] = NULL;
-                socket_bandwidth_prev[key] = NULL;
-            }
+            cleanup_variables_from_other_threads(key);
 
             pids = pids->next;
             continue;

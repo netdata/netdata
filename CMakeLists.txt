@@ -458,6 +458,11 @@ set(DISKSPACE_PLUGIN_FILES
         collectors/diskspace.plugin/plugin_diskspace.c
         )
 
+set(TIMEX_PLUGIN_FILES
+        collectors/timex.plugin/plugin_timex.h
+        collectors/timex.plugin/plugin_timex.c
+        )
+
 set(FREEIPMI_PLUGIN_FILES
         collectors/freeipmi.plugin/freeipmi_plugin.c
         )
@@ -481,10 +486,20 @@ set(SLABINFO_PLUGIN_FILES
 set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf.c
         collectors/ebpf.plugin/ebpf.h
+        collectors/ebpf.plugin/ebpf_cachestat.c
+        collectors/ebpf.plugin/ebpf_cachestat.h
+        collectors/ebpf.plugin/ebpf_dcstat.c
+        collectors/ebpf.plugin/ebpf_dcstat.h
         collectors/ebpf.plugin/ebpf_process.c
         collectors/ebpf.plugin/ebpf_process.h
         collectors/ebpf.plugin/ebpf_socket.c
         collectors/ebpf.plugin/ebpf_socket.h
+        collectors/ebpf.plugin/ebpf_sync.c
+        collectors/ebpf.plugin/ebpf_sync.h
+        collectors/ebpf.plugin/ebpf_swap.c
+        collectors/ebpf.plugin/ebpf_swap.h
+        collectors/ebpf.plugin/ebpf_vfs.c
+        collectors/ebpf.plugin/ebpf_vfs.h
         collectors/ebpf.plugin/ebpf_apps.c
         collectors/ebpf.plugin/ebpf_apps.h
         )
@@ -819,6 +834,8 @@ set(DAEMON_FILES
         daemon/daemon.h
         daemon/global_statistics.c
         daemon/global_statistics.h
+        daemon/analytics.c
+        daemon/analytics.h
         daemon/main.c
         daemon/main.h
         daemon/signals.c
@@ -980,6 +997,7 @@ IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
+            ${TIMEX_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )

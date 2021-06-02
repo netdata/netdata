@@ -28,6 +28,13 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
+    analytics_free_data();
+
+    char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
@@ -50,6 +57,7 @@ void netdata_cleanup_and_exit(int ret) {
         rrdeng_exit(&multidb_ctx);
 #endif
     }
+    sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
@@ -62,10 +70,12 @@ void netdata_cleanup_and_exit(int ret) {
     security_clean_openssl();
 #endif
     info("EXIT: all done - netdata is now exiting - bye bye...");
+    (void) unlink(agent_incomplete_shutdown_file);
     exit(ret);
 }
 
 struct netdata_static_thread static_threads[] = {
+    NETDATA_PLUGIN_HOOK_GLOBAL_STATISTICS
 
     NETDATA_PLUGIN_HOOK_CHECKS
     NETDATA_PLUGIN_HOOK_FREEBSD
@@ -74,13 +84,14 @@ struct netdata_static_thread static_threads[] = {
     // linux internal plugins
     NETDATA_PLUGIN_HOOK_LINUX_PROC
     NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
+    NETDATA_PLUGIN_HOOK_LINUX_TIMEX
     NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
     NETDATA_PLUGIN_HOOK_LINUX_TC
 
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
-#ifdef ENABLE_ACLK
+#if defined(ENABLE_ACLK) || defined(ACLK_NG)
     NETDATA_ACLK_HOOK
 #endif
 
@@ -92,6 +103,7 @@ struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_PLUGINSD
     NETDATA_PLUGIN_HOOK_HEALTH
+    NETDATA_PLUGIN_HOOK_ANALYTICS
 
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };
@@ -376,32 +388,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-// TODO: Remove this function with the nix major release.
-void remove_option(int opt_index, int *argc, char **argv) {
-    int i;
-
-    // remove the options.
-    do {
-        *argc = *argc - 1;
-        for(i = opt_index; i < *argc; i++) {
-            argv[i] = argv[i+1];
-        }
-        i = opt_index;
-    } while(argv[i][0] != '-' && opt_index >= *argc);
-}
-
-static const char *verify_required_directory(const char *dir) {
-    if(chdir(dir) == -1)
-        fatal("Cannot cd to directory '%s'", dir);
-
-    DIR *d = opendir(dir);
-    if(!d)
-        fatal("Cannot examine the contents of directory '%s'", dir);
-    closedir(d);
-
-    return dir;
-}
-
 #ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
@@ -556,7 +542,6 @@ static void get_netdata_configured_variables() {
     // get default memory mode for the database
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
-
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
@@ -581,7 +566,11 @@ static void get_netdata_configured_variables() {
         error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
         default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
     }
-
+#else
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use memory mode ram instead.");
+       default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    }
 #endif
     // ------------------------------------------------------------------------
 
@@ -603,147 +592,6 @@ static void get_netdata_configured_variables() {
     get_system_pid_max();
 
 
-}
-
-static void get_system_timezone(void) {
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
-    if(!tz || !*tz)
-        setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
-
-    char buffer[FILENAME_MAX + 1] = "";
-    const char *timezone = NULL;
-    ssize_t ret;
-
-    // use the TZ variable
-    if(tz && *tz && *tz != ':') {
-        timezone = tz;
-        // info("TIMEZONE: using TZ variable '%s'", timezone);
-    }
-
-    // use the contents of /etc/timezone
-    if(!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
-        timezone = buffer;
-        // info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
-    }
-
-    // read the link /etc/localtime
-    if(!timezone) {
-        ret = readlink("/etc/localtime", buffer, FILENAME_MAX);
-
-        if(ret > 0) {
-            buffer[ret] = '\0';
-
-            char   *cmp    = "/usr/share/zoneinfo/";
-            size_t cmp_len = strlen(cmp);
-
-            char *s = strstr(buffer, cmp);
-            if (s && s[cmp_len]) {
-                timezone = &s[cmp_len];
-                // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
-            }
-        }
-        else
-            buffer[0] = '\0';
-    }
-
-    // find the timezone from strftime()
-    if(!timezone) {
-        time_t t;
-        struct tm *tmp, tmbuf;
-
-        t = now_realtime_sec();
-        tmp = localtime_r(&t, &tmbuf);
-
-        if (tmp != NULL) {
-            if(strftime(buffer, FILENAME_MAX, "%Z", tmp) == 0)
-                buffer[0] = '\0';
-            else {
-                buffer[FILENAME_MAX] = '\0';
-                timezone = buffer;
-                // info("TIMEZONE: using strftime(): '%s'", timezone);
-            }
-        }
-    }
-
-    if(timezone && *timezone) {
-        // make sure it does not have illegal characters
-        // info("TIMEZONE: fixing '%s'", timezone);
-
-        size_t len = strlen(timezone);
-        char tmp[len + 1];
-        char *d = tmp;
-        *d = '\0';
-
-        while(*timezone) {
-            if(isalnum(*timezone) || *timezone == '_' || *timezone == '/')
-                *d++ = *timezone++;
-            else
-                timezone++;
-        }
-        *d = '\0';
-        strncpyz(buffer, tmp, len);
-        timezone = buffer;
-        // info("TIMEZONE: fixed as '%s'", timezone);
-    }
-
-    if(!timezone || !*timezone)
-        timezone = "unknown";
-
-    netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
-}
-
-void set_global_environment() {
-    {
-        char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
-        setenv("NETDATA_UPDATE_EVERY", b, 1);
-    }
-
-    setenv("NETDATA_VERSION"          , program_version, 1);
-    setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
-    setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
-    setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_primary_plugins_dir),      1);
-    setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
-    setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
-    setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
-    setenv("NETDATA_LOCK_DIR"         , netdata_configured_lock_dir, 1);
-    setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
-    setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
-    setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
-
-    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
-    int clean = 0;
-    if (!default_port) {
-        default_port = strdupz("19999");
-        clean = 1;
-    }
-
-    setenv("NETDATA_LISTEN_PORT"      , default_port, 1);
-    if(clean)
-        freez(default_port);
-
-    get_system_timezone();
-
-    // set the path we need
-    char path[1024 + 1], *p = getenv("PATH");
-    if(!p) p = "/bin:/usr/bin";
-    snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", config_get(CONFIG_SECTION_PLUGINS, "PATH environment variable", path), 1);
-
-    // python options
-    p = getenv("PYTHONPATH");
-    if(!p) p = "";
-    setenv("PYTHONPATH", config_get(CONFIG_SECTION_PLUGINS, "PYTHONPATH environment variable", p), 1);
-
-    // disable buffering for python plugins
-    setenv("PYTHONUNBUFFERED", "1", 1);
-
-    // switch to standard locale for plugins
-    setenv("LC_ALL", "C", 1);
 }
 
 static int load_netdata_conf(char *filename, char overwrite_used) {
@@ -828,47 +676,6 @@ int get_system_info(struct rrdhost_system_info *system_info) {
     return 0;
 }
 
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    static char *as_script;
-
-    if (netdata_anonymous_statistics_enabled == -1) {
-        char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
-        sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
-        if (likely(access(optout_file, R_OK) != 0)) {
-            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
-            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-            if (unlikely(access(as_script, R_OK) != 0)) {
-               netdata_anonymous_statistics_enabled=0;
-               info("Anonymous statistics script %s not found.",as_script);
-               freez(as_script);
-            } else {
-               netdata_anonymous_statistics_enabled=1;
-            }
-        } else {
-            netdata_anonymous_statistics_enabled = 0;
-            as_script = NULL;
-        }
-        freez(optout_file);
-    }
-    if(!netdata_anonymous_statistics_enabled) return;
-    if (!action) return;
-    if (!action_result) action_result="";
-    if (!action_data) action_data="";
-    char *command_to_run=mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + 10));
-    pid_t command_pid;
-
-    sprintf(command_to_run,"%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
-    info("%s", command_to_run);
-
-    FILE *fp = mypopen(command_to_run, &command_pid);
-    if(fp) {
-        char buffer[100 + 1];
-        while (fgets(buffer, 100, fp) != NULL);
-        mypclose(fp, command_pid);
-    }
-    freez(command_to_run);
-}
-
 void set_silencers_filename() {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
@@ -915,34 +722,6 @@ int main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
-    // parse depercated options
-    // TODO: Remove this block with the next major release.
-    {
-        i = 1;
-        while(i < argc) {
-            if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
-                strncpyz(pidfile, argv[i+1], FILENAME_MAX);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
-                dont_fork = 1;
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "host access prefix", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
-                config_set(CONFIG_SECTION_GLOBAL, "history", argv[i+1]);
-                fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else i++;
-        }
-    }
     if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
         // don't run netdata, this is the spawn server
         spawn_server();
@@ -1101,21 +880,21 @@ int main(int argc, char **argv) {
                                 return 1;
                             }
 
-                            const char *heystack = argv[optind];
+                            const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
                             char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(heystack, NULL, SIMPLE_PATTERN_EXACT);
+                            SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT);
                             int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
                             if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 0;
                             }
                             else {
-                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
+                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
                                 return 1;
                             }
                         }
@@ -1256,6 +1035,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "buildinfo") == 0) {
                             printf("Version: %s %s\n", program_name, program_version);
                             print_build_info();
+                            return 0;
+                        }
+                        else if(strcmp(optarg, "buildinfojson") == 0) {
+                            print_build_info_json();
                             return 0;
                         }
                         else {
@@ -1428,7 +1211,7 @@ int main(int argc, char **argv) {
 
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
-    // initialyze internal registry
+    // initialize internal registry
     registry_init();
     // fork the spawn server
     spawn_init();
@@ -1450,6 +1233,17 @@ int main(int argc, char **argv) {
 
     if(rrd_init(netdata_configured_hostname, system_info))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    char agent_crash_file[FILENAME_MAX + 1];
+    char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
+    snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
+    int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
+    snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
+    int crash_detected = (unlink(agent_crash_file) == 0);
+    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+    if (fd >= 0)
+        close(fd);
+
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
@@ -1492,7 +1286,26 @@ int main(int argc, char **argv) {
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
 
+    set_late_global_environment();
+
     send_statistics("START", "-",  "-");
+    if (crash_detected)
+        send_statistics("CRASH", "-", "-");
+    if (incomplete_shutdown_detected)
+        send_statistics("INCOMPLETE_SHUTDOWN", "-", "-");
+
+    //check if ANALYTICS needs to start
+    if (netdata_anonymous_statistics_enabled == 1) {
+        for (i = 0; static_threads[i].name != NULL; i++) {
+            if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
+                struct netdata_static_thread *st = &static_threads[i];
+                st->thread = mallocz(sizeof(netdata_thread_t));
+                st->enabled = 1;
+                debug(D_SYSTEM, "Starting thread %s.", st->name);
+                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            }
+        }
+    }
 
     // ------------------------------------------------------------------------
     // Report ACLK build failure

@@ -18,9 +18,10 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 
 ## The Netdata config directory
 
-On most Linux systems, using our [recommended one-line installation](/docs/get/README.md#install-the-netdata-agent), the
-**Netdata config directory** is `/etc/netdata/`. The config directory contains several configuration files with the
-`.conf` extension, a few directories, and a shell script named `edit-config`.
+On most Linux systems, using our [recommended one-line
+installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended), the **Netdata config
+directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
+few directories, and a shell script named `edit-config`.
 
 > Some operating systems will use `/opt/netdata/etc/netdata/` as the config directory. If you're not sure where yours
 > is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname of
@@ -40,7 +41,7 @@ exist.
 - `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
 - Various configuration files ending in `.conf` for [configuring plugins or
   collectors](/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
-  `python.d.conf`, and `ebpf.conf`.
+  `python.d.conf`, and `ebpf.d.conf`.
 - Various directories ending in `.d`, which contain other configuration files, each ending in `.conf`, for [configuring
   specific collectors](/docs/collect/enable-configure.md#configure-a-collector).
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
@@ -112,7 +113,7 @@ You can edit any Netdata configuration file using `edit-config`. A few examples:
 
 ```bash
 ./edit-config apps_groups.conf
-./edit-config ebpf.conf
+./edit-config ebpf.d.conf
 ./edit-config health.d/load.conf
 ./edit-config go.d/prometheus.conf
 ```
@@ -158,7 +159,7 @@ You can also take what you've learned about node configuration to enable or enha
 
 ### Related reference documentation
 
-- [Netdata Agent · Daemon](/health/README.md)
+- [Netdata Agent · Daemon](/daemon/README.md)
 - [Netdata Agent · Health monitoring](/health/README.md)
 - [Netdata Agent · Notifications](/health/notifications/README.md)
 

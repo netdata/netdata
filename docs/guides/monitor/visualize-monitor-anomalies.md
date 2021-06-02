@@ -136,9 +136,6 @@ unsupervised anomaly detection, or would like to see something added to it. You 
 that works well for monitoring some other popular application, like MySQL, PostgreSQL, Redis, or anything else we
 [support through collectors](/collectors/COLLECTORS.md).
 
-In part 3 of this series on unsupervised anomaly detection using Netdata, we'll create a custom model to apply
-unsupervised anomaly detection to an entire mission-critical application. Stay tuned!
-
 ### Related reference documentation
 
 - [Netdata Agent · Anomalies collector](/collectors/python.d.plugin/anomalies/README.md)

@@ -3,7 +3,11 @@
 #define ACLK_LWS_HTTPS_CLIENT_INTERNAL
 #include "aclk_lws_https_client.h"
 
+#ifndef ACLK_NG
 #include "aclk_common.h"
+#else
+#include "../aclk.h"
+#endif
 
 #include "aclk_lws_wss_client.h"
 

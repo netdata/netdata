@@ -11,6 +11,7 @@ void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->machine_guid);
     freez(rpt->os);
     freez(rpt->timezone);
+    freez(rpt->abbrev_timezone);
     freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
@@ -30,7 +31,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         executed = 1;
         struct receiver_state *rpt = (struct receiver_state *) ptr;
         // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
-        // the host pointer as it is unpredicable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
+        // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
         if (netdata_exit && rpt->host) {
             rpt->exited = 1;
             return;
@@ -49,7 +50,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     }
 }
 
-#include "../collectors/plugins.d/pluginsd_parser.h"
+#include "collectors/plugins.d/pluginsd_parser.h"
 
 PARSER_RC streaming_timestamp(char **words, void *user, PLUGINSD_ACTION *plugins_action)
 {
@@ -123,13 +124,16 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
 
     if(strcmp(words[1], host->machine_guid)) {
         error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", words[1], host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewehere else
+        return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
     rrdhost_aclk_state_lock(host);
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
     host->aclk_state.claimed_id = strcmp(words[2], "NULL") ? strdupz(words[2]) : NULL;
+
+    store_claim_id(&host->host_uuid, host->aclk_state.claimed_id ? &uuid : NULL);
+
     rrdhost_aclk_state_unlock(host);
 
     rrdpush_claimed_id(host);
@@ -261,6 +265,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(mode)));
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "memory mode", rrd_memory_mode_name(mode)));
 
+#ifndef ENABLE_DBENGINE
+    if (unlikely(mode == RRD_MEMORY_MODE_DBENGINE)) {
+        close(rpt->fd);
+        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "REJECTED -- DBENGINE MEMORY MODE NOT SUPPORTED");
+        return 1;
+    }
+#endif
+
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->machine_guid, "health enabled", health_enabled);
 
@@ -296,6 +308,8 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 , rpt->machine_guid
                 , rpt->os
                 , rpt->timezone
+                , rpt->abbrev_timezone
+                , rpt->utc_offset
                 , rpt->tags
                 , rpt->program_name
                 , rpt->program_version
@@ -440,7 +454,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
-#ifdef ENABLE_ACLK
+#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)
@@ -454,7 +468,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
-#ifdef ENABLE_ACLK
+#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)

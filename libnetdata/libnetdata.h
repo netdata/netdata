@@ -118,6 +118,10 @@ extern "C" {
 #include <sys/statfs.h>
 #endif
 
+#ifdef HAVE_LINUX_MAGIC_H
+#include <linux/magic.h>
+#endif
+
 #ifdef HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
@@ -205,11 +209,7 @@ extern "C" {
 #define WARNUNUSED
 #endif
 
-#ifdef abs
-#undef abs
-#endif
-#define abs(x) (((x) < 0)? (-(x)) : (x))
-
+#define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
@@ -283,6 +283,7 @@ extern void recursive_config_double_dir_load(
         , size_t depth
 );
 extern char *read_by_filename(char *filename, long *file_size);
+extern char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
@@ -291,7 +292,8 @@ extern char *read_by_filename(char *filename, long *file_size);
 #endif
 #endif
 
-#define BITS_IN_A_KILOBIT 1000
+#define BITS_IN_A_KILOBIT     1000
+#define KILOBITS_IN_A_MEGABIT 1000
 
 /* misc. */
 #define UNUSED(x) (void)(x)
@@ -319,7 +321,7 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "dictionary/dictionary.h"
-#ifdef HAVE_LIBBPF
+#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
 #include "eval/eval.h"

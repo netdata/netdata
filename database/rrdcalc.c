@@ -91,6 +91,9 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
+                rc->classification,
+                rc->component,
+                rc->type,
                 rc->exec,
                 rc->recipient,
                 now - rc->last_status_change,
@@ -165,6 +168,9 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
+                rc->classification,
+                rc->component,
+                rc->type,
                 rc->exec,
                 rc->recipient,
                 now - rc->last_status_change,
@@ -428,6 +434,10 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     if(rt->units) rc->units = strdupz(rt->units);
     if(rt->info) rc->info = strdupz(rt->info);
 
+    if (rt->classification) rc->classification = strdupz(rt->classification);
+    if (rt->component) rc->component = strdupz(rt->component);
+    if (rt->type) rc->type = strdupz(rt->type);
+
     if(rt->calculation) {
         rc->calculation = expression_parse(rt->calculation->source, NULL, NULL);
         if(!rc->calculation)
@@ -472,7 +482,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
 
     rrdcalc_add_to_host(host, rc);
     if(!rt->foreachdim) {
-        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl_t *)rc);
         if (rdcmp != rc) {
             error("Cannot insert the alarm index ID %s",rc->name);
         }
@@ -535,6 +545,10 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     if(rc->units) newrc->units = strdupz(rc->units);
     if(rc->info) newrc->info = strdupz(rc->info);
 
+    if (rc->classification) newrc->classification = strdupz(rc->classification);
+    if (rc->component) newrc->component = strdupz(rc->component);
+    if (rc->type) newrc->type = strdupz(rc->type);
+
     if(rc->calculation) {
         newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
         if(!newrc->calculation)
@@ -573,6 +587,9 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
+    freez(rc->classification);
+    freez(rc->component);
+    freez(rc->type);
     simple_pattern_free(rc->spdim);
     freez(rc->labels);
     simple_pattern_free(rc->splabels);
@@ -605,17 +622,17 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
-    RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+    RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl_t *)rc);
     if (rdcmp) {
-        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl_t *)rc);
         if (!rdcmp) {
             error("Cannot remove the health alarm index from health_log");
         }
     }
 
-    rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_name, (avl *)rc);
+    rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_name, (avl_t *)rc);
     if (rdcmp) {
-        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl *)rc);
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl_t *)rc);
         if (!rdcmp) {
             error("Cannot remove the health alarm index from idx_name");
         }
@@ -727,7 +744,7 @@ void rrdcalc_labels_unlink() {
 int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC findme;
     findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl *)&findme);
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl_t *)&findme);
     if (!rc) {
         return 0;
     }
@@ -761,7 +778,7 @@ RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name,uint32_t hash) {
     RRDCALC findme;
     findme.name = alarm_name;
     findme.hash = hash;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name, (avl *)&findme);
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name, (avl_t *)&findme);
 
     return rc;
 }

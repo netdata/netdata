@@ -499,7 +499,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                 "temperature",
                 NULL,
                 "temperature",
-                "cpu.temperatute",
+                "cpu.temperature",
                 "Core temperature",
                 "Celsius",
                 "freebsd.plugin",
@@ -641,52 +641,58 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static int mib_hw_intrnames[2] = {0, 0};
             static char *intrnames = NULL;
 
-            size = nintr * (MAXCOMLEN + 1);
-            if (unlikely(nintr != old_nintr))
-                intrnames = reallocz(intrnames, size);
-            if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
+            if (unlikely(GETSYSCTL_SIZE("hw.intrnames", mib_hw_intrnames, size))) {
                 error("DISABLED: system.intr chart");
                 error("DISABLED: system.interrupts chart");
                 error("DISABLED: hw.intrcnt module");
                 return 1;
             } else {
+                if (unlikely(nintr != old_nintr))
+                    intrnames = reallocz(intrnames, size);
+                if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
+                    error("DISABLED: system.intr chart");
+                    error("DISABLED: system.interrupts chart");
+                    error("DISABLED: hw.intrcnt module");
+                    return 1;
+                } else {
 
-                // --------------------------------------------------------------------
+                    // --------------------------------------------------------------------
 
-                static RRDSET *st_interrupts = NULL;
+                    static RRDSET *st_interrupts = NULL;
 
-                if (unlikely(!st_interrupts))
-                    st_interrupts = rrdset_create_localhost(
-                            "system",
-                            "interrupts",
-                            NULL,
-                            "interrupts",
-                            NULL,
-                            "System interrupts",
-                            "interrupts/s",
-                            "freebsd.plugin",
-                            "hw.intrcnt",
-                            NETDATA_CHART_PRIO_SYSTEM_INTERRUPTS,
-                            update_every,
-                            RRDSET_TYPE_STACKED
-                    );
-                else
-                    rrdset_next(st_interrupts);
+                    if (unlikely(!st_interrupts))
+                        st_interrupts = rrdset_create_localhost(
+                                "system",
+                                "interrupts",
+                                NULL,
+                                "interrupts",
+                                NULL,
+                                "System interrupts",
+                                "interrupts/s",
+                                "freebsd.plugin",
+                                "hw.intrcnt",
+                                NETDATA_CHART_PRIO_SYSTEM_INTERRUPTS,
+                                update_every,
+                                RRDSET_TYPE_STACKED
+                        );
+                    else
+                        rrdset_next(st_interrupts);
 
-                for (i = 0; i < nintr; i++) {
-                    void *p;
+                    for (i = 0; i < nintr; i++) {
+                        void *p;
 
-                    p = intrnames + i * (MAXCOMLEN + 1);
-                    if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
-                        RRDDIM *rd_interrupts = rrddim_find_active(st_interrupts, p);
+                        p = intrnames + i * (strlen(intrnames) + 1);
+                        if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
+                            RRDDIM *rd_interrupts = rrddim_find_active(st_interrupts, p);
 
-                        if (unlikely(!rd_interrupts))
-                            rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                            if (unlikely(!rd_interrupts))
+                                rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                        rrddim_set_by_pointer(st_interrupts, rd_interrupts, intrcnt[i]);
+                            rrddim_set_by_pointer(st_interrupts, rd_interrupts, intrcnt[i]);
+                        }
                     }
+                    rrdset_done(st_interrupts);
                 }
-                rrdset_done(st_interrupts);
             }
         }
 
@@ -969,7 +975,7 @@ int do_system_ram(int update_every, usec_t dt) {
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
                mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
-    int vfs_bufspace_count;
+    size_t vfs_bufspace_count;
 
 #if defined(NETDATA_COLLECT_LAUNDRY)
     static int mib_laundry_count[4] = {0, 0, 0, 0};

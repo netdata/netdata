@@ -12,7 +12,8 @@
 #  - NETDATA_TARBALL_URL
 #  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
-#  - NETDATA_PREFIX / NETDATA_LIB_DIR (After 1.16.1 we will only depend on lib dir)
+#  - NETDATA_PREFIX
+#  - NETDATA_LIB_DIR
 #
 # Optional environment options:
 #
@@ -65,7 +66,7 @@ if [ "${ENVIRONMENT_FILE}" == "THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT" ]; t
 fi
 
 safe_sha256sum() {
-  # Within the contexct of the installer, we only use -c option that is common between the two commands
+  # Within the context of the installer, we only use -c option that is common between the two commands
   # We will have to reconsider if we start non-common options
   if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$@"
@@ -116,14 +117,14 @@ _cannot_use_tmpdir() {
 
 create_tmp_directory() {
   if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
-    TMPDIR="${NETDATA_TMPDIR_PATH}"
+    echo "${NETDATA_TMPDIR_PATH}"
   else
     if [ -z "${NETDATA_TMPDIR}" ] || _cannot_use_tmpdir "${NETDATA_TMPDIR}" ; then
       if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
         if _cannot_use_tmpdir /tmp ; then
           if _cannot_use_tmpdir "${PWD}" ; then
             echo >&2
-            echo >&2 "Unable to find a usable temprorary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
+            echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
             exit 1
           else
             TMPDIR="${PWD}"
@@ -204,7 +205,7 @@ self_update() {
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
-      exec ./netdata-updater.sh --not-running-from-cron --no-self-update --tmpdir-path "$(pwd)" 
+      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update --tmpdir-path "$(pwd)"
     else
       echo >&3 "Failed to download newest version of updater script, continuing with current version."
     fi
@@ -215,7 +216,7 @@ parse_version() {
   r="${1}"
   if echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
-    # XXX: Need a regex group subsitutation here.
+    # XXX: Need a regex group substitution here.
     r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
   fi
 
@@ -234,13 +235,11 @@ parse_version() {
 }
 
 get_latest_version() {
-  local latest
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4
   else
-    latest="$(download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout)"
+    download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout
   fi
-  parse_version "$latest"
 }
 
 set_tarball_urls() {
@@ -272,7 +271,9 @@ update() {
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
 
   current_version="$(command -v netdata > /dev/null && parse_version "$(netdata -v | cut -f 2 -d ' ')")"
-  latest_version="$(get_latest_version)"
+  latest_tag="$(get_latest_version)"
+  latest_version="$(parse_version "${latest_tag}")"
+  path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
 
   # If we can't get the current version for some reason assume `0`
   current_version="${current_version:-0}"
@@ -295,9 +296,9 @@ update() {
     NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
     tar -xf netdata-latest.tar.gz >&3 2>&3
     rm netdata-latest.tar.gz >&3 2>&3
-    cd netdata-* || exit 1
+    cd "$(find . -maxdepth 1 -name "netdata-${path_version}*" | head -n 1)" || exit 1
     RUN_INSTALLER=1
-    cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}" || exit 1
+    cd "${NETDATA_LOCAL_TARBALL_OVERRIDE}" || exit 1
   fi
 
   # We got the sources, run the update now
@@ -314,14 +315,22 @@ update() {
       do_not_start="--dont-start-it"
     fi
 
+    env="TMPDIR='${TMPDIR}'"
+
     if [ -n "${NETDATA_SELECTED_DASHBOARD}" ]; then
-      env="NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
+      env="${env} NETDATA_SELECTED_DASHBOARD=${NETDATA_SELECTED_DASHBOARD}"
     fi
 
     if [ ! -x ./netdata-installer.sh ]; then
       if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
         cd "$(find . -mindepth 1 -maxdepth 1 -type d)" || exit 1
       fi
+    fi
+
+    if [ -e "${NETDATA_PREFIX}/etc/netdata/.install-type" ] ; then
+      install_type="$(cat "${NETDATA_PREFIX}"/etc/netdata/.install-type)"
+    else
+      install_type="INSTALL_TYPE='legacy-build'"
     fi
 
     info "Re-installing netdata..."
@@ -332,6 +341,8 @@ update() {
 
     info "Updating tarball checksum info"
     echo "${NEW_CHECKSUM}" > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
+
+    echo "${install_type}" > "${NETDATA_PREFIX}/etc/netdata/.install-type"
   fi
 
   rm -rf "${ndtmpdir}" >&3 2>&3
@@ -360,7 +371,7 @@ while [ -n "${1}" ]; do
   fi
 done
 
-# Random sleep to aileviate stampede effect of Agents upgrading
+# Random sleep to alleviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
@@ -374,7 +385,7 @@ source "${ENVIRONMENT_FILE}" || exit 1
 # We dont expect to find lib dir variable on older installations, so load this path if none found
 export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
-# Source the tarbal checksum, if not already available from environment (for existing installations with the old logic)
+# Source the tarball checksum, if not already available from environment (for existing installations with the old logic)
 [[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
 
 # Grab the nightlies baseurl (defaulting to our Google Storage bucket)
@@ -410,7 +421,13 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
   download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
   if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somehere and can be resolved by simply retrying in an hour."
+    fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
+  fi
+
+  if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
+    install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
+  else
+    install_type="INSTALL_TYPE='legacy-static'"
   fi
 
   # Do not pass any options other than the accept, for now
@@ -420,6 +437,9 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   else
     echo >&2 "NOTE: did not remove: ${ndtmpdir}"
   fi
+
+  echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
+
   echo >&2 "Switching back to ${PREVDIR}"
   cd "${PREVDIR}" || exit 1
 else

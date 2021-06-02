@@ -2,17 +2,40 @@
 
 # Checks if netdata is running in a kubernetes pod and fetches that pod's labels
 
-if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ] && [ -n "${MY_POD_NAMESPACE}" ] && [ -n "${MY_POD_NAME}" ]; then
-	if command -v jq >/dev/null 2>&1; then
-			KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
-		URL="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$MY_POD_NAMESPACE/pods/$MY_POD_NAME"
-		curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" "$URL" |
-		jq -r '.metadata.labels' | grep ':' | tr -d '," '
-		exit 0
-	else
-		echo "jq command not available. Please install jq to get host labels for kubernetes pods."
-		exit 1
-	fi
-else
-	exit 0
+if [ -z "${KUBERNETES_SERVICE_HOST}" ] || [ -z "${KUBERNETES_PORT_443_TCP_PORT}" ] || [ -z "${MY_POD_NAMESPACE}" ] || [ -z "${MY_POD_NAME}" ]; then
+  exit 0
 fi
+
+if ! command -v jq > /dev/null 2>&1; then
+  echo "jq command not available. Please install jq to get host labels for kubernetes pods."
+  exit 1
+fi
+
+TOKEN="$(< /var/run/secrets/kubernetes.io/serviceaccount/token)"
+HEADER="Authorization: Bearer $TOKEN"
+HOST="$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT"
+
+URL="https://$HOST/api/v1/namespaces/$MY_POD_NAMESPACE/pods/$MY_POD_NAME"
+if ! POD_DATA=$(curl -sSk -H "$HEADER" "$URL" 2>&1); then
+  echo "error on curl '${URL}': ${POD_DATA}."
+  exit 1
+fi
+
+URL="https://$HOST/api/v1/namespaces/kube-system"
+if ! KUBE_SYSTEM_NS_DATA=$(curl -sSk -H "$HEADER" "$URL" 2>&1); then
+  echo "error on curl '${URL}': ${KUBE_SYSTEM_NS_DATA}."
+  exit 1
+fi
+
+if ! POD_LABELS=$(jq -r '.metadata.labels' <<< "$POD_DATA" | grep ':' | tr -d '," ' 2>&1); then
+  echo "error on 'jq' parse pod data: ${POD_LABELS}."
+  exit 1
+fi
+
+if ! KUBE_SYSTEM_NS_UID=$(jq -r '.metadata.uid' <<< "$KUBE_SYSTEM_NS_DATA" 2>&1); then
+  echo "error on 'jq' parse kube_system_ns: ${KUBE_SYSTEM_NS_UID}."
+  exit 1
+fi
+
+echo -e "$POD_LABELS\nk8s_cluster_id:$KUBE_SYSTEM_NS_UID"
+exit 0

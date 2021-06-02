@@ -107,7 +107,7 @@ typedef enum statsd_metric_type {
 
 
 typedef struct statsd_metric {
-    avl avl;                        // indexing - has to be first
+    avl_t avl;                      // indexing - has to be first
 
     const char *name;               // the name of the metric
     uint32_t hash;                  // hash of the name
@@ -153,7 +153,7 @@ typedef struct statsd_index {
 
     STATSD_METRIC *first;           // the linked list of metrics (new metrics are added in front)
     STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
-    STATSD_FIRST_PTR_MUTEX;         // when mutli-threading is enabled, a lock to protect the linked list
+    STATSD_FIRST_PTR_MUTEX;         // when multi-threading is enabled, a lock to protect the linked list
 
     STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
 } STATSD_INDEX;
@@ -182,7 +182,7 @@ typedef struct statsd_app_chart_dimension {
 
     SIMPLE_PATTERN *metric_pattern; // set when the 'metric' is a simple pattern
 
-    collected_number multiplier;    // the multipler of the dimension
+    collected_number multiplier;    // the multiplier of the dimension
     collected_number divisor;       // the divisor of the dimension
     RRDDIM_FLAGS flags;             // the RRDDIM flags for this dimension
 
@@ -376,7 +376,7 @@ static inline STATSD_METRIC *statsd_metric_index_find(STATSD_INDEX *index, const
     tmp.name = name;
     tmp.hash = (hash)?hash:simple_hash(tmp.name);
 
-    return (STATSD_METRIC *)STATSD_AVL_SEARCH(&index->index, (avl *)&tmp);
+    return (STATSD_METRIC *)STATSD_AVL_SEARCH(&index->index, (avl_t *)&tmp);
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, STATSD_METRIC_TYPE type) {
@@ -398,7 +398,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
             m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
             netdata_mutex_init(&m->histogram.ext->mutex);
         }
-        STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl *)m);
+        STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl_t *)m);
         if(unlikely(n != m)) {
             freez((void *)m->histogram.ext);
             freez((void *)m->name);
@@ -1340,7 +1340,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
 
                 char *dim_name      = words[i++];
                 char *type          = words[i++];
-                char *multipler     = words[i++];
+                char *multiplier    = words[i++];
                 char *divisor       = words[i++];
                 char *options       = words[i++];
 
@@ -1371,7 +1371,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                         , chart
                         , metric_name
                         , dim_name
-                        , (multipler && *multipler)?str2l(multipler):1
+                        , (multiplier && *multiplier)?str2l(multiplier):1
                         , (divisor && *divisor)?str2l(divisor):1
                         , flags
                         , string2valuetype(type, line, filename)
@@ -2418,7 +2418,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd"
             , "netdata.statsd_cpu"
-            , "NetData statsd charting thread CPU usage"
+            , "Netdata statsd charting thread CPU usage"
             , "milliseconds/s"
             , PLUGIN_STATSD_NAME
             , "stats"

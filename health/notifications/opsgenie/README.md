@@ -20,14 +20,17 @@ directory](/docs/configure/nodes.md):
 ./edit-config health_alarm_notify.conf
 ```
 
-Change the variable `OPSGENIE_API_KEY` with the API key you got from Opsgenie.
+Change the variable `OPSGENIE_API_KEY` with the API key you got from Opsgenie. `OPSGENIE_API_URL` defaults to
+`https://api.opsgenie.com`, however there are region-specific API URLs such as `https://eu.api.opsgenie.com`, so set
+this if required.
 
-```
+```conf
 SEND_OPSGENIE="YES"
 
 # Api key
-# Default Opsgenie APi
+# Default Opsgenie API
 OPSGENIE_API_KEY="11111111-2222-3333-4444-555555555555"
+OPSGENIE_API_URL=""
 ```
 
 Changes to `health_alarm_notify.conf` do not require a Netdata restart. You can test your Opsgenie notifications

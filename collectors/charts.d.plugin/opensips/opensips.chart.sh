@@ -31,6 +31,7 @@ opensips_check() {
   # try to find it in the system
   if [ -z "$opensips_cmd" ]; then
     require_cmd opensipsctl || return 1
+    opensips_cmd="$OPENSIPSCTL_CMD"
   fi
 
   # check once if the command works
@@ -158,7 +159,7 @@ opensips_update() {
   #    local opensips_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
   # 4. then execute this as a script with the eval
   #    be very carefull with eval:
-  #    prepare the script and always grep at the end the lines that are usefull, so that
+  #    prepare the script and always grep at the end the lines that are useful, so that
   #    even if something goes wrong, no other code can be executed
 
   unset \

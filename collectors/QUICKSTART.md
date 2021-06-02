@@ -104,8 +104,8 @@ parameters as a reference, to configure the collector.
 Most collectors are enabled and will auto-detect their app/service without manual configuration. However, you need to
 restart Netdata to trigger the auto-detection process.
 
-To restart Netdata on most systems, use `service netdata restart`. For other systems, see the [other restart
-methods](/docs/getting-started.md#start-stop-and-restart-netdata).
+To restart Netdata on most systems, use `sudo systemctl restart netdata`, or the [appropriate
+method](/docs/configure/start-stop-restart.md) for your system.
 
 Open Netdata's dashboard in your browser, or refresh the page if you already have it open. You should now see a new
 entry in the menu and new interactive charts!

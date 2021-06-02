@@ -4,7 +4,8 @@
 
 
 inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null) {
-    rrdset_check_rdlock(r->st);
+    if (r->st_needs_lock)
+        rrdset_check_rdlock(r->st);
 
     long c;
     RRDDIM *d;

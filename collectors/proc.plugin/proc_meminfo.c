@@ -10,6 +10,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     static procfile *ff = NULL;
     static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1, do_hugepages = -1, do_transparent_hugepages = -1;
+    static int do_percpu = 0;
 
     static ARL_BASE *arl_base = NULL;
     static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL;
@@ -49,6 +50,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             //VmallocTotal = 0,
             VmallocUsed = 0,
             //VmallocChunk = 0,
+            Percpu = 0,
             AnonHugePages = 0,
             ShmemHugePages = 0,
             HugePages_Total = 0,
@@ -106,6 +108,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         //arl_expect(arl_base, "VmallocTotal", &VmallocTotal);
         arl_expect(arl_base, "VmallocUsed", &VmallocUsed);
         //arl_expect(arl_base, "VmallocChunk", &VmallocChunk);
+        arl_expect(arl_base, "Percpu", &Percpu);
         arl_hwcorrupted = arl_expect(arl_base, "HardwareCorrupted", &HardwareCorrupted);
         arl_expect(arl_base, "AnonHugePages", &AnonHugePages);
         arl_expect(arl_base, "ShmemHugePages", &ShmemHugePages);
@@ -134,14 +137,22 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     arl_begin(arl_base);
 
+    static int first_ff_read = 1;
+
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
+
+        if (first_ff_read && !strcmp(procfile_lineword(ff, l, 0), "Percpu"))
+            do_percpu = 1;
 
         if(unlikely(arl_check(arl_base,
                 procfile_lineword(ff, l, 0),
                 procfile_lineword(ff, l, 1)))) break;
     }
+
+    if (first_ff_read)
+        first_ff_read = 0;
 
     // --------------------------------------------------------------------
 
@@ -371,7 +382,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     if(do_kernel) {
         static RRDSET *st_mem_kernel = NULL;
-        static RRDDIM *rd_slab = NULL, *rd_kernelstack = NULL, *rd_pagetables = NULL, *rd_vmallocused = NULL;
+        static RRDDIM *rd_slab = NULL, *rd_kernelstack = NULL, *rd_pagetables = NULL, *rd_vmallocused = NULL,
+                      *rd_percpu = NULL;
 
         if(unlikely(!st_mem_kernel)) {
             st_mem_kernel = rrdset_create_localhost(
@@ -395,6 +407,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_kernelstack = rrddim_add(st_mem_kernel, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_pagetables  = rrddim_add(st_mem_kernel, "PageTables",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_vmallocused = rrddim_add(st_mem_kernel, "VmallocUsed", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            if (do_percpu)
+                rd_percpu  = rrddim_add(st_mem_kernel, "Percpu",      NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st_mem_kernel);
 
@@ -402,6 +416,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_mem_kernel, rd_kernelstack, KernelStack);
         rrddim_set_by_pointer(st_mem_kernel, rd_pagetables,  PageTables);
         rrddim_set_by_pointer(st_mem_kernel, rd_vmallocused, VmallocUsed);
+        if (do_percpu)
+            rrddim_set_by_pointer(st_mem_kernel, rd_percpu, Percpu);
 
         rrdset_done(st_mem_kernel);
     }

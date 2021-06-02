@@ -35,12 +35,21 @@ Then, as the issue passes, the anomaly probabilities should settle back down int
 ## Requirements
 
 - This collector will only work with Python 3 and requires the packages below be installed.
+- Typically you will not need to do this, but, if needed, to ensure Python 3 is used you can add the below line to the `[plugin:python.d]` section of `netdata.conf`
+
+```conf
+[plugin:python.d]
+    # update every = 1
+    command options = -ppython3
+```
+
+Install the required python libraries.
 
 ```bash
 # become netdata user
 sudo su -s /bin/bash netdata
 # install required packages for the netdata user
-pip3 install --user netdata-pandas==0.0.32 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
+pip3 install --user netdata-pandas==0.0.38 numba==0.50.1 scikit-learn==0.23.2 pyod==0.8.3
 ```
 
 ## Configuration
@@ -68,13 +77,13 @@ sudo ./edit-config python.d/anomalies.conf
 
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
-```yaml
+```conf
 # ----------------------------------------------------------------------
 # JOBS (data collection sources)
 
 # Pull data from local Netdata node.
-local:
-    name: 'local'
+anomalies:
+    name: 'Anomalies'
 
     # Host to pull data from.
     host: '127.0.0.1:19999'
@@ -85,6 +94,9 @@ local:
 
     # Use http or https to pull data
     protocol: 'http'
+
+    # SSL verify parameter for requests.get() calls
+    tls_verify: true
 
     # What charts to pull data for - A regex like 'system\..*|' or 'system\..*|apps.cpu|apps.mem' etc.
     charts_regex: 'system\..*'

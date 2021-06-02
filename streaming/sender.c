@@ -214,7 +214,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&tags=%s&ver=%u"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -250,6 +250,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , default_rrd_update_every
                  , host->os
                  , host->timezone
+                 , host->abbrev_timezone
+                 , host->utc_offset
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
                  , se.os_name
@@ -450,7 +452,7 @@ void attempt_to_send(struct sender_state *s) {
         s->last_sent_t = now_monotonic_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        debug(D_STREAM, "STREAM %s [send to %s]: unavailable aftering polling POLLOUT", s->host->hostname,
+        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", s->host->hostname,
               s->connected_to);
     else if (ret == -1) {
         debug(D_STREAM, "STREAM: Send failed - closing socket...");

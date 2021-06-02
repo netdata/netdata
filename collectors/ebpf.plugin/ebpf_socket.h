@@ -5,7 +5,6 @@
 #include "libnetdata/avl/avl.h"
 
 // Vector indexes
-#define NETDATA_MAX_SOCKET_VECTOR 6
 #define NETDATA_UDP_START 3
 #define NETDATA_RETRANSMIT_START 5
 
@@ -16,6 +15,39 @@
 #define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
+
+// config file
+#define NETDATA_NETWORK_CONFIG_FILE "network.conf"
+#define EBPF_NETWORK_VIEWER_SECTION "network connections"
+#define EBPF_SERVICE_NAME_SECTION "service name"
+#define EBPF_CONFIG_RESOLVE_HOSTNAME "resolve hostnames"
+#define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
+#define EBPF_CONFIG_PORTS "ports"
+#define EBPF_CONFIG_HOSTNAMES "hostnames"
+#define EBPF_CONFIG_BANDWIDTH_SIZE "bandwidth table size"
+#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
+#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_UDP_SIZE "udp connection table size"
+#define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
+
+enum ebpf_socket_table_list {
+    NETDATA_SOCKET_TABLE_BANDWIDTH,
+    NETDATA_SOCKET_TABLE_IPV4,
+    NETDATA_SOCKET_TABLE_IPV6,
+    NETDATA_SOCKET_TABLE_UDP
+};
+
+enum ebpf_socket_publish_index {
+    NETDATA_IDX_TCP_SENDMSG,
+    NETDATA_IDX_TCP_CLEANUP_RBUF,
+    NETDATA_IDX_TCP_CLOSE,
+    NETDATA_IDX_UDP_RECVBUF,
+    NETDATA_IDX_UDP_SENDMSG,
+    NETDATA_IDX_TCP_RETRANSMIT,
+
+    // Keep this as last and don't skip numbers as it is used as element counter
+    NETDATA_MAX_SOCKET_VECTOR
+};
 
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
@@ -38,6 +70,7 @@ typedef enum ebpf_socket_idx {
 
     NETDATA_KEY_TCP_RETRANSMIT,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SOCKET_COUNTER
 } ebpf_socket_index_t;
 
@@ -46,16 +79,16 @@ typedef enum ebpf_socket_idx {
 
 // Global chart name
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
-#define NETDATA_TCP_FUNCTION_BYTES "tcp_bandwidth"
+#define NETDATA_TCP_FUNCTION_BITS "total_tcp_bandwidth"
 #define NETDATA_TCP_FUNCTION_ERROR "tcp_error"
 #define NETDATA_TCP_RETRANSMIT "tcp_retransmit"
 #define NETDATA_UDP_FUNCTION_COUNT "udp_functions"
-#define NETDATA_UDP_FUNCTION_BYTES "udp_bandwidth"
+#define NETDATA_UDP_FUNCTION_BITS "total_udp_bandwidth"
 #define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
 // Charts created on Apps submenu
-#define NETDATA_NET_APPS_BANDWIDTH_SENT "bandwidth_sent"
-#define NETDATA_NET_APPS_BANDWIDTH_RECV "bandwidth_recv"
+#define NETDATA_NET_APPS_BANDWIDTH_SENT "total_bandwidth_sent"
+#define NETDATA_NET_APPS_BANDWIDTH_RECV "total_bandwidth_recv"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
 #define NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
@@ -72,6 +105,10 @@ typedef enum ebpf_socket_idx {
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
+#define NETDATA_COMPILED_CONNECTIONS_ALLOWED 65535U
+#define NETDATA_MAXIMUM_CONNECTIONS_ALLOWED 16384U
+#define NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED 8192U
+#define NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED 4096U
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
@@ -232,7 +269,7 @@ typedef struct netdata_socket_idx {
  */
 typedef struct netdata_socket_plot {
     // Search
-    avl avl;
+    avl_t avl;
     netdata_socket_idx_t index;
 
     // Current data
@@ -269,8 +306,12 @@ typedef struct netdata_vector_plot {
 extern void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 extern void update_listen_table(uint16_t value, uint8_t proto);
+extern void parse_network_viewer_section(struct config *cfg);
+extern void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
+extern void parse_service_name_section(struct config *cfg);
+extern void clean_socket_apps_structures();
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
-extern ebpf_socket_publish_apps_t **socket_bandwidth_prev;
+extern struct config socket_config;
 
 #endif

@@ -202,7 +202,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -416,7 +416,7 @@
           {
             "name": "group",
             "in": "query",
-            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimensions to return the most extreme value in either direction).",
             "required": true,
             "allowEmptyValue": false,
             "schema": {
@@ -514,7 +514,7 @@
           {
             "name": "value_color",
             "in": "query",
-            "description": "A color to be used for the background of the value *(right)* part of badge. You can set multiple using a pipe with a condition each, like this: `color<value|color:null` The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter. Currently only integers are suported as values.",
+            "description": "A color to be used for the background of the value *(right)* part of badge. You can set multiple using a pipe with a condition each, like this: `color<value|color:null` The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists). Each color can be specified in same manner as for `label_color` parameter. Currently only integers are supported as values.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
@@ -525,7 +525,7 @@
           {
             "name": "text_color_lbl",
             "in": "query",
-            "description": "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
+            "description": "Font color for label *(left)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
@@ -556,7 +556,7 @@
           {
             "name": "text_color_val",
             "in": "query",
-            "description": "Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceeding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
+            "description": "Font color for value *(right)* part of the badge. One of predefined colors or as HTML hexadecimal color without preceding `#` character. Formats allowed `RGB` or `RRGGBB`. If no or wrong value given default color will be used.",
             "required": false,
             "allowEmptyValue": true,
             "schema": {
@@ -998,7 +998,7 @@
     "/manage/health": {
       "get": {
         "summary": "Accesses the health management API to control health checks and notifications at runtime.",
-        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenaria, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
+        "description": "Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenarios, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.",
         "parameters": [
           {
             "name": "cmd",
@@ -1504,7 +1504,7 @@
           },
           "update_every": {
             "type": "number",
-            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
+            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (independently of the current view)."
           },
           "view_update_every": {
             "type": "number",
@@ -1512,11 +1512,11 @@
           },
           "first_entry": {
             "type": "number",
-            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
+            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (independently of the current view)."
           },
           "last_entry": {
             "type": "number",
-            "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
+            "description": "The UNIX timestamp of the latest entry in the round robin database (independently of the current view)."
           },
           "after": {
             "type": "number",
@@ -1549,7 +1549,7 @@
             }
           },
           "latest_values": {
-            "description": "The latest values collected for the chart (indepedently of the current view).",
+            "description": "The latest values collected for the chart (independently of the current view).",
             "type": "array",
             "items": {
               "type": "string"
