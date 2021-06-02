@@ -310,8 +310,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     EVAL_EXPRESSION *expr=NULL;
     BUFFER *warn_alarms, *crit_alarms;
 
-    warn_alarms = buffer_create(1000);
-    crit_alarms = buffer_create(1000);
+    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
