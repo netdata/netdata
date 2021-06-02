@@ -150,7 +150,8 @@ METRICS = {
     QUERY_NAME_REPSLOT_FILES: [
         'replslot_wal_keep',
         'replslot_files'
-    ]
+    ],
+    QUERY_NAME_STAT_REPLICATION: []
 }
 
 NO_VERSION = 0
