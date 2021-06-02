@@ -57,6 +57,13 @@
 #define NETDATA_EBPF_KERNEL_5_10 330240
 
 /**
+ *  Kernel 5.0
+ *
+ *  327680 = 5*65536 +256*0
+ */
+#define NETDATA_EBPF_KERNEL_5_0 327680
+
+/**
  *  Kernel 4.17
  *
  *  266496 = 4*65536 + 17*256
@@ -127,6 +134,8 @@ typedef struct ebpf_module {
     ebpf_local_maps_t *maps;
     ebpf_specify_name_t *names;
     uint32_t pid_map_size;
+    struct config *cfg;
+    const char *config_file;
 } ebpf_module_t;
 
 extern int get_kernel_version(char *out, int size);
@@ -140,10 +149,10 @@ extern struct bpf_link **ebpf_load_program(char *plugins_dir,
                              struct bpf_object **obj,
                              int *map_fd);
 
-extern void ebpf_mount_config_name(char *filename, size_t length, char *path, char *config);
+extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 extern int ebpf_load_config(struct config *config, char *filename);
-extern void ebpf_update_module_using_config(ebpf_module_t *modules, struct config *cfg);
-extern void ebpf_update_module(ebpf_module_t *em, struct config *cfg, char *cfg_file);
+extern void ebpf_update_module_using_config(ebpf_module_t *modules);
+extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */

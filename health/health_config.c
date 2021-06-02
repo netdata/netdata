@@ -473,6 +473,29 @@ static inline char *health_source_file(size_t line, const char *file) {
     return strdupz(buffer);
 }
 
+char *health_edit_command_from_source(const char *source)
+{
+    char buffer[FILENAME_MAX + 1];
+    char *temp = strdupz(source);
+    char *line_num = strchr(temp, '@');
+    char *file_no_path = strrchr(temp, '/');
+
+    if (likely(file_no_path && line_num)) {
+        *line_num = '\0';
+        snprintfz(
+            buffer,
+            FILENAME_MAX,
+            "sudo %s/edit-config health.d/%s=%s",
+            netdata_configured_user_config_dir,
+            file_no_path + 1,
+            temp);
+    } else
+        buffer[0] = '\0';
+
+    freez(temp);
+    return strdupz(buffer);
+}
+
 static inline void strip_quotes(char *s) {
     while(*s) {
         if(*s == '\'' || *s == '"') *s = ' ';

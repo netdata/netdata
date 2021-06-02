@@ -206,6 +206,16 @@ safe_sha256sum() {
   fi
 }
 
+mark_install_type() {
+    install_type_file="/opt/netdata/etc/netdata/.install-type"
+    # shellcheck disable=SC1090
+    . "${install_type_file}"
+    cat > "${install_type_file}" <<-EOF
+	INSTALL_TYPE='kickstart-static'
+	PREBUILT_ARCH='${PREBUILT_ARCH}'
+	EOF
+}
+
 # ----------------------------------------------------------------------------
 umask 022
 
@@ -385,6 +395,8 @@ fi
 # ----------------------------------------------------------------------------
 progress "Installing netdata"
 run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} -- ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
+
+mark_install_type
 
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then

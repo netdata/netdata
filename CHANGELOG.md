@@ -1,5 +1,44 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.31.0...HEAD)
+
+**Merged pull requests:**
+
+- Only report the exit code when anonymous statistics script fails [\#11215](https://github.com/netdata/netdata/pull/11215) ([MrZammler](https://github.com/MrZammler))
+- Reduce memory needed per dimension [\#11212](https://github.com/netdata/netdata/pull/11212) ([stelfrag](https://github.com/stelfrag))
+- Ignore dbengine journal files that can not be read [\#11210](https://github.com/netdata/netdata/pull/11210) ([stelfrag](https://github.com/stelfrag))
+- Use memory mode RAM if memory mode dbengine is specified but not available [\#11207](https://github.com/netdata/netdata/pull/11207) ([stelfrag](https://github.com/stelfrag))
+- Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
+- fix ebpf.plugin segfault when ebpf\_load\_program return null pointer [\#11203](https://github.com/netdata/netdata/pull/11203) ([wangpei-nice](https://github.com/wangpei-nice))
+- fix `install\_type` detection during update [\#11199](https://github.com/netdata/netdata/pull/11199) ([ilyam8](https://github.com/ilyam8))
+- claiming: exit 0 when daemon not running and the claim was successful [\#11195](https://github.com/netdata/netdata/pull/11195) ([ilyam8](https://github.com/ilyam8))
+- Check return status of execution of anonymous statistics script [\#11188](https://github.com/netdata/netdata/pull/11188) ([MrZammler](https://github.com/MrZammler))
+- VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
+- add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
+- rename default from job 'local' to 'anomalies' [\#11178](https://github.com/netdata/netdata/pull/11178) ([andrewm4894](https://github.com/andrewm4894))
+- health: add system clock synchronization state alarm [\#11177](https://github.com/netdata/netdata/pull/11177) ([ilyam8](https://github.com/ilyam8))
+- Fix broken links [\#11175](https://github.com/netdata/netdata/pull/11175) ([joelhans](https://github.com/joelhans))
+- mqtt\_websockets FreeBSD fix [\#11172](https://github.com/netdata/netdata/pull/11172) ([underhood](https://github.com/underhood))
+- Fix typo in aclk.c [\#11170](https://github.com/netdata/netdata/pull/11170) ([eltociear](https://github.com/eltociear))
+- Adding more postgres metrics [\#11169](https://github.com/netdata/netdata/pull/11169) ([filip-plata](https://github.com/filip-plata))
+- health: add python.d/go.d jobs last\_collected\_secs alarms [\#11168](https://github.com/netdata/netdata/pull/11168) ([ilyam8](https://github.com/ilyam8))
+- Update news in main README for latest release [\#11165](https://github.com/netdata/netdata/pull/11165) ([joelhans](https://github.com/joelhans))
+- Query the size of the hw.intrnames mib instead of using of a fixed va… [\#11159](https://github.com/netdata/netdata/pull/11159) ([MikaelUrankar](https://github.com/MikaelUrankar))
+- Store info about the installation type for later retrieval. [\#11157](https://github.com/netdata/netdata/pull/11157) ([Ferroin](https://github.com/Ferroin))
+- health: make stocks alarms less sensitive \(2\) [\#11153](https://github.com/netdata/netdata/pull/11153) ([ilyam8](https://github.com/ilyam8))
+- Move parser from children to main thread [\#11152](https://github.com/netdata/netdata/pull/11152) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove deprecated options. [\#11149](https://github.com/netdata/netdata/pull/11149) ([vkalintiris](https://github.com/vkalintiris))
+- Fixes mqtt\_websockets on MacOS [\#11145](https://github.com/netdata/netdata/pull/11145) ([underhood](https://github.com/underhood))
+- Removed Fedora 32 from CI. [\#11143](https://github.com/netdata/netdata/pull/11143) ([Ferroin](https://github.com/Ferroin))
+- Remove an unnecessary check for cgroup v1 [\#11137](https://github.com/netdata/netdata/pull/11137) ([vlvkobal](https://github.com/vlvkobal))
+- Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
+- Remove unecessary relative paths when including headers. [\#11124](https://github.com/netdata/netdata/pull/11124) ([vkalintiris](https://github.com/vkalintiris))
+- Move mdstat charts near to Disks [\#11119](https://github.com/netdata/netdata/pull/11119) ([thiagoftsm](https://github.com/thiagoftsm))
+- Ebpf swap [\#11090](https://github.com/netdata/netdata/pull/11090) ([thiagoftsm](https://github.com/thiagoftsm))
+- Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
+
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.30.1...v1.31.0)
@@ -247,12 +286,6 @@
 - Revamp statsd docs [\#10637](https://github.com/netdata/netdata/pull/10637) ([OdysLam](https://github.com/OdysLam))
 - replace GA with PostHog for backend telemetry events. [\#10636](https://github.com/netdata/netdata/pull/10636) ([andrewm4894](https://github.com/andrewm4894))
 - cpu stats per query thread [\#10634](https://github.com/netdata/netdata/pull/10634) ([MrZammler](https://github.com/MrZammler))
-- Assorted updater fixes. [\#10613](https://github.com/netdata/netdata/pull/10613) ([Ferroin](https://github.com/Ferroin))
-- add stats per cloud query type [\#10602](https://github.com/netdata/netdata/pull/10602) ([underhood](https://github.com/underhood))
-- Add a new workflow to test that updater works as expected [\#10599](https://github.com/netdata/netdata/pull/10599) ([kaskavel](https://github.com/kaskavel))
-- Add support for changing the number of pages per extent [\#10593](https://github.com/netdata/netdata/pull/10593) ([mfundul](https://github.com/mfundul))
-- web/gui: Fix broken external links [\#10586](https://github.com/netdata/netdata/pull/10586) ([Habetdin](https://github.com/Habetdin))
-- Fix wrong count for entries [\#10564](https://github.com/netdata/netdata/pull/10564) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
@@ -283,35 +316,14 @@
 - Add ACLK proxy setting as host label [\#10619](https://github.com/netdata/netdata/pull/10619) ([underhood](https://github.com/underhood))
 - dashboard@v2.13.6 [\#10618](https://github.com/netdata/netdata/pull/10618) ([jacekkolasa](https://github.com/jacekkolasa))
 - Disable stock alarms [\#10617](https://github.com/netdata/netdata/pull/10617) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fixes \#10597 raw binary data should never be printed [\#10603](https://github.com/netdata/netdata/pull/10603) ([rda0](https://github.com/rda0))
-- collectors/proc: change ksm mem chart type to stacked [\#10598](https://github.com/netdata/netdata/pull/10598) ([ilyam8](https://github.com/ilyam8))
-- ACLK reduce excessive logging [\#10596](https://github.com/netdata/netdata/pull/10596) ([underhood](https://github.com/underhood))
-- add k8s\_cluster\_id host label [\#10588](https://github.com/netdata/netdata/pull/10588) ([ilyam8](https://github.com/ilyam8))
-- add resetting CapabilityBoundingSet workaround to the python.d collectors \(that use `sudo`\) readmes [\#10587](https://github.com/netdata/netdata/pull/10587) ([ilyam8](https://github.com/ilyam8))
-- collectors/elasticsearch: document `scheme` option [\#10572](https://github.com/netdata/netdata/pull/10572) ([vjt](https://github.com/vjt))
-- Update claiming docs for Docker containers. [\#10570](https://github.com/netdata/netdata/pull/10570) ([Ferroin](https://github.com/Ferroin))
-- health: make Opsgenie API URL configurable [\#10561](https://github.com/netdata/netdata/pull/10561) ([tinyhammers](https://github.com/tinyhammers))
 
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.0...v1.29.1)
 
-**Merged pull requests:**
-
-- Fix crash during shutdown of cgroups internal plugin. [\#10614](https://github.com/netdata/netdata/pull/10614) ([mfundul](https://github.com/mfundul))
-- Update latest release on main README [\#10590](https://github.com/netdata/netdata/pull/10590) ([joelhans](https://github.com/joelhans))
-
 ## [v1.29.0](https://github.com/netdata/netdata/tree/v1.29.0) (2021-02-03)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.27.0_0104103941...v1.29.0)
-
-**Merged pull requests:**
-
-- Fixed Netdata Cloud support in RPM packages. [\#10578](https://github.com/netdata/netdata/pull/10578) ([Ferroin](https://github.com/Ferroin))
-- Fix container detection from systemd-detect-virt [\#10569](https://github.com/netdata/netdata/pull/10569) ([cakrit](https://github.com/cakrit))
-- dashboard v2.13.0 [\#10565](https://github.com/netdata/netdata/pull/10565) ([jacekkolasa](https://github.com/jacekkolasa))
-- bytes after last '}' trip JSON parser [\#10563](https://github.com/netdata/netdata/pull/10563) ([underhood](https://github.com/underhood))
-- Fix prometheus remote write header [\#10560](https://github.com/netdata/netdata/pull/10560) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.27.0_0104103941](https://github.com/netdata/netdata/tree/v1.27.0_0104103941) (2021-01-04)
 

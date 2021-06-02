@@ -122,13 +122,15 @@ static void ebpf_dcstat_cleanup(void *ptr)
 
     ebpf_dcstat_clean_names();
 
-    struct bpf_program *prog;
-    size_t i = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[i]);
-        i++;
+    if (probe_links) {
+        struct bpf_program *prog;
+        size_t i = 0 ;
+        bpf_object__for_each_program(prog, objects) {
+            bpf_link__destroy(probe_links[i]);
+            i++;
+        }
+        bpf_object__close(objects);
     }
-    bpf_object__close(objects);
 }
 
 /*****************************************************************
@@ -565,7 +567,6 @@ void *ebpf_dcstat_thread(void *ptr)
     em->maps = dcstat_maps;
     fill_ebpf_data(&dcstat_data);
 
-    ebpf_update_module(em, &dcstat_config, NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE);
     ebpf_update_pid_table(&dcstat_maps[0], em);
 
     ebpf_update_names(dc_optional_name, em);

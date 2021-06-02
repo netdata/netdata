@@ -3,8 +3,8 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "../database/rrd.h"
-#include "../libnetdata/libnetdata.h"
+#include "database/rrd.h"
+#include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
 
@@ -72,6 +72,8 @@ struct receiver_state {
     char *machine_guid;
     char *os;
     char *timezone;         // Unused?
+    char *abbrev_timezone;
+    int32_t utc_offset;
     char *tags;
     char *client_ip;        // Duplicated in pluginsd 
     char *client_port;        // Duplicated in pluginsd 

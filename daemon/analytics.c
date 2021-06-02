@@ -696,6 +696,46 @@ static void get_system_timezone(void)
         timezone = "unknown";
 
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+
+    //get the utc offset, and the timezone as returned by strftime
+    //will be sent to the cloud
+    //Note: This will need an agent restart to get new offset on time change (dst, etc).
+    {
+        time_t t;
+        struct tm *tmp, tmbuf;
+        char zone[FILENAME_MAX + 1];
+        char sign[2], hh[3], mm[3];
+
+        t = now_realtime_sec();
+        tmp = localtime_r(&t, &tmbuf);
+
+        if (tmp != NULL) {
+            if (strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
+                netdata_configured_abbrev_timezone = strdupz("UTC");
+            } else
+                netdata_configured_abbrev_timezone = strdupz(zone);
+
+            if (strftime(zone, FILENAME_MAX, "%z", tmp) == 0) {
+                netdata_configured_utc_offset = 0;
+            } else {
+                sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
+                sign[1] = '\0';
+                hh[0] = isdigit(zone[1]) ? zone[1] : '0';
+                hh[1] = isdigit(zone[2]) ? zone[2] : '0';
+                hh[2] = '\0';
+                mm[0] = isdigit(zone[3]) ? zone[3] : '0';
+                mm[1] = isdigit(zone[4]) ? zone[4] : '0';
+                mm[2] = '\0';
+
+                netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);
+                netdata_configured_utc_offset =
+                    sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
+            }
+        } else {
+            netdata_configured_abbrev_timezone = strdupz("UTC");
+            netdata_configured_utc_offset = 0;
+        }
+    }
 }
 
 void set_global_environment()
@@ -876,10 +916,15 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     FILE *fp = mypopen(command_to_run, &command_pid);
     if (fp) {
-        char buffer[100 + 1];
-        while (fgets(buffer, 100, fp) != NULL)
-            ;
-        mypclose(fp, command_pid);
+        char buffer[4 + 1];
+        char *s = fgets(buffer, 4, fp);
+        int exit_code = mypclose(fp, command_pid);
+        if (exit_code)
+            error("Execution of anonymous statistics script returned %d.", exit_code);
+        if (s && strncmp(buffer, "200", 3))
+            error("Execution of anonymous statistics script returned http code %s.", buffer);
+    } else {
+        error("Failed to run anonymous statistics script %s.", as_script);
     }
     freez(command_to_run);
 }

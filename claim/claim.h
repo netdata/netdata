@@ -3,7 +3,7 @@
 #ifndef NETDATA_CLAIM_H
 #define NETDATA_CLAIM_H 1
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 extern char *claiming_pending_arguments;
 extern struct config cloud_config;

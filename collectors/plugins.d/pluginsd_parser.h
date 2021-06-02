@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGINSD_PARSER_H
 #define NETDATA_PLUGINSD_PARSER_H
 
-#include "../../parser/parser.h"
+#include "parser/parser.h"
 
 
 typedef struct parser_user_object {

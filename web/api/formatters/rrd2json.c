@@ -18,7 +18,6 @@ static inline void free_single_rrdrim(RRDDIM *temp_rd, int archive_mode)
             freez(temp_rd->rrdset);
         }
     }
-    freez(temp_rd->state->metric_uuid);
     freez(temp_rd->state);
     freez(temp_rd);
 }
@@ -95,8 +94,6 @@ void build_context_param_list(struct context_param **param_list, RRDSET *st)
         memcpy(rd->state, rd1->state, sizeof(*rd->state));
         memcpy(&rd->state->collect_ops, &rd1->state->collect_ops, sizeof(struct rrddim_collect_ops));
         memcpy(&rd->state->query_ops, &rd1->state->query_ops, sizeof(struct rrddim_query_ops));
-        rd->state->metric_uuid = mallocz(sizeof(uuid_t));
-        uuid_copy(*rd->state->metric_uuid, *rd1->state->metric_uuid);
         rd->next = (*param_list)->rd;
         (*param_list)->rd = rd;
     }

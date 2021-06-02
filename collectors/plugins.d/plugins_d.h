@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #define NETDATA_PLUGIN_HOOK_PLUGINSD \
     { \

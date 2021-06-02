@@ -246,20 +246,20 @@ bind_fail:
     return 0;
 }
 
-uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
+int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
 {
     static __thread sqlite3_stmt *res = NULL;
-    uuid_t *uuid = NULL;
     int rc;
+    int status = 1;
 
     if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-        return NULL;
+        return 1;
 
     if (unlikely(!res)) {
         rc = prepare_statement(db_meta, SQL_FIND_DIMENSION_UUID, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
-            return NULL;
+            return 1;
         }
     }
 
@@ -277,49 +277,24 @@ uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd)
 
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW)) {
-        uuid = mallocz(sizeof(uuid_t));
-        uuid_copy(*uuid, sqlite3_column_blob(res, 0));
+        uuid_copy(*store_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
+        status = 0;
+    }
+    else {
+        uuid_generate(*store_uuid);
+        status = sql_store_dimension(store_uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
+        if (unlikely(status))
+            error_report("Failed to store dimension metadata in the database");
     }
 
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement find dimension uuid, rc = %d", rc);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    char  uuid_str[GUID_LEN + 1];
-    if (likely(uuid)) {
-        uuid_unparse_lower(*uuid, uuid_str);
-        debug(D_METADATALOG, "Found UUID %s for dimension %s", uuid_str, rd->name);
-    }
-    else
-        debug(D_METADATALOG, "UUID not found for dimension %s", rd->name);
-#endif
-    return uuid;
+    return status;
 
 bind_fail:
     error_report("Failed to bind input parameter to perform dimension UUID database lookup, rc = %d", rc);
-    return NULL;
-}
-
-uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd)
-{
-    uuid_t *uuid = NULL;
-    int rc;
-
-    uuid = mallocz(sizeof(uuid_t));
-    uuid_generate(*uuid);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(*uuid, uuid_str);
-    debug(D_METADATALOG,"Generating uuid [%s] for dimension %s under chart %s", uuid_str, rd->name, st->id);
-#endif
-
-    rc = sql_store_dimension(uuid, st->chart_uuid, rd->id, rd->name, rd->multiplier, rd->divisor, rd->algorithm);
-    if (unlikely(rc))
-       error_report("Failed to store dimension metadata in the database");
-
-    return uuid;
+    return 1;
 }
 
 #define DELETE_DIMENSION_UUID   "delete from dimension where dim_id = @uuid;"
@@ -984,7 +959,7 @@ RRDHOST *sql_create_host_by_uuid(char *hostname)
     set_host_properties(host, sqlite3_column_int(res, 2), RRD_MEMORY_MODE_DBENGINE, hostname,
                         (char *) sqlite3_column_text(res, 1), (const char *) uuid_str,
                         (char *) sqlite3_column_text(res, 3), (char *) sqlite3_column_text(res, 5),
-                        (char *) sqlite3_column_text(res, 4), NULL, NULL);
+                        (char *) sqlite3_column_text(res, 4), NULL, 0, NULL, NULL);
 
     uuid_copy(host->host_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
@@ -1206,7 +1181,7 @@ static RRDDIM *create_rrdim_entry(RRDSET *st, char *id, char *name, uuid_t *metr
     rd->state->query_ops.oldest_time = rrdeng_metric_oldest_time;
     rd->state->rrdeng_uuid = mallocz(sizeof(uuid_t));
     uuid_copy(*rd->state->rrdeng_uuid, *metric_uuid);
-    rd->state->metric_uuid = rd->state->rrdeng_uuid;
+    uuid_copy(rd->state->metric_uuid, *metric_uuid);
     rd->id = strdupz(id);
     rd->name = strdupz(name);
     return rd;

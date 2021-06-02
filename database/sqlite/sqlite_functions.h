@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_FUNCTIONS_H
 #define NETDATA_SQLITE_FUNCTIONS_H
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "sqlite3.h"
 
 // return a node list
@@ -34,9 +34,10 @@ struct node_instance_list {
 #define SQL_STORE_DIMENSION                                                                                           \
     "INSERT OR REPLACE into dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm) values (?0001,?0002,?0003,?0004,?0005,?0006,?0007);"
 
-#define SQL_FIND_DIMENSION_UUID "select dim_id from dimension where chart_id=@chart and id=@id and name=@name;"
+#define SQL_FIND_DIMENSION_UUID \
+    "select dim_id from dimension where chart_id=@chart and id=@id and name=@name and length(dim_id)=16;"
 
-#define SQL_STORE_ACTIVE_DIMENSION                                                                                     \
+#define SQL_STORE_ACTIVE_DIMENSION \
     "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
 extern int sql_init_database(void);
 extern void sql_close_database(void);
@@ -49,8 +50,7 @@ extern int sql_store_chart(
 extern int sql_store_dimension(uuid_t *dim_uuid, uuid_t *chart_uuid, const char *id, const char *name, collected_number multiplier,
                                collected_number divisor, int algorithm);
 
-extern uuid_t *find_dimension_uuid(RRDSET *st, RRDDIM *rd);
-extern uuid_t *create_dimension_uuid(RRDSET *st, RRDDIM *rd);
+extern int find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid);
 extern void store_active_dimension(uuid_t *dimension_uuid);
 
 extern uuid_t *find_chart_uuid(RRDHOST *host, const char *type, const char *id, const char *name);

@@ -174,12 +174,8 @@ AC_ARG_ENABLE(
 )
 AC_ARG_WITH(
     [bundled-lws],
-    [AS_HELP_STRING([--with-bundled-lws=DIR], [Use a specific Libwebsockets static library @<:@default use system library@:>@])],
-    [
-        with_bundled_lws="yes"
-        bundled_lws_dir="${withval}"
-    ],
-    [with_bundled_lws="no"]
+    [AS_HELP_STRING([--with-bundled-lws], [Use the bundled version of libwebsockets library @<:@default use system library@:>@])],
+    [with_bundled_lws="yes"], [with_bundled_lws="no"]
 )
 
 # -----------------------------------------------------------------------------
@@ -432,15 +428,14 @@ test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
 
-AC_ARG_WITH([libJudy],
-            [AS_HELP_STRING([--with-libJudy=PREFIX],[Use a specific Judy library (default is system-library)])],
+AC_ARG_WITH([bundled-libJudy],
+            [AS_HELP_STRING([--with-bundled-libJudy],[Use the bundled version of Judy library (default is system-library)])],
             [
-                libJudy_dir="$withval"
                 AC_MSG_CHECKING(for libJudy in $withval)
-                if test -f "${libJudy_dir}/libJudy.a" -a -f "${libJudy_dir}/Judy.h"; then
+                if test -f "externaldeps/libJudy/libJudy.a" -a -f "externaldeps/libJudy/Judy.h"; then
                     LIBS_BACKUP="${LIBS}"
-                    LIBS="${libJudy_dir}/libJudy.a"
-                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "${libJudy_dir}/Judy.h"
+                    LIBS="externaldeps/libJudy/libJudy.a"
+                    AC_LINK_IFELSE([AC_LANG_SOURCE([[#include "externaldeps/libJudy/Judy.h"
                                                      int main (int argc, char **argv) {
                                                         Pvoid_t PJLArray = (Pvoid_t) NULL;
                                                         Word_t * PValue;
@@ -450,8 +445,8 @@ AC_ARG_WITH([libJudy],
                                                      [HAVE_libJudy_a="yes"],
                                                      [HAVE_libJudy_a="no"])
                     LIBS="${LIBS_BACKUP}"
-                    JUDY_LIBS="${libJudy_dir}/libJudy.a"
-                    JUDY_CFLAGS="-I${libJudy_dir}"
+                    JUDY_LIBS="\$(abs_top_srcdir)/externaldeps/libJudy/libJudy.a"
+                    JUDY_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libJudy"
                     AC_MSG_RESULT([$HAVE_libJudy_a])
                 else
                     libjudy_dir=""
@@ -531,7 +526,7 @@ if test "${enable_jsonc}" != "no" -a -z "${JSONC_LIBS}"; then
 	if test "${HAVE_libjson_c_a}" = "yes"; then
 		AC_DEFINE([LINK_STATIC_JSONC], [1], [static json-c should be used])
 		JSONC_LIBS="static"
-		OPTIONAL_JSONC_STATIC_CFLAGS="-I externaldeps/jsonc"
+		OPTIONAL_JSONC_STATIC_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/jsonc"
 	fi
 	AC_MSG_RESULT([${HAVE_libjson_c_a}])
 fi
@@ -671,9 +666,9 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
 
     if test "${with_bundled_lws}" = "yes"; then
         AC_MSG_CHECKING([if libwebsockets static lib is present])
-        if test -f "${bundled_lws_dir}/libwebsockets.a"; then
-            LWS_CFLAGS="-I ${bundled_lws_dir}/include"
-            OPTIONAL_LWS_LIBS="${bundled_lws_dir}/libwebsockets.a"
+        if test -f "externaldeps/libwebsockets/libwebsockets.a"; then
+            LWS_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/libwebsockets/include"
+            OPTIONAL_LWS_LIBS="\$(abs_top_srcdir)/externaldeps/libwebsockets/libwebsockets.a"
             AC_MSG_RESULT([yes])
             AC_DEFINE([BUNDLED_LWS], [1], [using statically linked libwebsockets])
         else
@@ -774,7 +769,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
         enable_aclk="yes"
-        OPTIONAL_ACLK_NG_CFLAGS="-Imqtt_websockets/src/include -Imqtt_websockets/c-rbuf/include -Imqtt_websockets/MQTT-C/include"
+        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
     fi
 fi
 AC_SUBST([enable_cloud])
@@ -1087,8 +1082,8 @@ if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
     if test "${have_libelf}" = "yes" -a \
             "${have_bpf}" = "yes" -a \
             "${have_libbpf}" = "yes"; then
-        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I externaldeps/libbpf/include"
-        OPTIONAL_BPF_LIBS="externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
+        OPTIONAL_BPF_CFLAGS="${LIBELF_CFLAGS} -I \$(abs_top_srcdir)/externaldeps/libbpf/include"
+        OPTIONAL_BPF_LIBS="\$(abs_top_srcdir)/externaldeps/libbpf/libbpf.a ${LIBELF_LIBS}"
         AC_DEFINE([HAVE_LIBBPF], [1], [libbpf usability])
         enable_ebpf="yes"
     else
@@ -1360,7 +1355,7 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -Iexporting/prometheus/remote_write"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
 else

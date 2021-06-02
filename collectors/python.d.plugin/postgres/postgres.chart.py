@@ -45,10 +45,12 @@ QUERY_NAME_INDEX_STATS = 'INDEX_STATS'
 QUERY_NAME_DATABASE = 'DATABASE'
 QUERY_NAME_BGWRITER = 'BGWRITER'
 QUERY_NAME_LOCKS = 'LOCKS'
+QUERY_NAME_BLOCKERS = 'BLOCKERS'
 QUERY_NAME_DATABASES = 'DATABASES'
 QUERY_NAME_STANDBY = 'STANDBY'
 QUERY_NAME_REPLICATION_SLOT = 'REPLICATION_SLOT'
 QUERY_NAME_STANDBY_DELTA = 'STANDBY_DELTA'
+QUERY_NAME_STANDBY_LAG = 'STANDBY_LAG'
 QUERY_NAME_REPSLOT_FILES = 'REPSLOT_FILES'
 QUERY_NAME_IF_SUPERUSER = 'IF_SUPERUSER'
 QUERY_NAME_SERVER_VERSION = 'SERVER_VERSION'
@@ -123,6 +125,9 @@ METRICS = {
         'ShareLock',
         'RowExclusiveLock'
     ],
+    QUERY_NAME_BLOCKERS: [
+        'blocking_pids_avg'
+    ],
     QUERY_NAME_AUTOVACUUM: [
         'analyze',
         'vacuum_analyze',
@@ -135,6 +140,11 @@ METRICS = {
         'write_delta',
         'flush_delta',
         'replay_delta'
+    ],
+    QUERY_NAME_STANDBY_LAG: [
+        'write_lag',
+        'flush_lag',
+        'replay_lag'
     ],
     QUERY_NAME_REPSLOT_FILES: [
         'replslot_wal_keep',
@@ -263,7 +273,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE backend_type IN ('client backend', 'background worker')
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -277,7 +287,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE query NOT LIKE 'autovacuum: %%'
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -291,7 +301,7 @@ FROM (
     FROM pg_catalog.pg_stat_activity
     WHERE current_query NOT LIKE 'autovacuum: %%'
     UNION ALL
-    SELECT 'r', COUNT(1) 
+    SELECT 'r', COUNT(1)
     FROM pg_catalog.pg_stat_replication
 ) as s;
 """,
@@ -386,6 +396,48 @@ ORDER BY datname, mode;
 """,
 }
 
+QUERY_BLOCKERS = {
+    DEFAULT: """
+WITH B AS (
+SELECT DISTINCT
+    pg_database.datname as database_name,
+    pg_locks.pid,
+    cardinality(pg_blocking_pids(pg_locks.pid)) AS blocking_pids
+FROM pg_locks
+INNER JOIN pg_database ON pg_database.oid = pg_locks.database
+WHERE NOT pg_locks.granted)
+SELECT database_name, AVG(blocking_pids) AS blocking_pids_avg
+FROM B
+GROUP BY database_name
+""",
+    V96: """
+WITH B AS (
+SELECT DISTINCT
+    pg_database.datname as database_name,
+    blocked_locks.pid AS blocked_pid,
+    COUNT(blocking_locks.pid) AS blocking_pids
+FROM  pg_catalog.pg_locks blocked_locks
+INNER JOIN pg_database ON pg_database.oid = blocked_locks.database
+JOIN pg_catalog.pg_locks blocking_locks
+        ON blocking_locks.locktype = blocked_locks.locktype
+        AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+        AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+        AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+        AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+        AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+        AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+        AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+        AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+        AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+        AND blocking_locks.pid != blocked_locks.pid
+WHERE NOT blocked_locks.GRANTED
+GROUP BY database_name, blocked_pid)
+SELECT database_name, AVG(blocking_pids) AS blocking_pids_avg
+FROM B
+GROUP BY database_name
+"""
+}
+
 QUERY_DATABASES = {
     DEFAULT: """
 SELECT
@@ -476,6 +528,18 @@ SELECT
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
 """,
+}
+
+QUERY_STANDBY_LAG = {
+    DEFAULT: """
+SELECT
+    application_name,
+    COALESCE(EXTRACT(EPOCH FROM write_lag)::bigint, 0) AS write_lag,
+    COALESCE(EXTRACT(EPOCH FROM flush_lag)::bigint, 0) AS flush_lag,
+    COALESCE(EXTRACT(EPOCH FROM replay_lag)::bigint, 0) AS replay_lag
+FROM pg_stat_replication
+WHERE application_name IS NOT NULL;
+"""
 }
 
 QUERY_REPSLOT_FILES = {
@@ -632,6 +696,10 @@ def query_factory(name, version=NO_VERSION):
         return QUERY_BGWRITER[DEFAULT]
     elif name == QUERY_NAME_LOCKS:
         return QUERY_LOCKS[DEFAULT]
+    elif name == QUERY_NAME_BLOCKERS:
+        if version < 90600:
+            return QUERY_BLOCKERS[V96]
+        return QUERY_BLOCKERS[DEFAULT]
     elif name == QUERY_NAME_DATABASES:
         return QUERY_DATABASES[DEFAULT]
     elif name == QUERY_NAME_STANDBY:
@@ -656,6 +724,8 @@ def query_factory(name, version=NO_VERSION):
         if version < 100000:
             return QUERY_STANDBY_DELTA[V96]
         return QUERY_STANDBY_DELTA[DEFAULT]
+    elif name == QUERY_NAME_STANDBY_LAG:
+        return QUERY_STANDBY_LAG[DEFAULT]
     elif name == QUERY_NAME_REPSLOT_FILES:
         if version < 110000:
             return QUERY_REPSLOT_FILES[V10]
@@ -676,6 +746,7 @@ ORDER = [
     'db_stat_tuple_write',
     'db_stat_transactions',
     'db_stat_connections',
+    'db_stat_blocking_pids_avg',
     'database_size',
     'backend_process',
     'backend_usage',
@@ -695,6 +766,7 @@ ORDER = [
     'stat_bgwriter_maxwritten',
     'replication_slot',
     'standby_delta',
+    'standby_lag',
     'autovacuum'
 ]
 
@@ -750,6 +822,13 @@ CHARTS = {
                     'line'],
         'lines': [
             ['temp_files', 'files', 'incremental']
+        ]
+    },
+    'db_stat_blocking_pids_avg': {
+        'options': [None, 'Average number of blocking transactions in db', 'processes', 'db statistics',
+                    'postgres.db_stat_blocking_pids_avg', 'line'],
+        'lines': [
+            ['blocking_pids_avg', 'blocking', 'absolute']
         ]
     },
     'database_size': {
@@ -882,6 +961,14 @@ CHARTS = {
             ['write_delta', 'write delta', 'absolute', 1, 1024],
             ['flush_delta', 'flush delta', 'absolute', 1, 1024],
             ['replay_delta', 'replay delta', 'absolute', 1, 1024]
+        ]
+    },
+    'standby_lag': {
+        'options': [None, 'Standby lag', 'seconds', 'replication lag', 'postgres.standby_lag', 'line'],
+        'lines': [
+            ['write_lag', 'write lag', 'absolute'],
+            ['flush_lag', 'flush lag', 'absolute'],
+            ['replay_lag', 'replay lag', 'absolute']
         ]
     },
     'replication_slot': {
@@ -1073,6 +1160,7 @@ class Service(SimpleService):
         self.queries[query_factory(QUERY_NAME_BGWRITER)] = METRICS[QUERY_NAME_BGWRITER]
         self.queries[query_factory(QUERY_NAME_DIFF_LSN, self.server_version)] = METRICS[QUERY_NAME_WAL_WRITES]
         self.queries[query_factory(QUERY_NAME_STANDBY_DELTA, self.server_version)] = METRICS[QUERY_NAME_STANDBY_DELTA]
+        self.queries[query_factory(QUERY_NAME_BLOCKERS, self.server_version)] = METRICS[QUERY_NAME_BLOCKERS]
 
         if self.do_index_stats:
             self.queries[query_factory(QUERY_NAME_INDEX_STATS)] = METRICS[QUERY_NAME_INDEX_STATS]
@@ -1091,6 +1179,9 @@ class Service(SimpleService):
 
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
+
+        if self.server_version >= 100000:
+            self.queries[query_factory(QUERY_NAME_STANDBY_LAG)] = METRICS[QUERY_NAME_STANDBY_LAG]
 
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:
@@ -1116,11 +1207,19 @@ class Service(SimpleService):
             )
 
         for application_name in self.secondaries[::-1]:
-            add_replication_delta_chart(
+            add_replication_standby_chart(
                 order=self.order,
                 definitions=self.definitions,
                 name='standby_delta',
                 application_name=application_name,
+                chart_family='replication delta',
+            )
+            add_replication_standby_chart(
+                order=self.order,
+                definitions=self.definitions,
+                name='standby_lag',
+                application_name=application_name,
+                chart_family='replication lag',
             )
 
         for slot_name in self.replication_slots[::-1]:
@@ -1199,7 +1298,7 @@ def add_database_stat_chart(order, definitions, name, database_name):
         'lines': create_lines(database_name, chart_template['lines'])}
 
 
-def add_replication_delta_chart(order, definitions, name, application_name):
+def add_replication_standby_chart(order, definitions, name, application_name, chart_family):
     def create_lines(standby, lines):
         result = list()
         for line in lines:
@@ -1213,7 +1312,7 @@ def add_replication_delta_chart(order, definitions, name, application_name):
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-        'options': [name, title + ': ' + application_name, units, 'replication delta', context, chart_type],
+        'options': [name, title + ': ' + application_name, units, chart_family, context, chart_type],
         'lines': create_lines(application_name, chart_template['lines'])}
 
 

@@ -701,7 +701,7 @@ bundle_libwebsockets() {
       copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libwebsockets built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws=externaldeps/libwebsockets"
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws"
     else
       run_failed "Failed to build libwebsockets."
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
@@ -789,7 +789,7 @@ bundle_judy() {
       copy_judy "${tmp}/libjudy-${JUDY_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libJudy built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-libJudy=externaldeps/libJudy"
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-libJudy"
     else
       run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_BUILD_JUDY}" ]; then
@@ -1110,7 +1110,7 @@ run $make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.timer -a \! -name \*.logrotate -a \! -name \.install-type -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"

@@ -4,7 +4,7 @@
 
 #include "https_client.h"
 
-#include "../mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,

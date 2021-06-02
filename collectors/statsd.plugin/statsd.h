@@ -3,7 +3,7 @@
 #ifndef NETDATA_STATSD_H
 #define NETDATA_STATSD_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #define STATSD_LISTEN_PORT 8125
 #define STATSD_LISTEN_BACKLOG 4096

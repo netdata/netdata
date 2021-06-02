@@ -519,6 +519,7 @@ install() {
 }
 
 if [ -x netdata-installer.sh ]; then
+  echo "INSTALL_TYPE='kickstart-build'" > system/.install-type
   install "$@"
 else
   if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then

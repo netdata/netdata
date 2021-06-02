@@ -933,6 +933,18 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         freez(dcstat_pid[pid]);
         dcstat_pid[pid] = NULL;
     }
+
+    // Clean swap structure
+    if (swap_pid) {
+        freez(swap_pid[pid]);
+        swap_pid[pid] = NULL;
+    }
+
+    // Clean vfs structure
+    if (vfs_pid) {
+        freez(vfs_pid[pid]);
+        vfs_pid[pid] = NULL;
+    }
 }
 
 /**

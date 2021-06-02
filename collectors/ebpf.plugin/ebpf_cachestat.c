@@ -80,13 +80,15 @@ static void ebpf_cachestat_cleanup(void *ptr)
     freez(cachestat_vector);
     freez(cachestat_hash_values);
 
-    struct bpf_program *prog;
-    size_t i = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[i]);
-        i++;
+    if (probe_links) {
+        struct bpf_program *prog;
+        size_t i = 0 ;
+        bpf_object__for_each_program(prog, objects) {
+            bpf_link__destroy(probe_links[i]);
+            i++;
+        }
+        bpf_object__close(objects);
     }
-    bpf_object__close(objects);
 }
 
 /*****************************************************************
@@ -615,7 +617,6 @@ void *ebpf_cachestat_thread(void *ptr)
     em->maps = cachestat_maps;
     fill_ebpf_data(&cachestat_data);
 
-    ebpf_update_module(em, &cachestat_config, NETDATA_CACHESTAT_CONFIG_FILE);
     ebpf_update_pid_table(&cachestat_maps[0], em);
 
     if (!em->enabled)

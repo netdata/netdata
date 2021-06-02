@@ -127,6 +127,11 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'mdstat': {
+        title: 'MD arrays',
+        icon: '<i class="fas fa-hdd"></i>'
+    },
+
     'sensors': {
         title: 'Sensors',
         icon: '<i class="fas fa-leaf"></i>',
@@ -3449,6 +3454,53 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Filesystem
+
+    'filesystem.vfs_deleted_objects': {
+        title : 'VFS remove',
+        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <code>vfs_unlink</code>. '
+    },
+
+    'filesystem.vfs_io': {
+        title : 'VFS IO',
+        info: 'Successful or failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>. This chart may not show all file system events if it uses other functions to store data on disk.'
+    },
+
+    'filesystem.vfs_io_bytes': {
+        title : 'VFS bytes written',
+        info: 'Total of bytes read or written with success using the functions <code>vfs_read</code> and <code>vfs_write</code>.'
+    },
+
+    'filesystem.vfs_io_error': {
+        title : 'VFS IO error',
+        info: 'Failed calls to functions <code>vfs_read</code> and <code>vfs_write</code>.'
+    },
+
+    'filesystem.vfs_fsync': {
+        info: 'Successful or failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_fsync_error': {
+        info: 'Failed calls to functions <code>vfs_fsync</code>.'
+    },
+
+    'filesystem.vfs_open': {
+        info: 'Successful or failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_open_error': {
+        info: 'Failed calls to functions <code>vfs_open</code>.'
+    },
+
+    'filesystem.vfs_create': {
+        info: 'Successful or failed calls to functions <code>vfs_create</code>.'
+    },
+
+    'filesystem.vfs_create_error': {
+        info: 'Failed calls to functions <code>vfs_create</code>.'
+    },
+
+    // ------------------------------------------------------------------------
     // eBPF
 
     'ebpf.tcp_functions': {
@@ -3499,26 +3551,6 @@ netdataDashboard.context = {
             ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
     },
 
-    'ebpf.deleted_objects': {
-        title : 'VFS remove',
-        info: 'This chart does not show all events that remove files from the file system, because file systems can create their own functions to remove files, it shows calls for the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. '
-    },
-
-    'ebpf.io': {
-        title : 'VFS IO',
-        info: 'Successful or failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all file system events if it uses other functions to store data on disk.'
-    },
-
-    'ebpf.io_bytes': {
-        title : 'VFS bytes written',
-        info: 'Total of bytes read or written with success using the functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
-    },
-
-    'ebpf.io_error': {
-        title : 'VFS IO error',
-        info: 'Failed calls to functions <a  href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a> and <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
-    },
-
     'ebpf.process_thread': {
         title : 'Task creation',
         info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls for <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that has the flag <code>CLONE_THREAD</code> set.'
@@ -3537,6 +3569,14 @@ netdataDashboard.context = {
     'ebpf.process_status': {
         title : 'Task status',
         info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
+    },
+
+    'apps.swap_read_call': {
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory.'
+    },
+
+    'apps.swap_write_call': {
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
     },
 
     // ------------------------------------------------------------------------

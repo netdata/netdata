@@ -3,7 +3,7 @@
 #ifndef NETDATA_INCREMENTAL_PARSER_H
 #define NETDATA_INCREMENTAL_PARSER_H 1
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128

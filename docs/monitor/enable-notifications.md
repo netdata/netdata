@@ -25,10 +25,11 @@ response process.
 
 ## Netdata Cloud
 
-Netdata Cloud's [centralized alarm notifications](https://learn.netdata.cloud/docs/cloud/monitoring/notifications/) is a
-zero-configuration way to get notified when an anomaly or incident strikes any node or application in your
-infrastructure. The advantage of using centralized alarm notifications from Netdata Cloud is that you don't have to
-worry about configuring each node in your infrastructure.
+Netdata Cloud's [centralized alarm
+notifications](https://learn.netdata.cloud/docs/cloud/alerts-notifications/notifications) is a zero-configuration way to
+get notified when an anomaly or incident strikes any node or application in your infrastructure. The advantage of using
+centralized alarm notifications from Netdata Cloud is that you don't have to worry about configuring each node in your
+infrastructure.
 
 To enable centralized alarm notifications for a Space, click on **Manage Space** in the left-hand menu, then click on
 the **Notifications** tab. Click the toggle switch next to **E-mail** to enable this notification method.
@@ -40,8 +41,9 @@ choose what types of notifications to receive from each War Room.
 ![Enabling and configuring alarm notifications in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/101936280-93c50900-3b9d-11eb-9ba0-d6927fa872b7.gif)
 
-See the [centralized alarm notifications](https://learn.netdata.cloud/docs/cloud/monitoring/notifications/) reference
-doc for further details about what information is conveyed in an email notification, flood protection, and more.
+See the [centralized alarm notifications](https://learn.netdata.cloud/docs/cloud/alerts-notifications/notifications)
+reference doc for further details about what information is conveyed in an email notification, flood protection, and
+more.
 
 ## Netdata Agent
 
@@ -69,6 +71,7 @@ notification platform.
 -   [**Kavenegar**](/health/notifications/kavenegar/README.md)
 -   [**Matrix**](/health/notifications/matrix/README.md)
 -   [**Messagebird**](/health/notifications/messagebird/README.md)
+-   [**Microsoft Teams**](/health/notifications/msteams/README.md)
 -   [**Netdata Agent dashboard**](/health/notifications/web/README.md)
 -   [**Opsgenie**](/health/notifications/opsgenie/README.md)
 -   [**PagerDuty**](/health/notifications/pagerduty/README.md)
@@ -138,7 +141,7 @@ architecture](/docs/store/distributed-data-architecture.md) for the best-in-clas
 
 ### Related reference documentation
 
-- [Netdata Cloud · Alarm notifications](https://learn.netdata.cloud/docs/cloud/monitoring/notifications/)
+- [Netdata Cloud · Alarm notifications](https://learn.netdata.cloud/docs/cloud/alerts-notifications/notifications)
 - [Netdata Agent · Notifications](/health/notifications/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fmonitor%2Fenable-notifications&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -12,7 +12,8 @@
 #  - NETDATA_TARBALL_URL
 #  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
-#  - NETDATA_PREFIX / NETDATA_LIB_DIR (After 1.16.1 we will only depend on lib dir)
+#  - NETDATA_PREFIX
+#  - NETDATA_LIB_DIR
 #
 # Optional environment options:
 #
@@ -326,6 +327,12 @@ update() {
       fi
     fi
 
+    if [ -e "${NETDATA_PREFIX}/etc/netdata/.install-type" ] ; then
+      install_type="$(cat "${NETDATA_PREFIX}"/etc/netdata/.install-type)"
+    else
+      install_type="INSTALL_TYPE='legacy-build'"
+    fi
+
     info "Re-installing netdata..."
     eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 
@@ -334,6 +341,8 @@ update() {
 
     info "Updating tarball checksum info"
     echo "${NEW_CHECKSUM}" > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
+
+    echo "${install_type}" > "${NETDATA_PREFIX}/etc/netdata/.install-type"
   fi
 
   rm -rf "${ndtmpdir}" >&3 2>&3
@@ -415,6 +424,12 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
     fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
   fi
 
+  if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
+    install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
+  else
+    install_type="INSTALL_TYPE='legacy-static'"
+  fi
+
   # Do not pass any options other than the accept, for now
   # shellcheck disable=SC2086
   if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
@@ -422,6 +437,9 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   else
     echo >&2 "NOTE: did not remove: ${ndtmpdir}"
   fi
+
+  echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
+
   echo >&2 "Switching back to ${PREVDIR}"
   cd "${PREVDIR}" || exit 1
 else

@@ -3,7 +3,7 @@
 #ifndef NETDATA_ANALYTICS_H
 #define NETDATA_ANALYTICS_H 1
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 /* Max number of seconds before the first META analytics is sent */
 #define ANALYTICS_INIT_SLEEP_SEC 120

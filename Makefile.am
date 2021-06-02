@@ -295,6 +295,10 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_socket.h \
     collectors/ebpf.plugin/ebpf_sync.c \
     collectors/ebpf.plugin/ebpf_sync.h \
+    collectors/ebpf.plugin/ebpf_swap.c \
+    collectors/ebpf.plugin/ebpf_swap.h \
+    collectors/ebpf.plugin/ebpf_vfs.c \
+    collectors/ebpf.plugin/ebpf_vfs.h \
     collectors/ebpf.plugin/ebpf.h \
     collectors/ebpf.plugin/ebpf_apps.c \
     collectors/ebpf.plugin/ebpf_apps.h \
@@ -746,7 +750,7 @@ NETDATA_COMMON_LIBS = \
     $(NULL)
 
 if LINK_STATIC_JSONC
-    NETDATA_COMMON_LIBS += externaldeps/jsonc/libjson-c.a
+    NETDATA_COMMON_LIBS += $(abs_top_srcdir)/externaldeps/jsonc/libjson-c.a
 endif
 
 NETDATACLI_FILES = \
@@ -767,7 +771,7 @@ netdata_LDADD = \
 if !ACLK_NG
 if ENABLE_ACLK
 netdata_LDADD += \
-    externaldeps/mosquitto/libmosquitto.a \
+    $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
     $(NETDATA_COMMON_LIBS) \
