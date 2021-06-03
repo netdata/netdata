@@ -23,8 +23,4 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
 void safe_log_proxy_censor(char *proxy);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
 
-#ifdef ACLK_NG
-void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type);
-#endif
-
 #endif /* ACLK_PROXY_H */
