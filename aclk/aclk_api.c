@@ -114,6 +114,16 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
 }
 
 struct label *add_aclk_host_labels(struct label *label) {
+#ifdef ACLK_NG
+    label = add_label_to_list(label, "_aclk_ng_available", "true", LABEL_SOURCE_AUTO);
+#else
+    label = add_label_to_list(label, "_aclk_ng_available", "false", LABEL_SOURCE_AUTO);
+#endif
+#ifdef ACLK_LEGACY
+    label = add_label_to_list(label, "_aclk_legacy", "true", LABEL_SOURCE_AUTO);
+#else
+    label = add_label_to_list(label, "_aclk_legacy", "false", LABEL_SOURCE_AUTO);
+#endif
 #ifdef ENABLE_ACLK
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;
@@ -131,15 +141,8 @@ struct label *add_aclk_host_labels(struct label *label) {
             break;
     }
 
-#ifdef ACLK_NG
-    label = add_label_to_list(label, "_aclk_ng_available", NULL, LABEL_SOURCE_AUTO);
-#endif
-#ifdef ACLK_LEGACY
-    label = add_label_to_list(label, "_aclk_legacy_available", NULL, LABEL_SOURCE_AUTO);
-#endif
     label = add_label_to_list(label, "_aclk_impl", aclk_ng ? "Next Generation" : "Legacy", LABEL_SOURCE_AUTO);
-    return add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
-#else
-    return label;
+    label = add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
 #endif
+    return label;
 }
