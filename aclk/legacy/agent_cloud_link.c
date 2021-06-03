@@ -1089,7 +1089,7 @@ void aclk_connect()
 {
     info("Connection detected (%u queued queries)", aclk_query_size());
 
-    aclk_stats_upd_online(1);
+    legacy_aclk_stats_upd_online(1);
 
     aclk_connected = 1;
     aclk_reconnect_delay(0);
@@ -1104,7 +1104,7 @@ void aclk_disconnect()
     if (likely(aclk_connected))
         info("Disconnect detected (%u queued queries)", aclk_query_size());
 
-    aclk_stats_upd_online(0);
+    legacy_aclk_stats_upd_online(0);
 
     aclk_subscribed = 0;
     rrdhost_aclk_state_lock(localhost);
