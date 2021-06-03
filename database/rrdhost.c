@@ -1392,6 +1392,7 @@ restart_after_removal:
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
+            st->rrdhost->obsolete_charts_count--;
 #ifdef ENABLE_DBENGINE
             if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 RRDDIM *rd, *last;
@@ -1437,7 +1438,6 @@ restart_after_removal:
                 rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-                st->rrdhost->obsolete_charts_count--;
                 
                 if (st->dimensions) {
                     /* If the chart still has dimensions don't delete it from the metadata log */
