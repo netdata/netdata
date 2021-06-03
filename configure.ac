@@ -769,6 +769,7 @@ if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no"; then
     if test "$can_build_legacy" = "yes"; then
         AC_DEFINE([ACLK_LEGACY], [1], [ACLK Legacy Should be used])
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+        aclk_legacy="yes"
     fi
 fi
 
