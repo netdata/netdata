@@ -3,10 +3,6 @@
 
 #include <config.h>
 
-#ifdef ACLK_NG
-#include "mqtt_wss_client.h"
-#endif
-
 #define ACLK_PROXY_PROTO_ADDR_SEPARATOR "://"
 
 typedef enum aclk_proxy_type {

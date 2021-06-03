@@ -22,12 +22,12 @@ typedef enum aclk_metadata_state {
     ACLK_METADATA_CMD_QUEUED,
     ACLK_METADATA_SENT
 } ACLK_METADATA_STATE;
+#endif
 
 typedef enum aclk_agent_state {
     ACLK_HOST_INITIALIZING,
     ACLK_HOST_STABLE
 } ACLK_AGENT_STATE;
-#endif
 
 typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
