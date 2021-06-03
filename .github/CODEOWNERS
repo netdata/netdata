@@ -28,9 +28,9 @@ collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
 daemon/ @thiagoftsm @mfundul
-database/ @mfundul @thiagoftsm
+database/ @mfundul @thiagoftsm @vkalintiris
 docs/ @joelhans
-health/ @thiagoftsm @vlvkobal
+health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm @mfundul
@@ -38,17 +38,17 @@ packaging/ @Ferroin @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @vkalintiris
-tests/ @Ferroin @kaskavel
-web/ @thiagoftsm @mfundul @vlvkobal
+tests/ @Ferroin @kaskavel @vkalintiris
+web/ @thiagoftsm @mfundul @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin
+*.am @Ferroin @vkalintiris
 *.md @joelhans
 Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
-.gitignore @Ferroin @knatsakis
+.gitignore @Ferroin @knatsakis @vkalintiris
 .travis.yml @Ferroin @knatsakis @kaskavel @vkalintiris
 .lgtm.yml @Ferroin @knatsakis
 .eslintrc @Ferroin @knatsakis
@@ -62,5 +62,5 @@ netdata-installer.sh @Ferroin @knatsakis @vkalintiris
 package.json @jacekkolasa @Ferroin @knatsakis
 packaging/version @netdatabot @Ferroin @knatsakis
 
-LICENSE.md @joelhans @Ferroin
-CHANGELOG.md @netdatabot @Ferroin
+LICENSE.md @joelhans @Ferroin @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @vkalintiris
