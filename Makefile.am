@@ -573,18 +573,18 @@ endif #ACLK_NG
 
 if ENABLE_ACLK
 ACLK_COMMON_FILES = \
+    aclk/aclk_collector_list.c \
+    aclk/aclk_collector_list.h \
+    $(NULL)
+endif
+
+ACLK_ALWAYS_BUILD_FILES = \
     aclk/legacy/aclk_rrdhost_state.h \
     aclk/aclk_api.c \
     aclk/aclk_api.h \
     aclk/aclk_proxy.c \
     aclk/aclk_proxy.h \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
     $(NULL)
-endif
-#ACLK_FILES = \
-#    aclk/legacy/aclk_rrdhost_state.h \
-#    $(NULL)
 
 if ACLK_LEGACY
 ACLK_LEGACY_FILES = \
@@ -717,6 +717,7 @@ NETDATA_FILES = \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
     $(PARSER_FILES) \
+    $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_COMMON_FILES) \
     $(ACLK_LEGACY_FILES) \
     $(ACLK_NG_FILES) \
