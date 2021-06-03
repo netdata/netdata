@@ -752,7 +752,6 @@ if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no" -a "$enable_aclk" != "
     fi
     AC_MSG_RESULT([${can_enable_aclk}])
 
-# TODO fix this (you need to try fallback)
     test "${enable_cloud}" = "yes" -a "${can_enable_aclk}" = "no" && \
         AC_MSG_ERROR([User required agent-cloud-link but it can't be built!])
 
