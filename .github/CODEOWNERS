@@ -15,7 +15,7 @@ backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @Ferroin
 contrib/debian @Ferroin @vkalintiris
-collectors/ @vlvkobal @mfundul
+collectors/ @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
 collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
@@ -27,19 +27,19 @@ collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm @mfundul
-database/ @mfundul @thiagoftsm @vkalintiris
+daemon/ @thiagoftsm
+database/ @thiagoftsm @vkalintiris
 docs/ @joelhans
 health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
-libnetdata/ @thiagofsm @mfundul
+libnetdata/ @thiagofsm
 packaging/ @Ferroin @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @vkalintiris
 tests/ @Ferroin @kaskavel @vkalintiris
-web/ @thiagoftsm @mfundul @vlvkobal @vkalintiris
+web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
