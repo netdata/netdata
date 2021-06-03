@@ -143,8 +143,8 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_FILESYSTEM_MAX_BINS);
 
-        memset(filesystem_aggregated_data, 0 , NETDATA_FILESYSTEM_MAX_BINS*sizeof(netdata_syscall_stat_t));
-        memset(filesystem_publish_aggregated, 0 , NETDATA_FILESYSTEM_MAX_BINS*sizeof(netdata_publish_syscall_t));
+        memset(filesystem_aggregated_data, 0 , NETDATA_FILESYSTEM_MAX_BINS * sizeof(netdata_syscall_stat_t));
+        memset(filesystem_publish_aggregated, 0 , NETDATA_FILESYSTEM_MAX_BINS * sizeof(netdata_publish_syscall_t));
 
         filesystem_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     }
@@ -302,25 +302,23 @@ static void ebpf_filesystem_cleanup(void *ptr)
  *
  * @return It returns a pointer for the histogram
  */
-static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t *efp, uint32_t id)
+static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t *efp, uint32_t *idx, uint32_t id)
 {
-    switch (id) {
-        case NETDATA_KEY_CALLS_READ: {
-            return &efp->hread;
-        }
-        case NETDATA_KEY_CALLS_WRITE: {
-            return &efp->hwrite;
-        }
-        case NETDATA_KEY_CALLS_OPEN: {
-            return &efp->hopen;
-        }
-        case NETDATA_KEY_CALLS_SYNC: {
-            return &efp->hsync;
-        }
-        default: {
-            return NULL;
-        }
+    if (id < NETDATA_KEY_CALLS_READ) {
+        *idx = id;
+        return &efp->hread;
+    } else if (id < NETDATA_KEY_CALLS_WRITE) {
+        *idx = id - NETDATA_KEY_CALLS_READ;
+        return &efp->hwrite;
+    } else if (id < NETDATA_KEY_CALLS_OPEN) {
+        *idx = id - NETDATA_KEY_CALLS_WRITE;
+        return &efp->hopen;
+    } else if (id < NETDATA_KEY_CALLS_SYNC ){
+        *idx = id - NETDATA_KEY_CALLS_OPEN;
+        return &efp->hsync;
     }
+
+    return NULL;
 }
 
 /**
@@ -333,8 +331,9 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
 static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
 {
     netdata_idx_t *values = filesystem_hash_values;
-    netdata_fs_hist_t key = {};
-    netdata_fs_hist_t next_key;
+    uint32_t key = 0;
+    uint32_t next_key;
+    uint32_t idx;
     int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, values);
@@ -343,15 +342,20 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
             continue;
         }
 
-        netdata_ebpf_histogram_t *w = select_hist(efp, key.hist_id);
+        netdata_ebpf_histogram_t *w = select_hist(efp, &idx, key);
+        if (!w) {
+            key = next_key;
+            continue;
+        }
+
         uint64_t total = 0;
         int i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        int end = ebpf_nprocs;
         for (i = 0; i < end; i++) {
             total += values[i];
         }
 
-        w->histogram[key.bin] = total;
+        w->histogram[idx] = total;
         key = next_key;
     }
 }
@@ -391,7 +395,7 @@ void *ebpf_filesystem_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS*em->update_time;
+    usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_time;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -461,6 +465,7 @@ static void ebpf_histogram_send_data()
 /**
  * Main loop for this collector.
  *
+ * @param em main structure for this thread
  */
 static void filesystem_collector(ebpf_module_t *em)
 {

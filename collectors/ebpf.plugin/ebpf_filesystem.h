@@ -16,13 +16,11 @@ typedef struct netdata_fs_hist {
     uint32_t bin;
 } netdata_fs_hist_t;
 
-enum filesystem_counters {
-    NETDATA_KEY_CALLS_READ,
-    NETDATA_KEY_CALLS_WRITE,
-    NETDATA_KEY_CALLS_OPEN,
-    NETDATA_KEY_CALLS_SYNC,
-
-    NETDATA_FS_END
+enum filesystem_limit {
+    NETDATA_KEY_CALLS_READ = 24,
+    NETDATA_KEY_CALLS_WRITE = 48,
+    NETDATA_KEY_CALLS_OPEN = 72,
+    NETDATA_KEY_CALLS_SYNC = 96
 };
 
 enum netdata_filesystem_flags {
