@@ -31,6 +31,8 @@ struct _collector {
     struct _collector *next;
 };
 
+extern struct _collector *collector_list;
+
 struct _collector *_add_collector(const char *hostname, const char *plugin_name, const char *module_name);
 struct _collector *_del_collector(const char *hostname, const char *plugin_name, const char *module_name);
 void _reset_collector_list();

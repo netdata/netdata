@@ -3,7 +3,6 @@
 #define ACLK_UTIL_H
 
 #include "libnetdata/libnetdata.h"
-#include "mqtt_wss_client.h"
 
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
@@ -77,21 +76,5 @@ int aclk_get_conv_log_next();
 
 unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max);
 #define aclk_tbeb_reset(x) aclk_tbeb_delay(1, 0, 0, 0)
-
-typedef enum aclk_proxy_type {
-    PROXY_TYPE_UNKNOWN = 0,
-    PROXY_TYPE_SOCKS5,
-    PROXY_TYPE_HTTP,
-    PROXY_DISABLED,
-    PROXY_NOT_SET,
-} ACLK_PROXY_TYPE;
-
-const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type);
-ACLK_PROXY_TYPE aclk_verify_proxy(const char *string);
-const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type);
-void safe_log_proxy_censor(char *proxy);
-const char *aclk_get_proxy(ACLK_PROXY_TYPE *type);
-
-void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type);
 
 #endif /* ACLK_UTIL_H */

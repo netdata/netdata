@@ -9,12 +9,10 @@
 
 #define ACLK_STATS_THREAD_NAME "ACLK_Stats"
 
-extern netdata_mutex_t aclk_stats_mutex;
+extern netdata_mutex_t legacy_aclk_stats_mutex;
 
-#define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
-#define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
-
-extern int aclk_stats_enabled;
+#define LEGACY_ACLK_STATS_LOCK netdata_mutex_lock(&legacy_aclk_stats_mutex)
+#define LEGACY_ACLK_STATS_UNLOCK netdata_mutex_unlock(&legacy_aclk_stats_mutex)
 
 struct aclk_stats_thread {
     netdata_thread_t *thread;
@@ -22,7 +20,7 @@ struct aclk_stats_thread {
 };
 
 // preserve between samples
-struct aclk_metrics {
+struct legacy_aclk_metrics {
     volatile uint8_t online;
 };
 
@@ -53,7 +51,7 @@ extern struct aclk_mat_metrics {
     struct aclk_metric_mat cloud_q_recvd_to_processed;
 } aclk_mat_metrics;
 
-void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement);
+void legacy_aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement);
 
 #define ACLK_STATS_CLOUD_REQ_TYPE_CNT 7
 // if you change update cloud_req_type_names
@@ -61,7 +59,7 @@ void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurem
 int aclk_cloud_req_type_to_idx(const char *name);
 
 // reset to 0 on every sample
-extern struct aclk_metrics_per_sample {
+extern struct legacy_aclk_metrics_per_sample {
     /* in the unlikely event of ACLK disconnecting
        and reconnecting under 1 sampling rate
        we want to make sure we record the disconnection
@@ -90,13 +88,13 @@ extern struct aclk_metrics_per_sample {
 #endif
     struct aclk_metric_mat_data cloud_q_db_query_time;
     struct aclk_metric_mat_data cloud_q_recvd_to_processed;
-} aclk_metrics_per_sample;
+} legacy_aclk_metrics_per_sample;
 
-extern uint32_t *aclk_queries_per_thread;
+extern uint32_t *legacy_aclk_queries_per_thread;
 extern struct rusage *rusage_per_thread;
 
-void *aclk_stats_main_thread(void *ptr);
-void aclk_stats_thread_cleanup();
-void aclk_stats_upd_online(int online);
+void *legacy_aclk_stats_main_thread(void *ptr);
+void legacy_aclk_stats_thread_cleanup();
+void legacy_aclk_stats_upd_online(int online);
 
 #endif /* NETDATA_ACLK_STATS_H */

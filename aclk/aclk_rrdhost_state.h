@@ -1,8 +1,10 @@
+
 #ifndef ACLK_RRDHOST_STATE_H
 #define ACLK_RRDHOST_STATE_H
 
 #include "libnetdata/libnetdata.h"
 
+#ifdef ACLK_LEGACY
 typedef enum aclk_cmd {
     ACLK_CMD_CLOUD,
     ACLK_CMD_ONCONNECT,
@@ -24,19 +26,20 @@ typedef enum aclk_metadata_state {
 typedef enum aclk_agent_state {
     ACLK_HOST_INITIALIZING,
     ACLK_HOST_STABLE
-} ACLK_POPCORNING_STATE;
+} ACLK_AGENT_STATE;
+#endif
 
 typedef struct aclk_rrdhost_state {
     char *claimed_id; // Claimed ID if host has one otherwise NULL
 
-#ifdef ENABLE_ACLK
+#ifdef ACLK_LEGACY
     // per child popcorning
-    ACLK_POPCORNING_STATE state;
+    ACLK_AGENT_STATE state;
     ACLK_METADATA_STATE metadata;
 
     time_t timestamp_created;
     time_t t_last_popcorn_update;
-#endif /* ENABLE_ACLK */
+#endif /* ACLK_LEGACY */
 } aclk_rrdhost_state;
 
 #endif /* ACLK_RRDHOST_STATE_H */

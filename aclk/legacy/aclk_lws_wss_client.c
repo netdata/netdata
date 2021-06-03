@@ -6,6 +6,7 @@
 #include "daemon/common.h"
 #include "aclk_common.h"
 #include "aclk_stats.h"
+#include "../aclk_proxy.h"
 
 extern int aclk_shutting_down;
 
@@ -450,9 +451,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 if (n>=0) {
                     data->written += n;
                     if (aclk_stats_enabled) {
-                        ACLK_STATS_LOCK;
-                        aclk_metrics_per_sample.write_q_consumed += n;
-                        ACLK_STATS_UNLOCK;
+                        LEGACY_ACLK_STATS_LOCK;
+                        legacy_aclk_metrics_per_sample.write_q_consumed += n;
+                        LEGACY_ACLK_STATS_UNLOCK;
                     }
                 }
                 //error("lws_write(req=%u,written=%u) %zu of %zu",bytes_left, rc, data->written,data->data_size,rc);
@@ -473,9 +474,9 @@ static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reas
                 retval = 1;
             aclk_lws_mutex_unlock(&engine_instance->read_buf_mutex);
             if (aclk_stats_enabled) {
-                ACLK_STATS_LOCK;
-                aclk_metrics_per_sample.read_q_added += len;
-                ACLK_STATS_UNLOCK;
+                LEGACY_ACLK_STATS_LOCK;
+                legacy_aclk_metrics_per_sample.read_q_added += len;
+                LEGACY_ACLK_STATS_UNLOCK;
             }
 
             // to future myself -> do not call this while read lock is active as it will eventually
@@ -553,9 +554,9 @@ int aclk_lws_wss_client_write(void *buf, size_t count)
         aclk_lws_mutex_unlock(&engine_instance->write_buf_mutex);
 
         if (aclk_stats_enabled) {
-            ACLK_STATS_LOCK;
-            aclk_metrics_per_sample.write_q_added += count;
-            ACLK_STATS_UNLOCK;
+            LEGACY_ACLK_STATS_LOCK;
+            legacy_aclk_metrics_per_sample.write_q_added += count;
+            LEGACY_ACLK_STATS_UNLOCK;
         }
 
         lws_callback_on_writable(engine_instance->lws_wsi);
@@ -584,9 +585,9 @@ int aclk_lws_wss_client_read(void *buf, size_t count)
         engine_instance->data_to_read = 0;
 
     if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.read_q_consumed += data_to_be_read;
-        ACLK_STATS_UNLOCK;
+        LEGACY_ACLK_STATS_LOCK;
+        legacy_aclk_metrics_per_sample.read_q_consumed += data_to_be_read;
+        LEGACY_ACLK_STATS_UNLOCK;
     }
 
 abort:

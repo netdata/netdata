@@ -4,8 +4,6 @@
 
 netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
-int aclk_stats_enabled;
-
 int query_thread_count;
 
 // data ACLK stats need per query thread
