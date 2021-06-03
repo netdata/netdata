@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "libnetdata/libnetdata.h"
+#include "database/rrd.h"
 
 #ifdef ACLK_NG
 #include "aclk.h"
@@ -25,6 +26,7 @@ int aclk_ng = 1;
 int aclk_ng = 0;
 #endif
 
+#ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr) {
     //TODO read config
 #ifdef ACLK_NG
@@ -112,6 +114,8 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
 #endif
     fatal("ACLK_DEL_COLLECTOR");
 }
+
+#endif /* ENABLE_ACLK */
 
 struct label *add_aclk_host_labels(struct label *label) {
 #ifdef ACLK_NG
