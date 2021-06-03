@@ -13,7 +13,7 @@
         .name = "SERVICE", \
         .config_section = NULL, \
         .config_name = NULL, \
-        .enabled = 0, \
+        .enabled = 1, \
         .thread = NULL, \
         .init_routine = NULL, \
         .start_routine = service_main \
