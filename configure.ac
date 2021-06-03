@@ -194,11 +194,11 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_WITH(
-    [aclk-ng],
-    [AS_HELP_STRING([--with-aclk-ng],
-                    [Requires ACLK-NG to be used even in case ACLK Legacy can run on this system])],
-    [aclk_ng="$withval"],
-    [aclk_ng="fallback"]
+    [aclk-legacy],
+    [AS_HELP_STRING([--with-aclk-legacy],
+                    [Requires Legacy ACLK to be used even in case ACLK-NG can run on this system])],
+    [aclk_legacy="$withval"],
+    [aclk_legacy="fallback"]
 )
 
 if test "${enable_cloud}" = "no"; then
@@ -636,9 +636,54 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
-if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
-    # just to have all messages that can fail ACLK build in one place
-    # so it is easier to see why it can't be built
+
+if test "$enable_cloud" = "no" -a "$aclk_legacy" = "yes"; then
+    AC_MSG_ERROR([--disable-cloud && --with-aclk-legacy (--aclk-legacy in installer) not allowed together (such configuration is self contradicting)])
+fi
+
+if test "$enable_cloud" != "no" -a "$aclk_legacy" != "yes"; then
+    can_enable_ng="yes"
+    AC_MSG_CHECKING([if git submodules present for ACLK Next Generation])
+    if test -f "mqtt_websockets/src/mqtt_wss_client.c"; then
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+        can_enable_ng="no"
+    fi
+    AC_MSG_CHECKING([if SSL available for ACLK Next Generation])
+    if test -n "${SSL_LIBS}"; then
+        AC_MSG_RESULT([yes])
+        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+    else
+        AC_MSG_RESULT([no])
+    fi
+    AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
+    if test "$enable_jsonc" != "yes"; then
+        AC_MSG_RESULT([no])
+        can_enable_ng="no"
+    else
+        AC_MSG_RESULT([yes])
+    fi
+    AC_MSG_CHECKING([ACLK Next Generation can be built])
+    AC_MSG_RESULT([${can_enable_ng}])
+    if test "$can_enable_ng" = "yes"; then
+        aclk_ng="yes"
+        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
+        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
+        enable_aclk="yes"
+        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
+        OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+        CXX11FLAG="-std=c++11"
+        OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
+    fi
+fi
+
+if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no" -a "$enable_aclk" != "yes"; then
+    if test "$aclk_legacy" != "yes"; then
+        AC_MSG_NOTICE([ACLK-NG could not be built. Trying Legacy ACLK as fallback.])
+    fi
+
     if test -n "${SSL_LIBS}"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
@@ -728,50 +773,6 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "yes"; then
     AC_MSG_RESULT([${enable_aclk}])
 fi
 
-if test "$enable_cloud" = "no" -a "$aclk_ng" = "yes"; then
-    AC_MSG_ERROR([--disable-cloud && --aclk-ng not allowed together (such configuration is self contradicting)])
-fi
-
-if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
-    can_enable_ng="yes"
-    AC_MSG_CHECKING([if git submodules present for ACLK Next Generation])
-    if test -f "mqtt_websockets/src/mqtt_wss_client.c"; then
-        AC_MSG_RESULT([yes])
-    else
-        AC_MSG_RESULT([no])
-        can_enable_ng="no"
-    fi
-    AC_MSG_CHECKING([if SSL available for ACLK Next Generation])
-    if test -n "${SSL_LIBS}"; then
-        AC_MSG_RESULT([yes])
-        OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-        OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-    else
-        AC_MSG_RESULT([no])
-    fi
-    AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
-    if test "$enable_jsonc" != "yes"; then
-        AC_MSG_RESULT([no])
-        can_enable_ng="no"
-    else
-        AC_MSG_RESULT([yes])
-    fi
-    AC_MSG_CHECKING([ACLK Next Generation can be built])
-    AC_MSG_RESULT([${can_enable_ng}])
-    if test "$aclk_ng" = "yes" -a "$can_enable_ng" != "yes"; then
-        AC_MSG_ERROR([ACLK-NG requested but can't be built])
-    fi
-    if test "$aclk_ng" != "yes" -a "$enable_aclk" == "no" -a "$can_enable_ng" = "yes"; then #default "fallback"
-        AC_MSG_NOTICE([ACLK Legacy could not be built. Trying ACLK-NG as fallback.])
-        aclk_ng="yes"
-    fi
-    if test "$aclk_ng" = "yes"; then
-        AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
-        AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        enable_aclk="yes"
-        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
-    fi
-fi
 AC_SUBST([enable_cloud])
 AC_SUBST([enable_aclk])
 AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
