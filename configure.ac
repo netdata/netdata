@@ -644,6 +644,12 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
+if test "$aclk_ng" = "no"; then
+    AC_DEFINE([ACLK_NG_DISABLED], [1], [ACLK NG was disabled by user request])
+fi
+if test "$aclk_legacy" = "no"; then
+    AC_DEFINE([ACLK_LEGACY_DISABLED], [1], [ACLK Legacy was disabled by user request])
+fi
 
 if test "$enable_cloud" = "no" -a "$aclk_legacy" = "yes"; then
     AC_MSG_ERROR([--disable-cloud && --with-aclk-legacy not allowed together (such configuration is self contradicting)])
