@@ -11,9 +11,11 @@
 - Ignore dbengine journal files that can not be read [\#11210](https://github.com/netdata/netdata/pull/11210) ([stelfrag](https://github.com/stelfrag))
 - Use memory mode RAM if memory mode dbengine is specified but not available [\#11207](https://github.com/netdata/netdata/pull/11207) ([stelfrag](https://github.com/stelfrag))
 - Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
+- health: fix alarm-line-charts matching [\#11204](https://github.com/netdata/netdata/pull/11204) ([ilyam8](https://github.com/ilyam8))
 - fix ebpf.plugin segfault when ebpf\_load\_program return null pointer [\#11203](https://github.com/netdata/netdata/pull/11203) ([wangpei-nice](https://github.com/wangpei-nice))
 - fix `install\_type` detection during update [\#11199](https://github.com/netdata/netdata/pull/11199) ([ilyam8](https://github.com/ilyam8))
 - claiming: exit 0 when daemon not running and the claim was successful [\#11195](https://github.com/netdata/netdata/pull/11195) ([ilyam8](https://github.com/ilyam8))
+- Load class, component and type from health log when sufficient fields are detected. [\#11193](https://github.com/netdata/netdata/pull/11193) ([MrZammler](https://github.com/MrZammler))
 - Check return status of execution of anonymous statistics script [\#11188](https://github.com/netdata/netdata/pull/11188) ([MrZammler](https://github.com/MrZammler))
 - VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
 - add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
@@ -313,9 +315,6 @@
 - fix sendmail unrecognized option F error [\#10631](https://github.com/netdata/netdata/pull/10631) ([ilyam8](https://github.com/ilyam8))
 - Fix typo in web/gui/readme.md [\#10623](https://github.com/netdata/netdata/pull/10623) ([OdysLam](https://github.com/OdysLam))
 - add freeswitch to apps\_groups [\#10621](https://github.com/netdata/netdata/pull/10621) ([fayak](https://github.com/fayak))
-- Add ACLK proxy setting as host label [\#10619](https://github.com/netdata/netdata/pull/10619) ([underhood](https://github.com/underhood))
-- dashboard@v2.13.6 [\#10618](https://github.com/netdata/netdata/pull/10618) ([jacekkolasa](https://github.com/jacekkolasa))
-- Disable stock alarms [\#10617](https://github.com/netdata/netdata/pull/10617) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
