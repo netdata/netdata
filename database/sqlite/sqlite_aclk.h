@@ -71,7 +71,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_TIMER,
     ACLK_DATABASE_ADD_CHART,
-    ACLK_DATABASE_FETCH_CHART,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_CHART_ACK,
@@ -168,7 +167,7 @@ extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
 int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
-void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+//void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id);
 void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

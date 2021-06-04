@@ -398,7 +398,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
 inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client *w, char *url) {
     int ret = HTTP_RESP_BAD_REQUEST;
     buffer_flush(w->response.data);
-    int ping = 0;
+//    int ping = 0;
     int sequence_reset = 0;
     int status = 0;
     int nodelist = 0;
@@ -422,7 +422,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "fetch")) ping = atoi(value);
         if(!strcmp(name, "reset")) sequence_reset = atoi(value);
         if(!strcmp(name, "status")) status = atoi(value);
         if(!strcmp(name, "nodelist")) nodelist = 1;
@@ -454,15 +453,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         uuid_unparse_lower(*host->node_id, node_str);
 
         aclk_ack_chart_sequence_id(node_str, (uint64_t) chart_seq_ack);
-//        struct aclk_database_cmd cmd;
-//        cmd.opcode = ACLK_DATABASE_CHART_ACK;
-//        cmd.param1 = (uint64_t) chart_seq_ack;
-//        struct completion compl ;
-//        init_completion(&compl);
-//        cmd.completion = &compl ;
-//        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-//        wait_for_completion(&compl );
-//        destroy_completion(&compl );
         buffer_sprintf(w->response.data, "ACLK_SYNC: Setting last ACK chart sequence for %s to be %d", host->hostname, chart_seq_ack);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
@@ -514,36 +504,36 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         return HTTP_RESP_OK;
     }
 
-    if (ping) {
-        struct aclk_database_cmd cmd;
-        struct aclk_chart_payload_t *result, *tmp_result;
-        cmd.opcode = ACLK_DATABASE_FETCH_CHART;
-        cmd.data = (void *) &result;
-        cmd.count = ping;
-        cmd.completion = NULL;
-
-        struct completion compl ;
-        init_completion(&compl);
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl);
-        destroy_completion(&compl);
-        //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
-        int count = 0;
-        while (result) {
-            tmp_result = result->next;
-            if (count)
-                buffer_strcat(w->response.data,",\n");
-            buffer_sprintf(w->response.data, "{\"sequence_id\": %ld,\n \"last_sequence_id\": %ld, \n\"payload\": %s",
-                           result->sequence_id, result->last_sequence_id, result->payload);
-            freez(result->payload);
-            freez(result);
-            result = tmp_result;
-            count++;
-        }
-        buffer_no_cacheable(w->response.data);
-        return HTTP_RESP_OK;
-    }
+//    if (ping) {
+//        struct aclk_database_cmd cmd;
+//        struct aclk_chart_payload_t *result, *tmp_result;
+//        cmd.opcode = ACLK_DATABASE_FETCH_CHART;
+//        cmd.data = (void *) &result;
+//        cmd.count = ping;
+//        cmd.completion = NULL;
+//
+//        struct completion compl ;
+//        init_completion(&compl);
+//        cmd.completion = &compl ;
+//        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
+//        wait_for_completion(&compl);
+//        destroy_completion(&compl);
+//        //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
+//        int count = 0;
+//        while (result) {
+//            tmp_result = result->next;
+//            if (count)
+//                buffer_strcat(w->response.data,",\n");
+//            buffer_sprintf(w->response.data, "{\"sequence_id\": %ld,\n \"last_sequence_id\": %ld, \n\"payload\": %s",
+//                           result->sequence_id, result->last_sequence_id, result->payload);
+//            freez(result->payload);
+//            freez(result);
+//            result = tmp_result;
+//            count++;
+//        }
+//        buffer_no_cacheable(w->response.data);
+//        return HTTP_RESP_OK;
+//    }
 
     if (sequence_reset) {
         char node_str[GUID_LEN + 1];
