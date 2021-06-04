@@ -300,7 +300,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
-        sql_create_aclk_table(host);
+//        sql_create_aclk_table(host, &host->host_uuid);
         if (host->health_enabled) {
             if (!file_is_migrated(host->health_log_filename)) {
                 sql_create_health_log_table(host);

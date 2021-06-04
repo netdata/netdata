@@ -484,7 +484,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     }
 
     if (create_tables) {
-        sql_create_aclk_table(host);
+        sql_create_aclk_table(host, &host->host_uuid);
         buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK related tables created for host %s", host->hostname);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
