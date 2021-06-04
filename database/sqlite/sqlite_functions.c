@@ -1034,7 +1034,7 @@ void db_execute(const char *cmd)
     int rc;
     int cnt = 0;
     char *err_msg;
-#define SQL_MAX_RETRY 10
+#define SQL_MAX_RETRY 100
     while (cnt < SQL_MAX_RETRY) {
         rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
@@ -2941,9 +2941,9 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             "\t\t\"last_repeat\": \"%lu\",\n"
             "\t\t\"silenced\": \"%s\",\n",
             sqlite3_column_text(res, 0),
-            sqlite3_column_int(res, 1),
-            sqlite3_column_int(res, 2),
-            sqlite3_column_int(res, 3),
+            (unsigned int) sqlite3_column_int(res, 1),
+            (unsigned int) sqlite3_column_int(res, 2),
+            (unsigned int) sqlite3_column_int(res, 3),
             uuid_str,
             sqlite3_column_text(res, 13),
             sqlite3_column_text(res, 14),
@@ -2969,21 +2969,21 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             (long unsigned int)sqlite3_column_int(res, 12),
             (unsigned int)sqlite3_column_int(res, 5),
             (unsigned int)sqlite3_column_int(res, 6),
-            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
+            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
 
-            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
+            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), (char *) sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
             (long unsigned int)sqlite3_column_int(res, 27),
             (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
             char *replaced_info = NULL;
             if (likely(sqlite3_column_text(res, 20))) {
                 char *m = NULL;
-                replaced_info = strdupz(sqlite3_column_text(res, 20));
+                replaced_info = strdupz((char *) sqlite3_column_text(res, 20));
                 size_t pos = 0;
                 while ((m = strstr(replaced_info + pos, "$family"))) {
                     char *buf = NULL;
                     pos = m - replaced_info;
-                    buf = find_and_replace(replaced_info, "$family", sqlite3_column_text(res, 20) ? (const char *)sqlite3_column_text(res, 20) : "", m);
+                    buf = find_and_replace(replaced_info, "$family", (char *) sqlite3_column_text(res, 20) ? (const char *)sqlite3_column_text(res, 20) : "", m);
                     freez(replaced_info);
                     replaced_info = strdupz(buf);
                     freez(buf);
@@ -3112,8 +3112,9 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         /* char *s, *buf = mallocz(65536 + 1); */
         /* size_t line = 0, len = 0; */
-        ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
-        
+        //ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
+        ssize_t errored = 0;
+
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
@@ -3136,7 +3137,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         // Check if we got last_repeat field
         time_t last_repeat = 0;
-        char* alarm_name = strdupz(sqlite3_column_text(res, 14));
+        char* alarm_name = strdupz((char *) sqlite3_column_text(res, 14));
         last_repeat = (time_t)sqlite3_column_int(res, 27);
 
         RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
@@ -3218,8 +3219,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         ae->unique_id               = unique_id;
         
-        if (!is_valid_alarm_id(host, sqlite3_column_text(res, 14), sqlite3_column_text(res, 13), alarm_id))
-            alarm_id = rrdcalc_get_unique_id(host, sqlite3_column_text(res, 14), sqlite3_column_text(res, 13), NULL);
+        if (!is_valid_alarm_id(host, (const char *) sqlite3_column_text(res, 14), (const char *) sqlite3_column_text(res, 13), alarm_id))
+            alarm_id = rrdcalc_get_unique_id(host, (const char *) sqlite3_column_text(res, 14), (const char *) sqlite3_column_text(res, 13), NULL);
         ae->alarm_id                = alarm_id;
 
         //freez(ae->config_hash_id);
@@ -3241,36 +3242,36 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->exec_run_timestamp      = sqlite3_column_int(res, 11);
         ae->delay_up_to_timestamp   = sqlite3_column_int(res, 12);
 
-        ae->name = strdupz(sqlite3_column_text(res, 13));
+        ae->name = strdupz((char *) sqlite3_column_text(res, 13));
         ae->hash_name = simple_hash(ae->name);
 
-        ae->chart = strdupz(sqlite3_column_text(res, 14));
+        ae->chart = strdupz((char *) sqlite3_column_text(res, 14));
         ae->hash_chart = simple_hash(ae->chart);
 
-        ae->family = strdupz(sqlite3_column_text(res, 15));
+        ae->family = strdupz((char *) sqlite3_column_text(res, 15));
 
         if (sqlite3_column_type(res, 16) != SQLITE_NULL)
-            ae->exec = strdupz(sqlite3_column_text(res, 16));
+            ae->exec = strdupz((char *) sqlite3_column_text(res, 16));
         else
             ae->exec = NULL;
 
         if (sqlite3_column_type(res, 17) != SQLITE_NULL)
-            ae->recipient = strdupz(sqlite3_column_text(res, 17));
+            ae->recipient = strdupz((char *) sqlite3_column_text(res, 17));
         else
             ae->recipient = NULL;
 
         if (sqlite3_column_type(res, 18) != SQLITE_NULL)
-            ae->source = strdupz(sqlite3_column_text(res, 18));
+            ae->source = strdupz((char *) sqlite3_column_text(res, 18));
         else
             ae->source = NULL;
 
         if (sqlite3_column_type(res, 19) != SQLITE_NULL)
-            ae->units = strdupz(sqlite3_column_text(res, 19));
+            ae->units = strdupz((char *) sqlite3_column_text(res, 19));
         else
             ae->units = NULL;
 
         if (sqlite3_column_type(res, 20) != SQLITE_NULL)
-            ae->info = strdupz(sqlite3_column_text(res, 20));
+            ae->info = strdupz((char *) sqlite3_column_text(res, 20));
         else
             ae->info = NULL;
 
@@ -3285,17 +3286,17 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->last_repeat = last_repeat;
 
         if (sqlite3_column_type(res, 28) != SQLITE_NULL)
-            ae->classification = strdupz(sqlite3_column_text(res, 28));
+            ae->classification = strdupz((char *) sqlite3_column_text(res, 28));
         else
             ae->classification = NULL;
 
         if (sqlite3_column_type(res, 29) != SQLITE_NULL)
-            ae->component = strdupz(sqlite3_column_text(res, 29));
+            ae->component = strdupz((char *) sqlite3_column_text(res, 29));
         else
             ae->classification = NULL;
 
         if (sqlite3_column_type(res, 30) != SQLITE_NULL)
-            ae->type = strdupz(sqlite3_column_text(res, 30));
+            ae->type = strdupz((char *) sqlite3_column_text(res, 30));
         else
             ae->type = NULL;
 

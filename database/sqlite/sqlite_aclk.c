@@ -184,6 +184,7 @@ void aclk_database_worker(void *arg)
             cmd = aclk_database_deq_cmd(wc);
             opcode = cmd.opcode;
             ++cmd_batch_size;
+            db_lock();
             switch (opcode) {
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
@@ -201,14 +202,14 @@ void aclk_database_worker(void *arg)
                     break;
                 case ACLK_DATABASE_PUSH_CHART:
                     // Fetch one or more charts
-                    info("Pushing chart config to the cloud");
+                    info("Pushing chart info to the cloud for node %s", wc->uuid_str);
                     aclk_push_chart_event(wc, cmd);
                     //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     //freez(cmd.data_param);
                     break;
                 case ACLK_DATABASE_PUSH_CHART_CONFIG:
                     // Fetch one or more charts
-                    info("Pushing chart config to the cloud");
+                    info("Pushing chart config info to the cloud for node %s", wc->uuid_str);
                     aclk_push_chart_config_event(wc, cmd);
                     //aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     //freez(cmd.data_param);
@@ -276,6 +277,7 @@ void aclk_database_worker(void *arg)
                     debug(D_METADATALOG, "%s: default.", __func__);
                     break;
             }
+            db_unlock();
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 
@@ -413,11 +415,13 @@ void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 {
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql, "update aclk_chart_%s set date_submitted = NULL where sequence_id >= %"PRIu64";",
+    buffer_sprintf(sql, "update aclk_chart_%s set status = NULL, date_submitted = NULL where sequence_id >= %"PRIu64";",
                         wc->uuid_str, cmd.param1);
     db_execute(buffer_tostring(sql));
-
     buffer_free(sql);
+
+    sql_chart_deduplicate(wc, cmd);
+
     return;
 }
 
@@ -1599,18 +1603,38 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s; "
-                        "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
-                        "(SELECT unique_id from aclk_chart_%s WHERE status IS NOT NULL AND date_submitted IS NULL); "
-                        "DELETE FROM aclk_chart_payload_%s WHERE "
-                        "unique_id IN (SELECT unique_id FROM t_%s); "
-                        "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); "
-                        "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
-                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str,
-                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str);
+//    buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s; "
+//                        "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
+//                        "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL); "
+//                        "DELETE FROM aclk_chart_payload_%s WHERE "
+//                        "unique_id IN (SELECT unique_id FROM t_%s); "
+//                        "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); "
+//                        "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC; "
+//                        "DROP TABLE IF EXISTS t_%s;",
+//                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str,
+//                       wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
-    //info("DEBUG: %s", buffer_tostring(sql));
+    buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
 
+    buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
+
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);", wc->uuid_str, wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
+
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);", wc->uuid_str, wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
+
+    buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;", wc->uuid_str, wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
+
+    buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
