@@ -319,7 +319,7 @@ monitored.
 
 ### Filesystem configuration
 
-The filesystem configuration has specific options to disable monitoring for filesystems, as default option all 
+The filesystem configuration has specific options to disable monitoring for filesystems, by default all 
 filesystems are monitored.
 
 ```conf
