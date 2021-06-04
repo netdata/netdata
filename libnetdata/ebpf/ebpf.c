@@ -591,9 +591,9 @@ void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
 char **ebpf_fill_histogram_dimension(size_t maximum)
 {
     char *dimensions[] = { "us", "ms", "s"};
-    int previous_dim = 0, now_dim = 0;
-    uint32_t previous_level = 1000, now_level = 1000;
-    uint32_t previous_divisor = 1, now_divisor = 1;
+    int previous_dim = 0, current_dim = 0;
+    uint32_t previous_level = 1000, current_level = 1000;
+    uint32_t previous_divisor = 1, current_divisor = 1;
     uint32_t current = 1, previous = 0;
     uint32_t selector;
     char **out = callocz(maximum, sizeof(char *));
@@ -601,7 +601,7 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
     size_t end = maximum - 1;
     for (selector = 0; selector < end; selector++) {
         snprintf(range, 127, "%u%s->%u%s", previous/previous_divisor, dimensions[previous_dim],
-                 current/now_divisor, dimensions[now_dim]);
+                 current/current_divisor, dimensions[current_dim]);
         out[selector] = strdupz(range);
         previous = (current < 2) ? current : current + 1;
         current <<= 1;
@@ -613,11 +613,11 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
             previous_level *= 1000;
         }
 
-        if (now_dim != 2 && current > now_level) {
-            now_dim++;
+        if (current_dim != 2 && current > current_level) {
+            current_dim++;
 
-            now_divisor *= 1000;
-            now_level *= 1000;
+            current_divisor *= 1000;
+            current_level *= 1000;
         }
     }
     snprintf(range, 127, "%u%s->+Inf", previous/previous_divisor, dimensions[previous_dim]);
