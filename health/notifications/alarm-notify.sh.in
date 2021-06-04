@@ -2788,32 +2788,24 @@ if [ -n "$total_crit_alarms" ]; then
               <tr>
                 <td style=\"border-top:8px solid #F7F8F8;direction:ltr;font-size:0px;padding:20px 0;text-align:center;\">
                   <!--[if mso | IE]><table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\"><tr><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
-                  <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
-                  >
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
                     <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" style=\"vertical-align:top;\" width=\"100%\">
                       <tbody>
                       <tr>
                         <td align=\"left\" style=\"font-size:0px;padding:10px 25px;word-break:break-word;\">
-                          <div
-                            style=\"font-family:Open Sans, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#35414A;\"
-                          >${key}</div>
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:14px;font-weight:600;line-height:1;text-align:left;color:#35414A;\">${key}</div>
                         </td>
                       </tr>
                       <tr>
                         <td align=\"left\" style=\"font-size:0px;padding:10px 25px;padding-top:2px;word-break:break-word;\">
-                          <div
-                            style=\"font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:left;color:#35414A;\"
-                          >${date_c}</div>
+                          <div style=\"font-family:Open Sans, sans-serif;font-size:12px;line-height:1;text-align:left;color:#35414A;\">${date_c}</div>
                         </td>
                       </tr>
                       </tbody>
                     </table>
                   </div>
                   <!--[if mso | IE]></td><td class=\"\" style=\"vertical-align:top;width:300px;\" ><![endif]-->
-                  <div
-                    class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\"
-                  >
+                  <div class=\"mj-column-per-50 mj-outlook-group-fix\" style=\"font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:50%;\">
                     <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\" width=\"100%\">
                       <tbody>
                       <tr>
@@ -2977,9 +2969,7 @@ Content-Transfer-Encoding: 8bit
               <tr>
                 <td style="direction:ltr;font-size:0px;padding:20px 0;padding-bottom:0;padding-top:0;text-align:center;">
                   <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:418.6px;" ><![endif]-->
-                  <div
-                    class="mj-column-per-70 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:70%;"
-                  >
+                  <div class="mj-column-per-70 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:70%;">
                     <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="vertical-align:top;" width="100%">
                       <tbody>
                       <tr>
@@ -3000,9 +2990,7 @@ Content-Transfer-Encoding: 8bit
                             <tbody>
                             <tr>
                               <td style="width:100px;">
-                                <img
-                                  height="auto" src="${alarm_badge}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="100"
-                                />
+                                <img height="auto" src="${alarm_badge}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="100"/>
                               </td>
                             </tr>
                             </tbody>
@@ -3106,11 +3094,8 @@ Content-Transfer-Encoding: 8bit
                           <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;width:100%;line-height:100%;">
                             <tr>
                               <td
-                                align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle"
-                              >
-                                <p
-                                  style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:600;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;"
-                                >
+                                align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle">
+                                <p style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:600;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;">
                                   <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
                                 </p>
                               </td>
@@ -3371,7 +3356,7 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
                       <tr>
                         <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
-                          <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">The node has
+                          <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:center;color:#35414A;">The node has
                             <span style="font-weight:600">${total_warnings} warning</span>
                             and
                             <span style="font-weight:600">${total_critical} critical</span>
