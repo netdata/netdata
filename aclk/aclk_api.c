@@ -49,7 +49,7 @@ void *aclk_starter(void *ptr) {
 
 #ifndef ACLK_LEGACY
     if (!aclk_ng) {
-        error("Configuration requests ACLK Legacy but it is not available in this agent. Switching to NG.")
+        error("Configuration requests ACLK Legacy but it is not available in this agent. Switching to NG.");
         aclk_ng = 1;
     }
 #endif
