@@ -606,7 +606,7 @@ void *ebpf_filesystem_thread(void *ptr)
     }
 
     int algorithms[NETDATA_FILESYSTEM_MAX_BINS];
-    ebpf_set_unique_dimension(algorithms, NETDATA_FILESYSTEM_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
+    ebpf_fill_algorithms(algorithms, NETDATA_FILESYSTEM_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     ebpf_global_labels(filesystem_aggregated_data, filesystem_publish_aggregated, dimensions, dimensions,
                        algorithms, NETDATA_FILESYSTEM_MAX_BINS);
 

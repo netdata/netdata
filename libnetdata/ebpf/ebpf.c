@@ -567,7 +567,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
 //----------------------------------------------------------------------------------------------------------------------
 
 /**
- * Set unique dimension
+ * Fill Algorithms
  *
  * Set one unique dimension for all vector position.
  *
@@ -575,7 +575,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
  * @param length     number of elements of algorithms vector
  * @param algortihm  algorithm used on charts.
 */
-void ebpf_set_unique_dimension(int *algorithms, size_t length, int algorithm)
+void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
 {
     size_t i;
     for (i = 0; i < length; i++) {
