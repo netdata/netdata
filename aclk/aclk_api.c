@@ -149,9 +149,9 @@ struct label *add_aclk_host_labels(struct label *label) {
     label = add_label_to_list(label, "_aclk_ng_available", "false", LABEL_SOURCE_AUTO);
 #endif
 #ifdef ACLK_LEGACY
-    label = add_label_to_list(label, "_aclk_legacy", "true", LABEL_SOURCE_AUTO);
+    label = add_label_to_list(label, "_aclk_legacy_available", "true", LABEL_SOURCE_AUTO);
 #else
-    label = add_label_to_list(label, "_aclk_legacy", "false", LABEL_SOURCE_AUTO);
+    label = add_label_to_list(label, "_aclk_legacy_available", "false", LABEL_SOURCE_AUTO);
 #endif
 #ifdef ENABLE_ACLK
     ACLK_PROXY_TYPE aclk_proxy;

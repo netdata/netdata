@@ -19,6 +19,8 @@ extern int aclk_disable_single_updates;
 
 extern int aclk_stats_enabled;
 
+extern int aclk_ng;
+
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr);
 
