@@ -28,11 +28,14 @@ enum netdata_filesystem_flags {
     NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM = 1,
     NETDATA_FILESYSTEM_FLAG_HAS_PARTITION = 2,
     NETDATA_FILESYSTEM_FLAG_CHART_CREATED = 4,
-    NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE = 8
+    NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE = 8,
+    NETDATA_FILESYSTEM_REMOVE_CHARTS = 16
 };
 
 typedef struct netdata_ebpf_histogram {
     char *name;
+    char *title;
+    int order;
     uint64_t histogram[NETDATA_FILESYSTEM_MAX_BINS];
 } netdata_ebpf_histogram_t;
 
@@ -45,6 +48,7 @@ enum netdata_filesystem_table {
 typedef struct ebpf_filesystem_partitions {
     char *filesystem;
     char *family;
+    char *family_name;
     struct bpf_object *objects;
     struct bpf_link **probe_links;
 

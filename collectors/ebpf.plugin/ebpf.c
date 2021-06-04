@@ -395,6 +395,33 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
 }
 
 /**
+ * Write chart cmd on standard output
+ *
+ * @param type      chart type
+ * @param id        chart id
+ * @param title     chart title
+ * @param units     units label
+ * @param family    group name used to attach the chart on dashboard
+ * @param charttype chart type
+ * @param context   chart context
+ * @param order     chart order
+ */
+void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+                               char *charttype, char *context, int order)
+{
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
+           type,
+           id,
+           title,
+           units,
+           (family)?family:"",
+           (context)?context:"",
+           (charttype)?charttype:"",
+           order,
+           update_every);
+}
+
+/**
  * Write the dimension command on standard output
  *
  * @param name the dimension name
