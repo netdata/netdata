@@ -579,7 +579,7 @@ ACLK_COMMON_FILES = \
 endif
 
 ACLK_ALWAYS_BUILD_FILES = \
-    aclk/legacy/aclk_rrdhost_state.h \
+    aclk/aclk_rrdhost_state.h \
     aclk/aclk_api.c \
     aclk/aclk_api.h \
     aclk/aclk_proxy.c \
