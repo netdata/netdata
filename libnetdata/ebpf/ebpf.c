@@ -560,6 +560,8 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
             bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
         }
     }
+
+    procfile_close(ff);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
