@@ -26,9 +26,34 @@ int aclk_ng = 1;
 int aclk_ng = 0;
 #endif
 
+#define ACLK_IMPL_KEY_NAME "aclk implementation"
+
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr) {
-    //TODO read config
+    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "ng");
+
+    if (!strcasecmp(aclk_impl_req, "ng")) {
+        aclk_ng = 1;
+    } else if (!strcasecmp(aclk_impl_req, "legacy")) {
+        aclk_ng = 0;
+    } else {
+        error("Unknown value \"%s\" of key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\". Using ACLK %s.", aclk_impl_req, aclk_ng ? "NG" : "Legacy");
+    }
+
+#ifndef ACLK_NG
+    if (aclk_ng) {
+        error("Configuration requests ACLK-NG but it is not available in this agent. Switching to Legacy.");
+        aclk_ng = 0;
+    }
+#endif
+
+#ifndef ACLK_LEGACY
+    if (!aclk_ng) {
+        error("Configuration requests ACLK Legacy but it is not available in this agent. Switching to NG.")
+        aclk_ng = 1;
+    }
+#endif
+
 #ifdef ACLK_NG
     if (aclk_ng)
         return aclk_main(ptr);
