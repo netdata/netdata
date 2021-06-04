@@ -728,7 +728,6 @@ set(BACKENDS_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         claim/claim.c
         claim/claim.h
-        aclk/legacy/aclk_rrdhost_state.h
         aclk/legacy/aclk_common.c
         aclk/legacy/aclk_common.h
         )
