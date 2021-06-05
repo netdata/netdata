@@ -594,7 +594,7 @@ void *ebpf_filesystem_thread(void *ptr)
     if (!em->enabled)
         goto endfilesystem;
 
-    // Initialize optional as zero, for we identify when there is not partitions to monitor
+    // Initialize optional as zero, to identify when there are not partitions to monitor
     em->optional = 0;
 
     if (ebpf_update_partitions(em)) {
