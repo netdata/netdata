@@ -3,8 +3,6 @@
 #ifndef NETDATA_SERVICE_H
 #define NETDATA_SERVICE_H 1
 
-#include "daemon/common.h"
-
 /* Run service jobs every X seconds */
 #define SERVICE_HEARTBEAT 10
 
