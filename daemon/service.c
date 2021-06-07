@@ -25,16 +25,10 @@ void *service_main(void *ptr)
 
     debug(D_SYSTEM, "Service thread starts");
 
-    if (unlikely(netdata_exit))
-        goto cleanup;
-
     sec = 0;
-    while (1) {
+    while (!netdata_exit) {
         heartbeat_next(&hb, step);
         sec++;
-
-        if (unlikely(netdata_exit))
-            break;
 
         if (likely(sec < SERVICE_HEARTBEAT))
             continue;
@@ -62,7 +56,6 @@ void *service_main(void *ptr)
         sec = 0;
     }
 
-cleanup:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
