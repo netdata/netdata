@@ -3,9 +3,6 @@
 #ifndef NETDATA_SERVICE_H
 #define NETDATA_SERVICE_H 1
 
-/* Run service jobs every X seconds */
-#define SERVICE_HEARTBEAT 10
-
 #define NETDATA_PLUGIN_HOOK_SERVICE \
     { \
         .name = "SERVICE", \

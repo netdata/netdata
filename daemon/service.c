@@ -2,6 +2,9 @@
 
 #include "common.h"
 
+/* Run service jobs every X seconds */
+#define SERVICE_HEARTBEAT 10
+
 void service_main_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
