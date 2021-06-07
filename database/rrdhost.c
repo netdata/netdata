@@ -1460,6 +1460,30 @@ restart_after_removal:
     }
 }
 
+void rrd_cleanup_obsolete_charts()
+{
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host)
+    {
+        if (host->obsolete_charts_count) {
+            rrdhost_wrlock(host);
+#ifdef ENABLE_ACLK
+            host->deleted_charts_count = 0;
+#endif
+            rrdhost_cleanup_obsolete_charts(host);
+#ifdef ENABLE_ACLK
+            if (host->deleted_charts_count)
+                aclk_update_chart(host, "dummy-chart", ACLK_CMD_CHARTDEL);
+#endif
+            rrdhost_unlock(host);
+        }
+    }
+
+    rrd_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL

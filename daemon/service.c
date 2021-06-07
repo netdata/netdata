@@ -30,25 +30,7 @@ void *service_main(void *ptr)
     while (!netdata_exit) {
         heartbeat_next(&hb, step);
 
-        rrd_rdlock();
-
-        RRDHOST *host;
-        rrdhost_foreach_read(host) {
-            if (host->obsolete_charts_count) {
-                rrdhost_wrlock(host);
-#ifdef ENABLE_ACLK
-                host->deleted_charts_count = 0;
-#endif
-                rrdhost_cleanup_obsolete_charts(host);
-#ifdef ENABLE_ACLK
-                if (host->deleted_charts_count)
-                    aclk_update_chart(host, "dummy-chart", ACLK_CMD_CHARTDEL);
-#endif
-                rrdhost_unlock(host);
-            }
-        }
-
-        rrd_unlock();
+        rrd_cleanup_obsolete_charts();
     }
 
     netdata_thread_cleanup_pop(1);

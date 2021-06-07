@@ -1039,7 +1039,7 @@ extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
-extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
+extern void rrd_cleanup_obsolete_charts();
 
 extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
 
