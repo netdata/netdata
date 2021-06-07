@@ -592,7 +592,7 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
 {
     char *dimensions[] = { "us", "ms", "s"};
     int previous_dim = 0, current_dim = 0;
-    uint32_t previous_level = 1000, current_level = 1000, factor = 1, test_factor = 4;
+    uint32_t previous_level = 1000, current_level = 1000;
     uint32_t previous_divisor = 1, current_divisor = 1;
     uint32_t current = 1, previous = 0;
     uint32_t selector;
@@ -600,9 +600,8 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
     char range[128];
     size_t end = maximum - 1;
     for (selector = 0; selector < end; selector++) {
-        uint32_t value = (current < test_factor) ? current : current - factor;
         snprintf(range, 127, "%u%s->%u%s", previous/previous_divisor, dimensions[previous_dim],
-                 value/current_divisor, dimensions[current_dim]);
+                 current/current_divisor, dimensions[current_dim]);
         out[selector] = strdupz(range);
         previous = current;
         current <<= 1;
@@ -619,9 +618,6 @@ char **ebpf_fill_histogram_dimension(size_t maximum)
 
             current_divisor *= 1000;
             current_level *= 1000;
-
-            factor *= 1000;
-            test_factor *= 1000;
         }
     }
     snprintf(range, 127, "%u%s->+Inf", previous/previous_divisor, dimensions[previous_dim]);
