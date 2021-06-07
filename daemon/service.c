@@ -18,20 +18,14 @@ void service_main_cleanup(void *ptr)
 void *service_main(void *ptr)
 {
     netdata_thread_cleanup_push(service_main_cleanup, ptr);
-    unsigned int sec = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = USEC_PER_SEC;
+    usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
 
     debug(D_SYSTEM, "Service thread starts");
 
-    sec = 0;
     while (!netdata_exit) {
         heartbeat_next(&hb, step);
-        sec++;
-
-        if (likely(sec < SERVICE_HEARTBEAT))
-            continue;
 
         rrd_rdlock();
 
@@ -52,8 +46,6 @@ void *service_main(void *ptr)
         }
 
         rrd_unlock();
-
-        sec = 0;
     }
 
     netdata_thread_cleanup_pop(1);
