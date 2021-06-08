@@ -522,3 +522,123 @@ void ebpf_update_module(ebpf_module_t *em)
 
     ebpf_update_module_using_config(em);
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Load Address
+ *
+ * Helper used to get address from /proc/kallsym
+ *
+ * @param fa address structure
+ * @param fd file descriptor loaded inside kernel.
+ */
+void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
+{
+    if (fa->addr)
+        return ;
+
+    procfile *ff = procfile_open("/proc/kallsyms", " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff)
+        return;
+
+    ff = procfile_readall(ff);
+    if (!ff)
+        return;
+
+    fa->hash = simple_hash(fa->function);
+
+    size_t lines = procfile_lines(ff), l;
+    for(l = 0; l < lines ;l++) {
+        char *fcnt = procfile_lineword(ff, l, 2);
+        uint32_t hash = simple_hash(fcnt);
+        if (fa->hash == hash && !strcmp(fcnt, fa->function)) {
+            char addr[128];
+            snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
+            fa->addr = (unsigned long) strtoul(addr, NULL, 16);
+            uint32_t key = 0;
+            bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+        }
+    }
+
+    procfile_close(ff);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Fill Algorithms
+ *
+ * Set one unique dimension for all vector position.
+ *
+ * @param algorithms the output vector
+ * @param length     number of elements of algorithms vector
+ * @param algortihm  algorithm used on charts.
+*/
+void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
+{
+    size_t i;
+    for (i = 0; i < length; i++) {
+        algorithms[i] = algorithm;
+    }
+}
+
+/**
+ * Fill Histogram dimension
+ *
+ * Fill the histogram dimension with the specified ranges
+ */
+char **ebpf_fill_histogram_dimension(size_t maximum)
+{
+    char *dimensions[] = { "us", "ms", "s"};
+    int previous_dim = 0, current_dim = 0;
+    uint32_t previous_level = 1000, current_level = 1000;
+    uint32_t previous_divisor = 1, current_divisor = 1;
+    uint32_t current = 1, previous = 0;
+    uint32_t selector;
+    char **out = callocz(maximum, sizeof(char *));
+    char range[128];
+    size_t end = maximum - 1;
+    for (selector = 0; selector < end; selector++) {
+        snprintf(range, 127, "%u%s->%u%s", previous/previous_divisor, dimensions[previous_dim],
+                 current/current_divisor, dimensions[current_dim]);
+        out[selector] = strdupz(range);
+        previous = current;
+        current <<= 1;
+
+        if (previous_dim != 2 && previous > previous_level) {
+            previous_dim++;
+
+            previous_divisor *= 1000;
+            previous_level *= 1000;
+        }
+
+        if (current_dim != 2 && current > current_level) {
+            current_dim++;
+
+            current_divisor *= 1000;
+            current_level *= 1000;
+        }
+    }
+    snprintf(range, 127, "%u%s->+Inf", previous/previous_divisor, dimensions[previous_dim]);
+    out[selector] = strdupz(range);
+
+    return out;
+}
+
+/**
+ * Histogram dimension cleanup
+ *
+ * Cleanup dimensions allocated with function ebpf_fill_histogram_dimension
+ *
+ * @param ptr
+ * @param length
+ */
+void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
+{
+    size_t i;
+    for (i = 0; i < length; i++) {
+        freez(ptr[i]);
+    }
+    freez(ptr);
+}

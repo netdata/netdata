@@ -109,6 +109,11 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
       .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE },
+    { .thread_name = "filesystem", .config_name = "filesystem", .enabled = 0, .start_routine = ebpf_filesystem_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
+      .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -390,6 +395,33 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
 }
 
 /**
+ * Write chart cmd on standard output
+ *
+ * @param type      chart type
+ * @param id        chart id
+ * @param title     chart title
+ * @param units     units label
+ * @param family    group name used to attach the chart on dashboard
+ * @param charttype chart type
+ * @param context   chart context
+ * @param order     chart order
+ */
+void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+                               char *charttype, char *context, int order)
+{
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
+           type,
+           id,
+           title,
+           units,
+           (family)?family:"",
+           (context)?context:"",
+           (charttype)?charttype:"",
+           order,
+           update_every);
+}
+
+/**
  * Write the dimension command on standard output
  *
  * @param name the dimension name
@@ -624,6 +656,8 @@ void ebpf_print_help()
             " --cachestat or -c   Enable charts related to process run time.\n"
             "\n"
             " --dcstat or -d      Enable charts related to directory cache.\n"
+            "\n"
+            " --filesystem or -i  Enable chart related to filesystem run time.\n"
             "\n"
             " --net or -n         Enable network viewer charts.\n"
             "\n"
@@ -940,6 +974,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem",
+                                    CONFIG_BOOLEAN_NO);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1018,18 +1059,19 @@ static void parse_args(int argc, char **argv)
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
-        {"help",      no_argument,    0,  'h' },
-        {"version",   no_argument,    0,  'v' },
-        {"global",    no_argument,    0,  'g' },
-        {"all",       no_argument,    0,  'a' },
-        {"cachestat", no_argument,    0,  'c' },
-        {"dcstat",    no_argument,    0,  'd' },
-        {"net",       no_argument,    0,  'n' },
-        {"process",   no_argument,    0,  'p' },
-        {"return",    no_argument,    0,  'r' },
-        {"sync",      no_argument,    0,  's' },
-        {"swap",      no_argument,    0,  'w' },
-        {"vfs",       no_argument,    0,  'f' },
+        {"help",       no_argument,    0,  'h' },
+        {"version",    no_argument,    0,  'v' },
+        {"global",     no_argument,    0,  'g' },
+        {"all",        no_argument,    0,  'a' },
+        {"cachestat",  no_argument,    0,  'c' },
+        {"dcstat",     no_argument,    0,  'd' },
+        {"filesystem", no_argument,    0,  'i' },
+        {"net",        no_argument,    0,  'n' },
+        {"process",    no_argument,    0,  'p' },
+        {"return",     no_argument,    0,  'r' },
+        {"sync",       no_argument,    0,  's' },
+        {"swap",       no_argument,    0,  'w' },
+        {"vfs",        no_argument,    0,  'f' },
         {0, 0, 0, 0}
     };
 
@@ -1088,6 +1130,14 @@ static void parse_args(int argc, char **argv)
 #ifdef NETDATA_INTERNAL_CHECKS
                 info(
                     "EBPF enabling \"DCSTAT\" charts, because it was started with the option \"--dcstat\" or \"-d\".");
+#endif
+                break;
+            }
+            case 'i': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"filesystem\" chart, because it was started with the option \"--filesystem\" or \"-i\".");
 #endif
                 break;
             }
@@ -1285,6 +1335,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_SWAP_IDX].start_routine},
         {"EBPF VFS" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_VFS_IDX].start_routine},
+        {"EBPF FILESYSTEM" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };

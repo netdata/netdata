@@ -5,6 +5,7 @@
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+#include <stdlib.h> // Necessary for stdtoul
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 #define NETDATA_KALLSYMS "/proc/kallsyms"
@@ -87,6 +88,14 @@
 #define VERSION_STRING_LEN 256
 #define EBPF_KERNEL_REJECT_LIST_FILE "ebpf_kernel_reject_list.txt"
 
+
+typedef struct ebpf_addresses {
+    char *function;
+    uint32_t hash;
+    // We use long as address, because it matches system length
+    unsigned long addr;
+} ebpf_addresses_t;
+
 extern char *ebpf_user_config_dir;
 extern char *ebpf_stock_config_dir;
 
@@ -154,5 +163,9 @@ extern int ebpf_load_config(struct config *config, char *filename);
 extern void ebpf_update_module_using_config(ebpf_module_t *modules);
 extern void ebpf_update_module(ebpf_module_t *em);
 extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
+extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
+extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
+extern char **ebpf_fill_histogram_dimension(size_t maximum);
+extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 #endif /* NETDATA_EBPF_H */

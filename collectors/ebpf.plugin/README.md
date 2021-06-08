@@ -216,6 +216,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
     `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and 
     files are not found.
+-   `filesystem`: This eBPF program creates charts that show latency information for selected filesystem.
 -   `process`: This eBPF program creates charts that show information about process creation, calls to open files.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
@@ -239,6 +240,7 @@ The following configuration files are available:
 
 - `cachestat.conf`: Configuration for the `cachestat` thread.
 - `dcstat.conf`: Configuration for the `dcstat` thread.
+- `filesystem.conf`: Configuration for the `filesystem` thread.
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
   also lets you specify which network the eBPF collector monitors.
@@ -313,6 +315,16 @@ monitored.
     fdatasync = yes
     syncfs = yes
     sync_file_range = yes
+```
+
+### Filesystem configuration
+
+The filesystem configuration has specific options to disable monitoring for filesystems, by default all 
+filesystems are monitored.
+
+```conf
+[filesystem]
+    ext4dist = yes
 ```
 
 ## Troubleshooting
