@@ -18,9 +18,8 @@ jobs:
         with:
           submodules: recursive
       - name: Install the agent
-        run: >-
-          sudo apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libelf-dev libmnl-dev
-          gcc make git autoconf autoconf-archive autogen automake pkg-config curl python cmake &&
+        run: |
+          ./packaging/installer/install-required-packages.sh netdata --non-interactive--dont-wait
           sudo ./netdata-installer.sh --dont-wait
       - name: Cypress run
         run: |
