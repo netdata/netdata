@@ -397,24 +397,14 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
     uint32_t key;
     uint32_t idx;
     int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
-#ifdef NETDATA_INTERNAL_CHECKS
-    errno = 0;
-    error("READ FILESYSTEM TABLE %s", efp->filesystem);
-#endif
     for (key = 0; key < NETDATA_KEY_CALLS_SYNC; key++) {
         netdata_ebpf_histogram_t *w = select_hist(efp, &idx, key);
         if (!w) {
             continue;
         }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        error("key: %X", htonl(key));
-#endif
         int test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            error("value ALL CPU: 0");
-#endif
             continue;
         }
 
@@ -423,9 +413,6 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
         int end = ebpf_nprocs;
         for (i = 0; i < end; i++) {
             total += values[i];
-#ifdef NETDATA_INTERNAL_CHECKS
-            error("value (CPU %d): %lX\n", i, htobe64(values[i]));
-#endif
         }
 
         w->histogram[idx] = total;
