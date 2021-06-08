@@ -228,10 +228,12 @@ static int ebpf_read_local_partitions()
     }
 
     for(l = 0; l < lines ; l++) {
-        char *fs = procfile_lineword(ff, l, 7);
-        // When `shared` options is added to mount information, the filesystem shifts one position
-        if (*fs == '-')
-            fs = procfile_lineword(ff, l,8);
+        // In "normal" situation the expected value is at column 7
+        // When `shared` options is added to mount information, the filesystem is at column 8
+        // Finally when we have systemd starting netdata, it will be at column 9
+        unsigned long index = procfile_linewords(ff, l) - 3;
+
+        char *fs = procfile_lineword(ff, l, index);
 
         for (i = 0; localfs[i].filesystem; i++) {
             ebpf_filesystem_partitions_t *w = &localfs[i];
