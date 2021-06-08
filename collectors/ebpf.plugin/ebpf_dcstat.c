@@ -549,7 +549,6 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    memset(dcstat_values, 0, length * sizeof(netdata_idx_t));
     memset(dcstat_counter_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
     memset(dcstat_counter_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
 }
