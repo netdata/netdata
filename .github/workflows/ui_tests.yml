@@ -19,7 +19,7 @@ jobs:
           submodules: recursive
       - name: Install the agent
         run: |
-          ./packaging/installer/install-required-packages.sh netdata --non-interactive--dont-wait
+          ./packaging/installer/install-required-packages.sh netdata --non-interactive --dont-wait
           sudo ./netdata-installer.sh --dont-wait
       - name: Cypress run
         run: |
