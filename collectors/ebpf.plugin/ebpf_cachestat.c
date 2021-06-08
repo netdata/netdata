@@ -16,7 +16,8 @@ static netdata_publish_syscall_t cachestat_counter_publish_aggregated[NETDATA_CA
 
 netdata_cachestat_pid_t *cachestat_vector = NULL;
 
-static netdata_idx_t *cachestat_hash_values = NULL;
+static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
+static netdata_idx_t *cachestat_values = NULL;
 
 static int read_thread_closed = 1;
 
@@ -78,7 +79,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
 
     freez(cachestat_vector);
-    freez(cachestat_hash_values);
+    freez(cachestat_values);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -333,12 +334,18 @@ static void read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = cachestat_hash_values;
-    netdata_idx_t stored;
+    netdata_idx_t *stored = cachestat_values;
     int fd = map_fd[NETDATA_CACHESTAT_GLOBAL_STATS];
 
     for (idx = NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU; idx < NETDATA_CACHESTAT_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-            val[idx] = stored;
+        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+            int i;
+            int end = ebpf_nprocs;
+            netdata_idx_t total = 0;
+            for (i = 0; i < end; i++)
+                total += stored[i];
+
+            val[idx] = total;
         }
     }
 }
@@ -588,8 +595,9 @@ static void ebpf_cachestat_allocate_global_vectors(size_t length)
     cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
-    cachestat_hash_values = callocz(length, sizeof(netdata_idx_t));
+    cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
+    memset(cachestat_hash_values, 0, length * sizeof(netdata_idx_t));
     memset(cachestat_counter_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
     memset(cachestat_counter_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
 }
