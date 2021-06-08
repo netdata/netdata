@@ -167,7 +167,7 @@ static void read_global_table()
         uint64_t total = 0;
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             int i;
-            int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+            int end = ebpf_nprocs;
             for (i = 0; i < end; i++)
                 total += val[i];
         }
