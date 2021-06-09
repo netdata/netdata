@@ -9,6 +9,8 @@ on:
   pull_request:
     paths:
       - '**.md'
+env:
+  DO_NOT_TRACK: 1
 jobs:
   markdown-link-check:
     name: Broken Links

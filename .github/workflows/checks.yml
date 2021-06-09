@@ -5,6 +5,8 @@ on:
     branches:
       - master
   pull_request:
+env:
+  DO_NOT_TRACK: 1
 jobs:
   checksum-checks:
     name: Checksums

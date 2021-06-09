@@ -4,6 +4,7 @@ FROM ${BASE}
 
 ARG PRE
 ENV PRE=${PRE}
+ENV DO_NOT_TRACK=1
 
 COPY . /netdata
 

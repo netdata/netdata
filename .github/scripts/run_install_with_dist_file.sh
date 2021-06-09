@@ -29,6 +29,7 @@ printf >&2 "Entering %s and starting docker run ..." "${distdir}"
 
 pushd "${distdir}" || exit 1
 docker run \
+  -e DO_NOT_TRACK=1 \
   -v "${PWD}:/netdata" \
   -w /netdata \
   "ubuntu:latest" \

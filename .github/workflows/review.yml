@@ -8,6 +8,7 @@ env:
   run_hadolint: 0
   run_shellcheck: 0
   run_yamllint: 0
+  DO_NOT_TRACK: 1
 jobs:
   eslint:
     name: eslint

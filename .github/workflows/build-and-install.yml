@@ -5,6 +5,8 @@ on:
     branches:
       - master
   pull_request:
+env:
+  DO_NOT_TRACK: 1
 jobs:
   static-build:
     name: Build (x86_64)
@@ -207,5 +209,5 @@ jobs:
             ./build-kinesis.sh &&
             ./netdata-installer.sh --dont-wait --dont-start-it --enable-backend-kinesis
         run: |
-          docker run -w /netdata test \
+          docker run -e DO_NOT_TRACK=1 -w /netdata test \
             /bin/sh -c "$RUNCMD"
