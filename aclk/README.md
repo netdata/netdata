@@ -20,7 +20,8 @@ documentation](/claim/README.md).
 
 ## Data privacy
 
-Privacy is very important to us. We firmly believe that your data belongs to you. This is why **we don't store any metric data in Netdata Cloud**. 
+[Data privacy](https://netdata.cloud/data-privacy/) is very important to us. We firmly believe that your data belongs to
+you. This is why **we don't store any metric data in Netdata Cloud**. 
 
 All the data that the user sees in the web browser when using Netdata Cloud, are actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. They pass through our systems, but they are not stored.
 
