@@ -20,7 +20,7 @@ jobs:
       - name: Install the agent
         run: |
           ./packaging/installer/install-required-packages.sh netdata --non-interactive --dont-wait
-          sudo ./netdata-installer.sh --dont-wait
+          sudo ./netdata-installer.sh --dont-wait --disable-telemetry
       - name: Cypress run
         run: |
           npm install cypress --save-dev
