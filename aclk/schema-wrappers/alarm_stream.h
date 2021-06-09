@@ -65,7 +65,7 @@ struct alarm_log_entry {
     uint64_t delay_up_to_timestamp;
 
     uint64_t last_repeat;
-    bool silenced;
+    int silenced;
     double value;
     double old_value;
 
