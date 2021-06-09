@@ -1154,7 +1154,6 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             rrdset_unlock(st);
         }
         count++;
-
     }
 
     rc = sqlite3_finalize(res);
@@ -1167,6 +1166,12 @@ fail:
                         "where (status = 'processing' or (status is NULL and date_submitted is NULL)) "
                         "and sequence_id between %ld and %ld;", wc->uuid_str, first_sequence, last_sequence);
     db_execute(buffer_tostring(sql));
+    if  (count == 0) {
+        freez(payload_list);
+        freez(payload_list_size);
+        freez(position_list);
+        payload_list = NULL;
+    }
 
     if (payload_list) {
        payload_list = realloc(payload_list, (limit + total_dimension_count + 1) * sizeof(char *));
@@ -1201,7 +1206,6 @@ fail:
 
 //        void aclk_chart_inst_and_dim_update(char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions)
         aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list);
-
     }
 
 fail_complete:
