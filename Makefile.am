@@ -3,7 +3,7 @@
 AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
-BUILT_SOURCES=$(NULL)
+nodist_netdata_SOURCES=$(NULL)
 
 MAINTAINERCLEANFILES = \
     config.log config.status \
@@ -598,7 +598,7 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrappers.h \
     $(NULL)
 
-BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+ACLK_NG_PROTO_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
@@ -618,6 +618,9 @@ BUILT_SOURCES += aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/alarm/v1/config.pb.h \
     aclk/aclk-schemas/proto/alarm/v1/stream.pb.cc \
     aclk/aclk-schemas/proto/alarm/v1/stream.pb.h \
+    $(NULL)
+
+nodist_netdata_SOURCES += $(ACLK_NG_PROTO_FILES) \
     $(NULL)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
@@ -981,11 +984,11 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
         $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
         $(OPTIONAL_PROTOBUF_LIBS) \
         $(NULL)
-    BUILT_SOURCES += \
+    BUILT_SOURCES = \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
-    nodist_netdata_SOURCES = $(BUILT_SOURCES)
+    nodist_netdata_SOURCES += $(BUILT_SOURCES)
 
 exporting/prometheus/remote_write/remote_write.pb.cc \
 exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
