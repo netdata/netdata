@@ -74,6 +74,7 @@ extern void sql_build_context_param_list(struct context_param **param_list, RRDH
 extern void store_claim_id(uuid_t *host_id, uuid_t *claim_id);
 extern int update_node_id(uuid_t *host_id, uuid_t *node_id);
 extern int get_node_id(uuid_t *host_id, uuid_t *node_id);
+extern int get_host_id(uuid_t *node_id, uuid_t *host_id);
 extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
