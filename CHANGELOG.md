@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- eBPF ext4 \(new thread for collector\) [\#11224](https://github.com/netdata/netdata/pull/11224) ([thiagoftsm](https://github.com/thiagoftsm))
+- python.d: merge user/stock plugin configuration files [\#11217](https://github.com/netdata/netdata/pull/11217) ([ilyam8](https://github.com/ilyam8))
 - Only report the exit code when anonymous statistics script fails [\#11215](https://github.com/netdata/netdata/pull/11215) ([MrZammler](https://github.com/MrZammler))
 - Reduce memory needed per dimension [\#11212](https://github.com/netdata/netdata/pull/11212) ([stelfrag](https://github.com/stelfrag))
 - Ignore dbengine journal files that can not be read [\#11210](https://github.com/netdata/netdata/pull/11210) ([stelfrag](https://github.com/stelfrag))
@@ -314,7 +316,6 @@
 - collectors/proc: fix collecting operstate for virtual network interfaces [\#10633](https://github.com/netdata/netdata/pull/10633) ([ilyam8](https://github.com/ilyam8))
 - fix sendmail unrecognized option F error [\#10631](https://github.com/netdata/netdata/pull/10631) ([ilyam8](https://github.com/ilyam8))
 - Fix typo in web/gui/readme.md [\#10623](https://github.com/netdata/netdata/pull/10623) ([OdysLam](https://github.com/OdysLam))
-- add freeswitch to apps\_groups [\#10621](https://github.com/netdata/netdata/pull/10621) ([fayak](https://github.com/fayak))
 
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
