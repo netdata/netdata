@@ -23,7 +23,7 @@ if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "${DO_NOT
 fi
 
 NETDATA_IS_IN_CI="false"
-[ ! -z "${CI}" ] && NETDATA_IS_IN_CI="true"
+[ -n "${CI}" ] && NETDATA_IS_IN_CI="true"
 
 # -------------------------------------------------------------------------------------------------
 # Get the extra variables
