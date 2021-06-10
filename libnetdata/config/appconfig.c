@@ -716,13 +716,76 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
     return 1;
 }
 
+struct appconfig_generate_section_helper {
+    int pass;
+    int only_changed;
+    BUFFER *wb;
+};
+
+int appconfig_generate_section(void *entry, void *data)
+{
+    int pri;
+    struct section *co = (struct section *)entry;
+    struct config_option *cv;
+    struct appconfig_generate_section_helper *helper = (struct appconfig_generate_section_helper *)data;
+    BUFFER *wb = helper->wb;
+
+    if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
+        || !strcmp(co->name, CONFIG_SECTION_WEB)
+        || !strcmp(co->name, CONFIG_SECTION_STATSD)
+        || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
+        || !strcmp(co->name, CONFIG_SECTION_CLOUD)
+        || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
+        || !strcmp(co->name, CONFIG_SECTION_HEALTH)
+        || !strcmp(co->name, CONFIG_SECTION_BACKEND)
+        || !strcmp(co->name, CONFIG_SECTION_STREAM)
+        || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
+            )
+        pri = 0;
+    else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
+    else pri = 2;
+
+    if(helper->pass == pri) {
+        int loaded = 0;
+        int used = 0;
+        int changed = 0;
+        int count = 0;
+
+        config_section_wrlock(co);
+        for(cv = co->values; cv ; cv = cv->next) {
+            used += (cv->flags & CONFIG_VALUE_USED)?1:0;
+            loaded += (cv->flags & CONFIG_VALUE_LOADED)?1:0;
+            changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
+            count++;
+        }
+        config_section_unlock(co);
+
+        if(!count) return 0;
+        if(helper->only_changed && !changed && !loaded) return 0;
+
+        if(!used) {
+            buffer_sprintf(wb, "\n# section '%s' is not used.", co->name);
+        }
+
+        buffer_sprintf(wb, "\n[%s]\n", co->name);
+
+        config_section_wrlock(co);
+        for(cv = co->values; cv ; cv = cv->next) {
+
+            if(used && !(cv->flags & CONFIG_VALUE_USED)) {
+                buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
+            }
+            buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_LOADED)) && (!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
+        }
+        config_section_unlock(co);
+    }
+
+    return 0;
+}
+
 void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 {
-    int i, pri;
-    struct section *co;
-    struct config_option *cv;
-
-    for(i = 0; i < 3 ;i++) {
+    for(int i = 0; i < 3;i++) {
         switch(i) {
             case 0:
                 buffer_strcat(wb,
@@ -748,60 +811,9 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                 buffer_strcat(wb, "\n\n# per chart configuration\n");
                 break;
         }
+        struct appconfig_generate_section_helper helper = {.pass = i, .only_changed = only_changed, .wb = wb};
 
-        appconfig_wrlock(root);
-        for(co = root->first_section; co ; co = co->next) {
-            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
-               || !strcmp(co->name, CONFIG_SECTION_WEB)
-               || !strcmp(co->name, CONFIG_SECTION_STATSD)
-               || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
-               || !strcmp(co->name, CONFIG_SECTION_CLOUD)
-               || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
-               || !strcmp(co->name, CONFIG_SECTION_HEALTH)
-               || !strcmp(co->name, CONFIG_SECTION_BACKEND)
-               || !strcmp(co->name, CONFIG_SECTION_STREAM)
-               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
-                    )
-                pri = 0;
-            else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
-            else pri = 2;
-
-            if(i == pri) {
-                int loaded = 0;
-                int used = 0;
-                int changed = 0;
-                int count = 0;
-
-                config_section_wrlock(co);
-                for(cv = co->values; cv ; cv = cv->next) {
-                    used += (cv->flags & CONFIG_VALUE_USED)?1:0;
-                    loaded += (cv->flags & CONFIG_VALUE_LOADED)?1:0;
-                    changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
-                    count++;
-                }
-                config_section_unlock(co);
-
-                if(!count) continue;
-                if(only_changed && !changed && !loaded) continue;
-
-                if(!used) {
-                    buffer_sprintf(wb, "\n# section '%s' is not used.", co->name);
-                }
-
-                buffer_sprintf(wb, "\n[%s]\n", co->name);
-
-                config_section_wrlock(co);
-                for(cv = co->values; cv ; cv = cv->next) {
-
-                    if(used && !(cv->flags & CONFIG_VALUE_USED)) {
-                        buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
-                    }
-                    buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_LOADED)) && (!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
-                }
-                config_section_unlock(co);
-            }
-        }
-        appconfig_unlock(root);
+        avl_traverse_lock(&root->index, appconfig_generate_section, (void *)&helper);
     }
 }
 

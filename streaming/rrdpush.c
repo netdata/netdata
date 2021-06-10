@@ -27,8 +27,6 @@
  */
 
 struct config stream_config = {
-        .first_section = NULL,
-        .last_section = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 .avl_tree = {
@@ -144,21 +142,26 @@ static inline int should_send_chart_matching(RRDSET *st) {
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
 }
 
+int configured_as_parent_cb(void *entry, void *data)
+{
+    UNUSED(data);
+    struct section *section = (struct section *)entry;
+    int *is_parent = (int *)data;
+    uuid_t uuid;
+
+    if (uuid_parse(section->name, uuid) != -1 &&
+            appconfig_get_boolean_by_section(section, "enabled", 0)) {
+        *is_parent = 1;
+        return -1;
+    }
+
+    return 0;
+}
+
 int configured_as_parent() {
-    struct section *section = NULL;
     int is_parent = 0;
 
-    appconfig_wrlock(&stream_config);
-    for (section = stream_config.first_section; section; section = section->next) {
-        uuid_t uuid;
-
-        if (uuid_parse(section->name, uuid) != -1 &&
-                appconfig_get_boolean_by_section(section, "enabled", 0)) {
-            is_parent = 1;
-            break;
-        }
-    }
-    appconfig_unlock(&stream_config);
+    avl_traverse_lock(&stream_config.index, configured_as_parent_cb, (void *)&is_parent);
 
     return is_parent;
 }
