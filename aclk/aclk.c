@@ -775,7 +775,7 @@ void ng_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *m
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
-    if (unlikely(!netdata_ready)) {
+    if (unlikely(!netdata_ready || aclk_use_new_cloud_arch)) {
         return;
     }
 
@@ -818,7 +818,7 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
-    if (unlikely(!netdata_ready)) {
+    if (unlikely(!netdata_ready || aclk_use_new_cloud_arch)) {
         return;
     }
 
