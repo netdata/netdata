@@ -1269,7 +1269,7 @@ int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd)
     return 0;
 }
 
-void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd)
+void legacy_aclk_host_state_update(RRDHOST *host, int connect)
 {
 #if ACLK_VERSION_MIN < ACLK_V_CHILDRENSTATE
     if (legacy_aclk_shared_state.version_neg < ACLK_V_CHILDRENSTATE)
@@ -1281,19 +1281,14 @@ void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd)
     if (unlikely(aclk_host_initializing(localhost)))
         return;
 
-    switch (cmd) {
-        case ACLK_CMD_CHILD_CONNECT:
-            debug(D_ACLK, "Child Connected %s %s.", host->hostname, host->machine_guid);
-            aclk_start_host_popcorning(host);
-            legacy_aclk_queue_query("add_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_CONNECT);
-            break;
-        case ACLK_CMD_CHILD_DISCONNECT:
-            debug(D_ACLK, "Child Disconnected %s %s.", host->hostname, host->machine_guid);
-            aclk_stop_host_popcorning(host);
-            legacy_aclk_queue_query("del_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_DISCONNECT);
-            break;
-        default:
-            error("Unknown command for aclk_host_state_update %d.", (int)cmd);
+    if (connect) {
+        debug(D_ACLK, "Child Connected %s %s.", host->hostname, host->machine_guid);
+        aclk_start_host_popcorning(host);
+        legacy_aclk_queue_query("add_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_CONNECT);
+    } else {
+        debug(D_ACLK, "Child Disconnected %s %s.", host->hostname, host->machine_guid);
+        aclk_stop_host_popcorning(host);
+        legacy_aclk_queue_query("del_child", host, NULL, NULL, 0, 1, ACLK_CMD_CHILD_DISCONNECT);
     }
 }
 

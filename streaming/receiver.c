@@ -454,11 +454,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     cd.version = rpt->stream_version;
 
-#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+#if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_CONNECT);
+        aclk_host_state_update(rpt->host, 1);
 #endif
 
     size_t count = streaming_parser(rpt, &cd, fp);
@@ -468,11 +468,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", rpt->hostname, rpt->client_ip,
           rpt->client_port, count);
 
-#if defined(ENABLE_ACLK) && !defined(ACLK_NG)
+#if defined(ENABLE_ACLK)
     // in case we have cloud connection we inform cloud
     // new slave connected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, ACLK_CMD_CHILD_DISCONNECT);
+        aclk_host_state_update(rpt->host, 0);
 #endif
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread

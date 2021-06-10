@@ -854,3 +854,7 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
     query->data.metadata_alarms.initial_on_connect = 0;
     aclk_queue_query(query);
 }
+
+void ng_aclk_host_state_update(RRDHOST *host, int cmd)
+{
+}
