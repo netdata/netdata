@@ -324,9 +324,6 @@ void ebpf_filesystem_cleanup_ebpf_data()
                 j++;
             }
             bpf_object__close(efp->objects);
-
-            ebpf_histogram_dimension_cleanup(dimensions, NETDATA_FILESYSTEM_MAX_BINS);
-            freez(filesystem_hash_values);
         }
     }
 }
@@ -354,6 +351,8 @@ static void ebpf_filesystem_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
     ebpf_filesystem_cleanup_ebpf_data();
+    ebpf_histogram_dimension_cleanup(dimensions, NETDATA_FILESYSTEM_MAX_BINS);
+    freez(filesystem_hash_values);
 }
 
 /*****************************************************************
