@@ -361,7 +361,7 @@ void analytics_alarms_notifications(void)
 void analytics_get_install_type(void)
 {
     char *install_type_filename;
-    analytics_set_data_str(&analytics_data.netdata_install_type, "not-available");
+    analytics_set_data_str(&analytics_data.netdata_install_type, "");
 
     install_type_filename =
         mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 2));
