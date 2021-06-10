@@ -62,7 +62,7 @@ void *aclk_starter(void *ptr) {
     if (!aclk_ng)
         return legacy_aclk_main(ptr);
 #endif
-    fatal("ACLK couldn't be started");
+    error_report("No ACLK could be started");
     return NULL;
 }
 
@@ -98,7 +98,8 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
     if (!aclk_ng)
         return legacy_aclk_update_chart(host, chart_name, create);
 #endif
-    fatal("ACLK_UPDATE_CHART");
+    error_report("No usable aclk_update_chart implementation");
+    return 1;
 }
 
 int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
@@ -111,7 +112,8 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     if (!aclk_ng)
         return legacy_aclk_update_alarm(host, ae);
 #endif
-    fatal("ACLK_UPDATE_ALARM");
+    error_report("No usable aclk_update_alarm implementation");
+    return 1;
 }
 
 void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
@@ -124,7 +126,7 @@ void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *modu
     if (!aclk_ng)
         return legacy_aclk_add_collector(host, plugin_name, module_name);
 #endif
-    fatal("ACLK_ADD_COLLECTOR");
+    error_report("No usable aclk_add_collector implementation");
 }
 
 void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
@@ -137,7 +139,7 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
     if (!aclk_ng)
         return legacy_aclk_del_collector(host, plugin_name, module_name);
 #endif
-    fatal("ACLK_DEL_COLLECTOR");
+    error_report("No usable aclk_del_collector implementation");
 }
 
 #endif /* ENABLE_ACLK */
