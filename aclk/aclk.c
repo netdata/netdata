@@ -609,6 +609,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
  */
 void *aclk_main(void *ptr)
 {
+#ifdef ACLK_NEWARCH_DEVMODE
+    aclk_use_new_cloud_arch = 1;
+#endif
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     struct aclk_stats_thread *stats_thread = NULL;
