@@ -20,17 +20,17 @@ int aclk_disable_single_updates = 0;
 
 int aclk_stats_enabled;
 
-#ifdef ACLK_NG
-int aclk_ng = 1;
-#else
+#ifdef ACLK_LEGACY
 int aclk_ng = 0;
+#else
+int aclk_ng = 1;
 #endif
 
 #define ACLK_IMPL_KEY_NAME "aclk implementation"
 
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr) {
-    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "ng");
+    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "legacy");
 
     if (!strcasecmp(aclk_impl_req, "ng")) {
         aclk_ng = 1;
