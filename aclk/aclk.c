@@ -857,4 +857,41 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
 
 void ng_aclk_host_state_update(RRDHOST *host, int cmd)
 {
+    uuid_t node_id;
+    int ret;
+
+    if (!aclk_connected || !aclk_use_new_cloud_arch)
+        return;
+
+    ret = get_node_id(&host->host_uuid, &node_id);
+    if (ret > 0) {
+        // this means we were not able to check if node_id already present
+        error("Unable to check for node_id. Ignoring the host state update.");
+        return;
+    }
+    if (ret < 0) {
+        // node_id not found
+        aclk_query_t create_query;
+        create_query = aclk_query_new(REGISTER_NODE);
+        rrdhost_aclk_state_lock(localhost);
+        create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
+        rrdhost_aclk_state_unlock(localhost);
+        create_query->data.node_creation.hops = 1; //TODO - real hop count instead of hardcoded
+        create_query->data.node_creation.hostname = strdupz(host->hostname);
+        create_query->data.node_creation.machine_guid = strdupz(host->machine_guid);
+        aclk_queue_query(create_query);
+        return;
+    }
+
+    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+    query->data.node_update.hops = 1; //TODO - real hop count instead of hardcoded
+    rrdhost_aclk_state_lock(localhost);
+    query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(localhost);
+    query->data.node_update.live = cmd;
+    query->data.node_update.node_id = mallocz(UUID_STR_LEN);
+    uuid_unparse(node_id, (char*)query->data.node_update.node_id);
+    query->data.node_update.queriable = 1;
+    query->data.node_update.session_id = aclk_session_newarch;
+    aclk_queue_query(query);
 }
