@@ -117,7 +117,9 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
 
 static int aclk_handle_cloud_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
 {
-    HTTP_CHECK_AGENT_INITIALIZED();
+    if (!aclk_use_new_cloud_arch) {
+        HTTP_CHECK_AGENT_INITIALIZED();
+    }
 
     aclk_query_t query;
 
@@ -256,6 +258,11 @@ err_cleanup_nojson:
 
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
 {
+    //TODO do the look up table with hashes to optimize
+    if (!strcmp(message_type, "cmd")) {
+        aclk_handle_cloud_message(msg);
+        return;
+    }
     if (!strcmp(message_type, "CreateNodeInstanceResult")) {
         node_instance_creation_result_t res = parse_create_node_instance_result(msg, msg_len);
         debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
