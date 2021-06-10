@@ -45,4 +45,6 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
 
 void ng_aclk_host_state_update(RRDHOST *host, int cmd);
 
+void aclk_send_node_instances(void);
+
 #endif /* ACLK_H */
