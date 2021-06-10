@@ -308,26 +308,44 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     int n_warn=0, n_crit=0;
     RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
+    BUFFER *warn_alarms, *crit_alarms;
+
+    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
-        if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            n_warn++;
-            if (ae->alarm_id == rc->id)
-                expr=rc->warning;
+        if (unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+                if (n_warn)
+                    buffer_strcat(warn_alarms, ",");
+                buffer_strcat(warn_alarms, rc->name);
+                buffer_strcat(warn_alarms, "=");
+                buffer_snprintf(warn_alarms, 11, "%ld", rc->last_status_change);
+                n_warn++;
+            } else if (ae->alarm_id == rc->id)
+                expr = rc->warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            n_crit++;
-            if (ae->alarm_id == rc->id)
-                expr=rc->critical;
+            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
+                if (n_crit)
+                    buffer_strcat(crit_alarms, ",");
+                buffer_strcat(crit_alarms, rc->name);
+                buffer_strcat(crit_alarms, "=");
+                buffer_snprintf(crit_alarms, 11, "%ld", rc->last_status_change);
+                n_crit++;
+            } else if (ae->alarm_id == rc->id)
+                expr = rc->critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
             if (ae->alarm_id == rc->id)
-                expr=rc->warning;
+                expr = rc->warning;
         }
     }
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d'",
+    char *edit_command = ae->source ? health_edit_command_from_source(ae->source) : strdupz("UNKNOWN=0");
+
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -352,7 +370,12 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               (expr && expr->source)?expr->source:"NOSOURCE",
               (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
               n_warn,
-              n_crit
+              n_crit,
+              buffer_tostring(warn_alarms),
+              buffer_tostring(crit_alarms),
+              ae->classification?ae->classification:"Unknown",
+              edit_command,
+              localhost->registry_hostname
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
@@ -362,6 +385,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
     enqueue_alarm_notify_in_progress(ae);
+
+    freez(edit_command);
+    buffer_free(warn_alarms);
+    buffer_free(crit_alarms);
 
     return; //health_alarm_wait_for_execution
 done:
