@@ -415,6 +415,8 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
             total += values[i];
         }
 
+        if (idx >= NETDATA_FILESYSTEM_MAX_BINS)
+            idx = NETDATA_FILESYSTEM_MAX_BINS - 1;
         w->histogram[idx] = total;
     }
 }

@@ -12,6 +12,7 @@ static int *map_fd = NULL;
 netdata_publish_swap_t *swap_vector = NULL;
 
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
+static netdata_idx_t *swap_values = NULL;
 
 netdata_publish_swap_t **swap_pid = NULL;
 
@@ -72,6 +73,7 @@ static void ebpf_swap_cleanup(void *ptr)
     ebpf_cleanup_publish_syscall(swap_publish_aggregated);
 
     freez(swap_vector);
+    freez(swap_values);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -179,14 +181,20 @@ static void swap_send_global()
  */
 static void read_global_table()
 {
-    uint64_t stored;
+    netdata_idx_t *stored = swap_values;
     netdata_idx_t *val = swap_hash_values;
     int fd = map_fd[NETDATA_SWAP_GLOBAL_TABLE];
 
     uint32_t i, end = NETDATA_SWAP_END;
     for (i = NETDATA_KEY_SWAP_READPAGE_CALL; i < end; i++) {
-        if (!bpf_map_lookup_elem(fd, &i, &stored)) {
-            val[i] = stored;
+        if (!bpf_map_lookup_elem(fd, &i, stored)) {
+            int j;
+            int last = ebpf_nprocs;
+            netdata_idx_t total = 0;
+            for (j = 0; j < last; j++)
+                total += stored[j];
+
+            val[i] = total;
         }
     }
 }
@@ -362,6 +370,8 @@ static void ebpf_swap_allocate_global_vectors()
 {
     swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
     swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_swap_t));
+
+    swap_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(swap_hash_values, 0, sizeof(swap_hash_values));
 }

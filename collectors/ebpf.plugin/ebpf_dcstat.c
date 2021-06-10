@@ -17,6 +17,7 @@ static struct bpf_object *objects = NULL;
 
 static int *map_fd = NULL;
 static netdata_idx_t dcstat_hash_values[NETDATA_DCSTAT_IDX_END];
+static netdata_idx_t *dcstat_values = NULL;
 
 static int read_thread_closed = 1;
 
@@ -117,6 +118,7 @@ static void ebpf_dcstat_cleanup(void *ptr)
     }
 
     freez(dcstat_vector);
+    freez(dcstat_values);
 
     ebpf_cleanup_publish_syscall(dcstat_counter_publish_aggregated);
 
@@ -284,12 +286,18 @@ static void read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = dcstat_hash_values;
-    netdata_idx_t stored;
+    netdata_idx_t *stored = dcstat_values;
     int fd = map_fd[NETDATA_DCSTAT_GLOBAL_STATS];
 
     for (idx = NETDATA_KEY_DC_REFERENCE; idx < NETDATA_DIRECTORY_CACHE_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-            val[idx] = stored;
+        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+            int i;
+            int end = ebpf_nprocs;
+            netdata_idx_t total = 0;
+            for (i = 0; i < end; i++)
+                total += stored[i];
+
+            val[idx] = total;
         }
     }
 }
@@ -539,6 +547,7 @@ static void ebpf_dcstat_allocate_global_vectors(size_t length)
 {
     dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
+    dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(dcstat_counter_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
     memset(dcstat_counter_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
