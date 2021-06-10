@@ -40,8 +40,7 @@ static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_
                                               .type = NETDATA_EBPF_MAP_CONTROLLER,
                                               .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-struct config cachestat_config = { .first_section = NULL,
-    .last_section = NULL,
+struct config cachestat_config = {
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };

@@ -2,8 +2,7 @@
 
 #include "ebpf_filesystem.h"
 
-struct config fs_config = { .first_section = NULL,
-    .last_section = NULL,
+struct config fs_config = {
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };

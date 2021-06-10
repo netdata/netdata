@@ -141,8 +141,6 @@ struct section {
 };
 
 struct config {
-    struct section *first_section;
-    struct section *last_section; // optimize inserting at the end
     netdata_mutex_t mutex;
     avl_tree_lock index;
 };

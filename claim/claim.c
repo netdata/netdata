@@ -175,9 +175,7 @@ void load_claiming_state(void)
 #endif
 }
 
-struct config cloud_config = { .first_section = NULL,
-                               .last_section = NULL,
-                               .mutex = NETDATA_MUTEX_INITIALIZER,
+struct config cloud_config = { .mutex = NETDATA_MUTEX_INITIALIZER,
                                .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                           .rwlock = AVL_LOCK_INITIALIZER } };
 

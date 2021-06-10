@@ -176,16 +176,6 @@ static inline struct section *appconfig_section_create(struct config *root, cons
     if(unlikely(appconfig_index_add(root, co) != co))
         error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
-    appconfig_wrlock(root);
-    struct section *co2 = root->last_section;
-    if(co2) {
-        co2->next = co;
-    } else {
-        root->first_section = co;
-    }
-    root->last_section = co;
-    appconfig_unlock(root);
-
     return co;
 }
 
