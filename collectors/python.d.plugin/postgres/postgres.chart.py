@@ -1019,7 +1019,7 @@ CHARTS = {
     'tx_wraparound_oldest_current_xid': {
         'options': [None, 'Oldest current XID', 'xid', 'tx_wraparound', 'postgres.tx_wraparound_oldest_current_xid', 'line'],
         'lines': [
-            ['oldest_current_xid', 'percent', 'absolute']
+            ['oldest_current_xid', 'xid', 'absolute']
         ]
     },
     'tx_wraparound_percent_towards_wraparound': {
