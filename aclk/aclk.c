@@ -362,12 +362,20 @@ static inline void queue_connect_payloads(void)
 
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
-    const char *topic = aclk_get_topic(aclk_use_new_cloud_arch ? ACLK_TOPICID_CMD_NG_V1 : ACLK_TOPICID_COMMAND);
+    const char *topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
 
     if (!topic)
         error("Unable to fetch topic for COMMAND (to subscribe)");
     else
         mqtt_wss_subscribe(client, topic, 1);
+
+    if (aclk_use_new_cloud_arch) {
+        topic = aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
+        if (!topic)
+            error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
+        else
+            mqtt_wss_subscribe(client, topic, 1);
+    }
 
     aclk_stats_upd_online(1);
     aclk_connected = 1;
