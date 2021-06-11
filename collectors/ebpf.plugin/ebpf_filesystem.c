@@ -513,9 +513,10 @@ static void write_histogram_chart(char *family, char *name, const netdata_idx_t 
 static void ebpf_histogram_send_data()
 {
     uint32_t i;
+    uint32_t test = NETDATA_FILESYSTEM_FLAG_HAS_PARTITION | NETDATA_FILESYSTEM_REMOVE_CHARTS;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
+        if ((efp->flags & test) == NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
             write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                                   efp->hread.histogram, NETDATA_FILESYSTEM_MAX_BINS);
 
