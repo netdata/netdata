@@ -15,4 +15,6 @@ void aclk_chart_config_updated(struct chart_config_updated *config_list, int lis
 
 void aclk_chart_reset(chart_reset_t reset);
 
+void aclk_update_node_info(struct update_node_info *info);
+
 #endif /* ACLK_CHARTS_H */
