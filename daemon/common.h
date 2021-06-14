@@ -66,9 +66,7 @@
 #include "claim/claim.h"
 
 // netdata agent cloud link
-#ifdef ENABLE_ACLK
 #include "aclk/aclk_api.h"
-#endif
 
 // global GUID map functions
 
