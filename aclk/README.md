@@ -53,7 +53,6 @@ configuration uses two settings:
 [global]
   enabled = yes
   cloud base url = https://app.netdata.cloud
-  aclk implementation = legacy
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -62,12 +61,14 @@ claiming](/claim/README.md#claim-through-a-proxy).
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```
 [cloud]
-    statistics = yes
-    query thread count = 2
+  statistics = yes
+  query thread count = 2
+  aclk implementation = legacy
 ```
 
 - `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
 - `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
+- `aclk implementation` - see [ACLK implementation](#aclk-implementation) section
 
 ## ACLK implementation
 
