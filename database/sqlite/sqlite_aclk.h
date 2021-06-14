@@ -5,7 +5,6 @@
 
 #include "sqlite3.h"
 
-//#include "../../aclk/aclk.h"
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
@@ -30,34 +29,34 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
     return strdupz(uuid_str);
 }
 
-#define TABLE_ACLK_CHART "create table if not exists aclk_chart_%s (sequence_id integer primary key, " \
+#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY, " \
         "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
         "update_count default 1, unique(chart_id, status));"
 
-#define TABLE_ACLK_CHART_PAYLOAD "create table if not exists aclk_chart_payload_%s (unique_id blob primary key, " \
+#define TABLE_ACLK_CHART_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_chart_payload_%s (unique_id BLOB PRIMARY KEY, " \
         "chart_id, type, date_created, payload);"
 
-#define TRIGGER_ACLK_CHART_PAYLOAD "create trigger if not exists aclk_tr_chart_payload_%s " \
+#define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
         "after insert on aclk_chart_payload_%s " \
         "begin insert into aclk_chart_%s (chart_id, unique_id, status, date_created) values " \
         " (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
-#define TABLE_ACLK_DIMENSION "DROP TABLE IF EXISTS aclk_dimension_%s;"
+//#define TABLE_ACLK_DIMENSION "DROP TABLE IF EXISTS aclk_dimension_%s;"
 
-#define TABLE_ACLK_DIMENSION_PAYLOAD "DROP TABLE IF EXISTS aclk_dimension_payload_%s;"
+//#define TABLE_ACLK_DIMENSION_PAYLOAD "DROP TABLE IF EXISTS aclk_dimension_payload_%s;"
+//
+//#define TRIGGER_ACLK_DIMENSION_PAYLOAD "DROP TRIGGER IF EXISTS aclk_tr_dimension_payload_%s;"
 
-#define TRIGGER_ACLK_DIMENSION_PAYLOAD "DROP TRIGGER IF EXISTS aclk_tr_dimension_payload_%s;"
-
-#define TABLE_ACLK_ALERT "create table if not exists aclk_alert_%s (sequence_id integer primary key, " \
+#define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
                  "date_created, date_updated, date_submitted, status, alarm_id, unique_id, " \
-                 "update_count default 1, unique(alarm_id, status));"
+                 "update_count DEFAULT 1, UNIQUE(alarm_id, status));"
 
-#define TABLE_ACLK_ALERT_PAYLOAD "create table if not exists aclk_alert_payload_%s (unique_id blob primary key, " \
+#define TABLE_ACLK_ALERT_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_alert_payload_%s (unique_id BLOB PRIMARY KEY, " \
                  "ae_unique_id, alarm_id, type, date_created, payload);"
 
-#define TRIGGER_ACLK_ALERT_PAYLOAD "create trigger if not exists aclk_tr_alert_payload_%s " \
+#define TRIGGER_ACLK_ALERT_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_alert_payload_%s " \
         "after insert on aclk_alert_payload_%s " \
         "begin insert into aclk_alert_%s (alarm_id, unique_id, status, date_created) values " \
         " (new.alarm_id, new.unique_id, 'pending', strftime('%%s')) on conflict(alarm_id, status) " \
@@ -103,16 +102,7 @@ struct aclk_database_cmd {
     void *data_param;
     int count;
     uint64_t param1;
-    union {
-//        struct rrdeng_read_page {
-//            struct rrdeng_page_descr *page_cache_descr;
-//        } read_page;
-//        struct rrdeng_read_extent {
-//            struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
-//            int page_count;
-//        } read_extent;
-        struct completion *completion;
-    };
+    struct completion *completion;
 };
 
 #define ACLK_DATABASE_CMD_Q_MAX_SIZE (2048)
@@ -175,7 +165,6 @@ void aclk_reset_node_event(struct aclk_database_worker_config *wc, struct aclk_d
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id);
-void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_get_chart_config(char **hash_id_list);
 void aclk_start_streaming(char *node_id);
 void aclk_start_alert_streaming(char *node_id);
