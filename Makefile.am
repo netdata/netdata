@@ -114,7 +114,7 @@ SUBDIRS += \
     spawn \
     $(NULL)
 
-if !ACLK_NG
+if ENABLE_ACLK
 SUBDIRS += \
     aclk/legacy \
     $(NULL)
@@ -540,7 +540,7 @@ PARSER_FILES = \
     $(NULL)
 
 if ACLK_NG
-ACLK_FILES = \
+ACLK_NG_FILES = \
     aclk/aclk.c \
     aclk/aclk.h \
     aclk/aclk_util.c \
@@ -551,8 +551,6 @@ ACLK_FILES = \
     aclk/aclk_query.h \
     aclk/aclk_query_queue.c \
     aclk/aclk_query_queue.h \
-    aclk/aclk_collector_list.c \
-    aclk/aclk_collector_list.h \
     aclk/aclk_otp.c \
     aclk/aclk_otp.h \
     aclk/aclk_tx_msgs.c \
@@ -573,17 +571,25 @@ ACLK_FILES = \
     mqtt_websockets/MQTT-C/src/mqtt.c \
     mqtt_websockets/MQTT-C/include/mqtt.h \
     $(NULL)
-else #ACLK_NG
-ACLK_FILES = \
-    aclk/legacy/aclk_rrdhost_state.h \
-    aclk/legacy/aclk_common.c \
-    aclk/legacy/aclk_common.h \
-    aclk/legacy/aclk_stats.c \
-    aclk/legacy/aclk_stats.h \
-    $(NULL)
+endif #ACLK_NG
 
 if ENABLE_ACLK
-ACLK_FILES += \
+ACLK_COMMON_FILES = \
+    aclk/aclk_collector_list.c \
+    aclk/aclk_collector_list.h \
+    $(NULL)
+endif
+
+ACLK_ALWAYS_BUILD_FILES = \
+    aclk/aclk_rrdhost_state.h \
+    aclk/aclk_api.c \
+    aclk/aclk_api.h \
+    aclk/aclk_proxy.c \
+    aclk/aclk_proxy.h \
+    $(NULL)
+
+if ACLK_LEGACY
+ACLK_LEGACY_FILES = \
     aclk/legacy/agent_cloud_link.c \
     aclk/legacy/agent_cloud_link.h \
     aclk/legacy/aclk_query.c \
@@ -596,9 +602,12 @@ ACLK_FILES += \
     aclk/legacy/aclk_lws_wss_client.h \
     aclk/legacy/aclk_lws_https_client.c \
     aclk/legacy/aclk_lws_https_client.h \
+    aclk/legacy/aclk_common.c \
+    aclk/legacy/aclk_common.h \
+    aclk/legacy/aclk_stats.c \
+    aclk/legacy/aclk_stats.h \
     $(NULL)
-endif #ENABLE_ACLK
-endif #ACLK_NG
+endif #ACLK_LEGACY
 
 SPAWN_PLUGIN_FILES = \
     spawn/spawn.c \
@@ -710,7 +719,10 @@ NETDATA_FILES = \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
     $(PARSER_FILES) \
-    $(ACLK_FILES) \
+    $(ACLK_ALWAYS_BUILD_FILES) \
+    $(ACLK_COMMON_FILES) \
+    $(ACLK_LEGACY_FILES) \
+    $(ACLK_NG_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
@@ -770,16 +782,14 @@ netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
-if !ACLK_NG
-if ENABLE_ACLK
+if ACLK_LEGACY
 netdata_LDADD += \
     $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
-endif #ENABLE_ACLK
-endif #ACLK_NG
+endif #ACLK_LEGACY
 
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@

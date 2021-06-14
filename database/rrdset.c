@@ -938,7 +938,7 @@ RRDSET *rrdset_create_custom(
     rrdhost_cleanup_obsolete_charts(host);
 #ifdef ENABLE_ACLK
     if (host->obsolete_count)
-        aclk_update_chart(st->rrdhost, "dummy-chart", ACLK_CMD_CHARTDEL);
+        aclk_update_chart(st->rrdhost, "dummy-chart", 0);
 #endif
 
     rrdhost_unlock(host);
@@ -1384,7 +1384,7 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
+        aclk_update_chart(st->rrdhost, st->id, 1);
     }
 #endif
 

@@ -4,9 +4,12 @@
 
 #include "aclk_stats.h"
 #include "aclk_query_queue.h"
+#include "aclk.h"
 
 #define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 #define ACLK_CLOUD_REQ_V2_PREFIX "GET /api/v1/"
+
+#define ACLK_V_COMPRESSION 2
 
 struct aclk_request {
     char *type_id;
@@ -18,7 +21,7 @@ struct aclk_request {
     int max_version;
 };
 
-int cloud_to_agent_parse(JSON_ENTRY *e)
+static int cloud_to_agent_parse(JSON_ENTRY *e)
 {
     struct aclk_request *data = e->callback_data;
 
@@ -108,7 +111,7 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
 }
 
 #define HTTP_CHECK_AGENT_INITIALIZED() ACLK_SHARED_STATE_LOCK;\
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {\
+    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {\
         debug(D_ACLK, "Ignoring \"http\" cloud request; agent not in stable state");\
         ACLK_SHARED_STATE_UNLOCK;\
         return 1;\

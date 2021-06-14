@@ -7,6 +7,10 @@
 #include "aclk_stats.h"
 #include "aclk_rx_msgs.h"
 
+#include "agent_cloud_link.h"
+
+#define ACLK_QOS 1
+
 extern usec_t aclk_session_us;
 extern time_t aclk_session_sec;
 
@@ -27,7 +31,7 @@ void mqtt_message_callback(struct mosquitto *mosq, void *obj, const struct mosqu
     UNUSED(mosq);
     UNUSED(obj);
 
-    aclk_handle_cloud_message(msg->payload);
+    legacy_aclk_handle_cloud_message(msg->payload);
 }
 
 void publish_callback(struct mosquitto *mosq, void *obj, int rc)
@@ -44,7 +48,7 @@ void publish_callback(struct mosquitto *mosq, void *obj, int rc)
 
     info("Publish_callback: mid=%d latency=%" PRId64 "ms", rc, diff);
 
-    aclk_metric_mat_update(&aclk_metrics_per_sample.latency, diff);
+    legacy_aclk_metric_mat_update(&legacy_aclk_metrics_per_sample.latency, diff);
 #endif
     return;
 }

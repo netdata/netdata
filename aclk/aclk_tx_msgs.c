@@ -4,10 +4,14 @@
 #include "daemon/common.h"
 #include "aclk_util.h"
 #include "aclk_stats.h"
+#include "aclk.h"
 
 #ifndef __GNUC__
 #pragma region aclk_tx_msgs helper functions
 #endif
+
+// version for aclk legacy (old cloud arch)
+#define ACLK_VERSION 2
 
 static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg, enum aclk_topics subtopic)
 {

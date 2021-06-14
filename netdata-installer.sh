@@ -215,7 +215,7 @@ USAGE: ${PROGRAM} [options]
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
-  --aclk-ng                  Forces build of ACLK Next Generation which is fallback by default.
+  --aclk-legacy              Forces build of ACLK Legacy which is fallback by default.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -320,9 +320,9 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
-    "--aclk-ng")
-      NETDATA_ACLK_NG=1
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-ng/} --with-aclk-ng"
+    "--aclk-ng") ;;
+    "--aclk-legacy")
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-legacy/} --with-aclk-legacy"
       ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
@@ -572,7 +572,7 @@ copy_libmosquitto() {
 }
 
 bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
     echo "Skipping libmosquitto"
     return 0
   fi
@@ -674,7 +674,8 @@ copy_libwebsockets() {
 }
 
 bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ] || [ -n "${NETDATA_ACLK_NG}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ]; then
+    echo "Skipping libwebsockets"
     return 0
   fi
 

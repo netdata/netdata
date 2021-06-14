@@ -13,8 +13,6 @@ extern netdata_mutex_t aclk_stats_mutex;
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
-extern int aclk_stats_enabled;
-
 struct aclk_stats_thread {
     netdata_thread_t *thread;
     int query_thread_count;

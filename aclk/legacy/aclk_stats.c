@@ -1,33 +1,31 @@
 #include "aclk_stats.h"
 
-netdata_mutex_t aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
+netdata_mutex_t legacy_aclk_stats_mutex = NETDATA_MUTEX_INITIALIZER;
 
-int aclk_stats_enabled;
-
-int query_thread_count;
+int legacy_query_thread_count;
 
 // data ACLK stats need per query thread
-struct aclk_qt_data {
+struct legacy_aclk_qt_data {
     RRDDIM *dim;
-} *aclk_qt_data = NULL;
+} *legacy_aclk_qt_data = NULL;
 
 // ACLK per query thread cpu stats
-struct aclk_cpu_data {
+struct legacy_aclk_cpu_data {
     RRDDIM *user;
     RRDDIM *system;
     RRDSET *st;
-} *aclk_cpu_data = NULL;
+} *legacy_aclk_cpu_data = NULL;
 
-uint32_t *aclk_queries_per_thread = NULL;
-uint32_t *aclk_queries_per_thread_sample = NULL;
+uint32_t *legacy_aclk_queries_per_thread = NULL;
+uint32_t *legacy_aclk_queries_per_thread_sample = NULL;
 struct rusage *rusage_per_thread;
 uint8_t *getrusage_called_this_tick = NULL;
 
-struct aclk_metrics aclk_metrics = {
+static struct legacy_aclk_metrics legacy_aclk_metrics = {
     .online = 0,
 };
 
-struct aclk_metrics_per_sample aclk_metrics_per_sample;
+struct legacy_aclk_metrics_per_sample legacy_aclk_metrics_per_sample;
 
 struct aclk_mat_metrics aclk_mat_metrics = {
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -61,20 +59,20 @@ struct aclk_mat_metrics aclk_mat_metrics = {
                                              "by query thread (just before passing to the database)." }
 };
 
-void aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement)
+void legacy_aclk_metric_mat_update(struct aclk_metric_mat_data *metric, usec_t measurement)
 {
     if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
+        LEGACY_ACLK_STATS_LOCK;
         if (metric->max < measurement)
             metric->max = measurement;
 
         metric->total += measurement;
         metric->count++;
-        ACLK_STATS_UNLOCK;
+        LEGACY_ACLK_STATS_UNLOCK;
     }
 }
 
-static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struct aclk_metrics *permanent)
+static void aclk_stats_collect(struct legacy_aclk_metrics_per_sample *per_sample, struct legacy_aclk_metrics *permanent)
 {
     static RRDSET *st_aclkstats = NULL;
     static RRDDIM *rd_online_status = NULL;
@@ -93,7 +91,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
     rrdset_done(st_aclkstats);
 }
 
-static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_query_queue(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st_query_thread = NULL;
     static RRDDIM *rd_queued = NULL;
@@ -115,7 +113,7 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st_query_thread);
 }
 
-static void aclk_stats_write_q(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_write_q(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
     static RRDDIM *rd_wq_add = NULL;
@@ -137,7 +135,7 @@ static void aclk_stats_write_q(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-static void aclk_stats_read_q(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_read_q(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
     static RRDDIM *rd_rq_add = NULL;
@@ -159,7 +157,7 @@ static void aclk_stats_read_q(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_cloud_req(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
     static RRDDIM *rd_rq_ok = NULL;
@@ -181,7 +179,7 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
-static void aclk_stats_cloud_req_version(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_cloud_req_version(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st = NULL;
     static RRDDIM *rd_rq_v1 = NULL;
@@ -223,7 +221,7 @@ int aclk_cloud_req_type_to_idx(const char *name)
     return 0;
 }
 
-static void aclk_stats_cloud_req_cmd(struct aclk_metrics_per_sample *per_sample)
+static void aclk_stats_cloud_req_cmd(struct legacy_aclk_metrics_per_sample *per_sample)
 {
     static RRDSET *st;
     static int initialized = 0;
@@ -258,16 +256,16 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
             "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        for (int i = 0; i < query_thread_count; i++) {
+        for (int i = 0; i < legacy_query_thread_count; i++) {
             if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 error("snprintf encoding error");
-            aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+            legacy_aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     } else
         rrdset_next(st);
 
-    for (int i = 0; i < query_thread_count; i++) {
-        rrddim_set_by_pointer(st, aclk_qt_data[i].dim, queries_per_thread[i]);
+    for (int i = 0; i < legacy_query_thread_count; i++) {
+        rrddim_set_by_pointer(st, legacy_aclk_qt_data[i].dim, queries_per_thread[i]);
     }
 
     rrdset_done(st);
@@ -301,59 +299,59 @@ static void aclk_stats_cpu_threads(void)
     char id[100 + 1];
     char title[100 + 1];
 
-    for (int i = 0; i < query_thread_count; i++) {
-        if (unlikely(!aclk_cpu_data[i].st)) {
+    for (int i = 0; i < legacy_query_thread_count; i++) {
+        if (unlikely(!legacy_aclk_cpu_data[i].st)) {
 
             snprintfz(id, 100, "aclk_thread%d_cpu", i);
             snprintfz(title, 100, "Cpu Usage For Thread No %d", i);
 
-            aclk_cpu_data[i].st = rrdset_create_localhost(
+            legacy_aclk_cpu_data[i].st = rrdset_create_localhost(
                                          "netdata", id, NULL, "aclk", NULL, title, "milliseconds/s",
                                          "netdata", "stats", 200020 + i, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-            aclk_cpu_data[i].user   = rrddim_add(aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-            aclk_cpu_data[i].system = rrddim_add(aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            legacy_aclk_cpu_data[i].user   = rrddim_add(legacy_aclk_cpu_data[i].st, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            legacy_aclk_cpu_data[i].system = rrddim_add(legacy_aclk_cpu_data[i].st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
 
         } else
-            rrdset_next(aclk_cpu_data[i].st);
+            rrdset_next(legacy_aclk_cpu_data[i].st);
     }
 
-    for (int i = 0; i < query_thread_count; i++) {
-        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].user, rusage_per_thread[i].ru_utime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_utime.tv_usec);
-        rrddim_set_by_pointer(aclk_cpu_data[i].st, aclk_cpu_data[i].system, rusage_per_thread[i].ru_stime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_stime.tv_usec);
-        rrdset_done(aclk_cpu_data[i].st);
+    for (int i = 0; i < legacy_query_thread_count; i++) {
+        rrddim_set_by_pointer(legacy_aclk_cpu_data[i].st, legacy_aclk_cpu_data[i].user, rusage_per_thread[i].ru_utime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_utime.tv_usec);
+        rrddim_set_by_pointer(legacy_aclk_cpu_data[i].st, legacy_aclk_cpu_data[i].system, rusage_per_thread[i].ru_stime.tv_sec * 1000000ULL + rusage_per_thread[i].ru_stime.tv_usec);
+        rrdset_done(legacy_aclk_cpu_data[i].st);
     }
 }
 
-void aclk_stats_thread_cleanup()
+void legacy_aclk_stats_thread_cleanup()
 {
-    freez(aclk_qt_data);
-    freez(aclk_queries_per_thread);
-    freez(aclk_queries_per_thread_sample);
-    freez(aclk_cpu_data);
+    freez(legacy_aclk_qt_data);
+    freez(legacy_aclk_queries_per_thread);
+    freez(legacy_aclk_queries_per_thread_sample);
+    freez(legacy_aclk_cpu_data);
     freez(rusage_per_thread);
 }
 
-void *aclk_stats_main_thread(void *ptr)
+void *legacy_aclk_stats_main_thread(void *ptr)
 {
     struct aclk_stats_thread *args = ptr;
 
-    query_thread_count = args->query_thread_count;
-    aclk_qt_data = callocz(query_thread_count, sizeof(struct aclk_qt_data));
-    aclk_cpu_data = callocz(query_thread_count, sizeof(struct aclk_cpu_data));
-    aclk_queries_per_thread = callocz(query_thread_count, sizeof(uint32_t));
-    aclk_queries_per_thread_sample = callocz(query_thread_count, sizeof(uint32_t));
-    rusage_per_thread = callocz(query_thread_count, sizeof(struct rusage));
-    getrusage_called_this_tick = callocz(query_thread_count, sizeof(uint8_t));
+    legacy_query_thread_count = args->query_thread_count;
+    legacy_aclk_qt_data = callocz(legacy_query_thread_count, sizeof(struct legacy_aclk_qt_data));
+    legacy_aclk_cpu_data = callocz(legacy_query_thread_count, sizeof(struct legacy_aclk_cpu_data));
+    legacy_aclk_queries_per_thread = callocz(legacy_query_thread_count, sizeof(uint32_t));
+    legacy_aclk_queries_per_thread_sample = callocz(legacy_query_thread_count, sizeof(uint32_t));
+    rusage_per_thread = callocz(legacy_query_thread_count, sizeof(struct rusage));
+    getrusage_called_this_tick = callocz(legacy_query_thread_count, sizeof(uint8_t));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
 
-    memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+    memset(&legacy_aclk_metrics_per_sample, 0, sizeof(struct legacy_aclk_metrics_per_sample));
 
-    struct aclk_metrics_per_sample per_sample;
-    struct aclk_metrics permanent;
+    struct legacy_aclk_metrics_per_sample per_sample;
+    struct legacy_aclk_metrics permanent;
 
     while (!netdata_exit) {
         netdata_thread_testcancel();
@@ -363,17 +361,17 @@ void *aclk_stats_main_thread(void *ptr)
         heartbeat_next(&hb, step_ut);
         if (netdata_exit) break;
 
-        ACLK_STATS_LOCK;
+        LEGACY_ACLK_STATS_LOCK;
         // to not hold lock longer than necessary, especially not to hold it
         // during database rrd* operations
-        memcpy(&per_sample, &aclk_metrics_per_sample, sizeof(struct aclk_metrics_per_sample));
-        memcpy(&permanent, &aclk_metrics, sizeof(struct aclk_metrics));
-        memset(&aclk_metrics_per_sample, 0, sizeof(struct aclk_metrics_per_sample));
+        memcpy(&per_sample, &legacy_aclk_metrics_per_sample, sizeof(struct legacy_aclk_metrics_per_sample));
+        memcpy(&permanent, &legacy_aclk_metrics, sizeof(struct legacy_aclk_metrics));
+        memset(&legacy_aclk_metrics_per_sample, 0, sizeof(struct legacy_aclk_metrics_per_sample));
 
-        memcpy(aclk_queries_per_thread_sample, aclk_queries_per_thread, sizeof(uint32_t) * query_thread_count);
-        memset(aclk_queries_per_thread, 0, sizeof(uint32_t) * query_thread_count);
-        memset(getrusage_called_this_tick, 0, sizeof(uint8_t) * query_thread_count);
-        ACLK_STATS_UNLOCK;
+        memcpy(legacy_aclk_queries_per_thread_sample, legacy_aclk_queries_per_thread, sizeof(uint32_t) * legacy_query_thread_count);
+        memset(legacy_aclk_queries_per_thread, 0, sizeof(uint32_t) * legacy_query_thread_count);
+        memset(getrusage_called_this_tick, 0, sizeof(uint8_t) * legacy_query_thread_count);
+        LEGACY_ACLK_STATS_UNLOCK;
 
         aclk_stats_collect(&per_sample, &permanent);
         aclk_stats_query_queue(&per_sample);
@@ -386,7 +384,7 @@ void *aclk_stats_main_thread(void *ptr)
 
         aclk_stats_cloud_req_cmd(&per_sample);
 
-        aclk_stats_query_threads(aclk_queries_per_thread_sample);
+        aclk_stats_query_threads(legacy_aclk_queries_per_thread_sample);
 
         aclk_stats_cpu_threads();
 
@@ -400,14 +398,14 @@ void *aclk_stats_main_thread(void *ptr)
     return 0;
 }
 
-void aclk_stats_upd_online(int online) {
+void legacy_aclk_stats_upd_online(int online) {
     if(!aclk_stats_enabled)
         return;
 
-    ACLK_STATS_LOCK;
-    aclk_metrics.online = online;
+    LEGACY_ACLK_STATS_LOCK;
+    legacy_aclk_metrics.online = online;
 
     if(!online)
-        aclk_metrics_per_sample.offline_during_sample = 1;
-    ACLK_STATS_UNLOCK;
+        legacy_aclk_metrics_per_sample.offline_during_sample = 1;
+    LEGACY_ACLK_STATS_UNLOCK;
 }

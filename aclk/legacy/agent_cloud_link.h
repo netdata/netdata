@@ -7,7 +7,6 @@
 #include "mqtt.h"
 #include "aclk_common.h"
 
-#define ACLK_THREAD_NAME "ACLK_Query"
 #define ACLK_CHART_TOPIC "outbound/meta"
 #define ACLK_ALARMS_TOPIC "outbound/alarms"
 #define ACLK_METADATA_TOPIC "outbound/meta"
@@ -18,7 +17,6 @@
 
 #define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
-#define ACLK_QOS 1
 #define ACLK_PING_INTERVAL 60
 #define ACLK_LOOP_TIMEOUT 5 // seconds to wait for operations in the library loop
 
@@ -42,16 +40,7 @@ struct aclk_request {
 
 typedef enum aclk_init_action { ACLK_INIT, ACLK_REINIT } ACLK_INIT_ACTION;
 
-void *aclk_main(void *ptr);
-
-#define NETDATA_ACLK_HOOK                                                                                              \
-    { .name = "ACLK_Main",                                                                                             \
-      .config_section = NULL,                                                                                          \
-      .config_name = NULL,                                                                                             \
-      .enabled = 1,                                                                                                    \
-      .thread = NULL,                                                                                                  \
-      .init_routine = NULL,                                                                                            \
-      .start_routine = aclk_main },
+void *legacy_aclk_main(void *ptr);
 
 extern int aclk_send_message(char *sub_topic, char *message, char *msg_id);
 extern int aclk_send_message_bin(char *sub_topic, const void *message, size_t len, char *msg_id);
@@ -62,29 +51,27 @@ char *create_uuid();
 
 // callbacks for agent cloud link
 int aclk_subscribe(char *topic, int qos);
-int cloud_to_agent_parse(JSON_ENTRY *e);
+int legacy_cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
 
 int aclk_send_metadata(ACLK_METADATA_STATE state, RRDHOST *host);
-int aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *host);
-void aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
+int legacy_aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *host);
+void legacy_aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
 
 int aclk_wait_for_initialization();
 char *create_publish_base_topic();
 
 int aclk_send_single_chart(RRDHOST *host, char *chart);
-int aclk_update_chart(RRDHOST *host, char *chart_name, ACLK_CMD aclk_cmd);
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
+int legacy_aclk_update_chart(RRDHOST *host, char *chart_name, int create);
+int legacy_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id, time_t ts_secs, usec_t ts_us, int version);
-int aclk_handle_cloud_message(char *payload);
-void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
-void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
-void aclk_alarm_reload();
+int legacy_aclk_handle_cloud_message(char *payload);
+void legacy_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
+void legacy_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
+void legacy_aclk_alarm_reload(void);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
-void aclk_single_update_enable();
-void aclk_single_update_disable();
 
 void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd);
 int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);

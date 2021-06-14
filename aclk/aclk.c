@@ -13,6 +13,8 @@
 #include "aclk_collector_list.h"
 #include "https_client.h"
 
+#include "aclk_proxy.h"
+
 #ifdef ACLK_LOG_CONVERSATION_DIR
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,18 +23,9 @@
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
-//TODO remove most (as in 99.999999999%) of this crap
-int aclk_connected = 0;
-int aclk_disable_runtime = 0;
-int aclk_disable_single_updates = 0;
-int aclk_kill_link = 0;
-
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
 time_t aclk_block_until = 0;
-
-usec_t aclk_session_us = 0;         // Used by the mqtt layer
-time_t aclk_session_sec = 0;        // Used by the mqtt layer
 
 aclk_env_t *aclk_env = NULL;
 
@@ -43,21 +36,11 @@ netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
 #define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 struct aclk_shared_state aclk_shared_state = {
-    .agent_state = AGENT_INITIALIZING,
+    .agent_state = ACLK_HOST_INITIALIZING,
     .last_popcorn_interrupt = 0,
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0
 };
-
-void aclk_single_update_disable()
-{
-    aclk_disable_single_updates = 1;
-}
-
-void aclk_single_update_enable()
-{
-    aclk_disable_single_updates = 0;
-}
 
 //ENDTODO
 
@@ -301,7 +284,7 @@ static int handle_connection(mqtt_wss_client client)
 inline static int aclk_popcorn_check_bump()
 {
     ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
         aclk_shared_state.last_popcorn_interrupt = now_realtime_sec();
         ACLK_SHARED_STATE_UNLOCK;
         return 1;
@@ -340,7 +323,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_pubacks_per_conn = 0;
 
     ACLK_SHARED_STATE_LOCK;
-    if (aclk_shared_state.agent_state != AGENT_INITIALIZING) {
+    if (aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING) {
         error("Sending `connect` payload immediately as popcorning was finished already.");
         queue_connect_payloads();
     }
@@ -360,13 +343,13 @@ static int wait_popcorning_finishes(mqtt_wss_client client, struct aclk_query_th
     int need_wait;
     while (!netdata_exit) {
         ACLK_SHARED_STATE_LOCK;
-        if (likely(aclk_shared_state.agent_state != AGENT_INITIALIZING)) {
+        if (likely(aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING)) {
             ACLK_SHARED_STATE_UNLOCK;
             return 0;
         }
         elapsed = now_realtime_sec() - aclk_shared_state.last_popcorn_interrupt;
         if (elapsed >= ACLK_STABLE_TIMEOUT) {
-            aclk_shared_state.agent_state = AGENT_STABLE;
+            aclk_shared_state.agent_state = ACLK_HOST_STABLE;
             ACLK_SHARED_STATE_UNLOCK;
             error("ACLK localhost popocorn finished");
             if (unlikely(!query_threads->thread_list))
@@ -721,10 +704,10 @@ exit:
 // fix this in both old and new ACLK
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 
-void aclk_alarm_reload(void)
+void ng_aclk_alarm_reload(void)
 {
     ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
         ACLK_SHARED_STATE_UNLOCK;
         return;
     }
@@ -733,7 +716,7 @@ void aclk_alarm_reload(void)
     aclk_queue_query(aclk_query_new(METADATA_ALARMS));
 }
 
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
+int ng_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
 {
     BUFFER *local_buffer;
     json_object *msg;
@@ -742,7 +725,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
 
     ACLK_SHARED_STATE_LOCK;
-    if (unlikely(aclk_shared_state.agent_state == AGENT_INITIALIZING)) {
+    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
         ACLK_SHARED_STATE_UNLOCK;
         return 0;
     }
@@ -764,7 +747,7 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     return 0;
 }
 
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
+int ng_aclk_update_chart(RRDHOST *host, char *chart_name, int create)
 {
     struct aclk_query *query;
 
@@ -788,7 +771,7 @@ int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
  * Add a new collector to the list
  * If it exists, update the chart count
  */
-void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
+void ng_aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -831,7 +814,7 @@ void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *modu
  * This function will release the memory used and schedule
  * a cloud update
  */
-void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
+void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
 {
     struct aclk_query *query;
     struct _collector *tmp_collector;
@@ -870,28 +853,4 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
     query = aclk_query_new(METADATA_ALARMS);
     query->data.metadata_alarms.initial_on_connect = 0;
     aclk_queue_query(query);
-}
-
-struct label *add_aclk_host_labels(struct label *label) {
-#ifdef ENABLE_ACLK
-    ACLK_PROXY_TYPE aclk_proxy;
-    char *proxy_str;
-    aclk_get_proxy(&aclk_proxy);
-
-    switch(aclk_proxy) {
-        case PROXY_TYPE_SOCKS5:
-            proxy_str = "SOCKS5";
-            break;
-        case PROXY_TYPE_HTTP:
-            proxy_str = "HTTP";
-            break;
-        default:
-            proxy_str = "none";
-            break;
-    }
-    label = add_label_to_list(label, "_aclk_impl", "Next Generation", LABEL_SOURCE_AUTO);
-    return add_label_to_list(label, "_aclk_proxy", proxy_str, LABEL_SOURCE_AUTO);
-#else
-    return label;
-#endif
 }

@@ -6,7 +6,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 
-int aclk_handle_cloud_message(char *payload);
+int legacy_aclk_handle_cloud_message(char *payload);
 void aclk_set_rx_handlers(int version);
 
 
