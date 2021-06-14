@@ -5,7 +5,6 @@
 
 #include "../../daemon/common.h"
 #include "sqlite3.h"
-#include "sqlite_event_loop.h"
 
 // return a node list
 struct node_instance_list {

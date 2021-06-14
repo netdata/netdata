@@ -453,7 +453,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         uuid_unparse_lower(*host->node_id, node_str);
 
         aclk_ack_chart_sequence_id(node_str, (uint64_t) chart_seq_ack);
-        buffer_sprintf(w->response.data, "ACLK_SYNC: Setting last ACK chart sequence for %s to be %d", host->hostname, chart_seq_ack);
+        buffer_sprintf(w->response.data, "ACLK_SYNC: Setting last ACK chart sequence for %s to be %"PRIu64, host->hostname, chart_seq_ack);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
