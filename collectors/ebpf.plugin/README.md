@@ -325,6 +325,7 @@ filesystems are monitored.
 ```conf
 [filesystem]
     ext4dist = yes
+    xfsdist = yes
 ```
 
 ## Troubleshooting
