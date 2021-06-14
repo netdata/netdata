@@ -81,6 +81,8 @@ Features:
     ACLK Legacy:             YES
 ```
 
+To verify which ACLK implementation your agent uses you can visit `/api/v1/info` endpoint on your local dashboard and check the `aclk-implementation` key.
+
 Please note new Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as fallback in case some users have issues with ACLK-NG or need to use features which are not yet available in ACLK-NG *(like IPv6 support and SOCKS proxy)*.
 
 ### Improvements of ACLK-NG over Legacy are:
