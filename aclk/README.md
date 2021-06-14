@@ -53,6 +53,7 @@ configuration uses two settings:
 [global]
   enabled = yes
   cloud base url = https://app.netdata.cloud
+  aclk implementation = legacy
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -67,6 +68,26 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 
 - `statistics` enables/disables ACLK related statistics and their charts. You can disable this to save some space in the database and slightly reduce memory usage of Netdata Agent.
 - `query thread count` specifies the number of threads to process cloud queries. Increasing this setting is useful for nodes with many children (streaming), which can expect to handle more queries (and/or more complicated queries).
+
+## ACLK implementation
+
+Currently we are in process of switching ACLK to brand new technical stack called ACLK-NG. To choose implementation your agent should use you can change the `aclk implementation` setting in your `netdata.conf` (accepted values `ng` or `legacy`).
+
+Before changing this value check the desired implementation is available in your agent (determined at build time) by running `netdata -W buildinfo`. Following lines indicate which ACLK implementations are available in your agent:
+
+```
+Features:
+    ACLK Next Generation:    YES
+    ACLK Legacy:             YES
+```
+
+Please note new Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as fallback in case some users have issues with ACLK-NG or need to use features which are not yet available in ACLK-NG *(like IPv6 support and SOCKS proxy)*.
+
+### Improvements of ACLK-NG over Legacy are:
+- no dependency on custom patched `libmosquitto` (no bundling of libraries). Which should remove obstacles many GNU/Linux distribution package maintainers had trying to provide Netdata with Cloud support
+- no dependency on libwebsockets
+- lower latency and higher throughput
+- more up to date, new features for Netdata Cloud are currently developed on top of ACLK-NG first
 
 ## Disable the ACLK
 
