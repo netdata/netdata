@@ -57,6 +57,7 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
     debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_AVAILABLE     : [%s]", analytics_data.netdata_config_https_available);
     debug(D_ANALYTICS, "NETDATA_INSTALL_TYPE               : [%s]", analytics_data.netdata_install_type);
+    debug(D_ANALYTICS, "NETDATA_PREBUILT_DISTRO            : [%s]", analytics_data.netdata_prebuilt_distro);
     debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PRIVATE_REGISTRY : [%s]", analytics_data.netdata_config_is_private_registry);
     debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
     debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
@@ -104,6 +105,7 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_config_is_private_registry);
     freez(analytics_data.netdata_config_use_private_registry);
     freez(analytics_data.netdata_config_oom_score);
+    freez(analytics_data.netdata_prebuilt_distro);
 }
 
 /*
@@ -362,6 +364,7 @@ void analytics_get_install_type(void)
 {
     char *install_type_filename;
     analytics_set_data_str(&analytics_data.netdata_install_type, "");
+    analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, "");
 
     install_type_filename =
         mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 2));
@@ -389,7 +392,19 @@ void analytics_get_install_type(void)
                     if (*s)
                         analytics_set_data_str(&analytics_data.netdata_install_type, (char *)s);
                 }
-                break;
+            }
+            if (!strncmp(buf, "PREBUILT_DISTRO='", 17)) {
+                s = t = buf + 16;
+                if (s) {
+                    while (*s == '\'')
+                        s++;
+                    while (*++t != '\0')
+                        ;
+                    while (--t > s && *t == '\'')
+                        *t = '\0';
+                    if (*s)
+                        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)s);
+                }
             }
         }
         fclose(fp);
@@ -903,6 +918,7 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_config_is_private_registry, "null");
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
     analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
+    analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -984,7 +1000,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -1025,7 +1041,8 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_install_type,
         analytics_data.netdata_config_is_private_registry,
         analytics_data.netdata_config_use_private_registry,
-        analytics_data.netdata_config_oom_score);
+        analytics_data.netdata_config_oom_score,
+        analytics_data.netdata_prebuilt_distro);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 

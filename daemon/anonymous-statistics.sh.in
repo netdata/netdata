@@ -65,6 +65,8 @@ NETDATA_INSTALL_TYPE="${37}"
 NETDATA_IS_PRIVATE_REGISTRY="${38}"
 NETDATA_USE_PRIVATE_REGISTRY="${39}"
 NETDATA_CONFIG_OOM_SCORE="${40}"
+NETDATA_PREBUILT_DISTRO="${41}"
+
 
 # define body of request to be sent
 REQ_BODY="$(cat << EOF
@@ -86,6 +88,7 @@ REQ_BODY="$(cat << EOF
         "netdata_buildinfo": ${NETDATA_BUILDINFO},
         "netdata_release_channel": ${NETDATA_CONFIG_RELEASE_CHANNEL},
         "netdata_install_type": ${NETDATA_INSTALL_TYPE},
+        "netdata_prebuilt_distro": ${NETDATA_PREBUILT_DISTRO},
         "netdata_is_in_ci": ${NETDATA_IS_IN_CI},
         "host_os_name": "${NETDATA_HOST_OS_NAME}",
         "host_os_id": "${NETDATA_HOST_OS_ID}",
