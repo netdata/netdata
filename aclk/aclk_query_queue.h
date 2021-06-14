@@ -20,7 +20,8 @@ typedef enum {
     CHART_DIMS_UPDATE_BIN,
     CHART_CONFIG_UPDATED,
     CHART_RESET,
-    ALARM_LOG_HEALTH
+    ALARM_LOG_HEALTH,
+    UPDATE_NODE_INFO
 } aclk_query_type_t;
 
 struct aclk_query_metadata {

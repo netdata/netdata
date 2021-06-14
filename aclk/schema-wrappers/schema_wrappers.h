@@ -12,5 +12,6 @@
 #include "chart_config.h"
 #include "alarm_stream.h"
 #include "alarm_config.h"
+#include "node_info.h"
 
 #endif /* SCHEMA_WRAPPERS_H */
