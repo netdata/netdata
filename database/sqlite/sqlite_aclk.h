@@ -7,6 +7,8 @@
 
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
+#define ACLK_MAX_CHART_UPDATES  (5)
+
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
     uuid_unparse_lower(*uuid, out);
@@ -154,7 +156,7 @@ extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
-int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion);
+int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
 //void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

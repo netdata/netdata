@@ -94,7 +94,6 @@ static void async_cb(uv_async_t *handle)
     debug(D_METADATALOG, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
-/* Flushes dirty pages when timer expires */
 #define TIMER_PERIOD_MS (5000)
 
 static void timer_cb(uv_timer_t* handle)
@@ -109,12 +108,7 @@ static void timer_cb(uv_timer_t* handle)
 
     if (wc->chart_updates) {
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
-        cmd.count = 2;
-        aclk_database_enq_cmd(wc, &cmd);
-    }
-    if (wc->alert_updates) {
-        cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
-        cmd.count = 1;
+        cmd.count = ACLK_MAX_CHART_UPDATES;
         aclk_database_enq_cmd(wc, &cmd);
     }
 }
@@ -135,7 +129,7 @@ void aclk_database_worker(void *arg)
     wc->alert_updates = 0;
 
     aclk_database_init_cmd_queue(wc);
-    uv_thread_set_name_np(wc->thread, "Test");
+    uv_thread_set_name_np(wc->thread, wc->uuid_str);
 
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
@@ -163,7 +157,7 @@ void aclk_database_worker(void *arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
 
-    // RUn a chart deduplication
+    // Run a chart deduplication
     cmd.opcode = ACLK_DATABASE_DEDUP_CHART;
     aclk_database_enq_cmd(wc, &cmd);
 
@@ -223,8 +217,10 @@ void aclk_database_worker(void *arg)
                     aclk_status_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_ADD_CHART:
-                    aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
-                    freez(cmd.data_param);
+//                    aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
+                    aclk_add_chart_event(wc, cmd);
+                    if (cmd.completion)
+                        complete(cmd.completion);
                     break;
                 case ACLK_DATABASE_ADD_ALARM:
                     aclk_add_alarm_event((RRDHOST *) cmd.data, (ALARM_ENTRY *) cmd.data1, (char *) cmd.data_param, cmd.completion);
@@ -299,22 +295,27 @@ void aclk_set_architecture(int mode)
     aclk_architecture = mode;
 }
 
-int aclk_add_chart_payload(char *uuid_str, uuid_t *unique_id, uuid_t *chart_id, char *payload_type, const char *payload, size_t payload_size)
+int aclk_add_chart_payload(char *uuid_str, uuid_t *chart_id, char *payload_type, void *payload, size_t payload_size)
 {
-    char sql[1024];
     sqlite3_stmt *res_chart = NULL;
     int rc;
 
-    sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, chart_id, date_created, type, payload) " \
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, chart_id, date_created, type, payload) " \
                  "VALUES (@unique_id, @chart_id, strftime('%%s'), @type, @payload);", uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_chart, 0);
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_chart, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store chart payload data");
+        buffer_free(sql);
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res_chart, 1, unique_id , sizeof(*unique_id), SQLITE_STATIC);
+    uuid_t unique_uuid;
+    uuid_generate(unique_uuid);
+
+    rc = sqlite3_bind_blob(res_chart, 1, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -337,14 +338,15 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *unique_id, uuid_t *chart_id, 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_chart) != SQLITE_OK))
         error_report("Failed to reset statement in store chart payload, rc = %d", rc);
-
+    buffer_free(sql);
     return (rc != SQLITE_DONE);
 }
 
-int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *completion)
+int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     int rc = 0;
     if (unlikely(!db_meta)) {
+        freez(cmd.data_param);
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return 1;
         }
@@ -355,13 +357,10 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
 #ifdef ACLK_NG
     char *claim_id = is_agent_claimed();
 
+    RRDSET *st = cmd.data;
+    char *payload_type = cmd.data_param;
+
     if (likely(claim_id)) {
-        char uuid_str[GUID_LEN + 1];
-        uuid_unparse_lower_fix(&st->rrdhost->host_uuid, uuid_str);
-
-        uuid_t unique_uuid;
-        uuid_generate(unique_uuid);
-
         struct chart_instance_updated chart_payload;
         memset(&chart_payload, 0, sizeof(chart_payload));
         chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
@@ -372,19 +371,18 @@ int aclk_add_chart_event(RRDSET *st, char *payload_type, struct completion *comp
         chart_payload.claim_id = claim_id;
         chart_payload.id = strdupz(st->id);
 
-        size_t payload_size;
-        char *payload = generate_chart_instance_updated(&payload_size, &chart_payload);
-        rc = aclk_add_chart_payload(uuid_str, &unique_uuid, st->chart_uuid, payload_type, payload, payload_size);
-        chart_instance_updated_destroy(&chart_payload);
+        size_t size;
+        char *payload = generate_chart_instance_updated(&size, &chart_payload);
+        if (likely(payload))
+            rc = aclk_add_chart_payload(wc->uuid_str, st->chart_uuid, payload_type, (void *) payload, size);
         freez(payload);
+        chart_instance_updated_destroy(&chart_payload);
     }
 #else
-    UNUSED(st);
-    UNUSED(payload_type);
+    UNUSED(wc);
+    UNUSED(cmd);
 #endif
-    if (completion)
-       complete(completion);
-
+    freez(cmd.data_param);
     return rc;
 }
 
