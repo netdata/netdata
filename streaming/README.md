@@ -20,6 +20,8 @@ capable of:
 The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
 There are also **proxies**, which collects metrics from a child and sends it to a parent.
 
+:exclamation: This communication is not HTTP (it cannot be proxied by web proxies).
+
 ## Supported configurations
 
 ### Netdata without a database or web API (headless collector)
