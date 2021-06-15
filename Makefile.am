@@ -4,6 +4,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
 nodist_netdata_SOURCES=$(NULL)
+BUILT_SOURCES=$(NULL)
 
 MAINTAINERCLEANFILES = \
     config.log config.status \
@@ -598,7 +599,7 @@ ACLK_FILES = \
     aclk/schema-wrappers/schema_wrappers.h \
     $(NULL)
 
-ACLK_NG_PROTO_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
@@ -622,8 +623,8 @@ ACLK_NG_PROTO_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h \
     $(NULL)
 
-nodist_netdata_SOURCES += $(ACLK_NG_PROTO_FILES) \
-    $(NULL)
+BUILT_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
+nodist_netdata_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -990,11 +991,12 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
         $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
         $(OPTIONAL_PROTOBUF_LIBS) \
         $(NULL)
-    BUILT_SOURCES = \
+    BACKEND_PROMETHEUS_BUILT_SOURCES = \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
-    nodist_netdata_SOURCES += $(BUILT_SOURCES)
+    BUILT_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
+    nodist_netdata_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
 
 exporting/prometheus/remote_write/remote_write.pb.cc \
 exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
@@ -1133,7 +1135,7 @@ if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
         -Wl,--wrap=add_label \
         -Wl,--wrap=add_metric \
         $(NULL)
-    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BACKEND_PROMETHEUS_BUILT_SOURCES)
 endif
 if ENABLE_BACKEND_KINESIS
     exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h"
+#include "proto/nodeinstance/connection/v1/connection.pb.h"
 #include "node_connection.h"
 
 #include <sys/time.h>
