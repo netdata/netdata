@@ -46,6 +46,19 @@ Many menu items also contain a **submenu**, with links to additional categories.
 ![Animated GIF of using Netdata's menus and
 submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8ba1-11ea-8140-d0a17a62009b.gif)
 
+## Play, pause, force play, and timeframe selector
+
+The dashboard has three different states: playing, paused, and force playing. The default playing state refreshes charts
+every second as long as the browser tab is in focus. [Interacting with a chart](/docs/dashboard/interact-charts) pauses
+the War Room. Once the tab loses focus, charts pause automatically.
+
+The top navigation bar on the dashboard has a play/pause button that reflects the current state of the dashboard and
+lets you quickly switch between the two states. There is also a dropdown to select **Force Play**, which keeps charts
+refreshing regardless of tab focus, potentially at the expense of system performance.
+
+To the right of the play/pause button is the [timeframe selector](/docs/dashboard/select-timeframes.mdx), which allows
+you to visualize specific windows of historical metrics.
+
 ## Charts
 
 Every **chart** in the Netdata dashboard is [fully interactive](/docs/dashboard/interact-charts.mdx). Netdata
