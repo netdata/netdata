@@ -488,10 +488,11 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
     modules->mode = ebpf_select_mode(mode);
 
-    modules->update_time = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
+    modules->update_time = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+                                                     EBPF_CFG_UPDATE_EVERY, modules->update_time);
 
     modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
-                                                 CONFIG_BOOLEAN_YES);
+                                                 modules->apps_charts);
 
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
