@@ -1,0 +1,17 @@
+Source: netdata-repo
+Section: net
+Priority: optional
+Maintainer: Netdata Builder <bot@netdata.cloud>
+Standards-Version: 3.9.6
+Build-Depends: debhelper (>= 10), curl, gnupg
+Homepage: https://netdata.cloud
+
+Package: netdata-repo
+Architecture: all
+Depends: apt-transport-https, debian-archive-keyring, gnupg
+Description: Configuration for the official Netdata Stable package repository.
+
+Package: netdata-edge-repo
+Architecture:all
+Depends: apt-transport-https, debian-archive-keyring, gnupg
+Description: Configuration for the official Netdata Edge package repository.

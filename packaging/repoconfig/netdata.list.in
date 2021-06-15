@@ -1,0 +1,1 @@
+deb https://packagecloud.io/netdata/netdata__VARIANT__/__DISTRO__/ __SUITE__ main
