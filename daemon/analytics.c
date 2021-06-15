@@ -411,13 +411,13 @@ void analytics_misc(void)
 {
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
-#ifdef ACLK_NG
-    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
-#else
-    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
-#endif
+    if (aclk_ng)
+        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
+    else
+        analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "legacy");
 #else
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
+    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");
 #endif
 
 #ifdef ENABLE_ACLK
