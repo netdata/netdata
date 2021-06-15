@@ -393,7 +393,7 @@ void analytics_get_install_type(void)
                         analytics_set_data_str(&analytics_data.netdata_install_type, (char *)s);
                 }
             }
-            if (!strncmp(buf, "PREBUILT_DISTRO='", 17)) {
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17)) {
                 s = t = buf + 16;
                 if (s) {
                     while (*s == '\'')
