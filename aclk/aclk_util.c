@@ -51,6 +51,15 @@ void aclk_env_t_destroy(aclk_env_t *env) {
     }
 }
 
+int aclk_env_has_capa(const char *capa)
+{
+    for (int i = 0; i < aclk_env->capability_count; i++) {
+        if (!strcasecmp(capa, aclk_env->capabilities[i]))
+            return 1;
+    }
+    return 0;
+}
+
 #ifdef ACLK_LOG_CONVERSATION_DIR
 volatile int aclk_conversation_log_counter = 0;
 #if !defined(HAVE_C___ATOMIC) || defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
