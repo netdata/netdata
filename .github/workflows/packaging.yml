@@ -15,6 +15,8 @@ on:
       version:
         name: Package version
         required: false
+env:
+  DO_NOT_TRACK: 1
 jobs:
   build:
     name: Build
@@ -112,7 +114,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          docker run --platform ${{ matrix.platform }} -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
+          docker run -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} -v $PWD/artifacts:/artifacts local/package-builder:${{ matrix.distro }}${{ matrix.version }}
       - name: Upload
         if: github.event_name == 'workflow_dispatch'
         shell: bash

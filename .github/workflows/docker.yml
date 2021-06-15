@@ -11,6 +11,8 @@ on:
         name: Version Tag
         default: nightly
         required: true
+env:
+  DO_NOT_TRACK: 1
 jobs:
   docker-build:
     name: Docker Build

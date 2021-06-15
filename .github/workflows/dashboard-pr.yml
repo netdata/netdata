@@ -11,6 +11,9 @@ on:
         name: Dashboard Version
         required: true
 
+env:
+  DO_NOT_TRACK: 1
+
 jobs:
   dashboard-pr:
     name: Generate Dashboard Version Bump PR

@@ -8,6 +8,9 @@ on:
     branches:
       - master
 
+env:
+  DO_NOT_TRACK: 1
+
 jobs:
   source-build:
     name: Install, Build & Update
@@ -79,7 +82,7 @@ jobs:
         run: |
           echo $PRE > ./prep-cmd.sh
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
-          docker run --network host -w /netdata test \
+          docker run -e DO_NOT_TRACK=1 --network host -w /netdata test \
               /bin/sh -c '/netdata/packaging/installer/kickstart.sh --dont-wait \
               && /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update \
               && bash /netdata/.github/scripts/check-updater.sh'

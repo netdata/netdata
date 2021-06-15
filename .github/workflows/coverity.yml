@@ -8,6 +8,8 @@ on:
     paths:
       - .github/workflows/coverity.yml
       - coverity-scan.sh
+env:
+  DO_NOT_TRACK: 1
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'

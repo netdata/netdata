@@ -4,6 +4,8 @@ name: Pull Request Labeler
 on:
   schedule:
     - cron: '*/5 * * * *'
+env:
+  DO_NOT_TRACK: 1
 jobs:
   labeler:
     runs-on: ubuntu-latest
