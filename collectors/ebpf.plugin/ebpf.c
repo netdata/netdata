@@ -1220,20 +1220,15 @@ static void parse_args(int argc, char **argv)
 #endif
     }
 
-    if (disable_apps)
-        return;
-
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
             &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
-        info(
-            "Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
-            ebpf_user_config_dir, ebpf_stock_config_dir);
+        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
+             ebpf_user_config_dir, ebpf_stock_config_dir);
         if (ebpf_read_apps_groups_conf(
                 &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
-            error(
-                "Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
-                ebpf_stock_config_dir);
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
+                  ebpf_stock_config_dir);
             thread_finished++;
             ebpf_exit(1);
         }
