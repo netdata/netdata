@@ -72,7 +72,7 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 
 ## ACLK implementation
 
-Currently we are in process of switching ACLK to brand new technical stack called ACLK-NG. To choose implementation your agent should use you can change the `aclk implementation` setting in your `netdata.conf` (accepted values `ng` or `legacy`).
+Currently we are in process of switching ACLK to brand new technical stack called ACLK-NG. To choose your implementation, change the `aclk implementation` setting in your `netdata.conf` (accepted values `ng` or `legacy`).
 
 Before changing this value check the desired implementation is available in your agent (determined at build time) by running `netdata -W buildinfo`. Following lines indicate which ACLK implementations are available in your agent:
 
@@ -173,4 +173,3 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 Restart your Agent and [claim your node](/claim/README.md#how-to-claim-a-node).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Faclk%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
-
