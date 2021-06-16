@@ -76,47 +76,47 @@ pthread_cond_t collect_data_cond_var;
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &process_config,
       .config_file = NETDATA_PROCESS_CONFIG_FILE},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &socket_config,
       .config_file = NETDATA_NETWORK_CONFIG_FILE},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &cachestat_config,
       .config_file = NETDATA_CACHESTAT_CONFIG_FILE},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &sync_config,
       .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = "dc", .config_name = "dc", .enabled = 0, .start_routine = ebpf_dcstat_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_dcstat_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &dcstat_config,
       .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE},
     { .thread_name = "swap", .config_name = "swap", .enabled = 0, .start_routine = ebpf_swap_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &swap_config,
       .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE},
     { .thread_name = "vfs", .config_name = "swap", .enabled = 0, .start_routine = ebpf_vfs_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
       .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE },
     { .thread_name = "filesystem", .config_name = "filesystem", .enabled = 0, .start_routine = ebpf_filesystem_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = 1, .mode = MODE_ENTRY,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
       .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
-      .global_charts = 0, .apps_charts = 1, .mode = MODE_ENTRY,
+      .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
       .cfg = NULL, .config_name = NULL},
 };
@@ -1220,20 +1220,15 @@ static void parse_args(int argc, char **argv)
 #endif
     }
 
-    if (disable_apps)
-        return;
-
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
             &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
-        info(
-            "Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
-            ebpf_user_config_dir, ebpf_stock_config_dir);
+        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
+             ebpf_user_config_dir, ebpf_stock_config_dir);
         if (ebpf_read_apps_groups_conf(
                 &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
-            error(
-                "Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
-                ebpf_stock_config_dir);
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
+                  ebpf_stock_config_dir);
             thread_finished++;
             ebpf_exit(1);
         }
