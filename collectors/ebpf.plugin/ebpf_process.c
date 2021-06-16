@@ -18,8 +18,19 @@ static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = { "do_sys_open"
 static char *status[] = { "process", "zombie" };
 
 static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                                 .user_input = 0},
-                                             {.name = NULL, .internal_input = 0, .user_input = 0}};
+                                            .user_input = 0,
+                                            .type = NETDATA_EBPF_MAP_RESIZABLE  | NETDATA_EBPF_MAP_PID,
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           {.name = "tbl_total_stats", .internal_input = NETDATA_KEY_END_VECTOR,
+                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           {.name = "process_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                            .user_input = 0,
+                                            .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                           {.name = NULL, .internal_input = 0, .user_input = 0,
+                                            .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
 static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
@@ -32,7 +43,6 @@ ebpf_process_publish_apps_t **current_apps_data = NULL;
 
 int process_enabled = 0;
 
-static int *map_fd = NULL;
 static struct bpf_object *objects = NULL;
 static struct bpf_link **probe_links = NULL;
 
@@ -165,7 +175,7 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
 void ebpf_process_remove_pids()
 {
     struct pid_stat *pids = root_of_pids;
-    int pid_fd = map_fd[0];
+    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (pids) {
         uint32_t pid = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[pid];
@@ -280,8 +290,9 @@ static void read_hash_global_tables()
     netdata_idx_t res[NETDATA_KEY_END_VECTOR];
 
     netdata_idx_t *val = process_hash_values;
+    int fd = process_maps[NETDATA_PROCESS_GLOBAL_TABLE].map_fd;
     for (idx = 0; idx < NETDATA_KEY_END_VECTOR; idx++) {
-        if (!bpf_map_lookup_elem(map_fd[1], &idx, val)) {
+        if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
             int i;
             int end = ebpf_nprocs;
@@ -601,7 +612,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
-    int pid_fd = map_fd[0];
+    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -644,7 +655,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
  *****************************************************************/
 
 void clean_global_memory() {
-    int pid_fd = map_fd[0];
+    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     struct pid_stat *pids = root_of_pids;
     while (pids) {
         uint32_t pid = pids->pid;
@@ -729,8 +740,6 @@ static void change_syscalls()
  */
 static void set_local_pointers()
 {
-    map_fd = process_data.map_fd;
-
     if (process_data.isrh >= NETDATA_MINIMUM_RH_VERSION && process_data.isrh < NETDATA_RH_8)
         change_syscalls();
 }
