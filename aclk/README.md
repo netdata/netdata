@@ -84,7 +84,7 @@ Features:
 
 To verify which ACLK implementation Netdata uses, visit the `/api/v1/info` endpoint on your local dashboard and check the `aclk-implementation` key.
 
-Please note new Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as fallback in case some users have issues with ACLK-NG or need to use features which are not yet available in ACLK-NG *(like IPv6 support and SOCKS proxy)*.
+New Netdata Cloud features will be implemented on top of ACLK-NG from this point on. ACLK Legacy is therefore kept as a fallback in case some users have issues with ACLK-NG or need to use features which are not yet available in ACLK-NG *(like IPv6 support and SOCKS proxy)*.
 
 ### Improvements of ACLK-NG over Legacy are:
 - no dependency on custom patched `libmosquitto` (no bundling of libraries). Which should remove obstacles many GNU/Linux distribution package maintainers had trying to provide Netdata with Cloud support
