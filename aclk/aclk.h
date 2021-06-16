@@ -24,6 +24,7 @@ extern int aclk_disable_runtime;
 extern int aclk_disable_single_updates;
 extern int aclk_kill_link;
 extern int aclk_connected;
+extern int chart_batch_id;
 
 extern time_t aclk_block_until;
 

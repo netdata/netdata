@@ -313,6 +313,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             freez(res.node_id);
             return;
         }
+        chart_batch_id = res.batch_id;
         aclk_start_streaming(res.node_id);
         freez(res.claim_id);
         freez(res.node_id);
