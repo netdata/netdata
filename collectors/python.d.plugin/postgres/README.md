@@ -84,6 +84,18 @@ Following charts are drawn:
 14. **Average number of blocking transactions in db** processes
 
     - blocking
+    
+15. **Percent towards emergency autovac** percent
+
+    - percent
+
+16. **Oldest current XID** xid
+
+    - xid
+    
+17. **Percent towards wraparound** percent
+
+    - percent    
 
 ## Configuration
 
