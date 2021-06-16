@@ -8,7 +8,6 @@ static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
 static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 
 static int read_thread_closed = 1;
-static int *map_fd = NULL;
 netdata_publish_swap_t *swap_vector = NULL;
 
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
@@ -24,7 +23,17 @@ struct config swap_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                         .user_input = 0},
+                                         .user_input = 0,
+                                         .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "swap_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                         .user_input = 0,
+                                         .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "tbl_swap", .internal_input = NETDATA_SWAP_END,
+                                         .user_input = 0,
+                                         .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 static struct bpf_link **probe_links = NULL;
@@ -139,7 +148,7 @@ static void read_apps_table()
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
     struct pid_stat *pids = root_of_pids;
-    int fd = map_fd[NETDATA_PID_SWAP_TABLE];
+    int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
     while (pids) {
         key = pids->pid;
@@ -183,7 +192,7 @@ static void read_global_table()
 {
     netdata_idx_t *stored = swap_values;
     netdata_idx_t *val = swap_hash_values;
-    int fd = map_fd[NETDATA_SWAP_GLOBAL_TABLE];
+    int fd = swap_maps[NETDATA_SWAP_GLOBAL_TABLE].map_fd;
 
     uint32_t i, end = NETDATA_SWAP_END;
     for (i = NETDATA_KEY_SWAP_READPAGE_CALL; i < end; i++) {
@@ -295,8 +304,6 @@ static void swap_collector(ebpf_module_t *em)
 {
     swap_threads.thread = mallocz(sizeof(netdata_thread_t));
     swap_threads.start_routine = ebpf_swap_read_hash;
-
-    map_fd = swap_data.map_fd;
 
     netdata_thread_create(swap_threads.thread, swap_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_swap_read_hash, em);
@@ -416,7 +423,7 @@ void *ebpf_swap_thread(void *ptr)
     em->maps = swap_maps;
     fill_ebpf_data(&swap_data);
 
-    ebpf_update_pid_table(&swap_maps[0], em);
+    ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
 
     if (!em->enabled)
         goto endswap;
