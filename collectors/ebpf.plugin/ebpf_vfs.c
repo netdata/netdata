@@ -19,7 +19,15 @@ netdata_publish_vfs_t *vfs_vector = NULL;
 static ebpf_data_t vfs_data;
 
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                        .user_input = 0},
+                                        .user_input = 0, .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                       {.name = "tbl_vfs_stats", .internal_input = NETDATA_VFS_COUNTER,
+                                        .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                       {.name = "vfs_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                        .user_input = 0,
+                                        .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                        {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 struct config vfs_config = { .first_section = NULL,
@@ -34,8 +42,6 @@ static struct bpf_link **probe_links = NULL;
 struct netdata_static_thread vfs_threads = {"VFS KERNEL",
                                             NULL, NULL, 1, NULL,
                                             NULL,  NULL};
-
-static int *map_fd = NULL;
 
 static int read_thread_closed = 1;
 
@@ -162,7 +168,7 @@ static void read_global_table()
     netdata_idx_t res[NETDATA_VFS_COUNTER];
 
     netdata_idx_t *val = vfs_hash_values;
-    int fd = map_fd[NETDATA_VFS_ALL];
+    int fd = vfs_maps[NETDATA_VFS_ALL].map_fd;
     for (idx = 0; idx < NETDATA_VFS_COUNTER; idx++) {
         uint64_t total = 0;
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
@@ -455,7 +461,7 @@ static void ebpf_vfs_read_apps()
 {
     struct pid_stat *pids = root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
-    int fd = map_fd[NETDATA_VFS_PID];
+    int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
     size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;
     while (pids) {
         uint32_t key = pids->pid;
@@ -518,8 +524,6 @@ static void vfs_collector(ebpf_module_t *em)
 {
     vfs_threads.thread = mallocz(sizeof(netdata_thread_t));
     vfs_threads.start_routine = ebpf_vfs_read_hash;
-
-    map_fd = vfs_data.map_fd;
 
     netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_vfs_read_hash, em);
@@ -894,7 +898,7 @@ void *ebpf_vfs_thread(void *ptr)
     em->maps = vfs_maps;
     fill_ebpf_data(&vfs_data);
 
-    ebpf_update_pid_table(&vfs_maps[0], em);
+    ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
 
     ebpf_vfs_allocate_global_vectors();
 
