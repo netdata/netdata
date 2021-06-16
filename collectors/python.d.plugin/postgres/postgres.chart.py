@@ -462,7 +462,7 @@ WHERE
 QUERY_STANDBY = {
     DEFAULT: """
 SELECT
-    coalesce(prs.slot_name, psr.application_name) application_name
+    COALESCE(prs.slot_name, psr.application_name) application_name
 FROM pg_stat_replication psr
 LEFT OUTER JOIN pg_replication_slots prs on psr.pid = prs.active_pid
 WHERE application_name IS NOT NULL;
@@ -479,7 +479,7 @@ FROM pg_replication_slots;
 QUERY_STANDBY_DELTA = {
     DEFAULT: """
 SELECT
-    coalesce(prs.slot_name, psr.application_name) application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     pg_wal_lsn_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_wal_receive_lsn()
@@ -510,7 +510,7 @@ WHERE application_name IS NOT NULL;
 """,
     V96: """
 SELECT
-    coalesce(prs.slot_name, psr.application_name) application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     pg_xlog_location_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_xlog_receive_location()
@@ -544,7 +544,7 @@ WHERE application_name IS NOT NULL;
 QUERY_STANDBY_LAG = {
     DEFAULT: """
 SELECT
-    coalesce(prs.slot_name, psr.application_name) application_name,
+    COALESCE(prs.slot_name, psr.application_name) application_name,
     COALESCE(EXTRACT(EPOCH FROM write_lag)::bigint, 0) AS write_lag,
     COALESCE(EXTRACT(EPOCH FROM flush_lag)::bigint, 0) AS flush_lag,
     COALESCE(EXTRACT(EPOCH FROM replay_lag)::bigint, 0) AS replay_lag
