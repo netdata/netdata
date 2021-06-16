@@ -169,7 +169,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
     chart::v1::ChartDimensionUpdated *dim;
     aclk_lib::v1::ACLKMessagePosition *pos;
 
-    msg.set_batch_id(1); //TODO
+    msg.set_batch_id(chart_batch_id);
 
     for (int i = 0; payloads[i]; i++) {
         if (is_dim[i]) {
@@ -214,7 +214,7 @@ char *generate_charts_updated(size_t *len, char **payloads, size_t *payload_size
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
 
-    msg.set_batch_id(1); //TODO
+    msg.set_batch_id(chart_batch_id);
 
     for (int i = 0; payloads[i]; i++) {
         chart::v1::ChartInstanceUpdated db_msg;
@@ -247,7 +247,7 @@ char *generate_chart_dimensions_updated(size_t *len, char **payloads, size_t *pa
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
 
-    msg.set_batch_id(1); //TODO
+    msg.set_batch_id(chart_batch_id);
 
     for (int i = 0; payloads[i]; i++) {
         chart::v1::ChartDimensionUpdated db_msg;

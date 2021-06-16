@@ -26,6 +26,7 @@ int aclk_connected = 0;
 int aclk_disable_runtime = 0;
 int aclk_disable_single_updates = 0;
 int aclk_kill_link = 0;
+int chart_batch_id;
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
