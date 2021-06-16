@@ -386,6 +386,60 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     return links;
 }
 
+static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *obj)
+{
+    if (!map_fd)
+        return;
+
+    ebpf_local_maps_t *maps = em->maps;
+    struct bpf_map *map;
+    size_t i = 0;
+        bpf_map__for_each(map, obj)
+    {
+        int fd = bpf_map__fd(map);
+        if (maps) {
+            const char *map_name = bpf_map__name(map);
+            int j = 0; ;
+            while (maps[j].name) {
+                ebpf_local_maps_t *w = &maps[j];
+                if (w->map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED && !strcmp(map_name, w->name))
+                    w->map_fd = fd;
+
+                j++;
+            }
+        }
+        map_fd[i] = fd;
+        i++;
+    }
+}
+
+static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
+{
+    ebpf_local_maps_t *maps = em->maps;
+    if (!maps)
+        return;
+
+    struct bpf_map *map;
+        bpf_map__for_each(map, obj)
+    {
+        size_t i = 0;
+        while (maps[i].name) {
+            ebpf_local_maps_t *w = &maps[i];
+            if (w->map_fd != ND_EBPF_MAP_FD_NOT_INITIALIZED && (w->type & NETDATA_EBPF_MAP_CONTROLLER)) {
+                w->type &= ~NETDATA_EBPF_MAP_CONTROLLER;
+                w->type |= NETDATA_EBPF_MAP_CONTROLLER_UPDATED;
+
+                uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
+                int value = em->apps_charts;
+                int ret = bpf_map_update_elem(w->map_fd, &key, &value, 0);
+                if (ret)
+                    error("Add key(%u) for controller table failed.", key);
+            }
+            i++;
+        }
+    }
+}
+
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
                                     struct bpf_object **obj, int *map_fd)
 {
@@ -412,13 +466,8 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
     }
 
-    struct bpf_map *map;
-    size_t i = 0;
-    bpf_map__for_each(map, *obj)
-    {
-        map_fd[i] = bpf_map__fd(map);
-        i++;
-    }
+    ebpf_update_maps(em, map_fd, *obj);
+    ebpf_update_controller(em, *obj);
 
     size_t count_programs =  ebpf_count_programs(*obj);
 
