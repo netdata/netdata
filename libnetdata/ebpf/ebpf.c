@@ -307,18 +307,27 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
     if (!maps)
         return;
 
+    uint32_t apps_type = NETDATA_EBPF_MAP_PID | NETDATA_EBPF_MAP_RESIZABLE;
     bpf_map__for_each(map, program)
     {
         const char *map_name = bpf_map__name(map);
         int i = 0; ;
         while (maps[i].name) {
             ebpf_local_maps_t *w = &maps[i];
-            if (w->user_input != w->internal_input && !strcmp(w->name, map_name)) {
+            if (w->type & NETDATA_EBPF_MAP_RESIZABLE) {
+                if (!strcmp(w->name, map_name)) {
+                    if (w->user_input && w->user_input != w->internal_input) {
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
+                        info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
 #endif
-                bpf_map__resize(map, w->user_input);
+                        bpf_map__resize(map, w->user_input);
+                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts)) {
+                        w->user_input = ND_EBPF_DEFAULT_MIN_PID;
+                        bpf_map__resize(map, w->user_input);
+                    }
+                }
             }
+
             i++;
         }
     }
