@@ -74,7 +74,7 @@ You can configure following keys in the `netdata.conf` section `[cloud]`:
 
 Currently we are in process of switching ACLK to brand new technical stack called ACLK-NG. To choose your implementation, change the `aclk implementation` setting in your `netdata.conf` (accepted values `ng` or `legacy`).
 
-Before changing this value check the desired implementation is available in your agent (determined at build time) by running `netdata -W buildinfo`. Following lines indicate which ACLK implementations are available in your agent:
+Before changing this value, check the desired implementation is available (determined at build time) by running `netdata -W buildinfo`. Following lines indicate which ACLK implementations are available:
 
 ```
 Features:
