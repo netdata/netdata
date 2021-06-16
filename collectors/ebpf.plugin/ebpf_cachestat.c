@@ -25,11 +25,20 @@ struct netdata_static_thread cachestat_threads = {"CACHESTAT KERNEL",
                                                   NULL, NULL, 1, NULL,
                                                   NULL,  NULL};
 
-static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                             .user_input = 0},
-                                             {.name = NULL, .internal_input = 0, .user_input = 0}};
-
-static int *map_fd = NULL;
+static ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
+                                              .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                             {.name = "cstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                              .user_input = 0,
+                                              .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
+                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                             {.name = "cstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                              .user_input = 0,
+                                              .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                             {.name = NULL, .internal_input = 0, .user_input = 0,
+                                              .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
 struct config cachestat_config = { .first_section = NULL,
     .last_section = NULL,
@@ -250,7 +259,7 @@ static void read_apps_table()
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key;
     struct pid_stat *pids = root_of_pids;
-    int fd = map_fd[NETDATA_CACHESTAT_PID_STATS];
+    int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
     while (pids) {
         key = pids->pid;
@@ -335,7 +344,7 @@ static void read_global_table()
     uint32_t idx;
     netdata_idx_t *val = cachestat_hash_values;
     netdata_idx_t *stored = cachestat_values;
-    int fd = map_fd[NETDATA_CACHESTAT_GLOBAL_STATS];
+    int fd = cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd;
 
     for (idx = NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU; idx < NETDATA_CACHESTAT_END; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, stored)) {
@@ -503,8 +512,6 @@ static void cachestat_collector(ebpf_module_t *em)
     cachestat_threads.thread = mallocz(sizeof(netdata_thread_t));
     cachestat_threads.start_routine = ebpf_cachestat_read_hash;
 
-    map_fd = cachestat_data.map_fd;
-
     netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_cachestat_read_hash, em);
 
@@ -625,7 +632,7 @@ void *ebpf_cachestat_thread(void *ptr)
     em->maps = cachestat_maps;
     fill_ebpf_data(&cachestat_data);
 
-    ebpf_update_pid_table(&cachestat_maps[0], em);
+    ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
     if (!em->enabled)
         goto endcachestat;
