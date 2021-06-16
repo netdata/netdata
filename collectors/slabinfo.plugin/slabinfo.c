@@ -189,7 +189,7 @@ struct slabinfo *read_file_slabinfo() {
 
     // Iterate on all lines to populate / update the slabinfo struct
     size_t lines = procfile_lines(ff), l;
-    if (lines != lines_discovered) {
+    if (unlikely(lines != lines_discovered)) {
         lines_discovered = lines;
         redraw_chart = 1;
     }
@@ -260,7 +260,7 @@ unsigned int do_slab_stats(int update_every) {
         sactive = read_file_slabinfo();
 
         // Init Charts
-        if (redraw_chart) {
+        if (unlikely(redraw_chart)) {
             redraw_chart = 0;
             // Memory Usage
             printf("CHART %s.%s '' 'Memory Usage' 'B' '%s' '' line %d %d %s\n"
