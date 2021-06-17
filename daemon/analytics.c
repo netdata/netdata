@@ -385,8 +385,7 @@ void analytics_get_install_type(void)
                 if (s) {
                     while (*s == '\'')
                         s++;
-                    while (*++t != '\0')
-                        ;
+                    while (*++t != '\0');
                     while (--t > s && *t == '\'')
                         *t = '\0';
                     if (*s)
@@ -398,8 +397,7 @@ void analytics_get_install_type(void)
                 if (s) {
                     while (*s == '\'')
                         s++;
-                    while (*++t != '\0')
-                        ;
+                    while (*++t != '\0');
                     while (--t > s && *t == '\'')
                         *t = '\0';
                     if (*s)
