@@ -366,9 +366,9 @@ void analytics_get_install_type(void)
     analytics_set_data_str(&analytics_data.netdata_install_type, "");
     analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, "");
 
-    install_type_filename =
-        mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 2));
-    sprintf(install_type_filename, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
     if (unlikely(access(install_type_filename, R_OK) != 0)) {
         freez(install_type_filename);
         return;
