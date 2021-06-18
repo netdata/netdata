@@ -1563,7 +1563,7 @@ validate_tree_centos() {
     fi
 
     echo >&2 " > Installing Judy-devel directly ..."
-    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+    run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
   elif [[ "${version}" =~ ^6\..*$ ]]; then
     echo >&2 " > Detected CentOS 6.x ..."
