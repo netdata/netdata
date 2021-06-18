@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- slabinfo: Handle slabs added after discovery [\#11257](https://github.com/netdata/netdata/pull/11257) ([Saruspete](https://github.com/Saruspete))
 - eBPF keep values from `ebpf.d.conf` [\#11253](https://github.com/netdata/netdata/pull/11253) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add more nics to FreeBSD plugin [\#11251](https://github.com/netdata/netdata/pull/11251) ([diizzyy](https://github.com/diizzyy))
 - Send correct aclk implementation used by agent to posthog. [\#11247](https://github.com/netdata/netdata/pull/11247) ([MrZammler](https://github.com/MrZammler))
@@ -299,7 +300,6 @@
 - Update screenshots and text for new Cloud nav [\#10664](https://github.com/netdata/netdata/pull/10664) ([joelhans](https://github.com/joelhans))
 - Improve the Kubernetes deployment documentation [\#10662](https://github.com/netdata/netdata/pull/10662) ([joelhans](https://github.com/joelhans))
 - installer: update go.d.plugin version to v0.28.0 [\#10660](https://github.com/netdata/netdata/pull/10660) ([ilyam8](https://github.com/ilyam8))
-- Changed Docker image tagging to use semver tags for releases. [\#10648](https://github.com/netdata/netdata/pull/10648) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
@@ -310,15 +310,10 @@
 - Invalidate RRDSETVAR pointers on obsoletion. [\#10667](https://github.com/netdata/netdata/pull/10667) ([mfundul](https://github.com/mfundul))
 - Fixed condition controlling use of static LWS in RPM builds. [\#10661](https://github.com/netdata/netdata/pull/10661) ([Ferroin](https://github.com/Ferroin))
 - fix wrong link on docs Netdata Agent Daemon [\#10659](https://github.com/netdata/netdata/pull/10659) ([OdysLam](https://github.com/OdysLam))
-- Fix broken links in docs and add collectors to list [\#10651](https://github.com/netdata/netdata/pull/10651) ([joelhans](https://github.com/joelhans))
 
 ## [v1.29.2](https://github.com/netdata/netdata/tree/v1.29.2) (2021-02-18)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.1...v1.29.2)
-
-**Merged pull requests:**
-
-- Fix the context filtering on the data query endpoint [\#10652](https://github.com/netdata/netdata/pull/10652) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.29.1](https://github.com/netdata/netdata/tree/v1.29.1) (2021-02-09)
 
