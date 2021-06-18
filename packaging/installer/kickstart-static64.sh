@@ -207,13 +207,15 @@ safe_sha256sum() {
 }
 
 mark_install_type() {
-    install_type_file="/opt/netdata/etc/netdata/.install-type"
+  install_type_file="/opt/netdata/etc/netdata/.install-type"
+  if [ -f "${install_type_file}" ]; then
     # shellcheck disable=SC1090
     . "${install_type_file}"
-    cat > "${install_type_file}" <<-EOF
+    cat > "${install_type_file}" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
+  fi
 }
 
 # ----------------------------------------------------------------------------
