@@ -55,7 +55,7 @@ QUERY_NAME_REPSLOT_FILES = 'REPSLOT_FILES'
 QUERY_NAME_IF_SUPERUSER = 'IF_SUPERUSER'
 QUERY_NAME_SERVER_VERSION = 'SERVER_VERSION'
 QUERY_NAME_AUTOVACUUM = 'AUTOVACUUM'
-QUERY_NAME_EMERGENCY_AUTOVACUUM = 'EMERGENCY_AUTOVACUUM'
+QUERY_NAME_FORCED_AUTOVACUUM = 'FORCED_AUTOVACUUM'
 QUERY_NAME_TX_WRAPAROUND = 'TX_WRAPAROUND'
 QUERY_NAME_DIFF_LSN = 'DIFF_LSN'
 QUERY_NAME_WAL_WRITES = 'WAL_WRITES'
@@ -137,8 +137,8 @@ METRICS = {
         'vacuum_freeze',
         'brin_summarize'
     ],
-    QUERY_NAME_EMERGENCY_AUTOVACUUM: [
-        'percent_towards_emergency_autovac'
+    QUERY_NAME_FORCED_AUTOVACUUM: [
+        'percent_towards_forced_vacuum'
     ],
     QUERY_NAME_TX_WRAPAROUND: [
         'oldest_current_xid',
@@ -662,7 +662,7 @@ WHERE query NOT LIKE '%%pg_stat_activity%%';
 """,
 }
 
-QUERY_EMERGENCY_AUTOVACUUM = {
+QUERY_FORCED_AUTOVACUUM = {
     DEFAULT: """
 WITH max_age AS (
     SELECT setting AS autovacuum_freeze_max_age
@@ -675,7 +675,7 @@ WITH max_age AS (
     FROM pg_catalog.pg_database d
     JOIN max_age m ON (true)
     WHERE d.datallowconn )
-SELECT max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_emergency_autovac
+SELECT max(ROUND(100*(oldest_current_xid/autovacuum_freeze_max_age::float))) AS percent_towards_forced_autovacuum
 FROM per_database_stats;
 """,
 }
@@ -761,8 +761,8 @@ def query_factory(name, version=NO_VERSION):
         return QUERY_SHOW_VERSION[DEFAULT]
     elif name == QUERY_NAME_AUTOVACUUM:
         return QUERY_AUTOVACUUM[DEFAULT]
-    elif name == QUERY_NAME_EMERGENCY_AUTOVACUUM:
-        return QUERY_EMERGENCY_AUTOVACUUM[DEFAULT]
+    elif name == QUERY_NAME_FORCED_AUTOVACUUM:
+        return QUERY_FORCED_AUTOVACUUM[DEFAULT]
     elif name == QUERY_NAME_TX_WRAPAROUND:
         return QUERY_TX_WRAPAROUND[DEFAULT]
     elif name == QUERY_NAME_WAL:
@@ -821,7 +821,7 @@ ORDER = [
     'standby_delta',
     'standby_lag',
     'autovacuum',
-    'emergency_autovacuum',
+    'forced_autovacuum',
     'tx_wraparound_oldest_current_xid',
     'tx_wraparound_percent_towards_wraparound'
 ]
@@ -1010,10 +1010,10 @@ CHARTS = {
             ['brin_summarize', 'brin summarize', 'absolute']
         ]
     },
-    'emergency_autovacuum': {
-        'options': [None, 'Percent towards emergency autovac', 'percent', 'autovacuum', 'postgres.emergency_autovacuum', 'line'],
+    'forced_autovacuum': {
+        'options': [None, 'Percent towards forced autovacuum', 'percent', 'autovacuum', 'postgres.forced_autovacuum', 'line'],
         'lines': [
-            ['percent_towards_emergency_autovac', 'percent', 'absolute']
+            ['percent_towards_forced_autovacuum', 'percent', 'absolute']
         ]
     },
     'tx_wraparound_oldest_current_xid': {
@@ -1253,7 +1253,7 @@ class Service(SimpleService):
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
 
-        self.queries[query_factory(QUERY_NAME_EMERGENCY_AUTOVACUUM)] = METRICS[QUERY_NAME_EMERGENCY_AUTOVACUUM]
+        self.queries[query_factory(QUERY_NAME_FORCED_AUTOVACUUM)] = METRICS[QUERY_NAME_FORCED_AUTOVACUUM]
         self.queries[query_factory(QUERY_NAME_TX_WRAPAROUND)] = METRICS[QUERY_NAME_TX_WRAPAROUND]
 
         if self.server_version >= 100000:

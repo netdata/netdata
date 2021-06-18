@@ -1684,9 +1684,9 @@ netdataDashboard.context = {
             'Assuming non-superuser accounts are being used to connect to Postgres (so <i>superuser_reserved_connections</i> are subtracted from <i>max_connections</i>).<br/>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/runtime-config-connection.html" target="_blank">Connections and Authentication</a>.'
     },
-    'postgres.emergency_autovacuum': {
-        info: 'Percent towards emergency autovacuum for one or more tables.<ul>' +
-            '<li><strong>percent_towards_emergency_autovac:</strong> an emergency autovacuum will run once this value reaches 100.</li>' +
+    'postgres.forced_autovacuum': {
+        info: 'Percent towards forced autovacuum for one or more tables.<ul>' +
+            '<li><strong>percent_towards_forced_autovacuum:</strong> a forced autovacuum will run once this value reaches 100.</li>' +
             '</ul>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
     },
