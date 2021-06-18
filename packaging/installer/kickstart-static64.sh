@@ -208,7 +208,7 @@ safe_sha256sum() {
 
 mark_install_type() {
   install_type_file="/opt/netdata/etc/netdata/.install-type"
-  if [ -e "${install_type_file}" ]; then
+  if [ -f "${install_type_file}" ]; then
     # shellcheck disable=SC1090
     . "${install_type_file}"
     cat > "${install_type_file}" <<- EOF
