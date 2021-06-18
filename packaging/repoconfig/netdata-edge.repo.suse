@@ -1,0 +1,9 @@
+[netdata]
+name=Netdata
+baseurl=https://packagecloud.io/netdata/netdata-edge/opensuse/$releasever/$basearch
+repo_gpgcheck=1
+pkg_gpgcheck=0
+gpgkey=https://packagecloud.io/netdata/netdata-edge/gpgkey
+enabled=1
+type=rpm-md
+autorefresh=1

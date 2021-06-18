@@ -11,7 +11,7 @@ Architecture: all
 Depends: apt-transport-https, debian-archive-keyring, gnupg
 Description: Configuration for the official Netdata Stable package repository.
 
-Package: netdata-edge-repo
+Package: netdata-repo-edge
 Architecture:all
 Depends: apt-transport-https, debian-archive-keyring, gnupg
 Description: Configuration for the official Netdata Edge package repository.
