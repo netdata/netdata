@@ -88,6 +88,8 @@
 #define VERSION_STRING_LEN 256
 #define EBPF_KERNEL_REJECT_LIST_FILE "ebpf_kernel_reject_list.txt"
 
+#define ND_EBPF_DEFAULT_MIN_PID 1U
+#define ND_EBPF_MAP_FD_NOT_INITIALIZED (int)-1
 
 typedef struct ebpf_addresses {
     char *function;
@@ -115,10 +117,26 @@ typedef enum {
 
 #define ND_EBPF_DEFAULT_PID_SIZE 32768U
 
+enum netdata_ebpf_map_type {
+    NETDATA_EBPF_MAP_STATIC = 0,
+    NETDATA_EBPF_MAP_RESIZABLE = 1,
+    NETDATA_EBPF_MAP_CONTROLLER = 2,
+    NETDATA_EBPF_MAP_CONTROLLER_UPDATED = 4,
+    NETDATA_EBPF_MAP_PID = 8
+};
+
+enum netdata_controller {
+    NETDATA_CONTROLLER_APPS_ENABLED,
+
+    NETDATA_CONTROLLER_END
+};
+
 typedef struct ebpf_local_maps {
     char *name;
     uint32_t internal_input;
     uint32_t user_input;
+    uint32_t type;
+    int map_fd;
 } ebpf_local_maps_t;
 
 typedef struct ebpf_specify_name {
