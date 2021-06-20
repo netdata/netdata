@@ -357,6 +357,20 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
+char *get_value_from_key(char *buffer, char *key)
+{
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}
+
 /*
  * Checks for the existance of .install_type file and reads it
  */
@@ -376,34 +390,14 @@ void analytics_get_install_type(void)
 
     FILE *fp = fopen(install_type_filename, "r");
     if (fp) {
-        char *s, *t, buf[256 + 1];
+        char *s, buf[256 + 1];
         size_t len = 0;
 
         while ((s = fgets_trim_len(buf, 4096, fp, &len))) {
-            if (!strncmp(buf, "INSTALL_TYPE='", 14)) {
-                s = t = buf + 13;
-                if (s) {
-                    while (*s == '\'')
-                        s++;
-                    while (*++t != '\0');
-                    while (--t > s && *t == '\'')
-                        *t = '\0';
-                    if (*s)
-                        analytics_set_data_str(&analytics_data.netdata_install_type, (char *)s);
-                }
-            }
-            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17)) {
-                s = t = buf + 16;
-                if (s) {
-                    while (*s == '\'')
-                        s++;
-                    while (*++t != '\0');
-                    while (--t > s && *t == '\'')
-                        *t = '\0';
-                    if (*s)
-                        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)s);
-                }
-            }
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                analytics_set_data_str(&analytics_data.netdata_install_type, (char *)get_value_from_key(buf, "INSTALL_TYPE"));
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
         }
         fclose(fp);
     }
