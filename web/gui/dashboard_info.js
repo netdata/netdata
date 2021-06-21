@@ -1684,6 +1684,25 @@ netdataDashboard.context = {
             'Assuming non-superuser accounts are being used to connect to Postgres (so <i>superuser_reserved_connections</i> are subtracted from <i>max_connections</i>).<br/>' +
             'For more information see <a href="https://www.postgresql.org/docs/current/runtime-config-connection.html" target="_blank">Connections and Authentication</a>.'
     },
+    'postgres.forced_autovacuum': {
+        info: 'Percent towards forced autovacuum for one or more tables.<ul>' +
+            '<li><strong>percent_towards_forced_autovacuum:</strong> a forced autovacuum will run once this value reaches 100.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    'postgres.tx_wraparound_oldest_current_xid': {
+        info: 'The oldest current transaction id (xid).<ul>' +
+            '<li><strong>oldest_current_xid:</strong> oldest current transaction id.</li>' +
+            '</ul>' +
+            'If for some reason autovacuum fails to clear old XIDs from a table, the system will begin to emit warning messages when the database\'s oldest XIDs reach eleven million transactions from the wraparound point.<br/>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
+    'postgres.percent_towards_wraparound': {
+        info: 'Percent towards transaction wraparound.<ul>' +
+            '<li><strong>percent_towards_wraparound:</strong> transaction wraparound may occur when this value reaches 100.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" target="_blank">Preventing Transaction ID Wraparound Failures</a>.'
+    },
 
 
     // ------------------------------------------------------------------------
