@@ -184,6 +184,17 @@ extern void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em);
 extern void ebpf_load_addresses(ebpf_addresses_t *fa, int fd);
 extern void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm);
 extern char **ebpf_fill_histogram_dimension(size_t maximum);
+
+// Histogram
+#define NETDATA_HIST_MAX_BINS 24UL
+
+typedef struct netdata_ebpf_histogram {
+    char *name;
+    char *title;
+    int order;
+    uint64_t histogram[NETDATA_HIST_MAX_BINS];
+} netdata_ebpf_histogram_t;
+
 extern void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 // Tracepoint helpers
