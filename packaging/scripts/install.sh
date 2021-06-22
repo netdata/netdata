@@ -60,7 +60,7 @@ install_suse_like() {
 
   # Install testing tools
   zypper install -y --no-recommends \
-    curl gnu-netcat jq
+    curl netcat-openbsd jq
 }
 
 case "${DISTRO}" in
