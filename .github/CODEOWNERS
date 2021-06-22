@@ -15,7 +15,7 @@ backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
 build/ @Ferroin
 contrib/debian @Ferroin @vkalintiris
-collectors/ @vlvkobal @mfundul
+collectors/ @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
 collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
@@ -27,28 +27,28 @@ collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm @mfundul
-database/ @mfundul @thiagoftsm
+daemon/ @thiagoftsm
+database/ @thiagoftsm @vkalintiris
 docs/ @joelhans
-health/ @thiagoftsm @vlvkobal
+health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
-libnetdata/ @thiagofsm @mfundul
+libnetdata/ @thiagofsm
 packaging/ @Ferroin @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @vkalintiris
-tests/ @Ferroin @kaskavel
-web/ @thiagoftsm @mfundul @vlvkobal
+tests/ @Ferroin @kaskavel @vkalintiris
+web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin
+*.am @Ferroin @vkalintiris
 *.md @joelhans
 Dockerfile* @Ferroin @knatsakis
 
 # Ownership of specific files
-.gitignore @Ferroin @knatsakis
+.gitignore @Ferroin @knatsakis @vkalintiris
 .travis.yml @Ferroin @knatsakis @kaskavel @vkalintiris
 .lgtm.yml @Ferroin @knatsakis
 .eslintrc @Ferroin @knatsakis
@@ -62,5 +62,5 @@ netdata-installer.sh @Ferroin @knatsakis @vkalintiris
 package.json @jacekkolasa @Ferroin @knatsakis
 packaging/version @netdatabot @Ferroin @knatsakis
 
-LICENSE.md @joelhans @Ferroin
-CHANGELOG.md @netdatabot @Ferroin
+LICENSE.md @joelhans @Ferroin @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @vkalintiris
