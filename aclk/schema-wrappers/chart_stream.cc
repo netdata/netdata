@@ -160,7 +160,7 @@ static int set_chart_dim_updated(chart::v1::ChartDimensionUpdated *dim, const st
     return 0;
 }
 
-char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions)
+char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions, uint64_t batch_id)
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
     chart::v1::ChartInstanceUpdated db_chart;
@@ -169,7 +169,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
     chart::v1::ChartDimensionUpdated *dim;
     aclk_lib::v1::ACLKMessagePosition *pos;
 
-    msg.set_batch_id(chart_batch_id);
+    msg.set_batch_id(batch_id);
 
     for (int i = 0; payloads[i]; i++) {
         if (is_dim[i]) {

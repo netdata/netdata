@@ -45,29 +45,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
-//#define TABLE_ACLK_DIMENSION "DROP TABLE IF EXISTS aclk_dimension_%s;"
-
-//#define TABLE_ACLK_DIMENSION_PAYLOAD "DROP TABLE IF EXISTS aclk_dimension_payload_%s;"
-//
-//#define TRIGGER_ACLK_DIMENSION_PAYLOAD "DROP TRIGGER IF EXISTS aclk_tr_dimension_payload_%s;"
-
-#define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
-                 "date_created, date_updated, date_submitted, status, alarm_id, unique_id, " \
-                 "update_count DEFAULT 1, UNIQUE(alarm_id, status));"
-
-#define TABLE_ACLK_ALERT_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_alert_payload_%s (unique_id BLOB PRIMARY KEY, " \
-                 "ae_unique_id, alarm_id, type, date_created, payload);"
-
-#define TRIGGER_ACLK_ALERT_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_alert_payload_%s " \
-        "after insert on aclk_alert_payload_%s " \
-        "begin insert into aclk_alert_%s (alarm_id, unique_id, status, date_created) values " \
-        " (new.alarm_id, new.unique_id, 'pending', strftime('%%s')) on conflict(alarm_id, status) " \
-        " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
-        "end;"
-
-
 enum aclk_database_opcode {
-    /* can be used to return empty status or flush the command queue */
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_TIMER,
@@ -75,14 +53,9 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_CHART_ACK,
-    ACLK_DATABASE_PUSH_ALERT,
-    ACLK_DATABASE_ADD_CHART_CONFIG,
-    ACLK_DATABASE_PUSH_DIMENSION,
     ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_STATUS_CHART,
     ACLK_DATABASE_RESET_NODE,
-    ACLK_DATABASE_UPD_CHART,
-    ACLK_DATABASE_UPD_ALERT,
     ACLK_DATABASE_SHUTDOWN,
     ACLK_DATABASE_ADD_ALARM,
     ACLK_DATABASE_DEDUP_CHART,
@@ -168,7 +141,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id);
 void aclk_get_chart_config(char **hash_id_list);
-void aclk_start_streaming(char *node_id);
+void aclk_start_streaming(char *node_id, uint64_t seq_id, time_t created_at, uint64_t batch_id);
 void aclk_start_alert_streaming(char *node_id);
 void sql_aclk_drop_all_table_list();
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

@@ -35,10 +35,10 @@ void aclk_chart_reset(chart_reset_t reset)
         aclk_queue_query(query);
 }
 
-void aclk_chart_inst_and_dim_update(char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions)
+void aclk_chart_inst_and_dim_update(char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions, uint64_t batch_id)
 {
     aclk_query_t query = aclk_query_new(CHART_DIMS_UPDATE_BIN);
-    query->data.bin_payload.payload = generate_charts_and_dimensions_updated(&query->data.bin_payload.size, payloads, payload_sizes, is_dim, new_positions);
+    query->data.bin_payload.payload = generate_charts_and_dimensions_updated(&query->data.bin_payload.size, payloads, payload_sizes, is_dim, new_positions, batch_id);
     if (query->data.bin_payload.payload)
         aclk_queue_query(query);
 }
