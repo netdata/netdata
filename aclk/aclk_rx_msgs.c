@@ -6,7 +6,7 @@
 #include "aclk_query_queue.h"
 
 #define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-#define ACLK_CLOUD_REQ_V2_PREFIX "GET /api/v1/"
+#define ACLK_CLOUD_REQ_V2_PREFIX "GET /"
 
 struct aclk_request {
     char *type_id;
@@ -88,6 +88,7 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
 {
     const char *start, *end;
 
+    // TODO better check of URL
     if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
         errno = 0;
         error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);

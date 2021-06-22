@@ -55,11 +55,33 @@ static usec_t aclk_web_api_v1_request(RRDHOST *host, struct web_client *w, char 
     return t;
 }
 
+static RRDHOST *node_id_2_rrdhost(const char *node_id)
+{
+    int res;
+    uuid_t node_id_bin, host_id_bin;
+    char host_id[UUID_STR_LEN];
+    if (uuid_parse(node_id, node_id_bin)) {
+        error("Couldn't parse UUID %s", node_id);
+        return NULL;
+    }
+    if ((res = get_host_id(&node_id_bin, &host_id_bin))) {
+        error("node not found rc=%d", res);
+        return NULL;
+    }
+    uuid_unparse(host_id_bin, host_id);
+    return rrdhost_find_by_guid(host_id, 0);
+}
+
+#define NODE_ID_QUERY "/node/"
+// TODO this function should be quarantied and written nicely
+// lots of skeletons from initial ACLK Legacy impl.
+// quick and dirty from the start
 static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
 {
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
+    RRDHOST *query_host = localhost;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
@@ -76,6 +98,24 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
+    if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
+        char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
+        char nodeid[UUID_STR_LEN];
+        if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
+            error("URL requests node_id but there is not enough chars following");
+            retval = 1;
+            goto cleanup;
+        }
+        strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
+
+        query_host = node_id_2_rrdhost(nodeid);
+        if (!query_host) {
+            error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
+            retval = 1;
+            goto cleanup;
+        }
+    }
+
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
         url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
@@ -86,7 +126,7 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     mysep = strrchr(query->data.http_api_v2.query, '/');
 
     // execute the query
-    t = aclk_web_api_v1_request(localhost, w, mysep ? mysep + 1 : "noop");
+    t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
