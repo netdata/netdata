@@ -529,6 +529,26 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
     return;
 }
 
+void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    //if (!aclk_architecture) {
+    aclk_update_alarm(host, ae);
+    return;
+//
+//
+//    if (unlikely(!host->dbsync_worker))
+//        return;
+//
+//    struct aclk_database_cmd cmd;
+//    cmd.opcode = ACLK_DATABASE_ADD_ALARM;
+//    cmd.data = host;
+//    cmd.data1 = ae;
+//    cmd.data_param = strdupz("JSON");
+//    cmd.completion = NULL;
+//    aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
+//    return;
+}
+
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid)
 {
     int rc;
