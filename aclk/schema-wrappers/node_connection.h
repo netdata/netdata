@@ -12,7 +12,7 @@ typedef struct {
     const char* node_id;
 
     unsigned int live:1;
-    unsigned int queriable:1;
+    unsigned int queryable:1;
 
     int64_t session_id;
 
