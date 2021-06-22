@@ -17,6 +17,9 @@ Source5:        netdata-edge.repo.centos
 
 BuildArch:      noarch
 
+# Overlapping file installs
+Conflicts:      netdata-repo-edge
+
 %description
 This package contains the official Netdata package repository configuration for stable versions of Netdata.
 
@@ -65,8 +68,11 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %package edge
-Summary: Netdata nightly repositories configuration.
-Group:   System Environment/Base
+Summary:   Netdata nightly repositories configuration.
+Group:     System Environment/Base
+
+# Overlapping file installs
+Conflicts: netdata-repo
 
 %description edge
 This package contains the official Netdata package repository configuration for nightly versions of Netdata.

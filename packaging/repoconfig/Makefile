@@ -1,4 +1,4 @@
-FILES = netdata.list netdata-edge.list netdata-archive-keyring.gpg netdata-edge-archive-keyring.gpg
+FILES = netdata.list netdata-edge.list netdata-archive-keyring.gpg netdata-edge-archive-keyring.gpg netdata-repoconfig-archive-keyring.gpg
 
 all: $(FILES)
 
@@ -15,6 +15,9 @@ netdata-archive-keyring.gpg:
 
 netdata-edge-archive-keyring.gpg:
 	curl -L https://packagecloud.io/netdata/netdata-edge/gpgkey | gpg --dearmor > netdata-edge-archive-keyring.gpg
+
+netdata-repoconfig-archive-keyring.gpg:
+	curl -L https://packagecloud.io/netdata/netdata-repoconfig/gpgkey | gpg --dearmor > netdata-repoconfig-archive-keyring.gpg
 
 debian/tmp:
 	mkdir -p debian/tmp

@@ -14,6 +14,8 @@ override_dh_install:
 	mkdir -p $(TOP)/etc/apt/sources.list.d $(TOP)/etc/apt/trusted.gpg.d/
 	mv -f $(TEMPTOP)/netdata.list $(TOP)/etc/apt/sources.list.d
 	mv -f $(TEMPTOP)/netdata-archive-keyring.gpg $(TOP)/etc/apt/trusted.gpg.d
+	cp $(TESMTOP)/netdata-repoconfig-archive-keyring.gpg $(TOP)/etc/apt/trusted.gpg.d
 	mkdir -p $(TOP_EDGE)/etc/apt/sources.list.d $(TOP_EDGE)/etc/apt/trusted.gpg.d/
 	mv -f $(TEMPTOP)/netdata-edge.list $(TOP_EDGE)/etc/apt/sources.list.d
 	mv -f $(TEMPTOP)/netdata-edge-archive-keyring.gpg $(TOP_EDGE)/etc/apt/trusted.gpg.d
+	cp $(TESMTOP)/netdata-repoconfig-archive-keyring.gpg $(TOP_EDGE)/etc/apt/trusted.gpg.d
