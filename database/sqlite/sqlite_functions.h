@@ -12,7 +12,7 @@ struct node_instance_list {
     uuid_t  host_id;
     char *hostname;
     int live;
-    int querable;
+    int queryable;
     int hops;
 };
 

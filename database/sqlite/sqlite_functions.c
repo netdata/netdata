@@ -1062,6 +1062,8 @@ void db_execute(const char *cmd)
             }
             else break;
         }
+        else
+            break;
         ++cnt;
     }
     return;
@@ -1539,7 +1541,7 @@ void compute_chart_hash(RRDSET *st)
 
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*((uuid_t *) &hash_value), uuid_str);
-    info("Calculating HASH %s for chart %s", uuid_str, st->name);
+    //info("Calculating HASH %s for chart %s", uuid_str, st->name);
     uuid_copy(st->state->hash_id, *((uuid_t *) &hash_value));
 
     (void)sql_store_chart_hash(
@@ -1888,7 +1890,7 @@ struct  node_instance_list *get_node_list(void)
 
     rc = sqlite3_prepare_v2(db_meta, SQL_GET_NODE_INSTANCE_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement store chart labels");
+        error_report("Failed to prepare statement to get node instance information");
         return NULL;
     };
 
@@ -1910,7 +1912,7 @@ struct  node_instance_list *get_node_list(void)
         if (sqlite3_column_bytes(res, 1) == sizeof(uuid_t)) {
             uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
             uuid_copy(node_list[row].host_id, *host_id);
-            node_list[row].querable = 1;
+            node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
             node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
             node_list[row].hops = uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
@@ -2419,7 +2421,7 @@ int alert_hash_and_store_config(
 
     char uuid_str[36 + 1];
     uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
-    info("Calculating HASH %s for alert %s", uuid_str, alarm);
+//    info("Calculating HASH %s for alert %s", uuid_str, alarm);
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 
     /* store everything, so it can be recreated when not in memory or just a subset ? */

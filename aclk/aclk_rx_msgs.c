@@ -295,7 +295,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         }
 
         query->data.node_update.node_id = res.node_id; // aclk_query_free will free it
-        query->data.node_update.queriable = 1;
+        query->data.node_update.queryable = 1;
         query->data.node_update.session_id = aclk_session_newarch;
         aclk_queue_query(query);
         freez(res.machine_guid);
@@ -315,7 +315,8 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             return;
         }
         chart_batch_id = res.batch_id;
-        aclk_start_streaming(res.node_id);
+        info("DEBUG: Received batch id %d", chart_batch_id);
+        aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
         freez(res.claim_id);
         freez(res.node_id);
         return;

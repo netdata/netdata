@@ -1017,7 +1017,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd) {
     query->data.node_update.live = cmd;
     query->data.node_update.node_id = mallocz(UUID_STR_LEN);
     uuid_unparse(node_id, (char*)query->data.node_update.node_id);
-    query->data.node_update.queriable = 1;
+    query->data.node_update.queryable = 1;
     query->data.node_update.session_id = aclk_session_newarch;
     aclk_queue_query(query);
 }
@@ -1035,23 +1035,23 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_unlock(localhost);
             uuid_unparse(list->host_id, host_id);
             host = rrdhost_find_by_guid(host_id, 0);
-            query->data.node_update.live = 0;
-            query->data.node_update.hops = 1; //TODO
-            if (host) {
-                // not all host must have RRDHOST struct created for them
-                // if they never connected during runtime of agent
-                if (host == localhost) {
-                    query->data.node_update.live = 1;
-                    query->data.node_update.hops = 0;
-                } else {
-                    netdata_mutex_lock(&host->receiver_lock);
-                    query->data.node_update.live = (host->receiver != NULL);
-                    netdata_mutex_unlock(&host->receiver_lock);
-                }
-            }
+            query->data.node_update.live = list->live;
+            query->data.node_update.hops = list->hops;
+//            if (host) {
+//                // not all host must have RRDHOST struct created for them
+//                // if they never connected during runtime of agent
+//                if (host == localhost) {
+//                    query->data.node_update.live = 1;
+//                    query->data.node_update.hops = 0;
+//                } else {
+//                    netdata_mutex_lock(&host->receiver_lock);
+//                    query->data.node_update.live = (host->receiver != NULL);
+//                    netdata_mutex_unlock(&host->receiver_lock);
+//                }
+//            }
             query->data.node_update.node_id = mallocz(UUID_STR_LEN);
             uuid_unparse(list->node_id, (char*)query->data.node_update.node_id);
-            query->data.node_update.queriable = 1;
+            query->data.node_update.queryable = list->queryable;
             query->data.node_update.session_id = aclk_session_newarch;
             aclk_queue_query(query);
         } else {
@@ -1060,7 +1060,7 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_lock(localhost);
             create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
             rrdhost_aclk_state_unlock(localhost);
-            create_query->data.node_creation.hops = 1; //TODO
+            create_query->data.node_creation.hops = list->hops;
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
             uuid_unparse(list->host_id, (char*)create_query->data.node_creation.machine_guid);
