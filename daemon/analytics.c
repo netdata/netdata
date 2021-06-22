@@ -393,7 +393,7 @@ void analytics_get_install_type(void)
         char *s, buf[256 + 1];
         size_t len = 0;
 
-        while ((s = fgets_trim_len(buf, 4096, fp, &len))) {
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
             if (!strncmp(buf, "INSTALL_TYPE='", 14))
                 analytics_set_data_str(&analytics_data.netdata_install_type, (char *)get_value_from_key(buf, "INSTALL_TYPE"));
             else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
@@ -412,12 +412,7 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
-    buffer_strcat(
-        b,
-        netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE &&
-                localhost->rrdpush_sender_connected == 1 ?
-            "streaming|" :
-            "|");
+    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && localhost->rrdpush_sender_connected == 1 ? "streaming|" : "|");
     buffer_strcat(b, netdata_srv_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
@@ -519,10 +514,7 @@ void analytics_misc(void)
 #endif
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
 
-    analytics_set_data(
-        &analytics_data.netdata_config_exporting_enabled,
-        appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" :
-                                                                                                           "false");
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
 
     analytics_set_data(&analytics_data.netdata_config_is_private_registry, "false");
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "false");
