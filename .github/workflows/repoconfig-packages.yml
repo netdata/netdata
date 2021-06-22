@@ -18,6 +18,7 @@ jobs:
       DO_NOT_TRACK: 1
       DOCKER_CLI_EXPERIMENTAL: enabled
     strategy:
+      # This needs to be kept in sync with the matrix in packaging.yml, but should only include the AMD64 lines.
       matrix:
         include:
           - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
@@ -42,14 +43,12 @@ jobs:
       - name: Checkout
         if: contains(github.event.input.distros, join([matrix.distro, matrix.version], '-')) || github.event.input.distros == 'all'
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0 # We need full history for versioning
-          submodules: true
+        # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Build Packages
         if: contains(github.event.input.distros, join([matrix.distro, matrix.version], '-')) || github.event.input.distros == 'all'
         shell: bash
         run: |
-          docker run -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} -v $PWD:/netdata netdata/package-builder:${{ matrix.distro }}${{ matrix.version }} /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
+          docker run -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
         if: contains(github.event.input.distros, join([matrix.distro, matrix.version], '-')) || github.event.input.distros == 'all'
         shell: bash
