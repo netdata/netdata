@@ -59,6 +59,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_SHUTDOWN,
     ACLK_DATABASE_ADD_ALARM,
     ACLK_DATABASE_DEDUP_CHART,
+    ACLK_DATABASE_SYNC_CHART_SEQ,
     ACLK_DATABASE_MAX_OPCODE
 };
 
@@ -91,6 +92,9 @@ struct aclk_database_worker_config {
     uv_thread_t thread;
     char uuid_str[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
+    uint64_t chart_sequence_id;     // last chart_sequence_id
+    time_t chart_timestamp;         // last chart timestamp
+    uint64_t batch_id;    // batch id to use
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;
@@ -149,4 +153,5 @@ void aclk_submit_param_command(char *node_id, enum aclk_database_opcode aclk_com
 extern void aclk_set_architecture(int mode);
 char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size_t  *total);
 void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 #endif //NETDATA_SQLITE_ACLK_H
