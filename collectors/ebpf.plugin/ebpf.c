@@ -514,6 +514,31 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
     }
 }
 
+/**
+ * Call the necessary functions to create a name.
+ *
+ *  @param family     family name
+ *  @param name       chart name
+ *  @param hist0      histogram values
+ *  @param dimensions dimension values.
+ *  @param end        number of bins that will be sent to Netdata.
+ *
+ * @return It returns a variable tha maps the charts that did not have zero values.
+ */
+void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end)
+{
+    write_begin_chart(family, name);
+
+    uint32_t i;
+    for (i = 0; i < end; i++) {
+        write_chart_dimension(dimensions[i], (long long) hist[i]);
+    }
+
+    write_end_chart();
+
+    fflush(stdout);
+}
+
 /*****************************************************************
  *
  *  FUNCTIONS TO DEFINE OPTIONS

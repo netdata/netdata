@@ -487,30 +487,6 @@ void *ebpf_filesystem_read_hash(void *ptr)
 }
 
 /**
- * Call the necessary functions to create a name.
- *
- *  @param family family name
- *  @param name   chart name
- *  @param hist0  histogram values
- *  @param end    number of bins that will be sent to Netdata.
- *
- * @return It returns a variable tha maps the charts that did not have zero values.
- */
-static void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, uint32_t end)
-{
-    write_begin_chart(family, name);
-
-    uint32_t i;
-    for (i = 0; i < end; i++) {
-        write_chart_dimension(dimensions[i], (long long) hist[i]);
-    }
-
-    write_end_chart();
-
-    fflush(stdout);
-}
-
-/**
  * Send Hard disk data
  *
  * Send hard disk information to Netdata.
@@ -523,16 +499,16 @@ static void ebpf_histogram_send_data()
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if ((efp->flags & test) == NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
             write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
-                                  efp->hread.histogram, NETDATA_EBPF_HIST_MAX_BINS);
+                                  efp->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
             write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
-                                  efp->hwrite.histogram, NETDATA_EBPF_HIST_MAX_BINS);
+                                  efp->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
             write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
-                                  efp->hopen.histogram, NETDATA_EBPF_HIST_MAX_BINS);
+                                  efp->hopen.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
             write_histogram_chart(NETDATA_FILESYSTEM_FAMILY, efp->hsync.name,
-                                  efp->hsync.histogram, NETDATA_EBPF_HIST_MAX_BINS);
+                                  efp->hsync.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
     }
 }

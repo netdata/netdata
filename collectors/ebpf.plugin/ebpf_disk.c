@@ -649,13 +649,11 @@ static void ebpf_latency_send_hd_data()
         }
 
         if ((flags & NETDATA_DISK_IS_HERE)) {
-            /*
             write_histogram_chart(ned->hread.name, ned->family,
                                   ned->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
             write_histogram_chart(ned->hwrite.name, ned->family,
                                   ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
-                                  */
         }
 
         ned->flags &= ~NETDATA_DISK_IS_HERE;
