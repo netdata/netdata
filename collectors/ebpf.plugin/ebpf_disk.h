@@ -53,6 +53,20 @@ typedef struct netdata_ebpf_disks {
     struct netdata_ebpf_disks *next;
 } netdata_ebpf_disks_t;
 
+enum ebpf_disk_tables {
+    NETDATA_DISK_READ,
+    NETDATA_DISK_WRITE
+};
+
+typedef struct block_key {
+    uint32_t bin;
+    uint32_t dev;
+} block_key_t;
+
+typedef struct netdata_ebpf_publish_disk {
+    netdata_ebpf_disks_t *plot;
+    struct netdata_ebpf_publish_disk *next;
+} ebpf_publish_disk_t;
 
 extern struct config disk_config;
 

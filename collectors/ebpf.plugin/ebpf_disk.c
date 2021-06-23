@@ -43,6 +43,9 @@ static struct netdata_static_thread disk_threads = {"DISK KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
 
+ebpf_publish_disk_t *plot_disks = NULL;
+pthread_mutex_t plot_mutex;
+
 /*****************************************************************
  *
  *  FUNCTIONS TO MANIPULATE HARD DISKS
@@ -348,6 +351,22 @@ static void ebpf_disk_disable_tracepoints()
 }
 
 /**
+ * Cleanup plot disks
+ *
+ * Clean disk list
+ */
+static void ebpf_cleanup_plot_disks()
+{
+    ebpf_publish_disk_t *move = plot_disks, *next;
+    while (move) {
+        next = move->next;
+        free(move);
+
+        move = next;
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -372,6 +391,9 @@ static void ebpf_disk_cleanup(void *ptr)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
     freez(disk_hash_values);
+    pthread_mutex_destroy(&plot_mutex);
+
+    ebpf_cleanup_plot_disks();
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -389,6 +411,106 @@ static void ebpf_disk_cleanup(void *ptr)
  *  MAIN LOOP
  *
  *****************************************************************/
+
+/**
+ * Fill Plot list
+ *
+ * @param ptr a pointer for current disk
+ */
+static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
+{
+    pthread_mutex_lock(&plot_mutex);
+    ebpf_publish_disk_t *w;
+    if (likely(plot_disks)) {
+        ebpf_publish_disk_t *move = plot_disks, *store;
+        while (move) {
+            if (move->plot == ptr) {
+                pthread_mutex_unlock(&plot_mutex);
+                return;
+            }
+
+            store = move;
+            move = move->next;
+        }
+
+        w = callocz(1, sizeof(ebpf_publish_disk_t));
+        w->plot = ptr;
+        store->next = w;
+    } else {
+        w = callocz(1, sizeof(ebpf_publish_disk_t));
+        w->plot = ptr;
+    }
+    pthread_mutex_unlock(&plot_mutex);
+
+    ptr->flags |= NETDATA_DISK_ADDED_TO_PLOT_LIST;
+}
+
+/**
+ * Read hard disk table
+ *
+ * @param table file descriptor for table
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_hard_disk_tables(int table)
+{
+    netdata_idx_t *values = disk_hash_values;
+    block_key_t key = {};
+    block_key_t next_key = {};
+    int cmp_table = disk_maps[NETDATA_DISK_READ].map_fd;
+
+    netdata_ebpf_disks_t *ret = NULL;
+
+    while (bpf_map_get_next_key(table, &key, &next_key) == 0) {
+        int test = bpf_map_lookup_elem(table, &key, values);
+        if (test < 0) {
+            key = next_key;
+            continue;
+        }
+
+        netdata_ebpf_disks_t find;
+        find.dev = key.dev;
+
+        if (likely(ret)) {
+            if (find.dev != ret->dev)
+                ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
+        } else
+            ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
+
+        // Disk was inserted after we parse /proc/partitions
+        if (!ret) {
+            if (read_local_disks()) {
+                key = next_key;
+                continue;
+            }
+
+            ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
+            if (!ret) {
+                // We should never reach this point, but we are adding it to keep a safe code
+                key = next_key;
+                continue;
+            }
+        }
+
+        uint64_t total = 0;
+        int i;
+        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        for (i = 0; i < end; i++) {
+            total += values[i];
+        }
+
+        if (table == cmp_table) {
+            ret->hread.histogram[key.bin] = total;
+        } else {
+            ret->hwrite.histogram[key.bin] = total;
+        }
+
+        if (!(ret->flags & NETDATA_DISK_ADDED_TO_PLOT_LIST))
+            ebpf_fill_plot_disks(ret);
+
+        key = next_key;
+    }
+}
 
 /**
  * Disk read hash
@@ -412,6 +534,8 @@ void *ebpf_disk_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_WRITE].map_fd);
     }
 
     return NULL;
@@ -512,6 +636,11 @@ void *ebpf_disk_thread(void *ptr)
     avl_init_lock(&disk_tree, ebpf_compare_disks);
     if (read_local_disks()) {
         em->enabled = CONFIG_BOOLEAN_NO;
+        goto enddisk;
+    }
+
+    if (pthread_mutex_init(&plot_mutex, NULL)) {
+        error("Cannot initialize local mutex");
         goto enddisk;
     }
 
