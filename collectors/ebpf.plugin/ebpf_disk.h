@@ -40,7 +40,7 @@ typedef struct netdata_ebpf_disks {
     uint64_t end;   // end sector
 
     // Print information
-    char family[NETDATA_DISK_NAME_LEN];
+    char family[NETDATA_DISK_NAME_LEN + 1];
     char *boot_chart;
 
     netdata_ebpf_histogram_t hread;

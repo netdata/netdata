@@ -744,6 +744,7 @@ int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
         close(fd);
         return -1;
     }
+    close(fd);
 
     return (text[0] == '1') ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
 }

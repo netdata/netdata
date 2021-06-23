@@ -60,12 +60,13 @@ pthread_mutex_t plot_mutex;
  *
  * Parse start address of disk
  *
- * @param w    structure where data is stored
- * @param text variable used to store value
+ * @param w      structure where data is stored
+ * @param text   variable used to store value
+ * @param length max allowed size for text vector.
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text)
+static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text, ssize_t length)
 {
     int fd = open(text, O_RDONLY, 0);
     if (fd < 0) {
@@ -74,6 +75,9 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text)
 
     ssize_t file_length = read(fd, text, 4095);
     if (file_length > 0) {
+        if (file_length > length)
+            file_length = length;
+
         text[file_length] = '\0';
         w->start = str2uint64_t(text);
     }
@@ -87,12 +91,13 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text)
  *
  * Parse uevent file
  *
- * @param w    structure where data is stored
- * @param text variable used to store value
+ * @param w      structure where data is stored
+ * @param text   variable used to store value
+ * @param length max allowed size for text vector.
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text)
+static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text, ssize_t length)
 {
     int fd = open(text, O_RDONLY, 0);
     if (fd < 0) {
@@ -101,6 +106,9 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text)
 
     ssize_t file_length = read(fd, text, FILENAME_MAX);
     if (file_length > 0) {
+        if (file_length > length)
+            file_length = length;
+
         text[file_length] = '\0';
 
         char *s = strstr(text, "PARTNAME=EFI");
@@ -118,12 +126,13 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text)
 /**
  * Parse Size
  *
- * @param w    structure where data is stored
- * @param text variable used to store value
+ * @param w      structure where data is stored
+ * @param text   variable used to store value
+ * @param length max allowed size for text vector.
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *text)
+static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *text, ssize_t length)
 {
     int fd = open(text, O_RDONLY, 0);
     if (fd < 0) {
@@ -132,6 +141,9 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *text)
 
     ssize_t file_length = read(fd, text, FILENAME_MAX);
     if (file_length > 0) {
+        if (file_length > length)
+            file_length = length;
+
         text[file_length] = '\0';
         w->end = w->start + str2uint64_t(text) -1;
     }
@@ -178,15 +190,15 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
     w->main = main_disk;
 
     snprintfz(text, FILENAME_MAX, "%s/%s/%s/uevent", path, disk, name);
-    if (ebpf_parse_uevent(w, text))
+    if (ebpf_parse_uevent(w, text, FILENAME_MAX))
         return;
 
     snprintfz(text, FILENAME_MAX, "%s/%s/%s/start", path, disk, name);
-    if (ebpf_disk_parse_start(w, text))
+    if (ebpf_disk_parse_start(w, text, FILENAME_MAX))
         return;
 
     snprintfz(text, FILENAME_MAX, "%s/%s/%s/size", path, disk, name);
-    ebpf_parse_size(w, text);
+    ebpf_parse_size(w, text, FILENAME_MAX);
 }
 
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L46
@@ -238,6 +250,7 @@ static void update_disk_table(char *name, int major, int minor)
 {
     netdata_ebpf_disks_t find;
     netdata_ebpf_disks_t *w;
+    size_t length;
 
     uint32_t dev = netdata_new_encode_dev(major, minor);
     find.dev = dev;
@@ -259,14 +272,24 @@ static void update_disk_table(char *name, int major, int minor)
         }
 
         w = callocz(1, sizeof(netdata_ebpf_disks_t));
-        strcpy(w->family, name);
+        length = strlen(name);
+        if (length >= NETDATA_DISK_NAME_LEN)
+            length = NETDATA_DISK_NAME_LEN;
+
+        strncpy(w->family, name, length);
+        w->family[length] = '\0';
         w->major = major;
         w->minor = minor;
         w->dev = netdata_new_encode_dev(major, minor);
         update_next->next = w;
     } else {
         disk_list = callocz(1, sizeof(netdata_ebpf_disks_t));
-        strcpy(disk_list->family, name);
+        length = strlen(name);
+        if (length >= NETDATA_DISK_NAME_LEN)
+            length = NETDATA_DISK_NAME_LEN;
+
+        strncpy(disk_list->family, name, length);
+        disk_list->family[length] = '\0';
         disk_list->major = major;
         disk_list->minor = minor;
         disk_list->dev = netdata_new_encode_dev(major, minor);
