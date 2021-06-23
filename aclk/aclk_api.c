@@ -20,24 +20,24 @@ int aclk_disable_single_updates = 0;
 
 int aclk_stats_enabled;
 
-#ifdef ACLK_LEGACY
-int aclk_ng = 0;
-#else
+#ifdef ACLK_NG
 int aclk_ng = 1;
+#else
+int aclk_ng = 0;
 #endif
 
 #define ACLK_IMPL_KEY_NAME "aclk implementation"
 
 #ifdef ENABLE_ACLK
 void *aclk_starter(void *ptr) {
-    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "legacy");
+    char *aclk_impl_req = config_get(CONFIG_SECTION_CLOUD, ACLK_IMPL_KEY_NAME, "ng");
 
     if (!strcasecmp(aclk_impl_req, "ng")) {
         aclk_ng = 1;
     } else if (!strcasecmp(aclk_impl_req, "legacy")) {
         aclk_ng = 0;
     } else {
-        error("Unknown value \"%s\" of key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\". Using ACLK %s.", aclk_impl_req, aclk_ng ? "NG" : "Legacy");
+        error("Unknown value \"%s\" of key \"" ACLK_IMPL_KEY_NAME "\" in section \"" CONFIG_SECTION_CLOUD "\". Trying default ACLK %s.", aclk_impl_req, aclk_ng ? "NG" : "Legacy");
     }
 
 #ifndef ACLK_NG
@@ -55,12 +55,16 @@ void *aclk_starter(void *ptr) {
 #endif
 
 #ifdef ACLK_NG
-    if (aclk_ng)
+    if (aclk_ng) {
+        info("Starting ACLK-NG");
         return aclk_main(ptr);
+    }
 #endif
 #ifdef ACLK_LEGACY
-    if (!aclk_ng)
+    if (!aclk_ng) {
+        info("Starting ACLK Legacy");
         return legacy_aclk_main(ptr);
+    }
 #endif
     error_report("No ACLK could be started");
     return NULL;
