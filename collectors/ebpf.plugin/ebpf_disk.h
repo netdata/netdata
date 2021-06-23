@@ -10,9 +10,6 @@
 
 #define NETDATA_LATENCY_DISK_SLEEP_MS 650000ULL
 
-#define NETDATA_DISK_MAX 256U
-#define NETDATA_DISK_HISTOGRAM_LENGTH (NETDATA_DISK_MAX * NETDATA_EBPF_HIST_MAX_BINS)
-
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L7
 #define MINORBITS       20
 #define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))
