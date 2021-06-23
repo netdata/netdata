@@ -48,6 +48,7 @@ void aclk_update_node_info(struct update_node_info *info)
     aclk_query_t query = aclk_query_new(UPDATE_NODE_INFO);
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_INFO;
     query->data.bin_payload.payload = generate_update_node_info_message(&query->data.bin_payload.size, info);
+    query->data.bin_payload.msg_name = "UpdateNodeInfo";
     if (query->data.bin_payload.payload)
         aclk_queue_query(query);
 }
