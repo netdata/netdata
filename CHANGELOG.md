@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Added new postgres charts and updated standby charts to include slot\_… [\#11267](https://github.com/netdata/netdata/pull/11267) ([mjtice](https://github.com/mjtice))
 - Explicitly update libarchive on CentOS 8 when installing dependencies. [\#11264](https://github.com/netdata/netdata/pull/11264) ([Ferroin](https://github.com/Ferroin))
 - fix kickstart-static64.sh install script fail when trying to access `.install-type` before it is created [\#11262](https://github.com/netdata/netdata/pull/11262) ([ilyam8](https://github.com/ilyam8))
+- Add openSUSE 15.3 package builds. [\#11259](https://github.com/netdata/netdata/pull/11259) ([Ferroin](https://github.com/Ferroin))
 - slabinfo: Handle slabs added after discovery [\#11257](https://github.com/netdata/netdata/pull/11257) ([Saruspete](https://github.com/Saruspete))
 - Ebpf apps memory usage [\#11256](https://github.com/netdata/netdata/pull/11256) ([thiagoftsm](https://github.com/thiagoftsm))
 - eBPF keep values from `ebpf.d.conf` [\#11253](https://github.com/netdata/netdata/pull/11253) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -23,6 +25,7 @@
 - Add links to data privacy page [\#11226](https://github.com/netdata/netdata/pull/11226) ([joelhans](https://github.com/joelhans))
 - Allows ACLK NG and Legacy to coexist [\#11225](https://github.com/netdata/netdata/pull/11225) ([underhood](https://github.com/underhood))
 - eBPF ext4 \(new thread for collector\) [\#11224](https://github.com/netdata/netdata/pull/11224) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add vkalintiris as a code owner for more components [\#11221](https://github.com/netdata/netdata/pull/11221) ([vkalintiris](https://github.com/vkalintiris))
 - Decentralized [\#11220](https://github.com/netdata/netdata/pull/11220) ([OdysLam](https://github.com/OdysLam))
 - New email notification template [\#11219](https://github.com/netdata/netdata/pull/11219) ([MrZammler](https://github.com/MrZammler))
 - python.d: merge user/stock plugin configuration files [\#11217](https://github.com/netdata/netdata/pull/11217) ([ilyam8](https://github.com/ilyam8))
@@ -301,17 +304,10 @@
 - Alarms collector add alarm values [\#10675](https://github.com/netdata/netdata/pull/10675) ([andrewm4894](https://github.com/andrewm4894))
 - Don't add duplicate \_total suffixes for the prometheus go.d module [\#10674](https://github.com/netdata/netdata/pull/10674) ([vlvkobal](https://github.com/vlvkobal))
 - fix a typo in the email notifications readme [\#10668](https://github.com/netdata/netdata/pull/10668) ([ossimantylahti](https://github.com/ossimantylahti))
-- Update screenshots and text for new Cloud nav [\#10664](https://github.com/netdata/netdata/pull/10664) ([joelhans](https://github.com/joelhans))
-- Improve the Kubernetes deployment documentation [\#10662](https://github.com/netdata/netdata/pull/10662) ([joelhans](https://github.com/joelhans))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.2...v1.29.3)
-
-**Merged pull requests:**
-
-- Invalidate RRDSETVAR pointers on obsoletion. [\#10667](https://github.com/netdata/netdata/pull/10667) ([mfundul](https://github.com/mfundul))
-- Fixed condition controlling use of static LWS in RPM builds. [\#10661](https://github.com/netdata/netdata/pull/10661) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.2](https://github.com/netdata/netdata/tree/v1.29.2) (2021-02-18)
 
