@@ -36,6 +36,9 @@ static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
 
 static char **dimensions = NULL;
+static netdata_syscall_stat_t disk_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
+static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
+
 static int read_thread_closed = 1;
 
 static netdata_idx_t *disk_hash_values = NULL;
@@ -325,6 +328,23 @@ static int read_local_disks()
     return 0;
 }
 
+/**
+ * Update disks
+ *
+ * @param em main thread structure
+ */
+void ebpf_update_disks(ebpf_module_t *em)
+{
+    static time_t update_time = 0;
+    time_t curr = now_realtime_sec();
+    if (curr < update_time)
+        return;
+
+    update_time = curr + 5 * em->update_time;
+
+    (void)read_local_disks();
+}
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -542,6 +562,109 @@ void *ebpf_disk_read_hash(void *ptr)
 }
 
 /**
+ * Create Hard Disk charts
+ *
+ * @param w the structure with necessary information to create the chart
+ *
+ * Make Hard disk charts and fill chart name
+ */
+static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
+{
+    char title[256];
+    int order = NETDATA_CHART_PRIO_DISK_LATENCY;
+    char *family = w->family;
+
+    snprintf(title, 255, "Disk latency %s for output.", family);
+    w->hread.name = strdupz("disk_latency_output");
+    w->hread.title = strdupz(title);
+    w->hread.order = order;
+
+    ebpf_create_chart(w->hread.name, family, title, EBPF_COMMON_DIMENSION_CALL,
+                      family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+    order++;
+
+    snprintf(title, 255, "Disk latency %s for input.", family);
+    w->hwrite.name = strdupz("disk_latency_input");
+    w->hwrite.title = strdupz(title);
+    w->hwrite.order = order;
+
+    ebpf_create_chart(w->hwrite.name, family, title, EBPF_COMMON_DIMENSION_CALL,
+                      family, "disk.latency_input", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+
+    w->flags |= NETDATA_DISK_CHART_CREATED;
+}
+
+/**
+ * Remove pointer from plot
+ *
+ * Remove pointer from plot list when the disk is not present.
+ */
+static void ebpf_remove_pointer_from_plot_disk()
+{
+    ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
+    while (move) {
+        netdata_ebpf_disks_t *ned = move->plot;
+        uint32_t flags = ned->flags;
+
+        if (!(flags & NETDATA_DISK_IS_HERE)) {
+            if (move == plot_disks) {
+                freez(move);
+                plot_disks = NULL;
+                break;
+            } else {
+                prev->next = move->next;
+                ebpf_publish_disk_t *clean = move;
+                move = move->next;
+                freez(clean);
+                continue;
+            }
+        }
+
+        prev = move;
+        move = move->next;
+    }
+}
+
+/**
+ * Send Hard disk data
+ *
+ * Send hard disk information to Netdata.
+ */
+static void ebpf_latency_send_hd_data()
+{
+    if (likely(plot_disks)) {
+        return;
+    }
+
+    ebpf_remove_pointer_from_plot_disk();
+
+    ebpf_publish_disk_t *move = plot_disks;
+    while (move) {
+        netdata_ebpf_disks_t *ned = move->plot;
+        uint32_t flags = ned->flags;
+        if (!(flags & NETDATA_DISK_CHART_CREATED)) {
+            ebpf_create_hd_charts(ned);
+        }
+
+        if ((flags & NETDATA_DISK_IS_HERE)) {
+            /*
+            write_histogram_chart(ned->hread.name, ned->family,
+                                  ned->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+
+            write_histogram_chart(ned->hwrite.name, ned->family,
+                                  ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+                                  */
+        }
+
+        ned->flags &= ~NETDATA_DISK_IS_HERE;
+
+        move = move->next;
+    }
+}
+
+/**
 * Main loop for this collector.
 */
 static void disk_collector(ebpf_module_t *em)
@@ -560,9 +683,13 @@ static void disk_collector(ebpf_module_t *em)
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
+        ebpf_remove_pointer_from_plot_disk();
+        ebpf_latency_send_hd_data();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        ebpf_update_disks(em);
     }
     read_thread_closed = 1;
 }
@@ -652,6 +779,9 @@ void *ebpf_disk_thread(void *ptr)
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
+
+    ebpf_global_labels(disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms,
+                       NETDATA_EBPF_HIST_MAX_BINS);
 
     disk_collector(em);
 
