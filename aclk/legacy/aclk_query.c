@@ -794,8 +794,7 @@ void *legacy_aclk_query_main_thread(void *ptr)
                 sleep(1);
                 continue;
             }
-            errno = 0;
-            error("ACLK version negotiation failed. No reply to \"hello\" with \"version\" from cloud in time of %ds."
+            info("ACLK version negotiation failed (This is expected). No reply to \"hello\" with \"version\" from cloud in time of %ds."
                 " Reverting to default ACLK version of %d.", VERSION_NEG_TIMEOUT, ACLK_VERSION_MIN);
             legacy_aclk_shared_state.version_neg = ACLK_VERSION_MIN;
             aclk_set_rx_handlers(legacy_aclk_shared_state.version_neg);
