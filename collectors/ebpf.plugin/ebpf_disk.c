@@ -36,6 +36,12 @@ static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
 
 static char **dimensions = NULL;
+static int read_thread_closed = 1;
+
+static netdata_idx_t *disk_hash_values = NULL;
+static struct netdata_static_thread disk_threads = {"DISK KERNEL",
+                                                    NULL, NULL, 1, NULL,
+                                                    NULL, NULL };
 
 /*****************************************************************
  *
@@ -354,8 +360,18 @@ static void ebpf_disk_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t tick = 2 * USEC_PER_MS;
+    while (!read_thread_closed) {
+        usec_t dt = heartbeat_next(&hb, tick);
+        UNUSED(dt);
+    }
+
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+
+    freez(disk_hash_values);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -366,6 +382,65 @@ static void ebpf_disk_cleanup(void *ptr)
         }
         bpf_object__close(objects);
     }
+}
+
+/*****************************************************************
+ *
+ *  MAIN LOOP
+ *
+ *****************************************************************/
+
+/**
+ * Disk read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_disk_read_hash(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_time;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+    }
+
+    return NULL;
+}
+
+/**
+* Main loop for this collector.
+*/
+static void disk_collector(ebpf_module_t *em)
+{
+    disk_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
+    disk_threads.thread = mallocz(sizeof(netdata_thread_t));
+    disk_threads.start_routine = ebpf_disk_read_hash;
+
+    netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+                          ebpf_disk_read_hash, em);
+
+
+    read_thread_closed = 0;
+    while (!close_ebpf_plugin) {
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        pthread_mutex_lock(&lock);
+
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&collect_data_mutex);
+    }
+    read_thread_closed = 1;
 }
 
 /*****************************************************************
@@ -448,6 +523,8 @@ void *ebpf_disk_thread(void *ptr)
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
+
+    disk_collector(em);
 
 enddisk:
     netdata_thread_cleanup_pop(1);
