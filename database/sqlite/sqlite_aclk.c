@@ -230,12 +230,18 @@ void aclk_database_worker(void *arg)
   //                  aclk_add_alarm_event((RRDHOST *) cmd.data, (ALARM_ENTRY *) cmd.data1, (char *) cmd.data_param, cmd.completion);
     //                freez(cmd.data_param);
       //              break;
+                case ACLK_DATABASE_NODE_INFO:
+                    sql_build_node_info(wc, cmd);
+                    break;
                 case ACLK_DATABASE_TIMER:
-                    if (unlikely(!wc->host)) {
+                    if (unlikely(localhost && !wc->host)) {
                         wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
                         if (wc->host) {
                             info("HOST %s detected as active !!!", wc->host->hostname);
                             wc->host->dbsync_worker = wc;
+                            cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                            cmd.completion = NULL;
+                            aclk_database_enq_cmd(wc, &cmd);
                         }
                     }
                     break;
@@ -1230,5 +1236,46 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc, struct 
 
 fail:
     buffer_free(sql);
+    return;
+}
+
+void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    UNUSED(cmd);
+
+    struct update_node_info node_info;
+
+    node_info.node_id = get_str_from_uuid(wc->host->node_id);
+    node_info.claim_id = is_agent_claimed();
+    node_info.machine_guid = strdupz(wc->host_guid);
+    node_info.child = (wc->host != localhost);
+
+    info("DEBUG: Sending node info for %s", wc->uuid_str);
+
+    RRDHOST *host = wc->host;
+
+    node_info.data.name = strdupz(host->hostname);
+    node_info.data.os = strdupz(host->os);
+    node_info.data.os_name = strdupz(host->system_info->host_os_name);
+    node_info.data.os_version = strdupz(host->system_info->host_os_version);
+    node_info.data.kernel_name = strdupz(host->system_info->kernel_name);
+    node_info.data.kernel_version = strdupz(host->system_info->kernel_version);
+    node_info.data.architecture = strdupz(host->system_info->architecture);
+    node_info.data.cpus = str2uint32_t(host->system_info->host_cores);
+    node_info.data.cpu_frequency = strdupz(host->system_info->host_cpu_freq);
+    node_info.data.memory = strdupz(host->system_info->host_ram_total);
+    node_info.data.disk_space = strdupz(host->system_info->host_disk_space);
+    node_info.data.version = strdupz(VERSION);
+    node_info.data.release_channel = strdupz("nightly");
+    node_info.data.timezone = strdupz("UTC");
+    node_info.data.virtualization_type = strdupz(host->system_info->virtualization);
+    node_info.data.container_type = strdupz(host->system_info->container);
+    node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
+    node_info.data.services = NULL;   // char **
+    node_info.data.service_count = 0;
+    node_info.data.machine_guid = strdupz(wc->host_guid);
+    node_info.data.host_labels_head = NULL;     //struct label *host_labels_head;
+
+    aclk_update_node_info(&node_info);
     return;
 }
