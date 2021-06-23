@@ -221,17 +221,15 @@ void aclk_database_worker(void *arg)
                     aclk_status_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_ADD_CHART:
-//                    aclk_add_chart_event((RRDSET *) cmd.data, (char *) cmd.data_param, cmd.completion);
                     aclk_add_chart_event(wc, cmd);
                     if (cmd.completion)
                         complete(cmd.completion);
                     break;
-//                case ACLK_DATABASE_ADD_ALARM:
-  //                  aclk_add_alarm_event((RRDHOST *) cmd.data, (ALARM_ENTRY *) cmd.data1, (char *) cmd.data_param, cmd.completion);
-    //                freez(cmd.data_param);
-      //              break;
                 case ACLK_DATABASE_NODE_INFO:
                     sql_build_node_info(wc, cmd);
+                    break;
+                case ACLK_DATABASE_UPD_STATS:
+                    sql_update_metric_statistics(wc, cmd);
                     break;
                 case ACLK_DATABASE_TIMER:
                     if (unlikely(localhost && !wc->host)) {
@@ -240,6 +238,10 @@ void aclk_database_worker(void *arg)
                             info("HOST %s detected as active !!!", wc->host->hostname);
                             wc->host->dbsync_worker = wc;
                             cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                            cmd.completion = NULL;
+                            aclk_database_enq_cmd(wc, &cmd);
+
+                            cmd.opcode = ACLK_DATABASE_UPD_STATS;
                             cmd.completion = NULL;
                             aclk_database_enq_cmd(wc, &cmd);
                         }
@@ -1249,6 +1251,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.claim_id = is_agent_claimed();
     node_info.machine_guid = strdupz(wc->host_guid);
     node_info.child = (wc->host != localhost);
+    now_realtime_timeval(&node_info.updated_at);
 
     info("DEBUG: Sending node info for %s", wc->uuid_str);
 
@@ -1277,5 +1280,58 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.host_labels_head = NULL;     //struct label *host_labels_head;
 
     aclk_update_node_info(&node_info);
+    return;
+}
+
+#define SELECT_HOST_DIMENSION_LIST  "SELECT d.dim_id, c.update_every FROM chart c, dimension d, host h " \
+        "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id order by c.update_every;"
+
+void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    UNUSED(cmd);
+#ifdef ENABLE_DBENGINE
+    int rc;
+
+    sqlite3_stmt *res = NULL;
+
+    RRDHOST *host = wc->host;
+
+    rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_DIMENSION_LIST, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch host dimensions");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch host dimensions");
+        goto failed;
+    }
+
+    time_t  host_oldest_metric = LONG_LONG_MAX;
+    time_t  dim_first_entry_t;
+    time_t  dim_last_entry_t;
+    int last_update_every = 0;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        if (!last_update_every || last_update_every != sqlite3_column_int(res, 1)) {
+            if (last_update_every)
+                info("DEBUG: Update %s for %d -- setting oldest time = %ld", host->machine_guid, last_update_every, host_oldest_metric);
+            last_update_every = sqlite3_column_int(res, 1);
+            host_oldest_metric = LONG_LONG_MAX;
+        }
+        rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &dim_first_entry_t, &dim_last_entry_t);
+        host_oldest_metric = MIN(host_oldest_metric, dim_first_entry_t);
+    }
+    if (last_update_every)
+        info("DEBUG: Update %s for %d -- setting oldest time = %ld", host->machine_guid, last_update_every, host_oldest_metric);
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading archived charts");
+#else
+    UNUSED(wc);
+#endif
     return;
 }
