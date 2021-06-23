@@ -19,8 +19,9 @@ jobs:
       max-parallel: 8
       matrix:
         distro:
-          - 'alpine:3.12'
+          - 'alpine:3.14'
           - 'alpine:3.13'
+          - 'alpine:3.12'
           - 'archlinux:latest'
           - 'centos:7'
           - 'centos:8'
@@ -35,9 +36,11 @@ jobs:
           - 'ubuntu:20.10'
           - 'ubuntu:21.04'
         include:
-          - distro: 'alpine:3.12'
+          - distro: 'alpine:3.14'
             pre: 'apk add -U bash'
           - distro: 'alpine:3.13'
+            pre: 'apk add -U bash'
+          - distro: 'alpine:3.12'
             pre: 'apk add -U bash'
           - distro: 'debian:9'
             pre: 'apt-get update'
