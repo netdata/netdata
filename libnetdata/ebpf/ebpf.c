@@ -707,11 +707,11 @@ void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
 /**
  * Open tracepoint path
  *
- * @param filename    pointer to store the path
- * @param length      file length
+ * @param filename   pointer to store the path
+ * @param length     file length
  * @param subsys     is the name of your subsystem.
  * @param eventname  is the name of the event to trace.
- * @param flags       flags used with syscall open
+ * @param flags      flags used with syscall open
  *
  * @return it returns a positive value on success and a negative otherwise.
  */
