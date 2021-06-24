@@ -71,3 +71,4 @@ extern struct config disk_config;
 extern void *ebpf_disk_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_DISK_H */
+
