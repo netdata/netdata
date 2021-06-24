@@ -652,7 +652,7 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
 static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 {
     time_t current_time = now_realtime_sec();
-    usec_t limit = 10 * em->update_time;
+    time_t limit = 10 * em->update_time;
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
     while (move) {
@@ -660,7 +660,7 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
         uint32_t flags = ned->flags;
 
         if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
-            ebpf_obsolete_hd_charts(move);
+            ebpf_obsolete_hd_charts(ned);
             if (move == plot_disks) {
                 freez(move);
                 plot_disks = NULL;
