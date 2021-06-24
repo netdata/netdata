@@ -234,8 +234,9 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_TIMER:
                     if (unlikely(localhost && !wc->host)) {
                         wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
-                        if (wc->host) {
-                            info("HOST %s detected as active !!!", wc->host->hostname);
+                        char *agent_id = is_agent_claimed();
+                        if (wc->host && agent_id) {
+                            info("HOST %s detected as active and claimed !!!", wc->host->hostname);
                             wc->host->dbsync_worker = wc;
                             cmd.opcode = ACLK_DATABASE_NODE_INFO;
                             cmd.completion = NULL;
@@ -245,6 +246,7 @@ void aclk_database_worker(void *arg)
                             cmd.completion = NULL;
                             aclk_database_enq_cmd(wc, &cmd);
                         }
+                        freez(agent_id);
                     }
                     break;
                 case ACLK_DATABASE_DEDUP_CHART:
