@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Needed because dpkg is stupid and tries to configure things interactively if it sees a terminal.
+export DEBIAN_FRONTEND=noninteractive
+
 # Pull in our dependencies
 apt update || exit 1
 apt upgrade -y || exit 1
