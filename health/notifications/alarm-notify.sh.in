@@ -939,7 +939,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && sendmail --help 2>&1 | grep -q "\-F " && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && [[ ! `readlink "$(command -v sendmail 2>/dev/null)"` == */busybox ]] && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
