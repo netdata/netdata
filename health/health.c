@@ -358,8 +358,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
     ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
-    sql_health_alarm_log_save(host, ae);
-
     debug(D_HEALTH, "executing command '%s'", command_to_run);
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
     ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
@@ -367,8 +365,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     return; //health_alarm_wait_for_execution
 done:
-    //health_alarm_log_save(host, ae);
-    sql_health_alarm_log_save(host, ae);
+    health_alarm_log_save(host, ae);
 }
 
 static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
