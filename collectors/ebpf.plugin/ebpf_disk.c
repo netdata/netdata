@@ -465,7 +465,7 @@ static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *w;
     if (likely(plot_disks)) {
-        ebpf_publish_disk_t *move = plot_disks, *store;
+        ebpf_publish_disk_t *move = plot_disks, *store = plot_disks;
         while (move) {
             if (move->plot == ptr) {
                 pthread_mutex_unlock(&plot_mutex);
@@ -480,8 +480,8 @@ static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
         w->plot = ptr;
         store->next = w;
     } else {
-        w = callocz(1, sizeof(ebpf_publish_disk_t));
-        w->plot = ptr;
+        plot_disks = callocz(1, sizeof(ebpf_publish_disk_t));
+        plot_disks->plot = ptr;
     }
     pthread_mutex_unlock(&plot_mutex);
 
@@ -626,12 +626,15 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
  */
 static void ebpf_remove_pointer_from_plot_disk()
 {
+    return;
+    pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
 
         if (!(flags & NETDATA_DISK_IS_HERE)) {
+            // ADD OBSOLETION HERE
             if (move == plot_disks) {
                 freez(move);
                 plot_disks = NULL;
@@ -648,6 +651,7 @@ static void ebpf_remove_pointer_from_plot_disk()
         prev = move;
         move = move->next;
     }
+    pthread_mutex_unlock(&plot_mutex);
 }
 
 /**
@@ -657,12 +661,11 @@ static void ebpf_remove_pointer_from_plot_disk()
  */
 static void ebpf_latency_send_hd_data()
 {
-    if (likely(plot_disks)) {
+    if (!plot_disks) {
         return;
     }
 
-    ebpf_remove_pointer_from_plot_disk();
-
+    pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
@@ -679,10 +682,11 @@ static void ebpf_latency_send_hd_data()
                                   ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
 
-        ned->flags &= ~NETDATA_DISK_IS_HERE;
+        //ned->flags &= ~NETDATA_DISK_IS_HERE;
 
         move = move->next;
     }
+    pthread_mutex_unlock(&plot_mutex);
 }
 
 /**
