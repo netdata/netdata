@@ -701,7 +701,7 @@ static void ebpf_latency_send_hd_data()
             ebpf_create_hd_charts(ned);
         }
 
-        if ((flags & NETDATA_DISK_IS_HERE)) {
+        if ((flags & NETDATA_DISK_CHART_CREATED)) {
             write_histogram_chart(ned->hread.name, ned->family,
                                   ned->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
