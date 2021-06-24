@@ -1310,7 +1310,7 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
         goto failed;
     }
 
-    time_t  host_oldest_metric = LONG_LONG_MAX;
+    time_t  host_oldest_metric = LONG_MAX;
     time_t  dim_first_entry_t;
     time_t  dim_last_entry_t;
     int last_update_every = 0;
@@ -1320,7 +1320,7 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
             if (last_update_every)
                 info("DEBUG: Update %s for %d -- setting oldest time = %ld", host->machine_guid, last_update_every, host_oldest_metric);
             last_update_every = sqlite3_column_int(res, 1);
-            host_oldest_metric = LONG_LONG_MAX;
+            host_oldest_metric = LONG_MAX;
         }
         rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &dim_first_entry_t, &dim_last_entry_t);
         host_oldest_metric = MIN(host_oldest_metric, dim_first_entry_t);
