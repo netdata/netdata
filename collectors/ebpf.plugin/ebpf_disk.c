@@ -244,9 +244,12 @@ static int ebpf_compare_disks(void *a, void *b)
  *
  * Update link list when it is necessary.
  *
- * @param name the disk name
+ * @param name  the    disk name
+ * @param major major  disk identifier
+ * @param minor minor  disk identifier
+ * @param current_time current timestamp
  */
-static void update_disk_table(char *name, int major, int minor)
+static void update_disk_table(char *name, int major, int minor, time_t current_time)
 {
     netdata_ebpf_disks_t find;
     netdata_ebpf_disks_t *w;
@@ -257,6 +260,7 @@ static void update_disk_table(char *name, int major, int minor)
     netdata_ebpf_disks_t *ret = (netdata_ebpf_disks_t *) avl_search_lock(&disk_tree, (avl_t *)&find);
     if (ret) { // Disk is already present
         ret->flags |= NETDATA_DISK_IS_HERE;
+        ret->last_update = current_time;
         return;
     }
 
@@ -331,6 +335,7 @@ static int read_local_disks()
         return -1;
 
     size_t lines = procfile_lines(ff), l;
+    time_t current_time = now_realtime_sec();
     for(l = 2; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         // This is header or end of file
@@ -342,7 +347,7 @@ static int read_local_disks()
         // smaller than 7 according /proc/devices is not "important".
         if (major > 7) {
             int minor = (int)strtol(procfile_lineword(ff, l, 1), NULL, 10);
-            update_disk_table(procfile_lineword(ff, l, 3), major, minor);
+            update_disk_table(procfile_lineword(ff, l, 3), major, minor, current_time);
         }
     }
 
@@ -585,6 +590,26 @@ void *ebpf_disk_read_hash(void *ptr)
 }
 
 /**
+ * Obsolete Hard Disk charts
+ *
+ * @param w the structure with necessary information to create the chart
+ *
+ * Make Hard disk charts and fill chart name
+ */
+static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
+{
+    ebpf_write_chart_obsolete(w->hread.name, w->family, w->hread.title, EBPF_COMMON_DIMENSION_CALL,
+                              w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->hread.order);
+
+    ebpf_write_chart_obsolete(w->hwrite.name, w->family, w->hwrite.title, EBPF_COMMON_DIMENSION_CALL,
+                              w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->hwrite.order);
+
+    w->flags = 0;
+}
+
+/**
  * Create Hard Disk charts
  *
  * @param w the structure with necessary information to create the chart
@@ -624,17 +649,18 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
  *
  * Remove pointer from plot list when the disk is not present.
  */
-static void ebpf_remove_pointer_from_plot_disk()
+static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 {
-    return;
+    time_t current_time = now_realtime_sec();
+    usec_t limit = 10 * em->update_time;
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
 
-        if (!(flags & NETDATA_DISK_IS_HERE)) {
-            // ADD OBSOLETION HERE
+        if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
+            ebpf_obsolete_hd_charts(move);
             if (move == plot_disks) {
                 freez(move);
                 plot_disks = NULL;
@@ -661,11 +687,12 @@ static void ebpf_remove_pointer_from_plot_disk()
  */
 static void ebpf_latency_send_hd_data()
 {
+    pthread_mutex_lock(&plot_mutex);
     if (!plot_disks) {
+        pthread_mutex_unlock(&plot_mutex);
         return;
     }
 
-    pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
@@ -682,7 +709,7 @@ static void ebpf_latency_send_hd_data()
                                   ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
 
-        //ned->flags &= ~NETDATA_DISK_IS_HERE;
+        ned->flags &= ~NETDATA_DISK_IS_HERE;
 
         move = move->next;
     }
@@ -708,7 +735,7 @@ static void disk_collector(ebpf_module_t *em)
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
-        ebpf_remove_pointer_from_plot_disk();
+        ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data();
 
         pthread_mutex_unlock(&lock);

@@ -44,6 +44,7 @@ typedef struct netdata_ebpf_disks {
     netdata_ebpf_histogram_t hwrite;
 
     uint32_t flags;
+    time_t last_update;
 
     struct netdata_ebpf_disks *main;
     struct netdata_ebpf_disks *boot_partition;
