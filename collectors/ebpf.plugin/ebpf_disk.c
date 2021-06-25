@@ -603,7 +603,7 @@ static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
                               w->hread.order);
 
     ebpf_write_chart_obsolete(w->hwrite.name, w->family, w->hwrite.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->family, "disk.latency_input", NETDATA_EBPF_CHART_TYPE_STACKED,
                               w->hwrite.order);
 
     w->flags = 0;
