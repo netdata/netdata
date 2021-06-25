@@ -60,26 +60,26 @@ pthread_mutex_t plot_mutex;
  *
  * Parse start address of disk
  *
- * @param w      structure where data is stored
- * @param text   variable used to store value
- * @param length max allowed size for text vector.
+ * @param w          structure where data is stored
+ * @param filename   variable used to store value
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text, ssize_t length)
+static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
 {
-    int fd = open(text, O_RDONLY, 0);
+    char content[FILENAME_MAX + 1];
+    int fd = open(filename, O_RDONLY, 0);
     if (fd < 0) {
         return -1;
     }
 
-    ssize_t file_length = read(fd, text, 4095);
+    ssize_t file_length = read(fd, content, 4095);
     if (file_length > 0) {
-        if (file_length > length)
-            file_length = length;
+        if (file_length > FILENAME_MAX)
+            file_length = FILENAME_MAX;
 
-        text[file_length] = '\0';
-        w->start = str2uint64_t(text);
+        content[file_length] = '\0';
+        w->start = str2uint64_t(content);
     }
     close(fd);
 
@@ -91,27 +91,27 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *text, ssi
  *
  * Parse uevent file
  *
- * @param w      structure where data is stored
- * @param text   variable used to store value
- * @param length max allowed size for text vector.
+ * @param w          structure where data is stored
+ * @param filename   variable used to store value
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text, ssize_t length)
+static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 {
-    int fd = open(text, O_RDONLY, 0);
+    char content[FILENAME_MAX + 1];
+    int fd = open(filename, O_RDONLY, 0);
     if (fd < 0) {
         return -1;
     }
 
-    ssize_t file_length = read(fd, text, FILENAME_MAX);
+    ssize_t file_length = read(fd, content, FILENAME_MAX);
     if (file_length > 0) {
-        if (file_length > length)
-            file_length = length;
+        if (file_length > FILENAME_MAX)
+            file_length = FILENAME_MAX;
 
-        text[file_length] = '\0';
+        content[file_length] = '\0';
 
-        char *s = strstr(text, "PARTNAME=EFI");
+        char *s = strstr(content, "PARTNAME=EFI");
         if (s) {
             w->main->boot_partition = w;
             w->flags |= NETDATA_DISK_HAS_EFI;
@@ -126,26 +126,26 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *text, ssize_t
 /**
  * Parse Size
  *
- * @param w      structure where data is stored
- * @param text   variable used to store value
- * @param length max allowed size for text vector.
+ * @param w          structure where data is stored
+ * @param filename   variable used to store value
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *text, ssize_t length)
+static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
 {
-    int fd = open(text, O_RDONLY, 0);
+    char content[FILENAME_MAX + 1];
+    int fd = open(filename, O_RDONLY, 0);
     if (fd < 0) {
         return -1;
     }
 
-    ssize_t file_length = read(fd, text, FILENAME_MAX);
+    ssize_t file_length = read(fd, content, FILENAME_MAX);
     if (file_length > 0) {
-        if (file_length > length)
-            file_length = length;
+        if (file_length > FILENAME_MAX)
+            file_length = FILENAME_MAX;
 
-        text[file_length] = '\0';
-        w->end = w->start + str2uint64_t(text) -1;
+        content[file_length] = '\0';
+        w->end = w->start + str2uint64_t(content) -1;
     }
     close(fd);
 
@@ -166,7 +166,7 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
     static uint32_t key = 0;
     char *path = { "/sys/block" };
     char disk[NETDATA_DISK_NAME_LEN + 1];
-    char text[FILENAME_MAX + 1];
+    char filename[FILENAME_MAX + 1];
     snprintfz(disk, NETDATA_DISK_NAME_LEN, "%s", name);
     size_t length = strlen(disk);
     if (!length) {
@@ -189,16 +189,16 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
     w->bootsector_key = key;
     w->main = main_disk;
 
-    snprintfz(text, FILENAME_MAX, "%s/%s/%s/uevent", path, disk, name);
-    if (ebpf_parse_uevent(w, text, FILENAME_MAX))
+    snprintfz(filename, FILENAME_MAX, "%s/%s/%s/uevent", path, disk, name);
+    if (ebpf_parse_uevent(w, filename))
         return;
 
-    snprintfz(text, FILENAME_MAX, "%s/%s/%s/start", path, disk, name);
-    if (ebpf_disk_parse_start(w, text, FILENAME_MAX))
+    snprintfz(filename, FILENAME_MAX, "%s/%s/%s/start", path, disk, name);
+    if (ebpf_disk_parse_start(w, filename))
         return;
 
-    snprintfz(text, FILENAME_MAX, "%s/%s/%s/size", path, disk, name);
-    ebpf_parse_size(w, text, FILENAME_MAX);
+    snprintfz(filename, FILENAME_MAX, "%s/%s/%s/size", path, disk, name);
+    ebpf_parse_size(w, filename);
 }
 
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L46
