@@ -468,8 +468,8 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         init_completion(&compl);
         cmd.completion = &compl ;
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl );
-        destroy_completion(&compl );
+        wait_for_completion(&compl);
+        destroy_completion(&compl);
         buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK thread shutdown for host %s", host->hostname);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
@@ -478,12 +478,8 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     if (update_info) {
         struct aclk_database_cmd cmd;
         cmd.opcode = ACLK_DATABASE_NODE_INFO;
-        //struct completion compl ;
-        //init_completion(&compl);
         cmd.completion = NULL;
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        //wait_for_completion(&compl );
-        //destroy_completion(&compl );
         buffer_sprintf(w->response.data, "ACLK_SYNC: Node info updated for host %s", host->hostname);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
@@ -519,37 +515,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
     }
-
-//    if (ping) {
-//        struct aclk_database_cmd cmd;
-//        struct aclk_chart_payload_t *result, *tmp_result;
-//        cmd.opcode = ACLK_DATABASE_FETCH_CHART;
-//        cmd.data = (void *) &result;
-//        cmd.count = ping;
-//        cmd.completion = NULL;
-//
-//        struct completion compl ;
-//        init_completion(&compl);
-//        cmd.completion = &compl ;
-//        aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-//        wait_for_completion(&compl);
-//        destroy_completion(&compl);
-//        //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
-//        int count = 0;
-//        while (result) {
-//            tmp_result = result->next;
-//            if (count)
-//                buffer_strcat(w->response.data,",\n");
-//            buffer_sprintf(w->response.data, "{\"sequence_id\": %ld,\n \"last_sequence_id\": %ld, \n\"payload\": %s",
-//                           result->sequence_id, result->last_sequence_id, result->payload);
-//            freez(result->payload);
-//            freez(result);
-//            result = tmp_result;
-//            count++;
-//        }
-//        buffer_no_cacheable(w->response.data);
-//        return HTTP_RESP_OK;
-//    }
 
     if (sequence_reset) {
         char node_str[GUID_LEN + 1];
@@ -633,7 +598,6 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
 
     if (reset_node) {
         struct aclk_database_cmd cmd;
-        //struct aclk_chart_payload_t *result, *tmp_result;
         cmd.opcode = ACLK_DATABASE_RESET_NODE;
         cmd.data = (void *) reset_node;
         cmd.completion = NULL;
@@ -642,8 +606,8 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         init_completion(&compl );
         cmd.completion = &compl ;
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl );
-        destroy_completion(&compl );
+        wait_for_completion(&compl);
+        destroy_completion(&compl);
         buffer_sprintf(w->response.data, "Resetting node instance id of host %s", reset_node);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
