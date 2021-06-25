@@ -40,7 +40,8 @@ if [ -n "${DOCKER_USR}" ]; then
   NETDATA_USER="${DOCKER_USR}"
 fi
 
-if getent group netdata > /dev/null; then
+if [ -w /etc/passwd ] && [ -w /etc/group ] && [ -w /etc/shadow ] && [ -w /etc/gshadow ] ; then
+  if getent group netdata > /dev/null; then
   existing_gid="$(getent group netdata | cut -d ':' -f 3)"
 
   if [ "${existing_gid}" != "${NETDATA_GID}" ]; then
@@ -48,51 +49,54 @@ if getent group netdata > /dev/null; then
     remove_group=1
     create_group=1
   fi
-else
+  else
   echo "Netdata group not found, preparing to create one with GID=${NETDATA_GID}."
   create_group=1
-fi
+  fi
 
-if [ -n "${remove_group}" ]; then
+  if [ -n "${remove_group}" ]; then
   delgroup netdata netdata
   delgroup netdata || exit 1
-fi
+  fi
 
-if [ -n "${create_group}" ]; then
+  if [ -n "${create_group}" ]; then
   addgroup -g "${NETDATA_GID}" -S netdata || exit 1
-fi
+  fi
 
-if [ "${NETDATA_USER}" = "netdata" ]; then
-  if getent passwd netdata > /dev/null; then
-    existing_user="$(getent passwd netdata)"
-    existing_uid="$(echo "${existing_user}" | cut -d ':' -f 3)"
-    existing_primary_gid="$(echo "${existing_user}" | cut -d ':' -f 4)"
+  if [ "${NETDATA_USER}" = "netdata" ]; then
+    if getent passwd netdata > /dev/null; then
+      existing_user="$(getent passwd netdata)"
+      existing_uid="$(echo "${existing_user}" | cut -d ':' -f 3)"
+      existing_primary_gid="$(echo "${existing_user}" | cut -d ':' -f 4)"
 
-    if [ "${existing_gid}" != "${NETDATA_UID}" ]; then
-      echo "Netdata user ID mismatch (expected ${NETDATA_UID} but found ${existing_uid}), the existing user will be replaced."
-      remove_user=1
+      if [ "${existing_gid}" != "${NETDATA_UID}" ]; then
+        echo "Netdata user ID mismatch (expected ${NETDATA_UID} but found ${existing_uid}), the existing user will be replaced."
+        remove_user=1
+        create_user=1
+      fi
+
+      if [ "${existing_primary_gid}" = "${NETDATA_GID}" ]; then
+        user_in_group=1
+      else
+        echo "Netdata user is not in the correct primary group (expected ${NETDATA_GID} but found ${existing_primary_gid}), the user will be updated."
+      fi
+    else
+      echo "Netdata user not found, preparing to create one with UID=${NETDATA_UID}."
       create_user=1
     fi
 
-    if [ "${existing_primary_gid}" = "${NETDATA_GID}" ]; then
-      user_in_group=1
-    else
-      echo "Netdata user is not in the correct primary group (expected ${NETDATA_GID} but found ${existing_primary_gid}), the user will be updated."
+    if [ -n "${remove_user}" ]; then
+      userdel netdata || exit 1
     fi
-  else
-    echo "Netdata user not found, preparing to create one with UID=${NETDATA_UID}."
-    create_user=1
-  fi
 
-  if [ -n "${remove_user}" ]; then
-    userdel netdata || exit 1
+    if [ -n "${create_user}" ]; then
+      adduser -S -H -s /usr/sbin/nologin -u "${NETDATA_UID}" -h /etc/netdata -G netdata netdata
+    elif [ -z "${user_in_group}" ]; then
+      usermod -a -G netdata netdata
+    fi
   fi
-
-  if [ -n "${create_user}" ]; then
-    adduser -S -H -s /usr/sbin/nologin -u "${NETDATA_UID}" -h /etc/netdata -G netdata netdata
-  elif [ -z "${user_in_group}" ]; then
-    usermod -a -G netdata netdata
-  fi
+else
+  echo "Account databases are not writable, assuming you know what you’re doing and continuing."
 fi
 
 chown -R "${NETDATA_USER}:root" /usr/lib/netdata /var/cache/netdata /var/lib/netdata /var/log/netdata
