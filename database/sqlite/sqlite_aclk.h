@@ -76,7 +76,6 @@ struct aclk_chart_payload_t {
 struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *data;
-    void *data1;
     void *data_param;
     int count;
     uint64_t param1;

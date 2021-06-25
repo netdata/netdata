@@ -68,6 +68,7 @@ struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_confi
     queue_size = wc->queue_size;
     if (queue_size == 0) {
         ret.opcode = ACLK_DATABASE_NOOP;
+        ret.completion = NULL;
     } else {
         /* dequeue command */
         ret = wc->cmd_queue.cmd_array[wc->cmd_queue.head];
@@ -91,7 +92,7 @@ static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    debug(D_METADATALOG, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+    debug(D_ACLK_SYNC, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
 #define TIMER_PERIOD_MS (5000)
@@ -104,11 +105,13 @@ static void timer_cb(uv_timer_t* handle)
 
     struct aclk_database_cmd cmd;
     cmd.opcode = ACLK_DATABASE_TIMER;
+    cmd.completion = NULL;
     aclk_database_enq_cmd(wc, &cmd);
 
     if (wc->chart_updates) {
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
         cmd.count = ACLK_MAX_CHART_UPDATES;
+        cmd.completion = NULL;
         aclk_database_enq_cmd(wc, &cmd);
     }
 }
@@ -157,18 +160,11 @@ void aclk_database_worker(void *arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
 
-    // Run a chart deduplication
-    //cmd.opcode = ACLK_DATABASE_DEDUP_CHART;
-    //aclk_database_enq_cmd(wc, &cmd);
+//    cmd.opcode = ACLK_DATABASE_SYNC_CHART_SEQ;
+//    aclk_database_enq_cmd(wc, &cmd);
 
-    cmd.opcode = ACLK_DATABASE_SYNC_CHART_SEQ;
-    aclk_database_enq_cmd(wc, &cmd);
-
-
-    info(
-        "Starting ACLK sync event loop for host with GUID %s (Host is '%s')",
-        wc->host_guid,
-        wc->host ? "connected" : "not connected");
+    info("Starting ACLK sync event loop for host with GUID %s (Host is '%s')", wc->host_guid, wc->host ? "connected" : "not connected");
+    sql_get_last_chart_sequence(wc, cmd);
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -189,43 +185,40 @@ void aclk_database_worker(void *arg)
                     /* the command queue was empty, do nothing */
                     break;
                 case ACLK_DATABASE_CLEANUP:
+                    debug(D_ACLK_SYNC, "Database cleanup for %s", wc->uuid_str);
                     //sql_maint_database();
-                    info("Cleanup for %s", wc->uuid_str);
                     break;
                 case ACLK_DATABASE_PUSH_CHART:
-                    info("Pushing chart info to the cloud for node %s", wc->uuid_str);
+                    debug(D_ACLK_SYNC, "Pushing chart info to the cloud for node %s", wc->uuid_str);
                     aclk_push_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_PUSH_CHART_CONFIG:
-                    info("Pushing chart config info to the cloud for node %s", wc->uuid_str);
+                    debug(D_ACLK_SYNC, "Pushing chart config info to the cloud for node %s", wc->uuid_str);
                     aclk_push_chart_config_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_CHART_ACK:
-                    info("Setting last chart sequence ACK");
+                    debug(D_ACLK_SYNC, "ACK chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
                     sql_set_chart_ack(wc, cmd);
-                    if (cmd.completion)
-                        complete(cmd.completion);
                     break;
                 case ACLK_DATABASE_RESET_CHART:
+                    debug(D_ACLK_SYNC, "RESET chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
 
                     sql_reset_chart_event(wc, cmd);
-                    if (cmd.completion)
-                        complete(cmd.completion);
                     break;
                 case ACLK_DATABASE_RESET_NODE:
-                    info("Resetting the node instance id of host with guid %s", (char *) cmd.data);
+                    debug(D_ACLK_SYNC,"Resetting the node instance id of host %s", (char *) cmd.data);
                     aclk_reset_node_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_STATUS_CHART:
-                    info("Requesting chart status for host %s", wc->uuid_str);
+                    debug(D_ACLK_SYNC,"Requesting chart status for %s", wc->uuid_str);
                     aclk_status_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_ADD_CHART:
+                    debug(D_ACLK_SYNC,"Adding chart event for %s", wc->uuid_str);
                     aclk_add_chart_event(wc, cmd);
-                    if (cmd.completion)
-                        complete(cmd.completion);
                     break;
                 case ACLK_DATABASE_NODE_INFO:
+                    debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_STATS:
@@ -250,23 +243,25 @@ void aclk_database_worker(void *arg)
                     }
                     break;
                 case ACLK_DATABASE_DEDUP_CHART:
+                    debug(D_ACLK_SYNC,"Running chart deduplication for %s", wc->uuid_str);
                     sql_chart_deduplicate(wc, cmd);
                     break;
                 case ACLK_DATABASE_SYNC_CHART_SEQ:
+                    debug(D_ACLK_SYNC,"Calculatting chart sequence for %s", wc->uuid_str);
                     sql_get_last_chart_sequence(wc, cmd);
                     break;
                 case ACLK_DATABASE_SHUTDOWN:
                     shutdown = 1;
                     fatal_assert(0 == uv_timer_stop(&timer_req));
                     uv_close((uv_handle_t *)&timer_req, NULL);
-                    if (cmd.completion)
-                        complete(cmd.completion);
                     break;
                 default:
-                    debug(D_METADATALOG, "%s: default.", __func__);
+                    debug(D_ACLK_SYNC, "%s: default.", __func__);
                     break;
             }
             db_unlock();
+            if (cmd.completion)
+                complete(cmd.completion);
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 
@@ -413,16 +408,11 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     BUFFER *sql = buffer_create(1024);
-
-    info("DEBUG: Resetting chart for %s to sequence id %"PRIu64, wc->uuid_str, cmd.param1);
-
     buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted = NULL WHERE sequence_id >= %"PRIu64";",
                         wc->uuid_str, cmd.param1);
     db_execute(buffer_tostring(sql));
     buffer_free(sql);
-
     sql_chart_deduplicate(wc, cmd);
-
     return;
 }
 
@@ -465,9 +455,6 @@ fail:
     buffer_free(sql);
 
 fail1:
-    if (cmd.completion)
-        complete(cmd.completion);
-
     return;
 }
 
@@ -513,9 +500,6 @@ void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk
 fail:
     buffer_free(sql);
     buffer_free(resp);
-    if (cmd.completion)
-        complete(cmd.completion);
-
     return;
 }
 
@@ -1016,6 +1000,7 @@ void aclk_get_chart_config(char **hash_id)
         info("Request for chart config %d -- %s received", i, hash_id[i]);
         cmd.data_param = (void *) strdupz(hash_id[i]);
         cmd.count = 1;
+        cmd.completion = NULL;
         aclk_database_enq_cmd(wc, &cmd);
     }
 
@@ -1024,6 +1009,9 @@ void aclk_get_chart_config(char **hash_id)
 
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
+    UNUSED(wc);
+    sqlite3_stmt *res = NULL;
+
     int rc = 0;
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
@@ -1033,17 +1021,10 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
         return 1;
     }
 
-    UNUSED(wc);
-
     char *hash_id = (char *) cmd.data_param;
-
     BUFFER *sql = buffer_create(1024);
-
-    sqlite3_stmt *res = NULL;
-
-    buffer_sprintf(
-        sql,
-        "SELECT type, family, context, title, priority, plugin, module, unit, chart_type FROM chart_hash WHERE hash_id = @hash_id;");
+    buffer_sprintf(sql, "SELECT type, family, context, title, priority, plugin, module, unit, chart_type " \
+                        "FROM chart_hash WHERE hash_id = @hash_id;");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -1072,7 +1053,7 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
         chart_config.config_hash = strdupz(hash_id);
     }
 
-    info("SENDING CHART HASH CONFIG for %s", hash_id);
+    debug(D_ACLK_SYNC,"Sending chart config for %s", hash_id);
 
     aclk_chart_config_updated(&chart_config, 1);
     destroy_chart_config_updated(&chart_config);
@@ -1092,12 +1073,11 @@ fail:
 void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     int rc;
+    sqlite3_stmt *res = NULL;
 
     BUFFER *sql = buffer_create(1024);
 
-    sqlite3_stmt *res = NULL;
-
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE sequence_id < @sequence_id AND date_submitted IS NOT NULL;",
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE sequence_id <= @sequence_id AND date_submitted IS NOT NULL;",
                    wc->uuid_str);
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -1155,7 +1135,7 @@ void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
     if (unlikely(!node_id))
         return;
 
-    info("NODE %s reports last sequence id received %"PRIu64 , node_id, last_sequence_id);
+    debug(D_ACLK_SYNC, "NODE %s reports last sequence id received %"PRIu64, node_id, last_sequence_id);
     aclk_submit_param_command(node_id, ACLK_DATABASE_CHART_ACK, last_sequence_id);
     return;
 }
@@ -1165,7 +1145,7 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
     if (unlikely(!node_id))
         return;
 
-    info("NODE %s wants to resync from %"PRIu64 , node_id, last_sequence_id);
+    debug(D_ACLK_SYNC, "NODE %s wants to resync from %"PRIu64, node_id, last_sequence_id);
     aclk_submit_param_command(node_id, ACLK_DATABASE_RESET_CHART, last_sequence_id);
     return;
 }
@@ -1180,19 +1160,23 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
+       "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);", wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);",
+                   wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);", wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);",
+                   wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;", wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
+                   wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
@@ -1211,16 +1195,11 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc, struct 
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(
-        sql,
-        "select ac.sequence_id, ac.date_created from aclk_chart_%s ac where "
-        "ac.date_submitted is null order by ac.sequence_id asc limit 1;",
-        wc->uuid_str);
+    buffer_sprintf(sql,"select ac.sequence_id, ac.date_created from aclk_chart_%s ac " \
+                        "where ac.date_submitted is null order by ac.sequence_id asc limit 1;", wc->uuid_str);
 
     int rc;
-
     sqlite3_stmt *res = NULL;
-
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to find last chart sequence id");
@@ -1232,7 +1211,8 @@ void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc, struct 
         wc->chart_timestamp  = (time_t) sqlite3_column_int64(res, 1);
     }
 
-    info("DEBUG: Chart %s reports last seq=%"PRIu64" t=%ld", wc->uuid_str, wc->chart_sequence_id, wc->chart_timestamp);
+    debug(D_ACLK_SYNC,"Chart %s reports last seq=%"PRIu64" t=%ld", wc->uuid_str,
+          wc->chart_sequence_id, wc->chart_timestamp);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -1249,13 +1229,12 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     struct update_node_info node_info;
 
+    rrd_wrlock();
     node_info.node_id = get_str_from_uuid(wc->host->node_id);
     node_info.claim_id = is_agent_claimed();
     node_info.machine_guid = strdupz(wc->host_guid);
     node_info.child = (wc->host != localhost);
     now_realtime_timeval(&node_info.updated_at);
-
-    info("DEBUG: Sending node info for %s", wc->uuid_str);
 
     RRDHOST *host = wc->host;
 
@@ -1281,6 +1260,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.machine_guid = strdupz(wc->host_guid);
     node_info.data.host_labels_head = NULL;     //struct label *host_labels_head;
 
+    rrd_unlock();
     aclk_update_node_info(&node_info);
     return;
 }
@@ -1310,23 +1290,23 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
         goto failed;
     }
 
-    time_t  host_oldest_metric = LONG_MAX;
-    time_t  dim_first_entry_t;
-    time_t  dim_last_entry_t;
-    int last_update_every = 0;
+    time_t  start_time = LONG_MAX;
+    time_t  first_entry_t;
+    time_t  last_entry_t;
+    int update_every = 0;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        if (!last_update_every || last_update_every != sqlite3_column_int(res, 1)) {
-            if (last_update_every)
-                info("DEBUG: Update %s for %d -- setting oldest time = %ld", host->machine_guid, last_update_every, host_oldest_metric);
-            last_update_every = sqlite3_column_int(res, 1);
-            host_oldest_metric = LONG_MAX;
+        if (!update_every || update_every != sqlite3_column_int(res, 1)) {
+            if (update_every)
+                debug(D_ACLK_SYNC,"Update %s for %d oldest time = %ld", host->machine_guid, update_every, start_time);
+            update_every = sqlite3_column_int(res, 1);
+            start_time = LONG_MAX;
         }
-        rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &dim_first_entry_t, &dim_last_entry_t);
-        host_oldest_metric = MIN(host_oldest_metric, dim_first_entry_t);
+        rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
+        start_time = MIN(start_time, first_entry_t);
     }
-    if (last_update_every)
-        info("DEBUG: Update %s for %d -- setting oldest time = %ld", host->machine_guid, last_update_every, host_oldest_metric);
+    if (update_every)
+        debug(D_ACLK_SYNC,"Update %s for %d oldest time = %ld", host->machine_guid, update_every, start_time);
 
 failed:
     rc = sqlite3_finalize(res);
