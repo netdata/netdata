@@ -587,6 +587,11 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     SSL_set_fd(client->ssl, client->sockfd);
     SSL_set_connect_state(client->ssl);
 
+    if (!SSL_set_tlsext_host_name(client->ssl, client->target_host)) {
+        mws_error(client->log, "Error setting TLS SNI host");
+        return -7;
+    }
+
     result = SSL_connect(client->ssl);
     if (result != -1 && result != 1) {
         mws_error(client->log, "SSL could not connect");
