@@ -187,7 +187,6 @@
 - implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
 - Support mulitple jobs in make\(1\) when building LWS. [\#10799](https://github.com/netdata/netdata/pull/10799) ([vkalintiris](https://github.com/vkalintiris))
 - Overhaul streaming documentation [\#10709](https://github.com/netdata/netdata/pull/10709) ([joelhans](https://github.com/joelhans))
-- Zscores python collector [\#10673](https://github.com/netdata/netdata/pull/10673) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
