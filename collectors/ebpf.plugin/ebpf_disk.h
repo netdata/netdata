@@ -40,7 +40,7 @@ typedef struct netdata_ebpf_disks {
     char family[NETDATA_DISK_NAME_LEN + 1];
     char *boot_chart;
 
-    netdata_ebpf_histogram_t hread;
+    netdata_ebpf_histogram_t histogram;
     netdata_ebpf_histogram_t hwrite;
 
     uint32_t flags;

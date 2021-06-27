@@ -545,7 +545,7 @@ static void read_hard_disk_tables(int table)
         }
 
         if (table == cmp_table) {
-            ret->hread.histogram[key.bin] = total;
+            ret->histogram.histogram[key.bin] = total;
         } else {
             ret->hwrite.histogram[key.bin] = total;
         }
@@ -595,9 +595,9 @@ void *ebpf_disk_read_hash(void *ptr)
  */
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
 {
-    ebpf_write_chart_obsolete(w->hread.name, w->family, w->hread.title, EBPF_COMMON_DIMENSION_CALL,
+    ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
                               w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
-                              w->hread.order);
+                              w->histogram.order);
 
     ebpf_write_chart_obsolete(w->hwrite.name, w->family, w->hwrite.title, EBPF_COMMON_DIMENSION_CALL,
                               w->family, "disk.latency_input", NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -620,11 +620,11 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
     char *family = w->family;
 
     snprintf(title, 255, "Disk latency %s for output.", family);
-    w->hread.name = strdupz("disk_latency_output");
-    w->hread.title = strdupz(title);
-    w->hread.order = order;
+    w->histogram.name = strdupz("disk_latency_output");
+    w->histogram.title = strdupz(title);
+    w->histogram.order = order;
 
-    ebpf_create_chart(w->hread.name, family, title, EBPF_COMMON_DIMENSION_CALL,
+    ebpf_create_chart(w->histogram.name, family, title, EBPF_COMMON_DIMENSION_CALL,
                       family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
     order++;
@@ -699,8 +699,8 @@ static void ebpf_latency_send_hd_data()
         }
 
         if ((flags & NETDATA_DISK_CHART_CREATED)) {
-            write_histogram_chart(ned->hread.name, ned->family,
-                                  ned->hread.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+            write_histogram_chart(ned->histogram.name, ned->family,
+                                  ned->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
             write_histogram_chart(ned->hwrite.name, ned->family,
                                   ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
