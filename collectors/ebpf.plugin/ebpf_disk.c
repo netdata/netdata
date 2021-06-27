@@ -11,10 +11,7 @@ struct config disk_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_rcall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
-                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                        {.name = "tbl_disk_wcall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
+static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                         {.name = NULL, .internal_input = 0, .user_input = 0,
