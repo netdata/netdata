@@ -14,6 +14,7 @@ struct node_instance_list {
     int live;
     int querable;
     int hops;
+    RRDHOST *host;
 };
 
 
