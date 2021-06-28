@@ -590,7 +590,7 @@ void *ebpf_disk_read_hash(void *ptr)
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
 {
     ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED,
                               w->histogram.order);
 
     w->flags = 0;
@@ -609,13 +609,13 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
     int order = NETDATA_CHART_PRIO_DISK_LATENCY;
     char *family = w->family;
 
-    snprintf(title, 255, "Disk latency %s for output.", family);
-    w->histogram.name = strdupz("disk_latency_output");
+    snprintf(title, 255, "Disk latency %s.", family);
+    w->histogram.name = strdupz("disk_latency_io");
     w->histogram.title = strdupz(title);
     w->histogram.order = order;
 
     ebpf_create_chart(w->histogram.name, family, title, EBPF_COMMON_DIMENSION_CALL,
-                      family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                      family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
     order++;
 
