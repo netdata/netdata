@@ -41,7 +41,6 @@ typedef struct netdata_ebpf_disks {
     char *boot_chart;
 
     netdata_ebpf_histogram_t histogram;
-    netdata_ebpf_histogram_t hwrite;
 
     uint32_t flags;
     time_t last_update;
@@ -52,8 +51,7 @@ typedef struct netdata_ebpf_disks {
 } netdata_ebpf_disks_t;
 
 enum ebpf_disk_tables {
-    NETDATA_DISK_READ,
-    NETDATA_DISK_WRITE
+    NETDATA_DISK_READ
 };
 
 typedef struct block_key {

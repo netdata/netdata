@@ -502,7 +502,6 @@ static void read_hard_disk_tables(int table)
     netdata_idx_t *values = disk_hash_values;
     block_key_t key = {};
     block_key_t next_key = {};
-    int cmp_table = disk_maps[NETDATA_DISK_READ].map_fd;
 
     netdata_ebpf_disks_t *ret = NULL;
 
@@ -544,11 +543,7 @@ static void read_hard_disk_tables(int table)
             total += values[i];
         }
 
-        if (table == cmp_table) {
-            ret->histogram.histogram[key.bin] = total;
-        } else {
-            ret->hwrite.histogram[key.bin] = total;
-        }
+        ret->histogram.histogram[key.bin] = total;
 
         if (!(ret->flags & NETDATA_DISK_ADDED_TO_PLOT_LIST))
             ebpf_fill_plot_disks(ret);
@@ -580,7 +575,6 @@ void *ebpf_disk_read_hash(void *ptr)
         (void)dt;
 
         read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
-        read_hard_disk_tables(disk_maps[NETDATA_DISK_WRITE].map_fd);
     }
 
     return NULL;
@@ -598,10 +592,6 @@ static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
     ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
                               w->family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED,
                               w->histogram.order);
-
-    ebpf_write_chart_obsolete(w->hwrite.name, w->family, w->hwrite.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, "disk.latency_input", NETDATA_EBPF_CHART_TYPE_STACKED,
-                              w->hwrite.order);
 
     w->flags = 0;
 }
@@ -628,15 +618,6 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
                       family, "disk.latency_output", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
     order++;
-
-    snprintf(title, 255, "Disk latency %s for input.", family);
-    w->hwrite.name = strdupz("disk_latency_input");
-    w->hwrite.title = strdupz(title);
-    w->hwrite.order = order;
-
-    ebpf_create_chart(w->hwrite.name, family, title, EBPF_COMMON_DIMENSION_CALL,
-                      family, "disk.latency_input", NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
 
     w->flags |= NETDATA_DISK_CHART_CREATED;
 }
@@ -701,9 +682,6 @@ static void ebpf_latency_send_hd_data()
         if ((flags & NETDATA_DISK_CHART_CREATED)) {
             write_histogram_chart(ned->histogram.name, ned->family,
                                   ned->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
-
-            write_histogram_chart(ned->hwrite.name, ned->family,
-                                  ned->hwrite.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
 
         ned->flags &= ~NETDATA_DISK_IS_HERE;
