@@ -4,6 +4,7 @@
 
 struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
+extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
 extern int aclk_connected;
 
@@ -54,6 +55,12 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
     debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
     debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_AVAILABLE     : [%s]", analytics_data.netdata_config_https_available);
+    debug(D_ANALYTICS, "NETDATA_INSTALL_TYPE               : [%s]", analytics_data.netdata_install_type);
+    debug(D_ANALYTICS, "NETDATA_PREBUILT_DISTRO            : [%s]", analytics_data.netdata_prebuilt_distro);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PRIVATE_REGISTRY : [%s]", analytics_data.netdata_config_is_private_registry);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
+    debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
 }
 
 /*
@@ -93,6 +100,12 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_host_aclk_implementation);
     freez(analytics_data.netdata_host_agent_claimed);
     freez(analytics_data.netdata_host_cloud_enabled);
+    freez(analytics_data.netdata_config_https_available);
+    freez(analytics_data.netdata_install_type);
+    freez(analytics_data.netdata_config_is_private_registry);
+    freez(analytics_data.netdata_config_use_private_registry);
+    freez(analytics_data.netdata_config_oom_score);
+    freez(analytics_data.netdata_prebuilt_distro);
 }
 
 /*
@@ -182,6 +195,15 @@ void analytics_log_dashboard(void)
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
     }
+}
+
+/*
+ * Called when setting the oom score
+ */
+void analytics_report_oom_score(long long int score){
+    char b[7];
+    snprintfz(b, 6, "%d", (int)score);
+    analytics_set_data(&analytics_data.netdata_config_oom_score, b);
 }
 
 void analytics_mirrored_hosts(void)
@@ -335,6 +357,71 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
+char *get_value_from_key(char *buffer, char *key)
+{
+    char *s = NULL, *t = NULL;
+    s = t = buffer + strlen(key) + 2;
+    if (s) {
+        while (*s == '\'')
+            s++;
+        while (*++t != '\0');
+        while (--t > s && *t == '\'')
+            *t = '\0';
+    }
+    return s;
+}
+
+/*
+ * Checks for the existance of .install_type file and reads it
+ */
+void analytics_get_install_type(void)
+{
+    char *install_type_filename;
+    analytics_set_data_str(&analytics_data.netdata_install_type, "");
+    analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, "");
+
+    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
+    snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
+    if (unlikely(access(install_type_filename, R_OK) != 0)) {
+        freez(install_type_filename);
+        return;
+    }
+
+    FILE *fp = fopen(install_type_filename, "r");
+    if (fp) {
+        char *s, buf[256 + 1];
+        size_t len = 0;
+
+        while ((s = fgets_trim_len(buf, 256, fp, &len))) {
+            if (!strncmp(buf, "INSTALL_TYPE='", 14))
+                analytics_set_data_str(&analytics_data.netdata_install_type, (char *)get_value_from_key(buf, "INSTALL_TYPE"));
+            else if (!strncmp(buf, "PREBUILT_DISTRO='", 17))
+                analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, (char *)get_value_from_key(buf, "PREBUILT_DISTRO"));
+        }
+        fclose(fp);
+    }
+    freez(install_type_filename);
+}
+
+/*
+ * Pick up if https is actually used
+ */
+void analytics_https(void)
+{
+    BUFFER *b = buffer_create(30);
+#ifdef ENABLE_HTTPS
+    analytics_exporting_connectors_ssl(b);
+    buffer_strcat(b, netdata_client_ctx && localhost->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE && localhost->rrdpush_sender_connected == 1 ? "streaming|" : "|");
+    buffer_strcat(b, netdata_srv_ctx ? "web" : "");
+#else
+    buffer_strcat(b, "||");
+#endif
+
+    analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
+    buffer_free(b);
+}
+
 void analytics_charts(void)
 {
     RRDSET *st;
@@ -426,17 +513,33 @@ void analytics_misc(void)
     else
 #endif
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
+
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
+
+    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "false");
+    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "false");
+
+    if (strcmp(
+        config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io"),
+        "https://registry.my-netdata.io"))
+        analytics_set_data(&analytics_data.netdata_config_use_private_registry, "true");
+
+    //do we need both registry to announce and enabled to indicate that this is a private registry ?
+    if (config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", CONFIG_BOOLEAN_NO) &&
+        web_server_mode != WEB_SERVER_MODE_NONE)
+        analytics_set_data(&analytics_data.netdata_config_is_private_registry, "true");
 }
 
 /*
  * Get the meta data, called from the thread once after the original delay
- * These are values that won't change between agent restarts, and therefore
+ * These are values that won't change during agent runtime, and therefore
  * don't try to read them on each META event send
  */
 void analytics_gather_immutable_meta_data(void)
 {
     analytics_misc();
     analytics_exporters();
+    analytics_https();
 }
 
 /*
@@ -521,7 +624,7 @@ void *analytics_main(void *ptr)
 
     analytics_gather_immutable_meta_data();
     analytics_gather_mutable_meta_data();
-    send_statistics("META", "-", "-");
+    send_statistics("META_START", "-", "-");
     analytics_log_data();
 
     sec = 0;
@@ -567,7 +670,6 @@ void set_late_global_environment()
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
-    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO) ? "true" : "false");
 
 #ifdef DISABLE_CLOUD
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
@@ -607,6 +709,8 @@ void set_late_global_environment()
         analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
         buffer_free(bi);
     }
+
+    analytics_get_install_type();
 }
 
 static void get_system_timezone(void)
@@ -793,6 +897,12 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_https_available, "null");
+    analytics_set_data(&analytics_data.netdata_install_type, "null");
+    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
+    analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -874,7 +984,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -910,7 +1020,13 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_host_aclk_available,
         analytics_data.netdata_host_aclk_implementation,
         analytics_data.netdata_host_agent_claimed,
-        analytics_data.netdata_host_cloud_enabled);
+        analytics_data.netdata_host_cloud_enabled,
+        analytics_data.netdata_config_https_available,
+        analytics_data.netdata_install_type,
+        analytics_data.netdata_config_is_private_registry,
+        analytics_data.netdata_config_use_private_registry,
+        analytics_data.netdata_config_oom_score,
+        analytics_data.netdata_prebuilt_distro);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 

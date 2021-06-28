@@ -1267,6 +1267,8 @@ int main(int argc, char **argv) {
 
     netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
+    set_late_global_environment();
+
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1285,8 +1287,6 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
-
-    set_late_global_environment();
 
     send_statistics("START", "-",  "-");
     if (crash_detected)

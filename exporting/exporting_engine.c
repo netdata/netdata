@@ -4,6 +4,22 @@
 
 static struct engine *engine = NULL;
 
+void analytics_exporting_connectors_ssl(BUFFER *b)
+{
+#ifdef ENABLE_HTTPS
+    if (netdata_exporting_ctx) {
+        for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+            struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
+            if (connector_specific_data->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+                buffer_strcat(b, "exporting");
+                break;
+            }
+        }
+    }
+#endif
+    buffer_strcat(b, "|");
+}
+
 void analytics_exporting_connectors(BUFFER *b)
 {
     if (!engine)
