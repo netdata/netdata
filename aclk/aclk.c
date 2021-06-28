@@ -871,3 +871,39 @@ void ng_aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *m
     query->data.metadata_alarms.initial_on_connect = 0;
     aclk_queue_query(query);
 }
+
+void aclk_send_node_instances()
+{
+    struct node_instance_list *list = get_node_list();
+    while (!uuid_is_null(list->host_id)) {
+        // temporarily we support only localhost
+        // this condition will be removed soon when cloud ready
+        if (list->host && list->host == localhost) {
+            if (!uuid_is_null(list->node_id)) {
+                aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+                rrdhost_aclk_state_lock(localhost);
+                query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
+                rrdhost_aclk_state_unlock(localhost);
+                query->data.node_update.live = list->live;
+                query->data.node_update.hops = list->hops;
+                query->data.node_update.node_id = mallocz(UUID_STR_LEN);
+                uuid_unparse(list->node_id, (char*)query->data.node_update.node_id);
+                query->data.node_update.queriable = list->querable;
+                query->data.node_update.session_id = aclk_session_newarch;
+                aclk_queue_query(query);
+            } else {
+                aclk_query_t create_query;
+                create_query = aclk_query_new(REGISTER_NODE);
+                rrdhost_aclk_state_lock(localhost);
+                create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
+                rrdhost_aclk_state_unlock(localhost);
+                create_query->data.node_creation.hops = list->hops;
+                create_query->data.node_creation.hostname = list->hostname;
+                create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
+                uuid_unparse(list->host_id, (char*)create_query->data.node_creation.machine_guid);
+                aclk_queue_query(create_query);
+            }
+        }
+        list++;
+    }
+}
