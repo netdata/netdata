@@ -306,11 +306,6 @@ static inline void queue_connect_payloads(void)
 
 static inline void mqtt_connected_actions(mqtt_wss_client client)
 {
-    // TODO global vars?
-    usec_t now = now_realtime_usec();
-    aclk_session_sec = now / USEC_PER_SEC;
-    aclk_session_us = now % USEC_PER_SEC;
-
     const char *topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
 
     if (!topic)
@@ -556,6 +551,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 #endif
+
+        aclk_session_newarch = now_realtime_usec();
+        aclk_session_sec = aclk_session_newarch / USEC_PER_SEC;
+        aclk_session_us = aclk_session_newarch % USEC_PER_SEC;
 
         lwt = aclk_generate_disconnect(NULL);
         mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
