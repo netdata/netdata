@@ -296,27 +296,27 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_alarm_log_sql(RRDHOST *host, struct web_client *w, char *url) {
-    uint32_t after = 0;
-    char *chart = NULL;
+/* inline int web_client_api_request_v1_alarm_log_sql(RRDHOST *host, struct web_client *w, char *url) { */
+/*     uint32_t after = 0; */
+/*     char *chart = NULL; */
 
-    while(url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value) continue;
+/*     while(url) { */
+/*         char *value = mystrsep(&url, "&"); */
+/*         if (!value || !*value) continue; */
 
-        char *name = mystrsep(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
+/*         char *name = mystrsep(&value, "="); */
+/*         if(!name || !*name) continue; */
+/*         if(!value || !*value) continue; */
 
-        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
-        else if (!strcmp(name, "chart")) chart = value;
-    }
+/*         if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0); */
+/*         else if (!strcmp(name, "chart")) chart = value; */
+/*     } */
 
-    buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log_sql2json(host, w->response.data, after, chart);
-    return HTTP_RESP_OK;
-}
+/*     buffer_flush(w->response.data); */
+/*     w->response.data->contenttype = CT_APPLICATION_JSON; */
+/*     health_alarm_log_sql2json(host, w->response.data, after, chart); */
+/*     return HTTP_RESP_OK; */
+/* } */
 
 int web_client_api_request_v1_alarm_config (RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *config_hash_id = NULL;
@@ -1396,7 +1396,7 @@ static struct api_command {
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms_values   },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
-        { "alarm_log_sql",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log_sql   },
+        /* { "alarm_log_sql",   0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log_sql   }, */
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "alarm_config",    0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_config    },

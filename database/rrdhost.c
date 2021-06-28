@@ -285,6 +285,9 @@ RRDHOST *rrdhost_create(const char *hostname,
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
+
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
     }
 
     RRDHOST *t = rrdhost_index_add(host);
@@ -300,23 +303,10 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
-//        sql_create_aclk_table(host, &host->host_uuid);
-        if (host->health_enabled) {
-            if (!file_is_migrated(host->health_log_filename)) {
-                sql_create_health_log_table(host);
-                health_alarm_log_load(host);
-                //health_alarm_log_open(host);
-            } else {
-                //continue from sqlite
-                sql_health_alarm_log_load(host);
-            }
-        }
     }
 
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
-
-    //fatal("Exiting ok");
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
@@ -505,13 +495,8 @@ void rrdhost_update(RRDHOST *host
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
             rrdhost_unlock(host);
 
-            if (!file_is_migrated(host->health_log_filename)) {
-                sql_create_health_log_table(host); //already ok?
-                health_alarm_log_load(host);
-            } else {
-                //continue from sqlite
-                sql_health_alarm_log_load(host);
-            }
+            health_alarm_log_load(host);
+            health_alarm_log_open(host);
         }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);

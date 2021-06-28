@@ -145,29 +145,29 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
-void health_alarm_log_sql2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+/* void health_alarm_log_sql2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) { */
+/*     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock); */
 
-    buffer_strcat(wb, "[");
+/*     buffer_strcat(wb, "["); */
 
-    unsigned int max = host->health_log.max;
-    unsigned int count = 0;
-    uint32_t hash_chart = 0;
-    if (chart) hash_chart = simple_hash(chart);
-    ALARM_ENTRY *ae;
-    for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) {
-        if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) {
-            if (likely(count))
-                buffer_strcat(wb, ",");
-            health_alarm_entry_sql2json(wb, ae->unique_id, ae->alarm_id, host);
-            count++;
-        }
-    }
+/*     unsigned int max = host->health_log.max; */
+/*     unsigned int count = 0; */
+/*     uint32_t hash_chart = 0; */
+/*     if (chart) hash_chart = simple_hash(chart); */
+/*     ALARM_ENTRY *ae; */
+/*     for (ae = host->health_log.alarms; ae && count < max; ae = ae->next) { */
+/*         if ((ae->unique_id > after) && (!chart || (ae->hash_chart == hash_chart && !strcmp(ae->chart, chart)))) { */
+/*             if (likely(count)) */
+/*                 buffer_strcat(wb, ","); */
+/*             health_alarm_entry_sql2json(wb, ae->unique_id, ae->alarm_id, host); */
+/*             count++; */
+/*         } */
+/*     } */
 
-    buffer_strcat(wb, "\n]\n");
+/*     buffer_strcat(wb, "\n]\n"); */
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
-}
+/*     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock); */
+/* } */
 
 static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
     (void)host;
