@@ -223,6 +223,44 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     aclk_handle_cloud_message(cmsg);
 }
 
+static void msg_callback_new(const char *topic, const void *msg, size_t msglen, int qos)
+{
+    if (msglen > RX_MSGLEN_MAX)
+        error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
+
+    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
+
+    if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
+        error("Link is shutting down. Ignoring message.");
+        return;
+    }
+
+    const char *msgtype = strrchr(topic, '/');
+    if (unlikely(!msgtype)) {
+        error_report("Cannot get message type from topic. Ignoring message from topic \"%s\"", topic);
+        return;
+    }
+    msgtype++;
+    if (unlikely(!*msgtype)) {
+        error_report("Message type empty. Ignoring message from topic \"%s\"", topic);
+        return;
+    }
+
+#ifdef ACLK_LOG_CONVERSATION_DIR
+#define FN_MAX_LEN 512
+    char filename[FN_MAX_LEN];
+    int logfd;
+    snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-rx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgtype);
+    logfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR );
+    if(logfd < 0)
+        error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
+    write(logfd, msg, msglen);
+    close(logfd);
+#endif
+
+    aclk_handle_new_cloud_msg(msgtype, msg, msglen);
+}
+
 static void puback_callback(uint16_t packet_id)
 {
     if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE)
@@ -653,7 +691,7 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, (aclk_use_new_cloud_arch ? msg_callback_new : msg_callback), puback_callback))) {
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
