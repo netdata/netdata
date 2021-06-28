@@ -321,13 +321,6 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_stats_upd_online(1);
     aclk_connected = 1;
     aclk_pubacks_per_conn = 0;
-
-    ACLK_SHARED_STATE_LOCK;
-    if (aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING) {
-        error("Sending `connect` payload immediately as popcorning was finished already.");
-        queue_connect_payloads();
-    }
-    ACLK_SHARED_STATE_UNLOCK;
 }
 
 /* Waits until agent is ready or needs to exit
@@ -337,7 +330,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
  * @return  0 - Popcorning Finished - Agent STABLE,
  *         !0 - netdata_exit
  */
-static int wait_popcorning_finishes(mqtt_wss_client client, struct aclk_query_threads *query_threads)
+static int wait_popcorning_finishes()
 {
     time_t elapsed;
     int need_wait;
@@ -352,9 +345,6 @@ static int wait_popcorning_finishes(mqtt_wss_client client, struct aclk_query_th
             aclk_shared_state.agent_state = ACLK_HOST_STABLE;
             ACLK_SHARED_STATE_UNLOCK;
             error("ACLK localhost popocorn finished");
-            if (unlikely(!query_threads->thread_list))
-                aclk_query_threads_start(query_threads, client);
-            queue_connect_payloads();
             return 0;
         }
         ACLK_SHARED_STATE_UNLOCK;
@@ -669,8 +659,14 @@ void *aclk_main(void *ptr)
         // warning this assumes the popcorning is relative short (3s)
         // if that changes call mqtt_wss_service from within
         // to keep OpenSSL, WSS and MQTT connection alive
-        if (wait_popcorning_finishes(mqttwss_client, &query_threads))
+        if (wait_popcorning_finishes())
             goto exit_full;
+
+        if (unlikely(!query_threads.thread_list))
+            aclk_query_threads_start(&query_threads, mqttwss_client);
+
+        if (!aclk_use_new_cloud_arch)
+            queue_connect_payloads();
 
         if (!handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
