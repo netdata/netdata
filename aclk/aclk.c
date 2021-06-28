@@ -1027,28 +1027,12 @@ void aclk_send_node_instances()
     struct node_instance_list *list = get_node_list();
     while (!uuid_is_null(list->host_id)) {
         if (!uuid_is_null(list->node_id)) {
-            RRDHOST *host;
-            char host_id[UUID_STR_LEN];
             aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
             rrdhost_aclk_state_lock(localhost);
             query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
             rrdhost_aclk_state_unlock(localhost);
-            uuid_unparse(list->host_id, host_id);
-            host = rrdhost_find_by_guid(host_id, 0);
             query->data.node_update.live = list->live;
             query->data.node_update.hops = list->hops;
-//            if (host) {
-//                // not all host must have RRDHOST struct created for them
-//                // if they never connected during runtime of agent
-//                if (host == localhost) {
-//                    query->data.node_update.live = 1;
-//                    query->data.node_update.hops = 0;
-//                } else {
-//                    netdata_mutex_lock(&host->receiver_lock);
-//                    query->data.node_update.live = (host->receiver != NULL);
-//                    netdata_mutex_unlock(&host->receiver_lock);
-//                }
-//            }
             query->data.node_update.node_id = mallocz(UUID_STR_LEN);
             uuid_unparse(list->node_id, (char*)query->data.node_update.node_id);
             query->data.node_update.queryable = list->queryable;
