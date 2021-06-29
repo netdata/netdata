@@ -1701,6 +1701,13 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
     uuid_copy(*(host->node_id), *node_id);
+
+    if (host->dbsync_worker) {
+        struct aclk_database_cmd cmd;
+        cmd.opcode = ACLK_DATABASE_NODE_INFO;
+        cmd.completion = NULL;
+        aclk_database_enq_cmd(host->dbsync_worker, &cmd);
+    }
     return;
 }
 
