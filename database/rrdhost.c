@@ -1482,7 +1482,7 @@ void rrd_cleanup_obsolete_charts()
             rrdhost_cleanup_obsolete_charts(host);
 #ifdef ENABLE_ACLK
             if (host->deleted_charts_count)
-                aclk_update_chart(host, "dummy-chart", ACLK_CMD_CHARTDEL);
+                aclk_update_chart(host, "dummy-chart", 0);
 #endif
             rrdhost_unlock(host);
         }
