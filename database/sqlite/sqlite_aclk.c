@@ -217,6 +217,10 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Adding chart event for %s", wc->uuid_str);
                     aclk_add_chart_event(wc, cmd);
                     break;
+                case ACLK_DATABASE_ADD_DIMENSION:
+                    debug(D_ACLK_SYNC,"Adding dimension event for %s", wc->uuid_str);
+                    aclk_add_dimension_event(wc, cmd);
+                    break;
                 case ACLK_DATABASE_NODE_INFO:
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
@@ -396,9 +400,64 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
         if (likely(payload))
-            rc = aclk_add_chart_payload(wc->uuid_str, st->chart_uuid, payload_type, (void *) payload, size);
+            rc = aclk_add_chart_payload(wc->uuid_str, st->chart_uuid, "chart", (void *) payload, size);
         freez(payload);
         chart_instance_updated_destroy(&chart_payload);
+    }
+#else
+    UNUSED(wc);
+    UNUSED(cmd);
+#endif
+    freez(cmd.data_param);
+    return rc;
+}
+
+int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc = 0;
+    if (unlikely(!db_meta)) {
+        freez(cmd.data_param);
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            return 1;
+        }
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+#ifdef ACLK_NG
+    char *claim_id = is_agent_claimed();
+
+    RRDDIM *rd = cmd.data;
+    char *payload_type = cmd.data_param;
+
+    time_t now = now_realtime_sec();
+
+    if (likely(claim_id)) {
+        const char *node_id = NULL;
+        node_id = get_str_from_uuid(rd->rrdset->rrdhost->node_id);
+        struct chart_dimension_updated dim_payload;
+        memset(&dim_payload, 0, sizeof(dim_payload));
+        dim_payload.node_id = node_id;
+        dim_payload.claim_id = claim_id;
+
+        dim_payload.chart_id = strdupz(rd->rrdset->name);
+        dim_payload.created_at = rd->last_collected_time; //TODO: Fix with creation time
+        if ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every)) {
+            dim_payload.last_timestamp.tv_usec = 0;
+            dim_payload.last_timestamp.tv_sec = 0;
+        }
+        else
+            dim_payload.last_timestamp = rd->last_collected_time;
+
+        dim_payload.name = strdupz(rd->name);
+        dim_payload.id = strdupz(rd->id);
+
+        size_t size;
+        char *payload = generate_chart_dimension_updated(&size, &dim_payload);
+        if (likely(payload))
+            rc = aclk_add_chart_payload(wc->uuid_str, rd->rrdset->chart_uuid, "dimension", (void *) payload, size);
+        freez(payload);
+        //chart_instance_updated_destroy(&dim_payload);
     }
 #else
     UNUSED(wc);
