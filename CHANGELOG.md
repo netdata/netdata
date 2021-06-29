@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- suport TLS SNI in ACLK-NG [\#11285](https://github.com/netdata/netdata/pull/11285) ([underhood](https://github.com/underhood))
 - fixes confusing error in ACLK Legacy [\#11278](https://github.com/netdata/netdata/pull/11278) ([underhood](https://github.com/underhood))
 - makes ACLK-NG the default if available [\#11272](https://github.com/netdata/netdata/pull/11272) ([underhood](https://github.com/underhood))
 - Added new postgres charts and updated standby charts to include slot\_… [\#11267](https://github.com/netdata/netdata/pull/11267) ([mjtice](https://github.com/mjtice))
@@ -23,6 +24,7 @@
 - Swap class and type attributes in stock alarm configurations [\#11240](https://github.com/netdata/netdata/pull/11240) ([MrZammler](https://github.com/MrZammler))
 - packaging: update go.d.plugin version to v0.29.0 [\#11239](https://github.com/netdata/netdata/pull/11239) ([ilyam8](https://github.com/ilyam8))
 - Adds xfs filesystem monitoring to eBPF [\#11238](https://github.com/netdata/netdata/pull/11238) ([thiagoftsm](https://github.com/thiagoftsm))
+- Extra posthog attributes [\#11237](https://github.com/netdata/netdata/pull/11237) ([MrZammler](https://github.com/MrZammler))
 - health: update cockroachdb alarms [\#11235](https://github.com/netdata/netdata/pull/11235) ([ilyam8](https://github.com/ilyam8))
 - Ebpf arrays [\#11230](https://github.com/netdata/netdata/pull/11230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add links to data privacy page [\#11226](https://github.com/netdata/netdata/pull/11226) ([joelhans](https://github.com/joelhans))
@@ -301,9 +303,6 @@
 - health: make alarms less sensitive [\#10688](https://github.com/netdata/netdata/pull/10688) ([ilyam8](https://github.com/ilyam8))
 - Ebpf support new collectors [\#10680](https://github.com/netdata/netdata/pull/10680) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix broken links in active alarms doc [\#10678](https://github.com/netdata/netdata/pull/10678) ([joelhans](https://github.com/joelhans))
-- Add new cookie to fix 8094 [\#10676](https://github.com/netdata/netdata/pull/10676) ([thiagoftsm](https://github.com/thiagoftsm))
-- Alarms collector add alarm values [\#10675](https://github.com/netdata/netdata/pull/10675) ([andrewm4894](https://github.com/andrewm4894))
-- Don't add duplicate \_total suffixes for the prometheus go.d module [\#10674](https://github.com/netdata/netdata/pull/10674) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
