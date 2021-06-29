@@ -232,10 +232,11 @@ void aclk_database_worker(void *arg)
                             if (wc->host) {
                                 info("HOST %s detected as active and claimed !!!", wc->host->hostname);
                                 wc->host->dbsync_worker = wc;
-                                cmd.opcode = ACLK_DATABASE_NODE_INFO;
-                                cmd.completion = NULL;
-                                aclk_database_enq_cmd(wc, &cmd);
-
+                                if (wc->host->node_id) {
+                                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                                    cmd.completion = NULL;
+                                    aclk_database_enq_cmd(wc, &cmd);
+                                }
                                 cmd.opcode = ACLK_DATABASE_UPD_STATS;
                                 cmd.completion = NULL;
                                 aclk_database_enq_cmd(wc, &cmd);
