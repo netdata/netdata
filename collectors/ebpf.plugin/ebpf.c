@@ -1283,15 +1283,16 @@ static char *ebpf_get_process_name(pid_t pid)
     if(unlikely(!ff))
         return name;
 
-    procfile_close(ff);
-
     unsigned long i, lines = procfile_lines(ff);
     for(i = 0; i < lines ; i++) {
         char *cmp = procfile_lineword(ff, i, 0);
         if (!strcmp(cmp, "Name:")) {
-            return strdupz(procfile_lineword(ff, i, 1));
+            name = strdupz(procfile_lineword(ff, i, 1));
+            break;
         }
     }
+
+    procfile_close(ff);
 
     return name;
 }
@@ -1313,6 +1314,9 @@ static pid_t ebpf_read_previous_pid(char *filename)
     size_t length = fread(buffer, sizeof(*buffer), 63, fp);
     pid_t old_pid = 0;
     if (length) {
+        if (length > 63)
+            length = 63;
+
         buffer[length] = '\0';
         old_pid = (pid_t)str2uint32_t(buffer);
     }
