@@ -11,6 +11,8 @@
 extern int aclk_use_new_cloud_arch;
 extern usec_t aclk_session_newarch;
 
+extern int chart_batch_id;
+
 typedef enum {
     ACLK_ENC_UNKNOWN = 0,
     ACLK_ENC_JSON,

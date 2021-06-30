@@ -13,6 +13,8 @@
 int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 
+int chart_batch_id;
+
 aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str) {
     if (!strcmp(str, "json")) {
         return ACLK_ENC_JSON;
