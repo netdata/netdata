@@ -982,7 +982,7 @@ void aclk_send_node_instances()
             query->data.node_update.live = list->live;
             query->data.node_update.hops = list->hops;
             query->data.node_update.node_id = mallocz(UUID_STR_LEN);
-            uuid_unparse(list->node_id, (char*)query->data.node_update.node_id);
+            uuid_unparse_lower(list->node_id, (char*)query->data.node_update.node_id);
             query->data.node_update.queriable = 1;
             query->data.node_update.session_id = aclk_session_newarch;
             aclk_queue_query(query);
@@ -995,7 +995,7 @@ void aclk_send_node_instances()
             create_query->data.node_creation.hops = uuid_compare(list->host_id, localhost->host_uuid) ? 1 : 0; // TODO - when streaming supports hops
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
-            uuid_unparse(list->host_id, (char*)create_query->data.node_creation.machine_guid);
+            uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
             aclk_queue_query(create_query);
         }
 

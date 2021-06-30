@@ -68,7 +68,7 @@ static RRDHOST *node_id_2_rrdhost(const char *node_id)
         error("node not found rc=%d", res);
         return NULL;
     }
-    uuid_unparse(host_id_bin, host_id);
+    uuid_unparse_lower(host_id_bin, host_id);
     return rrdhost_find_by_guid(host_id, 0);
 }
 
