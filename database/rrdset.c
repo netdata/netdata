@@ -1796,6 +1796,14 @@ after_second_database_work:
             continue;
         if(unlikely(!rd->updated))
             continue;
+#ifdef ENABLE_ACLK
+        if (unlikely(!rrddim_flag_check(st, RRDDIM_FLAG_ACLK))) {
+            if (rd->rrdset->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
+                rrddim_flag_set(st, RRDDIM_FLAG_ACLK);
+                sql_queue_dimension_to_aclk(rd, 0);
+            }
+        }
+#endif
 
         #ifdef NETDATA_INTERNAL_CHECKS
         rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rd->name, rd->last_collected_value, rd->collected_value);
