@@ -964,7 +964,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
     rrdhost_aclk_state_unlock(localhost);
     query->data.node_update.live = cmd;
     query->data.node_update.node_id = mallocz(UUID_STR_LEN);
-    uuid_unparse(node_id, (char*)query->data.node_update.node_id);
+    uuid_unparse_lower(node_id, (char*)query->data.node_update.node_id);
     query->data.node_update.queriable = 1;
     query->data.node_update.session_id = aclk_session_newarch;
     aclk_queue_query(query);
