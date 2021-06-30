@@ -38,32 +38,34 @@ static inline void health_log_rotate(RRDHOST *host) {
     }
 
     if(unlikely(host->health_log_entries_written > rotate_every)) {
-        health_alarm_log_close(host);
+        if(unlikely(host->health_log_fp)) {
+            health_alarm_log_close(host);
 
-        char old_filename[FILENAME_MAX + 1];
-        snprintfz(old_filename, FILENAME_MAX, "%s.old", host->health_log_filename);
+            char old_filename[FILENAME_MAX + 1];
+            snprintfz(old_filename, FILENAME_MAX, "%s.old", host->health_log_filename);
 
-        if(unlink(old_filename) == -1 && errno != ENOENT)
-            error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, old_filename);
+            if(unlink(old_filename) == -1 && errno != ENOENT)
+                error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, old_filename);
 
-        if(link(host->health_log_filename, old_filename) == -1 && errno != ENOENT)
-            error("HEALTH [%s]: cannot move file '%s' to '%s'.", host->hostname, host->health_log_filename, old_filename);
+            if(link(host->health_log_filename, old_filename) == -1 && errno != ENOENT)
+                error("HEALTH [%s]: cannot move file '%s' to '%s'.", host->hostname, host->health_log_filename, old_filename);
 
-        if(unlink(host->health_log_filename) == -1 && errno != ENOENT)
-            error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, host->health_log_filename);
+            if(unlink(host->health_log_filename) == -1 && errno != ENOENT)
+                error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, host->health_log_filename);
 
-        // open it with truncate
-        host->health_log_fp = fopen(host->health_log_filename, "w");
+            // open it with truncate
+            host->health_log_fp = fopen(host->health_log_filename, "w");
 
-        if(host->health_log_fp)
-            fclose(host->health_log_fp);
-        else
-            error("HEALTH [%s]: cannot truncate health log '%s'", host->hostname, host->health_log_filename);
+            if(host->health_log_fp)
+                fclose(host->health_log_fp);
+            else
+                error("HEALTH [%s]: cannot truncate health log '%s'", host->hostname, host->health_log_filename);
 
-        host->health_log_fp = NULL;
+            host->health_log_fp = NULL;
 
-        host->health_log_entries_written = 0;
-        health_alarm_log_open(host);
+            host->health_log_entries_written = 0;
+            health_alarm_log_open(host);
+        }
     }
 }
 
@@ -156,12 +158,16 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
             host->health_log_entries_written++;
         }
     }
+    else 
+        sql_health_alarm_log_save(host, ae);
+    
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
-        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
-            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
-            aclk_update_alarm(host, ae);
-        }
+        /* if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) || */
+        /*     ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) { */
+            //aclk_update_alarm(host, ae);
+        if (ae->new_status != RRDCALC_STATUS_UNINITIALIZED)
+            sql_queue_alarm_to_aclk(host, ae);
     }
 #endif
 }
@@ -393,9 +399,12 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
                 ae->next = host->health_log.alarms;
                 host->health_log.alarms = ae;
                 loaded++;
+                sql_health_alarm_log_insert(host, ae);
             }
-            else
+            else {
+                sql_health_alarm_log_update(host, ae);
                 updated++;
+            }
 
             if(unlikely(ae->unique_id > host->health_max_unique_id))
                 host->health_max_unique_id = ae->unique_id;
