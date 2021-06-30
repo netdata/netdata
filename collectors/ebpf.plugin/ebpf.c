@@ -1243,6 +1243,136 @@ static void parse_args(int argc, char **argv)
  *****************************************************************/
 
 /**
+ * Update PID file
+ *
+ * Update the content of PID file
+ *
+ * @param filename is the full name of the file.
+ * @param pid that identifies the process
+ */
+static void ebpf_update_pid_file(char *filename, pid_t pid)
+{
+    FILE *fp = fopen(filename, "w");
+    if (!fp)
+        return;
+
+    fprintf(fp, "%d", pid);
+    fclose(fp);
+}
+
+/**
+ * Get Process Name
+ *
+ * Get process name from /proc/PID/status
+ *
+ * @param pid that identifies the process
+ */
+static char *ebpf_get_process_name(pid_t pid)
+{
+    char *name = NULL;
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/proc/%d/status", pid);
+
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) {
+        error("Cannot open %s", filename);
+        return name;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff))
+        return name;
+
+    unsigned long i, lines = procfile_lines(ff);
+    for(i = 0; i < lines ; i++) {
+        char *cmp = procfile_lineword(ff, i, 0);
+        if (!strcmp(cmp, "Name:")) {
+            name = strdupz(procfile_lineword(ff, i, 1));
+            break;
+        }
+    }
+
+    procfile_close(ff);
+
+    return name;
+}
+
+/**
+ * Read Previous PID
+ *
+ * @param filename is the full name of the file.
+ *
+ * @return It returns the PID used during previous execution on success or 0 otherwise
+ */
+static pid_t ebpf_read_previous_pid(char *filename)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp)
+        return 0;
+
+    char buffer[64];
+    size_t length = fread(buffer, sizeof(*buffer), 63, fp);
+    pid_t old_pid = 0;
+    if (length) {
+        if (length > 63)
+            length = 63;
+
+        buffer[length] = '\0';
+        old_pid = (pid_t)str2uint32_t(buffer);
+    }
+    fclose(fp);
+
+    return old_pid;
+}
+
+/**
+ * Kill previous process
+ *
+ * Kill previous process whether it was not closed.
+ *
+ * @param filename is the full name of the file.
+ * @param pid that identifies the process
+ */
+static void ebpf_kill_previous_process(char *filename, pid_t pid)
+{
+    pid_t old_pid =  ebpf_read_previous_pid(filename);
+    if (!old_pid)
+        return;
+
+    // Process is not running
+    char *prev_name =  ebpf_get_process_name(old_pid);
+    if (!prev_name)
+        return;
+
+    char *current_name =  ebpf_get_process_name(pid);
+
+    if (!strcmp(prev_name, current_name))
+        kill(old_pid, SIGKILL);
+
+    freez(prev_name);
+    freez(current_name);
+
+    // wait few microseconds before start new plugin
+    sleep_usec(USEC_PER_MS * 300);
+}
+
+/**
+ * Manage PID
+ *
+ * This function kills another instance of eBPF whether it is necessary and update the file content.
+ *
+ * @param pid that identifies the process
+ */
+static void ebpf_manage_pid(pid_t pid)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s%s/ebpf.d/ebpf.pid", netdata_configured_host_prefix, ebpf_plugin_dir);
+
+    ebpf_kill_previous_process(filename, pid);
+    ebpf_update_pid_file(filename, pid);
+}
+
+/**
  * Load collector config
  *
  * @param lmode  the mode that will be used for them.
@@ -1268,6 +1398,7 @@ int main(int argc, char **argv)
     set_global_variables();
     parse_args(argc, argv);
     ebpf_load_thread_config();
+    ebpf_manage_pid(getpid());
 
     running_on_kernel = get_kernel_version(kernel_string, 63);
     if (!has_condition_to_run(running_on_kernel)) {
