@@ -217,6 +217,10 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Adding chart event for %s", wc->uuid_str);
                     aclk_add_chart_event(wc, cmd);
                     break;
+                case ACLK_DATABASE_ADD_DIMENSION:
+                    debug(D_ACLK_SYNC,"Adding dimension event for %s", wc->uuid_str);
+                    aclk_add_dimension_event(wc, cmd);
+                    break;
                 case ACLK_DATABASE_NODE_INFO:
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
@@ -317,15 +321,17 @@ void aclk_set_architecture(int mode)
     aclk_architecture = mode;
 }
 
-int aclk_add_chart_payload(char *uuid_str, uuid_t *chart_id, char *payload_type, void *payload, size_t payload_size)
+int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, char *payload_type, void *payload, size_t payload_size)
 {
     sqlite3_stmt *res_chart = NULL;
     int rc;
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, chart_id, date_created, type, payload) " \
-                 "VALUES (@unique_id, @chart_id, strftime('%%s'), @type, @payload);", uuid_str);
+    //uuid, claim_id, type, date_created, payload
+
+    buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
+                 "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s'), @type, @payload);", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_chart, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -337,19 +343,26 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *chart_id, char *payload_type,
     uuid_t unique_uuid;
     uuid_generate(unique_uuid);
 
+    uuid_t claim_uuid;
+    uuid_parse(claim_id, claim_uuid);
+
     rc = sqlite3_bind_blob(res_chart, 1, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_blob(res_chart, 2, chart_id , sizeof(*chart_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res_chart, 2, uuid , sizeof(*uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res_chart, 3, payload_type ,-1, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res_chart, 3, &claim_uuid , sizeof(claim_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_blob(res_chart, 4, payload, payload_size, SQLITE_STATIC);
+    rc = sqlite3_bind_text(res_chart, 4, payload_type ,-1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_blob(res_chart, 5, payload, payload_size, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -396,9 +409,64 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         size_t size;
         char *payload = generate_chart_instance_updated(&size, &chart_payload);
         if (likely(payload))
-            rc = aclk_add_chart_payload(wc->uuid_str, st->chart_uuid, payload_type, (void *) payload, size);
+            rc = aclk_add_chart_payload(wc->uuid_str, st->chart_uuid, claim_id, "0", (void *) payload, size);
         freez(payload);
         chart_instance_updated_destroy(&chart_payload);
+    }
+#else
+    UNUSED(wc);
+    UNUSED(cmd);
+#endif
+    freez(cmd.data_param);
+    return rc;
+}
+
+int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc = 0;
+    if (unlikely(!db_meta)) {
+        freez(cmd.data_param);
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            return 1;
+        }
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+#ifdef ACLK_NG
+    char *claim_id = is_agent_claimed();
+
+    RRDDIM *rd = cmd.data;
+    char *payload_type = cmd.data_param;
+
+    time_t now = now_realtime_sec();
+
+    if (likely(claim_id)) {
+        const char *node_id = NULL;
+        node_id = get_str_from_uuid(rd->rrdset->rrdhost->node_id);
+        struct chart_dimension_updated dim_payload;
+        memset(&dim_payload, 0, sizeof(dim_payload));
+        dim_payload.node_id = node_id;
+        dim_payload.claim_id = claim_id;
+
+        dim_payload.chart_id = strdupz(rd->rrdset->name);
+        dim_payload.created_at = rd->last_collected_time; //TODO: Fix with creation time
+        if ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every)) {
+            dim_payload.last_timestamp.tv_usec = 0;
+            dim_payload.last_timestamp.tv_sec = 0;
+        }
+        else
+            dim_payload.last_timestamp = rd->last_collected_time;
+
+        dim_payload.name = strdupz(rd->name);
+        dim_payload.id = strdupz(rd->id);
+
+        size_t size;
+        char *payload = generate_chart_dimension_updated(&size, &dim_payload);
+        if (likely(payload))
+            rc = aclk_add_chart_payload(wc->uuid_str, rd->state->metric_uuid, claim_id, "1", (void *) payload, size);
+        freez(payload);
+        //chart_instance_updated_destroy(&dim_payload);
     }
 #else
     UNUSED(wc);
@@ -523,6 +591,22 @@ void sql_queue_chart_to_aclk(RRDSET *st, int mode)
     cmd.data_param = strdupz("BINARY");
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
+    return;
+}
+
+void sql_queue_dimension_to_aclk(RRDDIM *rd, int mode)
+{
+    UNUSED(mode);
+
+    if (unlikely(!rd->rrdset->rrdhost->dbsync_worker))
+        return;
+
+    struct aclk_database_cmd cmd;
+    cmd.opcode = ACLK_DATABASE_ADD_DIMENSION;
+    cmd.data = rd;
+    cmd.data_param = strdupz("BINARY");
+    cmd.completion = NULL;
+    aclk_database_enq_cmd((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker, &cmd);
     return;
 }
 
@@ -877,7 +961,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     buffer_sprintf(sql, "select ac.sequence_id, (select sequence_id from aclk_chart_%s " \
         "lac where lac.sequence_id < ac.sequence_id and (status is NULL or status = 'processing')  " \
         "order by lac.sequence_id desc limit 1), " \
-        "acp.payload, ac.date_created, ac.chart_id " \
+        "acp.payload, ac.date_created, ac.uuid, ac.type " \
         "from aclk_chart_%s ac, " \
         "aclk_chart_payload_%s acp " \
         "where (ac.status = 'processing' or (ac.status is NULL and ac.date_submitted is null)) " \
@@ -894,6 +978,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     char **payload_list = callocz(limit+1, sizeof(char *));
     size_t *payload_list_size = callocz(limit+1, sizeof(size_t));
     struct aclk_message_position *position_list =  callocz(limit+1, sizeof(*position_list));
+    int *is_dim = callocz(limit+1, sizeof(*is_dim));
 
     int count = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
@@ -909,18 +994,19 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             first_sequence = position_list[count].sequence_id;
         last_sequence = position_list[count].sequence_id;
         last_timestamp = position_list[count].seq_id_creation_time.tv_sec;
+        is_dim[count] = sqlite3_column_int(res, 5);  // 0 chart , 1 dimension
 
-        RRDSET *st = find_rrdset_by_uuid(wc->host, (uuid_t *) sqlite3_column_blob(res, 4));
-        if (st) {
-            rrdset_rdlock(st);
-            tmp_dim = callocz(1, sizeof(*tmp_dim));
-            tmp_dim->position_index = count;
-            tmp_dim->dimension_list = build_dimension_payload_list(st, &tmp_dim->dim_size, &tmp_dim->count);
-            tmp_dim->next = dim_head;
-            dim_head = tmp_dim;
-            total_dimension_count += tmp_dim->count;
-            rrdset_unlock(st);
-        }
+//        RRDSET *st = find_rrdset_by_uuid(wc->host, (uuid_t *) sqlite3_column_blob(res, 4));
+//        if (st) {
+//            rrdset_rdlock(st);
+//            tmp_dim = callocz(1, sizeof(*tmp_dim));
+//            tmp_dim->position_index = count;
+//            tmp_dim->dimension_list = build_dimension_payload_list(st, &tmp_dim->dim_size, &tmp_dim->count);
+//            tmp_dim->next = dim_head;
+//            dim_head = tmp_dim;
+//            total_dimension_count += tmp_dim->count;
+//            rrdset_unlock(st);
+//        }
         count++;
     }
 
@@ -949,34 +1035,40 @@ fail:
         freez(payload_list);
         freez(payload_list_size);
         freez(position_list);
-        payload_list = NULL;
+        freez(is_dim);
+//        payload_list = NULL;
     }
-
-    if (payload_list) {
-        payload_list = realloc(payload_list, (count + total_dimension_count + 1) * sizeof(char *));
-        payload_list_size = realloc(payload_list_size, (count + total_dimension_count + 1) * sizeof(size_t));
-        position_list = realloc(position_list, (count + total_dimension_count + 1) * sizeof(*position_list));
-        payload_list[count + total_dimension_count] = NULL;
-        int *is_dim = callocz(count + total_dimension_count + 1, sizeof(*is_dim));
-
-        while (dim_head) {
-            tmp_dim = dim_head->next;
-            memcpy(payload_list + count, dim_head->dimension_list, dim_head->count * sizeof(char *));
-            memcpy(payload_list_size + count, dim_head->dim_size, dim_head->count * sizeof(size_t));
-            for (size_t i = 0; i < dim_head->count; ++i) {
-                position_list[count + i] = position_list[dim_head->position_index];
-                is_dim[count + i] = 1;
-            }
-            count += dim_head->count;
-            freez(dim_head->dimension_list);
-            freez(dim_head->dim_size);
-            freez(dim_head);
-            dim_head = tmp_dim;
-        }
+    else {
         aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
-        wc->chart_sequence_id = last_sequence;
-        wc->chart_timestamp = last_timestamp;
+            wc->chart_sequence_id = last_sequence;
+            wc->chart_timestamp = last_timestamp;
     }
+
+//    if (payload_list) {
+//        payload_list = realloc(payload_list, (count + total_dimension_count + 1) * sizeof(char *));
+//        payload_list_size = realloc(payload_list_size, (count + total_dimension_count + 1) * sizeof(size_t));
+//        position_list = realloc(position_list, (count + total_dimension_count + 1) * sizeof(*position_list));
+//        payload_list[count + total_dimension_count] = NULL;
+//        int *is_dim = callocz(count + total_dimension_count + 1, sizeof(*is_dim));
+//
+//        while (dim_head) {
+//            tmp_dim = dim_head->next;
+//            memcpy(payload_list + count, dim_head->dimension_list, dim_head->count * sizeof(char *));
+//            memcpy(payload_list_size + count, dim_head->dim_size, dim_head->count * sizeof(size_t));
+//            for (size_t i = 0; i < dim_head->count; ++i) {
+//                position_list[count + i] = position_list[dim_head->position_index];
+//                is_dim[count + i] = 1;
+//            }
+//            count += dim_head->count;
+//            freez(dim_head->dimension_list);
+//            freez(dim_head->dim_size);
+//            freez(dim_head);
+//            dim_head = tmp_dim;
+//        }
+//        aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
+//        wc->chart_sequence_id = last_sequence;
+//        wc->chart_timestamp = last_timestamp;
+//    }
 
 fail_complete:
     buffer_free(sql);
