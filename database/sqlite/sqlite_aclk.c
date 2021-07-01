@@ -1379,61 +1379,63 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         goto fail_complete;
     }
 
-    struct alarm_log_entry *alarm_log = callocz(limit+1, sizeof(*alarm_log));
+    //struct alarm_log_entry *alarm_log = callocz(limit+1, sizeof(*alarm_log));
 
     int count = 0;
     char *claim_id = is_agent_claimed();
     while (sqlite3_step(res) == SQLITE_ROW) {
 
+        struct alarm_log_entry alarm_log;
+
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
 
-        alarm_log[count].node_id = get_str_from_uuid(wc->host->node_id);
-        alarm_log[count].claim_id = strdupz((char *)claim_id); //will need free
+        alarm_log.node_id = get_str_from_uuid(wc->host->node_id);
+        alarm_log.claim_id = strdupz((char *)claim_id); //will need free
         
-        alarm_log[count].chart = strdupz((char *)sqlite3_column_text(res, 12));
-        alarm_log[count].name = strdupz((char *)sqlite3_column_text(res, 11));
-        alarm_log[count].family = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
+        alarm_log.chart = strdupz((char *)sqlite3_column_text(res, 12));
+        alarm_log.name = strdupz((char *)sqlite3_column_text(res, 11));
+        alarm_log.family = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
         
-        alarm_log[count].batch_id = 1;//wc->alerts_batch_id;
-        alarm_log[count].sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
-        alarm_log[count].when = (uint64_t) sqlite3_column_int64(res, 5);
+        alarm_log.batch_id = 1;//wc->alerts_batch_id;
+        alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        alarm_log.when = (uint64_t) sqlite3_column_int64(res, 5);
 
-        alarm_log[count].config_hash = strdupz((char *)uuid_str);
+        alarm_log.config_hash = strdupz((char *)uuid_str);
 
-        alarm_log[count].utc_offset = 0; //fix!!!
-        alarm_log[count].timezone = strdupz((char *)wc->host->timezone);
+        alarm_log.utc_offset = 0; //fix!!!
+        alarm_log.timezone = strdupz((char *)wc->host->timezone);
 
-        alarm_log[count].exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : strdupz((char *)wc->host->health_default_exec);
-        alarm_log[count].conf_source = strdupz((char *)sqlite3_column_text(res, 16));
-        alarm_log[count].command = strdupz((char *)sqlite3_column_text(res, 16)); //fix, do edit_command
+        alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : strdupz((char *)wc->host->health_default_exec);
+        alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
+        alarm_log.command = strdupz((char *)sqlite3_column_text(res, 16)); //fix, do edit_command
 
-        alarm_log[count].duration = (uint32_t) sqlite3_column_int(res, 6); //correct ?
-        alarm_log[count].non_clear_duration = (uint32_t) sqlite3_column_int(res, 7);
+        alarm_log.duration = (uint32_t) sqlite3_column_int(res, 6); //correct ?
+        alarm_log.non_clear_duration = (uint32_t) sqlite3_column_int(res, 7);
 
-        alarm_log[count].status = 4; //fix!!!
-        alarm_log[count].old_status = 4; //fix!!!
+        alarm_log.status = 4; //fix!!!
+        alarm_log.old_status = 4; //fix!!!
 
-        alarm_log[count].delay = (uint64_t) sqlite3_column_int64(res, 22);
-        alarm_log[count].delay_up_to_timestamp = (uint64_t) sqlite3_column_int64(res, 10);
-        alarm_log[count].last_repeat = (uint64_t) sqlite3_column_int64(res, 25);
+        alarm_log.delay = (uint64_t) sqlite3_column_int64(res, 22);
+        alarm_log.delay_up_to_timestamp = (uint64_t) sqlite3_column_int64(res, 10);
+        alarm_log.last_repeat = (uint64_t) sqlite3_column_int64(res, 25);
 
-        alarm_log[count].silenced = 0; //FIX!!!
+        alarm_log.silenced = 0; //FIX!!!
 
-        alarm_log[count].value_string = strdupz((char *)"0%"); //fix!!!
-        alarm_log[count].old_value_string = strdupz((char *)"0%"); //fix!!!
+        alarm_log.value_string = strdupz((char *)"0%"); //fix!!!
+        alarm_log.old_value_string = strdupz((char *)"0%"); //fix!!!
 
-        alarm_log[count].value = (double) sqlite3_column_double(res, 23);
-        alarm_log[count].old_value = (double) sqlite3_column_double(res, 24);
+        alarm_log.value = (double) sqlite3_column_double(res, 23);
+        alarm_log.old_value = (double) sqlite3_column_double(res, 24);
 
-        alarm_log[count].updated = (sqlite3_column_int(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
+        alarm_log.updated = (sqlite3_column_int(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
         
-        alarm_log[count].rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
+        alarm_log.rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
         
-        
+        aclk_send_alarm_log_entry(&alarm_log);
         count++;
     }
 
-    aclk_send_alarm_log_entry(alarm_log);
+    
 
     //need stuff
 
