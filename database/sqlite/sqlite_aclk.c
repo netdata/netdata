@@ -217,6 +217,10 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Adding chart event for %s", wc->uuid_str);
                     aclk_add_chart_event(wc, cmd);
                     break;
+                case ACLK_DATABASE_ADD_ALERT:
+                    debug(D_ACLK_SYNC,"Adding alert event for %s", wc->uuid_str);
+                    aclk_add_alert_event(wc, cmd);
+                    break;
                 case ACLK_DATABASE_ADD_DIMENSION:
                     debug(D_ACLK_SYNC,"Adding dimension event for %s", wc->uuid_str);
                     aclk_add_dimension_event(wc, cmd);
@@ -612,22 +616,20 @@ void sql_queue_dimension_to_aclk(RRDDIM *rd, int mode)
 
 void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    //if (!aclk_architecture) {
-    aclk_update_alarm(host, ae);
+    if (!aclk_architecture) //{ //queue_chart_to_aclk continues after that, should we too ?
+        aclk_update_alarm(host, ae);
+
+    if (unlikely(!host->dbsync_worker))
+       return;
+
+    struct aclk_database_cmd cmd;
+    cmd.opcode = ACLK_DATABASE_ADD_ALERT;
+    cmd.data = ae;
+    //cmd.data1 = ae;
+    //cmd.data_param = ae;
+    cmd.completion = NULL;
+    aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
     return;
-//
-//
-//    if (unlikely(!host->dbsync_worker))
-//        return;
-//
-//    struct aclk_database_cmd cmd;
-//    cmd.opcode = ACLK_DATABASE_ADD_ALARM;
-//    cmd.data = host;
-//    cmd.data1 = ae;
-//    cmd.data_param = strdupz("JSON");
-//    cmd.completion = NULL;
-//    aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
-//    return;
 }
 
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid)
@@ -686,9 +688,9 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid)
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);
 
-//    buffer_sprintf(sql,TABLE_ACLK_ALERT, uuid_str);
-//    db_execute(buffer_tostring(sql));
-//    buffer_flush(sql);
+    buffer_sprintf(sql,TABLE_ACLK_ALERT, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
 //
 //    buffer_sprintf(sql,TABLE_ACLK_ALERT_PAYLOAD, uuid_str);
 //    db_execute(buffer_tostring(sql));
@@ -1419,4 +1421,49 @@ failed:
     UNUSED(wc);
 #endif
     return;
+}
+
+int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc = 0;
+    if (unlikely(!db_meta)) {
+        freez(cmd.data_param);
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            return 1;
+        }
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    sqlite3_stmt *res_alert = NULL;
+    ALARM_ENTRY *ae = cmd.data;
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql,"INSERT INTO aclk_alert_%s (alert_unique_id, date_created) " \
+                 "VALUES (@alert_unique_id, strftime('%%s')); ", wc->uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_alert, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to store alert event");
+        buffer_free(sql);
+        return 1;
+    }
+
+    rc = sqlite3_bind_int(res_alert, 1, ae->unique_id);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res_alert);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store alert event, rc = %d", rc);
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
+        error_report("Failed to reset statement in store chart payload, rc = %d", rc);
+    buffer_free(sql);
+    return (rc != SQLITE_DONE);
+
+    freez(cmd.data);
+    return rc;
 }
