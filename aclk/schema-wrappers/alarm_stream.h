@@ -68,7 +68,7 @@ struct alarm_log_entry {
 
     char *config_hash;
 
-    uint32_t utc_offset;
+    int32_t utc_offset;
     char *timezone;
 
     char *exec_path;
