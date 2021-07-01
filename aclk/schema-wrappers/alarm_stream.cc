@@ -58,11 +58,11 @@ char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data)
     }
 
     entries = msg.mutable_log_entries();
-    entries->set_first_sequence_id(data->first_seq_id);
-    entries->set_last_sequence_id(data->last_seq_id);
+    entries->set_first_sequence_id(data->log_entries.first_seq_id);
+    entries->set_last_sequence_id(data->log_entries.last_seq_id);
 
-    set_google_timestamp_from_timeval(data->first_when, entries->mutable_first_when());
-    set_google_timestamp_from_timeval(data->last_when, entries->mutable_last_when());
+    set_google_timestamp_from_timeval(data->log_entries.first_when, entries->mutable_first_when());
+    set_google_timestamp_from_timeval(data->log_entries.last_when, entries->mutable_last_when());
 
     *len = msg.ByteSizeLong();
     char *bin = (char*)mallocz(*len);
@@ -104,22 +104,44 @@ char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 
     le.set_chart(data->chart);
     le.set_name(data->name);
+    if (data->family)
+        le.set_family(data->family);
+
     le.set_batch_id(data->batch_id);
     le.set_sequence_id(data->sequence_id);
     le.set_when(data->when);
 
     le.set_config_hash(data->config_hash);
+
+    le.set_utc_offset(data->utc_offset);
+    le.set_timezone(data->timezone);
+
+    le.set_exec_path(data->exec_path);
+    le.set_conf_source(data->conf_source);
+    le.set_command(data->command);
+
+    le.set_duration(data->duration);
+    le.set_non_clear_duration(data->non_clear_duration);
+
+
     le.set_status(aclk_alarm_status_to_proto(data->status));
     le.set_old_status(aclk_alarm_status_to_proto(data->old_status));
-
+    le.set_delay(data->delay);
     le.set_delay_up_to_timestamp(data->delay_up_to_timestamp);
+
     le.set_last_repeat(data->last_repeat);
     le.set_silenced(data->silenced);
+
+    if (data->value_string)
+        le.set_value_string(data->value_string);
+    if (data->old_value_string)
+        le.set_old_value_string(data->old_value_string);
 
     le.set_value(data->value);
     le.set_old_value(data->old_value);
 
     le.set_updated(data->updated);
+
     le.set_rendered_info(data->rendered_info);
 
     *len = le.ByteSizeLong();
