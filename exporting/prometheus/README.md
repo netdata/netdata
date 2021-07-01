@@ -138,7 +138,7 @@ groups:
 
   rules:
   - alert: node_high_cpu_usage_70
-    expr: sum(avg_over_time(netdata_cpu_cpu_percentage_average{dimension!="idle"}[10m])) by (job) > 70
+    expr: sum(sum_over_time(netdata_system_cpu_percentage_average{dimension=~"(user|system|softirq|irq|guest)"}[10m])) by (job) / sum(count_over_time(netdata_system_cpu_percentage_average{dimension="idle"}[10m])) by (job) > 70
     for: 1m
     annotations:
       description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value }}%.'
