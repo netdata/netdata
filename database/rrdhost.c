@@ -295,6 +295,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         return NULL;
     }
 
+
     if (likely(!uuid_parse(host->machine_guid, host->host_uuid))) {
         int rc = sql_store_host(&host->host_uuid, hostname, registry_hostname, update_every, os, timezone, tags);
         if (unlikely(rc))

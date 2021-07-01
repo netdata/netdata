@@ -45,6 +45,9 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
+#define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
+        "alert_unique_id, date_created, date_submitted); "
+
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_CLEANUP,
@@ -57,7 +60,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_STATUS_CHART,
     ACLK_DATABASE_RESET_NODE,
     ACLK_DATABASE_SHUTDOWN,
-    ACLK_DATABASE_ADD_ALARM,
+    ACLK_DATABASE_ADD_ALERT,
     ACLK_DATABASE_NODE_INFO,
     ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_UPD_STATS,
@@ -136,7 +139,8 @@ extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-int aclk_add_alarm_event(RRDHOST *host, ALARM_ENTRY *ae, char *payload_type, struct completion *completion);
+//int aclk_add_alert_event(RRDHOST *host, ALARM_ENTRY *ae, struct completion *completion);
+int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

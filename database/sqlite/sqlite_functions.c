@@ -3214,8 +3214,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         freez(alarm_name);
     
         // check for a possible host mismatch
-        if(strcmp((char *) sqlite3_column_text(res, 13), host->hostname)) {
-            error("HEALTH [%s]: Unique id %u provides an alarm for host '%s' but this is named '%s'. Ignoring it.", host->hostname, unique_id, (char *) sqlite3_column_text(res, 13), host->hostname);
+        if(strcmp((char *) sqlite3_column_text(res, 0), host->hostname)) {
+            error("HEALTH [%s]: Unique id %u provides an alarm for host '%s' but this is named '%s'. Ignoring it.", host->hostname, unique_id, (char *) sqlite3_column_text(res, 0), host->hostname);
             errored++;
             continue;
         }
