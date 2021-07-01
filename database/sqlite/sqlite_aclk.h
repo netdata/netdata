@@ -32,16 +32,16 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 }
 
 #define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "date_created, date_updated, date_submitted, status, chart_id, unique_id, " \
-        "update_count default 1, unique(chart_id, status));"
+        "date_created, date_updated, date_submitted, status, uuid, type, unique_id, " \
+        "update_count default 1, unique(uuid, status));"
 
 #define TABLE_ACLK_CHART_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_chart_payload_%s (unique_id BLOB PRIMARY KEY, " \
-        "chart_id, type, date_created, payload);"
+        "uuid, claim_id, type, date_created, payload);"
 
 #define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
         "after insert on aclk_chart_payload_%s " \
-        "begin insert into aclk_chart_%s (chart_id, unique_id, status, date_created) values " \
-        " (new.chart_id, new.unique_id, 'pending', strftime('%%s')) on conflict(chart_id, status) " \
+        "begin insert into aclk_chart_%s (uuid, unique_id, type, status, date_created) values " \
+        " (new.uuid, new.unique_id, new.type, 'pending', strftime('%%s')) on conflict(uuid, status) " \
         " do update set unique_id = new.unique_id, update_count = update_count + 1; " \
         "end;"
 
@@ -53,6 +53,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_TIMER,
     ACLK_DATABASE_ADD_CHART,
+    ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_CHART_ACK,
@@ -134,10 +135,12 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
 extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
+extern void sql_queue_dimension_to_aclk(RRDDIM *rd, int cmd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //int aclk_add_alert_event(RRDHOST *host, ALARM_ENTRY *ae, struct completion *completion);
 int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

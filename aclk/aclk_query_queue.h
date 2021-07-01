@@ -21,6 +21,8 @@ typedef enum {
     CHART_CONFIG_UPDATED,
     CHART_RESET,
     ALARM_LOG_HEALTH,
+    ALARM_LOG_ENTRY,
+    ALARM_PROVIDE_CFG,
     UPDATE_NODE_INFO
 } aclk_query_type_t;
 
