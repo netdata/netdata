@@ -198,11 +198,10 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
     ebpf_parse_size(w, filename);
 }
 
-// Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L46
 /**
  * New encode dev
  *
- * New enconde algorithm
+ * New encode algorithm extracted from https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L39
  *
  * @param major  driver major number
  * @param minor  driver minor number
