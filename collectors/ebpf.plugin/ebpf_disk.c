@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <sys/resource.h>
+#include <stdlib.h>
 
 #include "ebpf.h"
 #include "ebpf_disk.h"
@@ -76,7 +77,7 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
             file_length = FILENAME_MAX;
 
         content[file_length] = '\0';
-        w->start = str2uint64_t(content);
+        w->start = strtoul(content, NULL, 10);
     }
     close(fd);
 
@@ -142,7 +143,7 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
             file_length = FILENAME_MAX;
 
         content[file_length] = '\0';
-        w->end = w->start + str2uint64_t(content) -1;
+        w->end = w->start + strtoul(content, NULL, 10) -1;
     }
     close(fd);
 
