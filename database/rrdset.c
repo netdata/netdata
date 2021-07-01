@@ -1798,7 +1798,7 @@ after_second_database_work:
             continue;
 #ifdef ENABLE_ACLK
         if (unlikely(!rrddim_flag_check(st, RRDDIM_FLAG_ACLK))) {
-            if (rd->rrdset->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
+            if (rd->rrdset->counter_done > RRDSET_MINIMUM_LIVE_COUNT) {
                 rrddim_flag_set(st, RRDDIM_FLAG_ACLK);
                 sql_queue_dimension_to_aclk(rd, 0);
             }
