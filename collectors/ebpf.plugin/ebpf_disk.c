@@ -240,9 +240,9 @@ static int ebpf_compare_disks(void *a, void *b)
  *
  * Update link list when it is necessary.
  *
- * @param name  the    disk name
- * @param major major  disk identifier
- * @param minor minor  disk identifier
+ * @param name         disk name
+ * @param major        major disk identifier
+ * @param minor        minor disk identifier
  * @param current_time current timestamp
  */
 static void update_disk_table(char *name, int major, int minor, time_t current_time)
@@ -312,7 +312,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
 }
 
 /**
- *  Read Local Ports
+ *  Read Local Disks
  *
  *  Parse /proc/partitions to get block disks used to measure latency.
  *
