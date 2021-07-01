@@ -8,6 +8,7 @@
 #else
 #include "../../aclk/aclk.h"
 #include "../../aclk/aclk_charts_api.h"
+#include "../../aclk/aclk_alarm_api.h"
 #endif
 
 int aclk_architecture = 0;
@@ -114,6 +115,13 @@ static void timer_cb(uv_timer_t* handle)
         cmd.completion = NULL;
         aclk_database_enq_cmd(wc, &cmd);
     }
+
+    if (wc->alert_updates) {
+        cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
+        cmd.count = ACLK_MAX_ALERT_UPDATES;
+        cmd.completion = NULL;
+        aclk_database_enq_cmd(wc, &cmd);
+    }
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -129,7 +137,7 @@ void aclk_database_worker(void *arg)
     unsigned cmd_batch_size;
 
     wc->chart_updates = 0;
-    wc->alert_updates = 0;
+    wc->alert_updates = 1;
 
     aclk_database_init_cmd_queue(wc);
     uv_thread_set_name_np(wc->thread, wc->uuid_str);
@@ -220,6 +228,10 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_ADD_ALERT:
                     debug(D_ACLK_SYNC,"Adding alert event for %s", wc->uuid_str);
                     aclk_add_alert_event(wc, cmd);
+                    break;
+                case ACLK_DATABASE_PUSH_ALERT:
+                    debug(D_ACLK_SYNC, "Pushing alert info to the cloud for node %s", wc->uuid_str);
+                    aclk_push_alert_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_ADD_DIMENSION:
                     debug(D_ACLK_SYNC,"Adding dimension event for %s", wc->uuid_str);
@@ -804,31 +816,32 @@ void aclk_start_alert_streaming(char *node_id)
     if (unlikely(!node_id))
         return;
 
-    info("START streaming alerts for %s received but not yet supported", node_id);
-    return;
-//
-//    uuid_t node_uuid;
-//    uuid_parse(node_id, node_uuid);
-//
-//    struct aclk_database_worker_config *wc  = NULL;
-//    rrd_wrlock();
-//    RRDHOST *host = localhost;
-//    while(host) {
-//        if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
-//            wc = (struct aclk_database_worker_config *)host->dbsync_worker;
-//            if (likely(wc)) {
-//                wc->alert_updates = 1;
-//                info("START streaming alerts for %s enabled", node_id);
-//            }
-//            else
-//                error("ACLK synchronization thread is not active for host %s", host->hostname);
-//            break;
-//        }
-//        host = host->next;
-//    }
-//    rrd_unlock();
-//
-//    return;
+    info("START streaming alerts for %s received", node_id);
+    debug(D_ACLK_SYNC, "START streaming alerts for %s received", node_id);
+    
+
+   uuid_t node_uuid;
+   uuid_parse(node_id, node_uuid);
+
+   struct aclk_database_worker_config *wc  = NULL;
+   rrd_wrlock();
+   RRDHOST *host = localhost;
+   while(host) {
+       if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+           wc = (struct aclk_database_worker_config *)host->dbsync_worker;
+           if (likely(wc)) {
+               wc->alert_updates = 1;
+               info("START streaming alerts for %s enabled", node_id);
+           }
+           else
+               error("ACLK synchronization thread is not active for host %s", host->hostname);
+           break;
+       }
+       host = host->next;
+   }
+   rrd_unlock();
+
+   return;
 }
 
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
@@ -1331,4 +1344,102 @@ bind_fail:
 
     freez(cmd.data);
     return rc;
+}
+
+void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+#ifndef ACLK_NG
+    UNUSED (wc);
+    UNUSED(cmd);
+#else
+    int rc;
+
+    int limit = cmd.count > 0 ? cmd.count : 1;
+    int available = 0;
+    uint64_t first_sequence = 0;
+    uint64_t last_sequence = 0;
+    time_t last_timestamp;
+    char uuid_str[GUID_LEN + 1];
+
+    BUFFER *sql = buffer_create(1024);
+
+    sqlite3_stmt *res = NULL;
+
+    buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, \
+                   hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, \
+                   hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status, \
+                   hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat \
+                         from health_log_%s hl, aclk_alert_%s aa \
+                         where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null \
+                         order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
+    
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to get health entries from the database");
+        goto fail_complete;
+    }
+
+    struct alarm_log_entry *alarm_log = callocz(limit+1, sizeof(*alarm_log));
+
+    int count = 0;
+    char *claim_id = is_agent_claimed();
+    while (sqlite3_step(res) == SQLITE_ROW) {
+
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
+
+        alarm_log[count].node_id = get_str_from_uuid(wc->host->node_id);
+        alarm_log[count].claim_id = strdupz((char *)claim_id); //will need free
+        
+        alarm_log[count].chart = strdupz((char *)sqlite3_column_text(res, 12));
+        alarm_log[count].name = strdupz((char *)sqlite3_column_text(res, 11));
+        alarm_log[count].family = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
+        
+        alarm_log[count].batch_id = 1;//wc->alerts_batch_id;
+        alarm_log[count].sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        alarm_log[count].when = (uint64_t) sqlite3_column_int64(res, 5);
+
+        alarm_log[count].config_hash = strdupz((char *)uuid_str);
+
+        alarm_log[count].utc_offset = 0; //fix!!!
+        alarm_log[count].timezone = strdupz((char *)wc->host->timezone);
+
+        alarm_log[count].exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : strdupz((char *)wc->host->health_default_exec);
+        alarm_log[count].conf_source = strdupz((char *)sqlite3_column_text(res, 16));
+        alarm_log[count].command = strdupz((char *)sqlite3_column_text(res, 16)); //fix, do edit_command
+
+        alarm_log[count].duration = (uint32_t) sqlite3_column_int(res, 6); //correct ?
+        alarm_log[count].non_clear_duration = (uint32_t) sqlite3_column_int(res, 7);
+
+        alarm_log[count].status = 4; //fix!!!
+        alarm_log[count].old_status = 4; //fix!!!
+
+        alarm_log[count].delay = (uint64_t) sqlite3_column_int64(res, 22);
+        alarm_log[count].delay_up_to_timestamp = (uint64_t) sqlite3_column_int64(res, 10);
+        alarm_log[count].last_repeat = (uint64_t) sqlite3_column_int64(res, 25);
+
+        alarm_log[count].silenced = 0; //FIX!!!
+
+        alarm_log[count].value_string = strdupz((char *)"0%"); //fix!!!
+        alarm_log[count].old_value_string = strdupz((char *)"0%"); //fix!!!
+
+        alarm_log[count].value = (double) sqlite3_column_double(res, 23);
+        alarm_log[count].old_value = (double) sqlite3_column_double(res, 24);
+
+        alarm_log[count].updated = (sqlite3_column_int(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
+        
+        alarm_log[count].rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
+        
+        
+        count++;
+    }
+
+    aclk_send_alarm_log_entry(alarm_log);
+
+    //need stuff
+
+fail_complete:
+    buffer_free(sql);
+#endif
+
+    return;
 }

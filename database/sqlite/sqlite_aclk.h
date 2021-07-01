@@ -8,6 +8,7 @@
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
 #define ACLK_MAX_CHART_UPDATES  (5)
+#define ACLK_MAX_ALERT_UPDATES  (5)
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
@@ -46,7 +47,8 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
         "end;"
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "alert_unique_id, date_created, date_submitted); "
+        "alert_unique_id, date_created, date_submitted, " \
+        "unique(alert_unique_id));"
 
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
@@ -66,7 +68,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_UPD_STATS,
     ACLK_DATABASE_SYNC_CHART_SEQ,
-    ACLK_DATABASE_MAX_OPCODE
+    ACLK_DATABASE_MAX_OPCODE,
+    ACLK_DATABASE_PUSH_ALERT
 };
 
 struct aclk_chart_payload_t {
@@ -100,6 +103,7 @@ struct aclk_database_worker_config {
     uint64_t chart_sequence_id;     // last chart_sequence_id
     time_t chart_timestamp;         // last chart timestamp
     uint64_t batch_id;    // batch id to use
+    uint64_t alerts_batch_id; // batch id for alerts to use
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;
@@ -144,6 +148,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //int aclk_add_alert_event(RRDHOST *host, ALARM_ENTRY *ae, struct completion *completion);
 int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
