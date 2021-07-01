@@ -368,7 +368,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         return;
     }
     if (!strcmp(message_type, "SendAlarmConfiguration")) {
-        const char *config_hash = parse_send_alarm_configuration(msg, msg_len);
+        char *config_hash = parse_send_alarm_configuration(msg, msg_len);
         if (!config_hash) {
             error("Error parsing SensAlarmConfiguration");
             return;
