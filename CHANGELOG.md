@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- fix `mdstat` current operation charts context/title [\#11289](https://github.com/netdata/netdata/pull/11289) ([ilyam8](https://github.com/ilyam8))
 - Remove access check for install-type file [\#11288](https://github.com/netdata/netdata/pull/11288) ([MrZammler](https://github.com/MrZammler))
+- eBPF plugin remove parallel plugins [\#11287](https://github.com/netdata/netdata/pull/11287) ([thiagoftsm](https://github.com/thiagoftsm))
 - suport TLS SNI in ACLK-NG [\#11285](https://github.com/netdata/netdata/pull/11285) ([underhood](https://github.com/underhood))
 - fixes confusing error in ACLK Legacy [\#11278](https://github.com/netdata/netdata/pull/11278) ([underhood](https://github.com/underhood))
 - makes ACLK-NG the default if available [\#11272](https://github.com/netdata/netdata/pull/11272) ([underhood](https://github.com/underhood))
@@ -302,8 +304,6 @@
 - Add Linux page cache metrics to eBPF [\#10693](https://github.com/netdata/netdata/pull/10693) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update guide: Kubernetes monitoring with Netdata: Overview and visualizations [\#10691](https://github.com/netdata/netdata/pull/10691) ([joelhans](https://github.com/joelhans))
 - health: make alarms less sensitive [\#10688](https://github.com/netdata/netdata/pull/10688) ([ilyam8](https://github.com/ilyam8))
-- Ebpf support new collectors [\#10680](https://github.com/netdata/netdata/pull/10680) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix broken links in active alarms doc [\#10678](https://github.com/netdata/netdata/pull/10678) ([joelhans](https://github.com/joelhans))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
