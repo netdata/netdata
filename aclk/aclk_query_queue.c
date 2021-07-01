@@ -133,6 +133,7 @@ void aclk_query_free(aclk_query_t query)
     case CHART_CONFIG_UPDATED:
     case CHART_RESET:
     case ALARM_LOG_HEALTH:
+    case ALARM_LOG_ENTRY:
     case UPDATE_NODE_INFO:
         freez(query->data.bin_payload.payload);
         break;
