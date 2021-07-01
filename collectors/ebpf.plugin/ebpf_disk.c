@@ -404,7 +404,25 @@ static void ebpf_cleanup_plot_disks()
     ebpf_publish_disk_t *move = plot_disks, *next;
     while (move) {
         next = move->next;
-        free(move);
+
+        freez(move);
+
+        move = next;
+    }
+}
+
+/**
+ * Cleanup Disk List
+ */
+static void ebpf_cleanup_disk_list()
+{
+    netdata_ebpf_disks_t *move = disk_list;
+    while (move) {
+        netdata_ebpf_disks_t *next = move->next;
+
+        freez(move->histogram.name);
+        freez(move->boot_chart);
+        freez(move);
 
         move = next;
     }
@@ -435,9 +453,11 @@ static void ebpf_disk_cleanup(void *ptr)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
     freez(disk_hash_values);
+    freez(disk_threads.thread);
     pthread_mutex_destroy(&plot_mutex);
 
     ebpf_cleanup_plot_disks();
+    ebpf_cleanup_disk_list();
 
     if (probe_links) {
         struct bpf_program *prog;
