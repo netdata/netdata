@@ -11,6 +11,28 @@
 extern "C" {
 #endif
 
+enum alarm_log_status_aclk {
+    ALARM_LOG_STATUS_UNSPECIFIED = 0,
+    ALARM_LOG_STATUS_RUNNING = 1,
+    ALARM_LOG_STATUS_IDLE = 2
+};
+
+struct alarm_log_entries {
+    int64_t first_seq_id;
+    struct timeval first_when;
+
+    int64_t last_seq_id;
+    struct timeval last_when;
+};
+
+struct alarm_log_health {
+    char *claim_id;
+    char *node_id;
+    int enabled;
+    enum alarm_log_status_aclk status;
+    struct alarm_log_entries log_entries;
+};
+
 struct start_alarm_streaming {
     char *node_id;
     uint64_t batch_id;
@@ -19,22 +41,6 @@ struct start_alarm_streaming {
 
 struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len);
 char *parse_send_alarm_log_health(const char *data, size_t len);
-
-enum alarm_log_status_aclk {
-    ALARM_LOG_STATUS_UNSPECIFIED = 0,
-    ALARM_LOG_STATUS_RUNNING = 1,
-    ALARM_LOG_STATUS_IDLE = 2
-};
-struct alarm_log_health {
-    char *claim_id;
-    char *node_id;
-    int enabled;
-    enum alarm_log_status_aclk status;
-    int64_t first_seq_id;
-    struct timeval first_when;
-    int64_t last_seq_id;
-    struct timeval last_when;
-};
 
 char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data);
 
@@ -54,18 +60,35 @@ struct alarm_log_entry {
 
     char *chart;
     char *name;
+    char *family;
+
     uint64_t batch_id;
     uint64_t sequence_id;
     uint64_t when;
 
     char *config_hash;
 
+    uint32_t utc_offset;
+    char *timezone;
+
+    char *exec_path;
+    char *conf_source;
+    char *command;
+
+    uint32_t duration;
+    uint32_t non_clear_duration;
+
     enum aclk_alarm_status status;
     enum aclk_alarm_status old_status;
+    uint64_t delay;
     uint64_t delay_up_to_timestamp;
 
     uint64_t last_repeat;
     int silenced;
+
+    char *value_string;
+    char *old_value_string;
+
     double value;
     double old_value;
 
