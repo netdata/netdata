@@ -398,7 +398,7 @@ CHARTS = {
         ]
     },
     'innodb_os_log_fsync_writes': {
-        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log_fsyncs', 'line'],
         'lines': [
             ['Innodb_os_log_fsyncs', 'fsyncs', 'incremental'],
         ]
