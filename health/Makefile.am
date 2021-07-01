@@ -41,7 +41,6 @@ dist_healthconfig_DATA = \
     health.d/dnsmasq_dhcp.conf \
     health.d/dns_query.conf \
     health.d/dockerd.conf \
-    health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
     health.d/fping.conf \
@@ -89,7 +88,6 @@ dist_healthconfig_DATA = \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/unbound.conf \
-    health.d/varnish.conf \
     health.d/vcsa.conf \
     health.d/vernemq.conf \
     health.d/vsphere.conf \
