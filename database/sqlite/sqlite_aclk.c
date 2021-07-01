@@ -755,6 +755,14 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
             if (likely(wc)) {
+
+                if (unlikely(!wc->chart_updates)) {
+                    struct aclk_database_cmd cmd;
+                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                    cmd.completion = NULL;
+                    aclk_database_enq_cmd(wc, &cmd);
+                }
+
                 wc->chart_updates = 1;
                 wc->batch_id = batch_id;
                 info("DEBUG: START streaming charts for %s (%s) enabled -- last streamed sequence %"PRIu64" t=%ld", node_id, wc->uuid_str,
