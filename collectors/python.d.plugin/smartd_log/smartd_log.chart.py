@@ -154,7 +154,7 @@ CHARTS = {
         'algo': INCREMENTAL,
     },
     'write_total_err_corrected': {
-        'options': [None, 'Write Error Corrected', 'errors', 'errors', 'smartd_log.read_total_err_corrected', 'line'],
+        'options': [None, 'Write Error Corrected', 'errors', 'errors', 'smartd_log.write_total_err_corrected', 'line'],
         'lines': [],
         'attrs': [ATTR_WRITE_ERR_COR],
         'algo': INCREMENTAL,

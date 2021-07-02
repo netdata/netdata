@@ -398,7 +398,7 @@ CHARTS = {
         ]
     },
     'innodb_os_log_fsync_writes': {
-        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log_fsyncs', 'line'],
         'lines': [
             ['Innodb_os_log_fsyncs', 'fsyncs', 'incremental'],
         ]
@@ -445,7 +445,7 @@ CHARTS = {
     },
     'innodb_buffer_pool_flush_pages_requests': {
         'options': [None, 'InnoDB Buffer Pool Flush Pages Requests', 'requests/s', 'innodb',
-                    'mysql.innodb_buffer_pool_pages', 'line'],
+                    'mysql.innodb_buffer_pool_pages_flushed', 'line'],
         'lines': [
             ['Innodb_buffer_pool_pages_flushed', 'flush pages', 'incremental'],
         ]
