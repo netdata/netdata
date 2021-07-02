@@ -471,7 +471,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     char buf[GUID_LEN + 1];
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-
+    system_info->hops = 1;
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -498,6 +498,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             abbrev_timezone = value;
         else if(!strcmp(name, "utc_offset"))
             utc_offset = (int32_t)strtol(value, NULL, 0);
+        else if(!strcmp(name, "hops"))
+            system_info->hops = (uint16_t) strtoul(value, NULL, 0);
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver"))
