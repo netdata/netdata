@@ -5,7 +5,6 @@
 
 #include "ebpf.h"
 
-#define NETDATA_FILESYSTEM_MAX_BINS 24UL
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
@@ -31,14 +30,6 @@ enum netdata_filesystem_flags {
     NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE = 8,
     NETDATA_FILESYSTEM_REMOVE_CHARTS = 16
 };
-
-typedef struct netdata_ebpf_histogram {
-    char *name;
-    char *title;
-    int order;
-    uint64_t histogram[NETDATA_FILESYSTEM_MAX_BINS];
-} netdata_ebpf_histogram_t;
-
 
 enum netdata_filesystem_table {
     NETDATA_MAIN_FS_TABLE,

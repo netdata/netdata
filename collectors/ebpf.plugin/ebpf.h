@@ -81,7 +81,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_DCSTAT_IDX,
     EBPF_MODULE_SWAP_IDX,
     EBPF_MODULE_VFS_IDX,
-    EBPF_MODULE_FILESYSTEM_IDX
+    EBPF_MODULE_FILESYSTEM_IDX,
+    EBPF_MODULE_DISK_IDX
 };
 
 // Copied from musl header
@@ -226,6 +227,7 @@ extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
                                       char *charttype, char *context, int order);
+extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 

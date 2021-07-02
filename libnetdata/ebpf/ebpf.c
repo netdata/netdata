@@ -701,3 +701,114 @@ void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
     }
     freez(ptr);
 }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Open tracepoint path
+ *
+ * @param filename   pointer to store the path
+ * @param length     file length
+ * @param subsys     is the name of your subsystem.
+ * @param eventname  is the name of the event to trace.
+ * @param flags      flags used with syscall open
+ *
+ * @return it returns a positive value on success and a negative otherwise.
+ */
+static inline int ebpf_open_tracepoint_path(char *filename, size_t length, char *subsys, char *eventname, int flags)
+{
+    snprintfz(filename, length, "%s/events/%s/%s/enable", NETDATA_DEBUGFS, subsys, eventname);
+    return open(filename, flags, 0);
+}
+
+/**
+ * Is tracepoint enabled
+ *
+ * Check whether the tracepoint is enabled.
+ *
+ * @param subsys     is the name of your subsystem.
+ * @param eventname  is the name of the event to trace.
+ *
+ * @return  it returns 1 when it is enabled, 0 when it is disabled and -1 on error.
+ */
+int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
+{
+    char text[FILENAME_MAX + 1];
+    int fd = ebpf_open_tracepoint_path(text, FILENAME_MAX, subsys, eventname, O_RDONLY);
+    if (fd < 0) {
+        return -1;
+    }
+
+    ssize_t length = read(fd, text, 1);
+    if (length != 1) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+
+    return (text[0] == '1') ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+}
+
+/**
+ *  Change Tracing values
+ *
+ * Change value for specific tracepoint enabling or disabling it according value given.
+ *
+ * @param subsys     is the name of your subsystem.
+ * @param eventname  is the name of the event to trace.
+ * @param value      a value to enable (1) or disable (0) a tracepoint.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+static int ebpf_change_tracing_values(char *subsys, char *eventname, char *value)
+{
+    if (strcmp("0", value) && strcmp("1", value)) {
+        error("Invalid value given to either enable or disable a tracepoint.");
+        return -1;
+    }
+
+    char filename[1024];
+    int fd = ebpf_open_tracepoint_path(filename, 1023, subsys, eventname, O_WRONLY);
+    if (fd < 0) {
+        return -1;
+    }
+
+    ssize_t written = write(fd, value, strlen(value));
+    if (written < 0) {
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
+/**
+ * Enable tracing values
+ *
+ * Enable a tracepoint on a system
+ *
+ * @param subsys     is the name of your subsystem.
+ * @param eventname  is the name of the event to trace.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_enable_tracing_values(char *subsys, char *eventname)
+{
+    return ebpf_change_tracing_values(subsys, eventname, "1");
+}
+
+/**
+ * Disable tracing values
+ *
+ * Disable tracing points enabled by collector
+ *
+ * @param subsys     is the name of your subsystem.
+ * @param eventname  is the name of the event to trace.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_disable_tracing_values(char *subsys, char *eventname)
+{
+    return ebpf_change_tracing_values(subsys, eventname, "0");
+}
