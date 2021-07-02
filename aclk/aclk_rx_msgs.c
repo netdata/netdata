@@ -299,7 +299,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         }
 
         query->data.node_update.node_id = res.node_id; // aclk_query_free will free it
-        query->data.node_update.queriable = 1;
+        query->data.node_update.queryable = 1;
         query->data.node_update.session_id = aclk_session_newarch;
         aclk_queue_query(query);
         freez(res.machine_guid);

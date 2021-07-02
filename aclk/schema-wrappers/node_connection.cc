@@ -16,7 +16,7 @@ char *generate_node_instance_connection(size_t *len, const node_instance_connect
     msg.set_node_id(data->node_id);
 
     msg.set_liveness(data->live);
-    msg.set_queryable(data->queriable);
+    msg.set_queryable(data->queryable);
 
     msg.set_session_id(data->session_id);
     msg.set_hops(data->hops);
