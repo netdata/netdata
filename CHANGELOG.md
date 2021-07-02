@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- health: remove pythond modules specific last\_collected alarms [\#11307](https://github.com/netdata/netdata/pull/11307) ([ilyam8](https://github.com/ilyam8))
 - fix `mdstat` current operation charts context/title [\#11289](https://github.com/netdata/netdata/pull/11289) ([ilyam8](https://github.com/ilyam8))
 - Remove access check for install-type file [\#11288](https://github.com/netdata/netdata/pull/11288) ([MrZammler](https://github.com/MrZammler))
 - eBPF plugin remove parallel plugins [\#11287](https://github.com/netdata/netdata/pull/11287) ([thiagoftsm](https://github.com/thiagoftsm))
