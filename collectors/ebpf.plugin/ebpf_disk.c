@@ -632,7 +632,7 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
     w->histogram.title = NULL;
     w->histogram.order = order;
 
-    ebpf_create_chart(w->histogram.name, family, "Disk latency.", EBPF_COMMON_DIMENSION_CALL,
+    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_DIMENSION_CALL,
                       family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
     order++;
