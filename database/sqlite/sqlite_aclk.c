@@ -113,6 +113,7 @@ static void timer_cb(uv_timer_t* handle)
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
         cmd.count = ACLK_MAX_CHART_UPDATES;
         cmd.completion = NULL;
+        cmd.param1 = 0;
         aclk_database_enq_cmd(wc, &cmd);
     }
 
@@ -401,7 +402,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
 {
     int rc = 0;
     if (unlikely(!db_meta)) {
-        freez(cmd.data_param);
+//        freez(cmd.data_param);
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return 1;
         }
@@ -436,7 +437,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     UNUSED(wc);
     UNUSED(cmd);
 #endif
-    freez(cmd.data_param);
+//    freez(cmd.data_param);
     return rc;
 }
 
@@ -444,7 +445,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
 {
     int rc = 0;
     if (unlikely(!db_meta)) {
-        freez(cmd.data_param);
+//        freez(cmd.data_param);
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return 1;
         }
@@ -490,7 +491,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     UNUSED(wc);
     UNUSED(cmd);
 #endif
-    freez(cmd.data_param);
+//    freez(cmd.data_param);
     return rc;
 }
 
@@ -592,40 +593,54 @@ fail:
     return;
 }
 
-// ST is read locked
-void sql_queue_chart_to_aclk(RRDSET *st, int mode)
+int sql_queue_chart_payload(struct aclk_database_worker_config *wc, void *data, enum aclk_database_opcode opcode)
 {
-    UNUSED(mode);
-
-    if (!aclk_architecture)
-        aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
-
-    if (unlikely(!st->rrdhost->dbsync_worker))
-        return;
+    if (unlikely(!wc))
+        return 1;
 
     struct aclk_database_cmd cmd;
-    cmd.opcode = ACLK_DATABASE_ADD_CHART;
-    cmd.data = st;
-    cmd.data_param = strdupz("BINARY");
+    cmd.opcode = opcode;
+    cmd.data = data;
     cmd.completion = NULL;
-    aclk_database_enq_cmd((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
-    return;
+    aclk_database_enq_cmd(wc, &cmd);
+    return 0;
 }
 
-void sql_queue_dimension_to_aclk(RRDDIM *rd, int mode)
+// ST is read locked
+int sql_queue_chart_to_aclk(RRDSET *st, int mode)
 {
     UNUSED(mode);
 
-    if (unlikely(!rd->rrdset->rrdhost->dbsync_worker))
-        return;
+    //if (!aclk_architecture)
+    //    aclk_update_chart(st->rrdhost, st->id, ACLK_CMD_CHART);
 
-    struct aclk_database_cmd cmd;
-    cmd.opcode = ACLK_DATABASE_ADD_DIMENSION;
-    cmd.data = rd;
-    cmd.data_param = strdupz("BINARY");
-    cmd.completion = NULL;
-    aclk_database_enq_cmd((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker, &cmd);
-    return;
+    return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, st, ACLK_DATABASE_ADD_CHART);
+//    if (unlikely(!st->rrdhost->dbsync_worker))
+//        return 1;
+//
+//    struct aclk_database_cmd cmd;
+//    cmd.opcode = ACLK_DATABASE_ADD_CHART;
+//    cmd.data = st;
+////    cmd.data_param = strdupz("BINARY");
+//    cmd.completion = NULL;
+//    aclk_database_enq_cmd((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker, &cmd);
+//    return 0;
+}
+
+int sql_queue_dimension_to_aclk(RRDDIM *rd, int mode)
+{
+    UNUSED(mode);
+    return sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker, rd, ACLK_DATABASE_ADD_DIMENSION);
+//    if (unlikely(!rd->rrdset->rrdhost->dbsync_worker))
+//        return 1;
+//
+//    struct aclk_database_cmd cmd;
+//    cmd.opcode = ACLK_DATABASE_ADD_DIMENSION;
+//    cmd.data = rd;
+////    cmd.data_param = strdupz("BINARY");
+//    cmd.completion = NULL;
+//    aclk_database_enq_cmd((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker, &cmd);
+//    return 0;
 }
 
 void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
@@ -945,7 +960,7 @@ fail:
                         "WHERE (status = 'processing' OR (status IS NULL AND date_submitted IS NULL)) "
                         "AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
             wc->uuid_str, first_sequence, last_sequence);
-        info("DEBUG: %s pushing chart seq %" PRIu64 " - %" PRIu64", t=%ld", wc->uuid_str, first_sequence, last_sequence, last_timestamp);
+        info("DEBUG: %s pushing chart seq %" PRIu64 " - %" PRIu64", t=%ld batch_id=%"PRIu64, wc->uuid_str, first_sequence, last_sequence, last_timestamp, wc->batch_id);
         db_execute(buffer_tostring(sql));
     }
     else
@@ -960,6 +975,15 @@ fail:
         aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
             wc->chart_sequence_id = last_sequence;
             wc->chart_timestamp = last_timestamp;
+
+        // Enqueue command
+        if (cmd.param1 < 5) {
+            cmd.param1++;
+            cmd.opcode = ACLK_DATABASE_PUSH_CHART;
+            cmd.count = ACLK_MAX_CHART_UPDATES;
+            cmd.completion = NULL;
+            aclk_database_enq_cmd(wc, &cmd);
+        }
     }
 
 fail_complete:

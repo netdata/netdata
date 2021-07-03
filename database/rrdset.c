@@ -645,7 +645,7 @@ RRDSET *rrdset_create_custom(
                         aclk_add_collector(host, st->plugin_name, st->module_name);
                     }
                 }
-                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+                rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             }
 #endif
             freez(old_plugin);
@@ -946,7 +946,7 @@ RRDSET *rrdset_create_custom(
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
         aclk_add_collector(host, plugin, module);
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
     return(st);
 }
@@ -1383,10 +1383,10 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
-            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            sql_queue_chart_to_aclk(st, 0);
+            if (likely(!sql_queue_chart_to_aclk(st, 0)))
+                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
 #endif
@@ -1797,11 +1797,9 @@ after_second_database_work:
         if(unlikely(!rd->updated))
             continue;
 #ifdef ENABLE_ACLK
-        if (unlikely(!rrddim_flag_check(st, RRDDIM_FLAG_ACLK))) {
-            if (rd->rrdset->counter_done > RRDSET_MINIMUM_LIVE_COUNT) {
-                rrddim_flag_set(st, RRDDIM_FLAG_ACLK);
-                sql_queue_dimension_to_aclk(rd, 0);
-            }
+        if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
+            if (likely(!sql_queue_dimension_to_aclk(rd, 0)))
+                rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
         }
 #endif
 
