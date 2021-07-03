@@ -2937,6 +2937,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             (long unsigned int)sqlite3_column_int(res, 27),
             (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
+        //not needed, it's already stored with replaced info
             char *replaced_info = NULL;
             if (likely(sqlite3_column_text(res, 20))) {
                 char *m = NULL;

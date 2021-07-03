@@ -347,13 +347,13 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     }
     if (!strcmp(message_type, "StartAlarmStreaming")) {
         struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
-        if (!res.node_id) {
+        if (!res.node_id || !res.batch_id) {
             error("Error parsing StartAlarmStreaming");
             freez(res.node_id);
             return;
         }
         //TODO stelfrag/MrZammler call your handler here
-        aclk_start_alert_streaming(res.node_id);
+        aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
         freez(res.node_id);
         return;
     }
@@ -364,6 +364,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             return;
         }
         //TODO stelfrag/MrZammler call your handler here
+        aclk_send_alarm_health_log(node_id);
         freez(node_id);
         return;
     }
