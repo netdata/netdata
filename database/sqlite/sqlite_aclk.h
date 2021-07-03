@@ -140,8 +140,8 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 //extern void sqlite_worker(void* arg);
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
-extern void sql_queue_chart_to_aclk(RRDSET *st, int cmd);
-extern void sql_queue_dimension_to_aclk(RRDDIM *rd, int cmd);
+extern int sql_queue_chart_to_aclk(RRDSET *st, int cmd);
+extern int sql_queue_dimension_to_aclk(RRDDIM *rd, int cmd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
