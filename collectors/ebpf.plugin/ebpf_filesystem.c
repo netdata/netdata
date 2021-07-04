@@ -147,8 +147,8 @@ static void ebpf_create_fs_charts()
             order++;
 
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
-            snprintfz(title, 255, "%s latency for each %s request.", type, efp->filesystem);
-            snprintfz(chart_name, 63, "%s_%s_latency", type, efp->filesystem);
+            snprintfz(title, 255, "%s latency for each %s request.", efp->filesystem, type);
+            snprintfz(chart_name, 63, "%s_%s_latency", efp->filesystem, type);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
             efp->hadditional.order = order;
