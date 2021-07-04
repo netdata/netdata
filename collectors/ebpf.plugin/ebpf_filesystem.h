@@ -46,7 +46,7 @@ typedef struct ebpf_filesystem_partitions {
     netdata_ebpf_histogram_t hread;
     netdata_ebpf_histogram_t hwrite;
     netdata_ebpf_histogram_t hopen;
-    netdata_ebpf_histogram_t hsync;
+    netdata_ebpf_histogram_t hadditional;
 
     uint32_t flags;
     uint32_t enabled;
