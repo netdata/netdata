@@ -133,7 +133,7 @@ to IP addresses within the `160.1.x.x` range and that reverse DNS is setup for t
 
 Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](Running-behind-nginx.md), [Apache](Running-behind-apache.md), [lighttpd](Running-behind-lighttpd.md) and [Caddy](Running-behind-caddy.md).
 
-To use this method, you should firewall protect all your Netdata servers, so that only the web server IP will allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
+To use this method, you should firewall protect all your Netdata servers, so that only the web server IP will be allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
 
 ```sh
 PROXY_IP="1.2.3.4"
