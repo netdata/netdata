@@ -496,7 +496,7 @@ collectors are described only in code and associated charts in Netdata dashboard
 -   [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
     Agent is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
 -   [Alarms](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/alarms): This collector creates an
-    <strong>Alarms</strong> menu with one line plot showing the alarm states of a Netdata Agent over time.
+    **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
 -   [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the
     Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
 -   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
