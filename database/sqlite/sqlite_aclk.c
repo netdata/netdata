@@ -211,7 +211,6 @@ void aclk_database_worker(void *arg)
                     break;
                 case ACLK_DATABASE_RESET_CHART:
                     debug(D_ACLK_SYNC, "RESET chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
-
                     sql_reset_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_RESET_NODE:
@@ -229,6 +228,10 @@ void aclk_database_worker(void *arg)
                 case ACLK_DATABASE_ADD_ALERT:
                     debug(D_ACLK_SYNC,"Adding alert event for %s", wc->uuid_str);
                     aclk_add_alert_event(wc, cmd);
+                    break;
+                case ACLK_DATABASE_PUSH_ALERT_CONFIG:
+                    debug(D_ACLK_SYNC,"Pushing chart config info to the cloud for node %s", wc->uuid_str);
+                    aclk_push_alert_config_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_PUSH_ALERT:
                     debug(D_ACLK_SYNC, "Pushing alert info to the cloud for node %s", wc->uuid_str);
@@ -648,6 +651,9 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     if (!aclk_architecture) //{ //queue_chart_to_aclk continues after that, should we too ?
         aclk_update_alarm(host, ae);
 
+    if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
+        return;
+    
     if (unlikely(!host->dbsync_worker))
        return;
 
@@ -658,6 +664,7 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     //cmd.data_param = ae;
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
+    ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
     return;
 }
 
@@ -1362,7 +1369,7 @@ int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_dat
 
     rc = execute_insert(res_alert);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store alert event, rc = %d", rc);
+        error_report("Failed to store alert event %d, rc = %d", ae->unique_id, rc);
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
@@ -1631,4 +1638,116 @@ fail_complete:
 #endif
 
     return;
+}
+
+void aclk_send_alarm_configuration(char *config_hash)
+{
+    if (unlikely(!config_hash))
+        return;
+
+    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) localhost->dbsync_worker;
+
+    if (unlikely(!wc)) {
+        return;
+    }
+
+    struct aclk_database_cmd cmd;
+    cmd.opcode = ACLK_DATABASE_PUSH_ALERT_CONFIG;
+
+    info("Request for alert config %s received", config_hash);
+    cmd.data_param = (void *) strdupz(config_hash);
+    cmd.completion = NULL;
+    aclk_database_enq_cmd(wc, &cmd);
+
+    return;
+}
+
+int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    UNUSED(wc);
+    sqlite3_stmt *res = NULL;
+
+    int rc = 0;
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+            return 1;
+        }
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    char *config_hash = (char *) cmd.data_param;
+    BUFFER *sql = buffer_create(1024);
+    buffer_sprintf(sql, "SELECT alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels " \
+                        "FROM alert_hash WHERE hash_id = @hash_id;");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to fetch a chart hash configuration");
+        goto fail;
+    }
+
+    uuid_t hash_uuid;
+    uuid_parse(config_hash, hash_uuid);
+    rc = sqlite3_bind_blob(res, 1, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    //check if we indeed have the alarm config, bail out if we dont
+
+    struct aclk_alarm_configuration alarm_config;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+            alarm_config.alarm = sqlite3_column_bytes(res, 0) > 0 ? strdupz((char *)sqlite3_column_text(res, 0)) : NULL;
+            alarm_config.tmpl = sqlite3_column_bytes(res, 1) > 0 ? strdupz((char *)sqlite3_column_text(res, 1)) : NULL;
+            alarm_config.on_chart = sqlite3_column_bytes(res, 2) > 0 ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
+            alarm_config.classification = sqlite3_column_bytes(res, 3) > 0 ? strdupz((char *)sqlite3_column_text(res, 3)) : NULL;
+            alarm_config.type = sqlite3_column_bytes(res, 4) > 0 ? strdupz((char *)sqlite3_column_text(res, 4)) : NULL;
+            alarm_config.component = sqlite3_column_bytes(res, 5) > 0 ? strdupz((char *)sqlite3_column_text(res, 5)) : NULL;
+        
+            alarm_config.os = sqlite3_column_bytes(res, 6) > 0 ? strdupz((char *)sqlite3_column_text(res, 6)) : NULL;
+            alarm_config.hosts = sqlite3_column_bytes(res, 7) > 0 ? strdupz((char *)sqlite3_column_text(res, 7)) : NULL;
+            alarm_config.plugin = sqlite3_column_bytes(res, 8) > 0 ? strdupz((char *)sqlite3_column_text(res, 8)) : NULL;
+            alarm_config.module = sqlite3_column_bytes(res, 9) > 0 ? strdupz((char *)sqlite3_column_text(res, 9)) : NULL;
+            alarm_config.charts = sqlite3_column_bytes(res, 10) > 0 ? strdupz((char *)sqlite3_column_text(res, 10)) : NULL;
+            alarm_config.families = sqlite3_column_bytes(res, 11) > 0 ? strdupz((char *)sqlite3_column_text(res, 11)) : NULL;
+            alarm_config.lookup = sqlite3_column_bytes(res, 12) > 0 ? strdupz((char *)sqlite3_column_text(res, 12)) : NULL;
+            alarm_config.every = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
+            alarm_config.units = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : NULL;
+
+            alarm_config.green = sqlite3_column_bytes(res, 15) > 0 ? strdupz((char *)sqlite3_column_text(res, 15)) : NULL;
+            alarm_config.red = sqlite3_column_bytes(res, 16) > 0 ? strdupz((char *)sqlite3_column_text(res, 16)) : NULL;
+
+            alarm_config.calculation_expr = sqlite3_column_bytes(res, 17) > 0 ? strdupz((char *)sqlite3_column_text(res, 17)) : NULL;
+            alarm_config.warning_expr = sqlite3_column_bytes(res, 18) > 0 ? strdupz((char *)sqlite3_column_text(res, 18)) : NULL;
+            alarm_config.critical_expr = sqlite3_column_bytes(res, 19) > 0 ? strdupz((char *)sqlite3_column_text(res, 19)) : NULL;
+    
+            alarm_config.recipient = sqlite3_column_bytes(res, 20) > 0 ? strdupz((char *)sqlite3_column_text(res, 20)) : NULL;
+            alarm_config.exec = sqlite3_column_bytes(res, 21) > 0 ? strdupz((char *)sqlite3_column_text(res, 21)) : NULL;
+            alarm_config.delay = sqlite3_column_bytes(res, 22) > 0 ? strdupz((char *)sqlite3_column_text(res, 22)) : NULL;
+            alarm_config.repeat = sqlite3_column_bytes(res, 23) > 0 ? strdupz((char *)sqlite3_column_text(res, 23)) : NULL;
+            alarm_config.info = sqlite3_column_bytes(res, 24) > 0 ? strdupz((char *)sqlite3_column_text(res, 24)) : NULL;
+            alarm_config.options = sqlite3_column_bytes(res, 25) > 0 ? strdupz((char *)sqlite3_column_text(res, 25)) : NULL;
+            alarm_config.host_labels = sqlite3_column_bytes(res, 26) > 0 ? strdupz((char *)sqlite3_column_text(res, 26)) : NULL;
+    }
+
+    struct provide_alarm_configuration p_alarm_config;
+
+    p_alarm_config.cfg_hash = strdupz((char *) config_hash);
+    p_alarm_config.cfg = alarm_config;
+
+    debug(D_ACLK_SYNC,"Sending alarm config for %s", config_hash);
+
+    aclk_send_provide_alarm_cfg(&p_alarm_config);
+    freez((char *) cmd.data_param);
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when pushing alarm config hash, rc = %d", rc);
+
+fail:
+    buffer_free(sql);
+
+    return rc;
 }
