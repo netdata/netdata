@@ -44,6 +44,8 @@ struct aclk_alarm_configuration {
     char *host_labels;
 };
 
+void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg);
+
 struct provide_alarm_configuration {
     char *cfg_hash;
     struct aclk_alarm_configuration cfg;

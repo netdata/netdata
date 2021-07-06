@@ -95,6 +95,29 @@ static alarmstream::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_s
     }
 }
 
+void destroy_alarm_log_entry(struct alarm_log_entry *entry)
+{
+    freez(entry->node_id);
+    freez(entry->claim_id);
+
+    freez(entry->chart);
+    freez(entry->name);
+    freez(entry->family);
+
+    freez(entry->config_hash);
+
+    freez(entry->timezone);
+
+    freez(entry->exec_path);
+    freez(entry->conf_source);
+    freez(entry->command);
+
+    freez(entry->value_string);
+    freez(entry->old_value_string);
+
+    freez(entry->rendered_info);
+}
+
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 {
     alarmstream::v1::AlarmLogEntry le;
