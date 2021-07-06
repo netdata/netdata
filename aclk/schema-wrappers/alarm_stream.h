@@ -99,6 +99,8 @@ struct alarm_log_entry {
     char *rendered_info;
 };
 
+void destroy_alarm_log_entry(struct alarm_log_entry *entry);
+
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data);
 
 #ifdef __cplusplus
