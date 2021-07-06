@@ -345,6 +345,55 @@ void aclk_set_architecture(int mode)
     aclk_architecture = mode;
 }
 
+
+int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size) {
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_%s ac, aclk_chart_payload_%s acp WHERE ac.unique_id = acp.unique_id "
+                       "AND ac.uuid = @uuid "
+                       "AND (ac.update_count = 0 OR ac.update_count > 0 AND ac.date_submitted is NULL)"
+                       "AND acp.payload = @payload;", uuid_str, uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check payload data");
+        buffer_free(sql);
+        return 0;
+    }
+
+
+    rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_blob(res, 2, payload , payload_size, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    int payload_sent = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        payload_sent = sqlite3_column_int(res, 0);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when checking for payload, rc = %d", rc);
+
+    return payload_sent;
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement in check payload, rc = %d", rc);
+    buffer_free(sql);
+    return 0;
+}
+
+
+
+
 int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, int payload_type, void *payload, size_t payload_size)
 {
     sqlite3_stmt *res_chart = NULL;
@@ -353,6 +402,10 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, int pay
     BUFFER *sql = buffer_create(1024);
 
     //uuid, claim_id, type, date_created, payload
+    rc = chart_payload_sent (uuid_str, uuid, payload, payload_size);
+    info("DEBUG: Checking if payload already sent, RC = %d", rc);
+    if (rc == 1)
+        return 0;
 
     buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
                  "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s'), @type, @payload);", uuid_str);
@@ -506,6 +559,8 @@ void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_free(sql);
     sql_chart_deduplicate(wc, cmd);
+    // Start sending updates
+    wc->chart_updates = 1;
     return;
 }
 
@@ -786,7 +841,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     if (unlikely(!node_id))
         return;
 
-    info("DEBUG: START streaming charts for %s received from sequence %"PRIu64" t=%ld", node_id, sequence_id, created_at);
+    info("DEBUG: START streaming charts for %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id, sequence_id, created_at, batch_id);
     uuid_t node_uuid;
     uuid_parse(node_id, node_uuid);
 
@@ -805,8 +860,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                     aclk_database_enq_cmd(wc, &cmd);
                 }
 
-                wc->chart_updates = 1;
                 wc->batch_id = batch_id;
+                wc->batch_created = now_realtime_sec();
                 info("DEBUG: START streaming charts for %s (%s) enabled -- last streamed sequence %"PRIu64" t=%ld", node_id, wc->uuid_str,
                      wc->chart_sequence_id, wc->chart_timestamp);
                 // If mismatch detected
@@ -817,6 +872,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                     chart_reset.claim_id = is_agent_claimed();
                     chart_reset.reason = SEQ_ID_NOT_EXISTS;
                     aclk_chart_reset(chart_reset);
+                    wc->chart_updates = 0;
                 } else {
                     struct aclk_database_cmd cmd;
                     // TODO: handle timestamp
@@ -827,6 +883,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     }
+                    else
+                        wc->chart_updates = 1;
                 }
             }
             else
@@ -876,12 +934,16 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
 
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-
 #ifndef ACLK_NG
-    UNUSED (wc);
+    UNUSED(wc);
     UNUSED(cmd);
 #else
     int rc;
+
+    if (unlikely(!wc->chart_updates)) {
+        info("DEBUG: Ignoring chart push event, updates have been turned off %s", wc->uuid_str);
+        return;
+    }
 
     int limit = cmd.count > 0 ? cmd.count : 1;
     int available = 0;
@@ -894,7 +956,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     sqlite3_stmt *res = NULL;
 
     buffer_sprintf(sql, "select count(*) from aclk_chart_%s where case when status is null then 'processing' " \
-                        "else status end = 'processing' and date_submitted is null;", wc->uuid_str);
+                        "else status end = 'processing' and date_submitted is null and update_count > 0;", wc->uuid_str);
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement count sequence ids in the database");
@@ -913,7 +975,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (limit > available) {
         limit = limit - available;
 
-        buffer_sprintf(sql, "update aclk_chart_%s set status = 'processing' where status = 'pending' "
+        buffer_sprintf(sql, "update aclk_chart_%s set status = 'processing' where status = 'pending' and update_count > 0 "
                             "order by sequence_id limit %d;", wc->uuid_str, limit);
         db_execute(buffer_tostring(sql));
         buffer_flush(sql);
@@ -926,7 +988,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         "FROM aclk_chart_%s ac, " \
         "aclk_chart_payload_%s acp " \
         "WHERE (ac.status = 'processing' OR (ac.status IS NULL AND ac.date_submitted IS NULL)) " \
-        "AND ac.unique_id = acp.unique_id " \
+        "AND ac.unique_id = acp.unique_id AND ac.update_count > 0 " \
         "ORDER BY ac.sequence_id ASC LIMIT %d;",
                    wc->uuid_str, wc->uuid_str, wc->uuid_str, limit);
 
@@ -942,7 +1004,7 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     int *is_dim = callocz(limit+1, sizeof(*is_dim));
 
     int count = 0;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (count < limit && sqlite3_step(res) == SQLITE_ROW) {
         size_t  payload_size = sqlite3_column_bytes(res, 2);
         payload_list_size[count] = payload_size;
         payload_list[count] = mallocz(payload_size);
@@ -967,33 +1029,46 @@ fail:
 
     if (likely(first_sequence)) {
         buffer_flush(sql);
+        buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, type, unique_id, update_count, date_created) "
+                " select uuid, 'pending', type, unique_id, 0, strftime('%%s') from aclk_chart_%s s "
+                " WHERE status = 'processing' AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
+                " AND s.uuid NOT IN (SELECT t.uuid FROM aclk_chart_%s t WHERE t.uuid = s.uuid AND t.status = 'pending');",
+                       wc->uuid_str, wc->uuid_str, first_sequence, last_sequence, wc->uuid_str);
+        db_execute(buffer_tostring(sql));
+
+        buffer_reset(sql);
+
         buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s') "
                         "WHERE (status = 'processing' OR (status IS NULL AND date_submitted IS NULL)) "
                         "AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
             wc->uuid_str, first_sequence, last_sequence);
         info("DEBUG: %s pushing chart seq %" PRIu64 " - %" PRIu64", t=%ld batch_id=%"PRIu64, wc->uuid_str, first_sequence, last_sequence, last_timestamp, wc->batch_id);
         db_execute(buffer_tostring(sql));
+        //wc->chart_updates = 0;
     }
-    //else
-    //    info("DEBUG: %s no chart changes detected", wc->uuid_str);
+    else {
+        info("DEBUG: %s no chart changes detected", wc->uuid_str);
+        // Add a pending entry
+    }
     if  (count == 0) {
         freez(payload_list);
         freez(payload_list_size);
         freez(position_list);
         freez(is_dim);
-    }
-    else {
+    } else {
         aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
-            wc->chart_sequence_id = last_sequence;
-            wc->chart_timestamp = last_timestamp;
+        wc->chart_sequence_id = last_sequence;
+        wc->chart_timestamp = last_timestamp;
 
         // Enqueue command
-        if (cmd.param1 < 5) {
-            cmd.param1++;
-            cmd.opcode = ACLK_DATABASE_PUSH_CHART;
-            cmd.count = ACLK_MAX_CHART_UPDATES;
-            cmd.completion = NULL;
-            aclk_database_enq_cmd(wc, &cmd);
+        if (wc->batch_created && now_realtime_sec() - wc->batch_created > 10) {
+            if (cmd.param1 < 14) {
+                cmd.param1++;
+                cmd.opcode = ACLK_DATABASE_PUSH_CHART;
+                cmd.count = ACLK_MAX_CHART_UPDATES;
+                cmd.completion = NULL;
+                aclk_database_enq_cmd(wc, &cmd);
+            }
         }
     }
 
@@ -1183,7 +1258,7 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     buffer_reset(sql);
 
     buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
-       "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+       "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL and update_count > 0);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
