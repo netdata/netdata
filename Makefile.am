@@ -826,8 +826,8 @@ endif
 if ACLK_LEGACY
 netdata_LDADD += \
     $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
-    $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
+    $(OPTIONAL_LIBCAP_LIBS) \
     $(NULL)
 endif #ACLK_LEGACY
 
