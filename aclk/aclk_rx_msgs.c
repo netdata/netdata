@@ -265,7 +265,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     // TODO do the look up table with hashes to optimize when there are more
     // than few
     if (!strcmp(message_type, "cmd")) {
-        aclk_handle_cloud_message(msg);
+        aclk_handle_cloud_message((char *)msg);
         return;
     }
     if (!strcmp(message_type, "CreateNodeInstanceResult")) {
