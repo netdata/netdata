@@ -128,7 +128,11 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     mysep = strrchr(query->data.http_api_v2.query, '/');
 
     // execute the query
+    w->tv_in = query->created_tv;
+    now_realtime_timeval(&w->tv_ready);
     t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
+    size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY) ? w->response.rlen : w->response.data->len;
+    size_t sent = size;
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
@@ -177,7 +181,6 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     }
 #endif
 
-    now_realtime_timeval(&w->tv_ready);
     w->response.data->date = w->tv_ready.tv_sec;
     web_client_build_http_header(w);
     local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -191,6 +194,7 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
             buffer_need_bytes(local_buffer, w->response.data->len);
             memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
             local_buffer->len += w->response.data->len;
+            sent = sent - size + w->response.data->len;
         } else {
 #endif
             buffer_strcat(local_buffer, w->response.data->buffer);
@@ -199,7 +203,26 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
 #endif
     }
 
+    // send msg.
     aclk_http_msg_v2(client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
+
+    // log.
+    struct timeval tv;
+    now_realtime_timeval(&tv);
+    log_access("%llu: %d '[ACLK]:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+        w->id
+        , gettid()
+        , aclk_query_thread->idx
+        , "DATA"
+        , sent
+        , size
+        , size > sent ? -((size > 0) ? (((size - sent) / (double) size) * 100.0) : 0.0) : ((size > 0) ? (((sent - size ) / (double) size) * 100.0) : 0.0)
+        , dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
+        , dt_usec(&tv, &w->tv_ready) / 1000.0
+        , dt_usec(&tv, &w->tv_in) / 1000.0
+        , w->response.code
+        , strip_control_characters(query->data.http_api_v2.query)
+    );
 
 cleanup:
 #ifdef NETDATA_WITH_ZLIB
