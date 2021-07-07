@@ -152,7 +152,7 @@ void aclk_host_state_update(RRDHOST *host, int connect)
     if (aclk_ng)
         return ng_aclk_host_state_update(host, connect);
 #endif
-#ifdef ACLK_LEGACT
+#ifdef ACLK_LEGACY
     if (!aclk_ng)
         return legacy_aclk_host_state_update(host, connect);
 #endif
