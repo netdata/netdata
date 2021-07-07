@@ -51,38 +51,65 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
 
     msg.set_config_hash(data->cfg_hash);
 
-    cfg->set_alarm(data->cfg.alarm);
-    cfg->set_template_(data->cfg.tmpl);
-    cfg->set_on_chart(data->cfg.on_chart);
-    
-    cfg->set_classification(data->cfg.classification);
-    cfg->set_type(data->cfg.type);
-    cfg->set_component(data->cfg.component);
-        
-    cfg->set_os(data->cfg.os);
-    cfg->set_hosts(data->cfg.hosts);
-    cfg->set_plugin(data->cfg.plugin);
-    cfg->set_module(data->cfg.module);
-    cfg->set_charts(data->cfg.charts);
-    cfg->set_families(data->cfg.families);
-    cfg->set_lookup(data->cfg.lookup);
-    cfg->set_every(data->cfg.every);
-    cfg->set_units(data->cfg.units);
+    if (data->cfg.alarm)
+        cfg->set_alarm(data->cfg.alarm);
+    if (data->cfg.tmpl)
+        cfg->set_template_(data->cfg.tmpl);
+    if(data->cfg.on_chart)
+        cfg->set_on_chart(data->cfg.on_chart);
 
-    cfg->set_green(data->cfg.green);
-    cfg->set_red(data->cfg.red);
+    if (data->cfg.classification)
+        cfg->set_classification(data->cfg.classification);
+    if (data->cfg.type)
+        cfg->set_type(data->cfg.type);
+    if (data->cfg.component)
+        cfg->set_component(data->cfg.component);
 
-    cfg->set_calculation_expr(data->cfg.calculation_expr);
-    cfg->set_warning_expr(data->cfg.warning_expr);
-    cfg->set_critical_expr(data->cfg.critical_expr);
-    
-    cfg->set_recipient(data->cfg.recipient);
-    cfg->set_exec(data->cfg.exec);
-    cfg->set_delay(data->cfg.delay);
-    cfg->set_repeat(data->cfg.repeat);
-    cfg->set_info(data->cfg.info);
-    cfg->set_options(data->cfg.options);
-    cfg->set_host_labels(data->cfg.host_labels);
+    if (data->cfg.os)
+        cfg->set_os(data->cfg.os);
+    if (data->cfg.hosts)
+        cfg->set_hosts(data->cfg.hosts);
+    if (data->cfg.plugin)
+        cfg->set_plugin(data->cfg.plugin);
+    if(data->cfg.module)
+        cfg->set_module(data->cfg.module);
+    if(data->cfg.charts)
+        cfg->set_charts(data->cfg.charts);
+    if(data->cfg.families)
+        cfg->set_families(data->cfg.families);
+    if(data->cfg.lookup)
+        cfg->set_lookup(data->cfg.lookup);
+    if(data->cfg.every)
+        cfg->set_every(data->cfg.every);
+    if(data->cfg.units)
+        cfg->set_units(data->cfg.units);
+
+    if (data->cfg.green)
+        cfg->set_green(data->cfg.green);
+    if (data->cfg.red)
+        cfg->set_red(data->cfg.red);
+
+    if (data->cfg.calculation_expr)
+        cfg->set_calculation_expr(data->cfg.calculation_expr);
+    if (data->cfg.warning_expr)
+        cfg->set_warning_expr(data->cfg.warning_expr);
+    if (data->cfg.critical_expr)
+        cfg->set_critical_expr(data->cfg.critical_expr);
+
+    if (data->cfg.recipient)
+        cfg->set_recipient(data->cfg.recipient);
+    if (data->cfg.exec)
+        cfg->set_exec(data->cfg.exec);
+    if (data->cfg.delay)
+        cfg->set_delay(data->cfg.delay);
+    if (data->cfg.repeat)
+        cfg->set_repeat(data->cfg.repeat);
+    if (data->cfg.info)
+        cfg->set_info(data->cfg.info);
+    if (data->cfg.options)
+        cfg->set_options(data->cfg.options);
+    if (data->cfg.host_labels)
+        cfg->set_host_labels(data->cfg.host_labels);
 
     *len = msg.ByteSizeLong();
     char *bin = (char*)mallocz(*len);
