@@ -867,8 +867,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
         netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
-            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"claim_id\": ", host->machine_guid,
-            (host->receiver || host == localhost) ? "true" : "false");
+            wb, "\t\t{ \"guid\": \"%s\", \"reachable\": %s, \"hops\": %d, \"claim_id\": ", host->machine_guid,
+            (host->receiver || host == localhost) ? "true" : "false", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
         netdata_mutex_unlock(&host->receiver_lock);
 
         rrdhost_aclk_state_lock(host);
