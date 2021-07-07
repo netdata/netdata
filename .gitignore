@@ -210,3 +210,7 @@ netdata.cbp
 
 # External dependencies
 externaldeps/
+
+# vim sessions
+Session.vim
+Session.*.vim
