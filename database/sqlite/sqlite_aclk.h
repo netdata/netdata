@@ -70,7 +70,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_SYNC_CHART_SEQ,
     ACLK_DATABASE_MAX_OPCODE,
     ACLK_DATABASE_PUSH_ALERT,
-    ACLK_DATABASE_ALARM_HEALTH_LOG
+    ACLK_DATABASE_ALARM_HEALTH_LOG,
+    ACLK_DATABASE_PUSH_ALERT_CONFIG
 };
 
 struct aclk_chart_payload_t {
@@ -153,6 +154,8 @@ int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_dat
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_send_alarm_health_log(char *node_id);
 void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_send_alarm_configuration (char *config_hash);
+int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
