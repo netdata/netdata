@@ -657,6 +657,10 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     if (unlikely(!host->dbsync_worker))
        return;
 
+    //check if ae->config_hash exists, if not, don't queue it!
+    if (unlikely(!ae->config_hash_id))
+        return;
+
     struct aclk_database_cmd cmd;
     cmd.opcode = ACLK_DATABASE_ADD_ALERT;
     cmd.data = ae;
