@@ -1699,7 +1699,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
 
     struct aclk_alarm_configuration alarm_config;
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    if (sqlite3_step(res) == SQLITE_ROW) {
 
 
             alarm_config.alarm = sqlite3_column_bytes(res, 0) > 0 ? strdupz((char *)sqlite3_column_text(res, 0)) : NULL;
@@ -1733,19 +1733,19 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
             alarm_config.info = sqlite3_column_bytes(res, 24) > 0 ? strdupz((char *)sqlite3_column_text(res, 24)) : NULL;
             alarm_config.options = sqlite3_column_bytes(res, 25) > 0 ? strdupz((char *)sqlite3_column_text(res, 25)) : NULL;
             alarm_config.host_labels = sqlite3_column_bytes(res, 26) > 0 ? strdupz((char *)sqlite3_column_text(res, 26)) : NULL;
+
+            struct provide_alarm_configuration p_alarm_config;
+
+            p_alarm_config.cfg_hash = strdupz((char *) config_hash);
+            p_alarm_config.cfg = alarm_config;
+
+            debug(D_ACLK_SYNC,"Sending alarm config for %s", config_hash);
+
+            aclk_send_provide_alarm_cfg(&p_alarm_config);
+            freez((char *) cmd.data_param);
+            freez(p_alarm_config.cfg_hash);
+            destroy_aclk_alarm_configuration(&alarm_config);
     }
-
-    struct provide_alarm_configuration p_alarm_config;
-
-    p_alarm_config.cfg_hash = strdupz((char *) config_hash);
-    p_alarm_config.cfg = alarm_config;
-
-    debug(D_ACLK_SYNC,"Sending alarm config for %s", config_hash);
-
-    aclk_send_provide_alarm_cfg(&p_alarm_config);
-    freez((char *) cmd.data_param);
-    freez(p_alarm_config.cfg_hash);
-    destroy_aclk_alarm_configuration(&alarm_config);
 
 bind_fail:
     rc = sqlite3_finalize(res);
