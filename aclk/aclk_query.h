@@ -15,6 +15,9 @@ extern pthread_mutex_t query_lock_wait;
 // TODO
 //extern volatile int aclk_connected;
 
+// thread-local ACLK query thread self-reference.
+extern __thread struct aclk_query_thread *aclk_query_thread;
+
 struct aclk_query_thread {
     netdata_thread_t thread;
     int idx;

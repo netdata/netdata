@@ -14,6 +14,8 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
+__thread struct aclk_query_thread *aclk_query_thread = NULL;
+
 typedef struct aclk_query_handler {
     aclk_query_type_t type;
     char *name; // for logging purposes
@@ -256,17 +258,17 @@ aclk_query_handler aclk_query_handlers[] = {
 };
 
 
-static void aclk_query_process_msg(struct aclk_query_thread *info, aclk_query_t query)
+static void aclk_query_process_msg(aclk_query_t query)
 {
     for (int i = 0; aclk_query_handlers[i].type != UNKNOWN; i++) {
         if (aclk_query_handlers[i].type == query->type) {
             debug(D_ACLK, "Processing Queued Message of type: \"%s\"", aclk_query_handlers[i].name);
-            aclk_query_handlers[i].fnc(info->client, query);
+            aclk_query_handlers[i].fnc(aclk_query_thread->client, query);
             aclk_query_free(query);
             if (aclk_stats_enabled) {
                 ACLK_STATS_LOCK;
                 aclk_metrics_per_sample.queries_dispatched++;
-                aclk_queries_per_thread[info->idx]++;
+                aclk_queries_per_thread[aclk_query_thread->idx]++;
                 ACLK_STATS_UNLOCK;
             }
             return;
@@ -275,25 +277,20 @@ static void aclk_query_process_msg(struct aclk_query_thread *info, aclk_query_t 
     fatal("Unknown query in query queue. %u", query->type);
 }
 
-/* Processes messages from queue. Compete for work with other threads
- */
-int aclk_query_process_msgs(struct aclk_query_thread *info)
-{
-    aclk_query_t query;
-    while ((query = aclk_queue_pop()))
-        aclk_query_process_msg(info, query);
-
-    return 0;
-}
-
 /**
  * Main query processing thread
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    struct aclk_query_thread *info = ptr;
+    // assign thread-local self-ref.
+    aclk_query_thread = ptr;
+
     while (!netdata_exit) {
-        aclk_query_process_msgs(info);
+        aclk_query_t query;
+
+        // process msgs from queue continuously.
+        while ((query = aclk_queue_pop()))
+            aclk_query_process_msg(query);
 
         QUERY_THREAD_LOCK;
 
