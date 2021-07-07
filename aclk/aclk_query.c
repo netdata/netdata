@@ -14,25 +14,23 @@ pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
 #define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
-__thread struct aclk_query_thread *aclk_query_thread = NULL;
-
 typedef struct aclk_query_handler {
     aclk_query_type_t type;
     char *name; // for logging purposes
-    int(*fnc)(mqtt_wss_client client, aclk_query_t query);
+    int(*fnc)(struct aclk_query_thread *query_thr, aclk_query_t query);
 } aclk_query_handler;
 
-static int info_metadata(mqtt_wss_client client, aclk_query_t query)
+static int info_metadata(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
-    aclk_send_info_metadata(client,
+    aclk_send_info_metadata(query_thr->client,
         !query->data.metadata_info.initial_on_connect,
         query->data.metadata_info.host);
     return 0;
 }
 
-static int alarms_metadata(mqtt_wss_client client, aclk_query_t query)
+static int alarms_metadata(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
-    aclk_send_alarm_metadata(client,
+    aclk_send_alarm_metadata(query_thr->client,
         !query->data.metadata_info.initial_on_connect);
     return 0;
 }
@@ -78,7 +76,7 @@ static RRDHOST *node_id_2_rrdhost(const char *node_id)
 // TODO this function should be quarantied and written nicely
 // lots of skeletons from initial ACLK Legacy impl.
 // quick and dirty from the start
-static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
+static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
     int retval = 0;
     usec_t t;
@@ -204,7 +202,7 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     }
 
     // send msg.
-    aclk_http_msg_v2(client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
+    aclk_http_msg_v2(query_thr->client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
 
     // log.
     struct timeval tv;
@@ -212,7 +210,7 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     log_access("%llu: %d '[ACLK]:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
         w->id
         , gettid()
-        , aclk_query_thread->idx
+        , query_thr->idx
         , "DATA"
         , sent
         , size
@@ -238,33 +236,33 @@ cleanup:
     return retval;
 }
 
-static int chart_query(mqtt_wss_client client, aclk_query_t query)
+static int chart_query(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
-    aclk_chart_msg(client, query->data.chart_add_del.host, query->data.chart_add_del.chart_name);
+    aclk_chart_msg(query_thr->client, query->data.chart_add_del.host, query->data.chart_add_del.chart_name);
     return 0;
 }
 
-static int alarm_state_update_query(mqtt_wss_client client, aclk_query_t query)
+static int alarm_state_update_query(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
-    aclk_alarm_state_msg(client, query->data.alarm_update);
+    aclk_alarm_state_msg(query_thr->client, query->data.alarm_update);
     // aclk_alarm_state_msg frees the json object including the header it generates
     query->data.alarm_update = NULL;
     return 0;
 }
 
-static int register_node(mqtt_wss_client client, aclk_query_t query) {
+static int register_node(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
     // go unanswered from the cloud
-    aclk_generate_node_registration(client, &query->data.node_creation);
+    aclk_generate_node_registration(query_thr->client, &query->data.node_creation);
     return 0;
 }
 
-static int node_state_update(mqtt_wss_client client, aclk_query_t query) {
+static int node_state_update(struct aclk_query_thread *query_thr, aclk_query_t query) {
     // TODO create a pending registrations list
     // with some timeouts to detect registration requests that
     // go unanswered from the cloud
-    aclk_generate_node_state_update(client, &query->data.node_update);
+    aclk_generate_node_state_update(query_thr->client, &query->data.node_update);
     return 0;
 }
 
@@ -281,17 +279,17 @@ aclk_query_handler aclk_query_handlers[] = {
 };
 
 
-static void aclk_query_process_msg(aclk_query_t query)
+static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
 {
     for (int i = 0; aclk_query_handlers[i].type != UNKNOWN; i++) {
         if (aclk_query_handlers[i].type == query->type) {
             debug(D_ACLK, "Processing Queued Message of type: \"%s\"", aclk_query_handlers[i].name);
-            aclk_query_handlers[i].fnc(aclk_query_thread->client, query);
+            aclk_query_handlers[i].fnc(query_thr, query);
             aclk_query_free(query);
             if (aclk_stats_enabled) {
                 ACLK_STATS_LOCK;
                 aclk_metrics_per_sample.queries_dispatched++;
-                aclk_queries_per_thread[aclk_query_thread->idx]++;
+                aclk_queries_per_thread[query_thr->idx]++;
                 ACLK_STATS_UNLOCK;
             }
             return;
@@ -300,26 +298,30 @@ static void aclk_query_process_msg(aclk_query_t query)
     fatal("Unknown query in query queue. %u", query->type);
 }
 
+/* Processes messages from queue. Compete for work with other threads
+ */
+int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
+{
+    aclk_query_t query;
+    while ((query = aclk_queue_pop()))
+        aclk_query_process_msg(query_thr, query);
+
+    return 0;
+}
+
 /**
  * Main query processing thread
  */
 void *aclk_query_main_thread(void *ptr)
 {
-    // assign thread-local self-ref.
-    aclk_query_thread = ptr;
+    struct aclk_query_thread *query_thr = ptr;
 
     while (!netdata_exit) {
-        aclk_query_t query;
-
-        // process msgs from queue continuously.
-        while ((query = aclk_queue_pop()))
-            aclk_query_process_msg(query);
+        aclk_query_process_msgs(query_thr);
 
         QUERY_THREAD_LOCK;
-
         if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
             sleep_usec(USEC_PER_SEC * 1);
-
         QUERY_THREAD_UNLOCK;
     }
     return NULL;
