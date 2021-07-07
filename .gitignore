@@ -165,6 +165,7 @@ diagrams/plantuml.jar
 # cppcheck
 cppcheck-build/
 
+# python virtual environment
 venv/
 
 # debugging / profiling
