@@ -35,6 +35,8 @@ int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae);
 void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name);
 
+void aclk_host_state_update(RRDHOST *host, int connect);
+
 #define NETDATA_ACLK_HOOK                                                                                              \
     { .name = "ACLK_Main",                                                                                             \
       .config_section = NULL,                                                                                          \

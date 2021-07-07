@@ -73,7 +73,7 @@ void legacy_aclk_alarm_reload(void);
 unsigned long int aclk_reconnect_delay(int mode);
 extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host);
 
-void aclk_host_state_update(RRDHOST *host, ACLK_CMD cmd);
+void legacy_aclk_host_state_update(RRDHOST *host, int connect);
 int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);
 void aclk_update_next_child_to_popcorn(void);
 

@@ -55,11 +55,33 @@ static usec_t aclk_web_api_v1_request(RRDHOST *host, struct web_client *w, char 
     return t;
 }
 
+static RRDHOST *node_id_2_rrdhost(const char *node_id)
+{
+    int res;
+    uuid_t node_id_bin, host_id_bin;
+    char host_id[UUID_STR_LEN];
+    if (uuid_parse(node_id, node_id_bin)) {
+        error("Couldn't parse UUID %s", node_id);
+        return NULL;
+    }
+    if ((res = get_host_id(&node_id_bin, &host_id_bin))) {
+        error("node not found rc=%d", res);
+        return NULL;
+    }
+    uuid_unparse_lower(host_id_bin, host_id);
+    return rrdhost_find_by_guid(host_id, 0);
+}
+
+#define NODE_ID_QUERY "/node/"
+// TODO this function should be quarantied and written nicely
+// lots of skeletons from initial ACLK Legacy impl.
+// quick and dirty from the start
 static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
 {
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
+    RRDHOST *query_host = localhost;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
@@ -76,6 +98,24 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
     w->acl = 0x1f;
 
+    if (!strncmp(query->data.http_api_v2.query, NODE_ID_QUERY, strlen(NODE_ID_QUERY))) {
+        char *node_uuid = query->data.http_api_v2.query + strlen(NODE_ID_QUERY);
+        char nodeid[UUID_STR_LEN];
+        if (strlen(node_uuid) < (UUID_STR_LEN - 1)) {
+            error("URL requests node_id but there is not enough chars following");
+            retval = 1;
+            goto cleanup;
+        }
+        strncpyz(nodeid, node_uuid, UUID_STR_LEN - 1);
+
+        query_host = node_id_2_rrdhost(nodeid);
+        if (!query_host) {
+            error("Host with node_id \"%s\" not found! Query Ignored!", node_uuid);
+            retval = 1;
+            goto cleanup;
+        }
+    }
+
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
         url_decode_r(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE + 1);
@@ -86,7 +126,7 @@ static int http_api_v2(mqtt_wss_client client, aclk_query_t query)
     mysep = strrchr(query->data.http_api_v2.query, '/');
 
     // execute the query
-    t = aclk_web_api_v1_request(localhost, w, mysep ? mysep + 1 : "noop");
+    t = aclk_web_api_v1_request(query_host, w, mysep ? mysep + 1 : "noop");
 
 #ifdef NETDATA_WITH_ZLIB
     // check if gzip encoding can and should be used
@@ -187,6 +227,22 @@ static int alarm_state_update_query(mqtt_wss_client client, aclk_query_t query)
     return 0;
 }
 
+static int register_node(mqtt_wss_client client, aclk_query_t query) {
+    // TODO create a pending registrations list
+    // with some timeouts to detect registration requests that
+    // go unanswered from the cloud
+    aclk_generate_node_registration(client, &query->data.node_creation);
+    return 0;
+}
+
+static int node_state_update(mqtt_wss_client client, aclk_query_t query) {
+    // TODO create a pending registrations list
+    // with some timeouts to detect registration requests that
+    // go unanswered from the cloud
+    aclk_generate_node_state_update(client, &query->data.node_update);
+    return 0;
+}
+
 aclk_query_handler aclk_query_handlers[] = {
     { .type = HTTP_API_V2,        .name = "http api request v2", .fnc = http_api_v2              },
     { .type = ALARM_STATE_UPDATE, .name = "alarm state update",  .fnc = alarm_state_update_query },
@@ -194,6 +250,8 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = METADATA_ALARMS,    .name = "alarms metadata",     .fnc = alarms_metadata          },
     { .type = CHART_NEW,          .name = "chart new",           .fnc = chart_query              },
     { .type = CHART_DEL,          .name = "chart delete",        .fnc = info_metadata            },
+    { .type = REGISTER_NODE,      .name = "register node",       .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,  .name = "node state update",   .fnc = node_state_update        },
     { .type = UNKNOWN,            .name = NULL,                  .fnc = NULL                     }
 };
 

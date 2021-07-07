@@ -146,6 +146,19 @@ void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *modu
     error_report("No usable aclk_del_collector implementation");
 }
 
+void aclk_host_state_update(RRDHOST *host, int connect)
+{
+#ifdef ACLK_NG
+    if (aclk_ng)
+        return ng_aclk_host_state_update(host, connect);
+#endif
+#ifdef ACLK_LEGACY
+    if (!aclk_ng)
+        return legacy_aclk_host_state_update(host, connect);
+#endif
+    error_report("Couldn't use any version of aclk_host_state_update");
+}
+
 #endif /* ENABLE_ACLK */
 
 struct label *add_aclk_host_labels(struct label *label) {

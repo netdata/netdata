@@ -3,6 +3,9 @@
 AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
+nodist_netdata_SOURCES=$(NULL)
+BUILT_SOURCES=$(NULL)
+
 MAINTAINERCLEANFILES = \
     config.log config.status \
     $(srcdir)/Makefile.in \
@@ -572,7 +575,39 @@ ACLK_NG_FILES = \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
     mqtt_websockets/MQTT-C/src/mqtt.c \
     mqtt_websockets/MQTT-C/include/mqtt.h \
+    aclk/schema-wrappers/connection.cc \
+    aclk/schema-wrappers/connection.h \
+    aclk/schema-wrappers/node_connection.cc \
+    aclk/schema-wrappers/node_connection.h \
+    aclk/schema-wrappers/node_creation.cc \
+    aclk/schema-wrappers/node_creation.h \
+    aclk/schema-wrappers/schema_wrappers.h \
+    aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
+
+ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+    aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
+    $(NULL)
+
+BUILT_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
+nodist_netdata_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
+
+aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
+aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
+aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
 endif #ACLK_NG
 
 if ENABLE_ACLK
@@ -784,12 +819,15 @@ netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
+if ACLK_NG
+    netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS)
+endif
+
 if ACLK_LEGACY
 netdata_LDADD += \
     $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_LWS_LIBS) \
-    $(NETDATA_COMMON_LIBS) \
     $(NULL)
 endif #ACLK_LEGACY
 
@@ -899,12 +937,15 @@ endif
 
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES) $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
-    BUILT_SOURCES = \
+    netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
+        $(OPTIONAL_PROTOBUF_LIBS) \
+        $(NULL)
+    BACKEND_PROMETHEUS_BUILT_SOURCES = \
         exporting/prometheus/remote_write/remote_write.pb.cc \
         exporting/prometheus/remote_write/remote_write.pb.h \
         $(NULL)
-    nodist_netdata_SOURCES = $(BUILT_SOURCES)
+    BUILT_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
+    nodist_netdata_SOURCES += $(BACKEND_PROMETHEUS_BUILT_SOURCES)
 
 exporting/prometheus/remote_write/remote_write.pb.cc \
 exporting/prometheus/remote_write/remote_write.pb.h: exporting/prometheus/remote_write/remote_write.proto
@@ -1033,14 +1074,17 @@ if ENABLE_UNITTESTS
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     exporting_tests_exporting_engine_testdriver_SOURCES += $(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES)
-    exporting_tests_exporting_engine_testdriver_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    exporting_tests_exporting_engine_testdriver_LDADD += \
+        $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS) \
+        $(OPTIONAL_PROTOBUF_LIBS) \
+        $(NULL)
     exporting_tests_exporting_engine_testdriver_LDFLAGS += \
         -Wl,--wrap=init_write_request \
         -Wl,--wrap=add_host_info \
         -Wl,--wrap=add_label \
         -Wl,--wrap=add_metric \
         $(NULL)
-    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BUILT_SOURCES)
+    nodist_exporting_tests_exporting_engine_testdriver_SOURCES = $(BACKEND_PROMETHEUS_BUILT_SOURCES)
 endif
 if ENABLE_BACKEND_KINESIS
     exporting_tests_exporting_engine_testdriver_SOURCES += $(KINESIS_EXPORTING_FILES)

@@ -10,6 +10,9 @@
 #define UUID_STR_LEN 37
 #endif
 
+int aclk_use_new_cloud_arch = 0;
+usec_t aclk_session_newarch = 0;
+
 aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str) {
     if (!strcmp(str, "json")) {
         return ACLK_ENC_JSON;
@@ -107,18 +110,35 @@ struct topic_name {
     // in answer to /password endpoint
     const char *name;
 } topic_names[] = {
-    { .id = ACLK_TOPICID_CHART,    .name = "chart"     },
-    { .id = ACLK_TOPICID_ALARMS,   .name = "alarms"    },
-    { .id = ACLK_TOPICID_METADATA, .name = "meta"      },
-    { .id = ACLK_TOPICID_COMMAND,  .name = "inbox-cmd" },
-    { .id = ACLK_TOPICID_UNKNOWN,  .name = NULL        }
+    { .id = ACLK_TOPICID_CHART,       .name = "chart"                    },
+    { .id = ACLK_TOPICID_ALARMS,      .name = "alarms"                   },
+    { .id = ACLK_TOPICID_METADATA,    .name = "meta"                     },
+    { .id = ACLK_TOPICID_COMMAND,     .name = "inbox-cmd"                },
+    { .id = ACLK_TOPICID_AGENT_CONN,  .name = "agent-connection"         },
+    { .id = ACLK_TOPICID_CMD_NG_V1,   .name = "inbox-cmd-v1"             },
+    { .id = ACLK_TOPICID_CREATE_NODE, .name = "create-node-instance"     },
+    { .id = ACLK_TOPICID_NODE_CONN,   .name = "node-instance-connection" },
+    { .id = ACLK_TOPICID_UNKNOWN,     .name = NULL                       }
 };
 
-enum aclk_topics compulsory_topics[] = {
+enum aclk_topics compulsory_topics_legacy[] = {
     ACLK_TOPICID_CHART,
     ACLK_TOPICID_ALARMS,
     ACLK_TOPICID_METADATA,
     ACLK_TOPICID_COMMAND,
+    ACLK_TOPICID_UNKNOWN
+};
+
+enum aclk_topics compulsory_topics_new_cloud_arch[] = {
+// TODO remove old topics once not needed anymore
+    ACLK_TOPICID_CHART,
+    ACLK_TOPICID_ALARMS,
+    ACLK_TOPICID_METADATA,
+    ACLK_TOPICID_COMMAND,
+    ACLK_TOPICID_AGENT_CONN,
+    ACLK_TOPICID_CMD_NG_V1,
+    ACLK_TOPICID_CREATE_NODE,
+    ACLK_TOPICID_NODE_CONN,
     ACLK_TOPICID_UNKNOWN
 };
 
@@ -186,7 +206,7 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
             }
             topic->topic_id = topic_name_to_id(json_object_get_string(json_object_iter_peek_value(&it)));
             if (topic->topic_id == ACLK_TOPICID_UNKNOWN) {
-                info("topic dictionary has unknown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
+                debug(D_ACLK, "topic dictionary has unknown topic name \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
             }
             json_object_iter_next(&it);
             continue;
@@ -243,6 +263,8 @@ int aclk_generate_topic_cache(struct json_object *json)
             return 1;
         }
     }
+
+    enum aclk_topics *compulsory_topics = aclk_use_new_cloud_arch ? compulsory_topics_new_cloud_arch : compulsory_topics_legacy;
 
     for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
         if (!aclk_get_topic(compulsory_topics[i])) {

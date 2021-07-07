@@ -8,6 +8,9 @@
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
 
+extern int aclk_use_new_cloud_arch;
+extern usec_t aclk_session_newarch;
+
 typedef enum {
     ACLK_ENC_UNKNOWN = 0,
     ACLK_ENC_JSON,
@@ -51,11 +54,15 @@ void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc);
 void aclk_env_t_destroy(aclk_env_t *env);
 
 enum aclk_topics {
-    ACLK_TOPICID_UNKNOWN  = 0,
-    ACLK_TOPICID_CHART    = 1,
-    ACLK_TOPICID_ALARMS   = 2,
-    ACLK_TOPICID_METADATA = 3,
-    ACLK_TOPICID_COMMAND  = 4
+    ACLK_TOPICID_UNKNOWN     = 0,
+    ACLK_TOPICID_CHART       = 1,
+    ACLK_TOPICID_ALARMS      = 2,
+    ACLK_TOPICID_METADATA    = 3,
+    ACLK_TOPICID_COMMAND     = 4,
+    ACLK_TOPICID_AGENT_CONN  = 5,
+    ACLK_TOPICID_CMD_NG_V1   = 6,
+    ACLK_TOPICID_CREATE_NODE = 7,
+    ACLK_TOPICID_NODE_CONN   = 8
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);

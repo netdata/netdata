@@ -796,6 +796,14 @@ set(ACLK_NG_FILES
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
         mqtt_websockets/MQTT-C/src/mqtt.c
         mqtt_websockets/MQTT-C/include/mqtt.h
+        aclk/schema-wrappers/connection.cc
+        aclk/schema-wrappers/connection.h
+        aclk/schema-wrappers/node_connection.cc
+        aclk/schema-wrappers/node_connection.h
+        aclk/schema-wrappers/node_creation.cc
+        aclk/schema-wrappers/node_creation.h
+        aclk/schema-wrappers/schema_wrappers.h
+        aclk/schema-wrappers/schema_wrapper_utils.h
         )
 
 set(SPAWN_PLUGIN_FILES
@@ -1038,9 +1046,58 @@ ELSE()
     message(STATUS "agent-cloud-link Legacy: disabled")
 ENDIF()
 
+find_package(Protobuf REQUIRED)
+
+function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
+  if(NOT ARGN)
+    message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
+    return()
+  endif()
+
+  set(${SRCS})
+  set(${HDRS})
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
+    set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+    set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+# cmake > 3.20 required :(
+#    cmake_path(SET GENERATED_PB_CC "${DIR}")
+#    cmake_path(SET GENERATED_PB_H "${DIR}")
+#    cmake_path(APPEND GENERATED_PB_CC "${FIL_WE}.pb.cc")
+#    cmake_path(APPEND GENERATED_PB_H "${FIL_WE}.pb.h")
+
+    list(APPEND ${SRCS} ${GENERATED_PB_CC})
+    list(APPEND ${HDRS} ${GENERATED_PB_H})
+    add_custom_command(
+      OUTPUT ${GENERATED_PB_CC}
+             ${GENERATED_PB_H}
+      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+      ARGS -I=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas --cpp_out=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas ${ABS_FIL}
+      DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+      VERBATIM )
+  endforeach()
+  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+endfunction()
+
+set(ACLK_NG_PROTO_DEFS
+        aclk/aclk-schemas/proto/agent/v1/connection.proto
+        aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+        aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+        )
+PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
+
+list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES})
+list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
+list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
-list(APPEND NETDATA_FILES ${ACLK_NG_FILES})
+list(APPEND NETDATA_FILES ${ACLK_NG_FILES} ${ACLK_NG_PROTO_BUILT_SRCS} ${ACLK_NG_PROTO_BUILT_HDRS})
 list(APPEND NETDATA_FILES ${ACLK_COMMON_FILES})
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
