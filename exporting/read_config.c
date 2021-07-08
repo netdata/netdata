@@ -2,7 +2,9 @@
 
 #include "exporting_engine.h"
 
-struct config exporting_config = { .mutex = NETDATA_MUTEX_INITIALIZER,
+struct config exporting_config = { .first_section = NULL,
+                                   .last_section = NULL,
+                                   .mutex = NETDATA_MUTEX_INITIALIZER,
                                    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                               .rwlock = AVL_LOCK_INITIALIZER } };
 

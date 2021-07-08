@@ -16,7 +16,8 @@ static netdata_idx_t *swap_values = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 
 static ebpf_data_t swap_data;
-struct config swap_config = {
+struct config swap_config = { .first_section = NULL,
+    .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };

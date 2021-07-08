@@ -17,7 +17,8 @@ static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
                                               NULL, NULL,  NULL};
 
-struct config sync_config = {
+struct config sync_config = { .first_section = NULL,
+    .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };

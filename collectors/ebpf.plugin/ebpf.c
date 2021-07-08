@@ -58,7 +58,9 @@ char *ebpf_algorithms[] = {"absolute", "incremental"};
 int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
-struct config collector_config = { .mutex = NETDATA_MUTEX_INITIALIZER,
+struct config collector_config = { .first_section = NULL,
+                                   .last_section = NULL,
+                                   .mutex = NETDATA_MUTEX_INITIALIZER,
                                    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                               .rwlock = AVL_LOCK_INITIALIZER } };
 

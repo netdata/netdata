@@ -20,7 +20,8 @@ static netdata_idx_t *dcstat_values = NULL;
 
 static int read_thread_closed = 1;
 
-struct config dcstat_config = {
+struct config dcstat_config = { .first_section = NULL,
+    .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };

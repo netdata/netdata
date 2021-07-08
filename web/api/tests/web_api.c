@@ -196,7 +196,9 @@ WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 char *netdata_configured_web_dir = "UNKNOWN FIXME";
 RRDHOST *localhost = NULL;
 
-struct config netdata_config = { .mutex = NETDATA_MUTEX_INITIALIZER,
+struct config netdata_config = { .first_section = NULL,
+                                 .last_section = NULL,
+                                 .mutex = NETDATA_MUTEX_INITIALIZER,
                                  .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                             .rwlock = AVL_LOCK_INITIALIZER } };
 

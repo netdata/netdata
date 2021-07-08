@@ -30,7 +30,8 @@ static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input =
                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                        {.name = NULL, .internal_input = 0, .user_input = 0}};
 
-struct config vfs_config = {
+struct config vfs_config = { .first_section = NULL,
+    .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
     .rwlock = AVL_LOCK_INITIALIZER } };
