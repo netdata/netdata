@@ -7,7 +7,7 @@
 
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
-#define ACLK_MAX_CHART_UPDATES  (5)
+#define ACLK_MAX_CHART_UPDATES  (10)
 #define ACLK_MAX_ALERT_UPDATES  (5)
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
