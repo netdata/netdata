@@ -972,7 +972,12 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
 
 void aclk_send_node_instances()
 {
-    struct node_instance_list *list = get_node_list();
+    struct node_instance_list *list_head = get_node_list();
+    struct node_instance_list *list = list_head;
+    if (unlikely(!list)) {
+        error_report("Failure to get_node_list from DB!");
+        return;
+    }
     while (!uuid_is_null(list->host_id)) {
         if (!uuid_is_null(list->node_id)) {
             aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
@@ -1001,4 +1006,5 @@ void aclk_send_node_instances()
 
         list++;
     }
+    freez(list_head);
 }
