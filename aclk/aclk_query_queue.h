@@ -47,6 +47,7 @@ struct aclk_query {
     char *callback_topic;
     char *msg_id;
 
+    struct timeval created_tv;
     usec_t created;
 
     aclk_query_t next;

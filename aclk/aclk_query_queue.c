@@ -20,7 +20,9 @@ static struct aclk_query_queue {
 
 static inline int _aclk_queue_query(aclk_query_t query)
 {
+    now_realtime_timeval(&query->created_tv);
     query->created = now_realtime_usec();
+
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
@@ -110,7 +112,7 @@ void aclk_query_free(aclk_query_t query)
 
     if (query->type == CHART_NEW)
         freez(query->data.chart_add_del.chart_name);
-    
+
     if (query->type == ALARM_STATE_UPDATE && query->data.alarm_update)
         json_object_put(query->data.alarm_update);
 
