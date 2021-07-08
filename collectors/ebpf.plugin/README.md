@@ -327,8 +327,11 @@ filesystems are monitored.
 ```conf
 [filesystem]
     ext4dist = yes
+    nfsdist = yes
     xfsdist = yes
 ```
+
+The ebpf program `nfsdist` monitors only `nfs` mount points.
 
 ## Troubleshooting
 

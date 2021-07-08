@@ -28,7 +28,8 @@ enum netdata_filesystem_flags {
     NETDATA_FILESYSTEM_FLAG_HAS_PARTITION = 2,
     NETDATA_FILESYSTEM_FLAG_CHART_CREATED = 4,
     NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE = 8,
-    NETDATA_FILESYSTEM_REMOVE_CHARTS = 16
+    NETDATA_FILESYSTEM_REMOVE_CHARTS = 16,
+    NETDATA_FILESYSTEM_ATTR_CHARTS = 32
 };
 
 enum netdata_filesystem_table {
@@ -38,6 +39,7 @@ enum netdata_filesystem_table {
 
 typedef struct ebpf_filesystem_partitions {
     char *filesystem;
+    char *optional_filesystem;
     char *family;
     char *family_name;
     struct bpf_object *objects;
@@ -46,7 +48,7 @@ typedef struct ebpf_filesystem_partitions {
     netdata_ebpf_histogram_t hread;
     netdata_ebpf_histogram_t hwrite;
     netdata_ebpf_histogram_t hopen;
-    netdata_ebpf_histogram_t hsync;
+    netdata_ebpf_histogram_t hadditional;
 
     uint32_t flags;
     uint32_t enabled;
