@@ -39,6 +39,7 @@ enum netdata_filesystem_table {
 
 typedef struct ebpf_filesystem_partitions {
     char *filesystem;
+    char *optional_filesystem;
     char *family;
     char *family_name;
     struct bpf_object *objects;

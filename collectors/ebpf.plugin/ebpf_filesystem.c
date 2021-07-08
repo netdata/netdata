@@ -10,6 +10,7 @@ struct config fs_config = { .first_section = NULL,
 
 ebpf_filesystem_partitions_t localfs[] =
     {{.filesystem = "ext4",
+      .optional_filesystem = NULL,
       .family = "EXT4",
       .objects = NULL,
       .probe_links = NULL,
@@ -17,6 +18,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0}},
      {.filesystem = "xfs",
+      .optional_filesystem = NULL,
       .family = "XFS",
       .objects = NULL,
       .probe_links = NULL,
@@ -24,6 +26,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0}},
      {.filesystem = "nfs",
+      .optional_filesystem = "nfs4",
       .family = "NFS",
       .objects = NULL,
       .probe_links = NULL,
@@ -31,6 +34,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0}},
      {.filesystem = NULL,
+      .optional_filesystem = NULL,
       .family = NULL,
       .objects = NULL,
       .probe_links = NULL,
@@ -249,7 +253,8 @@ static int ebpf_read_local_partitions()
 
         for (i = 0; localfs[i].filesystem; i++) {
             ebpf_filesystem_partitions_t *w = &localfs[i];
-            if (w->enabled && !strcmp(fs, w->filesystem)) {
+            if (w->enabled && (!strcmp(fs, w->filesystem) ||
+                              (w->optional_filesystem && !strcmp(fs, w->optional_filesystem)))) {
                 localfs[i].flags |= NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
                 localfs[i].flags &= ~NETDATA_FILESYSTEM_REMOVE_CHARTS;
                 count++;
