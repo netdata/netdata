@@ -96,7 +96,7 @@ static void async_cb(uv_async_t *handle)
     debug(D_ACLK_SYNC, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
-#define TIMER_PERIOD_MS (5000)
+#define TIMER_PERIOD_MS (2000)
 
 static void timer_cb(uv_timer_t* handle)
 {
@@ -974,8 +974,8 @@ fail:
         info("DEBUG: %s pushing chart seq %" PRIu64 " - %" PRIu64", t=%ld batch_id=%"PRIu64, wc->uuid_str, first_sequence, last_sequence, last_timestamp, wc->batch_id);
         db_execute(buffer_tostring(sql));
     }
-    else
-        info("DEBUG: %s no chart changes detected", wc->uuid_str);
+    //else
+    //    info("DEBUG: %s no chart changes detected", wc->uuid_str);
     if  (count == 0) {
         freez(payload_list);
         freez(payload_list_size);
