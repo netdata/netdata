@@ -7,6 +7,9 @@ gcs-credentials.json
 .project
 .pydevproject
 
+# local dev outputs
+dist/
+
 *.o
 *.a
 config.h.in
@@ -165,6 +168,7 @@ diagrams/plantuml.jar
 # cppcheck
 cppcheck-build/
 
+# python virtual environment
 venv/
 
 # debugging / profiling
@@ -209,3 +213,7 @@ netdata.cbp
 
 # External dependencies
 externaldeps/
+
+# vim sessions
+Session.vim
+Session.*.vim
