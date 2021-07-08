@@ -135,6 +135,7 @@ configure any of these collectors according to your setup and infrastructure.
 -   [Riak KV](/collectors/python.d.plugin/riakkv/README.md): Collect database stats from the `/stats` endpoint.
 -   [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper/): Monitor application
     health metrics reading the server's response to the `mntr` command.
+-   [Memcached](/collectors/python.d.plugin/memcached/README.md): Collect memory-caching system performance metrics.
 
 ### Distributed computing
 
@@ -417,7 +418,6 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
     `proc.plugin` collector.
 -   [KSM](/collectors/proc.plugin/README.md): Measure the amount of merging, savings, and effectiveness using the
     `proc.plugin` collector.
--   [Memcached](/collectors/python.d.plugin/memcached/README.md): Collect memory-caching system performance metrics.
 -   [Numa](/collectors/proc.plugin/README.md): Gather metrics on the number of non-uniform memory access (NUMA) events
     every second using the `proc.plugin` collector.
 -   [Page faults](/collectors/proc.plugin/README.md): Collect the number of memory page faults per second using the
@@ -496,7 +496,7 @@ collectors are described only in code and associated charts in Netdata dashboard
 -   [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
     Agent is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
 -   [Alarms](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/alarms): This collector creates an
-    <strong>Alarms</strong> menu with one line plot showing the alarm states of a Netdata Agent over time.
+    **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
 -   [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the
     Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
 -   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
