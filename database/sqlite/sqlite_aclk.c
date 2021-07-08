@@ -1222,6 +1222,7 @@ void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
         return;
 
     debug(D_ACLK_SYNC, "NODE %s reports last sequence id received %"PRIu64, node_id, last_sequence_id);
+    info("DEBUG: NODE %s reports last sequence id received %"PRIu64, node_id, last_sequence_id);
     aclk_submit_param_command(node_id, ACLK_DATABASE_CHART_ACK, last_sequence_id);
     return;
 }
@@ -1246,8 +1247,22 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
+
+    buffer_sprintf(sql, "CREATE TABLE ts_%s AS SELECT * FROM aclk_chart_%s WHERE date_submitted IS NULL "
+                        "AND update_count = 0;", wc->uuid_str, wc->uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
+
+//    buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, type, unique_id, update_count, date_created) "
+//                        " select uuid, 'pending', type, unique_id, 0, strftime('%%s') from aclk_chart_%s s "
+//                        " WHERE status = 'processing' AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
+//                        " AND s.uuid NOT IN (SELECT t.uuid FROM aclk_chart_%s t WHERE t.uuid = s.uuid AND t.status = 'pending');",
+//                   wc->uuid_str, wc->uuid_str, first_sequence, last_sequence, wc->uuid_str);
+
+
+
     buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
-       "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL and update_count > 0);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+       "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
@@ -1265,6 +1280,9 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
                    wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
+
+    buffer_sprintf(sql, "DROP TABLE IF EXISTS ts_%s;", wc->uuid_str);
+    db_execute(buffer_tostring(sql));
 
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
