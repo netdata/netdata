@@ -1458,8 +1458,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         goto fail_complete;
     }
 
-
-
     int count = 0;
     char *claim_id = is_agent_claimed();
     while (sqlite3_step(res) == SQLITE_ROW) {
@@ -1529,9 +1527,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         error_report("Failed to finalize statement to send Alarm Entries from the database, rc = %d", rc);
         goto fail_complete;
     }
-
-
-
 
     //need stuff
     freez(claim_id);
@@ -1633,6 +1628,8 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     alarm_log.node_id = get_str_from_uuid(wc->host->node_id);
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
+
+    wc->alert_sequence_id = last_sequence;
 
     aclk_send_alarm_log_health(&alarm_log);
     freez(alarm_log.claim_id);
