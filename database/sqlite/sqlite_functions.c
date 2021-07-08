@@ -2541,7 +2541,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 2, ae->flags);
+    rc = sqlite3_bind_int64(res, 2, (uint64_t)ae->flags);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind flags parameter for SQL_UPDATE_HEALTH_LOG");
         goto failed;
@@ -2667,7 +2667,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 11, ae->flags);
+    rc = sqlite3_bind_int64(res, 11, (uint64_t)ae->flags);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind flags parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -3233,7 +3233,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae->duration = sqlite3_column_int(res, 8);
         ae->non_clear_duration = sqlite3_column_int(res, 9);
 
-        ae->flags = sqlite3_column_int(res, 10);
+        ae->flags = sqlite3_column_int64(res, 10);
         ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
 
         ae->exec_run_timestamp = sqlite3_column_int(res, 11);

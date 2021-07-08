@@ -1580,12 +1580,12 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select aa.sequence_id, aa.date_submitted, \
+    buffer_sprintf(sql, "select aa.sequence_id, aa.date_created, \
                          (select laa.sequence_id from aclk_alert_%s laa \
-                         where laa.date_submitted is not null order by laa.sequence_id desc limit 1), \
-                         (select laa.date_submitted from aclk_alert_%s laa \
-                         where laa.date_submitted is not null order by laa.sequence_id desc limit 1) \
-                         from aclk_alert_%s aa where aa.date_submitted is not null order by aa.sequence_id asc limit 1;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+                         order by laa.sequence_id desc limit 1), \
+                         (select laa.date_created from aclk_alert_%s laa \
+                         order by laa.sequence_id desc limit 1) \
+                         from aclk_alert_%s aa order by aa.sequence_id asc limit 1;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
