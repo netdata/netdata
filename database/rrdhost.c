@@ -306,7 +306,6 @@ RRDHOST *rrdhost_create(const char *hostname,
                 int rc = sql_create_health_log_table(host);
                 if (unlikely(rc)) {
                     error_report("Failed to create health log table in the database");
-
                     health_alarm_log_load(host);
                     health_alarm_log_open(host);
                 }

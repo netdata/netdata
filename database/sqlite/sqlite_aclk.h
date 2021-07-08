@@ -107,6 +107,7 @@ struct aclk_database_worker_config {
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
+    uint64_t alert_sequence_id; // last alert sequence_id
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;

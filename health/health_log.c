@@ -454,8 +454,6 @@ inline void health_alarm_log_load(RRDHOST *host) {
         health_alarm_log_read(host, fp, host->health_log_filename);
         fclose(fp);
     }
-
-    health_alarm_log_open(host);
 }
 
 // ----------------------------------------------------------------------------
