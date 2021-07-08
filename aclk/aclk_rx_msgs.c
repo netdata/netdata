@@ -270,10 +270,28 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     }
     if (!strcmp(message_type, "CreateNodeInstanceResult")) {
         node_instance_creation_result_t res = parse_create_node_instance_result(msg, msg_len);
+        if (!res.machine_guid || !res.node_id) {
+            error_report("Error parsing CreateNodeInstanceResult");
+            freez(res.machine_guid);
+            freez(res.node_id);
+            return;
+        }
+
         debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
+
         uuid_t host_id, node_id;
-        uuid_parse(res.machine_guid, host_id);
-        uuid_parse(res.node_id, node_id);
+        if (uuid_parse(res.machine_guid, host_id)) {
+            error("Error parsing machine_guid provided by CreateNodeInstanceResult");
+            freez(res.machine_guid);
+            freez(res.node_id);
+            return;
+        }
+        if (uuid_parse(res.node_id, node_id)) {
+            error("Error parsing node_id provided by CreateNodeInstanceResult");
+            freez(res.machine_guid);
+            freez(res.node_id);
+            return;
+        }
         update_node_id(&host_id, &node_id);
 
         aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
