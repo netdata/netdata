@@ -346,9 +346,11 @@ void aclk_set_architecture(int mode)
 }
 
 
-int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size) {
+int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
+{
     sqlite3_stmt *res = NULL;
     int rc;
+    int payload_sent = 0;
 
     BUFFER *sql = buffer_create(1024);
 
@@ -364,7 +366,6 @@ int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t paylo
         return 0;
     }
 
-
     rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
@@ -373,26 +374,16 @@ int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t paylo
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    int payload_sent = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         payload_sent = sqlite3_column_int(res, 0);
     }
-
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when checking for payload, rc = %d", rc);
-
-    return payload_sent;
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to reset statement in check payload, rc = %d", rc);
     buffer_free(sql);
-    return 0;
+    return payload_sent;
 }
-
-
-
 
 int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, int payload_type, void *payload, size_t payload_size)
 {
@@ -401,8 +392,7 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, int pay
 
     BUFFER *sql = buffer_create(1024);
 
-    //uuid, claim_id, type, date_created, payload
-    rc = chart_payload_sent (uuid_str, uuid, payload, payload_size);
+    rc = chart_payload_sent(uuid_str, uuid, payload, payload_size);
     info("DEBUG: Checking if payload already sent, RC = %d", rc);
     if (rc == 1)
         return 0;
@@ -1174,8 +1164,9 @@ void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_datab
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE sequence_id <= @sequence_id AND date_submitted IS NOT NULL;",
-                   wc->uuid_str);
+    buffer_sprintf(sql, "UPDATE aclk_chart_%s set date_updated=strftime('%%s') WHERE sequence_id <= @sequence_id "
+            "AND date_submitted IS NOT NULL;", wc->uuid_str);
+
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement count sequence ids in the database");
@@ -1191,13 +1182,11 @@ void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_datab
         error_report("Failed to delete sequence ids, rc = %d", rc);
 
 bind_fail:
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize statement to delete older sequence ids, rc = %d", rc);
 
 prepare_fail:
     buffer_free(sql);
-
     return;
 }
 
