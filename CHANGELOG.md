@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Fixes coverity errors in ACLK [\#11322](https://github.com/netdata/netdata/pull/11322) ([underhood](https://github.com/underhood))
+- Fix tiny issues in docs [\#11320](https://github.com/netdata/netdata/pull/11320) ([UmanShahzad](https://github.com/UmanShahzad))
+- Add some more entries to gitignore [\#11319](https://github.com/netdata/netdata/pull/11319) ([UmanShahzad](https://github.com/UmanShahzad))
+- Add HTTP access log messages for ACLK-NG [\#11318](https://github.com/netdata/netdata/pull/11318) ([UmanShahzad](https://github.com/UmanShahzad))
 - Updated dashboard version. [\#11316](https://github.com/netdata/netdata/pull/11316) ([allelos](https://github.com/allelos))
+- eBPF NFS monitoring [\#11313](https://github.com/netdata/netdata/pull/11313) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add hop count for children [\#11311](https://github.com/netdata/netdata/pull/11311) ([stelfrag](https://github.com/stelfrag))
 - fix various python modules charts contexts [\#11310](https://github.com/netdata/netdata/pull/11310) ([ilyam8](https://github.com/ilyam8))
 - \[docs\] fix prometheus node cpu alert rule [\#11309](https://github.com/netdata/netdata/pull/11309) ([ilyam8](https://github.com/ilyam8))
@@ -306,10 +311,6 @@
 - update\_kernel\_version: Fix overflow on Centos and probably Ubuntu [\#10704](https://github.com/netdata/netdata/pull/10704) ([thiagoftsm](https://github.com/thiagoftsm))
 - Docs: Convert references to `service` to `systemctl` [\#10703](https://github.com/netdata/netdata/pull/10703) ([joelhans](https://github.com/joelhans))
 - Add noauthcodecheck workaround flag to the freeipmi plugin [\#10701](https://github.com/netdata/netdata/pull/10701) ([vlvkobal](https://github.com/vlvkobal))
-- Add guide: LAMP stack monitoring [\#10698](https://github.com/netdata/netdata/pull/10698) ([joelhans](https://github.com/joelhans))
-- Log ACLK cloud commands to access.log [\#10697](https://github.com/netdata/netdata/pull/10697) ([stelfrag](https://github.com/stelfrag))
-- Add Linux page cache metrics to eBPF [\#10693](https://github.com/netdata/netdata/pull/10693) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update guide: Kubernetes monitoring with Netdata: Overview and visualizations [\#10691](https://github.com/netdata/netdata/pull/10691) ([joelhans](https://github.com/joelhans))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
