@@ -110,6 +110,46 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     rrdset_done(st);
 }
 
+static char *cloud_req_http_type_names[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT] = {
+    "other",
+    "info",
+    "data",
+    "alarms",
+    "alarm_log",
+    "chart",
+    "charts"
+    // if you change then update `ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT`.
+};
+
+int aclk_cloud_req_http_type_to_idx(const char *name)
+{
+    for (int i = 1; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+        if (!strcmp(cloud_req_http_type_names[i], name))
+            return i;
+    return 0;
+}
+
+static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_sample)
+{
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_rq_types[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+            "netdata", "aclk_cloud_req_http_type", NULL, "aclk", NULL, "Requests received from cloud via HTTP by their type", "req/s",
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+            rd_rq_types[i] = rrddim_add(st, cloud_req_http_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(st);
+
+    for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
+        rrddim_set_by_pointer(st, rd_rq_types[i], per_sample->cloud_req_http_by_type[i]);
+
+    rrdset_done(st);
+}
+
 #define MAX_DIM_NAME 16
 static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 {
@@ -216,6 +256,8 @@ void *aclk_stats_main_thread(void *ptr)
 #endif
 
         aclk_stats_cloud_req(&per_sample);
+        aclk_stats_cloud_req_http_type(&per_sample);
+
         aclk_stats_query_threads(aclk_queries_per_thread_sample);
 
         aclk_stats_query_time(&per_sample);

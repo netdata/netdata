@@ -13,6 +13,9 @@ extern netdata_mutex_t aclk_stats_mutex;
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
 #define ACLK_STATS_UNLOCK netdata_mutex_unlock(&aclk_stats_mutex)
 
+// if you change update `cloud_req_http_type_names`.
+#define ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT 7
+
 struct aclk_stats_thread {
     netdata_thread_t *thread;
     int query_thread_count;
@@ -42,6 +45,8 @@ extern struct aclk_metrics_per_sample {
 
     volatile uint32_t cloud_req_recvd;
     volatile uint32_t cloud_req_err;
+
+    volatile uint16_t cloud_req_http_by_type[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
 
     volatile uint32_t cloud_q_process_total;
     volatile uint32_t cloud_q_process_count;
