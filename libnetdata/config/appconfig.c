@@ -225,6 +225,31 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
         error("Cannot remove section '%s' from config.", section);
         return;
     }
+    
+    appconfig_wrlock(root);
+
+    if (root->first_section == co) {
+        root->first_section = co->next;
+
+        if (root->last_section == co)
+            root->last_section = root->first_section;
+    } else {
+        struct section *co_cur = root->first_section, *co_prev = NULL;
+
+        while(co_cur && co_cur != co) {
+            co_prev = co_cur;
+            co_cur = co_cur->next;
+        }
+
+        if (co_cur) {
+            co_prev->next = co_cur->next;
+
+            if (root->last_section == co_cur)
+                root->last_section = co_prev;
+        }
+    }
+
+    appconfig_unlock(root);
 
     avl_destroy_lock(&co->values_index);
     freez(co->name);
