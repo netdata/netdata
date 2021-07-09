@@ -705,7 +705,7 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
        return;
 
     //check if ae->config_hash exists, if not, don't queue it!
-    if (unlikely(!ae->config_hash_id))
+    if (unlikely(uuid_is_null(ae->config_hash_id)))
         return;
 
     struct aclk_database_cmd cmd;
@@ -911,7 +911,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
                 wc->alert_updates = 1;
                 wc->alerts_batch_id = batch_id;
                 wc->alerts_start_seq_id = start_seq_id;
-                info("START streaming alerts for %s enabled with batch_id %ld and start_seq_id %ld", node_id, batch_id, start_seq_id);
+                info("START streaming alerts for %s enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64, node_id, batch_id, start_seq_id);
             }
             else
                 error("ACLK synchronization thread is not active for host %s", host->hostname);
@@ -1472,7 +1472,7 @@ int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_dat
 
     rc = execute_insert(res_alert);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store alert event %d, rc = %d", ae->unique_id, rc);
+        error_report("Failed to store alert event %u, rc = %d", ae->unique_id, rc);
 
 bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
@@ -1523,7 +1523,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     int rc;
 
     int limit = cmd.count > 0 ? cmd.count : 1;
-    int available = 0;
+//    int available = 0;
     /* uint64_t first_sequence = 0; */
     /* uint64_t last_sequence = 0; */
     /* time_t last_timestamp; */
@@ -1557,7 +1557,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         goto fail_complete;
     }
 
-    int count = 0;
+//    int count = 0;
     char *claim_id = is_agent_claimed();
     while (sqlite3_step(res) == SQLITE_ROW) {
 
@@ -1662,18 +1662,18 @@ void aclk_send_alarm_health_log(char *node_id)
 
 void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
+    UNUSED(cmd);
 #ifndef ACLK_NG
     UNUSED (wc);
-    UNUSED(cmd);
 #else
     int rc;
 
-    int available = 0;
+//    int available = 0;
     uint64_t first_sequence = 0;
     uint64_t last_sequence = 0;
     struct timeval first_timestamp;
     struct timeval last_timestamp;
-    char uuid_str[GUID_LEN + 1];
+//    char uuid_str[GUID_LEN + 1];
 
     BUFFER *sql = buffer_create(1024);
 
