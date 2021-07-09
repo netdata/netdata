@@ -119,6 +119,7 @@ struct aclk_database_worker_config {
     int error;
     int chart_updates;
     int alert_updates;
+    time_t batch_created;
 };
 
 static inline RRDHOST *find_host_by_node_id(char *node_id)
