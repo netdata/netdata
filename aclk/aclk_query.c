@@ -127,7 +127,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;
-        int stat_idx = aclk_cloud_req_type_to_idx(mysep ? mysep + 1 : "other");
+        int stat_idx = aclk_cloud_req_http_type_to_idx(mysep ? mysep + 1 : "other");
         aclk_metrics_per_sample.cloud_req_http_by_type[stat_idx]++;
         ACLK_STATS_UNLOCK;
     }

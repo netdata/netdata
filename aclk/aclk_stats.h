@@ -16,6 +16,8 @@ extern netdata_mutex_t aclk_stats_mutex;
 // if you change update `cloud_req_http_type_names`.
 #define ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT 7
 
+int aclk_cloud_req_http_type_to_idx(const char *name);
+
 struct aclk_stats_thread {
     netdata_thread_t *thread;
     int query_thread_count;
