@@ -22,7 +22,7 @@ if [[ $BALENA_PGID =~ $re ]]; then
   echo "Netdata detected balena-engine.sock"
   DOCKER_HOST='/var/run/balena-engine.sock'
   PGID="$BALENA_PGID"
-else if [[ $DOCKER_PGID =~ $re ]]; then
+elif [[ $DOCKER_PGID =~ $re ]]; then
   echo "Netdata detected docker.sock"
   DOCKER_HOST="/var/run/docker.sock"
   PGID=$(ls -nd /var/run/docker.sock | awk '{print $4}')
