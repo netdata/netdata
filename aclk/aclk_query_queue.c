@@ -45,6 +45,31 @@ static inline int _aclk_queue_query(aclk_query_t query)
 
 }
 
+// Gets a pointer to the metric associated with a particular query type.
+// NULL if the query type has no associated metric.
+static inline volatile uint32_t *aclk_stats_qmetric_for_qtype(aclk_query_type_t qtype) {
+    switch (qtype) {
+        case HTTP_API_V2:
+            return &aclk_metrics_per_sample.cloud_req_type_http;
+        case ALARM_STATE_UPDATE:
+            return &aclk_metrics_per_sample.cloud_req_type_alarm_upd;
+        case METADATA_INFO:
+            return &aclk_metrics_per_sample.cloud_req_type_metadata_info;
+        case METADATA_ALARMS:
+            return &aclk_metrics_per_sample.cloud_req_type_metadata_alarms;
+        case CHART_NEW:
+            return &aclk_metrics_per_sample.cloud_req_type_chart_new;
+        case CHART_DEL:
+            return &aclk_metrics_per_sample.cloud_req_type_chart_del;
+        case REGISTER_NODE:
+            return &aclk_metrics_per_sample.cloud_req_type_register_node;
+        case NODE_STATE_UPDATE:
+            return &aclk_metrics_per_sample.cloud_req_type_node_upd;
+        default:
+            return NULL;
+    }
+}
+
 int aclk_queue_query(aclk_query_t query)
 {
     int ret = _aclk_queue_query(query);
@@ -57,23 +82,7 @@ int aclk_queue_query(aclk_query_t query)
         if (aclk_stats_enabled) {
             // get target query type metric before lock so we keep lock for
             // minimal time.
-            volatile uint32_t *metric = NULL;
-            if (qtype == HTTP_API_V2)
-                metric = &aclk_metrics_per_sample.cloud_req_type_http;
-            else if (qtype == ALARM_STATE_UPDATE)
-                metric = &aclk_metrics_per_sample.cloud_req_type_alarm_upd;
-            else if (qtype == METADATA_INFO)
-                metric = &aclk_metrics_per_sample.cloud_req_type_metadata_info;
-            else if (qtype == METADATA_ALARMS)
-                metric = &aclk_metrics_per_sample.cloud_req_type_metadata_alarms;
-            else if (qtype == CHART_NEW)
-                metric = &aclk_metrics_per_sample.cloud_req_type_chart_new;
-            else if (qtype == CHART_DEL)
-                metric = &aclk_metrics_per_sample.cloud_req_type_chart_del;
-            else if (qtype == REGISTER_NODE)
-                metric = &aclk_metrics_per_sample.cloud_req_type_register_node;
-            else if (qtype == NODE_STATE_UPDATE)
-                metric = &aclk_metrics_per_sample.cloud_req_type_node_upd;
+            volatile uint32_t *metric = aclk_stats_qmetric_for_qtype(qtype);
 
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.queries_queued++;
