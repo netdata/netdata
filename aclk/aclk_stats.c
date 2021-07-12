@@ -200,7 +200,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
             if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
@@ -227,7 +227,7 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
-            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
