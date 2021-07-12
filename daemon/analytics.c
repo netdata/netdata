@@ -372,7 +372,7 @@ char *get_value_from_key(char *buffer, char *key)
 }
 
 /*
- * Checks for the existance of .install_type file and reads it
+ * Checks for the existence of .install_type file and reads it
  */
 void analytics_get_install_type(void)
 {
