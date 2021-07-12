@@ -49,10 +49,36 @@ int aclk_queue_query(aclk_query_t query)
 {
     int ret = _aclk_queue_query(query);
     if (!ret) {
+        // local cache of query type before we wake up query thread, which may
+        // free the query in a race.
+        aclk_query_type_t qtype = query->type;
         QUERY_THREAD_WAKEUP;
+
         if (aclk_stats_enabled) {
+            // get target query type metric before lock so we keep lock for
+            // minimal time.
+            volatile uint32_t *metric = NULL;
+            if (qtype == HTTP_API_V2)
+                metric = &aclk_metrics_per_sample.cloud_req_type_http;
+            else if (qtype == ALARM_STATE_UPDATE)
+                metric = &aclk_metrics_per_sample.cloud_req_type_alarm_upd;
+            else if (qtype == METADATA_INFO)
+                metric = &aclk_metrics_per_sample.cloud_req_type_metadata_info;
+            else if (qtype == METADATA_ALARMS)
+                metric = &aclk_metrics_per_sample.cloud_req_type_metadata_alarms;
+            else if (qtype == CHART_NEW)
+                metric = &aclk_metrics_per_sample.cloud_req_type_chart_new;
+            else if (qtype == CHART_DEL)
+                metric = &aclk_metrics_per_sample.cloud_req_type_chart_del;
+            else if (qtype == REGISTER_NODE)
+                metric = &aclk_metrics_per_sample.cloud_req_type_register_node;
+            else if (qtype == NODE_STATE_UPDATE)
+                metric = &aclk_metrics_per_sample.cloud_req_type_node_upd;
+
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.queries_queued++;
+            if (metric)
+                *metric += 1;
             ACLK_STATS_UNLOCK;
         }
     }
