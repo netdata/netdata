@@ -1598,7 +1598,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.delay_up_to_timestamp = (uint64_t) sqlite3_column_int64(res, 10);
         alarm_log.last_repeat = (uint64_t) sqlite3_column_int64(res, 25);
 
-        alarm_log.silenced = 0; //FIX!!!
+        alarm_log.silenced = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_SILENCED) ? 1 : 0; //check
 
         alarm_log.value_string = sqlite3_column_type(res, 23) == SQLITE_NULL ? strdupz((char *)"-") : strdupz((char *)format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 23), (char *) sqlite3_column_text(res, 17), -1));
         alarm_log.old_value_string = sqlite3_column_type(res, 24) == SQLITE_NULL ? strdupz((char *)"-") : strdupz((char *)format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 17), -1));
@@ -1606,7 +1606,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.value = (double) sqlite3_column_double(res, 23);
         alarm_log.old_value = (double) sqlite3_column_double(res, 24);
 
-        alarm_log.updated = (sqlite3_column_int(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0; //check when 0
+        alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0; //check when 0
 
         alarm_log.rendered_info = strdupz((char *)sqlite3_column_text(res, 18)); //check, should be already ok?
 
@@ -1780,7 +1780,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
 
     char *config_hash = (char *) cmd.data_param;
     BUFFER *sql = buffer_create(1024);
-    buffer_sprintf(sql, "SELECT alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels " \
+    buffer_sprintf(sql, "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin, module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info, options, host_labels " \
                         "FROM alert_hash WHERE hash_id = @hash_id;");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
