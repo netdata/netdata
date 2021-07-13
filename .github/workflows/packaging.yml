@@ -30,8 +30,8 @@ jobs:
           - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/i386, arch: i386}
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/i386, arch: i386}
-          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "10", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/i386, arch: i386}
+          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/amd64, arch: amd64, alias: bullseye}
+          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/i386, arch: i386, alias: bullseye}
           - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
@@ -98,6 +98,14 @@ jobs:
         run: |
           echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
+      - name: Set Base Image Version
+        shell: bash
+        run: |
+          if [ -z "${{ matrix.alias }}" ] ; then
+            echo "version=${{ matrix.version }}" >> $GITHUB_ENV
+          else
+            echo "version=${{ matrix.alias }}" >> $GITHUB_ENV
+          fi
       - name: Build Packages
         uses: docker/build-push-action@v2
         with:
@@ -110,7 +118,8 @@ jobs:
             ARCH=${{ matrix.arch }}
             DISTRO=${{ matrix.distro }}
             TEST_BASE=${{ matrix.base_image }}
-            DISTRO_VERSION=${{ matrix.version }}
+            BUILDER_VERSION=${{ matrix.version }}
+            DISTRO_VERSION=${{ env.version }}
             PKG_VERSION=${{ env.pkg_version }}
       - name: Extract Packages
         shell: bash
