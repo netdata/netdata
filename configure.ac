@@ -177,6 +177,13 @@ AC_ARG_WITH(
     [AS_HELP_STRING([--with-bundled-lws], [Use the bundled version of libwebsockets library @<:@default use system library@:>@])],
     [with_bundled_lws="yes"], [with_bundled_lws="no"]
 )
+AC_ARG_WITH(
+    [bundled-protobuf],
+    [AS_HELP_STRING([--with-bundled-protobuf],
+                    [Uses the bundled version of Google Protocol Buffers @<:@default bundled if present@:>@])],
+    [with_bundled_protobuf="$withval"],
+    [with_bundled_protobuf="detect"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -642,6 +649,22 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # -----------------------------------------------------------------------------
 # ACLK
 
+bundled_proto_avail="no"
+if test "${with_bundled_protobuf}" != "no"; then
+    AC_MSG_CHECKING([is bundled protobuf available])
+    if test -f "externaldeps/protobuf/src/protoc"; then
+        bundled_proto_avail="yes"
+    fi
+    AC_MSG_RESULT([${bundled_proto_avail}])
+    if test "${with_bundled_protobuf}" == "yes" -a "${bundled_proto_avail}" != "yes"; then
+        AC_MSG_ERROR([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found])
+    fi
+    if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
+        with_bundled_protobuf="yes"
+    fi
+fi
+
+if test "${with_bundled_protobuf}" != "yes"; then
 PKG_CHECK_MODULES(
     [PROTOBUF],
     [protobuf >= 3],
@@ -655,6 +678,14 @@ AS_IF(
     [have_protoc=no],
     [have_protoc=yes]
 )
+else
+    AC_MSG_NOTICE([using bundled protobuf])
+    PROTOC="\$(abs_top_srcdir)/externaldeps/protobuf/src/protoc"
+    PROTOBUF_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/protobuf/src"
+    PROTOBUF_LIBS="\$(abs_top_srcdir)/externaldeps/protobuf/src/.libs/libprotobuf.a"
+    have_libprotobuf="yes"
+    have_protoc="yes"
+fi
 
 AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
 AS_IF(
@@ -1504,11 +1535,11 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_NG_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS}"
+    ${OPTIONAL_ACLK_NG_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
