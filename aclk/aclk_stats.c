@@ -124,7 +124,7 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
 
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
-            "netdata", "aclk_cloud_req_type", NULL, "aclk", NULL, "Requests received from cloud via their type", "req/s",
+            "netdata", "aclk_cloud_req_type", NULL, "aclk", NULL, "Requests received from cloud by their type", "req/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_type_http = rrddim_add(st, "http", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
