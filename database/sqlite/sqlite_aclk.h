@@ -9,6 +9,7 @@
 
 #define ACLK_MAX_CHART_UPDATES  (1)
 #define ACLK_MAX_ALERT_UPDATES  (5)
+#define ACLK_SYNC_RETRY_COUNT   "10"
 
 extern uv_mutex_t aclk_async_lock;
 
