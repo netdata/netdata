@@ -25,6 +25,7 @@
 - suport TLS SNI in ACLK-NG [\#11285](https://github.com/netdata/netdata/pull/11285) ([underhood](https://github.com/underhood))
 - fixes confusing error in ACLK Legacy [\#11278](https://github.com/netdata/netdata/pull/11278) ([underhood](https://github.com/underhood))
 - Ebpf disk latency [\#11276](https://github.com/netdata/netdata/pull/11276) ([thiagoftsm](https://github.com/thiagoftsm))
+- Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([OdysLam](https://github.com/OdysLam))
 - makes ACLK-NG the default if available [\#11272](https://github.com/netdata/netdata/pull/11272) ([underhood](https://github.com/underhood))
 - Added new postgres charts and updated standby charts to include slot\_… [\#11267](https://github.com/netdata/netdata/pull/11267) ([mjtice](https://github.com/mjtice))
 - Explicitly update libarchive on CentOS 8 when installing dependencies. [\#11264](https://github.com/netdata/netdata/pull/11264) ([Ferroin](https://github.com/Ferroin))
@@ -310,7 +311,6 @@
 - Add guide: Develop a custom data collector for Netdata in Python [\#10710](https://github.com/netdata/netdata/pull/10710) ([joelhans](https://github.com/joelhans))
 - New version eBPF programs. [\#10707](https://github.com/netdata/netdata/pull/10707) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add JSON output option for buildinfo. [\#10706](https://github.com/netdata/netdata/pull/10706) ([Ferroin](https://github.com/Ferroin))
-- Fix disk utilization and backlog charts [\#10705](https://github.com/netdata/netdata/pull/10705) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
