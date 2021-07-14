@@ -959,7 +959,14 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
     ret = mqtt_publish_pid(client->mqtt_client, topic, msg, msg_len, mqtt_flags, packet_id);
     if (ret != MQTT_OK) {
         mws_error(client->log, "Error Publishing MQTT msg. Desc: \"%s\"", mqtt_error_str(ret));
-        return 1;
+        switch (ret) {
+        case MQTT_ERROR_SEND_BUFFER_IS_FULL:
+            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+        case MQTT_ERROR_RECV_BUFFER_TOO_SMALL:
+            return MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
+        default:
+            return 1;
+        }
     }
 
 #ifdef DEBUG_ULTRA_VERBOSE
