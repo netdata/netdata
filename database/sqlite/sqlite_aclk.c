@@ -767,10 +767,9 @@ void aclk_status_chart_event(struct aclk_database_worker_config *wc, struct aclk
         head = chart_payload;
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
-
+//    rc = sqlite3_finalize(res);
+//    if (unlikely(rc != SQLITE_OK))
+//        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
 //    buffer_reset(sql);
 //    buffer_sprintf(sql, "SELECT sequence_id, date_submitted, date_updated FROM aclk_chart_%s "
 //                        "WHERE date_submitted IS NOT NULL ORDER BY sequence_id ASC;" , wc->uuid_str);
