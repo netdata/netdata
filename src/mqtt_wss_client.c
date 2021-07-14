@@ -86,7 +86,9 @@ struct mqtt_wss_client_struct {
     int ssl_flags;
 
     struct mqtt_client *mqtt_client;
+    size_t mqtt_send_buf_size;
     uint8_t *mqtt_send_buf;
+    size_t mqtt_recv_buf_size;
     uint8_t *mqtt_recv_buf;
 
 // signifies that we didn't write all MQTT wanted
@@ -215,18 +217,20 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
     client->mqtt_client = calloc(1, sizeof(struct mqtt_client));
     if (!client->mqtt_client)
         goto fail_3;
-    client->mqtt_send_buf = malloc(MQTT_BUFFER_SIZE);
+    client->mqtt_send_buf_size = MQTT_BUFFER_SIZE;
+    client->mqtt_send_buf = malloc(client->mqtt_send_buf_size);
     if (!client->mqtt_send_buf)
         goto fail_4;
-    client->mqtt_recv_buf = malloc(MQTT_BUFFER_SIZE);
+    client->mqtt_recv_buf_size = MQTT_BUFFER_SIZE;
+    client->mqtt_recv_buf = malloc(client->mqtt_recv_buf_size);
     if (!client->mqtt_send_buf)
         goto fail_5;
 
     ret = mqtt_init(client->mqtt_client,
                     client, client->mqtt_send_buf,
-                    MQTT_BUFFER_SIZE,
+                    client->mqtt_send_buf_size,
                     client->mqtt_recv_buf,
-                    MQTT_BUFFER_SIZE,
+                    client->mqtt_recv_buf_size,
                     (msg_callback ? mqtt_rx_msg_callback : NULL)
           );
     if (ret != MQTT_OK) {
@@ -612,8 +616,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
     if (mqtt_flags &= MQTT_CONNECT_CLEAN_SESSION)
         mqtt_reinit(client->mqtt_client, client,
-            client->mqtt_send_buf, MQTT_BUFFER_SIZE,
-            client->mqtt_recv_buf, MQTT_BUFFER_SIZE);
+            client->mqtt_send_buf, client->mqtt_send_buf_size,
+            client->mqtt_recv_buf, client->mqtt_recv_buf_size);
 
     enum MQTTErrors ret = mqtt_connect(client->mqtt_client,
                                        mqtt_params->clientid,
