@@ -299,10 +299,15 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             destroy_completion(&compl);
 
             if (unlikely(failures > 1)) {
-                unsigned long slots;
+                unsigned long slots, usecs_to_sleep;
                 /* exponential backoff */
                 slots = random() % (2LU << MIN(failures, FAILURES_CEILING));
-                (void)sleep_usec(slots * exp_backoff_slot_usec);
+                usecs_to_sleep = slots * exp_backoff_slot_usec;
+
+                if (usecs_to_sleep >= USEC_PER_SEC)
+                    error("Page cache is full. Sleeping for %llu second(s).", usecs_to_sleep / USEC_PER_SEC);
+
+                (void)sleep_usec(usecs_to_sleep);
             }
             uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }
