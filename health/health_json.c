@@ -177,13 +177,21 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
                    , rc->chart, rc->name
                    , (unsigned long)rc->id);
 
-    buffer_strcat(wb, "\t\t\t\"value\":");
+    buffer_strcat(wb, "\t\t\t\"value\": ");
     buffer_rrd_value(wb, rc->value);
     buffer_strcat(wb, ",\n");
 
     buffer_sprintf(wb,
-                   "\t\t\t\"status\": \"%s\"\n"
+                   "\t\t\t\"status\": \"%s\",\n"
                    , rrdcalc_status2string(rc->status));
+
+    buffer_sprintf(wb,
+                   "\t\t\t\"units\": \"%s\",\n"
+                   , rc->units?rc->units:"");
+
+    buffer_sprintf(wb,
+                   "\t\t\t\"last_status_change\": %lu\n"
+                   , (unsigned long)rc->last_status_change);
 
     buffer_strcat(wb, "\t\t}");
 }
