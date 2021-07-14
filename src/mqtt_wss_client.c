@@ -91,6 +91,13 @@ struct mqtt_wss_client_struct {
     size_t mqtt_recv_buf_size;
     uint8_t *mqtt_recv_buf;
 
+// TODO this is temporary workaround and
+// will be removed when own MQTT client is done
+// alternatively we can realloc buffer immediately when
+// it's inadequacy is detected
+    size_t mqtt_buf_max_size;
+    int last_ec;
+
 // signifies that we didn't write all MQTT wanted
 // us to write during last cycle (e.g. due to buffer
 // size) and thus we should arm POLLOUT
@@ -263,6 +270,11 @@ fail_1:
 fail:
     mqtt_wss_log_ctx_destroy(log);
     return NULL;
+}
+
+void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size)
+{
+    client->mqtt_buf_max_size = size;
 }
 
 void mqtt_wss_destroy(mqtt_wss_client client)
@@ -464,6 +476,23 @@ cleanup:
     return rc;
 }
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+static int mqtt_wss_grow_mqtt_buf(uint8_t **buffer, size_t *buffer_size, size_t max_size)
+{
+    size_t new_size = MIN(*buffer_size * 2, max_size);
+    if (new_size == *buffer_size)
+        return 0;
+
+    uint8_t *new_ptr = realloc(*buffer, new_size);
+    if (!new_ptr)
+        return -1;
+
+    *buffer = new_ptr;
+    *buffer_size = new_size;
+
+    return 0;
+}
+
 int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags, struct mqtt_wss_proxy *proxy)
 {
     struct sockaddr_in addr;
@@ -614,10 +643,23 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         mqtt_flags |= MQTT_CONNECT_WILL_RETAIN;
     mqtt_flags |= MQTT_CONNECT_CLEAN_SESSION;
 
-    if (mqtt_flags &= MQTT_CONNECT_CLEAN_SESSION)
+    if (mqtt_flags &= MQTT_CONNECT_CLEAN_SESSION) {
+        if (client->mqtt_buf_max_size && client->last_ec) {
+            if (client->last_ec == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
+                mws_info(client->log, "Last error was MQTT_WSS_ERR_TX_BUF_TOO_SMALL and buffer growth enabled. Attempting size increase.");
+                if (mqtt_wss_grow_mqtt_buf(&client->mqtt_send_buf, &client->mqtt_send_buf_size, client->mqtt_buf_max_size))
+                    mws_error(client->log, "Failed to increase send buffer size. Continuing with original buffer.");
+            }else if(client->last_ec == MQTT_WSS_ERR_RX_BUF_TOO_SMALL) {
+                mws_info(client->log, "Last error was MQTT_WSS_ERR_RX_BUF_TOO_SMALL and buffer growth enabled. Attempting size increase.");
+                if (mqtt_wss_grow_mqtt_buf(&client->mqtt_recv_buf, &client->mqtt_recv_buf_size, client->mqtt_buf_max_size))
+                    mws_error(client->log, "Failed to increase receive buffer size. Continuing with original buffer.");
+            }
+            client->last_ec = 0;
+        }
         mqtt_reinit(client->mqtt_client, client,
             client->mqtt_send_buf, client->mqtt_send_buf_size,
             client->mqtt_recv_buf, client->mqtt_recv_buf_size);
+    }
 
     enum MQTTErrors ret = mqtt_connect(client->mqtt_client,
                                        mqtt_params->clientid,
@@ -949,6 +991,7 @@ ssize_t mqtt_pal_recvall(mqtt_pal_socket_handle mqtt_wss_client, void* buf, size
 int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
 {
     int ret;
+    int rc = 0;
     uint8_t mqtt_flags = 0;
 
     if (!client->mqtt_connected) {
@@ -965,20 +1008,24 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
         mws_error(client->log, "Error Publishing MQTT msg. Desc: \"%s\"", mqtt_error_str(ret));
         switch (ret) {
         case MQTT_ERROR_SEND_BUFFER_IS_FULL:
-            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+            client->last_ec = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+            rc = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+            break;
         case MQTT_ERROR_RECV_BUFFER_TOO_SMALL:
-            return MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
+            client->last_ec = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
+            rc = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
+            break;
         default:
             return 1;
         }
     }
-
 #ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(client->log, "Publishing Message to topic \"%s\" with size %d as packet_id=%d", topic, msg_len, *packet_id);
+    else
+        mws_debug(client->log, "Publishing Message to topic \"%s\" with size %d as packet_id=%d", topic, msg_len, *packet_id);
 #endif
 
     mqtt_wss_wakeup(client);
-    return 0;
+    return rc;
 }
 
 int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags)
