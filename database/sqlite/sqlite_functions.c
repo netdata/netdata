@@ -231,6 +231,7 @@ int sql_init_database(void)
     info("SQLite database initialization completed");
 
 //    sql_create_aclk_table(host, &host->host_uuid);
+    sql_aclk_sync_init();
     rc = sqlite3_exec(db_meta, "select host_id from host;", aclk_start_sync_thread, NULL, NULL);
 
     return 0;

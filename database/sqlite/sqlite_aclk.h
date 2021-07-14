@@ -7,8 +7,11 @@
 
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
-#define ACLK_MAX_CHART_UPDATES  (10)
+#define ACLK_MAX_CHART_UPDATES  (1)
 #define ACLK_MAX_ALERT_UPDATES  (5)
+#define ACLK_SYNC_RETRY_COUNT   "10"
+
+extern uv_mutex_t aclk_async_lock;
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
@@ -54,6 +57,8 @@ enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_TIMER,
+    ACLK_DATABASE_CHECK,
+    ACLK_DATABASE_CHECK_ROTATION,
     ACLK_DATABASE_ADD_CHART,
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_PUSH_CHART,
@@ -68,10 +73,10 @@ enum aclk_database_opcode {
     ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_UPD_STATS,
     ACLK_DATABASE_SYNC_CHART_SEQ,
-    ACLK_DATABASE_MAX_OPCODE,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_ALARM_HEALTH_LOG,
-    ACLK_DATABASE_PUSH_ALERT_CONFIG
+    ACLK_DATABASE_PUSH_ALERT_CONFIG,
+    ACLK_DATABASE_MAX_OPCODE
 };
 
 struct aclk_chart_payload_t {
@@ -101,9 +106,12 @@ struct aclk_database_cmdqueue {
 struct aclk_database_worker_config {
     uv_thread_t thread;
     char uuid_str[GUID_LEN + 1];
+    char node_id[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
     uint64_t chart_sequence_id;     // last chart_sequence_id
     time_t chart_timestamp;         // last chart timestamp
+    time_t cleanup_after;           // Start a cleanup after this timestamp
+    time_t startup_time;           // When the sync thread started
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
@@ -120,6 +128,7 @@ struct aclk_database_worker_config {
     int chart_updates;
     int alert_updates;
     time_t batch_created;
+    struct aclk_database_worker_config  *next;
 };
 
 static inline RRDHOST *find_host_by_node_id(char *node_id)
@@ -143,8 +152,8 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 //extern void sqlite_worker(void* arg);
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 
-extern int sql_queue_chart_to_aclk(RRDSET *st, int cmd);
-extern int sql_queue_dimension_to_aclk(RRDDIM *rd, int cmd);
+extern int sql_queue_chart_to_aclk(RRDSET *st);
+extern int sql_queue_dimension_to_aclk(RRDDIM *rd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
 extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
@@ -178,4 +187,8 @@ char **build_dimension_payload_list(RRDSET *st, size_t **payload_list_size, size
 void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_check_dimension_state(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_check_rotation_state(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+int aclk_add_offline_dimension_event(struct aclk_database_worker_config *wc, char *node_id, char *chart_name, uuid_t *dim_uuid, char *rd_id, char *rd_name, time_t first_entry_t, time_t last_entry_t);
+void sql_aclk_sync_init(void);
 #endif //NETDATA_SQLITE_ACLK_H

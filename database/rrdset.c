@@ -1385,7 +1385,7 @@ void rrdset_done(RRDSET *st) {
 #ifdef ENABLE_ACLK
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
-            if (likely(!sql_queue_chart_to_aclk(st, 0)))
+            if (likely(!sql_queue_chart_to_aclk(st)))
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
@@ -1798,7 +1798,7 @@ after_second_database_work:
             continue;
 #ifdef ENABLE_ACLK
         if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
-            if (likely(!sql_queue_dimension_to_aclk(rd, 0)))
+            if (likely(!sql_queue_dimension_to_aclk(rd)))
                 rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
         }
 #endif
