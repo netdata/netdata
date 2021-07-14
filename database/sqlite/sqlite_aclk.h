@@ -13,6 +13,8 @@
 
 extern uv_mutex_t aclk_async_lock;
 
+extern int aclk_architecture;
+
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
     uuid_unparse_lower(*uuid, out);
@@ -149,25 +151,22 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 }
 
 
-//extern void sqlite_worker(void* arg);
-extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
+extern sqlite3 *db_meta;
 
+extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern int sql_queue_chart_to_aclk(RRDSET *st);
 extern int sql_queue_dimension_to_aclk(RRDDIM *rd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
-extern sqlite3 *db_meta;
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-//int aclk_add_alert_event(RRDHOST *host, ALARM_ENTRY *ae, struct completion *completion);
 int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_send_alarm_health_log(char *node_id);
 void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_send_alarm_configuration (char *config_hash);
 int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-//void aclk_fetch_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_reset_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id);
