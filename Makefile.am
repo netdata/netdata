@@ -57,6 +57,7 @@ dist_noinst_DATA = \
     contrib \
     docs \
     mqtt_websockets \
+    aclk/aclk-schemas \
     netdata.cppcheck \
     netdata.spec \
     package.json \
