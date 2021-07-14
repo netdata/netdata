@@ -106,6 +106,8 @@ struct mqtt_wss_client_struct {
     unsigned int mqtt_connected:1;
     unsigned int mqtt_disconnecting:1;
 
+    unsigned int mqtt_drop_on_pub_fail:1;
+
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
     void (*puback_callback)(uint16_t packet_id);
@@ -535,6 +537,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
     client->ssl_flags = ssl_flags;
 
+    client->mqtt_drop_on_pub_fail = mqtt_params->drop_on_publish_fail ? 1 : 0;
+
     //TODO gethostbyname -> getaddinfo
     //     hstrerror -> gai_strerror
     if ((he = gethostbyname(client->host)) == NULL) {
@@ -877,6 +881,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         (!ret) ? "POLL_TIMEOUT" : "");
 #endif
 
+    if (client->mqtt_drop_on_pub_fail && client->poll_fds[POLLFD_PIPE].revents & POLLIN && client->last_ec) {
+        client->mqtt_connected = 0;
+        return client->last_ec;
+    }
+
     if (ret == 0) {
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
@@ -1010,10 +1019,14 @@ int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *
         case MQTT_ERROR_SEND_BUFFER_IS_FULL:
             client->last_ec = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
             rc = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
+            if (!client->mqtt_drop_on_pub_fail)
+                return rc;
             break;
         case MQTT_ERROR_RECV_BUFFER_TOO_SMALL:
             client->last_ec = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
             rc = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
+            if (!client->mqtt_drop_on_pub_fail)
+                return rc;
             break;
         default:
             return 1;

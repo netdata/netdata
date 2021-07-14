@@ -94,6 +94,7 @@ struct mqtt_connect_params {
     enum mqtt_wss_publish_flags will_flags;
     size_t will_msg_len;
     int keep_alive;
+    int drop_on_publish_fail;
 };
 
 enum mqtt_wss_proxy_type {
