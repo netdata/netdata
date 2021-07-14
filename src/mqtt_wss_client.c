@@ -658,12 +658,13 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
                 if (mqtt_wss_grow_mqtt_buf(&client->mqtt_recv_buf, &client->mqtt_recv_buf_size, client->mqtt_buf_max_size))
                     mws_error(client->log, "Failed to increase receive buffer size. Continuing with original buffer.");
             }
-            client->last_ec = 0;
         }
         mqtt_reinit(client->mqtt_client, client,
             client->mqtt_send_buf, client->mqtt_send_buf_size,
             client->mqtt_recv_buf, client->mqtt_recv_buf_size);
     }
+
+    client->last_ec = 0;
 
     enum MQTTErrors ret = mqtt_connect(client->mqtt_client,
                                        mqtt_params->clientid,
