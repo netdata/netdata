@@ -562,7 +562,8 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .will_topic = "lwt",
             .will_msg   = NULL,
             .will_flags = MQTT_WSS_PUB_QOS2,
-            .keep_alive = 60
+            .keep_alive = 60,
+            .drop_on_publish_fail = 1
         };
 
 #ifndef ACLK_DISABLE_CHALLENGE
@@ -714,6 +715,11 @@ void *aclk_main(void *ptr)
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
+
+    // Enable MQTT buffer growth if necessary
+    // e.g. old cloud architecture clients with huge nodes
+    // that send JSON payloads of 10 MB as single messages
+    mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
 
     aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", CONFIG_BOOLEAN_YES);
     if (aclk_stats_enabled) {
