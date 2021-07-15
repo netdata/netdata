@@ -2,6 +2,9 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_aclk.h"
+#include "sqlite_aclk_chart.h"
+#include "sqlite_aclk_alert.h"
+#include "sqlite_aclk_node.h"
 
 #ifndef ACLK_NG
 #include "../../aclk/legacy/agent_cloud_link.h"
@@ -195,9 +198,9 @@ static void timer_cb(uv_timer_t* handle)
 
     if (wc->chart_updates) {
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
-        cmd.count = ACLK_MAX_CHART_UPDATES;
+        cmd.count = ACLK_MAX_CHART_BATCH;
         cmd.completion = NULL;
-        cmd.param1 = 0;
+        cmd.param1 = ACLK_MAX_CHART_BATCH_COUNT;
         aclk_database_enq_cmd(wc, &cmd);
     }
 
