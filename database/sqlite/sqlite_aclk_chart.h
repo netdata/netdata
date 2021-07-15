@@ -9,7 +9,7 @@ extern sqlite3 *db_meta;
 extern int sql_queue_chart_to_aclk(RRDSET *st);
 extern int sql_queue_dimension_to_aclk(RRDDIM *rd);
 extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
-extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
+extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

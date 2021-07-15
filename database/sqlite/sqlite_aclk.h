@@ -7,8 +7,8 @@
 
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
-#define ACLK_MAX_CHART_BATCH    (10)
-#define ACLK_MAX_CHART_BATCH_COUNT (10)
+#define ACLK_MAX_CHART_BATCH    (20)
+#define ACLK_MAX_CHART_BATCH_COUNT (5)
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_SYNC_RETRY_COUNT   "10"
 
@@ -44,6 +44,9 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 
 #define TABLE_ACLK_CHART_PAYLOAD "CREATE TABLE IF NOT EXISTS aclk_chart_payload_%s (unique_id BLOB PRIMARY KEY, " \
         "uuid, claim_id, type, date_created, payload);"
+
+#define TABLE_ACLK_CHART_LATEST "CREATE TABLE IF NOT EXISTS aclk_chart_latest_%s (uuid BLOB PRIMARY KEY, " \
+        "unique_id, date_submitted);"
 
 #define TRIGGER_ACLK_CHART_PAYLOAD "CREATE TRIGGER IF NOT EXISTS aclk_tr_chart_payload_%s " \
         "after insert on aclk_chart_payload_%s " \
@@ -158,7 +161,7 @@ extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct
 //extern int sql_queue_chart_to_aclk(RRDSET *st);
 //extern int sql_queue_dimension_to_aclk(RRDDIM *rd);
 //extern void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae);
-extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid);
+extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 //int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 //int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
