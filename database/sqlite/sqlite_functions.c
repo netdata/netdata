@@ -191,7 +191,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
     info("DEBUG: Start thread for %s", uuid_str);
-    sql_create_aclk_table(NULL, (uuid_t *) argv[0]);
+    sql_create_aclk_table(NULL, (uuid_t *) argv[0], (uuid_t *) argv[1]);
     return 0;
 }
 
@@ -232,7 +232,7 @@ int sql_init_database(void)
 
 //    sql_create_aclk_table(host, &host->host_uuid);
     sql_aclk_sync_init();
-    rc = sqlite3_exec(db_meta, "select host_id from host;", aclk_start_sync_thread, NULL, NULL);
+    rc = sqlite3_exec(db_meta, "select host_id, node_id from host;", aclk_start_sync_thread, NULL, NULL);
 
     return 0;
 }
@@ -1699,12 +1699,16 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
+    struct aclk_database_worker_config *wc = host->dbsync_worker;
+
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
     uuid_copy(*(host->node_id), *node_id);
 
-    if (unlikely(!host->dbsync_worker))
-        sql_create_aclk_table(host, &host->host_uuid);
+    if (unlikely(!wc))
+        sql_create_aclk_table(host, &host->host_uuid, node_id);
+    else
+        uuid_unparse_lower(*node_id, wc->node_id);
     return;
 }
 

@@ -496,7 +496,7 @@ failed:
 }
 
 
-void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid)
+void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 {
     char uuid_str[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
@@ -511,6 +511,10 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid)
     buffer_flush(sql);
 
     buffer_sprintf(sql, TABLE_ACLK_CHART_PAYLOAD, uuid_str);
+    db_execute(buffer_tostring(sql));
+    buffer_flush(sql);
+
+    buffer_sprintf(sql, TABLE_ACLK_CHART_LATEST, uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_flush(sql);
 
@@ -543,6 +547,8 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid)
     wc->startup_time = now_realtime_sec();
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
+    if (node_id && !uuid_is_null(*node_id))
+        uuid_unparse_lower(*node_id, wc->node_id);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
 }
 

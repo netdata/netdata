@@ -20,10 +20,9 @@ int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t paylo
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_%s ac, aclk_chart_payload_%s acp WHERE ac.unique_id = acp.unique_id "
-                       "AND ac.uuid = @uuid "
-                       "AND (ac.update_count = 0 OR ac.update_count > 0 AND ac.date_submitted is NULL)"
-                       "AND acp.payload = @payload;", uuid_str, uuid_str);
+    buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
+                       "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
+                        uuid_str, uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -136,7 +135,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
         chart_payload.name = strdupz((char *)st->name);
-        chart_payload.node_id = get_str_from_uuid(st->rrdhost->node_id);
+        chart_payload.node_id = strdupz(wc->node_id); //get_str_from_uuid(st->rrdhost->node_id);
         chart_payload.claim_id = claim_id;
         chart_payload.id = strdupz(st->id);
 
@@ -176,10 +175,10 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
 
     if (likely(claim_id)) {
         const char *node_id = NULL;
-        node_id = get_str_from_uuid(rd->rrdset->rrdhost->node_id);
+        node_id = wc->node_id; // get_str_from_uuid(rd->rrdset->rrdhost->node_id);
         struct chart_dimension_updated dim_payload;
         memset(&dim_payload, 0, sizeof(dim_payload));
-        dim_payload.node_id = node_id;
+        dim_payload.node_id = strdupz(node_id);
         dim_payload.claim_id = claim_id;
 
         dim_payload.chart_id = strdupz(rd->rrdset->name);
@@ -418,9 +417,9 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             if (payload_list_max_size[count] < payload_size) {
                 freez(payload_list[count]);
                 payload_list_max_size[count] = payload_size;
-                payload_list_size[count] = payload_size;
                 payload_list[count] = mallocz(payload_size);
             }
+            payload_list_size[count] = payload_size;
             memcpy(payload_list[count], sqlite3_column_blob(res, 1), payload_size);
             position_list[count].sequence_id = (uint64_t)sqlite3_column_int64(res, 0);
             position_list[count].previous_sequence_id = previous_sequence_id;
@@ -450,11 +449,17 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             db_execute(buffer_tostring(sql));
 
             buffer_reset(sql);
-            buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, type, unique_id, update_count, date_created) "
-                " SELECT uuid, 'pending', type, unique_id, 0, strftime('%%s') FROM aclk_chart_%s s "
-                " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
-                " AND s.uuid NOT IN (SELECT t.uuid FROM aclk_chart_%s t WHERE t.uuid = s.uuid AND t.status = 'pending');",
-                wc->uuid_str, wc->uuid_str, first_sequence, last_sequence, wc->uuid_str);
+//            buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, type, unique_id, update_count, date_created) "
+//                " SELECT uuid, 'pending', type, unique_id, 0, strftime('%%s') FROM aclk_chart_%s s "
+//                " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
+//                " AND s.uuid NOT IN (SELECT t.uuid FROM aclk_chart_%s t WHERE t.uuid = s.uuid AND t.status = 'pending');",
+//                wc->uuid_str, wc->uuid_str, first_sequence, last_sequence, wc->uuid_str);
+
+            buffer_sprintf(sql, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
+                                " SELECT uuid, unique_id, date_submitted FROM aclk_chart_%s s "
+                                " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
+                                " ;",
+                           wc->uuid_str, wc->uuid_str, first_sequence, last_sequence);
 
             db_execute(buffer_tostring(sql));
 
