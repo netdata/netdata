@@ -537,7 +537,7 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   if [ -z "${NETDATA_PREFIX}" ] ; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   else
-    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/bin/netdata-claim.sh"
+    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
   if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
