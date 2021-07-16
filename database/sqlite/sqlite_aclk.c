@@ -16,6 +16,8 @@
 
 const char *aclk_sync_config[] = {
     NULL,
+    "CREATE TABLE IF NOT EXISTS dimension_state(dim_id blob PRIMARY KEY, start_date, state);",
+    NULL,
     "CREATE TABLE IF NOT EXISTS delete_dimension(host_id, chart_id, dim_id, chart_name, dimension_id, dimension_name);"
     "CREATE TRIGGER IF NOT EXISTS tr_del_dim AFTER DELETE ON dimension " \
     "BEGIN INSERT INTO delete_dimension (host_id, chart_id, dim_id, chart_name, dimension_id, dimension_name) " \
@@ -388,7 +390,7 @@ void aclk_database_worker(void *arg)
             }
             db_unlock();
             if (cmd.completion)
-                complete(cmd.completion);
+                aclk_complete(cmd.completion);
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 

@@ -11,8 +11,113 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
+// Get the dimension start time from the database -- 0 does not exist
+time_t get_dimension_state(uuid_t *uuid, int *state)
+{
+    sqlite3_stmt *res = NULL;
+    time_t first_t = 0;
+    int rc;
 
-int chart_payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
+    BUFFER *sql = buffer_create(1024);
+    buffer_sprintf(sql,"SELECT start_date, state FROM dimension_state WHERE dim_id = @uuid;");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check dimension state data");
+        buffer_free(sql);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        first_t = sqlite3_column_int64(res, 0);
+        *state  = sqlite3_column_int(res, 1);
+    }
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement in check dimension retention data, rc = %d", rc);
+    buffer_free(sql);
+    return first_t;
+}
+
+// Set the dimension start time from the database -- 0 does not exist
+void set_dimension_state(uuid_t *uuid, time_t start_date, int state)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    BUFFER *sql = buffer_create(1024);
+    buffer_sprintf(sql,"INSERT OR REPLACE INTO dimension_state (dim_id, start_date, state) "
+                        "values (@uuid, @start_date, @state);");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check dimension retention data");
+        buffer_free(sql);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int64(res, 2, start_date);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, 3, state);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed store dimension state data, rc = %d", rc);
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement in check dimension state data, rc = %d", rc);
+    buffer_free(sql);
+    return;
+}
+
+// Checks to see if a UUID has been sent
+int uuid_sent(char *uuid_str, uuid_t *uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+    int sent = 0;
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_latest_%s acl WHERE acl.uuid = @uuid;", uuid_str);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check payload data");
+        buffer_free(sql);
+        return 0;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        sent = sqlite3_column_int(res, 0);
+    }
+
+bind_fail:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to reset statement in check uuid sent, rc = %d", rc);
+    buffer_free(sql);
+    return sent;
+}
+
+int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -55,10 +160,12 @@ int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, int pay
     sqlite3_stmt *res_chart = NULL;
     int rc;
 
-    rc = chart_payload_sent(uuid_str, uuid, payload, payload_size);
+    rc = payload_sent(uuid_str, uuid, payload, payload_size);
     char uuid_str1[GUID_LEN + 1];
     uuid_unparse_lower(*uuid, uuid_str1);
-    //info("DEBUG: Checking %s if payload already sent (%s), RC = %d (payload type = %d)", uuid_str, uuid_str1, rc, payload_type);
+
+    //if (payload_type > 0)
+    //    info("DEBUG: Checking %s if payload already sent (%s), RC = %d (payload type = %d)", uuid_str, uuid_str1, rc, payload_type);
     if (rc == 1)
         return 0;
 
@@ -172,32 +279,45 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     RRDDIM *rd = cmd.data;
 
     time_t now = now_realtime_sec();
-
     if (likely(claim_id)) {
-        const char *node_id = NULL;
-        node_id = wc->node_id; // get_str_from_uuid(rd->rrdset->rrdhost->node_id);
+
+        // IF uuid has been sent then it will be considered
+        time_t first_t = rd->state->query_ops.oldest_time(rd);
+        time_t last_t  = rd->state->query_ops.latest_time(rd);
+
+        //int last_state;
+        int new_state = ((now - last_t) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+        ///time_t last_first_t = get_dimension_state(rd->state->metric_uuid, &last_state);
+        //    set_dimension_state(rd->state->metric_uuid, first_t, new_state);
+
         struct chart_dimension_updated dim_payload;
+        size_t size;
+        const char *node_id = strdupz(wc->node_id);
+
         memset(&dim_payload, 0, sizeof(dim_payload));
         dim_payload.node_id = strdupz(node_id);
         dim_payload.claim_id = claim_id;
-
-        dim_payload.chart_id = strdupz(rd->rrdset->name);
-        dim_payload.created_at = rd->last_collected_time; //TODO: Fix with creation time
-        if ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every)) {
-            dim_payload.last_timestamp.tv_usec = 0;
-            dim_payload.last_timestamp.tv_sec = 0;
-        }
-        else
-            dim_payload.last_timestamp = rd->last_collected_time;
-
         dim_payload.name = strdupz(rd->name);
         dim_payload.id = strdupz(rd->id);
 
-        size_t size;
+        dim_payload.chart_id = strdupz(rd->rrdset->name);
+        dim_payload.created_at.tv_usec = 0;
+        dim_payload.created_at.tv_sec = first_t;
+        dim_payload.last_timestamp.tv_usec = 0;
+        if (new_state)
+            dim_payload.last_timestamp.tv_sec = 0;
+        else
+            dim_payload.last_timestamp.tv_sec = last_t;
+
         char *payload = generate_chart_dimension_updated(&size, &dim_payload);
         if (likely(payload))
-            rc = aclk_add_chart_payload(wc->uuid_str, rd->state->metric_uuid, claim_id, 1, (void *) payload, size);
+            rc = aclk_add_chart_payload(wc->uuid_str, rd->state->metric_uuid, claim_id, 1, (void *)payload, size);
+        freez((char *)dim_payload.node_id);
+        freez((char *)dim_payload.chart_id);
+        freez((char *)dim_payload.name);
+        freez((char *)dim_payload.id);
         freez(payload);
+        freez(claim_id);
         //chart_instance_updated_destroy(&dim_payload);
     }
 #else
@@ -536,15 +656,31 @@ void sql_check_dimension_state(struct aclk_database_worker_config *wc, struct ac
     while (sqlite3_step(res) == SQLITE_ROW) {
         dim_uuid = (uuid_t *) sqlite3_column_blob(res, 0);
         uuid_unparse_lower(*dim_uuid, dim_uuid_str);
+        rc = 1;
 #ifdef ENABLE_DBENGINE
-        rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
-
+        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        else
+#endif
+        {
+            RRDSET  *st = rrdset_find(wc->host, (const char *) sqlite3_column_text(res, 3));
+            if (st) {
+                RRDDIM *rd = rrddim_find(st, (const char *) sqlite3_column_text(res, 1));
+                if (rd) {
+                    first_entry_t = rd->state->query_ops.oldest_time(rd);
+                    last_entry_t = rd->state->query_ops.latest_time(rd);
+                    rc = 0;
+                }
+            }
+        }
         if (!rc)
             info("DEBUG: %d Checking dimension %s (id=%s, name=%s, chart=%s) --> %s (%ld, %ld)", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, !rc ? first_entry_t : 0, !rc ? last_entry_t : 0);
         if (!rc)
             aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
-#endif
+
+        if (!rc)
+            aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
         ++count;
     }
 
@@ -605,17 +741,34 @@ void sql_check_rotation_state(struct aclk_database_worker_config *wc, struct acl
     while (sqlite3_step(res) == SQLITE_ROW) {
         dim_uuid = (uuid_t *) sqlite3_column_blob(res, 0);
         uuid_unparse_lower(*dim_uuid, dim_uuid_str);
+
+
+        rc = 1;
 #ifdef ENABLE_DBENGINE
-        rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        else
+#endif
+        {
+            RRDSET *st = rrdset_find(wc->host, (const char *) sqlite3_column_text(res, 3));
+            if (st) {
+                RRDDIM *rd = rrddim_find(st, (const char *) sqlite3_column_text(res, 1));
+                if (rd) {
+                    first_entry_t = rd->state->query_ops.oldest_time(rd);
+                    last_entry_t = rd->state->query_ops.latest_time(rd);
+                    rc = 0;
+                }
+            }
+        }
+
         if (!rc)
             info("DEBUG: %d Checking rotated dimension %s (id=%s, name=%s, chart=%s) --> %s (%ld, %ld)", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, !rc ? first_entry_t : 0, !rc ? last_entry_t : 0);
         else
             info("DEBUG: %d Checking rotated dimension %s (id=%s, name=%s, chart=%s) --> %s (%d, %d) NOT FOUND", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, 0, 0);
-        //if (!rc)
-        //    aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
-#endif
+//        if (!rc)
+//            aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
         ++count;
     }
 

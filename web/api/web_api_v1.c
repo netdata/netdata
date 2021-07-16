@@ -464,12 +464,12 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
     if (stop_thread) {
         struct aclk_database_cmd cmd;
         cmd.opcode = ACLK_DATABASE_SHUTDOWN;
-        struct completion compl ;
-        init_completion(&compl);
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl);
         cmd.completion = &compl ;
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl);
-        destroy_completion(&compl);
+        wait_for_aclk_completion(&compl);
+        destroy_aclk_completion(&compl);
         buffer_sprintf(w->response.data, "ACLK_SYNC: ACLK thread shutdown for host %s", host->hostname);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
@@ -536,8 +536,8 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         cmd.count = sequence_reset;
         cmd.completion = NULL;
 
-        struct completion compl ;
-        init_completion(&compl);
+        struct aclk_completion compl ;
+        init_aclk_completion(&compl);
         cmd.completion = &compl ;
 
         rrd_wrlock();
@@ -550,7 +550,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
             }
             compl.completed = 0;
             aclk_database_enq_cmd((struct aclk_database_worker_config *)this_host->dbsync_worker, &cmd);
-            wait_for_completion(&compl);
+            wait_for_aclk_completion(&compl);
 
             //info("Received payload sequence_id = %ld  %s", result->sequence_id, result->payload);
             int count = 0;
@@ -569,7 +569,7 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
             if (status == 1)
                 break;
         }
-        destroy_completion(&compl);
+        destroy_aclk_completion(&compl);
         rrd_unlock();
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
@@ -602,12 +602,12 @@ inline int web_client_api_request_v1_aclk_sync(RRDHOST *host, struct web_client 
         cmd.data = (void *) reset_node;
         cmd.completion = NULL;
 
-        struct completion compl ;
-        init_completion(&compl );
+        struct aclk_completion compl;
+        init_aclk_completion(&compl);
         cmd.completion = &compl ;
         aclk_database_enq_cmd((struct aclk_database_worker_config *)host->dbsync_worker, &cmd);
-        wait_for_completion(&compl);
-        destroy_completion(&compl);
+        wait_for_aclk_completion(&compl);
+        destroy_aclk_completion(&compl);
         buffer_sprintf(w->response.data, "Resetting node instance id of host %s", reset_node);
         buffer_no_cacheable(w->response.data);
         return HTTP_RESP_OK;
