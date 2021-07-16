@@ -1794,8 +1794,15 @@ after_second_database_work:
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
-        if(unlikely(!rd->updated))
+        if(unlikely(!rd->updated)) {
+#ifdef ENABLE_ACLK
+            if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
+                if (likely(!sql_queue_dimension_to_aclk(rd)))
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
+            }
+#endif
             continue;
+        }
 #ifdef ENABLE_ACLK
         if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
             if (likely(!sql_queue_dimension_to_aclk(rd)))
