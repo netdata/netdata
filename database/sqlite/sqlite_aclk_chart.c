@@ -309,6 +309,10 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         else
             dim_payload.last_timestamp.tv_sec = last_t;
 
+       // char *uuid_str = get_str_from_uuid(rd->state->metric_uuid);
+       // info("DEBUG: RD %s (%ld, %ld) live=%d", uuid_str, dim_payload.created_at.tv_sec,
+       //      dim_payload.last_timestamp.tv_sec, new_state);
+
         char *payload = generate_chart_dimension_updated(&size, &dim_payload);
         if (likely(payload))
             rc = aclk_add_chart_payload(wc->uuid_str, rd->state->metric_uuid, claim_id, 1, (void *)payload, size);
@@ -894,7 +898,7 @@ void sql_set_chart_ack(struct aclk_database_worker_config *wc, struct aclk_datab
         goto bind_fail;
 
     rc = execute_insert(res);
-    if (rc)
+    if (rc != SQLITE_DONE)
         error_report("Failed to delete sequence ids, rc = %d", rc);
 
     bind_fail:
@@ -963,15 +967,15 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE status is NULL and update_count = 0;", wc->uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
-
-    buffer_sprintf(sql, "CREATE TABLE ts_%s AS SELECT date_created, date_updated, date_submitted, "
-                        " status, uuid, type, unique_id, update_count"
-                        " FROM aclk_chart_%s WHERE date_submitted IS NULL AND update_count = 0;", wc->uuid_str, wc->uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
+//    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE status is NULL and update_count = 0;", wc->uuid_str);
+//    db_execute(buffer_tostring(sql));
+//    buffer_reset(sql);
+//
+//    buffer_sprintf(sql, "CREATE TABLE ts_%s AS SELECT date_created, date_updated, date_submitted, "
+//                        " status, uuid, type, unique_id, update_count"
+//                        " FROM aclk_chart_%s WHERE date_submitted IS NULL AND update_count = 0;", wc->uuid_str, wc->uuid_str);
+//    db_execute(buffer_tostring(sql));
+//    buffer_reset(sql);
 
 //    buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, update_count) VALUES ('MARK', \"%s\", 0)", wc->uuid_str, wc->uuid_str);
 //    db_execute(buffer_tostring(sql));
@@ -982,8 +986,7 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s) "
-                        "AND unique_id NOT IN (SELECT unique_id FROM ts_%s);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); " , wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
@@ -992,14 +995,13 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_latest_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);",
                    wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM ts_%s WHERE uuid IN (SELECT uuid FROM aclk_chart_%s "
-                        "WHERE date_submitted IS NULL);", wc->uuid_str, wc->uuid_str);
-
+    buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
+                   wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
     buffer_reset(sql);
 
@@ -1011,9 +1013,17 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
 //    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE uuid = 'MARK' AND status=\"%s\"; ", wc->uuid_str, wc->uuid_str);
 //    db_execute(buffer_tostring(sql));
 //    buffer_reset(sql);
+//
+//    buffer_sprintf(sql, "DROP TABLE IF EXISTS ts_%s;", wc->uuid_str);
+//    db_execute(buffer_tostring(sql));
 
-    buffer_sprintf(sql, "DROP TABLE IF EXISTS ts_%s;", wc->uuid_str);
+    buffer_sprintf(sql, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
+                        "SELECT uuid, unique_id, date_submitted FROM aclk_chart_%s where sequence_id IN "
+                        "(SELECT sequence_id FROM aclk_chart_%s WHERE date_submitted IS NOT NULL "
+                        "GROUP BY uuid HAVING sequence_id = MAX(sequence_id));"
+                        , wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
+    buffer_reset(sql);
 
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
