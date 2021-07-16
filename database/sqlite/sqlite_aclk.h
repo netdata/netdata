@@ -12,6 +12,43 @@
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_SYNC_RETRY_COUNT   "10"
 
+struct aclk_completion {
+    uv_mutex_t mutex;
+    uv_cond_t cond;
+    volatile unsigned completed;
+};
+
+static inline void init_aclk_completion(struct aclk_completion *p)
+{
+    p->completed = 0;
+    fatal_assert(0 == uv_cond_init(&p->cond));
+    fatal_assert(0 == uv_mutex_init(&p->mutex));
+}
+
+static inline void destroy_aclk_completion(struct aclk_completion *p)
+{
+    uv_cond_destroy(&p->cond);
+    uv_mutex_destroy(&p->mutex);
+}
+
+static inline void wait_for_aclk_completion(struct aclk_completion *p)
+{
+    uv_mutex_lock(&p->mutex);
+    while (0 == p->completed) {
+        uv_cond_wait(&p->cond, &p->mutex);
+    }
+    fatal_assert(1 == p->completed);
+    uv_mutex_unlock(&p->mutex);
+}
+
+static inline void aclk_complete(struct aclk_completion *p)
+{
+    uv_mutex_lock(&p->mutex);
+    p->completed = 1;
+    uv_mutex_unlock(&p->mutex);
+    uv_cond_broadcast(&p->cond);
+}
+
 extern uv_mutex_t aclk_async_lock;
 
 extern int aclk_architecture;
@@ -99,7 +136,7 @@ struct aclk_database_cmd {
     void *data_param;
     int count;
     uint64_t param1;
-    struct completion *completion;
+    struct aclk_completion *completion;
 };
 
 #define ACLK_DATABASE_CMD_Q_MAX_SIZE (2048)

@@ -388,7 +388,7 @@ void aclk_database_worker(void *arg)
             }
             db_unlock();
             if (cmd.completion)
-                complete(cmd.completion);
+                aclk_complete(cmd.completion);
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 

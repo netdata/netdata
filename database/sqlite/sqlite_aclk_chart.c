@@ -172,31 +172,37 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     RRDDIM *rd = cmd.data;
 
     time_t now = now_realtime_sec();
-
     if (likely(claim_id)) {
-        const char *node_id = NULL;
-        node_id = wc->node_id; // get_str_from_uuid(rd->rrdset->rrdhost->node_id);
         struct chart_dimension_updated dim_payload;
+        size_t size;
+        const char *node_id = strdupz(wc->node_id);
+
+        time_t first_t = rd->state->query_ops.oldest_time(rd);
+        time_t last_t  = rd->state->query_ops.latest_time(rd);
+
         memset(&dim_payload, 0, sizeof(dim_payload));
         dim_payload.node_id = strdupz(node_id);
         dim_payload.claim_id = claim_id;
-
-        dim_payload.chart_id = strdupz(rd->rrdset->name);
-        dim_payload.created_at = rd->last_collected_time; //TODO: Fix with creation time
-        if ((now - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every)) {
-            dim_payload.last_timestamp.tv_usec = 0;
-            dim_payload.last_timestamp.tv_sec = 0;
-        }
-        else
-            dim_payload.last_timestamp = rd->last_collected_time;
-
         dim_payload.name = strdupz(rd->name);
         dim_payload.id = strdupz(rd->id);
 
-        size_t size;
+        dim_payload.chart_id = strdupz(rd->rrdset->name);
+        dim_payload.created_at.tv_usec = 0;
+        dim_payload.created_at.tv_sec  = first_t;
+        dim_payload.last_timestamp.tv_usec = 0;
+        if ((now - last_t) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every))
+            dim_payload.last_timestamp.tv_sec = 0;
+        else
+            dim_payload.last_timestamp.tv_sec = last_t;
+
         char *payload = generate_chart_dimension_updated(&size, &dim_payload);
         if (likely(payload))
             rc = aclk_add_chart_payload(wc->uuid_str, rd->state->metric_uuid, claim_id, 1, (void *) payload, size);
+        freez((char *) dim_payload.node_id);
+        freez((char *) dim_payload.chart_id);
+        freez((char *) dim_payload.name);
+        freez((char *) dim_payload.id);
+        freez(claim_id);
         freez(payload);
         //chart_instance_updated_destroy(&dim_payload);
     }
@@ -536,15 +542,31 @@ void sql_check_dimension_state(struct aclk_database_worker_config *wc, struct ac
     while (sqlite3_step(res) == SQLITE_ROW) {
         dim_uuid = (uuid_t *) sqlite3_column_blob(res, 0);
         uuid_unparse_lower(*dim_uuid, dim_uuid_str);
+        rc = 1;
 #ifdef ENABLE_DBENGINE
-        rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
-
+        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        else
+#endif
+        {
+            RRDSET  *st = rrdset_find(wc->host, (const char *) sqlite3_column_text(res, 3));
+            if (st) {
+                RRDDIM *rd = rrddim_find(st, (const char *) sqlite3_column_text(res, 1));
+                if (rd) {
+                    first_entry_t = rd->state->query_ops.oldest_time(rd);
+                    last_entry_t = rd->state->query_ops.latest_time(rd);
+                    rc = 0;
+                }
+            }
+        }
         if (!rc)
             info("DEBUG: %d Checking dimension %s (id=%s, name=%s, chart=%s) --> %s (%ld, %ld)", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, !rc ? first_entry_t : 0, !rc ? last_entry_t : 0);
         if (!rc)
             aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
-#endif
+
+        if (!rc)
+            aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
         ++count;
     }
 
@@ -605,17 +627,34 @@ void sql_check_rotation_state(struct aclk_database_worker_config *wc, struct acl
     while (sqlite3_step(res) == SQLITE_ROW) {
         dim_uuid = (uuid_t *) sqlite3_column_blob(res, 0);
         uuid_unparse_lower(*dim_uuid, dim_uuid_str);
+
+
+        rc = 1;
 #ifdef ENABLE_DBENGINE
-        rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rc = rrdeng_metric_latest_time_by_uuid(dim_uuid, &first_entry_t, &last_entry_t);
+        else
+#endif
+        {
+            RRDSET *st = rrdset_find(wc->host, (const char *) sqlite3_column_text(res, 3));
+            if (st) {
+                RRDDIM *rd = rrddim_find(st, (const char *) sqlite3_column_text(res, 1));
+                if (rd) {
+                    first_entry_t = rd->state->query_ops.oldest_time(rd);
+                    last_entry_t = rd->state->query_ops.latest_time(rd);
+                    rc = 0;
+                }
+            }
+        }
+
         if (!rc)
             info("DEBUG: %d Checking rotated dimension %s (id=%s, name=%s, chart=%s) --> %s (%ld, %ld)", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, !rc ? first_entry_t : 0, !rc ? last_entry_t : 0);
         else
             info("DEBUG: %d Checking rotated dimension %s (id=%s, name=%s, chart=%s) --> %s (%d, %d) NOT FOUND", count, wc->uuid_str,   sqlite3_column_text(res, 1), sqlite3_column_text(res, 2),  sqlite3_column_text(res, 3),
                  dim_uuid_str, 0, 0);
-        //if (!rc)
-        //    aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
-#endif
+//        if (!rc)
+//            aclk_add_offline_dimension_event(wc, wc->node_id, (char *) sqlite3_column_text(res, 3), dim_uuid, (char *) sqlite3_column_text(res, 1), (char *) sqlite3_column_text(res, 2), first_entry_t, last_entry_t);
         ++count;
     }
 
