@@ -8,6 +8,7 @@
 
 - Adds aclk-schemas to dist\_noinst\_DATA [\#11338](https://github.com/netdata/netdata/pull/11338) ([underhood](https://github.com/underhood))
 - Fix typo in analytics.c [\#11329](https://github.com/netdata/netdata/pull/11329) ([eltociear](https://github.com/eltociear))
+- add postgresql version to requirements section [\#11328](https://github.com/netdata/netdata/pull/11328) ([charoleizer](https://github.com/charoleizer))
 - v2.19.1 [\#11323](https://github.com/netdata/netdata/pull/11323) ([allelos](https://github.com/allelos))
 - Fixes coverity errors in ACLK [\#11322](https://github.com/netdata/netdata/pull/11322) ([underhood](https://github.com/underhood))
 - Fix tiny issues in docs [\#11320](https://github.com/netdata/netdata/pull/11320) ([UmanShahzad](https://github.com/UmanShahzad))
@@ -307,9 +308,6 @@
 - Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
 - Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
 - Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
-- Add guide: Unsupervised anomaly detection for Raspberry Pi monitoring [\#10713](https://github.com/netdata/netdata/pull/10713) ([joelhans](https://github.com/joelhans))
-- Add Working Set charts to the cgroups plugin [\#10712](https://github.com/netdata/netdata/pull/10712) ([vlvkobal](https://github.com/vlvkobal))
-- python.d/smartd\_log: collect attribute 233 \(Media Wearout Indicator \(SSD\)\). [\#10711](https://github.com/netdata/netdata/pull/10711) ([aazedo](https://github.com/aazedo))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
