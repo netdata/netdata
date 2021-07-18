@@ -329,6 +329,7 @@ filesystems are monitored.
     ext4dist = yes
     nfsdist = yes
     xfsdist = yes
+    zfsdist = yes
 ```
 
 The ebpf program `nfsdist` monitors only `nfs` mount points.
