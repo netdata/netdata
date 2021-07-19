@@ -259,36 +259,32 @@ dependencies() {
   echo "Machine           : ${MACHINE}"
   echo "BASH major version: ${BASH_MAJOR_VERSION}"
 
-  if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
-    warning "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
+  bash="$(command -v bash 2> /dev/null)"
+  if ! detect_bash4 "${bash}"; then
+    warning "Cannot detect packages to be installed in this system, without BASH v4+."
   else
-    bash="$(command -v bash 2> /dev/null)"
-    if ! detect_bash4 "${bash}"; then
-      warning "Cannot detect packages to be installed in this system, without BASH v4+."
+    progress "Fetching script to detect required packages..."
+    if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+      if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+        run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+      else
+        fatal "Invalid given dependency file, please check your --local-files parameter options and try again"
+      fi
     else
-      progress "Fetching script to detect required packages..."
-      if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-        if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-          run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
-        else
-          fatal "Invalid given dependency file, please check your --local-files parameter options and try again"
-        fi
-      else
-        download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
-      fi
-
-      if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
-        warning "Downloaded dependency installation script is empty."
-      else
-        progress "Running downloaded script to detect required packages..."
-        run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
-        # shellcheck disable=SC2181
-        if [ $? -ne 0 ]; then
-          warning "It failed to install all the required packages, but installation might still be possible."
-        fi
-      fi
-
+      download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
     fi
+
+    if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
+      warning "Downloaded dependency installation script is empty."
+    else
+      progress "Running downloaded script to detect required packages..."
+      run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      # shellcheck disable=SC2181
+      if [ $? -ne 0 ]; then
+        warning "It failed to install all the required packages, but installation might still be possible."
+      fi
+    fi
+
   fi
 }
 
@@ -537,7 +533,7 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   if [ -z "${NETDATA_PREFIX}" ] ; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   else
-    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/bin/netdata-claim.sh"
+    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
   if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
