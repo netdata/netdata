@@ -194,6 +194,8 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+        st->rrdhost->obsolete_charts_count++;
+
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         // the chart will not get more updates (data collection)
@@ -205,6 +207,8 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        st->rrdhost->obsolete_charts_count--;
+
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         // the chart will be pushed upstream automatically
@@ -452,7 +456,7 @@ void rrdset_delete_custom(RRDSET *st, int db_rotated) {
 #ifdef ENABLE_ACLK
     if ((netdata_cloud_setting) && (db_rotated || RRD_MEMORY_MODE_DBENGINE != st->rrd_memory_mode)) {
         aclk_del_collector(st->rrdhost, st->plugin_name, st->module_name);
-        st->rrdhost->obsolete_count++;
+        st->rrdhost->deleted_charts_count++;
     }
 #endif
 
@@ -931,15 +935,6 @@ RRDSET *rrdset_create_custom(
         update_chart_metadata(st->chart_uuid, st, id, name);
 
     store_active_chart(st->chart_uuid);
-
-#ifdef ENABLE_ACLK
-    host->obsolete_count = 0;
-#endif
-    rrdhost_cleanup_obsolete_charts(host);
-#ifdef ENABLE_ACLK
-    if (host->obsolete_count)
-        aclk_update_chart(st->rrdhost, "dummy-chart", 0);
-#endif
 
     rrdhost_unlock(host);
 #ifdef ENABLE_ACLK

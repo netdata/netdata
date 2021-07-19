@@ -650,6 +650,13 @@ restart_after_removal:
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentaion faults if a short
+    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
+    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
+    if (rrdset_free_obsolete_time < 10) {
+        rrdset_free_obsolete_time = 10;
+        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds. A lower delay can potentially cause a segmentaion fault.");
+    }
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
@@ -1392,6 +1399,7 @@ restart_after_removal:
                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
         )) {
+            st->rrdhost->obsolete_charts_count--;
 #ifdef ENABLE_DBENGINE
             if(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 RRDDIM *rd, *last;
@@ -1437,6 +1445,7 @@ restart_after_removal:
                 rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
                 rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+                
                 if (st->dimensions) {
                     /* If the chart still has dimensions don't delete it from the metadata log */
                     continue;
@@ -1456,6 +1465,30 @@ restart_after_removal:
             goto restart_after_removal;
         }
     }
+}
+
+void rrd_cleanup_obsolete_charts()
+{
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host)
+    {
+        if (host->obsolete_charts_count) {
+            rrdhost_wrlock(host);
+#ifdef ENABLE_ACLK
+            host->deleted_charts_count = 0;
+#endif
+            rrdhost_cleanup_obsolete_charts(host);
+#ifdef ENABLE_ACLK
+            if (host->deleted_charts_count)
+                aclk_update_chart(host, "dummy-chart", 0);
+#endif
+            rrdhost_unlock(host);
+        }
+    }
+
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------

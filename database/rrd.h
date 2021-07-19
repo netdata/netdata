@@ -762,7 +762,7 @@ struct rrdhost {
     const char *timezone;                           // the timezone of the host
 
 #ifdef ENABLE_ACLK
-    long    obsolete_count;
+    long    deleted_charts_count;
 #endif
 
     const char *abbrev_timezone;                    // the abbriviated timezone of the host
@@ -858,6 +858,8 @@ struct rrdhost {
     // the charts of the host
 
     RRDSET *rrdset_root;                            // the host charts
+
+    unsigned int obsolete_charts_count;
 
 
     // ------------------------------------------------------------------------
@@ -1038,6 +1040,7 @@ extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
+extern void rrd_cleanup_obsolete_charts();
 
 extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
 
@@ -1326,7 +1329,6 @@ extern void rrdset_save(RRDSET *st);
 extern void rrdset_delete_custom(RRDSET *st, int db_rotated);
 extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
-extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
 extern RRDHOST *rrdhost_create(
     const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
     const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
