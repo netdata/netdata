@@ -114,6 +114,31 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
     }
 }
 
+/* only to help ng, this is in master already */
+char *health_edit_command_from_source(const char *source)
+{
+    char buffer[FILENAME_MAX + 1];
+    char *temp = strdupz(source);
+    char *line_num = strchr(temp, '@');
+    char *file_no_path = strrchr(temp, '/');
+
+    if (likely(file_no_path && line_num)) {
+        *line_num = '\0';
+        snprintfz(
+            buffer,
+            FILENAME_MAX,
+            "sudo %s/edit-config health.d/%s=%s",
+            netdata_configured_user_config_dir,
+            file_no_path + 1,
+            temp);
+    } else
+        buffer[0] = '\0';
+
+    freez(temp);
+    return strdupz(buffer);
+}
+
+
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
 #ifndef ACLK_NG
@@ -180,16 +205,17 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         alarm_log.config_hash = strdupz((char *)uuid_str);
 
-        alarm_log.utc_offset = 10; //fix!!!
-        alarm_log.timezone = strdupz((char *)"EEST"); //fix
+        alarm_log.utc_offset = 10800; //will be there in master
+        alarm_log.timezone = strdupz((char *)"EEST"); //will be there in master
 
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : strdupz((char *)wc->host->health_default_exec);
         alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
-        alarm_log.command = strdupz((char *)sqlite3_column_text(res, 16)); //fix, do edit_command
+
+        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) : strdupz("UNKNOWN=0");
+        alarm_log.command = strdupz(edit_command);
 
         alarm_log.duration = (uint32_t) sqlite3_column_int(res, 6); //correct ?
         alarm_log.non_clear_duration = (uint32_t) sqlite3_column_int(res, 7); //correct?
-
 
         alarm_log.status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 20));
         alarm_log.old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 21));
@@ -219,6 +245,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         db_execute(buffer_tostring(sql));
         destroy_alarm_log_entry(&alarm_log);
+        freez(edit_command);
     }
 
     rc = sqlite3_finalize(res);
