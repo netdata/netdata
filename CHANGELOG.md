@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Adds aclk-schemas to dist\_noinst\_DATA [\#11338](https://github.com/netdata/netdata/pull/11338) ([underhood](https://github.com/underhood))
+- eBPF ZFS monitoring [\#11330](https://github.com/netdata/netdata/pull/11330) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix typo in analytics.c [\#11329](https://github.com/netdata/netdata/pull/11329) ([eltociear](https://github.com/eltociear))
 - add postgresql version to requirements section [\#11328](https://github.com/netdata/netdata/pull/11328) ([charoleizer](https://github.com/charoleizer))
 - v2.19.1 [\#11323](https://github.com/netdata/netdata/pull/11323) ([allelos](https://github.com/allelos))
