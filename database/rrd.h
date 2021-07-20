@@ -168,8 +168,7 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_ACLK                            = (1 << 4)
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 3)
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -382,6 +381,9 @@ struct rrddim_query_handle {
 // ----------------------------------------------------------------------------
 // volatile state per RRD dimension
 struct rrddim_volatile {
+#ifdef ENABLE_ACLK
+    int aclk_live_status;
+#endif
 #ifdef ENABLE_DBENGINE
     uuid_t *rrdeng_uuid;                 // database engine metric UUID
     struct pg_cache_page_index *page_index;

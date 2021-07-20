@@ -1791,24 +1791,24 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
+    time_t mark = now_realtime_sec();
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
-        if(unlikely(!rd->updated)) {
+
 #ifdef ENABLE_ACLK
-            if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
-                if (likely(!sql_queue_dimension_to_aclk(rd)))
-                    rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
+        int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+        if (unlikely(live != rd->state->aclk_live_status)) {
+            if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+                if (likely(!sql_queue_dimension_to_aclk(rd))) {
+                    rd->state->aclk_live_status = live;
+                    //info("DEBUG: Dimension %s on chart %s live status = %d", rd->name, rd->rrdset->name, live);
+                }
             }
+        }
 #endif
+        if(unlikely(!rd->updated))
             continue;
-        }
-#ifdef ENABLE_ACLK
-        if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK) && !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK))) {
-            if (likely(!sql_queue_dimension_to_aclk(rd)))
-                rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
-        }
-#endif
 
         #ifdef NETDATA_INTERNAL_CHECKS
         rrdset_debug(st, "%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", rd->name, rd->last_collected_value, rd->collected_value);

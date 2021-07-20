@@ -387,6 +387,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
     rd->state = mallocz(sizeof(*rd->state));
+#ifdef ENABLE_ACLK
+    rd->state->aclk_live_status = -1;
+#endif
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         uuid_t *dim_uuid = find_dimension_uuid(st, rd);
