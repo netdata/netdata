@@ -40,6 +40,10 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
+unsigned int default_use_replication = 0;
+time_t default_rrdpush_gap_block_size;
+uint32_t default_rrdpush_max_gap;
+uint32_t default_rrdpush_gap_history;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -73,6 +77,10 @@ int rrdpush_init() {
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+    default_use_replication = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable replication", default_use_replication);
+    default_rrdpush_gap_block_size = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "gap replication block size", 60);
+    default_rrdpush_gap_history = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "history gap replication", 60);
+    default_rrdpush_max_gap = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "max gap replication", 60);
 
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
@@ -122,7 +130,7 @@ int rrdpush_init() {
 unsigned int remote_clock_resync_iterations = 60;
 
 
-static inline int should_send_chart_matching(RRDSET *st) {
+int should_send_chart_matching(RRDSET *st) {
     if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
         rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
@@ -164,7 +172,7 @@ int configured_as_parent() {
 }
 
 // checks if the current chart definition has been sent
-static inline int need_to_send_chart_definition(RRDSET *st) {
+int need_to_send_chart_definition(RRDSET *st) {
     rrdset_check_rdlock(st);
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
@@ -185,7 +193,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
+void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -305,6 +313,9 @@ void rrdset_done_push(RRDSET *st) {
 
     if(unlikely(host->rrdpush_send_enabled && !host->rrdpush_sender_spawn))
         rrdpush_sender_thread_spawn(host);
+
+    if (host->sender->version >= VERSION_GAP_FILLING)
+        return;
 
     // Handle non-connected case
     if(unlikely(!host->rrdpush_sender_connected)) {
@@ -702,6 +713,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     w->ssl.conn = NULL;
     w->ssl.flags = NETDATA_SSL_START;
 #endif
+    rpt->max_gap           = default_rrdpush_max_gap;
+    rpt->gap_history       = default_rrdpush_gap_history;
+    rpt->use_replication   = default_use_replication;
+    fatal_assert(0 == uv_cond_init(&rpt->cmd_queue.cmd_cond));    // the rest of the cmd_queue fields should be zeroed
+    fatal_assert(0 == uv_mutex_init(&rpt->cmd_queue.cmd_mutex));  // on allocation
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

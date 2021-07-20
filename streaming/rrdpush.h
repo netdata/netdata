@@ -10,10 +10,9 @@
 
 #define CONNECTED_TO_SIZE 100
 
-// #define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4       Gap-filling
-#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)3
-#define VERSION_GAP_FILLING 4
 #define STREAM_VERSION_CLAIM 3
+#define VERSION_GAP_FILLING 4
+#define STREAMING_PROTOCOL_CURRENT_VERSION (uint32_t)4
 
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
@@ -57,9 +56,29 @@ struct sender_state {
     netdata_mutex_t mutex;
     struct circular_buffer *buffer;
     BUFFER *build;
-    char read_buffer[512];
+    char read_buffer[32768];
     int read_len;
     int32_t version;
+};
+
+struct replication_req {
+    RRDHOST *host; // if this is NULL then the request is a no-op
+    char *st_id;
+    time_t start;
+    time_t end;
+};
+
+#define RECEIVER_CMD_Q_MAX_SIZE (32768)
+
+// The receiver main thread enqueues replication requests for a separate thread. Those replication requests are
+// transmitted back to the remote child host.
+struct receiver_tx_cmdqueue {
+    unsigned head, tail;
+    struct replication_req cmd_array[RECEIVER_CMD_Q_MAX_SIZE];
+    uv_mutex_t cmd_mutex;
+    uv_cond_t cmd_cond;
+    unsigned queue_size;
+    uint8_t stop_thread; // if set to 1 the thread should shut down
 };
 
 struct receiver_state {
@@ -83,6 +102,7 @@ struct receiver_state {
     int update_every;
     uint32_t stream_version;
     time_t last_msg_t;
+    uint32_t max_gap, gap_history, use_replication;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
 #ifdef ENABLE_HTTPS
@@ -90,18 +110,24 @@ struct receiver_state {
 #endif
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+    struct receiver_tx_cmdqueue cmd_queue;
+    netdata_thread_t receiver_tx_thread;
+    volatile unsigned int receiver_tx_spawn:1;   // 1 when the receiver TX thread has been spawned
 };
 
 
 extern unsigned int default_rrdpush_enabled;
+extern uint32_t default_rrdpush_gap_history;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
 extern void sender_init(struct sender_state *s, RRDHOST *parent);
-void sender_start(struct sender_state *s);
-void sender_commit(struct sender_state *s);
+extern void sender_start(struct sender_state *s);
+extern void sender_commit(struct sender_state *s);
+extern int sender_commit_no_overflow(struct sender_state *s);
+extern void sender_replicate(RRDSET *st);
 extern int rrdpush_init();
 extern int configured_as_parent();
 extern void rrdset_done_push(RRDSET *st);
@@ -116,4 +142,7 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
+extern int need_to_send_chart_definition(RRDSET *st);
+extern int should_send_chart_matching(RRDSET *st);
+extern void rrdpush_send_chart_definition_nolock(RRDSET *st);
 #endif //NETDATA_RRDPUSH_H

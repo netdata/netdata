@@ -227,6 +227,60 @@ The receiving end (proxy or parent) logs entries like these:
 
 For Netdata v1.9+, streaming can also be monitored via `access.log`.
 
+### Explicit Database Replication (**Experimental**)
+
+We have added another experimental streaming mode which explicitly replicates at the database level (point by point).
+This mode has the advantage that unstable network connection or restart of the parent node does not cause gaps in the
+charts, because the parent node can request the missing data points to be directly replicated from the child database
+from up to a certain point in time in the past until the present.
+
+`gap replication block size` is the maximum number of data points the child node (sender) can send per explicit parent
+node (receiver) replication request. Default value of `60`.
+
+`history gap replication` is the maximum number of seconds the receiver can go back in the past and request data points
+from the sender's database, when doing the initial synchronization per netdata chart. Default value of `60`.
+
+`max gap replication` is the maximum number of empty data points the receiver will attempt to fill with the
+corresponding data points from the sender's database. Default value of `60`.
+
+To enable explicit database replication you need to set `enable replication = yes` in the `stream` configuration
+section. Fore example:
+```
+[stream]
+    enable replication = yes | no
+    gap replication block size = 60
+    history gap replication = 60
+    max gap replication = 60
+```
+
+Some of the above options can be set per API_KEY (except for `gap replication block size`):
+```sh
+# replace API_KEY with your uuidgen generated GUID
+[API_KEY]
+    enable replication = yes | no
+    history gap replication = 60
+    max gap replication = 60
+```
+
+The above are used for all hosts pushed with this API key.
+
+You can also configure the above options per MACHINE_GUID:
+
+```sh
+# replace MACHINE_GUID with the child /var/lib/netdata/registry/netdata.public.unique.id
+[MACHINE_GUID]
+    enable replication = yes | no
+    history gap replication = 60
+    max gap replication = 60
+```
+
+For explicit replication to work there are the following limitations:
+-   The parent node needs to enable it via `enable replication`
+-   Both the parent and the child nodes need a netdata version that supports it.
+-   Both the parent and the child nodes must not use `memory mode = none`.
+-   Setting up a proxy node with it will not work. Only the final parent can do explicit database replication at the
+    moment.
+
 ### Securing streaming communications
 
 Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](/web/server/README.md#enabling-tls-support) on the parent. With encryption enabled on the receiving side, you need to instruct the child to use TLS/SSL as well. On the child's `stream.conf`, configure the destination as follows:

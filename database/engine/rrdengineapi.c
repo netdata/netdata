@@ -171,8 +171,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
         return;
     }
     if (likely(descr->page_length)) {
-        int page_is_empty;
-
+        int /*ret, */page_is_empty;
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 
         if (handle->prev_descr) {
@@ -216,12 +215,13 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     struct page_cache *pg_cache;
     struct rrdeng_page_descr *descr;
     storage_number *page;
-    uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
+    uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0, tf_alignment_change = 0;
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
+    uint32_t new_page_length;
 
     if (descr) {
         /* Make alignment decisions */
@@ -244,16 +244,45 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             must_flush_unaligned_page = 1;
             handle->unaligned_page = 0;
         }
+        // This is deliberately not a fatal assert as the timestamp is derived from a tainted source
+        if (point_in_time <= descr->end_time) {
+            errno = 0;
+            error("Attempt to store older/duplicate point in db: %llu < %llu", point_in_time, descr->end_time);
+            return;
+        }
+        new_page_length = descr->page_length;
+        // Respecting the API
+        if (descr->page_length >= sizeof(number)*2) {
+            usec_t tf_spacing = (descr->end_time - descr->start_time) / (descr->page_length / sizeof(number) - 1);
+            if (0 != ((point_in_time - descr->end_time) % tf_spacing))
+                tf_alignment_change = 1;
+            else {
+                if (point_in_time != descr->end_time + tf_spacing) {
+                    usec_t gap_in_points = (point_in_time - descr->end_time) / tf_spacing;
+                    if (gap_in_points * sizeof(number) + descr->page_length >= RRDENG_BLOCK_SIZE)
+                        tf_alignment_change = 1;
+                    else {
+                        page = descr->pg_cache_descr->page;
+                        for (size_t i=0; i<gap_in_points-1; i++) {
+                            page[new_page_length / sizeof(number)] = SN_EMPTY_SLOT;
+                            new_page_length += sizeof(number);
+                        }
+                    }
+                }
+            }
+        }
     }
     if (unlikely(NULL == descr ||
                  descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
-                 must_flush_unaligned_page)) {
+                 must_flush_unaligned_page ||
+                 tf_alignment_change)) {
         rrdeng_store_metric_flush_current_page(rd);
 
         page = rrdeng_create_page(ctx, &rd->state->page_index->id, &descr);
         fatal_assert(page);
 
         handle->descr = descr;
+        new_page_length = descr->page_length;
 
         handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
 
@@ -263,8 +292,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         }
     }
     page = descr->pg_cache_descr->page;
-    page[descr->page_length / sizeof(number)] = number;
-    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + sizeof(number));
+    page[new_page_length / sizeof(number)] = number;
+    new_page_length += sizeof(number);
+    pg_cache_atomic_set_pg_info(descr, point_in_time, new_page_length);
 
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;

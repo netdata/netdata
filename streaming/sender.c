@@ -22,6 +22,24 @@ void sender_commit(struct sender_state *s) {
     netdata_mutex_unlock(&s->mutex);
 }
 
+// Collector thread finishing a transmission
+// Returns 0 on success, 1 on overflow or if more than 50% of the send buffer is filled
+int sender_commit_no_overflow(struct sender_state *s) {
+    int ret = 0;
+
+    size_t len = cbuffer_len_unsafe(s->host->sender->buffer);
+    // check if 50% of the send buffer is filled
+    if (s->host->sender->build->len + len >= s->host->sender->buffer->max_size / 2)
+        ret = 1;
+    // check if an overflow occured
+    if(cbuffer_add_unsafe(s->host->sender->buffer, buffer_tostring(s->host->sender->build),
+                      s->host->sender->build->len))
+        ret = 1;
+    buffer_flush(s->build);
+    netdata_mutex_unlock(&s->mutex);
+
+    return ret;
+}
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     host->rrdpush_sender_connected = 0;
@@ -370,6 +388,12 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
+    if (version == VERSION_GAP_FILLING && host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)
+    {
+        version = VERSION_GAP_FILLING - 1;
+        info("STREAM %s [send to %s]: dropping back to streaming-mode, memory mode none does not support replication",
+             host->hostname, s->connected_to);
+    }
     s->version = version;
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
@@ -468,12 +492,16 @@ void attempt_to_send(struct sender_state *s) {
     netdata_thread_enable_cancelability();
 }
 
-void attempt_read(struct sender_state *s) {
-int ret;
+static void sender_attempt_read(struct sender_state *s) {
+    int ret, desired = sizeof(s->read_buffer) - s->read_len - 1;
+
+    if (!desired) {
+        debug(D_STREAM, "Cannot read any more bytes, read buffer is full, need to execute commands first.");
+        return;
+    }
 #ifdef ENABLE_HTTPS
     if (s->host->ssl.conn && !s->host->stream_ssl.flags) {
         ERR_clear_error();
-        int desired = sizeof(s->read_buffer) - s->read_len - 1;
         ret = SSL_read(s->host->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += ret;
@@ -493,8 +521,7 @@ int ret;
         return;
     }
 #endif
-    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,
-               MSG_DONTWAIT);
+    ret = recv(s->host->rrdpush_sender_socket, s->read_buffer + s->read_len, desired, MSG_DONTWAIT);
     if (ret>0) {
         s->read_len += ret;
         return;
@@ -510,19 +537,49 @@ int ret;
     rrdpush_sender_thread_close_socket(s->host);
 }
 
-// This is just a placeholder until the gap filling state machine is inserted
-void execute_commands(struct sender_state *s) {
+static int sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t);
+static void sender_execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
+    int overflow;
     *end = 0;
+    //debug(D_STREAM, "%s [send to %s] received command over connection (%d-bytes): %s", s->host->hostname,
+    //      s->connected_to, s->read_len, start);
     while( start<end && (newline=strchr(start, '\n')) ) {
         *newline = 0;
-        info("STREAM %s [send to %s] received command over connection: %s", s->host->hostname, s->connected_to, start);
+        if (!strncmp(start, "REPLICATE ", 10)) {
+            char *next = strchr(start+10, ' ');
+            if (next) {
+                *next = 0;
+                long start_t = strtol(next+1, &next, 10);
+                if (*next == ' ') {
+                    char *after;
+                    long end_t = strtol(next+1, &after, 10);
+                    if (after == newline) {
+                        overflow = sender_execute_replicate(s, start+10, start_t, end_t);
+                        start = after+1;
+                        if (overflow) {
+                            info("Stopped executing explicit replication commands because the send buffer is filling up.");
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            }
+            errno = 0;
+            error("Malformed command on streaming link: %s", start);
+            start = newline+1;
+            continue;
+        }
         start = newline+1;
+        errno = 0;
+        error("Unrecognised command received, skipping to position %ld", start - s->read_buffer);
     }
     if (start<end) {
         memmove(s->read_buffer, start, end-start);
         s->read_len = end-start;
     }
+    else
+        s->read_len = 0;
 }
 
 
@@ -561,7 +618,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 void sender_init(struct sender_state *s, RRDHOST *parent) {
     memset(s, 0, sizeof(*s));
     s->host = parent;
-    s->buffer = cbuffer_new(1024, 1024*1024);
+    s->buffer = cbuffer_new(1024, 1024);
     s->build = buffer_create(1);
     netdata_mutex_init(&s->mutex);
 }
@@ -625,13 +682,6 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
             attempt_to_connect(s);
-            if (s->version >= VERSION_GAP_FILLING) {
-                time_t now = now_realtime_sec();
-                sender_start(s);
-                buffer_sprintf(s->build, "TIMESTAMP %ld", now);
-                sender_commit(s);
-            }
-            rrdpush_claimed_id(s->host);
             continue;
         }
 
@@ -689,8 +739,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Read as much as possible to fill the buffer, split into full lines for execution.
         if (fds[Socket].revents & POLLIN)
-            attempt_read(s);
-        execute_commands(s);
+            sender_attempt_read(s);
+        sender_execute_commands(s);
 
         // If we have data and have seen the TCP window open then try to close it by a transmission.
         if (outstanding && fds[Socket].revents & POLLOUT)
@@ -723,4 +773,133 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_thread_cleanup_pop(1);
     return NULL;
+}
+
+extern time_t default_rrdpush_gap_block_size;
+/* start_time is set during an explicit replication request from the far end, or zero if we are pushing the latest
+   data from the collector.
+*/
+static void sender_fill_gap_nolock(struct sender_state *s, RRDSET *st, time_t start_time)
+{
+    UNUSED(s);
+    RRDDIM *rd;
+    struct rrddim_query_handle handle;
+
+    // When the sync is unknown against the far end (last_sent=0), sending the latest sample will trigger a
+    // replication from the far end if necessary.
+    time_t first_t = rrdset_first_entry_t(st);
+    time_t st_newest = st->last_updated.tv_sec;
+    time_t window_start;
+
+    if (start_time == 0) {
+        if (st->state->last_sent.tv_sec)
+            window_start = MAX((time_t)st->state->last_sent.tv_sec + st->update_every, first_t);
+        else // It is the first time this agent streams this chart during its uptime
+            window_start = st_newest;
+    }
+    else
+        window_start = MAX(start_time, first_t);
+
+    // Decide how much data to replicate from the beginning of the window
+    time_t unsent_points = (st_newest - window_start) / st->update_every + 1;
+    if (unsent_points > default_rrdpush_gap_block_size)
+        unsent_points = default_rrdpush_gap_block_size;
+    time_t window_end = window_start + unsent_points * st->update_every;    // window_end <= st_newest + update_every
+
+    // If we are responding to an explicit request then we may send empty windows, these communicate to the far end
+    // that there is no data in the interval. There are times in the REPBEGIN:
+    //   * The beginning of the window in time (e.g. where we are reporting from including gaps)
+    //   * The beginning of the data in time   (e.g. dropping leading gaps from the window)
+    //   * The end of the window.
+    // The start times are inclusive and the end time is exclusive, so if the requested window is 10..20 and the
+    // chart contains data at times 15,16,17,18 then the response will be REPBEGIN 10 15 19
+    if (start_time == 0)
+        buffer_sprintf(s->build, "REPBEGIN \"%s\" %ld %ld %ld\n", st->id, window_start, window_start, window_end);
+    else
+        buffer_sprintf(s->build, "REPBEGIN \"%s\" %ld %ld %ld\n", st->id, start_time, window_start, window_end);
+
+    rrdset_dump_debug_state(st);
+
+    size_t num_points = 0;
+    rrddim_foreach_read(rd, st) {
+        // Send the intersection of this dimension and the time-window on the chart
+        if (!rd->exposed)
+            continue;
+        time_t rd_start = rrddim_first_entry_t(rd);
+        time_t rd_end   = rrddim_last_entry_t(rd) + st->update_every;
+        if (rd_start < window_end && rd_end >= window_start) {
+
+            time_t rd_oldest = MAX(rd_start, window_start);
+            rd_end = MIN(rd_end,   window_end);
+
+            rd->state->query_ops.init(rd, &handle, rd_oldest, rd_end);
+            debug(D_REPLICATION, "Fill replication with %s.%s window=%ld-%ld data=%ld-%ld query=%ld-%ld",
+                  st->id, rd->id, window_start, window_end, rd_oldest, rd_end, handle.start_time, handle.end_time);
+
+            for (time_t metric_t = rd_oldest; metric_t < rd_end; ) {
+
+                if (rd->state->query_ops.is_finished(&handle)) {
+                    debug(D_REPLICATION, "%s.%s query handle finished early @%ld", st->id, rd->id, metric_t);
+                    break;
+                }
+
+                storage_number n = rd->state->query_ops.next_metric(&handle, &metric_t);
+                if (n == SN_EMPTY_SLOT)
+                    debug(D_REPLICATION, "%s.%s db empty in valid dimension range @ %ld", st->id, rd->id, metric_t);
+                else
+                    buffer_sprintf(s->build, "REPDIM \"%s\" %ld " STORAGE_NUMBER_FORMAT "\n", rd->id, metric_t, n);
+                debug(D_REPLICATION, "%s.%s REPDIM %ld " STORAGE_NUMBER_FORMAT "\n", st->id, rd->id, metric_t, n);
+                num_points++;
+            }
+            rd->state->query_ops.finalize(&handle);
+        }
+        else
+            debug(D_REPLICATION, "%s.%s has no data in the replication window (@%ld-%ld) last_collected=%ld.%ld",
+                                 st->id, rd->id, (long)window_start, window_end, (long)rd->last_collected_time.tv_sec,
+                                 rd->last_collected_time.tv_usec);
+
+    }
+    buffer_sprintf(s->build, "REPEND %zu %lld %lld\n", num_points, st->collected_total, st->last_collected_total);
+    st->state->last_sent.tv_sec = window_end - st->update_every;
+}
+
+// Call-site for the collector thread (from inside rrdset_done)
+void sender_replicate(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+    if (!host->rrdpush_sender_connected || host->sender->version < VERSION_GAP_FILLING)
+        return;
+    if(unlikely(!should_send_chart_matching(st)))
+        return;
+
+    sender_start(host->sender);         // Locks the sender buffer
+    if(need_to_send_chart_definition(st))
+        rrdpush_send_chart_definition_nolock(st);
+    sender_fill_gap_nolock(host->sender, st, 0);
+    sender_commit(host->sender);        // Releases the sender buffer
+
+    // signal the sender there are more data
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+}
+
+// Call-site for the sender thread (for explict requests)
+// Returns 1 if the send buffer would fill up (>= 50%) or overflow, 0 otherwise
+// Allow 50% of the send buffer to be available for commands that are not allowed to fail
+static int sender_execute_replicate(struct sender_state *s, char *st_id, long start_t, long end_t) {
+    int overflow = 0;
+    time_t now = now_realtime_sec();
+    debug(D_REPLICATION, "Replication request started: %s %ld - %ld @ %ld", st_id, (long)start_t, (long)end_t, (long)now);
+    RRDSET *st = rrdset_find(s->host, st_id);
+    if (!st) {
+        errno = 0;
+        error("Cannot replicate chart %s @ %ld - not found! (req. window %ld-%ld)", st_id, now, start_t, end_t);
+    }
+    else {
+        rrdset_rdlock(st);
+        sender_start(s);                    // Locks the sender buffer
+        sender_fill_gap_nolock(s, st, start_t);
+        overflow = sender_commit_no_overflow(s); // Releases the sender buffer
+        rrdset_unlock(st);
+    }
+    return overflow;
 }
