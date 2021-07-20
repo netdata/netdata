@@ -30,8 +30,6 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     struct aclk_database_cmd cmd;
     cmd.opcode = ACLK_DATABASE_ADD_ALERT;
     cmd.data = ae;
-    //cmd.data1 = ae;
-    //cmd.data_param = ae;
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
@@ -43,7 +41,6 @@ int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_dat
 {
     int rc = 0;
     if (unlikely(!db_meta)) {
-        freez(cmd.data_param);
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return 1;
         }
@@ -74,14 +71,11 @@ int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_dat
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store alert event %u, rc = %d", ae->unique_id, rc);
 
-    bind_fail:
+bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
         error_report("Failed to reset statement in store alert event, rc = %d", rc);
     buffer_free(sql);
     return (rc != SQLITE_DONE);
-
-    freez(cmd.data);
-    return rc;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
@@ -148,10 +142,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     int rc;
 
     int limit = cmd.count > 0 ? cmd.count : 1;
-//    int available = 0;
-    /* uint64_t first_sequence = 0; */
-    /* uint64_t last_sequence = 0; */
-    /* time_t last_timestamp; */
     char uuid_str[GUID_LEN + 1];
     BUFFER *sql = buffer_create(1024);
 

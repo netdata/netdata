@@ -43,7 +43,7 @@ int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_siz
         payload_sent = sqlite3_column_int(res, 0);
     }
 
-    bind_fail:
+bind_fail:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to reset statement in check payload, rc = %d", rc);
     buffer_free(sql);
@@ -179,8 +179,6 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         time_t last_t  = rd->state->query_ops.latest_time(rd);
 
         int live = ((now - last_t) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
-        ///time_t last_first_t = get_dimension_state(rd->state->metric_uuid, &last_state);
-        //    set_dimension_state(rd->state->metric_uuid, first_t, new_state);
 
         struct chart_dimension_updated dim_payload;
         size_t size;
@@ -215,7 +213,6 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     UNUSED(wc);
     UNUSED(cmd);
 #endif
-//    freez(cmd.data_param);
     return rc;
 }
 
@@ -374,8 +371,6 @@ int sql_queue_dimension_to_aclk(RRDDIM *rd)
     return sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker, rd, ACLK_DATABASE_ADD_DIMENSION);
 }
 
-
-
 void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
 #ifndef ACLK_NG
@@ -460,18 +455,11 @@ void aclk_push_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             db_execute(buffer_tostring(sql));
 
             buffer_reset(sql);
-//            buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, type, unique_id, update_count, date_created) "
-//                " SELECT uuid, 'pending', type, unique_id, 0, strftime('%%s') FROM aclk_chart_%s s "
-//                " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
-//                " AND s.uuid NOT IN (SELECT t.uuid FROM aclk_chart_%s t WHERE t.uuid = s.uuid AND t.status = 'pending');",
-//                wc->uuid_str, wc->uuid_str, first_sequence, last_sequence, wc->uuid_str);
-
             buffer_sprintf(sql, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
                                 " SELECT uuid, unique_id, date_submitted FROM aclk_chart_%s s "
                                 " WHERE date_submitted IS NOT NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64
                                 " ;",
                            wc->uuid_str, wc->uuid_str, first_sequence, last_sequence);
-
             db_execute(buffer_tostring(sql));
 
             info("DEBUG: %s Loop %d chart seq %" PRIu64 " - %" PRIu64", t=%ld batch=%"PRIu64, wc->uuid_str,
@@ -578,12 +566,12 @@ void sql_check_dimension_state(struct aclk_database_worker_config *wc, struct ac
     // Cleanup complete
 //    wc->cleanup_after = 0;
 
-    bind_fail:
+bind_fail:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when checking dimensions, rc = %d", rc);
 
-    fail_complete:
+fail_complete:
     buffer_free(sql);
 #endif
 
@@ -597,11 +585,6 @@ void sql_check_rotation_state(struct aclk_database_worker_config *wc, struct acl
     UNUSED(wc);
 #else
     int rc;
-
-//    if (unlikely(!wc->chart_updates)) {
-//        info("DEBUG: Ignoring sql_check_dimension_state for %s", wc->uuid_str);
-//        return;
-//    }
 
     BUFFER *sql = buffer_create(1024);
 
@@ -753,14 +736,12 @@ int aclk_push_chart_config_event(struct aclk_database_worker_config *wc, struct 
     destroy_chart_config_updated(&chart_config);
     freez((char *) cmd.data_param);
 
-    bind_fail:
+bind_fail:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when pushing chart config hash, rc = %d", rc);
-
-    fail:
+fail:
     buffer_free(sql);
-
     return rc;
 }
 
@@ -852,66 +833,48 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
 
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
+
     buffer_reset(sql);
-
-//    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE status is NULL and update_count = 0;", wc->uuid_str);
-//    db_execute(buffer_tostring(sql));
-//    buffer_reset(sql);
-//
-//    buffer_sprintf(sql, "CREATE TABLE ts_%s AS SELECT date_created, date_updated, date_submitted, "
-//                        " status, uuid, type, unique_id, update_count"
-//                        " FROM aclk_chart_%s WHERE date_submitted IS NULL AND update_count = 0;", wc->uuid_str, wc->uuid_str);
-//    db_execute(buffer_tostring(sql));
-//    buffer_reset(sql);
-
-//    buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (uuid, status, update_count) VALUES ('MARK', \"%s\", 0)", wc->uuid_str, wc->uuid_str);
-//    db_execute(buffer_tostring(sql));
-//    buffer_reset(sql);
-
     buffer_sprintf(sql, "CREATE TABLE t_%s AS SELECT * FROM aclk_chart_payload_%s WHERE unique_id IN "
-                        "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL AND update_count > 0);", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+        "(SELECT unique_id from aclk_chart_%s WHERE date_submitted IS NULL AND update_count > 0);",
+        wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
-    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); " , wc->uuid_str, wc->uuid_str);
+    buffer_reset(sql);
+    buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s WHERE unique_id IN (SELECT unique_id FROM t_%s); " ,
+       wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
+    buffer_reset(sql);
     buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);",
-                   wc->uuid_str, wc->uuid_str);
+       wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
+    buffer_reset(sql);
     buffer_sprintf(sql, "DELETE FROM aclk_chart_latest_%s WHERE unique_id IN (SELECT unique_id FROM t_%s);",
-                   wc->uuid_str, wc->uuid_str);
+       wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
+    buffer_reset(sql);
     buffer_sprintf(sql, "INSERT INTO aclk_chart_payload_%s SELECT * FROM t_%s ORDER BY DATE_CREATED ASC;",
                    wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
-    buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (date_created, date_updated, date_submitted, status, uuid, type, unique_id, update_count) "
-                        "SELECT * FROM ts_%s ORDER BY DATE_CREATED ASC;", wc->uuid_str, wc->uuid_str);
+    buffer_reset(sql);
+    buffer_sprintf(sql, "INSERT INTO aclk_chart_%s (date_created, date_updated, date_submitted, status, "
+                "uuid, type, unique_id, update_count) "
+                "SELECT * FROM ts_%s ORDER BY DATE_CREATED ASC;", wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
+
     buffer_reset(sql);
-
-//    buffer_sprintf(sql, "DELETE FROM aclk_chart_%s WHERE uuid = 'MARK' AND status=\"%s\"; ", wc->uuid_str, wc->uuid_str);
-//    db_execute(buffer_tostring(sql));
-//    buffer_reset(sql);
-//
-//    buffer_sprintf(sql, "DROP TABLE IF EXISTS ts_%s;", wc->uuid_str);
-//    db_execute(buffer_tostring(sql));
-
     buffer_sprintf(sql, "INSERT OR REPLACE INTO aclk_chart_latest_%s (uuid, unique_id, date_submitted) "
                         "SELECT uuid, unique_id, date_submitted FROM aclk_chart_%s where sequence_id IN "
                         "(SELECT sequence_id FROM aclk_chart_%s WHERE date_submitted IS NOT NULL "
                         "GROUP BY uuid HAVING sequence_id = MAX(sequence_id));"
                         , wc->uuid_str, wc->uuid_str, wc->uuid_str);
     db_execute(buffer_tostring(sql));
-    buffer_reset(sql);
 
+    buffer_reset(sql);
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
 
