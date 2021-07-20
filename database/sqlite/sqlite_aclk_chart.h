@@ -4,6 +4,12 @@
 #define NETDATA_SQLITE_ACLK_CHART_H
 
 
+typedef enum payload_type {
+    ACLK_PAYLOAD_CHART,
+    ACLK_PAYLOAD_DIMENSION,
+    ACLK_PAYLOAD_DIMENSION_ROTATED
+} ACLK_PAYLOAD_TYPE;
+
 extern sqlite3 *db_meta;
 
 extern int sql_queue_chart_to_aclk(RRDSET *st);
