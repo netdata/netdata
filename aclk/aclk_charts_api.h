@@ -17,4 +17,6 @@ void aclk_chart_reset(chart_reset_t reset);
 
 void aclk_update_node_info(struct update_node_info *info);
 
+void aclk_retention_updated(struct retention_updated *data);
+
 #endif /* ACLK_CHARTS_H */

@@ -52,3 +52,13 @@ void aclk_update_node_info(struct update_node_info *info)
     if (query->data.bin_payload.payload)
         aclk_queue_query(query);
 }
+
+void aclk_retention_updated(struct retention_updated *data)
+{
+    aclk_query_t query = aclk_query_new(RETENTION_UPDATED);
+    query->data.bin_payload.topic = ACLK_TOPICID_RETENTION_UPDATED;
+    query->data.bin_payload.payload = generate_retention_updated(&query->data.bin_payload.size, data);
+    query->data.bin_payload.msg_name = "RetentionUpdated";
+    if (query->data.bin_payload.payload)
+        aclk_queue_query(query);
+}
