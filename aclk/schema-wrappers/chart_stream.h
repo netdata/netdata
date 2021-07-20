@@ -90,11 +90,29 @@ typedef struct {
     uint64_t batch_id;
 } charts_and_dims_updated_t;
 
+struct interval_duration {
+    uint32_t update_every;
+    uint32_t retention;
+};
+
+struct retention_updated {
+    char *claim_id;
+    char *node_id;
+
+    RRD_MEMORY_MODE memory_mode;
+
+    struct interval_duration *interval_durations;
+    int interval_duration_count;
+
+    struct timeval rotation_timestamp;
+};
+
 char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, int *is_dim, struct aclk_message_position *new_positions, uint64_t batch_id);
 char *generate_charts_updated(size_t *len, char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions);
 char *generate_chart_instance_updated(size_t *len, const struct chart_instance_updated *update);
 char *generate_chart_dimensions_updated(size_t *len, char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions);
 char *generate_chart_dimension_updated(size_t *len, const struct chart_dimension_updated *dim);
+char *generate_retention_updated(size_t *len, struct retention_updated *data);
 
 #ifdef __cplusplus
 }
