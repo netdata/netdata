@@ -136,6 +136,7 @@ void aclk_query_free(aclk_query_t query)
     case ALARM_LOG_ENTRY:
     case ALARM_PROVIDE_CFG:
     case UPDATE_NODE_INFO:
+    case RETENTION_UPDATED:
         freez(query->data.bin_payload.payload);
         break;
     default:

@@ -23,7 +23,8 @@ typedef enum {
     ALARM_LOG_HEALTH,
     ALARM_LOG_ENTRY,
     ALARM_PROVIDE_CFG,
-    UPDATE_NODE_INFO
+    UPDATE_NODE_INFO,
+    RETENTION_UPDATED
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
