@@ -11,8 +11,8 @@ static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] = { "vfs_unlink", "vfs_re
                                                            "vfs_fsync", "vfs_open", "vfs_create"};
 
 static netdata_idx_t *vfs_hash_values = NULL;
-static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
-static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
+static netdata_syscall_stat_t vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_END];
+static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_END];
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
@@ -877,7 +877,7 @@ static void ebpf_vfs_allocate_global_vectors()
 
 /*****************************************************************
  *
- *  EBPF PROCESS THREAD
+ *  EBPF VFS THREAD
  *
  *****************************************************************/
 
@@ -914,7 +914,7 @@ void *ebpf_vfs_thread(void *ptr)
         goto endvfs;
     }
 
-    int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {
+    int algorithms[NETDATA_KEY_PUBLISH_VFS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX,
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX,NETDATA_EBPF_INCREMENTAL_IDX
     };
