@@ -94,7 +94,9 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
         "alert_unique_id, date_created, date_submitted, " \
-        "unique(alert_unique_id));"
+        "unique(alert_unique_id)); " \
+        "insert into aclk_alert_%s (alert_unique_id, date_created) " \
+        "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s where new_status <> 0 order by unique_id asc;"
 
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
