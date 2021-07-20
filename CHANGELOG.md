@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- packaging: update go.d.plugin version to v0.30.0 [\#11349](https://github.com/netdata/netdata/pull/11349) ([ilyam8](https://github.com/ilyam8))
+- Assorted kickstart install fixes. [\#11342](https://github.com/netdata/netdata/pull/11342) ([Ferroin](https://github.com/Ferroin))
+- add geth default config [\#11341](https://github.com/netdata/netdata/pull/11341) ([OdysLam](https://github.com/OdysLam))
 - Adds aclk-schemas to dist\_noinst\_DATA [\#11338](https://github.com/netdata/netdata/pull/11338) ([underhood](https://github.com/underhood))
 - eBPF ZFS monitoring [\#11330](https://github.com/netdata/netdata/pull/11330) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix typo in analytics.c [\#11329](https://github.com/netdata/netdata/pull/11329) ([eltociear](https://github.com/eltociear))
 - add postgresql version to requirements section [\#11328](https://github.com/netdata/netdata/pull/11328) ([charoleizer](https://github.com/charoleizer))
+- Add ACLK-NG cloud request type charts [\#11326](https://github.com/netdata/netdata/pull/11326) ([UmanShahzad](https://github.com/UmanShahzad))
 - v2.19.1 [\#11323](https://github.com/netdata/netdata/pull/11323) ([allelos](https://github.com/allelos))
 - Fixes coverity errors in ACLK [\#11322](https://github.com/netdata/netdata/pull/11322) ([underhood](https://github.com/underhood))
 - Fix tiny issues in docs [\#11320](https://github.com/netdata/netdata/pull/11320) ([UmanShahzad](https://github.com/UmanShahzad))
@@ -54,6 +58,7 @@
 - Add links to data privacy page [\#11226](https://github.com/netdata/netdata/pull/11226) ([joelhans](https://github.com/joelhans))
 - Allows ACLK NG and Legacy to coexist [\#11225](https://github.com/netdata/netdata/pull/11225) ([underhood](https://github.com/underhood))
 - eBPF ext4 \(new thread for collector\) [\#11224](https://github.com/netdata/netdata/pull/11224) ([thiagoftsm](https://github.com/thiagoftsm))
+- Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
 - Add vkalintiris as a code owner for more components [\#11221](https://github.com/netdata/netdata/pull/11221) ([vkalintiris](https://github.com/vkalintiris))
 - Decentralized [\#11220](https://github.com/netdata/netdata/pull/11220) ([OdysLam](https://github.com/OdysLam))
 - New email notification template [\#11219](https://github.com/netdata/netdata/pull/11219) ([MrZammler](https://github.com/MrZammler))
@@ -303,12 +308,6 @@
 - Removes unused fnc warning in ACLK Legacy [\#10731](https://github.com/netdata/netdata/pull/10731) ([underhood](https://github.com/underhood))
 - Update chart's metadata in database when it already exists during creation [\#10728](https://github.com/netdata/netdata/pull/10728) ([stelfrag](https://github.com/stelfrag))
 - New thread for ebpf.plugin [\#10726](https://github.com/netdata/netdata/pull/10726) ([thiagoftsm](https://github.com/thiagoftsm))
-- Support VS Code container devenv [\#10723](https://github.com/netdata/netdata/pull/10723) ([OdysLam](https://github.com/OdysLam))
-- Fixed detection of already claimed node in Docker images. [\#10720](https://github.com/netdata/netdata/pull/10720) ([Ferroin](https://github.com/Ferroin))
-- Add statsd guide [\#10719](https://github.com/netdata/netdata/pull/10719) ([OdysLam](https://github.com/OdysLam))
-- Add the ability to store chart labels in the database [\#10718](https://github.com/netdata/netdata/pull/10718) ([stelfrag](https://github.com/stelfrag))
-- Fix a parameter binding issue when storing chart names in the database [\#10717](https://github.com/netdata/netdata/pull/10717) ([stelfrag](https://github.com/stelfrag))
-- Fix typo in backend\_prometheus.c [\#10716](https://github.com/netdata/netdata/pull/10716) ([eltociear](https://github.com/eltociear))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
