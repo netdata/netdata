@@ -297,6 +297,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_disk.h \
     collectors/ebpf.plugin/ebpf_filesystem.c \
     collectors/ebpf.plugin/ebpf_filesystem.h \
+    collectors/ebpf.plugin/ebpf_mount.c \
+    collectors/ebpf.plugin/ebpf_mount.h \
     collectors/ebpf.plugin/ebpf_process.c \
     collectors/ebpf.plugin/ebpf_process.h \
     collectors/ebpf.plugin/ebpf_socket.c \
