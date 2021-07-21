@@ -534,6 +534,16 @@ default. To use a third-party collector, visit their GitHub/documentation page a
     servers.
 -   [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 
+If you wanted to install a third party collecotr into your Netdata agent you would do something like this (using [hamedbrd/netdata/tree/logparser](https://github.com/hamedbrd/netdata/tree/logparser) as an example):
+
+```bash
+# get the collector code
+sudo wget "https://raw.githubusercontent.com/hamedbrd/netdata/logparser/collectors/python.d.plugin/logparser/logparser.chart.py" -P /usr/libexec/netdata/python.d/
+
+# get the collector conf file (which you can then edit as needed)
+sudo wget "https://raw.githubusercontent.com/hamedbrd/netdata/logparser/collectors/python.d.plugin/logparser/logparser.conf" -P /etc/netdata/python.d/
+```
+
 ## Etc
 
 -   [checks.plugin](checks.plugin/README.md): A debugging collector, disabled by default.
