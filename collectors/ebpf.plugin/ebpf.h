@@ -82,7 +82,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_SWAP_IDX,
     EBPF_MODULE_VFS_IDX,
     EBPF_MODULE_FILESYSTEM_IDX,
-    EBPF_MODULE_DISK_IDX
+    EBPF_MODULE_DISK_IDX,
+    EBPF_MODULE_MOUNT_IDX
 };
 
 // Copied from musl header

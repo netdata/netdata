@@ -3,6 +3,20 @@
 #include "ebpf.h"
 #include "ebpf_mount.h"
 
+static ebpf_local_maps_t mount_maps[] = {{.name = "tbl_mount", .internal_input = NETDATA_MOUNT_END,
+                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                         {.name = NULL, .internal_input = 0, .user_input = 0,
+                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
+static ebpf_data_t mount_data;
+
+struct config mount_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
+                               .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                         .rwlock = AVL_LOCK_INITIALIZER } };
+
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
@@ -39,6 +53,13 @@ static void ebpf_mount_cleanup(void *ptr)
 void *ebpf_mount_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_mount_cleanup, ptr);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = mount_maps;
+    fill_ebpf_data(&mount_data);
+
+    if (!em->enabled)
+        goto endmount;
 
 endmount:
     netdata_thread_cleanup_pop(1);
