@@ -5,6 +5,10 @@
 
 #define NETDATA_EBPF_MOUNT_SYSCALL 2
 
+#define NETDATA_EBPF_MOUNT_CALLS "call"
+#define NETDATA_EBPF_MOUNT_ERRORS "error"
+#define NETDATA_EBPF_MOUNT_FAMILY "mount (eBPF)"
+
 enum mount_counters {
     NETDATA_KEY_MOUNT_CALL,
     NETDATA_KEY_UMOUNT_CALL,

@@ -98,6 +98,7 @@ enum ebpf_module_indexes {
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_FILESYSTEM_FAMILY "filesystem"
+#define NETDATA_EBPF_MOUNT_GLOBAL_FAMILY "mount_points"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"

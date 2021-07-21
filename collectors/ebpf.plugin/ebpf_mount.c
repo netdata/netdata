@@ -52,6 +52,40 @@ static void ebpf_mount_cleanup(void *ptr)
 
 /*****************************************************************
  *
+ *  INITIALIZE THREAD
+ *
+ *****************************************************************/
+
+/**
+ * Create mount charts
+ *
+ * Call ebpf_create_chart to create the charts for the collector.
+ */
+static void ebpf_create_mount_charts()
+{
+    ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
+                      "Calls to mount and umount syscalls.",
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
+                      ebpf_create_global_dimension,
+                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+
+    ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
+                      "Errors to mount and umount syscalls.",
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
+                      ebpf_create_global_dimension,
+                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+
+    fflush(stdout);
+}
+
+/*****************************************************************
+ *
  *  MAIN THREAD
  *
  *****************************************************************/
@@ -86,6 +120,9 @@ void *ebpf_mount_thread(void *ptr)
     ebpf_global_labels(mount_aggregated_data, mount_publish_aggregated, mount_dimension_name, mount_dimension_name,
                        algorithms, NETDATA_EBPF_MOUNT_SYSCALL);
 
+    pthread_mutex_lock(&lock);
+    ebpf_create_mount_charts();
+    pthread_mutex_unlock(&lock);
 
 endmount:
     netdata_thread_cleanup_pop(1);
