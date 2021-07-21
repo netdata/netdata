@@ -42,6 +42,10 @@ void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg)
     freez(cfg->info);
     freez(cfg->options);
     freez(cfg->host_labels);
+
+    freez(cfg->p_db_lookup_dimensions);
+    freez(cfg->p_db_lookup_method);
+    freez(cfg->p_db_lookup_options);
 }
 
 char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_configuration *data)
@@ -110,6 +114,16 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
         cfg->set_options(data->cfg.options);
     if (data->cfg.host_labels)
         cfg->set_host_labels(data->cfg.host_labels);
+
+    cfg->set_p_db_lookup_after(data->cfg.p_db_lookup_after);
+    cfg->set_p_db_lookup_before(data->cfg.p_db_lookup_before);
+    if (data->cfg.p_db_lookup_dimensions)
+        cfg->set_p_db_lookup_dimensions(data->cfg.p_db_lookup_dimensions);
+    if (data->cfg.p_db_lookup_method)
+        cfg->set_p_db_lookup_method(data->cfg.p_db_lookup_method);
+    if (data->cfg.p_db_lookup_options)
+        cfg->set_p_db_lookup_options(data->cfg.p_db_lookup_options);
+    cfg->set_p_update_every(data->cfg.p_update_every);
 
     *len = msg.ByteSizeLong();
     char *bin = (char*)mallocz(*len);
