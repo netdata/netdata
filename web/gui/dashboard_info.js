@@ -3547,6 +3547,21 @@ netdataDashboard.context = {
         info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>zpl_fsync</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools.'
     },
 
+    'filesystem.btrfs_read_latency': {
+        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>btrfs_file_read_iter</code> (kernel newer than 5.9.16) or the function <code>generic_file_read_iter</code> (old kernels) is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
+    },
+
+    'filesystem.btrfs_write_latency': {
+        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>btrfs_file_write_iter</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
+    },
+
+    'filesystem.btrfs_open_latency': {
+        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>btrfs_file_open</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
+    },
+
+    'filesystem.btrfs_sync_latency': {
+        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>btrfs_sync_file</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
+    },
 
     // ------------------------------------------------------------------------
     // eBPF

@@ -326,6 +326,7 @@ filesystems are monitored.
 
 ```conf
 [filesystem]
+    btrfsdist = yes
     ext4dist = yes
     nfsdist = yes
     xfsdist = yes
