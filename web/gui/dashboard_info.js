@@ -3574,7 +3574,7 @@ netdataDashboard.context = {
     },
 
     'mount_points.error': {
-        info: 'Monitor errors when syscalls <code>mount()</code> and <code>umount(2)</code> were called.'
+        info: 'Monitor errors when syscalls <code>mount(2)</code> and <code>umount(2)</code> were called.'
     },
 
     // ------------------------------------------------------------------------
