@@ -91,8 +91,24 @@ cleanup:
     return NULL;
 }
 
+void ws_client_free_headers(ws_client *client)
+{
+    struct http_header *ptr = client->hs.headers;
+    struct http_header *tmp;
+
+    while (ptr) {
+        tmp = ptr;
+        ptr = ptr->next;
+        free(tmp);
+    }
+
+    client->hs.headers = NULL;
+    client->hs.headers_tail = NULL;
+}
+
 void ws_client_destroy(ws_client *client)
 {
+    ws_client_free_headers(client);
     free(client->hs.nonce_reply);
     free(client->hs.http_reply_msg);
     close(client->entropy_fd);
@@ -104,6 +120,7 @@ void ws_client_destroy(ws_client *client)
 
 void ws_client_reset(ws_client *client)
 {
+    ws_client_free_headers(client);
     free(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
     free(client->hs.http_reply_msg);
@@ -114,6 +131,16 @@ void ws_client_reset(ws_client *client)
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
     client->rx.parse_state = WS_FIRST_2BYTES;
+}
+
+void ws_client_add_http_header(ws_client *client, struct http_header *hdr)
+{
+    if (client->hs.headers)
+        client->hs.headers_tail->next = hdr;
+    else
+        client->hs.headers = hdr;
+
+    client->hs.headers_tail = hdr;
 }
 
 int ws_client_want_write(ws_client *client)
@@ -227,7 +254,7 @@ int ws_client_start_handshake(ws_client *client)
         return WS_CLIENT_NEED_MORE_BYTES;
 
 #define MAX_HTTP_LINE_LENGTH 1024*4
-#define HTTP_EC_LENGTH 4 // "XXX " http return code
+#define HTTP_EC_LENGTH 4 // "XXX " http return code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
 #define WS_CONN_ACCEPT "sec-websocket-accept"
 #define HTTP_HDR_SEPARATOR ": "
@@ -249,7 +276,7 @@ int ws_client_start_handshake(ws_client *client)
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
-    char buf[MAX_HTTP_LINE_LENGTH];
+    char buf[HTTP_EC_LENGTH];
     int idx, idx2;
     char *ptr;
     size_t bytes;
@@ -310,37 +337,41 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 ERROR("Expected \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-
-            bytes = rbuf_pop(client->buf_read, buf, (idx2 < HTTP_HEADER_NAME_MAX_LEN) ? idx2 : HTTP_HEADER_NAME_MAX_LEN);
-            buf[bytes] = '\0';
-            rbuf_bump_tail(client->buf_read, strlen(HTTP_HDR_SEPARATOR));
-
-            for (int i = 0; buf[i]; i++)
-                buf[i] = tolower(buf[i]);
-
-//            DEBUG("HTTP header \"%s\" received.", buf);
-// TODO maybe store all headers instead of cherry picking?
-
-            ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx);
-            if(!idx) {
-                ERROR("HTTP header value cannot be empty");
+            if (idx == idx2 + (int)strlen(HTTP_HDR_SEPARATOR)) {
+                ERROR("HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            if(!strcmp(buf, WS_CONN_ACCEPT)) {
-                if (!ptr || idx != WS_NONCE_STRLEN_B64) {
-                    ERROR( "\"" WS_CONN_ACCEPT "\" hash length doesn't match or missing!");
-                    return WS_CLIENT_PROTOCOL_ERROR;
-                }
-                rbuf_pop(client->buf_read, buf, idx);
-                buf[idx] = 0;
-                if (strcmp(client->hs.nonce_reply, buf)) {
-                    ERROR("Received NONCE \"%s\" does not match expected nonce of \"%s\"", buf, client->hs.nonce_reply);
+
+            if (idx2 > HTTP_HEADER_NAME_MAX_LEN) {
+                ERROR("HTTP header too long (%d)",idx2);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
+
+            struct http_header *hdr = calloc(1, sizeof(struct http_header) + idx); //idx includes ": " that will be used as 2 \0 bytes
+            hdr->key = ((char*)hdr) + sizeof(struct http_header);
+            hdr->value = hdr->key + idx2 + 1;
+
+            bytes = rbuf_pop(client->buf_read, hdr->key, idx2);
+            rbuf_bump_tail(client->buf_read, strlen(HTTP_HDR_SEPARATOR));
+
+            bytes = rbuf_pop(client->buf_read, hdr->value, idx - idx2 - strlen(HTTP_HDR_SEPARATOR));
+            rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
+
+            for (int i = 0; hdr->key[i]; i++)
+                hdr->key[i] = tolower(hdr->key[i]);
+
+//            DEBUG("HTTP header \"%s\" received. Value \"%s\"", hdr->key, hdr->value);
+
+            ws_client_add_http_header(client, hdr);
+
+            if (!strcmp(hdr->key, WS_CONN_ACCEPT)) {
+                if (strcmp(client->hs.nonce_reply, hdr->value)) {
+                    ERROR("Received NONCE \"%s\" does not match expected nonce of \"%s\"", hdr->value, client->hs.nonce_reply);
                     return WS_CLIENT_PROTOCOL_ERROR;
                 }
                 client->hs.nonce_matched = 1;
-            } else
-                rbuf_bump_tail(client->buf_read, idx);
-            rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
+            }
+
             break;
         case WS_HDR_PARSE_DONE:
             if (!client->hs.nonce_matched) {

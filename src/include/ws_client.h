@@ -70,6 +70,12 @@ struct ws_op_close_payload {
     char *reason;
 };
 
+struct http_header {
+    char *key;
+    char *value;
+    struct http_header *next;
+};
+
 typedef struct websocket_client {
     enum websocket_client_conn_state state;
 
@@ -79,6 +85,8 @@ typedef struct websocket_client {
         int nonce_matched;
         int http_code;
         char *http_reply_msg;
+        struct http_header *headers;
+        struct http_header *headers_tail;
     } hs;
 
     struct ws_rx {
