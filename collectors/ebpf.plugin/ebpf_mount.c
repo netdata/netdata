@@ -19,8 +19,17 @@ struct config mount_config = { .first_section = NULL, .last_section = NULL, .mut
                                .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                          .rwlock = AVL_LOCK_INITIALIZER } };
 
+static int read_thread_closed = 1;
+static netdata_idx_t *mount_values = NULL;
+
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
+
+static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
+
+struct netdata_static_thread mount_threads = {"MOUNT KERNEL",
+                                              NULL, NULL, 1, NULL,
+                                              NULL,  NULL};
 
 /*****************************************************************
  *
@@ -39,6 +48,9 @@ static void ebpf_mount_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
+    freez(mount_threads.thread);
+    freez(mount_values);
+
     if (probe_links) {
         struct bpf_program *prog;
         size_t i = 0 ;
@@ -47,6 +59,95 @@ static void ebpf_mount_cleanup(void *ptr)
             i++;
         }
         bpf_object__close(objects);
+    }
+}
+
+/*****************************************************************
+ *
+ *  MAIN LOOP
+ *
+ *****************************************************************/
+
+/**
+ * Read global table
+ *
+ * Read the table with number of calls for all functions
+ */
+static void read_global_table()
+{
+    uint32_t idx;
+    netdata_idx_t *val = mount_hash_values;
+    netdata_idx_t *stored = mount_values;
+    int fd = mount_maps[NETDATA_KEY_MOUNT_TABLE].map_fd;
+
+    for (idx = NETDATA_KEY_MOUNT_CALL; idx < NETDATA_MOUNT_END; idx++) {
+        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+            int i;
+            int end = ebpf_nprocs;
+            netdata_idx_t total = 0;
+            for (i = 0; i < end; i++)
+                total += stored[i];
+
+            val[idx] = total;
+        }
+    }
+}
+
+/**
+ * Mount read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_mount_read_hash(void *ptr)
+{
+    read_thread_closed = 0;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_time;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        read_global_table();
+    }
+    read_thread_closed = 1;
+
+    return NULL;
+}
+
+/**
+* Main loop for this collector.
+*/
+static void mount_collector(ebpf_module_t *em)
+{
+    mount_threads.thread = mallocz(sizeof(netdata_thread_t));
+    mount_threads.start_routine = ebpf_mount_read_hash;
+    memset(mount_hash_values, 0, sizeof(mount_hash_values));
+
+    mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
+
+    netdata_thread_create(mount_threads.thread, mount_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+                          ebpf_mount_read_hash, em);
+
+    while (!close_ebpf_plugin) {
+        pthread_mutex_lock(&collect_data_mutex);
+        pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
+
+        pthread_mutex_lock(&lock);
+
+        ebpf_mount_send_data();
+
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&collect_data_mutex);
     }
 }
 
@@ -123,6 +224,8 @@ void *ebpf_mount_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_mount_charts();
     pthread_mutex_unlock(&lock);
+
+    mount_collector(em);
 
 endmount:
     netdata_thread_cleanup_pop(1);
