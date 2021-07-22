@@ -127,6 +127,12 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'mount': {
+        title: 'Mount Points',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: ''
+    },
+
     'mdstat': {
         title: 'MD arrays',
         icon: '<i class="fas fa-hdd"></i>'
@@ -3561,6 +3567,14 @@ netdataDashboard.context = {
 
     'filesystem.btrfs_sync_latency': {
         info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>btrfs_sync_file</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
+    },
+
+    'mount_points.call': {
+        info: 'Monitor calls for syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible to attach or remove file systems given as argument.'
+    },
+
+    'mount_points.error': {
+        info: 'Monitor errors when syscalls <code>mount()</code> and <code>umount(2)</code> were called.'
     },
 
     // ------------------------------------------------------------------------
