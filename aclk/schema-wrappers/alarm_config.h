@@ -4,6 +4,7 @@
 #define ACLK_SCHEMA_WRAPPER_ALARM_CONFIG_H
 
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
