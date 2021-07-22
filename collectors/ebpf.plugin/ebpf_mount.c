@@ -125,6 +125,27 @@ void *ebpf_mount_read_hash(void *ptr)
 }
 
 /**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em the structure with thread information
+*/
+static void ebpf_mount_send_data()
+{
+    int i, j;
+    int end = NETDATA_EBPF_MOUNT_SYSCALL;
+    for (i = NETDATA_KEY_MOUNT_CALL, j = NETDATA_KEY_MOUNT_ERROR; i < end; i++, j++) {
+        mount_publish_aggregated[i].ncall = mount_hash_values[i];
+        mount_publish_aggregated[i].nerr = mount_hash_values[j];
+    }
+
+    write_count_chart(NETDATA_EBPF_MOUNT_CALLS, NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+
+    write_err_chart(NETDATA_EBPF_MOUNT_ERRORS, NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+                    mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+}
+
+/**
 * Main loop for this collector.
 */
 static void mount_collector(ebpf_module_t *em)
