@@ -45,7 +45,6 @@ jobs:
           - 'opensuse/leap:15.3'
           - 'opensuse/tumbleweed:latest'
           - 'ubuntu:21.04'
-          - 'ubuntu:20.10'
           - 'ubuntu:20.04'
           - 'ubuntu:18.04'
           - 'ubuntu:16.04'
@@ -92,9 +91,6 @@ jobs:
             rmjsonc: 'zypper rm -y libjson-c-devel'
 
           - distro: 'ubuntu:21.04'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'ubuntu:20.10'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'ubuntu:20.04'
