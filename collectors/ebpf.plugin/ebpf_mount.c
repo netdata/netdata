@@ -232,6 +232,9 @@ void *ebpf_mount_thread(void *ptr)
     if (!em->enabled)
         goto endmount;
 
+    if (ebpf_update_kernel(&mount_data))
+        goto endmount;
+
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, mount_data.map_fd);
     if (!probe_links) {
         goto endmount;
