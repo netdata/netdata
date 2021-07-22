@@ -3,7 +3,7 @@
     "coffeescript": "^2.4.1",
     "dictionary-en-us": "^2.1.1",
     "gaze": "^1.1.3",
-    "grunt": "^1.1.0",
+    "grunt": "^1.3.0",
     "grunt-exec": "^3.0.0",
     "jasmine": "^3.4.0",
     "jasmine-core": "^3.4.0",
