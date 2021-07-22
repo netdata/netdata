@@ -60,23 +60,13 @@ FROM netdata/base:latest as base
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
-ENV DOCKER_GRP netdata
-ENV DOCKER_USR netdata
+ARG NETDATA_USER=netdata
+
+ENV NETDATA_UID=$NETDATA_UID
+ENV NETDATA_GID=$NETDATA_GID
+ENV NETDATA_USER=$NETDATA_USER
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
 #ENV DO_NOT_TRACK=1
-
-# Copy files over
-RUN mkdir -p /opt/src /var/log/netdata && \
-    # Link log files to stdout
-    ln -sf /dev/stdout /var/log/netdata/access.log && \
-    ln -sf /dev/stdout /var/log/netdata/debug.log && \
-    ln -sf /dev/stderr /var/log/netdata/error.log && \
-    # fping from alpine apk is on a different location. Moving it.
-    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
-    chmod 4755 /usr/local/bin/fping && \
-    # Add netdata user
-    addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
 
 # Long-term this should leverage BuildKit’s mount option.
 COPY --from=builder /wheels /wheels
@@ -89,23 +79,22 @@ RUN chown -R root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
-    chown -R netdata:root \
-        /usr/lib/netdata \
-        /var/cache/netdata \
-        /var/lib/netdata \
-        /var/log/netdata && \
-    chown -R netdata:netdata /var/lib/netdata/cloud.d && \
+    mkdir -p /opt/src /var/log/netdata && \
+    ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log && \
     chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
         /usr/libexec/netdata/plugins.d/apps.plugin \
         /usr/libexec/netdata/plugins.d/freeipmi.plugin && \
-    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     pip --no-cache-dir install /wheels/* && \
-    rm -rf /wheels
+    rm -rf /wheels && \
+    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
+    chmod 4755 /usr/local/bin/fping
 
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
