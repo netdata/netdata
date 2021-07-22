@@ -30,6 +30,42 @@
 #define RRDCALC_FLAG_RUN_ONCE              0x00000200
 #define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
+struct alert_config {
+    char *alarm;
+    char *template_key;
+    char *os;
+    char *host;
+    char *on;
+    char *families;
+    char *plugin;
+    char *module;
+    char *charts;
+    char *lookup;
+    char *calc;
+    char *warn;
+    char *crit;
+    char *every;
+    char *green;
+    char *red;
+    char *exec;
+    char *to;
+    char *units;
+    char *info;
+    char *classification;
+    char *component;
+    char *type;
+    char *delay;
+    char *options;
+    char *repeat;
+    char *host_labels;
+
+    char *p_db_lookup_dimensions;
+    char *p_db_lookup_method;
+    uint32_t p_db_lookup_options;
+    int p_db_lookup_after;
+    int p_db_lookup_before;
+    int p_update_every;
+};
 
 struct rrdcalc {
     avl_t avl;                      // the index, with key the id - this has to be first!
