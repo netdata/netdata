@@ -10,12 +10,6 @@
 # PACKAGE IS BROKEN WITHOUT THEM.
 AutoReqProv: yes
 
-%if "@HAVE_LIBBPF@" == "1"
-%global have_bpf 1
-%else
-%global have_bpf 0
-%endif
-
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
@@ -228,9 +222,7 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 %if 0%{!?fedora:1} && 0%{!?suse_version:1}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
-%if 0%{?have_bpf}
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%endif
 
 %build
 # Conf step
@@ -282,9 +274,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
-%if 0%{?have_bpf}
 install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
-%endif
 
 # ###########################################################
 # Install cups.plugin
@@ -411,9 +401,7 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
-%if 0%{?have_bpf}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
-%endif
 
 %pre
 
