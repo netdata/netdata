@@ -301,13 +301,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
             BUF_READ_CHECK_AT_LEAST(HTTP_SC_LENGTH); // "XXX " http return code
             rbuf_pop(client->buf_read, buf, HTTP_SC_LENGTH);
             if (buf[HTTP_SC_LENGTH - 1] != 0x20) {
-                rbuf_flush(client->buf_read);
+                ERROR("HTTP status code received is not terminated by space (0x20)");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             buf[HTTP_SC_LENGTH - 1] = 0;
             client->hs.http_code = atoi(buf);
             if (client->hs.http_code < 100 || client->hs.http_code >= 600) {
-                rbuf_flush(client->buf_read);
+                ERROR("HTTP status code received not in valid range 100-600");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
             client->hs.hdr_state = WS_HDR_ENDLINE;
