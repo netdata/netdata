@@ -104,6 +104,7 @@ void ws_client_free_headers(ws_client *client)
 
     client->hs.headers = NULL;
     client->hs.headers_tail = NULL;
+    client->hs.hdr_count = 0;
 }
 
 void ws_client_destroy(ws_client *client)
@@ -133,14 +134,23 @@ void ws_client_reset(ws_client *client)
     client->rx.parse_state = WS_FIRST_2BYTES;
 }
 
-void ws_client_add_http_header(ws_client *client, struct http_header *hdr)
+#define MAX_HTTP_HDR_COUNT 128
+int ws_client_add_http_header(ws_client *client, struct http_header *hdr)
 {
+    if (client->hs.hdr_count > MAX_HTTP_HDR_COUNT) {
+        ERROR("Too many HTTP response header fields");
+        return -1;
+    }
+
     if (client->hs.headers)
         client->hs.headers_tail->next = hdr;
     else
         client->hs.headers = hdr;
 
     client->hs.headers_tail = hdr;
+    client->hs.hdr_count++;
+
+    return 0;
 }
 
 int ws_client_want_write(ws_client *client)
@@ -362,7 +372,8 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
 //            DEBUG("HTTP header \"%s\" received. Value \"%s\"", hdr->key, hdr->value);
 
-            ws_client_add_http_header(client, hdr);
+            if (ws_client_add_http_header(client, hdr))
+                return WS_CLIENT_PROTOCOL_ERROR;
 
             if (!strcmp(hdr->key, WS_CONN_ACCEPT)) {
                 if (strcmp(client->hs.nonce_reply, hdr->value)) {

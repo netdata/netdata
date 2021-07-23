@@ -87,6 +87,7 @@ typedef struct websocket_client {
         char *http_reply_msg;
         struct http_header *headers;
         struct http_header *headers_tail;
+        int hdr_count;
     } hs;
 
     struct ws_rx {
