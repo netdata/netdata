@@ -109,6 +109,7 @@ include traefik/Makefile.inc
 include uwsgi/Makefile.inc
 include varnish/Makefile.inc
 include w1sensor/Makefile.inc
+include watchtower/Makefile.inc
 include web_log/Makefile.inc
 include zscores/Makefile.inc
 
