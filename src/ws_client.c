@@ -254,7 +254,7 @@ int ws_client_start_handshake(ws_client *client)
         return WS_CLIENT_NEED_MORE_BYTES;
 
 #define MAX_HTTP_LINE_LENGTH 1024*4
-#define HTTP_EC_LENGTH 4 // "XXX " http return code as C string
+#define HTTP_SC_LENGTH 4 // "XXX " http status code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
 #define WS_CONN_ACCEPT "sec-websocket-accept"
 #define HTTP_HDR_SEPARATOR ": "
@@ -276,7 +276,7 @@ int ws_client_start_handshake(ws_client *client)
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
-    char buf[HTTP_EC_LENGTH];
+    char buf[HTTP_SC_LENGTH];
     int idx, idx2;
     char *ptr;
     size_t bytes;
@@ -288,13 +288,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
             client->hs.hdr_state = WS_HDR_RC;
             break;
         case WS_HDR_RC:
-            BUF_READ_CHECK_AT_LEAST(HTTP_EC_LENGTH); // "XXX " http return code
-            rbuf_pop(client->buf_read, buf, HTTP_EC_LENGTH);
-            if (buf[HTTP_EC_LENGTH - 1] != 0x20) {
+            BUF_READ_CHECK_AT_LEAST(HTTP_SC_LENGTH); // "XXX " http return code
+            rbuf_pop(client->buf_read, buf, HTTP_SC_LENGTH);
+            if (buf[HTTP_SC_LENGTH - 1] != 0x20) {
                 rbuf_flush(client->buf_read);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            buf[HTTP_EC_LENGTH - 1] = 0;
+            buf[HTTP_SC_LENGTH - 1] = 0;
             client->hs.http_code = atoi(buf);
             if (client->hs.http_code < 100 || client->hs.http_code >= 600) {
                 rbuf_flush(client->buf_read);
