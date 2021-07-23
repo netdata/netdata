@@ -794,7 +794,12 @@ netdataDashboard.submenu = {
     'ntpd.peers': {
         title: 'peers',
         info: 'Statistics of the peer variables for each peer configured in <code>/etc/ntp.conf</code> as shown by the readvar billboard <code>ntpq -c "rv &lt;association&gt;"</code>, while each peer is assigned a nonzero association ID as shown by <code>ntpq -c "apeers"</code>. The module periodically scans for new/changed peers (default: every 60s). <b>ntpd</b> selects the best possible peer from the available peers to synchronize the clock. A minimum of at least 3 peers is required to properly identify the best possible peer.'
-    }
+    },
+
+    'filesystem.EXT4_latency': {
+        title: 'EXT4 Latency',
+        info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
+    },
 };
 
 
@@ -3484,19 +3489,19 @@ netdataDashboard.context = {
     },
 
     'filesystem.ext4_read_latency': {
-        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>ext4_file_read_iter</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
+        info: 'Netdata is attaching kprobes for function <code>ext4_file_read_iter</code>.'
     },
 
     'filesystem.ext4_write_latency': {
-        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>ext4_file_write_iter</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
+        info: 'Netdata is attaching kprobes for function <code>ext4_file_write_iter</code>.'
     },
 
     'filesystem.ext4_open_latency': {
-        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>ext4_file_open</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
+        info: 'Netdata is attaching kprobes for function <code>ext4_file_open</code>.'
     },
 
     'filesystem.ext4_sync_latency': {
-        info: 'Latency is the time it takes for an event to be completed. Netdata is attaching a kprobe for when the function <code>ext4_sync_file</code> is called and another for when it finishes the execution. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
+        info: 'Netdata is attaching kprobes for function <code>ext4_sync_file</code>.'
     },
 
     'filesystem.xfs_read_latency': {
