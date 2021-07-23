@@ -153,6 +153,9 @@
 
 #define NETDATA_CHART_PRIO_EBPF_FILESYSTEM_CHARTS     2160
 
+// Mount Points
+#define NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS          2195
+
 // NFS (server)
 
 #define NETDATA_CHART_PRIO_NFSD_READCACHE             2200
