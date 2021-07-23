@@ -277,7 +277,7 @@ int ws_client_start_handshake(ws_client *client)
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
-    int idx, idx2;
+    int idx_crlf, idx_sep;
     char *ptr;
     size_t bytes;
     switch (client->hs.hdr_state) {
@@ -303,58 +303,58 @@ int ws_client_parse_handshake_resp(ws_client *client)
             client->hs.hdr_state = WS_HDR_ENDLINE;
             break;
         case WS_HDR_ENDLINE:
-            ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx);
+            ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx_crlf);
             if (!ptr) {
                 bytes = rbuf_bytes_available(client->buf_read);
                 HTTP_HDR_LINE_CHECK_LIMIT(bytes);
                 return WS_CLIENT_NEED_MORE_BYTES;
             }
-            HTTP_HDR_LINE_CHECK_LIMIT(idx);
+            HTTP_HDR_LINE_CHECK_LIMIT(idx_crlf);
 
-            client->hs.http_reply_msg = malloc(idx+1);
-            rbuf_pop(client->buf_read, client->hs.http_reply_msg, idx);
-            client->hs.http_reply_msg[idx] = 0;
+            client->hs.http_reply_msg = malloc(idx_crlf+1);
+            rbuf_pop(client->buf_read, client->hs.http_reply_msg, idx_crlf);
+            client->hs.http_reply_msg[idx_crlf] = 0;
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
             client->hs.hdr_state = WS_HDR_PARSE_HEADERS;
             break;
         case WS_HDR_PARSE_HEADERS:
-            ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx);
+            ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx_crlf);
             if (!ptr) {
                 bytes = rbuf_bytes_available(client->buf_read);
                 HTTP_HDR_LINE_CHECK_LIMIT(bytes);
                 return WS_CLIENT_NEED_MORE_BYTES;
             }
-            HTTP_HDR_LINE_CHECK_LIMIT(idx);
+            HTTP_HDR_LINE_CHECK_LIMIT(idx_crlf);
 
-            if (!idx) { // empty line, header end
+            if (!idx_crlf) { // empty line, header end
                 rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
                 client->hs.hdr_state = WS_HDR_PARSE_DONE;
                 return 0;
             }
 
-            ptr = rbuf_find_bytes(client->buf_read, HTTP_HDR_SEPARATOR, strlen(HTTP_HDR_SEPARATOR), &idx2);
-            if (!ptr || idx2 > idx) {
-                ERROR("Expected \": \" before endline in non empty HTTP header line");
+            ptr = rbuf_find_bytes(client->buf_read, HTTP_HDR_SEPARATOR, strlen(HTTP_HDR_SEPARATOR), &idx_sep);
+            if (!ptr || idx_sep > idx_crlf) {
+                ERROR("Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            if (idx == idx2 + (int)strlen(HTTP_HDR_SEPARATOR)) {
+            if (idx_crlf == idx_sep + (int)strlen(HTTP_HDR_SEPARATOR)) {
                 ERROR("HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            if (idx2 > HTTP_HEADER_NAME_MAX_LEN) {
-                ERROR("HTTP header too long (%d)",idx2);
+            if (idx_sep > HTTP_HEADER_NAME_MAX_LEN) {
+                ERROR("HTTP header too long (%d)", idx_sep);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            struct http_header *hdr = calloc(1, sizeof(struct http_header) + idx); //idx includes ": " that will be used as 2 \0 bytes
+            struct http_header *hdr = calloc(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
             hdr->key = ((char*)hdr) + sizeof(struct http_header);
-            hdr->value = hdr->key + idx2 + 1;
+            hdr->value = hdr->key + idx_sep + 1;
 
-            bytes = rbuf_pop(client->buf_read, hdr->key, idx2);
+            bytes = rbuf_pop(client->buf_read, hdr->key, idx_sep);
             rbuf_bump_tail(client->buf_read, strlen(HTTP_HDR_SEPARATOR));
 
-            bytes = rbuf_pop(client->buf_read, hdr->value, idx - idx2 - strlen(HTTP_HDR_SEPARATOR));
+            bytes = rbuf_pop(client->buf_read, hdr->value, idx_crlf - idx_sep - strlen(HTTP_HDR_SEPARATOR));
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
 
             for (int i = 0; hdr->key[i]; i++)
