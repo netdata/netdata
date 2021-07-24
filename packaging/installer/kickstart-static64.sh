@@ -306,7 +306,7 @@ if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
   fi
 fi
 
-# shellcheck disable=SC2235,SC2030
+# shellcheck disable=SC2235,SC2030,SC2031
 if ( [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_URL}" ] ) || ( [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ -z "${NETDATA_CLAIM_URL}" ] ); then
   run_failed "Invalid claiming options, both a claiming token and URL must be specified."
   exit 1
@@ -414,9 +414,11 @@ fi
 # --------------------------------------------------------------------------------------------------------------------
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  # shellcheck disable=SC2031
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   NETDATA_CLAIM_PATH=/opt/netdata/bin/netdata-claim.sh
 
+  # shellcheck disable=SC2031
   if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
   else
