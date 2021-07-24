@@ -78,15 +78,18 @@ setup_terminal || echo > /dev/null
 # -----------------------------------------------------------------------------
 fatal() {
   printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+  log_put " [ ABORTED ] ${*} \n\n"
   exit 1
 }
 
 run_ok() {
   printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} \n\n"
+  log_put " [ OK ]\n\n"
 }
 
 run_failed() {
   printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} \n\n"
+  log_put " [ FAILED ]\n\n"
 }
 
 ESCAPED_PRINT_METHOD=
@@ -96,17 +99,45 @@ fi
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     printf "%q " "${@}"
+    log_put "%q " "${@}"
   else
     printf "%s" "${*}"
+    log_put "%s" "${*}"
   fi
   return 0
 }
 
-progress() {
-  echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+log_create() {
+  local logdir
+  logdir="$(dirname ${logpath})"
+  if [ ! -d "${logdir}" ] ; then
+    echo >&2 "Creating [${logdir}] for installer log file:"
+    mkdir -vp "$(dirname ${logpath})" >&2
+  fi
+  if ! touch ${logpath} ; then
+    echo >&2 "Unable to create [$logpath], falling back to current directory"
+    logpath="${PWD}/$(basename ${logpath})"
+  fi
+  if [ -e "${logpath}" ] ; then
+    echo >&2 "Rotating [${logpath}] log file:"
+    for i in {4..1}; do
+      if [ -e "${logpath}.${i}" ] ; then
+        mv -vf "${logpath}.${i}" "${logpath}.$((i+1))"
+      fi
+    done
+    mv -vf "${logpath}" "${logpath}.1"
+  fi
 }
 
-run_logfile="/dev/null"
+log_put() {
+  printf "$(date +%FT%T,%3N) ${*}\n" >>"${logpath}"
+}
+
+progress() {
+  echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+  log_put "${*}"
+}
+
 run() {
   local user="${USER--}" dir="${PWD}" info info_console
 
@@ -118,25 +149,20 @@ run() {
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
 
-  {
-    printf "${info}"
-    escaped_print "${@}"
-    printf " ... "
-  } >> "${run_logfile}"
-
+  log_put "${info}"
   printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
-  printf >&2 "${TPUT_RESET}"
+  printf >&2 "${TPUT_RESET}\n"
+  log_put " ... "
 
   "${@}"
 
   local ret=$?
   if [ ${ret} -ne 0 ]; then
     run_failed
-    printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
+    log_put "FAILED with exit code ${ret}"
   else
     run_ok
-    printf >> "${run_logfile}" "OK\n"
   fi
 
   return ${ret}
@@ -144,11 +170,13 @@ run() {
 
 fatal() {
   printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+  log_put " [ ABORTED ] ${*} \n\n"
   exit 1
 }
 
 warning() {
   printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*} \n\n"
+  log_put " [ WARNING ] ${*} \n\n"
   if [ "${INTERACTIVE}" = "0" ]; then
     fatal "Stopping due to non-interactive mode. Fix the issue or retry installation in an interactive mode."
   else
@@ -422,6 +450,7 @@ fi
 # look for an existing install and try to update that instead if it exists
 
 ndpath="$(command -v netdata 2>/dev/null)"
+logpath="/var/log/netdata/installer.log"
 if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
     ndpath="/opt/netdata/bin/netdata"
 fi
@@ -431,6 +460,10 @@ if [ -n "$ndpath" ] ; then
 
   if [ "${ndprefix}" = /usr ] ; then
     ndprefix="/"
+  fi
+  if [ "${ndprefix}" != "/" ] ; then
+    logpath="${ndprefix}${logpath}"
+    log_create
   fi
 
   progress "Found existing install of Netdata under: ${ndprefix}"
@@ -473,6 +506,7 @@ if [ -n "$ndpath" ] ; then
     fi
   fi
 fi
+log_create
 
 # ---------------------------------------------------------------------------------------------------------------------
 # install required system packages
