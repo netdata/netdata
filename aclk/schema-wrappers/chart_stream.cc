@@ -3,6 +3,8 @@
 #include "proto/chart/v1/stream.pb.h"
 #include "chart_stream.h"
 
+#include "common.h"
+
 #include <sys/time.h>
 #include <stdlib.h>
 
@@ -303,5 +305,52 @@ char *generate_chart_dimension_updated(size_t *len, const struct chart_dimension
     proto_dim->SerializeToArray(bin, *len);
 
     delete proto_dim;
+    return bin;
+}
+
+using namespace google::protobuf;
+
+char *generate_retention_updated(size_t *len, struct retention_updated *data)
+{
+    chart::v1::RetentionUpdated msg;
+    Map<uint32, uint32> *map;
+
+    msg.set_claim_id(data->claim_id);
+    msg.set_node_id(data->node_id);
+
+    switch (data->memory_mode) {
+    case RRD_MEMORY_MODE_NONE:
+        msg.set_memory_mode(chart::v1::NONE);
+        break;
+    case RRD_MEMORY_MODE_RAM:
+        msg.set_memory_mode(chart::v1::RAM);
+        break;
+    case RRD_MEMORY_MODE_MAP:
+        msg.set_memory_mode(chart::v1::MAP);
+        break;
+    case RRD_MEMORY_MODE_SAVE:
+        msg.set_memory_mode(chart::v1::SAVE);
+        break;
+    case RRD_MEMORY_MODE_ALLOC:
+        msg.set_memory_mode(chart::v1::ALLOC);
+        break;
+    case RRD_MEMORY_MODE_DBENGINE:
+        msg.set_memory_mode(chart::v1::DB_ENGINE);
+        break;
+    default:
+        return NULL;
+    }
+
+    for (int i = 0; i < data->interval_duration_count; i++) {
+        map = msg.mutable_interval_durations();
+        map->insert({data->interval_durations[i].update_every, data->interval_durations[i].retention});
+    }
+
+    set_google_timestamp_from_timeval(data->rotation_timestamp, msg.mutable_rotation_timestamp());
+
+    *len = msg.ByteSizeLong();
+    char *bin = (char*)mallocz(*len);
+    msg.SerializeToArray(bin, *len);
+
     return bin;
 }
