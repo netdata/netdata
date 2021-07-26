@@ -397,8 +397,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
 
     char *config_hash = (char *) cmd.data_param;
     BUFFER *sql = buffer_create(1024);
-    buffer_sprintf(sql, "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin, module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info, options, host_labels " \
-                        "FROM alert_hash WHERE hash_id = @hash_id;");
+    buffer_sprintf(sql, "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin, module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info, options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;");
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -451,12 +450,39 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
         alarm_config.options = sqlite3_column_bytes(res, 25) > 0 ? strdupz((char *)sqlite3_column_text(res, 25)) : NULL;
         alarm_config.host_labels = sqlite3_column_bytes(res, 26) > 0 ? strdupz((char *)sqlite3_column_text(res, 26)) : NULL;
 
+        alarm_config.p_db_lookup_dimensions = NULL;
+        alarm_config.p_db_lookup_method = NULL;
+        alarm_config.p_db_lookup_options = NULL;
+        alarm_config.p_db_lookup_after = 0;
+        alarm_config.p_db_lookup_before = 0;
+
+        //get some more values from rc for this hash_id
+        //this might not work... If this hash is requested from an
+        //agent that does not have an rc for this hash, it will not send back
+        //a full correct message..
+        //perhaps it's better to run the parsers on the sql data instead of looking up rc's...
+        if (sqlite3_column_bytes(res, 30) > 0) {
+
+            alarm_config.p_db_lookup_dimensions = sqlite3_column_bytes(res, 27) > 0 ? strdupz((char *)sqlite3_column_text(res, 27)) : NULL;
+            alarm_config.p_db_lookup_method = sqlite3_column_bytes(res, 28) > 0 ? strdupz((char *)sqlite3_column_text(res, 28)) : NULL;
+
+            BUFFER *tmp_buf = buffer_create(1024);
+            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
+            alarm_config.p_db_lookup_options = strdupz((char *)buffer_tostring(tmp_buf));
+            buffer_free(tmp_buf);
+
+            alarm_config.p_db_lookup_after = sqlite3_column_int(res, 30);
+            alarm_config.p_db_lookup_before = sqlite3_column_int(res, 31);
+        }
+
+        alarm_config.p_update_every = sqlite3_column_int(res, 32);
+
         struct provide_alarm_configuration p_alarm_config;
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
 
-        debug(D_ACLK_SYNC,"Sending alarm config for %s", config_hash);
+        info("Sending alarm config for %s", config_hash);
 
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         freez((char *) cmd.data_param);
