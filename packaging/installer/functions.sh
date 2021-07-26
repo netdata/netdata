@@ -128,7 +128,7 @@ download_file() {
 # -----------------------------------------------------------------------------
 # external component handling
 
-fetch_and_verify() {
+fetch_external_component() {
   local component=${1}
   local url=${2}
   local base_name=${3}
@@ -144,6 +144,18 @@ fetch_and_verify() {
 
   if [ ! -f "${tmp}/${base_name}" ] || [ ! -s "${tmp}/${base_name}" ]; then
     run_failed "Unable to find usable archive for ${component}"
+    return 1
+  fi
+}
+
+fetch_and_verify() {
+  local component=${1}
+  local url=${2}
+  local base_name=${3}
+  local tmp=${4}
+  local override=${5}
+
+  if fetch_external_component "${1}" "${2}" "${3}" "${4}" "${5}";then
     return 1
   fi
 
