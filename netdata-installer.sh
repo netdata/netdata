@@ -1621,12 +1621,15 @@ install_ebpf() {
   # Detect libc
   libc="${EBPF_LIBC:-"$(detect_libc)"}"
 
-  EBPF_VERSION="$(cat packaging/ebpf.version)"
+  EBPF_VERSION="$(curl -q -SL --connect-timeout 10 --retry 3  https://github.com/netdata/kernel-collector/releases | grep "/netdata/kernel-collector/releases/tag/" | grep -oP "(?<=>Release ).*?(?=<)" | head -1)"
+  if [ -z ${EBPF_VERSION} ];then
+    EBPF_VERSION="$(cat packaging/ebpf.version)"
+  fi
   EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
 
   tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
 
-  if ! fetch_and_verify "ebpf" \
+  if ! fetch_external_component "ebpf" \
     "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
     "${EBPF_TARBALL}" \
     "${tmp}" \
