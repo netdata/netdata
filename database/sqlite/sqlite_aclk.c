@@ -184,7 +184,10 @@ static void timer_cb(uv_timer_t* handle)
     aclk_database_enq_cmd(wc, &cmd);
 
     if (wc->cleanup_after && wc->cleanup_after < now_realtime_sec()) {
-        cmd.opcode = ACLK_DATABASE_CHECK;
+//        cmd.opcode = ACLK_DATABASE_CHECK;
+//        cmd.completion = NULL;
+//        aclk_database_enq_cmd(wc, &cmd);
+        cmd.opcode = ACLK_DATABASE_UPD_STATS;
         cmd.completion = NULL;
         aclk_database_enq_cmd(wc, &cmd);
         wc->cleanup_after = 0;
@@ -442,6 +445,23 @@ void aclk_set_architecture(int mode)
 }
 
 
+//struct interval_duration {
+//    uint32_t update_every;
+//    uint32_t retention;
+//};
+//
+//struct retention_updated {
+//    char *claim_id;
+//    char *node_id;
+//
+//    RRD_MEMORY_MODE memory_mode;
+//
+//    struct interval_duration *interval_durations;
+//    int interval_duration_count;
+//
+//    struct timeval rotation_timestamp;
+//};
+
 #define SELECT_HOST_DIMENSION_LIST  "SELECT d.dim_id, c.update_every FROM chart c, dimension d, host h " \
         "where d.chart_id = c.chart_id and c.host_id = h.host_id and c.host_id = @host_id order by c.update_every;"
 
@@ -451,9 +471,11 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
 #ifdef ENABLE_DBENGINE
     int rc;
 
-    sqlite3_stmt *res = NULL;
+    char *claim_id = is_agent_claimed();
+    if (unlikely(!claim_id))
+        return;
 
-    RRDHOST *host = wc->host;
+    sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_DIMENSION_LIST, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -461,7 +483,15 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (wc->host)
+        rc = sqlite3_bind_blob(res, 1, &wc->host->host_uuid , sizeof(wc->host->host_uuid), SQLITE_STATIC);
+    else {
+        uuid_t host_uuid;
+        rc = uuid_parse(wc->host_guid, host_uuid);
+        if (unlikely(rc))
+            goto failed;
+        rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
+    }
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch host dimensions");
         goto failed;
@@ -472,23 +502,55 @@ void sql_update_metric_statistics(struct aclk_database_worker_config *wc, struct
     time_t  last_entry_t;
     int update_every = 0;
 
+    struct retention_updated rotate_data;
+
+    memset(&rotate_data, 0, sizeof(rotate_data));
+
+    int max_intervals = 8;
+
+    rotate_data.interval_duration_count = 0;
+    rotate_data.interval_durations = callocz(max_intervals, sizeof(*rotate_data.interval_durations));
+
+    now_realtime_timeval(&rotate_data.rotation_timestamp);
+    rotate_data.memory_mode = localhost->rrd_memory_mode;       // TODO: FIX
+    rotate_data.claim_id = claim_id;
+    rotate_data.node_id = strdupz(wc->node_id);
+
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (!update_every || update_every != sqlite3_column_int(res, 1)) {
-            if (update_every)
-                debug(D_ACLK_SYNC,"Update %s for %d oldest time = %ld", host->machine_guid, update_every, start_time);
+            if (update_every) {
+                debug(D_ACLK_SYNC,"Update %s for %d oldest time = %ld", wc->host_guid, update_every, start_time);
+                rotate_data.interval_durations[rotate_data.interval_duration_count].update_every = update_every;
+                rotate_data.interval_durations[rotate_data.interval_duration_count].retention = rotate_data.rotation_timestamp.tv_sec - start_time;
+                rotate_data.interval_duration_count++;
+            }
             update_every = sqlite3_column_int(res, 1);
             start_time = LONG_MAX;
         }
         rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
         start_time = MIN(start_time, first_entry_t);
     }
-    if (update_every)
-        debug(D_ACLK_SYNC,"Update %s for %d oldest time = %ld", host->machine_guid, update_every, start_time);
+    if (update_every) {
+        debug(D_ACLK_SYNC, "Update %s for %d oldest time = %ld", wc->host_guid, update_every, start_time);
+        rotate_data.interval_durations[rotate_data.interval_duration_count].update_every = update_every;
+        rotate_data.interval_durations[rotate_data.interval_duration_count].retention = rotate_data.rotation_timestamp.tv_sec - start_time;
+        rotate_data.interval_duration_count++;
+    }
+
+    info("DEBUG: Scan update every for host");
+    for (int i=0; i < rotate_data.interval_duration_count; ++i) {
+        info("DEBUG:  %d --> Update %s for %u  Retention = %u", i, wc->host_guid,
+             rotate_data.interval_durations[i].update_every, rotate_data.interval_durations[i].retention);
+    };
+    aclk_retention_updated(&rotate_data);
+    freez(rotate_data.node_id);
+    freez(rotate_data.claim_id);
+    freez(rotate_data.interval_durations);
 
 failed:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading archived charts");
+        error_report("Failed to finalize the prepared statement when reading host dimensions");
 #else
     UNUSED(wc);
 #endif
