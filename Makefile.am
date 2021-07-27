@@ -84,6 +84,8 @@ dist_noinst_DATA = \
     packaging/libwebsockets.version \
     packaging/mosquitto.checksums \
     packaging/mosquitto.version \
+    packaging/protobuf.checksums \
+    packaging/protobuf.version \
     packaging/version \
     $(NULL)
 
