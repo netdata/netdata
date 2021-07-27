@@ -750,7 +750,7 @@ copy_protobuf() {
   target_dir="${PWD}/externaldeps/protobuf"
 
   run mkdir -p "${target_dir}" || return 1
-  run cp -a "${1}/src" "${target_dir}" return 1
+  run cp -a "${1}/src" "${target_dir}" || return 1
 }
 
 bundle_protobuf() {
