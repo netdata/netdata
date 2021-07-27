@@ -73,7 +73,7 @@ apt-get install zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev
 dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-devel elfutils-libelf-devel libmnl-devel protobuf-devel protobuf-compiler gcc gcc-c++ make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
 
 # CentOS / Red Hat Enterprise Linux
-yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel elfutils-libelf-devel make nc pkgconfig python zlib-devel cmake
+yum install autoconf automake curl gcc gcc-c++ git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel elfutils-libelf-devel protobuf protobuf-devel protobuf-compiler make nc pkgconfig python zlib-devel cmake
 
 # openSUSE
 zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libelf-devel libmnl-devel protobuf-devel gcc gcc-c++ make git autoconf autoconf-archive autogen automake pkgconfig curl findutils python cmake
