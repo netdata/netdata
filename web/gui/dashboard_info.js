@@ -3570,11 +3570,11 @@ netdataDashboard.context = {
     },
 
     'mount_points.call': {
-        info: 'Monitor calls for syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible to attach or remove file systems given as argument.'
+        info: 'Monitor calls to syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible for attaching or removing filesystems.'
     },
 
     'mount_points.error': {
-        info: 'Monitor errors when syscalls <code>mount(2)</code> and <code>umount(2)</code> were called.'
+        info: 'Monitor errors in calls to syscalls <code>mount(2)</code> and <code>umount(2)</code>.'
     },
 
     // ------------------------------------------------------------------------
