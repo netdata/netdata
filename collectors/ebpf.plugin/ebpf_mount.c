@@ -213,7 +213,7 @@ static void ebpf_create_mount_charts()
 /**
  * Mount thread
  *
- * Thread used to make dcstat thread
+ * Thread used to make mount thread
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
