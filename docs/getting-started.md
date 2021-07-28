@@ -203,7 +203,7 @@ You can use these features together or separately&mdash;the decision is up to yo
 
 -   Sign up for [Netdata Cloud](https://app.netdata.cloud).
 -   Read the [infrastructure monitoring quickstart](/docs/quickstart/infrastructure.md).
--   Better understand how the Netdata Agent connects securely to Netdata Cloud with [claiming](/claim/README.md) and
+-   Better understand how the Netdata Agent connects securely to Netdata Cloud with [connection process](/claim/README.md) and
     [Agent-Cloud link](/aclk/README.md) documentation.
 
 ## Start, stop, and restart Netdata
@@ -221,7 +221,7 @@ details.
 ## What's next?
 
 Even after you've configured `netdata.conf`, tweaked alarms, learned the basics of performance troubleshooting, and
-claimed all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
+connected all your systems in Netdata Cloud or added them to the Visited nodes menu, you've just gotten started with
 Netdata.
 
 Take a look at some more advanced features and configurations:

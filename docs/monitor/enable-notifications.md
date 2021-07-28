@@ -14,7 +14,7 @@ alarms](/docs/monitor/configure-alarms.md) to change the preconfigured threshold
 infrastructure.
 
 Netdata Cloud offers [centralized alarm notifications](#netdata-cloud) via email, which leverages the health status
-information already streamed to Netdata Cloud from claimed nodes to send notifications to those who have enabled them.
+information already streamed to Netdata Cloud from connected nodes to send notifications to those who have enabled them.
 
 The Netdata Agent has a [notification system](#netdata-agent) that supports more than a dozen services, such as email,
 Slack, PagerDuty, Twilio, Amazon SNS, Discord, and much more.
