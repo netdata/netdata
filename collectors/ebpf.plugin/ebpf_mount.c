@@ -126,8 +126,6 @@ void *ebpf_mount_read_hash(void *ptr)
 
 /**
  * Send data to Netdata calling auxiliar functions.
- *
- * @param em the structure with thread information
 */
 static void ebpf_mount_send_data()
 {
@@ -213,7 +211,7 @@ static void ebpf_create_mount_charts()
  *****************************************************************/
 
 /**
- * Directory Cache thread
+ * Mount thread
  *
  * Thread used to make dcstat thread
  *
