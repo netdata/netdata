@@ -1411,10 +1411,11 @@ function enrichChartData(chart) {
             break;
 
         case 'mount':
-            if (parts.length > 2)
+            if (parts.length > 2) {
                 chart.menu = tmp + '_' + parts[1];
-            else
+            } else {
                 chart.menu = tmp;
+            }
             break;
 
         case 'isc':
