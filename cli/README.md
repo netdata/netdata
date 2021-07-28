@@ -26,7 +26,7 @@ shutdown-agent
 fatal-agent
     Log the state and halt the netdata agent.
 reload-claiming-state
-    Reload agent claiming state from disk.
+    Reload agent connection state from disk.
 ```
 
 Those commands are the same that can be sent to netdata via [signals](/daemon/README.md#command-line-options).

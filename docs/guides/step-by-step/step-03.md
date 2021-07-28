@@ -43,7 +43,7 @@ features, new collectors for more applications, and improved UI, so will Cloud.
 
 ## Get started with Netdata Cloud
 
-Signing in, onboarding, and claiming your first nodes only takes a few minutes, and we have a [Get started with
+Signing in, onboarding, and connecting your first nodes only takes a few minutes, and we have a [Get started with
 Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide to help you walk through every step.
 
 Or, if you're feeling confident, dive right in.
@@ -82,7 +82,7 @@ nodes](https://user-images.githubusercontent.com/1153921/80831018-e158ac80-8b9e-
 
 ## What's next?
 
-Now that you have a Netdata Cloud account with a claimed node (or a few!) and can navigate between your dashboards with
+Now that you have a Netdata Cloud account with a connected node (or a few!) and can navigate between your dashboards with
 Visited nodes, it's time to learn more about how you can configure Netdata to your liking. From there, you'll be able to
 customize your Netdata experience to your exact infrastructure and the information you need.
 

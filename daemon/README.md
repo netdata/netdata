@@ -184,7 +184,7 @@ The command line options of the Netdata 1.10.0 version are the following:
                            Check if string matches pattern and exit.
 
   -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 url=https://app.netdata.cloud"
-                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.
+                           Connect the agent to the workspace rooms pointed to by TOKEN and ROOM*.
 
  Signals netdata handles:
 

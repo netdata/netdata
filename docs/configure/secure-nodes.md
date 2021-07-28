@@ -34,7 +34,7 @@ that align with your goals and your organization's standards.
 
 ## Disable the local dashboard
 
-This is the _recommended method for those who have claimed their nodes to Netdata Cloud_ and prefer viewing real-time
+This is the _recommended method for those who have connected their nodes to Netdata Cloud_ and prefer viewing real-time
 metrics using the War Room Overview, Nodes view, and Cloud dashboards.
 
 You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link ([ACLK](/aclk/README.md)) that

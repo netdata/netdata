@@ -217,13 +217,13 @@ cd netdata
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
 
-### Claim node to Netdata Cloud during installation
+### Connect node to Netdata Cloud during installation
 
 Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md) or
 [`kickstart-static64.sh`](/packaging/installer/methods/kickstart-64.md) methods, the `netdata-installer.sh` script does
-not allow you to automatically [claim](/claim/README.md) your node to Netdata Cloud immediately after installation.
+not allow you to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [claiming](/claim/README.md) doc for details on claiming a node with a manual installation of Netdata.
+See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 
