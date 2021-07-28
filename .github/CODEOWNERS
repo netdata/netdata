@@ -45,22 +45,22 @@ web/gui/ @jacekkolasa
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @vkalintiris
 *.md @joelhans
-Dockerfile* @Ferroin @knatsakis
+Dockerfile* @Ferroin
 
 # Ownership of specific files
-.gitignore @Ferroin @knatsakis @vkalintiris
-.travis.yml @Ferroin @knatsakis @kaskavel @vkalintiris
-.lgtm.yml @Ferroin @knatsakis
-.eslintrc @Ferroin @knatsakis
-.eslintignore @Ferroin @knatsakis
-.csslintrc @Ferroin @knatsakis
-.codeclimate.yml @Ferroin @knatsakis
-.codacy.yml @Ferroin @knatsakis
-.yamllint.yml @Ferroin @knatsakis
-netdata.spec.in @Ferroin @knatsakis @vkalintiris
-netdata-installer.sh @Ferroin @knatsakis @vkalintiris
-package.json @jacekkolasa @Ferroin @knatsakis
-packaging/version @netdatabot @Ferroin @knatsakis
+.gitignore @Ferroin @vkalintiris
+.travis.yml @Ferroin @kaskavel @vkalintiris
+.lgtm.yml @Ferroin
+.eslintrc @Ferroin
+.eslintignore @Ferroin
+.csslintrc @Ferroin
+.codeclimate.yml @Ferroin
+.codacy.yml @Ferroin
+.yamllint.yml @Ferroin
+netdata.spec.in @Ferroin @vkalintiris
+netdata-installer.sh @Ferroin @vkalintiris
+package.json @jacekkolasa @Ferroin
+packaging/version @netdatabot @Ferroin
 
 LICENSE.md @joelhans @Ferroin @vkalintiris
 CHANGELOG.md @netdatabot @Ferroin @vkalintiris
