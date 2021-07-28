@@ -27,7 +27,7 @@ static struct bpf_object *objects = NULL;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
-struct netdata_static_thread mount_threads = {"MOUNT KERNEL",
+struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
                                               NULL, NULL, 1, NULL,
                                               NULL,  NULL};
 
@@ -48,7 +48,7 @@ static void ebpf_mount_cleanup(void *ptr)
     if (!em->enabled)
         return;
 
-    freez(mount_threads.thread);
+    freez(mount_thread.thread);
     freez(mount_values);
 
     if (probe_links) {
@@ -148,13 +148,13 @@ static void ebpf_mount_send_data()
 */
 static void mount_collector(ebpf_module_t *em)
 {
-    mount_threads.thread = mallocz(sizeof(netdata_thread_t));
-    mount_threads.start_routine = ebpf_mount_read_hash;
+    mount_thread.thread = mallocz(sizeof(netdata_thread_t));
+    mount_thread.start_routine = ebpf_mount_read_hash;
     memset(mount_hash_values, 0, sizeof(mount_hash_values));
 
     mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    netdata_thread_create(mount_threads.thread, mount_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
+    netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_mount_read_hash, em);
 
     while (!close_ebpf_plugin) {
