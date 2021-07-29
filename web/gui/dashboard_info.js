@@ -127,6 +127,12 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'mount': {
+        title: 'Mount Points',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: ''
+    },
+
     'mdstat': {
         title: 'MD arrays',
         icon: '<i class="fas fa-hdd"></i>'
@@ -3586,6 +3592,14 @@ netdataDashboard.context = {
 
     'filesystem.btrfs_sync_latency': {
         info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_sync_file</code>.'
+    },
+
+    'mount_points.call': {
+        info: 'Monitor calls to syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible for attaching or removing filesystems.'
+    },
+
+    'mount_points.error': {
+        info: 'Monitor errors in calls to syscalls <code>mount(2)</code> and <code>umount(2)</code>.'
     },
 
     // ------------------------------------------------------------------------
