@@ -38,7 +38,7 @@ if [ -f .travis/current_build_status ]; then
 	  exit 0
   fi
 else
-  echo "File .travis/current_build_status, probably this is the very first build, let's continue"
+  echo "File .travis/current_build_status doesn't exist, probably this is the very first build, let's continue"
 fi
 
 echo "--- Initialize git configuration ---"
