@@ -4,18 +4,18 @@ description: "Netdata's health monitoring watchdog is incredibly adaptable to yo
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/monitor/configure-alarms.md
 -->
 
-# Configure health alarms
+# Configure health alerts
 
-Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alarm templates, and
-more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
+Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alert templates, and
+more. You can tweak any of the existing alerts based on your infrastructure's topology or specific monitoring needs, or
 create new entities.
 
-You can use health alarms in conjunction with any of Netdata's [collectors](/docs/collect/how-collectors-work.md) (see
+You can use health alerts in conjunction with any of Netdata's [collectors](/docs/collect/how-collectors-work.md) (see
 the [supported collector list](/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
 applications in real time.
 
-While you can see active alarms both on the local dashboard and Netdata Cloud, all health alarms are configured _per
-node_ via individual Netdata Agents. If you want to deploy a new alarm across your
+While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per
+node_ via individual Netdata Agents. If you want to deploy a new alert across your
 [infrastructure](/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
 files.
 
