@@ -1133,6 +1133,7 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
+        get_system_timezone();
         // --------------------------------------------------------------------
         // get the certificate and start security
 #ifdef ENABLE_HTTPS
