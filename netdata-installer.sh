@@ -544,7 +544,7 @@ build_libmosquitto() {
   fi
 
   if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} make -C "${1}/lib"
+    run ${env_cmd} ${make} -j$(find_processors) -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
@@ -556,7 +556,7 @@ build_libmosquitto() {
     else
       run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run ${env_cmd} make -C lib
+    run ${env_cmd} ${make} -j$(find_processors) -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -660,7 +660,7 @@ EOF
       $CMAKE_FLAGS \
       .
   fi
-  run ${env_cmd} make -j$(find_processors)
+  run ${env_cmd} ${make} -j$(find_processors)
   popd > /dev/null || exit 1
 }
 
@@ -744,7 +744,7 @@ build_judy() {
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
     run ${env_cmd} autoconf &&
     run ${env_cmd} ./configure &&
-    run ${env_cmd} make -C src &&
+    run ${env_cmd} ${make} -j$(find_processors) -C src &&
     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
     popd > /dev/null || return 1
   else
@@ -822,7 +822,7 @@ build_jsonc() {
 
   pushd "${1}" > /dev/null || exit 1
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  run ${env_cmd} make
+  run ${env_cmd} ${make} -j$(find_processors)
   popd > /dev/null || exit 1
 }
 
@@ -888,7 +888,7 @@ bundle_jsonc
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} -j$(find_processors) install
   popd > /dev/null || exit 1
 }
 
