@@ -730,7 +730,7 @@ void get_system_timezone(void)
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+        info("TIMEZONE: using the contents of /etc/timezone");
     }
 
     // read the link /etc/localtime
