@@ -120,6 +120,11 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
       .config_file = NETDATA_SYNC_CONFIG_FILE},
+    { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
+      .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -692,6 +697,8 @@ void ebpf_print_help()
             "\n"
             " --filesystem or -i  Enable chart related to filesystem run time.\n"
             "\n"
+            " --mount or -m       Enable charts related to mount monitoring.\n"
+            "\n"
             " --net or -n         Enable network viewer charts.\n"
             "\n"
             " --process or -p     Enable charts related to process run time.\n"
@@ -1021,6 +1028,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
+                                    CONFIG_BOOLEAN_YES);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1107,6 +1121,7 @@ static void parse_args(int argc, char **argv)
         {"dcstat",     no_argument,    0,  'd' },
         {"disk",       no_argument,    0,  'k' },
         {"filesystem", no_argument,    0,  'i' },
+        {"mount",      no_argument,    0,  'm' },
         {"net",        no_argument,    0,  'n' },
         {"process",    no_argument,    0,  'p' },
         {"return",     no_argument,    0,  'r' },
@@ -1187,6 +1202,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_chart(EBPF_MODULE_DISK_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"disk\" chart, because it was started with the option \"--disk\" or \"-k\".");
+#endif
+                break;
+            }
+            case 'm': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"mount\" chart, because it was started with the option \"--mount\" or \"-m\".");
 #endif
                 break;
             }
@@ -1514,6 +1537,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].start_routine},
         {"EBPF DISK" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_DISK_IDX].start_routine},
+        {"EBPF MOUNT" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_MOUNT_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };
