@@ -31,6 +31,9 @@ PREVIOUS_NIGHTLY_COUNT="$(rev <packaging/version | cut -d- -f 2 | rev)"
 if [ "${COMMITS_SINCE_RELEASE}" == "${PREVIOUS_NIGHTLY_COUNT}" ]; then
 	echo "No changes since last nightly release, nothing else to do"
 	exit 0
+else
+	echo "Changes happen since last nightly release"
+	echo "changes-#${TRAVIS_BUILD_NUMBER}" > .travis/current_build_status
 fi
 
 if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
