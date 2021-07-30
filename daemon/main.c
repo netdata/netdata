@@ -1130,6 +1130,8 @@ int main(int argc, char **argv) {
         // get log filenames and settings
         log_init();
         error_log_limit_unlimited();
+        // initialize the log files
+        open_all_log_files();
 
         // --------------------------------------------------------------------
         // get the certificate and start security
@@ -1179,9 +1181,6 @@ int main(int argc, char **argv) {
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
     }
-
-    // initialize the log files
-    open_all_log_files();
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
