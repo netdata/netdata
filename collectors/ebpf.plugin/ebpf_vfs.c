@@ -567,7 +567,7 @@ static void vfs_collector(ebpf_module_t *em)
  */
 static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order, int algorithm)
 {
-    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d\n",
+    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'filesystem'\n",
            family,
            name,
            axis,
