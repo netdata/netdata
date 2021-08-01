@@ -298,7 +298,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_LINE,
                                20090,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
                                "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
@@ -307,7 +307,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20091,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
                                "Number of cache access without counting dirty pages and page additions.",
@@ -316,7 +316,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20092,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
                                "Page caches added without counting dirty pages",
@@ -325,7 +325,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20093,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NULL);
 }
 
 /*****************************************************************

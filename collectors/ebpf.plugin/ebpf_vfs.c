@@ -736,7 +736,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20065,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
                                "Write to disk",
@@ -745,7 +745,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20066,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               apps_groups_root_target);
+                               apps_groups_root_target, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
@@ -755,7 +755,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20067,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NULL);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
@@ -765,7 +765,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20068,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
@@ -775,7 +775,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20069,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NULL);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
@@ -784,7 +784,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20070,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
@@ -792,7 +792,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20071,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC,
                                "Calls for <code>vfs_fsync</code>", EBPF_COMMON_DIMENSION_CALL,
@@ -800,7 +800,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20072,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
@@ -810,7 +810,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20073,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NULL);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN,
@@ -819,7 +819,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20074,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
@@ -829,7 +829,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20075,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NULL);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE,
@@ -838,7 +838,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20076,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
@@ -848,7 +848,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20077,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NULL);
     }
 }
 

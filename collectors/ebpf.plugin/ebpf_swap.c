@@ -353,7 +353,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20191,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_WRITE_CHART,
                                "Calls for function <code>swap_writepage</code>.",
@@ -362,7 +362,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NULL);
 }
 
 /**

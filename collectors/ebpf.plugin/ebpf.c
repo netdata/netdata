@@ -510,12 +510,13 @@ void ebpf_create_chart(char *type,
  * @param order  the chart order
  * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root)
+                                char *algorithm, struct target *root, char *module)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, "generic");
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, module);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
