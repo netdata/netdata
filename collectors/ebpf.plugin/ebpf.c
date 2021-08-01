@@ -389,11 +389,12 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
-                          char *charttype, char *context, int order)
+                          char *charttype, char *context, int order, char *module)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin'\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
            id,
            title,
@@ -402,7 +403,8 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
            (context)?context:"",
            (charttype)?charttype:"",
            order,
-           update_every);
+           update_every,
+           module);
 }
 
 /**
@@ -490,7 +492,7 @@ void ebpf_create_chart(char *type,
                        void *move,
                        int end)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order);
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, "generic");
 
     ncd(move, end);
 }
@@ -511,7 +513,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
                                 char *algorithm, struct target *root)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, "generic");
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
