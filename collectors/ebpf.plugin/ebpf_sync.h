@@ -4,7 +4,7 @@
 #define NETDATA_EBPF_SYNC_H 1
 
 // Module name
-#define NETDATA_MODULE_NAME_SYNC "sync"
+#define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
 
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"
