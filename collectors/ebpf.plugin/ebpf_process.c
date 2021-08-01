@@ -404,7 +404,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21000,
                       ebpf_create_global_dimension,
                       process_publish_aggregated,
-                      2);
+                      2, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -417,7 +417,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21001,
                           ebpf_create_global_dimension,
                           process_publish_aggregated,
-                          2);
+                          2, NULL);
     }
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -430,7 +430,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21002,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                      2);
+                      2, NULL);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
                       NETDATA_EXIT_SYSCALL,
@@ -442,7 +442,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21003,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
-                      2);
+                      2, NULL);
 
     ebpf_process_status_chart(NETDATA_EBPF_FAMILY,
                               NETDATA_PROCESS_STATUS_NAME,
@@ -462,7 +462,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21005,
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                          2);
+                          2, NULL);
     }
 }
 

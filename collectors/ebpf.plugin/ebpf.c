@@ -479,6 +479,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param ncd       a pointer to a function called to create dimensions
  * @param move      a pointer for a structure that has the dimensions
  * @param end       number of dimensions for the chart created
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_chart(char *type,
                        char *id,
@@ -490,9 +491,10 @@ void ebpf_create_chart(char *type,
                        int order,
                        void (*ncd)(void *, int),
                        void *move,
-                       int end)
+                       int end,
+                       char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, "generic");
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
 
     ncd(move, end);
 }

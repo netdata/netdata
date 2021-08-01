@@ -403,7 +403,7 @@ static void ebpf_create_swap_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       202,
                       ebpf_create_global_dimension,
-                      swap_publish_aggregated, NETDATA_SWAP_END);
+                      swap_publish_aggregated, NETDATA_SWAP_END, NULL);
 }
 
 /**

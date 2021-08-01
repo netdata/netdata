@@ -557,7 +557,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
-                      cachestat_counter_publish_aggregated, 1);
+                      cachestat_counter_publish_aggregated, 1, NULL);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
@@ -566,7 +566,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21101,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1, NULL);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
@@ -575,7 +575,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21102,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1, NULL);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
@@ -584,7 +584,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21103,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1, NULL);
 
     fflush(stdout);
 }

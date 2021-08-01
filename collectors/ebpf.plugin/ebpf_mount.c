@@ -190,7 +190,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                       ebpf_create_global_dimension,
-                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL, NULL);
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
                       "Errors to mount and umount syscalls.",
@@ -199,7 +199,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                       ebpf_create_global_dimension,
-                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL);
+                      mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL, NULL);
 
     fflush(stdout);
 }

@@ -604,7 +604,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_CLEAN,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK],
-                      1);
+                      1, NULL);
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
                       NETDATA_VFS_FILE_IO_COUNT,
@@ -616,7 +616,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_COUNT,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                      2);
+                      2, NULL);
 
     ebpf_create_io_chart(NETDATA_FILESYSTEM_FAMILY,
                          NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
@@ -635,7 +635,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EBYTES,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                          2);
+                          2, NULL);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -648,7 +648,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_FSYNC,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                      1);
+                      1, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -661,7 +661,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EFSYNC,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                          1);
+                          1, NULL);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -674,7 +674,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_OPEN,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                      1);
+                      1, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -687,7 +687,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EOPEN,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                          1);
+                          1, NULL);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -700,7 +700,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_CREATE,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                      1);
+                      1, NULL);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -713,7 +713,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_ECREATE,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                          1);
+                          1, NULL);
     }
 }
 

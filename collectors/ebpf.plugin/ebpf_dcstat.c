@@ -529,7 +529,7 @@ static void ebpf_create_filesystem_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,
                       ebpf_create_global_dimension,
-                      dcstat_counter_publish_aggregated, 1);
+                      dcstat_counter_publish_aggregated, 1, NULL);
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
@@ -538,7 +538,7 @@ static void ebpf_create_filesystem_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21201,
                       ebpf_create_global_dimension,
-                      &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3);
+                      &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3, NULL);
 
     fflush(stdout);
 }
