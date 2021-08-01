@@ -373,7 +373,7 @@ static void ebpf_process_update_apps_data()
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
                                       char *web, char *algorithm, int order)
 {
-    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d ''\n",
+    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'process'\n",
            family,
            name,
            axis,
