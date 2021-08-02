@@ -529,6 +529,37 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
+    if(likely(perf_events[EV_ID_INSTRUCTIONS].updated) && likely(perf_events[EV_ID_CPU_CYCLES].updated)) {
+        if(unlikely(!ipc_chart_generated)) {
+            ipc_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Instructions per cycle' 'instructions/cycle' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "instruction_per_cicle"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_IPC
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' absolute 1 100\n", "ipc");
+        }
+
+        printf("BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "instructions_per_cycle"
+               );
+
+        calculated_number result = ((calculated_number)perf_events[EV_ID_INSTRUCTIONS].value /
+                                    (calculated_number)perf_events[EV_ID_CPU_CYCLES].value) * 100.0;
+        printf("SET %s = %lld\n"
+               , "ipc"
+               , (collected_number) result
+               );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
     if(likely(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated || perf_events[EV_ID_BRANCH_MISSES].updated)) {
         if(unlikely(!branch_chart_generated)) {
             branch_chart_generated = 1;
