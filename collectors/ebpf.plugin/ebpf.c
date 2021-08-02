@@ -389,11 +389,12 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
-                          char *charttype, char *context, int order)
+                          char *charttype, char *context, int order, char *module)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
            id,
            title,
@@ -402,7 +403,8 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
            (context)?context:"",
            (charttype)?charttype:"",
            order,
-           update_every);
+           update_every,
+           module);
 }
 
 /**
@@ -477,6 +479,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param ncd       a pointer to a function called to create dimensions
  * @param move      a pointer for a structure that has the dimensions
  * @param end       number of dimensions for the chart created
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_chart(char *type,
                        char *id,
@@ -488,9 +491,10 @@ void ebpf_create_chart(char *type,
                        int order,
                        void (*ncd)(void *, int),
                        void *move,
-                       int end)
+                       int end,
+                       char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order);
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
 
     ncd(move, end);
 }
@@ -506,12 +510,13 @@ void ebpf_create_chart(char *type,
  * @param order  the chart order
  * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root)
+                                char *algorithm, struct target *root, char *module)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, module);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))

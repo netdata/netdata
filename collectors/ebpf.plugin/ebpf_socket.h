@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
+
 // Vector indexes
 #define NETDATA_UDP_START 3
 #define NETDATA_RETRANSMIT_START 5

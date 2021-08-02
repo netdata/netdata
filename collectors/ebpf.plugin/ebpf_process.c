@@ -373,7 +373,7 @@ static void ebpf_process_update_apps_data()
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
                                       char *web, char *algorithm, int order)
 {
-    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d ''\n",
+    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'process'\n",
            family,
            name,
            axis,
@@ -404,7 +404,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21000,
                       ebpf_create_global_dimension,
                       process_publish_aggregated,
-                      2);
+                      2, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -417,7 +417,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21001,
                           ebpf_create_global_dimension,
                           process_publish_aggregated,
-                          2);
+                          2, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
@@ -430,7 +430,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21002,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                      2);
+                      2, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(NETDATA_EBPF_FAMILY,
                       NETDATA_EXIT_SYSCALL,
@@ -442,7 +442,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21003,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
-                      2);
+                      2, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_process_status_chart(NETDATA_EBPF_FAMILY,
                               NETDATA_PROCESS_STATUS_NAME,
@@ -462,7 +462,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21005,
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                          2);
+                          2, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 }
 
@@ -484,7 +484,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20061,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
@@ -494,7 +494,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20062,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
@@ -504,7 +504,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20063,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
@@ -514,7 +514,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20064,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
@@ -524,7 +524,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20065,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
                                "Threads started",
@@ -533,7 +533,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20066,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_CLOSE,
                                "Tasks closed",
@@ -542,7 +542,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20067,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
 }
 
 /**

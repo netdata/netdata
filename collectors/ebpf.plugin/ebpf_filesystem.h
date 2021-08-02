@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_FILESYSTEM_H
 #define NETDATA_EBPF_FILESYSTEM_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_FILESYSTEM "filesystem"
+
 #include "ebpf.h"
 
 #define NETDATA_FS_MAX_DIST_NAME 64UL

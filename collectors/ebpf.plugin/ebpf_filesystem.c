@@ -139,7 +139,8 @@ static void ebpf_create_fs_charts()
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
                               NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
+                              NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             snprintfz(title, 255, "%s latency for each write request.", efp->filesystem);
@@ -151,7 +152,8 @@ static void ebpf_create_fs_charts()
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
                               NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
+                              NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             snprintfz(title, 255, "%s latency for each open request.", efp->filesystem);
@@ -163,7 +165,8 @@ static void ebpf_create_fs_charts()
                               title,
                               EBPF_COMMON_DIMENSION_CALL, family,
                               NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
+                              NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
@@ -175,7 +178,8 @@ static void ebpf_create_fs_charts()
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, title,
                               EBPF_COMMON_DIMENSION_CALL, family,
                               NULL, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
-                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+                              filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
+                              NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
             efp->flags |= NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
         }

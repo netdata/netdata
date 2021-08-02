@@ -154,7 +154,8 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *family,
                                  char *charttype,
                                  char *context,
-                                 int order);
+                                 int order,
+                                 char *module);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
 
@@ -170,7 +171,8 @@ extern void ebpf_create_chart(char *type,
                               int order,
                               void (*ncd)(void *, int),
                               void *move,
-                              int end);
+                              int end,
+                              char *module);
 
 extern void write_begin_chart(char *family, char *name);
 
@@ -192,7 +194,8 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root);
+                                       struct target *root,
+                                       char *module);
 
 extern void write_end_chart();
 

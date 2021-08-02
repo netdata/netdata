@@ -567,7 +567,7 @@ static void vfs_collector(ebpf_module_t *em)
  */
 static void ebpf_create_io_chart(char *family, char *name, char *axis, char *web, int order, int algorithm)
 {
-    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d\n",
+    printf("CHART %s.%s '' 'Bytes written and read' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'filesystem'\n",
            family,
            name,
            axis,
@@ -604,7 +604,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_CLEAN,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK],
-                      1);
+                      1, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
                       NETDATA_VFS_FILE_IO_COUNT,
@@ -616,7 +616,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_COUNT,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                      2);
+                      2, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_io_chart(NETDATA_FILESYSTEM_FAMILY,
                          NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
@@ -635,7 +635,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EBYTES,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
-                          2);
+                          2, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -648,7 +648,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_FSYNC,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                      1);
+                      1, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -661,7 +661,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EFSYNC,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
-                          1);
+                          1, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -674,7 +674,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_OPEN,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                      1);
+                      1, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -687,7 +687,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EOPEN,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
-                          1);
+                          1, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -700,7 +700,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_CREATE,
                       ebpf_create_global_dimension,
                       &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                      1);
+                      1, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -713,7 +713,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_ECREATE,
                           ebpf_create_global_dimension,
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
-                          1);
+                          1, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 }
 
@@ -736,7 +736,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20065,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
                                "Write to disk",
@@ -745,7 +745,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20066,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               apps_groups_root_target);
+                               apps_groups_root_target, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
@@ -755,7 +755,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20067,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
@@ -765,7 +765,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20068,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
@@ -775,7 +775,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20069,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
@@ -784,7 +784,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20070,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                                "Bytes read from disk", EBPF_COMMON_DIMENSION_BYTES,
@@ -792,7 +792,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20071,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC,
                                "Calls for <code>vfs_fsync</code>", EBPF_COMMON_DIMENSION_CALL,
@@ -800,7 +800,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20072,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
@@ -810,7 +810,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20073,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN,
@@ -819,7 +819,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20074,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
@@ -829,7 +829,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20075,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE,
@@ -838,7 +838,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20076,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_VFS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
@@ -848,7 +848,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20077,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root);
+                                   root, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 }
 
