@@ -535,7 +535,7 @@ static void perf_send_metrics() {
 
             printf("CHART %s.%s '' 'Instructions per cycle' 'instructions/cycle' %s '' line %d %d %s\n"
                    , RRD_TYPE_PERF
-                   , "instruction_per_cicle"
+                   , "instructions_per_cycle"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_IPC
                    , update_every
