@@ -437,6 +437,7 @@ static void perf_send_metrics() {
     static int // Hardware counters
                cpu_cycles_chart_generated = 0,
                instructions_chart_generated = 0,
+               ipc_chart_generated = 0,
                branch_chart_generated = 0,
                cache_chart_generated = 0,
                bus_cycles_chart_generated = 0,
