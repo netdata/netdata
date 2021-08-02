@@ -115,6 +115,7 @@ DIMENSION sl_sent_err_replies error incremental 1 1
 DIMENSION sl_received_ACKs ACKed incremental 1 1
 
 CHART opensips.dialogs '' "OpenSIPS Dialogs" "dialogs/s" dialogs '' line $((opensips_priority + 14)) $opensips_update_every '' '' 'opensips'
+DIMENSION dialog_processed_dialogs processed incremental 1 1
 DIMENSION dialog_expired_dialogs expired incremental 1 1
 DIMENSION dialog_failed_dialogs failed incremental -1 1
 
