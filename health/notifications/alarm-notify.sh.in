@@ -214,6 +214,7 @@ elif [[ ${1} = "dump_methods" ]]; then
     status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
+  logwatch=logwatch
   args_host="${2}"           # the host generated this event
   unique_id="${3}"           # the unique id of this event
   alarm_id="${4}"            # the unique id of the alarm that generated this event
@@ -841,6 +842,19 @@ if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
 else
   email_thread_headers=
 fi
+
+# -----------------------------------------------------------------------------
+# function to get Logwatch results.
+
+logwatch() {
+  if ! command -v logwatch &> /dev/null; then
+    start=`date "+%Y-%m-%d %T" -d ${date_utc} -1 minute`
+    end=`date "+%Y-%m-%d %T" -d ${date_utc} +1 minute`
+    return `logwatch --range "between ${start} and ${end}" --detail Medium`
+  else
+    return "Please install Logwatch to see an extract from your system state here."
+  fi
+}
 
 # -----------------------------------------------------------------------------
 # function to URL encode a string
@@ -3191,6 +3205,43 @@ Content-Transfer-Encoding: 8bit
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
                   <div style="font-family:Open Sans, sans-serif;font-size:16px;line-height:1;text-align:left;color:#35414A;">Role:
                     <span style="font-weight:600">${roles}</span></div>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <!--[if mso | IE]></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" class="set-font-outlook" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+  <div class="set-font" style="font-family: 'IBM Plex Sans', sans-serif; margin: 0px auto; max-width: 600px;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+      <tbody>
+      <tr>
+        <td style="direction:ltr;font-size:0px;padding:20px 0;padding-left:25px;text-align:left;">
+          <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:66px;" ><![endif]-->
+          <div class="mj-column-px-400 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:466px;">
+            <table border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+              <tbody>
+              <tr>
+                <td style="vertical-align:top;padding-left:0;">
+                  <table border="0" cellpadding="0" cellspacing="0" role="presentation" style width="100%">
+                    <tbody>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <div style="font-family:Open Sans, sans-serif;font-size:16px;font-weight:700;line-height:1;text-align:left;color:#35414A;">Logs within 1 minute of this alert</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="left" style="font-size:0px;padding:10px 25px;padding-left:0;word-break:break-word;">
+                        <pre>${logwatch}</pre>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
                 </td>
               </tr>
               </tbody>
