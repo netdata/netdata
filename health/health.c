@@ -662,6 +662,8 @@ void *health_main(void *ptr) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
+    int cleanup_sql_every_loop = 7200 / min_run_every;
+
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
@@ -715,6 +717,9 @@ void *health_main(void *ptr) {
                 info("Resuming health checks on host '%s'.", host->hostname);
                 host->health_delay_up_to = 0;
             }
+
+            if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
+                sql_health_alarm_log_cleanup(host);
 
             rrdhost_rdlock(host);
 

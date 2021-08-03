@@ -35,6 +35,7 @@ struct pg_cache_page_index;
 #include "rrdcalctemplate.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
+#include "sqlite/sqlite_health.h"
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
