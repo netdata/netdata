@@ -533,9 +533,10 @@ static void perf_send_metrics() {
         if(unlikely(!ipc_chart_generated)) {
             ipc_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Instructions per cycle' 'instructions/cycle' %s '' line %d %d %s\n"
+            printf("CHART %s.%s '' '%s' 'instructions/cycle' %s '' line %d %d %s\n"
                    , RRD_TYPE_PERF
                    , "instructions_per_cycle"
+                   , "Instructions per Cycle(IPC). An IPC < 1.0 likely means memory bound, and an IPC > 1.0 likely means instruction bound. "
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_IPC
                    , update_every
