@@ -32,7 +32,7 @@ sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_transaction_lock;
 
-static int execute_insert(sqlite3_stmt *res)
+int execute_insert(sqlite3_stmt *res)
 {
     int rc;
 
