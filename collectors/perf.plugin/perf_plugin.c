@@ -5,6 +5,9 @@
 #include <linux/perf_event.h>
 
 #define PLUGIN_PERF_NAME "perf.plugin"
+#define PLUGIN_PERF_MODULE_HARDWARE "hardware"
+#define PLUGIN_PERF_MODULE_SOFTWARE "software"
+#define PLUGIN_PERF_MODULE_CACHE "cache"
 
 // Hardware counters
 #define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8800
@@ -463,13 +466,14 @@ static void perf_send_metrics() {
         if(unlikely(!cpu_cycles_chart_generated)) {
             cpu_cycles_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'CPU cycles' 'cycles/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'CPU cycles' 'cycles/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "cpu_cycles"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_CPU_CYCLES
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "cpu");
             printf("DIMENSION %s '' absolute 1 1\n", "ref_cpu");
@@ -503,13 +507,14 @@ static void perf_send_metrics() {
         if(unlikely(!instructions_chart_generated)) {
             instructions_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Instructions' 'instructions/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Instructions' 'instructions/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "instructions"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_INSTRUCTIONS
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "instructions");
         }
@@ -533,7 +538,7 @@ static void perf_send_metrics() {
         if(unlikely(!ipc_chart_generated)) {
             ipc_chart_generated = 1;
 
-            printf("CHART %s.%s '' '%s' 'instructions/cycle' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' '%s' 'instructions/cycle' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "instructions_per_cycle"
                    , "Instructions per Cycle(IPC). An IPC < 1.0 likely means memory bound, and an IPC > 1.0 likely means instruction bound. For more details about the metric take a lookt at this <a href=\"https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html\" target=\"_blank\">blog post</a>."
@@ -541,6 +546,7 @@ static void perf_send_metrics() {
                    , NETDATA_CHART_PRIO_PERF_IPC
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 100\n", "ipc");
         }
@@ -565,13 +571,14 @@ static void perf_send_metrics() {
         if(unlikely(!branch_chart_generated)) {
             branch_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Branch instructions' 'instructions/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Branch instructions' 'instructions/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "branch_instructions"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUCTIONS
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "instructions");
             printf("DIMENSION %s '' absolute 1 1\n", "misses");
@@ -605,13 +612,14 @@ static void perf_send_metrics() {
         if(unlikely(!cache_chart_generated)) {
             cache_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Cache operations' 'operations/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Cache operations' 'operations/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "cache"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_CACHE
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "references");
             printf("DIMENSION %s '' absolute 1 1\n", "misses");
@@ -645,13 +653,14 @@ static void perf_send_metrics() {
         if(unlikely(!bus_cycles_chart_generated)) {
             bus_cycles_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Bus cycles' 'cycles/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Bus cycles' 'cycles/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "bus_cycles"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_BUS_CYCLES
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "bus");
         }
@@ -675,13 +684,14 @@ static void perf_send_metrics() {
         if(unlikely(!stalled_cycles_chart_generated)) {
             stalled_cycles_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Stalled frontend and backend cycles' 'cycles/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Stalled frontend and backend cycles' 'cycles/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "stalled_cycles"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_HARDWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "frontend");
             printf("DIMENSION %s '' absolute 1 1\n", "backend");
@@ -715,13 +725,14 @@ static void perf_send_metrics() {
         if(unlikely(!migrations_chart_generated)) {
             migrations_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'CPU migrations' 'migrations' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'CPU migrations' 'migrations' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "migrations"
                    , RRD_FAMILY_SW
                    , NETDATA_CHART_PRIO_PERF_MIGRATIONS
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_SOFTWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "migrations");
         }
@@ -745,13 +756,14 @@ static void perf_send_metrics() {
         if(unlikely(!alignment_chart_generated)) {
             alignment_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Alignment faults' 'faults' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Alignment faults' 'faults' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "alignment_faults"
                    , RRD_FAMILY_SW
                    , NETDATA_CHART_PRIO_PERF_ALIGNMENT
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_SOFTWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "faults");
         }
@@ -775,13 +787,14 @@ static void perf_send_metrics() {
         if(unlikely(!emulation_chart_generated)) {
             emulation_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Emulation faults' 'faults' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'Emulation faults' 'faults' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "emulation_faults"
                    , RRD_FAMILY_SW
                    , NETDATA_CHART_PRIO_PERF_EMULATION
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_SOFTWARE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "faults");
         }
@@ -806,13 +819,14 @@ static void perf_send_metrics() {
         if(unlikely(!L1D_chart_generated)) {
             L1D_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'L1D cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'L1D cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "l1d_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_L1D
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
             printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
@@ -862,13 +876,14 @@ static void perf_send_metrics() {
         if(unlikely(!L1D_prefetch_chart_generated)) {
             L1D_prefetch_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'L1D prefetch cache operations' 'prefetches/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'L1D prefetch cache operations' 'prefetches/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "l1d_cache_prefetch"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_L1D_PREFETCH
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "prefetches");
         }
@@ -892,13 +907,14 @@ static void perf_send_metrics() {
         if(unlikely(!L1I_chart_generated)) {
             L1I_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'L1I cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'L1I cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "l1i_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_L1I
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
             printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
@@ -933,13 +949,14 @@ static void perf_send_metrics() {
         if(unlikely(!LL_chart_generated)) {
             LL_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'LL cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'LL cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "ll_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_LL
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
             printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
@@ -990,13 +1007,14 @@ static void perf_send_metrics() {
         if(unlikely(!DTLB_chart_generated)) {
             DTLB_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'DTLB cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'DTLB cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "dtlb_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_DTLB
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
             printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
@@ -1046,13 +1064,14 @@ static void perf_send_metrics() {
         if(unlikely(!ITLB_chart_generated)) {
             ITLB_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'ITLB cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'ITLB cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "itlb_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_ITLB
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
             printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
@@ -1086,13 +1105,14 @@ static void perf_send_metrics() {
         if(unlikely(!PBU_chart_generated)) {
             PBU_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'PBU cache operations' 'events/s' %s '' line %d %d '' %s\n"
+            printf("CHART %s.%s '' 'PBU cache operations' 'events/s' %s '' line %d %d '' %s %s\n"
                    , RRD_TYPE_PERF
                    , "pbu_cache"
                    , RRD_FAMILY_CACHE
                    , NETDATA_CHART_PRIO_PERF_PBU
                    , update_every
                    , PLUGIN_PERF_NAME
+                   , PLUGIN_PERF_MODULE_CACHE
             );
             printf("DIMENSION %s '' absolute 1 1\n", "read_access");
         }
