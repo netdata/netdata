@@ -22,7 +22,12 @@ directory and set the following options:
 ```
 
 Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol. For example: `json:http:my_json_instance`,
-`json:https:my_json_instance`.
+`json:https:my_json_instance`. You can set basic HTTP authentication credentials using
+
+```conf
+    username = my_username
+    password = my_password
+```
 
 The JSON connector is further configurable using additional settings. See the [exporting reference
 doc](/exporting/README.md#options) for details.
