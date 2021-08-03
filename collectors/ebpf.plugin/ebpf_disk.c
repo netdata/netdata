@@ -277,7 +277,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         if (length >= NETDATA_DISK_NAME_LEN)
             length = NETDATA_DISK_NAME_LEN;
 
-        strncpy(w->family, name, length);
+        memcpy(w->family, name, length);
         w->family[length] = '\0';
         w->major = major;
         w->minor = minor;
@@ -289,7 +289,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         if (length >= NETDATA_DISK_NAME_LEN)
             length = NETDATA_DISK_NAME_LEN;
 
-        strncpy(disk_list->family, name, length);
+        memcpy(disk_list->family, name, length);
         disk_list->family[length] = '\0';
         disk_list->major = major;
         disk_list->minor = minor;
