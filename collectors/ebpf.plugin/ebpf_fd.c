@@ -84,6 +84,44 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
     UNUSED(ptr);
 }
 
+/**
+ * Create global charts
+ *
+ * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+static void ebpf_create_fd_global_charts(ebpf_module_t *em)
+{
+    ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
+                      NETDATA_FILE_OPEN_CLOSE_COUNT,
+                      "Open and close calls",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_FILE_GROUP,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_EBPF_FD_CHARTS,
+                      ebpf_create_global_dimension,
+                      fd_publish_aggregated,
+                      NETDATA_FD_SYSCALL_END,
+                      NETDATA_EBPF_MODULE_NAME_FD);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
+                          NETDATA_FILE_OPEN_ERR_COUNT,
+                          "Open fails",
+                          EBPF_COMMON_DIMENSION_CALL,
+                          NETDATA_FILE_GROUP,
+                          NULL,
+                          NETDATA_EBPF_CHART_TYPE_LINE,
+                          NETDATA_CHART_PRIO_EBPF_FD_CHARTS + 1,
+                          ebpf_create_global_dimension,
+                          fd_publish_aggregated,
+                          NETDATA_FD_SYSCALL_END,
+                          NETDATA_EBPF_MODULE_NAME_FD);
+    }
+}
+
 /*****************************************************************
  *
  *  MAIN THREAD
@@ -136,6 +174,10 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_global_labels(fd_aggregated_data, fd_publish_aggregated, fd_dimension_names, fd_id_names,
                        algorithms, NETDATA_FD_SYSCALL_END);
+
+    pthread_mutex_lock(&lock);
+    ebpf_create_fd_global_charts(em);
+    pthread_mutex_unlock(&lock);
 
 endfd:
     netdata_thread_cleanup_pop(1);

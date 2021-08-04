@@ -4,7 +4,14 @@
 #define NETDATA_EBPF_FD_H 1
 
 // Module name
-#define NETDATA_EBPF_MODULE_NAME_FD "fd"
+#define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
+
+// Menu group
+#define NETDATA_FILE_GROUP "File (eBPF)"
+
+// Global chart name
+#define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
+#define NETDATA_FILE_OPEN_ERR_COUNT "file_error"
 
 extern void *ebpf_fd_thread(void *ptr);
 extern void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
