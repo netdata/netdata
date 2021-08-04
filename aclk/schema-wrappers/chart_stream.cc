@@ -161,9 +161,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
 {
     chart::v1::ChartsAndDimensionsUpdated msg;
     chart::v1::ChartInstanceUpdated db_chart;
-    chart::v1::ChartInstanceUpdated *chart;
     chart::v1::ChartDimensionUpdated db_dim;
-    chart::v1::ChartDimensionUpdated *dim;
     aclk_lib::v1::ACLKMessagePosition *pos;
 
     msg.set_batch_id(batch_id);
@@ -180,7 +178,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
             pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
             set_google_timestamp_from_timeval(new_positions[i].seq_id_creation_time, pos->mutable_seq_id_created_at());
 
-            dim = msg.add_dimensions();
+            chart::v1::ChartDimensionUpdated *dim = msg.add_dimensions();
             *dim = db_dim;
         } else {
             if (!db_chart.ParseFromArray(payloads[i], payload_sizes[i])) {
@@ -193,7 +191,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
             pos->set_previous_sequence_id(new_positions[i].previous_sequence_id);
             set_google_timestamp_from_timeval(new_positions[i].seq_id_creation_time, pos->mutable_seq_id_created_at());
 
-            chart = msg.add_charts();
+            chart::v1::ChartInstanceUpdated *chart = msg.add_charts();
             *chart = db_chart;
         }
     }
@@ -304,7 +302,6 @@ using namespace google::protobuf;
 char *generate_retention_updated(size_t *len, struct retention_updated *data)
 {
     chart::v1::RetentionUpdated msg;
-    Map<uint32, uint32> *map;
 
     msg.set_claim_id(data->claim_id);
     msg.set_node_id(data->node_id);
@@ -333,7 +330,7 @@ char *generate_retention_updated(size_t *len, struct retention_updated *data)
     }
 
     for (int i = 0; i < data->interval_duration_count; i++) {
-        map = msg.mutable_interval_durations();
+        Map<uint32, uint32> *map = msg.mutable_interval_durations();
         map->insert({data->interval_durations[i].update_every, data->interval_durations[i].retention});
     }
 
