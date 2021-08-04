@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "common.h"
+#include "schema_wrapper_utils.h"
 
 void set_google_timestamp_from_timeval(struct timeval tv, google::protobuf::Timestamp *ts)
 {
