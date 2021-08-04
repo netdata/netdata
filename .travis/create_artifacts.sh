@@ -29,8 +29,8 @@ fi
 # if nightlies.sh has not written this TRAVIS_BUILD_NUMBER, there's no 
 # changes from last nigthly
 if [ -f .travis/current_build_status ]; then
-  FILE_TRAVIS_BUILD_NUMBER=$(cat .travis/current_build_status | cut -d'#' -f 2)
-  FILE_TRAVIS_BUILD_STATUS=$(cat .travis/current_build_status | cut -d- -f 1)
+  FILE_TRAVIS_BUILD_NUMBER=$(cut -d'#' -f2 < .travis/current_build_status)
+  FILE_TRAVIS_BUILD_STATUS=$(cut -d- -f1 < .travis/current_build_status)
   if [[ ${FILE_TRAVIS_BUILD_NUMBER} -eq ${TRAVIS_BUILD_NUMBER} ]] && [[ ${FILE_TRAVIS_BUILD_STATUS} == "changes" ]]; then
   	echo "Changes happen since last nightly release, let's continue"
   else
