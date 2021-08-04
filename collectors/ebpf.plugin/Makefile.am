@@ -35,6 +35,7 @@ dist_ebpfconfig_DATA = \
     ebpf.d/cachestat.conf \
     ebpf.d/dcstat.conf \
     ebpf.d/disk.conf \
+    ebpf.d/fd.conf \
     ebpf.d/filesystem.conf \
     ebpf.d/mount.conf \
     ebpf.d/network.conf \
