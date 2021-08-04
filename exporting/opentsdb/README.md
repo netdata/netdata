@@ -22,7 +22,12 @@ directory and set the following options:
 ```
 
 Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol. For example: `opentsdb:http:my_opentsdb_instance`,
-`opentsdb:https:my_opentsdb_instance`.
+`opentsdb:https:my_opentsdb_instance`. You can set basic HTTP authentication credentials using
+
+```conf
+    username = my_username
+    password = my_password
+```
 
 The OpenTSDB connector is further configurable using additional settings. See the [exporting reference
 doc](/exporting/README.md#options) for details.

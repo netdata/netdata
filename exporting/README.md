@@ -164,6 +164,8 @@ You can configure each connector individually using the available [options](#opt
 [opentsdb:http:my_opentsdb_http_instance]
     enabled = yes
     destination = localhost:4242
+    username = my_username
+    password = my_password
 
 [opentsdb:https:my_opentsdb_https_instance]
     enabled = yes
