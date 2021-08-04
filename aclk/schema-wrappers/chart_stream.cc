@@ -63,7 +63,7 @@ char *generate_reset_chart_messages(size_t *len, chart_reset_t reset)
             return NULL;
     }
 
-    *len = msg.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)malloc(*len);
     if (bin)
         msg.SerializeToArray(bin, *len);
@@ -198,7 +198,7 @@ char *generate_charts_and_dimensions_updated(size_t *len, char **payloads, size_
         }
     }
 
-    *len = msg.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
     msg.SerializeToArray(bin, *len);
 
@@ -230,7 +230,7 @@ char *generate_charts_updated(size_t *len, char **payloads, size_t *payload_size
         *chart = db_msg;
     }
 
-    *len = msg.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
     msg.SerializeToArray(bin, *len);
 
@@ -262,7 +262,7 @@ char *generate_chart_dimensions_updated(size_t *len, char **payloads, size_t *pa
         *dim = db_msg;
     }
 
-    *len = msg.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
     msg.SerializeToArray(bin, *len);
 
@@ -276,7 +276,7 @@ char *generate_chart_instance_updated(size_t *len, const struct chart_instance_u
     if (set_chart_instance_updated(chart, update))
         return NULL;
 
-    *len = chart->ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE_PTR(chart);
     char *bin = (char*)mallocz(*len);
     chart->SerializeToArray(bin, *len);
 
@@ -291,7 +291,7 @@ char *generate_chart_dimension_updated(size_t *len, const struct chart_dimension
     if (set_chart_dim_updated(proto_dim, dim))
         return NULL;
 
-    *len = proto_dim->ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE_PTR(proto_dim);
     char *bin = (char*)mallocz(*len);
     proto_dim->SerializeToArray(bin, *len);
 
@@ -339,7 +339,7 @@ char *generate_retention_updated(size_t *len, struct retention_updated *data)
 
     set_google_timestamp_from_timeval(data->rotation_timestamp, msg.mutable_rotation_timestamp());
 
-    *len = msg.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
     msg.SerializeToArray(bin, *len);
 

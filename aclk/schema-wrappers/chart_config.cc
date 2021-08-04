@@ -4,6 +4,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#include "schema_wrapper_utils.h"
+
 void destroy_update_chart_config(struct update_chart_config *cfg)
 {
     freez(cfg->claim_id);
@@ -95,7 +97,7 @@ char *generate_chart_configs_updated(size_t *len, const struct chart_config_upda
         config->set_config_hash(config_list[i].config_hash);
     }
 
-    *len = configs.ByteSizeLong();
+    *len = PROTO_COMPAT_MSG_SIZE(configs);
     char *bin = (char*)mallocz(*len);
     configs.SerializeToArray(bin, *len);
 
