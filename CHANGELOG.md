@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
+- Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
 - Specify module for threads [\#11387](https://github.com/netdata/netdata/pull/11387) ([thiagoftsm](https://github.com/thiagoftsm))
 - CODEOWNERS: Remove knatsakis [\#11377](https://github.com/netdata/netdata/pull/11377) ([knatsakis](https://github.com/knatsakis))
 - Update handling of builds of bundled dependencies. [\#11375](https://github.com/netdata/netdata/pull/11375) ([Ferroin](https://github.com/Ferroin))
@@ -306,8 +308,6 @@
 - health: make vernemq alarms less sensitive [\#10770](https://github.com/netdata/netdata/pull/10770) ([ilyam8](https://github.com/ilyam8))
 - Fixed handling of perf.plugin capabilities. [\#10766](https://github.com/netdata/netdata/pull/10766) ([Ferroin](https://github.com/Ferroin))
 - dashboard@v2.13.28 [\#10761](https://github.com/netdata/netdata/pull/10761) ([jacekkolasa](https://github.com/jacekkolasa))
-- collectors/cgroups: fix cpuset.cpus count [\#10757](https://github.com/netdata/netdata/pull/10757) ([ilyam8](https://github.com/ilyam8))
-- eBPF plugin \(fixes 10727\) [\#10756](https://github.com/netdata/netdata/pull/10756) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
