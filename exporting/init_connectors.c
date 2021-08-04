@@ -189,7 +189,7 @@ void simple_connector_init(struct instance *instance)
     first_buffer->next = connector_specific_data->first_buffer;
     connector_specific_data->last_buffer = connector_specific_data->first_buffer;
 
-    if (*instance->config.username && *instance->config.password) {
+    if (*instance->config.username || *instance->config.password) {
         BUFFER *auth_string = buffer_create(0);
 
         buffer_sprintf(auth_string, "%s:%s", instance->config.username, instance->config.password);
