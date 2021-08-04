@@ -105,6 +105,7 @@ int init_connectors(struct engine *engine)
     return 0;
 }
 
+// TODO: use a base64 encoder from a library
 static size_t base64_encode(unsigned char *input, size_t input_size, char *output, size_t output_size)
 {
     uint32_t value;
