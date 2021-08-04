@@ -196,13 +196,13 @@ typedef struct statsd_app_chart_dimension {
 } STATSD_APP_CHART_DIM;
 
 typedef struct statsd_app_chart {
-    const char *source;
     const char *id;
     const char *name;
     const char *title;
     const char *family;
     const char *context;
     const char *units;
+    const char *module;
     long priority;
     RRDSET_TYPE chart_type;
     STATSD_APP_CHART_DIM *dimensions;
@@ -1214,10 +1214,15 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     chart->next = app->charts;
                     app->charts = chart;
 
-                    {
-                        char lineandfile[FILENAME_MAX + 1];
-                        snprintfz(lineandfile, FILENAME_MAX, "%zu@%s", line, filename);
-                        chart->source = strdupz(lineandfile);
+                    if (!strncmp(
+                            filename,
+                            netdata_configured_stock_config_dir,
+                            strlen(netdata_configured_stock_config_dir))) {
+                        char tmpfilename[FILENAME_MAX + 1];
+                        strcpy(tmpfilename, filename);
+                        chart->module = strdupz(basename(tmpfilename));
+                    } else {
+                        chart->module = strdupz("synthetic_chart");
                     }
                 }
             }
@@ -1996,7 +2001,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->title              // title
                 , chart->units              // units
                 , PLUGIN_STATSD_NAME        // plugin
-                , chart->source             // module
+                , chart->module             // module
                 , chart->priority           // priority
                 , statsd.update_every       // update every
                 , chart->chart_type         // chart type
