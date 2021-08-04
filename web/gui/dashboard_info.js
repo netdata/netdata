@@ -3468,6 +3468,13 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Perf
+
+    'perf.instructions_per_cycle': {
+        info: 'An IPC < 1.0 likely means memory bound, and an IPC > 1.0 likely means instruction bound. For more details about the metric take a look at this <a href="https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html" target="_blank">blog post</a>.'
+    },
+
+    // ------------------------------------------------------------------------
     // Filesystem
 
     'filesystem.vfs_deleted_objects': {
