@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_health.h"
-
+#include "sqlite_functions.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 
@@ -355,7 +355,7 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 }
 
 
-#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, classification, component, type FROM health_log_%s where unique_id = ? and alarm_id = ?;", guid
+#define SQL_SELECT_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM health_log_%s where unique_id = ? and alarm_id = ?;", guid
 void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_id, RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -403,14 +403,18 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         char uuid_str[GUID_LEN + 1];
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), uuid_str);
 
+        char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
+
         buffer_sprintf(
             wb,
             "\n\t{\n"
             "\t\t\"hostname\": \"%s\",\n"
+            "\t\t\"utc_offset\": %d,\n"
+            "\t\t\"timezone\": \"%s\",\n"
             "\t\t\"unique_id\": %u,\n"
             "\t\t\"alarm_id\": %u,\n"
             "\t\t\"alarm_event_id\": %u,\n"
-            "\t\t\"config_hash_id\": \"%s\",\n"
+            //"\t\t\"config_hash_id\": \"%s\",\n"
             "\t\t\"name\": \"%s\",\n"
             "\t\t\"chart\": \"%s\",\n"
             "\t\t\"family\": \"%s\",\n"
@@ -425,6 +429,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             "\t\t\"recipient\": \"%s\",\n"
             "\t\t\"exec_code\": %d,\n"
             "\t\t\"source\": \"%s\",\n"
+            "\t\t\"command\": \"%s\",\n"
             "\t\t\"units\": \"%s\",\n"
             "\t\t\"when\": %lu,\n"
             "\t\t\"duration\": %lu,\n"
@@ -440,10 +445,12 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             "\t\t\"last_repeat\": \"%lu\",\n"
             "\t\t\"silenced\": \"%s\",\n",
             sqlite3_column_text(res, 0),
+            host->utc_offset,
+            host->abbrev_timezone,
             (unsigned int) sqlite3_column_int(res, 1),
             (unsigned int) sqlite3_column_int(res, 2),
             (unsigned int) sqlite3_column_int(res, 3),
-            uuid_str,
+            //uuid_str,
             sqlite3_column_text(res, 13),
             sqlite3_column_text(res, 14),
             sqlite3_column_text(res, 15),
@@ -458,6 +465,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : host->health_default_recipient,
             sqlite3_column_int(res, 21),
             sqlite3_column_text(res, 18),
+            edit_command,
             sqlite3_column_text(res, 19),
             (long unsigned int)sqlite3_column_int(res, 7),
             (long unsigned int)sqlite3_column_int(res, 8),
@@ -523,7 +531,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
 }
 
-#define SQL_SELECT_ALL_HEALTH_LOG(guid) "SELECT unique_id, alarm_id FROM health_log_%s order by unique_id desc;", guid //ADD A LIMIT
+#define SQL_SELECT_ALL_HEALTH_LOG(guid,limit) "SELECT unique_id, alarm_id FROM health_log_%s order by unique_id desc LIMIT %d;", guid,limit
 void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -542,7 +550,7 @@ void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     guid[18]='_';
     guid[23]='_';
 
-    sprintf(command, SQL_SELECT_ALL_HEALTH_LOG(guid));
+    sprintf(command, SQL_SELECT_ALL_HEALTH_LOG(guid, host->health_log.max));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -868,4 +876,492 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         error_report("Failed to finalize the health log read statement");
 
     sql_health_alarm_log_count(host);
+}
+
+/*
+ * Store an alert config hash in the database
+ */
+#define SQL_STORE_ALERT_CONFIG_HASH "insert into alert_hash (hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34) on conflict(hash_id) do nothing;"
+int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc, param = 0;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store alert configuration, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    param++;
+    rc = sqlite3_bind_blob(res, 1, hash_id, sizeof(*hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    if (cfg->alarm && *cfg->alarm)
+        rc = sqlite3_bind_text(res, 2, cfg->alarm, -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, 2);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    if (cfg->template_key && *cfg->template_key)
+        rc = sqlite3_bind_text(res, 3, cfg->template_key, -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, 3);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 4, cfg->on, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 5, cfg->classification, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 6, cfg->component, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 7, cfg->type, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 8, cfg->os, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 9, cfg->host, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 10, cfg->lookup, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 11, cfg->every, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 12, cfg->units, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 13, cfg->calc, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 14, cfg->families, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 15, cfg->plugin, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 16, cfg->module, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 17, cfg->charts, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 18, cfg->green, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 19, cfg->red, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 20, cfg->warn, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 21, cfg->crit, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 22, cfg->exec, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 23, cfg->to, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 24, cfg->info, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 25, cfg->delay, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 26, cfg->options, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 27, cfg->repeat, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    param++;
+    rc = sqlite3_bind_text(res, 28, cfg->host_labels, -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (cfg->p_db_lookup_after) {
+        param++;
+        rc = sqlite3_bind_text(res, 29, cfg->p_db_lookup_dimensions, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        param++;
+        rc = sqlite3_bind_text(res, 30, cfg->p_db_lookup_method, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        param++;
+        rc = sqlite3_bind_int(res, 31, cfg->p_db_lookup_options);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        param++;
+        rc = sqlite3_bind_int(res, 32, cfg->p_db_lookup_after);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        param++;
+        rc = sqlite3_bind_int(res, 33, cfg->p_db_lookup_before);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    } else {
+        param++;
+        rc = sqlite3_bind_null(res, 29);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+        param++;
+        rc = sqlite3_bind_null(res, 30);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+        param++;
+        rc = sqlite3_bind_null(res, 31);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+        param++;
+        rc = sqlite3_bind_null(res, 32);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+        param++;
+        rc = sqlite3_bind_null(res, 33);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    }
+
+    param++;
+    rc = sqlite3_bind_int(res, 34, cfg->p_update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store alert config, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
+
+    return 0;
+
+    bind_fail:
+    error_report("Failed to bind parameter %d to store alert hash_id, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
+    return 1;
+}
+
+/*
+ * Select an alert config
+ */
+#define SQL_SELECT_ALERT_CONFIG_WITH_HASH "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every from alert_hash where hash_id = @hash_id;"
+#define SQL_SELECT_ALERT_CONFIG "select hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every from alert_hash;"
+void sql_select_alert_config(char *hash_str, BUFFER *wb)
+{
+    int rc;
+    sqlite3_stmt *res_alert = NULL;
+
+    uuid_t hash_id;
+    if (hash_str)
+        uuid_parse(hash_str, hash_id);
+
+    if (hash_str)
+        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG_WITH_HASH, -1, &res_alert, 0);
+    else
+        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG, -1, &res_alert, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch chart config with hash");
+        return;
+    }
+
+    if (hash_str) {
+        rc = sqlite3_bind_blob(res_alert, 1, &hash_id, sizeof(hash_id), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind host parameter to fetch chart config with hash");
+            goto failed;
+        }
+    }
+
+    buffer_sprintf(wb, "[\n");
+
+    size_t c = 0;
+
+    while (sqlite3_step(res_alert) == SQLITE_ROW) {
+        /* char id[512]; */
+        /* sprintf(id, "%s.%s", sqlite3_column_text(res_alert, 3), sqlite3_column_text(res_alert, 1)); */
+
+        if (c)
+            buffer_strcat(wb, ",\t\t\n");
+        else
+            buffer_strcat(wb, "\t\n");
+        c++;
+
+        char uuid_str[36 + 1];
+        uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res_alert, 0)), uuid_str);
+
+        buffer_sprintf(wb, "\t{\n");
+        buffer_sprintf(wb, "\t\t\"config_hash_id\": \"%s\"", uuid_str);
+
+        if (sqlite3_column_type(res_alert, 1) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"alarm\": \"%s\"", sqlite3_column_text(res_alert, 1));
+        }
+        if (sqlite3_column_type(res_alert, 2) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"template\": \"%s\"", sqlite3_column_text(res_alert, 2));
+        }
+        if (sqlite3_column_type(res_alert, 3) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"on\": \"%s\"", sqlite3_column_text(res_alert, 3));
+        }
+        if (sqlite3_column_type(res_alert, 4) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"class\": \"%s\"", sqlite3_column_text(res_alert, 4));
+        }
+        if (sqlite3_column_type(res_alert, 5) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"component\": \"%s\"", sqlite3_column_text(res_alert, 5));
+        }
+        if (sqlite3_column_type(res_alert, 6) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"type\": \"%s\"", sqlite3_column_text(res_alert, 6));
+        }
+        if (sqlite3_column_type(res_alert, 7) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"os\": \"%s\"", sqlite3_column_text(res_alert, 7));
+        }
+        if (sqlite3_column_type(res_alert, 8) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"hosts\": \"%s\"", sqlite3_column_text(res_alert, 8));
+        }
+        if (sqlite3_column_type(res_alert, 9) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"lookup\": \"%s\"", sqlite3_column_text(res_alert, 9));
+        }
+        if (sqlite3_column_type(res_alert, 10) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"every\": \"%s\"", sqlite3_column_text(res_alert, 10));
+        }
+        if (sqlite3_column_type(res_alert, 11) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"units\": \"%s\"", sqlite3_column_text(res_alert, 11));
+        }
+        if (sqlite3_column_type(res_alert, 12) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"calc\": \"%s\"", sqlite3_column_text(res_alert, 12));
+        }
+        if (sqlite3_column_type(res_alert, 13) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"families\": \"%s\"", sqlite3_column_text(res_alert, 13));
+        }
+        if (sqlite3_column_type(res_alert, 14) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"plugin\": \"%s\"", sqlite3_column_text(res_alert, 14));
+        }
+        if (sqlite3_column_type(res_alert, 15) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"module\": \"%s\"", sqlite3_column_text(res_alert, 15));
+        }
+        if (sqlite3_column_type(res_alert, 16) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"green\": \"%s\"", sqlite3_column_text(res_alert, 16));
+        }
+        if (sqlite3_column_type(res_alert, 17) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"red\": \"%s\"", sqlite3_column_text(res_alert, 17));
+        }
+        if (sqlite3_column_type(res_alert, 18) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"warn\": \"%s\"", sqlite3_column_text(res_alert, 18));
+        }
+        if (sqlite3_column_type(res_alert, 19) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"crit\": \"%s\"", sqlite3_column_text(res_alert, 19));
+        }
+        if (sqlite3_column_type(res_alert, 20) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"exec\": \"%s\"", sqlite3_column_text(res_alert, 20));
+        }
+        if (sqlite3_column_type(res_alert, 21) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"to\": \"%s\"", sqlite3_column_text(res_alert, 21));
+        }
+        if (sqlite3_column_type(res_alert, 22) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"info\": \"%s\"", sqlite3_column_text(res_alert, 22));
+        }
+        if (sqlite3_column_type(res_alert, 23) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"delay\": \"%s\"", sqlite3_column_text(res_alert, 23));
+        }
+        if (sqlite3_column_type(res_alert, 24) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"options\": \"%s\"", sqlite3_column_text(res_alert, 24));
+        }
+        if (sqlite3_column_type(res_alert, 25) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"repeat\": \"%s\"", sqlite3_column_text(res_alert, 25));
+        }
+        if (sqlite3_column_type(res_alert, 26) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"host_labels\": \"%s\"", sqlite3_column_text(res_alert, 26));
+        }
+        if (sqlite3_column_type(res_alert, 27) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_db_lookup_dimensions\": \"%s\"", sqlite3_column_text(res_alert, 27));
+        }
+        if (sqlite3_column_type(res_alert, 28) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_db_lookup_method\": \"%s\"", sqlite3_column_text(res_alert, 28));
+        }
+        if (sqlite3_column_type(res_alert, 29) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_db_lookup_options\": \"");
+            buffer_data_options2string(wb, sqlite3_column_int(res_alert, 29));
+            buffer_strcat(wb, "\"");
+        }
+        if (sqlite3_column_type(res_alert, 30) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_db_lookup_after\": %d", sqlite3_column_int(res_alert, 30));
+        }
+        if (sqlite3_column_type(res_alert, 31) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_db_lookup_before\": %d", sqlite3_column_int(res_alert, 31));
+        }
+        if (sqlite3_column_type(res_alert, 32) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"p_update_every\": %d", sqlite3_column_int(res_alert, 32));
+        }
+
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to reset the prepared statement when reading chart config with hash");
+        buffer_strcat(wb, "\n\t}");
+    }
+
+    buffer_sprintf(wb, "\n]");
+
+    failed:
+    rc = sqlite3_finalize(res_alert);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading chart config with hash");
+
+    return;
+}
+
+int alert_hash_and_store_config(
+    uuid_t hash_id,
+    struct alert_config *cfg)
+{
+    EVP_MD_CTX *evpctx;
+    unsigned char hash_value[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    evpctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
+
+    error("HASH asked to hash [%s]", cfg->alarm ? cfg->alarm : cfg->template_key);
+
+    if (cfg->alarm) {
+        EVP_DigestUpdate(evpctx, cfg->alarm, strlen(cfg->alarm));
+    } else if (cfg->template_key)
+        EVP_DigestUpdate(evpctx, cfg->template_key, strlen(cfg->template_key));
+
+    if (cfg->os)
+        EVP_DigestUpdate(evpctx, cfg->os, strlen(cfg->os));
+    if (cfg->host)
+        EVP_DigestUpdate(evpctx, cfg->host, strlen(cfg->host));
+    if (cfg->on)
+        EVP_DigestUpdate(evpctx, cfg->on, strlen(cfg->on));
+    if (cfg->families)
+        EVP_DigestUpdate(evpctx, cfg->families, strlen(cfg->families));
+    if (cfg->plugin)
+        EVP_DigestUpdate(evpctx, cfg->plugin, strlen(cfg->plugin));
+    if (cfg->module)
+        EVP_DigestUpdate(evpctx, cfg->module, strlen(cfg->module));
+    if (cfg->charts)
+        EVP_DigestUpdate(evpctx, cfg->charts, strlen(cfg->charts));
+    if (cfg->lookup)
+        EVP_DigestUpdate(evpctx, cfg->lookup, strlen(cfg->lookup));
+    if (cfg->calc)
+        EVP_DigestUpdate(evpctx, cfg->calc, strlen(cfg->calc));
+    if (cfg->every)
+        EVP_DigestUpdate(evpctx, cfg->every, strlen(cfg->every));
+    if (cfg->green)
+        EVP_DigestUpdate(evpctx, cfg->green, strlen(cfg->green));
+    if (cfg->red)
+        EVP_DigestUpdate(evpctx, cfg->red, strlen(cfg->red));
+    if (cfg->warn)
+        EVP_DigestUpdate(evpctx, cfg->warn, strlen(cfg->warn));
+    if (cfg->crit)
+        EVP_DigestUpdate(evpctx, cfg->crit, strlen(cfg->crit));
+    if (cfg->exec)
+        EVP_DigestUpdate(evpctx, cfg->exec, strlen(cfg->exec));
+    if (cfg->to)
+        EVP_DigestUpdate(evpctx, cfg->to, strlen(cfg->to));
+    if (cfg->units)
+        EVP_DigestUpdate(evpctx, cfg->units, strlen(cfg->units));
+    if (cfg->info)
+        EVP_DigestUpdate(evpctx, cfg->info, strlen(cfg->info));
+    if (cfg->classification)
+        EVP_DigestUpdate(evpctx, cfg->classification, strlen(cfg->classification));
+    if (cfg->component)
+        EVP_DigestUpdate(evpctx, cfg->component, strlen(cfg->component));
+    if (cfg->type)
+        EVP_DigestUpdate(evpctx, cfg->type, strlen(cfg->type));
+    if (cfg->delay)
+        EVP_DigestUpdate(evpctx, cfg->delay, strlen(cfg->delay));
+    if (cfg->options)
+        EVP_DigestUpdate(evpctx, cfg->options, strlen(cfg->options));
+    if (cfg->repeat)
+        EVP_DigestUpdate(evpctx, cfg->repeat, strlen(cfg->repeat));
+    if (cfg->host_labels)
+        EVP_DigestUpdate(evpctx, cfg->host_labels, strlen(cfg->host_labels));
+
+    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
+    EVP_MD_CTX_destroy(evpctx);
+    fatal_assert(hash_len > sizeof(uuid_t));
+
+    char uuid_str[36 + 1];
+    uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
+    uuid_copy(hash_id, *((uuid_t *)&hash_value));
+
+    /* store everything, so it can be recreated when not in memory or just a subset ? */
+    (void)sql_store_alert_config_hash( (uuid_t *)&hash_value, cfg);
+
+    return 1;
 }

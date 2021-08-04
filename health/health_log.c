@@ -462,6 +462,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
+        uuid_t config_hash_id,
         time_t when,
         const char *name,
         const char *chart,
