@@ -795,6 +795,7 @@ struct rrdhost {
     struct sender_state *sender;
     volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    void *dbsync_worker;
 
     volatile unsigned int rrdpush_sender_connected:1; // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
@@ -1350,5 +1351,5 @@ extern void set_host_properties(
 #include "database/engine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
-
+#include "sqlite/sqlite_aclk.h"
 #endif /* NETDATA_RRD_H */
