@@ -688,8 +688,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         return;
     }
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
-
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(host->host_uuid, uuid_str);
     uuid_str[8] = '_';
@@ -704,6 +702,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         error_report("HEALTH [%s]: Failed to prepare sql statement to load health log.", host->hostname);
         return;
     }
+
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         errno = 0;
