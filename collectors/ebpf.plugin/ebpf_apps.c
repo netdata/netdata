@@ -945,6 +945,12 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         freez(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
     }
+
+    // Clean fd structure
+    if (fd_pid) {
+        freez(fd_pid[pid]);
+        fd_pid[pid] = NULL;
+    }
 }
 
 /**

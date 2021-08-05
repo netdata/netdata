@@ -15,9 +15,24 @@
 #define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
 #define NETDATA_FILE_OPEN_ERR_COUNT "file_error"
 
-extern void *ebpf_fd_thread(void *ptr);
-extern void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
-extern struct config fd_config;
+// Charts created on Apps submenu
+#define NETDATA_SYSCALL_APPS_FILE_OPEN "file_open"
+#define NETDATA_SYSCALL_APPS_FILE_CLOSED "file_closed"
+#define NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR "file_open_error"
+#define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
+
+typedef struct netdata_fd_stat {
+    uint64_t pid_tgid;                     //Unique identifier
+    uint32_t pid;                          //process id
+
+    //Counter
+    uint32_t open_call;                    //open syscalls (open and openat)
+    uint32_t close_call;                   //Close syscall (close)
+
+    //Counter
+    uint32_t open_err;
+    uint32_t close_err;
+} netdata_fd_stat_t;
 
 enum fd_tables {
     NETDATA_FD_PID_STATS,
@@ -44,5 +59,12 @@ enum fd_syscalls {
     // Do not insert nothing after this value
     NETDATA_FD_SYSCALL_END
 };
+
+
+extern void *ebpf_fd_thread(void *ptr);
+extern void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
+extern struct config fd_config;
+extern netdata_fd_stat_t **fd_pid;
+extern void clean_fd_pid_structures();
 
 #endif /* NETDATA_EBPF_FD_H */

@@ -39,11 +39,28 @@ static int read_thread_closed = 1;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
+netdata_fd_stat_t *fd_vector = NULL;
+netdata_fd_stat_t **fd_pid;
+
 /*****************************************************************
  *
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
+
+/**
+ * Clean PID structures
+ *
+ * Clean the allocated structures.
+ */
+void clean_fd_pid_structures() {
+    struct pid_stat *pids = root_of_pids;
+    while (pids) {
+        freez(fd_pid[pids->pid]);
+
+        pids = pids->next;
+    }
+}
 
 /**
  * Clean up the main thread.
@@ -68,6 +85,7 @@ static void ebpf_fd_cleanup(void *ptr)
     freez(fd_data.map_fd);
     freez(fd_thread.thread);
     freez(fd_values);
+    freez(fd_vector);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -164,6 +182,163 @@ void *ebpf_fd_read_hash(void *ptr)
 }
 
 /**
+ * Apps Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ */
+static void fd_apps_accumulator(netdata_fd_stat_t *out)
+{
+    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    netdata_fd_stat_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        netdata_fd_stat_t *w = &out[i];
+        total->open_call += w->open_call;
+        total->close_call += w->close_call;
+        total->open_err += w->open_err;
+        total->close_err += w->close_err;
+    }
+}
+
+/**
+ * Fill PID
+ *
+ * Fill PID structures
+ *
+ * @param current_pid pid that we are collecting data
+ * @param out         values read from hash tables;
+ */
+static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
+{
+    netdata_fd_stat_t *curr = fd_pid[current_pid];
+    if (!curr) {
+        curr = callocz(1, sizeof(netdata_fd_stat_t));
+        fd_pid[current_pid] = curr;
+    }
+
+    memcpy(curr, &publish[0], sizeof(netdata_fd_stat_t));
+}
+
+/**
+ * Read APPS table
+ *
+ * Read the apps table and store data inside the structure.
+ */
+static void read_apps_table()
+{
+    netdata_fd_stat_t *fv = fd_vector;
+    uint32_t key;
+    struct pid_stat *pids = root_of_pids;
+    int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
+    size_t length = sizeof(netdata_fd_stat_t) * ebpf_nprocs;
+    while (pids) {
+        key = pids->pid;
+
+        if (bpf_map_lookup_elem(fd, &key, fv)) {
+            pids = pids->next;
+            continue;
+        }
+
+        fd_apps_accumulator(fv);
+
+        fd_fill_pid(key, fv);
+
+        // We are cleaning to avoid passing data read from one process to other.
+        memset(fv, 0, length);
+
+        pids = pids->next;
+    }
+}
+
+/**
+ * Sum PIDs
+ *
+ * Sum values for all targets.
+ *
+ * @param fd   the output
+ * @param root list of pids
+ */
+static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
+{
+    uint32_t open_call = 0;
+    uint32_t close_call = 0;
+    uint32_t open_err = 0;
+    uint32_t close_err = 0;
+
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_fd_stat_t *w = fd_pid[pid];
+        if (w) {
+            open_call += w->open_call;
+            close_call += w->close_call;
+            open_err += w->open_err;
+            close_err += w->close_err;
+        }
+
+        root = root->next;
+    }
+
+    // These conditions were added, because we are using incremental algorithm
+    fd->open_call = (open_call >= fd->open_call) ? open_call : fd->open_call;
+    fd->close_call = (close_call >= fd->close_call) ? close_call : fd->close_call;
+    fd->open_err = (open_err >= fd->open_err) ? open_err : fd->open_err;
+    fd->close_err = (close_err >= fd->close_err) ? close_err : fd->close_err;
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+ *
+ * @param em   the structure with thread information
+ * @param root the target list.
+*/
+void ebpf_fd_send_apps_data(ebpf_module_t *em, struct target *root)
+{
+    struct target *w;
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_fd_sum_pids(&w->fd, w->root_pid);
+        }
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->fd.open_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->fd.open_err);
+            }
+        }
+        write_end_chart();
+    }
+
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            write_chart_dimension(w->name, w->fd.close_call);
+        }
+    }
+    write_end_chart();
+
+    if (em->mode < MODE_ENTRY) {
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes)) {
+                write_chart_dimension(w->name, w->fd.close_err);
+            }
+        }
+        write_end_chart();
+    }
+}
+
+/**
 * Main loop for this collector.
 */
 static void fd_collector(ebpf_module_t *em)
@@ -174,13 +349,20 @@ static void fd_collector(ebpf_module_t *em)
     netdata_thread_create(fd_thread.thread, fd_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_fd_read_hash, em);
 
+    int apps = em->apps_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
+        if (apps)
+            read_apps_table();
+
         pthread_mutex_lock(&lock);
 
         ebpf_fd_send_data(em);
+
+        if (apps)
+            ebpf_fd_send_apps_data(em, apps_groups_root_target);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -202,8 +384,46 @@ static void fd_collector(ebpf_module_t *em)
  */
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
-    UNUSED(ptr);
+    struct target *root = ptr;
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN,
+                               "Number of open files",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_FILE_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20061,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
+                                   "Fails to open files",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_FILE_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20062,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    }
+
+    ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
+                               "Files closed",
+                               EBPF_COMMON_DIMENSION_CALL,
+                               NETDATA_APPS_FILE_GROUP,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
+                               20063,
+                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    if (em->mode < MODE_ENTRY) {
+        ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
+                                   "Fails to close files",
+                                   EBPF_COMMON_DIMENSION_CALL,
+                                   NETDATA_APPS_FILE_GROUP,
+                                   NETDATA_EBPF_CHART_TYPE_STACKED,
+                                   20064,
+                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    }
 }
 
 /**
@@ -258,6 +478,9 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  */
 static void ebpf_fd_allocate_global_vectors()
 {
+    fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+    fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
+
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 }
 

@@ -204,6 +204,12 @@ static void ebpf_exit(int sig)
         freez(vfs_pid);
     }
 
+    if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
+        clean_fd_pid_structures();
+        freez(fd_pid);
+    }
+
     /*
     int ret = fork();
     if (ret < 0) // error
