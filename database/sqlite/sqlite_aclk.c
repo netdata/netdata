@@ -8,14 +8,6 @@
 //#include "sqlite_aclk_alert.h"
 //#include "sqlite_aclk_node.h"
 
-#ifndef ACLK_NG
-#include "../../aclk/legacy/agent_cloud_link.h"
-#else
-#include "../../aclk/aclk.h"
-//#include "../../aclk/aclk_charts_api.h"
-//#include "../../aclk/aclk_alarm_api.h"
-#endif
-
 const char *aclk_sync_config[] = {
     NULL,
     "CREATE TABLE IF NOT EXISTS delete_dimension(host_id, chart_id, dim_id, chart_name, dimension_id, dimension_name);"
