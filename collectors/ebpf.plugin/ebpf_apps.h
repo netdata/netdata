@@ -11,7 +11,7 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
-#define NETDATA_APPS_FILE_GROUP "file (eBPF)"
+#define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_VFS_GROUP "vfs (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net (eBPF)"
