@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix freebsd and macos plugin names [\#11398](https://github.com/netdata/netdata/pull/11398) ([vlvkobal](https://github.com/vlvkobal))
+- Add HTTP basic authentication to some exporting connectors [\#11394](https://github.com/netdata/netdata/pull/11394) ([vlvkobal](https://github.com/vlvkobal))
+- Update perf.events and add new charts [\#11392](https://github.com/netdata/netdata/pull/11392) ([thiagoftsm](https://github.com/thiagoftsm))
 - charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
 - Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
 - Specify module for threads [\#11387](https://github.com/netdata/netdata/pull/11387) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -307,7 +310,6 @@
 - Add data query support for archived charts [\#10771](https://github.com/netdata/netdata/pull/10771) ([stelfrag](https://github.com/stelfrag))
 - health: make vernemq alarms less sensitive [\#10770](https://github.com/netdata/netdata/pull/10770) ([ilyam8](https://github.com/ilyam8))
 - Fixed handling of perf.plugin capabilities. [\#10766](https://github.com/netdata/netdata/pull/10766) ([Ferroin](https://github.com/Ferroin))
-- dashboard@v2.13.28 [\#10761](https://github.com/netdata/netdata/pull/10761) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
