@@ -17,7 +17,7 @@ You can:
 You can also add Netdata charts to existing web pages.
 
 Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its
-**[html source](/web/gui//dashboard/demo.html)**.
+**[html source](/web/gui/dashboard/demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
