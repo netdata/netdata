@@ -567,6 +567,8 @@ ACLK_NG_FILES = \
     aclk/aclk_rx_msgs.h \
     aclk/https_client.c \
     aclk/https_client.h \
+    aclk/aclk_charts_api.c \
+    aclk/aclk_charts_api.h \
     mqtt_websockets/src/mqtt_wss_client.c \
     mqtt_websockets/src/include/mqtt_wss_client.h \
     mqtt_websockets/src/mqtt_wss_log.c \
@@ -584,7 +586,12 @@ ACLK_NG_FILES = \
     aclk/schema-wrappers/node_connection.h \
     aclk/schema-wrappers/node_creation.cc \
     aclk/schema-wrappers/node_creation.h \
+    aclk/schema-wrappers/chart_stream.cc \
+    aclk/schema-wrappers/chart_stream.h \
+    aclk/schema-wrappers/chart_config.cc \
+    aclk/schema-wrappers/chart_config.h \
     aclk/schema-wrappers/schema_wrappers.h \
+    aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
 
@@ -594,10 +601,21 @@ ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/instance.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
+    aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
+    aclk/aclk-schemas/proto/chart/v1/config.pb.h \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+    aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
     $(NULL)
 
 BUILT_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
 nodist_netdata_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
+CLEANFILES += $(ACLK_NG_PROTO_BUILT_FILES)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -609,6 +627,26 @@ aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-sc
 
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/instance.pb.h: aclk/aclk-schemas/proto/chart/v1/instance.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v1/dimension.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
+aclk/aclk-schemas/proto/chart/v1/config.pb.h: aclk/aclk-schemas/proto/chart/v1/config.proto
+	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
+
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
+aclk/aclk-schemas/proto/aclk/v1/lib.pb.h: aclk/aclk-schemas/proto/aclk/v1/lib.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 endif #ACLK_NG

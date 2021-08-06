@@ -805,6 +805,7 @@ set(ACLK_NG_FILES
         aclk/schema-wrappers/node_creation.cc
         aclk/schema-wrappers/node_creation.h
         aclk/schema-wrappers/schema_wrappers.h
+        aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
         )
 
