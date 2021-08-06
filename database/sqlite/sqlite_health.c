@@ -1294,8 +1294,6 @@ int alert_hash_and_store_config(
     evpctx = EVP_MD_CTX_create();
     EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
 
-    error("HASH asked to hash [%s]", cfg->alarm ? cfg->alarm : cfg->template_key);
-
     if (cfg->alarm) {
         EVP_DigestUpdate(evpctx, cfg->alarm, strlen(cfg->alarm));
     } else if (cfg->template_key)
