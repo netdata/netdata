@@ -1219,7 +1219,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                             netdata_configured_stock_config_dir,
                             strlen(netdata_configured_stock_config_dir))) {
                         char tmpfilename[FILENAME_MAX + 1];
-                        strcpy(tmpfilename, filename);
+                        strncpyz(tmpfilename, filename, FILENAME_MAX);
                         chart->module = strdupz(basename(tmpfilename));
                     } else {
                         chart->module = strdupz("synthetic_chart");
