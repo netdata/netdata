@@ -17,14 +17,14 @@ You can:
 You can also add Netdata charts to existing web pages.
 
 Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its
-**[html source](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/demo.html)**.
+**[html source](/web/gui/dashboard/demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard.html).
+supported charts. The code is [here](/web/gui/dashboard/dashboard.html).
 
 If you plan to put the dashboard on TV, check out
-[tv.html](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/tv.html). Here's is a screenshot of it,
+[tv.html](/web/gui/dashboard/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
