@@ -21,7 +21,7 @@ Check this **[very simple working example of a custom dashboard](http://netdata.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](/web/gui/dashboard.html).
+supported charts. The code is [here](/web/gui/dashboard/dashboard.html).
 
 If you plan to put the dashboard on TV, check out
 [tv.html](/web/gui/dashboard/tv.html). Here's is a screenshot of it,
