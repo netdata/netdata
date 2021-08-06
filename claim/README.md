@@ -41,44 +41,47 @@ There are two important notes regarding connecting nodes:
 
 ## How to connect a node
 
-To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
-given by Cloud into your node's terminal. Hit **Enter**.
+There will be two main flows from where you might want to start the node connection process to Netdata Cloud.
+* when you are on an [empty War Room](#empty-war-room) and you want to connect your first node
+* when you are at the [Manage Space](#manage-space) area and you select **Connect Nodes** to connect a node, coming from Manage Space or Manage War Room
 
-```bash
-sudo netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+### Empty War Room
+
+#TODO: add screenshot
+
+Either at your first sign in or following ones, when you enter Netdata Cloud and are at a War Room that doesn’t have any node added to it you will be able to:
+* connect a new node to Netdata Cloud and add it to the War Room you are in
+* add a previously connected node to the War Room you are in
+
+If your case is to connect a new node and add it to the War Room, you will need to tell us what environment is node running on (Linux, Docker, macOS, Kubernetes) and then we will provide you with a script to initiate the connection process. You just will need to copy and paste it into your node's terminal. See one of the follwoing sections depending on your case:
+* [Linux](#connect-an-agent-running-in-linux)
+* [Docker](#connect-an-agent-running-in-docker)
+* [macOS](#connect-an-agent-running-in-macos)
+* [Kubernetes](#connect-a-kubernetes-clusters-parent-netdata-pod)
+
+Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
+finished onboarding.
+### Manage Space
+
+To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
+given by Netdata Cloud into your node's terminal.
+
+### Connect an agent running in Linux
+
+If you want to connect a node that is running on a Linux environment, the scrip that will be provided to you by Nedata Cloud is the [kicksart](/packaging/installer/#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+
 ```
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2 --claim-url=https://app.netdata.cloud
+```
+For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer to [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart#claim-node-to-netdata-cloud-during-installation).
+
+#TODO: review the outcome of the script
 
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). If you prefer not to
 use root privileges via `sudo` to run the claiming script, see the next section.
 
-Repeat this process with every node you want to add to Cloud during onboarding. You can also add more nodes once you've
-finished onboarding.
-
-### Connect an agent without root privileges
-
-If you don't want to run the claiming script with root privileges, you can discover which user is running the Agent,
-switch to that user, and run the claiming script.
-
-Use `grep` to search your `netdata.conf` file, which is typically located at `/etc/netdata/netdata.conf`, for the `run
-as user` setting. For example:
-
-```bash
-grep "run as user" /etc/netdata/netdata.conf 
-    # run as user = netdata
-```
-
-The default user is `netdata`. Yours may be different, so pay attention to the output from `grep`. Switch to that user
-and run the claiming script.
-
-```bash
-netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
-```
-
-Hit **Enter**. The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
-you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting). 
-
-### Connect an Agent running in Docker
+### Connect an agent running in Docker
 
 To connect an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
 variables in the container to have it automatically connected on startup or restart, or use `docker exec` to manually
@@ -105,9 +108,16 @@ These variables can be specified using any mechanism supported by your container
 variables inside containers. For example, when creating a new Netdata continer using `docker run`, the following
 modified version of the command can be used to set the variables:
 
-```bash
+#### Using Docker run
+
+When using `docker run` command, if you have an agent container already running, it is important to know that will be short period of downtime. This is due to the processof  creating the new agent contaienr.
+
+The command that Netdata Cloud will provide to you is:
+
+```bash 
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
@@ -115,13 +125,14 @@ docker run -d --name=netdata \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
-  -e NETDATA_CLAIM_TOKEN=TOKEN \
-  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
-  -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  netdata/netdata
+  -e NETDATA_CLAIM_TOKEN=TOKEN \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
+  -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
+  -e NETDATA_CLAIM_PROXY=PROXY \
+ netdata/netdata
 ```
 
 Output that would be seen from the claiming script when using other methods will be present in the container logs.
@@ -129,17 +140,72 @@ Output that would be seen from the claiming script when using other methods will
 Using the environment variables like this to handle the connection process is the preferred method of connecting Docker containers
 as it works in the widest variety of situations and simplifies configuration management.
 
+#### Using Docker compose
+
+If you use `docker compose` you can copy the config provided by Netdata Cloud, which should be same as the one below:
+
+```bash
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+  hostname: example.com # set to fqdn of host
+  ports:
+    - 19999:19999
+  restart: unless-stopped
+  cap_add:
+    - SYS_PTRACE
+  security_opt:
+    - apparmor:unconfined
+  volumes:
+    - netdataconfig:/etc/netdata
+    - netdatalib:/var/lib/netdata
+    - netdatacache:/var/cache/netdata
+    - /etc/passwd:/host/etc/passwd:ro
+    - /etc/group:/host/etc/group:ro
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /etc/os-release:/host/etc/os-release:ro
+  environment:
+    - NETDATA_CLAIM_TOKEN=TOKEN
+    - NETDATA_CLAIM_URL="https://app.netdata.cloud"
+    - NETDATA_CLAIM_ROOMS=ROOM1,ROOM2
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+Then run the following commnad in the same directory as the `docker-compose.yml` file to start the container.
+
+```bash
+docker-compose up -d
+```
+
 #### Using docker exec
 
 Connect a _running Netdata Agent container_ by appending the script offered by Cloud to a `docker exec ...` command, replacing
 `netdata` with the name of your running container:
 
 ```bash
-docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+docker exec -it netdata netdata-claim.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2 --claim-url=https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the claiming script returns errors, or if
 you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
+
+### Connect an agent running in macOS
+
+If you want to connect a node that is running on a macOS environment the scrip that will be provided to you by Nedata Cloud is the [kicksart](/packaging/installer/#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+
+To connect a node that is running on macOS/OSX/FreeBSD the scrip that will be provided to you by Nedata Cloud is the [kicksart](/packaging/installer/methods/macos#install-netdata-with-kickstart) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install=/usr/local/ --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2 --claim-url=https://app.netdata.cloud
+```
+#TODO add output of the script
 
 ### Connect a Kubernetes cluster's parent Netdata pod
 
