@@ -531,7 +531,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
 }
 
-#define SQL_SELECT_ALL_HEALTH_LOG(guid,limit) "SELECT unique_id, alarm_id FROM health_log_%s order by unique_id desc LIMIT %d;", guid,limit
+#define SQL_SELECT_ALL_HEALTH_LOG(guid,limit) "SELECT unique_id, alarm_id FROM health_log_%s order by unique_id desc LIMIT %u;", guid,limit
 void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -674,7 +674,7 @@ static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM health_log_%s order by unique_id desc limit %d) order by unique_id asc;", guid, limit
+#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM health_log_%s order by unique_id desc limit %u) order by unique_id asc;", guid, limit
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
