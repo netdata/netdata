@@ -647,8 +647,8 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         return;
     }
     rc = sqlite3_step(res);
-
-    host->health_log_entries_written = sqlite3_column_int(res, 0);
+    if (likely(rc == SQLITE_ROW))
+        host->health_log_entries_written = sqlite3_column_int(res, 0);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
