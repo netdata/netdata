@@ -88,9 +88,6 @@ as user` setting. For example:
 To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
 given by Netdata Cloud into your node's terminal.
 
-```bash
-grep "run as user" /etc/netdata/netdata.conf 
-    # run as user = netdata
 ```
 
 The default user is `netdata`. Yours may be different, so pay attention to the output from `grep`. Switch to that user
@@ -205,7 +202,7 @@ Connect a _running Netdata Agent container_, where you don't want to recreate th
 `netdata` with the name of your running container:
 
 ```bash
-docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+docker exec -it netdata netdata-claim.sh --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2 --claim-url=https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the connection process returns errors, or if
