@@ -759,7 +759,13 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     fi
 
     if test "${with_bundled_protobuf}" = "yes"; then
-        AC_LANG_PUSH([C++])
+        AC_LANG_SAVE
+        AC_LANG_CPLUSPLUS
+        # 2 macros above are deprecated
+        # but new macro below doesnt work on older systems
+        # which we still do support. In future replace by
+        # AC_LANG_PUSH([C++]) 
+
         # Add -std=c++11 if necesssary. It is important for us to do this before the
         # libatomic check below, since that also depends on C++11.
         AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory])
@@ -779,7 +785,11 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
             OPTIONAL_ATOMIC_LIBS="-latomic"
         fi
         AC_SUBST([OPTIONAL_ATOMIC_LIBS])
-        AC_LANG_POP([C++])
+        AC_LANG_RESTORE
+        # macro above are deprecated
+        # but new macro below doesnt work on older systems
+        # which we still do support. In future replace by
+        # AC_LANG_POP([C++])
     fi
 
     AC_MSG_CHECKING([ACLK Next Generation can be built])
