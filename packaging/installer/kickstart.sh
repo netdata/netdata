@@ -465,11 +465,22 @@ elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
   exit 1
 fi
 
+logpath_suffix='var/log/netdata/kickstart.log'
+
+# shellcheck disable=SC2031
+state=$(set +o)
+set +u
+if [ -z "${NETDATA_PREFIX}" ] ; then
+  logpath="/${logpath_suffix}"
+else
+  logpath="${NETDATA_PREFIX}/${logpath_suffix}"
+fi
+eval "${state}"
+
 # ---------------------------------------------------------------------------------------------------------------------
 # look for an existing install and try to update that instead if it exists
 
 ndpath="$(command -v netdata 2>/dev/null)"
-logpath="/var/log/netdata/installer.log"
 if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
     ndpath="/opt/netdata/bin/netdata"
 fi
@@ -481,7 +492,7 @@ if [ -n "$ndpath" ] ; then
     ndprefix="/"
   fi
   if [ "${ndprefix}" != "/" ] ; then
-    logpath="${ndprefix}${logpath}"
+    logpath="${ndprefix}/${logpath_suffix}"
     log_create
   fi
 
