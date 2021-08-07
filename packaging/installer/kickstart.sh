@@ -108,7 +108,6 @@ escaped_print() {
 }
 
 log_create() {
-  local logdir
   logdir="$(dirname ${logpath})"
   if [ ! -d "${logdir}" ] ; then
     echo >&2 "Creating [${logdir}] for installer log file:"
@@ -120,10 +119,12 @@ log_create() {
   fi
   if [ -e "${logpath}" ] ; then
     echo >&2 "Rotating [${logpath}] log file:"
-    for i in {4..1}; do
+    i=4
+    while [ ${i} -gt 0 ] ; do
       if [ -e "${logpath}.${i}" ] ; then
         mv -vf "${logpath}.${i}" "${logpath}.$((i+1))"
       fi
+      i=$((i-1))
     done
     mv -vf "${logpath}" "${logpath}.1"
   fi
