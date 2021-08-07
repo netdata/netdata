@@ -110,6 +110,7 @@ else
   # shellcheck source=packaging/installer/functions.sh
   source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
+log_create
 
 download_go() {
   download_file "${1}" "${2}" "go.d plugin" "go"
@@ -1588,7 +1589,7 @@ remove_old_ebpf() {
     mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
   fi
 
-  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH 
+  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
     echo >&2 "Removing old eBPF programs with patch."
     rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
