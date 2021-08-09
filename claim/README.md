@@ -256,6 +256,7 @@ append the same proxy setting you added to `netdata.conf`.
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy socks5h://203.0.113.0:1080
 ```
+#TODO add output of the script
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if
 you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
