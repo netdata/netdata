@@ -3746,26 +3746,6 @@ netdataDashboard.context = {
             }
         ]
     },
-    'vernemq.queue_messages_in_queues': {
-        mainheads: [
-            function (os, id) {
-                void (os);
-                return '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="queue_messages_current"'
-                    + ' data-chart-library="gauge"'
-                    + ' data-title="Messages in the Queues"'
-                    + ' data-units="messages"'
-                    + ' data-gauge-adjust="width"'
-                    + ' data-width="16%"'
-                    + ' data-before="0"'
-                    + ' data-after="-CHART_DURATION"'
-                    + ' data-points="CHART_DURATION"'
-                    + ' data-colors="' + NETDATA.colors[2] + '"'
-                    + ' data-decimal-digits="2"'
-                    + ' role="application"></div>';
-            }
-        ]
-    },
     'vernemq.queue_messages': {
         mainheads: [
             function (os, id) {
