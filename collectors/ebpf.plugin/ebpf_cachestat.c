@@ -298,7 +298,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_LINE,
                                20090,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
                                "Number of pages marked as dirty. When a page is called dirty, this means that the data stored inside the page needs to be written to devices.",
@@ -307,7 +307,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20091,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
                                "Number of cache access without counting dirty pages and page additions.",
@@ -316,7 +316,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20092,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
                                "Page caches added without counting dirty pages",
@@ -325,7 +325,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20093,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 }
 
 /*****************************************************************
@@ -557,7 +557,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
-                      cachestat_counter_publish_aggregated, 1);
+                      cachestat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
@@ -566,7 +566,8 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21101,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
@@ -575,7 +576,8 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21102,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
@@ -584,7 +586,8 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21103,
                       ebpf_create_global_dimension,
-                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1);
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     fflush(stdout);
 }

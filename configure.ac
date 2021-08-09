@@ -757,6 +757,29 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     else
         AC_MSG_RESULT([yes])
     fi
+
+    if test "${with_bundled_protobuf}" = "yes"; then
+        AC_LANG_PUSH([C++]) 
+        CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+        # On some platforms, std::atomic needs a helper library
+        AC_MSG_CHECKING(whether -latomic is needed for static protobuf)
+        AC_LINK_IFELSE([AC_LANG_SOURCE([[
+          #include <atomic>
+          #include <cstdint>
+          std::atomic<std::int64_t> v;
+          int main() {
+            return v;
+          }
+        ]])], STD_ATOMIC_NEED_LIBATOMIC=no, STD_ATOMIC_NEED_LIBATOMIC=yes)
+        AC_MSG_RESULT($STD_ATOMIC_NEED_LIBATOMIC)
+        if test "x$STD_ATOMIC_NEED_LIBATOMIC" = xyes; then
+            OPTIONAL_ATOMIC_LIBS="-latomic"
+        fi
+        AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+        AC_LANG_POP([C++])
+    fi
+
     AC_MSG_CHECKING([ACLK Next Generation can be built])
     AC_MSG_RESULT([${can_enable_ng}])
     if test "$can_enable_ng" = "no" -a "$aclk_ng" = "yes"; then

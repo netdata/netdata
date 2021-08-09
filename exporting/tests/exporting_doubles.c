@@ -22,6 +22,8 @@ struct engine *__mock_read_exporting_config()
     instance->config.type = EXPORTING_CONNECTOR_TYPE_GRAPHITE;
     instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
+    instance->config.username = strdupz("");
+    instance->config.password = strdupz("");
     instance->config.prefix = strdupz("netdata");
     instance->config.hostname = strdupz("test-host");
     instance->config.update_every = 1;

@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_SWAP_H
 #define NETDATA_EBPF_SWAP_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_SWAP "swap"
+
 #define NETDATA_SWAP_SLEEP_MS 850000ULL
 
 // charts

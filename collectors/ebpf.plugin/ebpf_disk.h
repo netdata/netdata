@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_DISK_H
 #define NETDATA_EBPF_DISK_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_DISK "disk"
+
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/ebpf/ebpf.h"
 

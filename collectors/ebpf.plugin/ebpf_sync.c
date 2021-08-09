@@ -288,7 +288,8 @@ static void ebpf_create_sync_chart(char *id,
                                    int end)
 {
     ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
-                         NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order);
+                         NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
+                         NETDATA_EBPF_MODULE_NAME_SYNC);
 
     netdata_publish_syscall_t *move = &sync_counter_publish_aggregated[idx];
 

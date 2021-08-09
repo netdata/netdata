@@ -36,7 +36,7 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
 #endif
 }
 
-static uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);

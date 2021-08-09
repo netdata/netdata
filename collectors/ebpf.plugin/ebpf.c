@@ -120,6 +120,11 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
       .config_file = NETDATA_SYNC_CONFIG_FILE},
+    { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
+      .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -384,11 +389,12 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
-                          char *charttype, char *context, int order)
+                          char *charttype, char *context, int order, char *module)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
+    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
            id,
            title,
@@ -397,7 +403,8 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
            (context)?context:"",
            (charttype)?charttype:"",
            order,
-           update_every);
+           update_every,
+           module);
 }
 
 /**
@@ -472,6 +479,7 @@ void ebpf_create_global_dimension(void *ptr, int end)
  * @param ncd       a pointer to a function called to create dimensions
  * @param move      a pointer for a structure that has the dimensions
  * @param end       number of dimensions for the chart created
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_chart(char *type,
                        char *id,
@@ -483,9 +491,10 @@ void ebpf_create_chart(char *type,
                        int order,
                        void (*ncd)(void *, int),
                        void *move,
-                       int end)
+                       int end,
+                       char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order);
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
 
     ncd(move, end);
 }
@@ -501,12 +510,13 @@ void ebpf_create_chart(char *type,
  * @param order  the chart order
  * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
+ * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root)
+                                char *algorithm, struct target *root, char *module)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, module);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
@@ -691,6 +701,8 @@ void ebpf_print_help()
             " --disk or -k        Enable charts related to disk monitoring.\n"
             "\n"
             " --filesystem or -i  Enable chart related to filesystem run time.\n"
+            "\n"
+            " --mount or -m       Enable charts related to mount monitoring.\n"
             "\n"
             " --net or -n         Enable network viewer charts.\n"
             "\n"
@@ -1021,6 +1033,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
+                                    CONFIG_BOOLEAN_YES);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1107,6 +1126,7 @@ static void parse_args(int argc, char **argv)
         {"dcstat",     no_argument,    0,  'd' },
         {"disk",       no_argument,    0,  'k' },
         {"filesystem", no_argument,    0,  'i' },
+        {"mount",      no_argument,    0,  'm' },
         {"net",        no_argument,    0,  'n' },
         {"process",    no_argument,    0,  'p' },
         {"return",     no_argument,    0,  'r' },
@@ -1187,6 +1207,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_chart(EBPF_MODULE_DISK_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"disk\" chart, because it was started with the option \"--disk\" or \"-k\".");
+#endif
+                break;
+            }
+            case 'm': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"mount\" chart, because it was started with the option \"--mount\" or \"-m\".");
 #endif
                 break;
             }
@@ -1514,6 +1542,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].start_routine},
         {"EBPF DISK" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_DISK_IDX].start_routine},
+        {"EBPF MOUNT" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_MOUNT_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };

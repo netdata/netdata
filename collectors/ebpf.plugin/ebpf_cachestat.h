@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_CACHESTAT_H
 #define NETDATA_EBPF_CACHESTAT_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_CACHESTAT "cachestat"
+
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"
 #define NETDATA_CACHESTAT_DIRTY_CHART "cachestat_dirties"

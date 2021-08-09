@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"
