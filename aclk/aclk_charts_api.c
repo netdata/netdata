@@ -6,7 +6,7 @@
 #define CHART_DIM_UPDATE_NAME "ChartsAndDimensionsUpdated"
 
 #define QUEUE_IF_PAYLOAD_PERSENT(query)                                                                                \
-    if (query->data.bin_payload.payload) {                                                                             \
+    if (likely(query->data.bin_payload.payload)) {                                                                             \
         aclk_queue_query(query);                                                                                       \
     } else {                                                                                                           \
         error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
