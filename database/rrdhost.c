@@ -323,6 +323,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                     add_migrated_file(host->health_log_filename, 0);
                 }
             } else {
+                sql_create_health_log_table(host);
                 sql_health_alarm_log_load(host);
             }
         }
@@ -530,8 +531,10 @@ void rrdhost_update(RRDHOST *host
                     health_alarm_log_load(host);
                     add_migrated_file(host->health_log_filename, 0);
                 }
-            } else
+            } else {
+                sql_create_health_log_table(host);
                 sql_health_alarm_log_load(host);
+            }
         }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);
