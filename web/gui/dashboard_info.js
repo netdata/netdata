@@ -127,6 +127,12 @@ netdataDashboard.menu = {
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
+    'mount': {
+        title: 'Mount Points',
+        icon: '<i class="fas fa-hdd"></i>',
+        info: ''
+    },
+
     'mdstat': {
         title: 'MD arrays',
         icon: '<i class="fas fa-hdd"></i>'
@@ -3462,6 +3468,13 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Perf
+
+    'perf.instructions_per_cycle': {
+        info: 'An IPC < 1.0 likely means memory bound, and an IPC > 1.0 likely means instruction bound. For more details about the metric take a look at this <a href="https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html" target="_blank">blog post</a>.'
+    },
+
+    // ------------------------------------------------------------------------
     // Filesystem
 
     'filesystem.vfs_deleted_objects': {
@@ -3586,6 +3599,14 @@ netdataDashboard.context = {
 
     'filesystem.btrfs_sync_latency': {
         info: 'Netdata is attaching <code>kprobes</code> for when the function <code>btrfs_sync_file</code>.'
+    },
+
+    'mount_points.call': {
+        info: 'Monitor calls to syscalls <code>mount(2)</code> and <code>umount(2)</code> that are responsible for attaching or removing filesystems.'
+    },
+
+    'mount_points.error': {
+        info: 'Monitor errors in calls to syscalls <code>mount(2)</code> and <code>umount(2)</code>.'
     },
 
     // ------------------------------------------------------------------------

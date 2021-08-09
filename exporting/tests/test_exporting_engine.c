@@ -1053,7 +1053,7 @@ static void test_format_host_labels_prometheus(void **state)
     instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
     format_host_labels_prometheus(instance, localhost);
-    assert_string_equal(buffer_tostring(instance->labels), "key1=\"netdata\",key2=\"value2\"");
+    assert_string_equal(buffer_tostring(instance->labels), "key1=\"value1\",key2=\"value2\"");
 }
 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
@@ -1877,7 +1877,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_prometheus_label_copy, setup_prometheus, teardown_prometheus),
         cmocka_unit_test_setup_teardown(test_prometheus_units_copy, setup_prometheus, teardown_prometheus),
         cmocka_unit_test_setup_teardown(
-            test_format_host_labels_prometheus, setup_configured_engine, teardown_configured_engine),
+            test_format_host_labels_prometheus, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             rrd_stats_api_v1_charts_allmetrics_prometheus, setup_prometheus, teardown_prometheus),
     };

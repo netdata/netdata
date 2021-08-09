@@ -155,7 +155,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.io"
                                 , "Disk I/O Bandwidth"
                                 , "KiB/s"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2000
                                 , update_every
@@ -193,7 +193,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.ops"
                                 , "Disk Completed I/O Operations"
                                 , "operations/s"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2001
                                 , update_every
@@ -232,7 +232,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.util"
                                 , "Disk Utilization Time"
                                 , "% of time working"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2004
                                 , update_every
@@ -270,7 +270,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.iotime"
                                 , "Disk Total I/O Time"
                                 , "milliseconds/s"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2022
                                 , update_every
@@ -307,7 +307,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "disk.await"
                                     , "Average Completed I/O Operation Time"
                                     , "milliseconds/operation"
-                                    , "macos"
+                                    , "macos.plugin"
                                     , "iokit"
                                     , 2005
                                     , update_every
@@ -338,7 +338,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "disk.avgsz"
                                     , "Average Completed I/O Operation Bandwidth"
                                     , "KiB/operation"
-                                    , "macos"
+                                    , "macos.plugin"
                                     , "iokit"
                                     , 2006
                                     , update_every
@@ -369,7 +369,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "disk.svctm"
                                     , "Average Service Time"
                                     , "milliseconds/operation"
-                                    , "macos"
+                                    , "macos.plugin"
                                     , "iokit"
                                     , 2007
                                     , update_every
@@ -411,7 +411,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     , NULL
                     , "Disk I/O"
                     , "KiB/s"
-                    , "macos"
+                    , "macos.plugin"
                     , "iokit"
                     , 150
                     , update_every
@@ -464,7 +464,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.space"
                                 , title
                                 , "GiB"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2023
                                 , update_every
@@ -497,7 +497,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "disk.inodes"
                                 , title
                                 , "inodes"
-                                , "macos"
+                                , "macos.plugin"
                                 , "iokit"
                                 , 2024
                                 , update_every
@@ -543,7 +543,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , "net.net"
                             , "Bandwidth"
                             , "kilobits/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "iokit"
                             , 7000
                             , update_every
@@ -571,7 +571,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , "net.packets"
                             , "Packets"
                             , "packets/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "iokit"
                             , 7001
                             , update_every
@@ -604,7 +604,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , "net.errors"
                             , "Interface Errors"
                             , "errors/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "iokit"
                             , 7002
                             , update_every
@@ -633,7 +633,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , "net.drops"
                             , "Interface Drops"
                             , "drops/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "iokit"
                             , 7003
                             , update_every
@@ -660,7 +660,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , "net.events"
                             , "Network Interface Events"
                             , "events/s"
-                            , "macos"
+                            , "macos.plugin"
                             , "iokit"
                             , 7006
                             , update_every

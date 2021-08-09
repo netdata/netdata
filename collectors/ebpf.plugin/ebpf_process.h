@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_PROCESS_H
 #define NETDATA_EBPF_PROCESS_H 1
 
+// Module name
+#define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
+
 // Groups used on Dashboard
 #define NETDATA_FILE_GROUP "File"
 #define NETDATA_PROCESS_GROUP "Process"

@@ -277,7 +277,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         if (length >= NETDATA_DISK_NAME_LEN)
             length = NETDATA_DISK_NAME_LEN;
 
-        strncpy(w->family, name, length);
+        memcpy(w->family, name, length);
         w->family[length] = '\0';
         w->major = major;
         w->minor = minor;
@@ -289,7 +289,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         if (length >= NETDATA_DISK_NAME_LEN)
             length = NETDATA_DISK_NAME_LEN;
 
-        strncpy(disk_list->family, name, length);
+        memcpy(disk_list->family, name, length);
         disk_list->family[length] = '\0';
         disk_list->major = major;
         disk_list->minor = minor;
@@ -634,7 +634,8 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
 
     ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_DIMENSION_CALL,
                       family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
-                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS);
+                      ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
+                      NETDATA_EBPF_MODULE_NAME_DISK);
     order++;
 
     w->flags |= NETDATA_DISK_CHART_CREATED;

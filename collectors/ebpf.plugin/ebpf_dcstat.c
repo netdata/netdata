@@ -169,7 +169,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_LINE,
                                20100,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REFERENCE_CHART,
                                "Count file access.",
@@ -178,7 +178,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20101,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                "Access to files that were not present inside directory cache.",
@@ -187,7 +187,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20102,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                "Number of requests for files that were not found on filesystem.",
@@ -196,7 +196,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20103,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root);
+                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /*****************************************************************
@@ -529,7 +529,7 @@ static void ebpf_create_filesystem_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,
                       ebpf_create_global_dimension,
-                      dcstat_counter_publish_aggregated, 1);
+                      dcstat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
@@ -538,7 +538,8 @@ static void ebpf_create_filesystem_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21201,
                       ebpf_create_global_dimension,
-                      &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3);
+                      &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3,
+                      NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     fflush(stdout);
 }

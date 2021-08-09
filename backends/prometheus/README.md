@@ -110,7 +110,7 @@ scrape_configs:
       # You can use `prometheus_all_hosts` if you want Prometheus to set the `instance` to your hostname instead of IP 
       format: [prometheus]
       #
-      # sources: as-collected | raw | average | sum | volume
+      # source: as-collected | raw | average | sum | volume
       # default is: average
       #source: [as-collected]
       #

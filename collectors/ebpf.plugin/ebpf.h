@@ -82,7 +82,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_SWAP_IDX,
     EBPF_MODULE_VFS_IDX,
     EBPF_MODULE_FILESYSTEM_IDX,
-    EBPF_MODULE_DISK_IDX
+    EBPF_MODULE_DISK_IDX,
+    EBPF_MODULE_MOUNT_IDX
 };
 
 // Copied from musl header
@@ -97,6 +98,7 @@ enum ebpf_module_indexes {
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_FILESYSTEM_FAMILY "filesystem"
+#define NETDATA_EBPF_MOUNT_GLOBAL_FAMILY "mount_points"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
@@ -152,7 +154,8 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *family,
                                  char *charttype,
                                  char *context,
-                                 int order);
+                                 int order,
+                                 char *module);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
 
@@ -168,7 +171,8 @@ extern void ebpf_create_chart(char *type,
                               int order,
                               void (*ncd)(void *, int),
                               void *move,
-                              int end);
+                              int end,
+                              char *module);
 
 extern void write_begin_chart(char *family, char *name);
 
@@ -190,7 +194,8 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root);
+                                       struct target *root,
+                                       char *module);
 
 extern void write_end_chart();
 

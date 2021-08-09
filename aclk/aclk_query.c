@@ -273,16 +273,27 @@ static int node_state_update(struct aclk_query_thread *query_thr, aclk_query_t q
     return 0;
 }
 
+static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
+{
+    // this will be simplified when legacy support is removed
+    aclk_send_bin_message_subtopic_pid(query_thr->client, query->data.bin_payload.payload, query->data.bin_payload.size, query->data.bin_payload.topic, query->data.bin_payload.msg_name);
+    return 0;
+}
+
 aclk_query_handler aclk_query_handlers[] = {
-    { .type = HTTP_API_V2,        .name = "http api request v2", .fnc = http_api_v2              },
-    { .type = ALARM_STATE_UPDATE, .name = "alarm state update",  .fnc = alarm_state_update_query },
-    { .type = METADATA_INFO,      .name = "info metadata",       .fnc = info_metadata            },
-    { .type = METADATA_ALARMS,    .name = "alarms metadata",     .fnc = alarms_metadata          },
-    { .type = CHART_NEW,          .name = "chart new",           .fnc = chart_query              },
-    { .type = CHART_DEL,          .name = "chart delete",        .fnc = info_metadata            },
-    { .type = REGISTER_NODE,      .name = "register node",       .fnc = register_node            },
-    { .type = NODE_STATE_UPDATE,  .name = "node state update",   .fnc = node_state_update        },
-    { .type = UNKNOWN,            .name = NULL,                  .fnc = NULL                     }
+    { .type = HTTP_API_V2,          .name = "http api request v2",      .fnc = http_api_v2              },
+    { .type = ALARM_STATE_UPDATE,   .name = "alarm state update",       .fnc = alarm_state_update_query },
+    { .type = METADATA_INFO,        .name = "info metadata",            .fnc = info_metadata            },
+    { .type = METADATA_ALARMS,      .name = "alarms metadata",          .fnc = alarms_metadata          },
+    { .type = CHART_NEW,            .name = "chart new",                .fnc = chart_query              },
+    { .type = CHART_DEL,            .name = "chart delete",             .fnc = info_metadata            },
+    { .type = REGISTER_NODE,        .name = "register node",            .fnc = register_node            },
+    { .type = NODE_STATE_UPDATE,    .name = "node state update",        .fnc = node_state_update        },
+    { .type = CHART_DIMS_UPDATE,    .name = "chart and dim update bin", .fnc = send_bin_msg             },
+    { .type = CHART_CONFIG_UPDATED, .name = "chart config updated",     .fnc = send_bin_msg             },
+    { .type = CHART_RESET,          .name = "reset chart messages",     .fnc = send_bin_msg             },
+    { .type = RETENTION_UPDATED,    .name = "update retention info",    .fnc = send_bin_msg             },
+    { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
 
 

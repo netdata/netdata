@@ -15,6 +15,8 @@ static void clean_instance_config(struct instance_config *config)
     freez((void *)config->type_name);
     freez((void *)config->name);
     freez((void *)config->destination);
+    freez((void *)config->username);
+    freez((void *)config->password);
     freez((void *)config->prefix);
     freez((void *)config->hostname);
 
@@ -48,6 +50,8 @@ void simple_connector_cleanup(struct instance *instance)
 
     struct simple_connector_data *simple_connector_data =
         (struct simple_connector_data *)instance->connector_specific_data;
+
+    freez(simple_connector_data->auth_string);
 
     buffer_free(instance->buffer);
     buffer_free(simple_connector_data->buffer);
