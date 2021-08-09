@@ -863,15 +863,17 @@ netdata_LDADD = \
     $(NULL)
 
 if ACLK_NG
-    netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS)
+    netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
+        $(OPTIONAL_ATOMIC_LIBS) \
+        $(NULL)
 endif
 
 if ACLK_LEGACY
-netdata_LDADD += \
-    $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
-    $(OPTIONAL_LWS_LIBS) \
-    $(OPTIONAL_LIBCAP_LIBS) \
-    $(NULL)
+    netdata_LDADD += \
+        $(abs_top_srcdir)/externaldeps/mosquitto/libmosquitto.a \
+        $(OPTIONAL_LWS_LIBS) \
+        $(OPTIONAL_LIBCAP_LIBS) \
+        $(NULL)
 endif #ACLK_LEGACY
 
 if ENABLE_CXX_LINKER
