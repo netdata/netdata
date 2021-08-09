@@ -211,7 +211,6 @@ When the integration is enabled, eBPF collector allocates memory for each proces
 The eBPF collector enables and runs the following eBPF programs by default:
 
 -   `fd` :  This eBPF program creates charts that show information about calls to open files.
--   `filesystem`: This eBPF program creates charts that show latency information for selected filesystem.
 -   `mount`: This eBPF program creates charts that show calls for syscalls mount(2) and umount(2).
 -   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
