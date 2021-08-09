@@ -37,6 +37,7 @@ dist_ebpfconfig_DATA = \
     ebpf.d/disk.conf \
     ebpf.d/fd.conf \
     ebpf.d/filesystem.conf \
+    ebpf.d/hardirq.conf \
     ebpf.d/mount.conf \
     ebpf.d/network.conf \
     ebpf.d/process.conf \
