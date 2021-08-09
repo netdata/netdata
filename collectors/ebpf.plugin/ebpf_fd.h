@@ -22,14 +22,13 @@
 #define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
 
 typedef struct netdata_fd_stat {
-    uint64_t pid_tgid;                     //Unique identifier
-    uint32_t pid;                          //process id
+    uint64_t pid_tgid;                     // Unique identifier
+    uint32_t pid;                          // Process ID
 
-    //Counter
-    uint32_t open_call;                    //open syscalls (open and openat)
-    uint32_t close_call;                   //Close syscall (close)
+    uint32_t open_call;                    // Open syscalls (open and openat)
+    uint32_t close_call;                   // Close syscall (close)
 
-    //Counter
+    // Errors
     uint32_t open_err;
     uint32_t close_err;
 } netdata_fd_stat_t;
@@ -38,6 +37,7 @@ enum fd_tables {
     NETDATA_FD_PID_STATS,
     NETDATA_FD_GLOBAL_STATS,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_FD_CONTROLLER
 };
 
@@ -68,3 +68,4 @@ extern netdata_fd_stat_t **fd_pid;
 extern void clean_fd_pid_structures();
 
 #endif /* NETDATA_EBPF_FD_H */
+
