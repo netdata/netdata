@@ -3,6 +3,7 @@
 #ifndef SCHEMA_WRAPPER_UTILS_H
 #define SCHEMA_WRAPPER_UTILS_H
 
+#include <sys/time.h>
 #include <google/protobuf/timestamp.pb.h>
 
 #if GOOGLE_PROTOBUF_VERSION < 3001000
