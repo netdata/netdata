@@ -461,15 +461,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 
 The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
 
-=======
-#TODO: get confirmation from Austin
->>>>>>> first draft of how to connect node with new scripts for installing and connecting (e.g. kickstart)
-If Netdata Agent is already installed this script will ensure that you're running on its latest version by updating it, if needed.
-
 This  works with:
 * all Linux distributions, see [Netdata distribution support matrix](https://learn.netdata.cloud/docs/agent/packaging/distributions)
 * macOS both for OS X or FreeBSD environments
->>>>>>> further work on related pages to keep things synced
 
 For details on how to run this script please check [How to connect a node](#how-to-connect-a-node) and choose your environment.
 
