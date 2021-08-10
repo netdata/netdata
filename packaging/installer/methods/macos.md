@@ -13,11 +13,13 @@ configuration](/streaming/README.md).
 We recommend you to **[install Netdata with the our automatic one-line installation script](#install-netdata-with-the-automatic-one-line-installation-script)**, 
 
 
-As an alternatvie you also have community-created and -maintained [**Homebrew
+As an alternative you also have community-created and -maintained [**Homebrew
 package**](#install-netdata-with-the-homebrew-package). 
 
 -   [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
 -   [Install Netdata from source](#install-netdata-from-source)
+
+Being community-created and -maintained we don't guarantee that the features made available on our installation script will also be available or give support to it.
 
 ## Install Netdata with our automatic one-line installation script
 
