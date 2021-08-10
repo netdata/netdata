@@ -420,6 +420,7 @@ using the [ACLK](/aclk/README.md).
 The best way to install Netdata and connect your nodes to Netdata Cloud is with our automatic one-line installation script, [kickstart](/packaging/installer/#automatic-one-line-installation-script). This script will install the Netdata Agent, in case it isn't already installed, and connect your node to Netdata Cloud. 
 
 #TODO: get confirmation from Austin
+
 If Netdata Agent is already installed this script will ensure that you're running on its latest version by updating it, if needed.
 
 This  works with:
