@@ -77,7 +77,7 @@ For more details on what are the extra parameters `claim-token`, `claim-rooms` a
 
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
-													
+
 ### Connect an agent running in Docker
 
 To connect an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
@@ -103,7 +103,6 @@ Rooms. If a proxy is specified, it will be used for the connection process and f
 
 These variables can be specified using any mechanism supported by your container tooling for setting environment
 variables inside containers. For example, when creating a new Netdata container using `docker run`, the following
-modified version of the command can be used to set the variables.
 
 When using the `docker run` command, if you have an agent container already running, it is important to know that there will be a short period of downtime. This is due to the process of recreating the new agent container.
 
@@ -239,7 +238,6 @@ append the same proxy setting you added to `netdata.conf`.
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy socks5h://203.0.113.0:1080
 ```
-#TODO add output of the script
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if
 you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).

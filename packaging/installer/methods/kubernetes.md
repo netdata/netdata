@@ -46,9 +46,11 @@ To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualiz
 connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
 like the health map and time-series composite charts.
 
-First, find your claiming script in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**.
-Click the **Nodes** tab to reveal the `netdata-claim.sh` script for your Space in Netdata Cloud. You need the `TOKEN`
+First, find the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script), in Netdata Cloud by clicking on your Space's dropdown, then **Manage your Space**.
+Click the **Nodes** tab and select the environment your node is running to reveal the script for your Space in Netdata Cloud. You need the `TOKEN`
 and `ROOM` values.
+
+#TODO: wait feedback from Manos
 
 Next, create a file called `override.yml`.
 
