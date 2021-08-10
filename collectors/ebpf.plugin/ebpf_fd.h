@@ -21,6 +21,9 @@
 #define NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR "file_open_error"
 #define NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR "file_close_error"
 
+// Process configuration name
+#define NETDATA_FD_CONFIG_FILE "fd.conf"
+
 typedef struct netdata_fd_stat {
     uint64_t pid_tgid;                     // Unique identifier
     uint32_t pid;                          // Process ID
