@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Custom dash broken links [\#11413](https://github.com/netdata/netdata/pull/11413) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Fix CID372233 to CID 372236 [\#11411](https://github.com/netdata/netdata/pull/11411) ([underhood](https://github.com/underhood))
+- minor - Remove autoreconf warning [\#11407](https://github.com/netdata/netdata/pull/11407) ([underhood](https://github.com/underhood))
+- Fix bundled protobuf linkage on systems needing -latomic [\#11406](https://github.com/netdata/netdata/pull/11406) ([underhood](https://github.com/underhood))
 - replaced reference to raw.githubuser to a relative path [\#11405](https://github.com/netdata/netdata/pull/11405) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- remove "vernemq.queue\_messages\_in\_queues" from dashboard\_info.js [\#11403](https://github.com/netdata/netdata/pull/11403) ([ilyam8](https://github.com/ilyam8))
 - Use only stock configuration filenames as module names [\#11400](https://github.com/netdata/netdata/pull/11400) ([vlvkobal](https://github.com/vlvkobal))
 - Fix freebsd and macos plugin names [\#11398](https://github.com/netdata/netdata/pull/11398) ([vlvkobal](https://github.com/vlvkobal))
 - Add HTTP basic authentication to some exporting connectors [\#11394](https://github.com/netdata/netdata/pull/11394) ([vlvkobal](https://github.com/vlvkobal))
@@ -15,6 +20,7 @@
 - charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
 - Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
 - Specify module for threads [\#11387](https://github.com/netdata/netdata/pull/11387) ([thiagoftsm](https://github.com/thiagoftsm))
+- Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - CODEOWNERS: Remove knatsakis [\#11377](https://github.com/netdata/netdata/pull/11377) ([knatsakis](https://github.com/knatsakis))
 - Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
 - Update handling of builds of bundled dependencies. [\#11375](https://github.com/netdata/netdata/pull/11375) ([Ferroin](https://github.com/Ferroin))
@@ -301,12 +307,6 @@
 - health: remove ram\_in\_swap alarm [\#10789](https://github.com/netdata/netdata/pull/10789) ([ilyam8](https://github.com/ilyam8))
 - Add a new parameter 'chart' to the /api/v1/alarm\_log. [\#10788](https://github.com/netdata/netdata/pull/10788) ([MrZammler](https://github.com/MrZammler))
 - Add check for children connecting to a parent agent with unsupported memory mode [\#10787](https://github.com/netdata/netdata/pull/10787) ([stelfrag](https://github.com/stelfrag))
-- health: use separate packets\_dropped\_ratio alarms for wifi network interfaces [\#10785](https://github.com/netdata/netdata/pull/10785) ([ilyam8](https://github.com/ilyam8))
-- ACLK separate https client [\#10784](https://github.com/netdata/netdata/pull/10784) ([underhood](https://github.com/underhood))
-- health: add `wmi\_` prefix to the wmi collector network alarms [\#10782](https://github.com/netdata/netdata/pull/10782) ([ilyam8](https://github.com/ilyam8))
-- web/gui: add max value to the nvidia\_smi.fan\_speed gauge [\#10780](https://github.com/netdata/netdata/pull/10780) ([ilyam8](https://github.com/ilyam8))
-- health/: fix various alarms critical and warning thresholds hysteresis [\#10779](https://github.com/netdata/netdata/pull/10779) ([ilyam8](https://github.com/ilyam8))
-- Adds \_aclk\_impl label [\#10778](https://github.com/netdata/netdata/pull/10778) ([underhood](https://github.com/underhood))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
