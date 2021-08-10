@@ -541,9 +541,13 @@ static netdata_run_mode_t ebpf_select_mode(char *mode)
     return MODE_ENTRY;
 }
 
-void ebpf_update_module_using_config(ebpf_module_t *modules, int source)
+/**
+ * @param modules   structure that will be updated
+ * @param user_cfg  is this an user configuration?
+ */
+void ebpf_update_module_using_config(ebpf_module_t *modules, int user_cfg)
 {
-    if (source) {
+    if (user_cfg) {
         char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, EBPF_CFG_LOAD_MODE_DEFAULT);
         modules->mode = ebpf_select_mode(mode);
     }
