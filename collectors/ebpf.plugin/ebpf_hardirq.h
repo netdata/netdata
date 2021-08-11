@@ -7,14 +7,15 @@
 #define NETDATA_HARDIRQ_SLEEP_MS 650000ULL
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"
 
-// from kernel-collectors repo definitions.
+// from kernel-collectors repo definitions, modified for inclusion here.
 #define NETDATA_HARDIRQ_NAME_LEN 32
+#define NETDATA_HARDIRQ_MAX_IRQS 1024L
 typedef struct hardirq_key {
     int irq;
 } hardirq_key_t;
 typedef struct hardirq_val {
-    u64 latency;
-    u64 ts;
+    uint64_t latency;
+    uint64_t ts;
     char name[NETDATA_HARDIRQ_NAME_LEN];
 } hardirq_val_t;
 
