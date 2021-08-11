@@ -73,11 +73,34 @@ If you want to connect a node that is running on a Linux environment, the script
 ```
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
-For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer to [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart#connect-node-to-netdata-cloud-during-installation).
-
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
+Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](#connect-an-agent-without-root-privileges) section.
+
+For more details on what are the extra parameters `claim-token`, `claim-rooms` and `claim-url` please refer to [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart#connect-node-to-netdata-cloud-during-installation).
+
+### Connect an agent without root privileges
+
+If you don't want to run the installation script to connect your nodes to Netdata Cloud with root privileges, you can discover which user is running the Agent,
+switch to that user, and run the script.
+
+Use `grep` to search your `netdata.conf` file, which is typically located at `/etc/netdata/netdata.conf`, for the `run
+as user` setting. For example:
+To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
+given by Netdata Cloud into your node's terminal.
+
+```bash
+grep "run as user" /etc/netdata/netdata.conf 
+    # run as user = netdata
+```
+
+The default user is `netdata`. Yours may be different, so pay attention to the output from `grep`. Switch to that user
+and run the script.
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+```
 ### Connect an agent running in Docker
 
 To connect an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
@@ -266,6 +289,15 @@ If you run the kickstart script and get the following error `Existing install ap
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
 script](/docs/get-started.mdx#install-on-linux-with-one-line-installer-recommended).
+
+#### kickstart: Failed to write new machine GUID
+
+If you run the kickstart script but don't have privileges required for the actions done on the connecting to Netdata Cloud process you will get the following error:
+
+```bash
+Failed to write new machine GUID. Please make sure you have rights to write to /var/lib/netdata/registry/netdata.public.unique.id.
+```
+For a successful execution you will need to run the script with root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](#connect-an-agent-without-root-privileges) section.
 
 #### bash: netdata-claim.sh: command not found
 
