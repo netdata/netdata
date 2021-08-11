@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Netdata Builder <bot@netdata.cloud>
 Standards-Version: 3.9.6
-Build-Depends: debhelper (>= 10), curl, gnupg
+Build-Depends: debhelper (>= 9), curl, gnupg
 Homepage: https://netdata.cloud
 
 Package: netdata-repo
