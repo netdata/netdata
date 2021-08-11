@@ -513,7 +513,9 @@ void ebpf_create_chart(char *type,
 {
     ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
 
-    ncd(move, end);
+    if (ncd) {
+        ncd(move, end);
+    }
 }
 
 /**

@@ -208,6 +208,27 @@ void *ebpf_hardirq_read_hash(void *ptr)
 }
 
 /**
+ * Create hard IRQ latency charts.
+ */
+static void ebpf_create_hardirq_charts()
+{
+    ebpf_create_chart(
+        "system",
+        "hardirq_latency",
+        "Total time spent servicing hardware interrupts.",
+        "latency (milliseconds)",
+        "system",
+        NULL,
+        NETDATA_EBPF_CHART_TYPE_STACKED,
+        NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
+        NULL, NULL, 0,
+        NETDATA_EBPF_MODULE_NAME_HARDIRQ
+    );
+
+    fflush(stdout);
+}
+
+/**
 * Main loop for this collector.
 */
 static void hardirq_collector(ebpf_module_t *em)
@@ -217,6 +238,7 @@ static void hardirq_collector(ebpf_module_t *em)
         sizeof(hardirq_val_t)
     );
 
+    // create reader thread.
     hardirq_threads.thread = mallocz(sizeof(netdata_thread_t));
     hardirq_threads.start_routine = ebpf_hardirq_read_hash;
     netdata_thread_create(
@@ -227,12 +249,26 @@ static void hardirq_collector(ebpf_module_t *em)
         em
     );
 
+    // create chart.
+    pthread_mutex_lock(&lock);
+    ebpf_create_hardirq_charts();
+    pthread_mutex_unlock(&lock);
+
+    // loop and read from published data until ebpf plugin is closed.
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
         pthread_mutex_lock(&lock);
 
-        // TODO send data from published result.
+        write_begin_chart("system", "hardirq_latency");
+        uint32_t i;
+        for (i = 0; i < hardirq_vals_pub.len; i++) {
+            write_chart_dimension(
+                hardirq_vals_pub.vals[i].name,
+                hardirq_vals_pub.vals[i].latency
+            );
+        }
+        write_end_chart();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
