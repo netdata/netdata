@@ -163,18 +163,22 @@ static void hardirq_read_hash(int mapfd)
 
         // add up latency value for this IRQ across CPUs (or just 1) and
         // publish it.
+        bool name_saved = false;
         uint64_t total_latency_across_cpus = 0;
         int i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
             total_latency_across_cpus += hardirq_hash_vals[i].latency/1000;
+            if (!name_saved && hardirq_hash_vals[i].name[i] != '\0') {
+                name_saved = true;
+                strncpyz(
+                    hardirq_vals_pub.vals[j].name,
+                    hardirq_hash_vals[i].name,
+                    NETDATA_HARDIRQ_NAME_LEN
+                );
+            }
         }
         hardirq_vals_pub.vals[j].latency = total_latency_across_cpus;
-        strncpyz(
-            hardirq_vals_pub.vals[j].name,
-            hardirq_hash_vals[0].name,
-            NETDATA_HARDIRQ_NAME_LEN
-        );
 
         key = next_key;
         j++;
