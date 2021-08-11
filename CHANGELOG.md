@@ -32,6 +32,7 @@
 - eBPF mount [\#11358](https://github.com/netdata/netdata/pull/11358) ([thiagoftsm](https://github.com/thiagoftsm))
 - FIX index reference [\#11356](https://github.com/netdata/netdata/pull/11356) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix sending MS Teams notifications to multiple channels [\#11355](https://github.com/netdata/netdata/pull/11355) ([ilyam8](https://github.com/ilyam8))
+- Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
 - packaging: update go.d.plugin version to v0.30.0 [\#11349](https://github.com/netdata/netdata/pull/11349) ([ilyam8](https://github.com/ilyam8))
 - eBPF btrfs [\#11348](https://github.com/netdata/netdata/pull/11348) ([thiagoftsm](https://github.com/thiagoftsm))
 - Assorted kickstart install fixes. [\#11342](https://github.com/netdata/netdata/pull/11342) ([Ferroin](https://github.com/Ferroin))
@@ -305,8 +306,6 @@
 - claiming: increase curl connect-timeout and decrease number of claim attempts [\#10800](https://github.com/netdata/netdata/pull/10800) ([ilyam8](https://github.com/ilyam8))
 - Added Ubuntu 21.04 and Fedora 34 to our CI checks and binary package builds. [\#10791](https://github.com/netdata/netdata/pull/10791) ([Ferroin](https://github.com/Ferroin))
 - health: remove ram\_in\_swap alarm [\#10789](https://github.com/netdata/netdata/pull/10789) ([ilyam8](https://github.com/ilyam8))
-- Add a new parameter 'chart' to the /api/v1/alarm\_log. [\#10788](https://github.com/netdata/netdata/pull/10788) ([MrZammler](https://github.com/MrZammler))
-- Add check for children connecting to a parent agent with unsupported memory mode [\#10787](https://github.com/netdata/netdata/pull/10787) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
