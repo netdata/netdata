@@ -72,19 +72,19 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 1, ae->updated_by_id);
+    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind updated_by_id parameter for SQL_UPDATE_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 2, (uint64_t)ae->flags);
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->flags);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind flags parameter for SQL_UPDATE_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 3, ae->exec_run_timestamp);
+    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) ae->exec_run_timestamp);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec_run_timestamp parameter for SQL_UPDATE_HEALTH_LOG");
         goto failed;
@@ -96,7 +96,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 5, ae->unique_id);
+    rc = sqlite3_bind_int64(res, 5, (sqlite3_int64) ae->unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter for SQL_UPDATE_HEALTH_LOG");
         goto failed;
@@ -150,19 +150,19 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 2, ae->unique_id);
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 3, ae->alarm_id);
+    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) ae->alarm_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind alarm_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 4, ae->alarm_event_id);
+    rc = sqlite3_bind_int64(res, 4, (sqlite3_int64) ae->alarm_event_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind alarm_event_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -174,49 +174,49 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 6, ae->updated_by_id);
+    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->updated_by_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind updated_by_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 7, ae->updates_id);
+    rc = sqlite3_bind_int64(res, 7, (sqlite3_int64) ae->updates_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind updates_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 8, ae->when);
+    rc = sqlite3_bind_int64(res, 8, (sqlite3_int64) ae->when);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind when parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 9, ae->duration);
+    rc = sqlite3_bind_int64(res, 9, (sqlite3_int64) ae->duration);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind duration parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 10, ae->non_clear_duration);
+    rc = sqlite3_bind_int64(res, 10, (sqlite3_int64) ae->non_clear_duration);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind non_clear_duration parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int64(res, 11, (uint64_t)ae->flags);
+    rc = sqlite3_bind_int64(res, 11, (sqlite3_int64) ae->flags);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind flags parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 12, ae->exec_run_timestamp);
+    rc = sqlite3_bind_int64(res, 12, (sqlite3_int64) ae->exec_run_timestamp);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec_run_timestamp parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 13, ae->delay_up_to_timestamp);
+    rc = sqlite3_bind_int64(res, 13, (sqlite3_int64) ae->delay_up_to_timestamp);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind delay_up_to_timestamp parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -306,7 +306,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 28, ae->last_repeat);
+    rc = sqlite3_bind_int64(res, 28, (sqlite3_int64) ae->last_repeat);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_repeat parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -382,14 +382,14 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         return;
     }
 
-    rc = sqlite3_bind_int(res, 1, unique_id);
+    rc = sqlite3_bind_int64(res, 1, unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter to SQL_SELECT_HEALTH_LOG");
         debug(D_HEALTH, "GREPME2: Failed to bind 1");
         goto failed;
     }
 
-    rc = sqlite3_bind_int(res, 2, alarm_id);
+    rc = sqlite3_bind_int64(res, 2, alarm_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind alarm_id parameter to SQL_SELECT_HEALTH_LOG");
         goto failed;
@@ -414,7 +414,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             "\t\t\"unique_id\": %u,\n"
             "\t\t\"alarm_id\": %u,\n"
             "\t\t\"alarm_event_id\": %u,\n"
-            //"\t\t\"config_hash_id\": \"%s\",\n"
+            "\t\t\"config_hash_id\": \"%s\",\n"
             "\t\t\"name\": \"%s\",\n"
             "\t\t\"chart\": \"%s\",\n"
             "\t\t\"family\": \"%s\",\n"
@@ -447,40 +447,39 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             sqlite3_column_text(res, 0),
             host->utc_offset,
             host->abbrev_timezone,
-            (unsigned int) sqlite3_column_int(res, 1),
-            (unsigned int) sqlite3_column_int(res, 2),
-            (unsigned int) sqlite3_column_int(res, 3),
-            //uuid_str,
+            (unsigned int) sqlite3_column_int64(res, 1),
+            (unsigned int) sqlite3_column_int64(res, 2),
+            (unsigned int) sqlite3_column_int64(res, 3),
+            uuid_str,
             sqlite3_column_text(res, 13),
             sqlite3_column_text(res, 14),
             sqlite3_column_text(res, 15),
             sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
             sqlite3_column_text(res, 29) ? (const char *) sqlite3_column_text(res, 29) : (char *) "Unknown",
             sqlite3_column_text(res, 30) ? (const char *) sqlite3_column_text(res, 30) : (char *) "Unknown",
-            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
-            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
-            (long unsigned int)sqlite3_column_int(res, 11),
-            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
+            (long unsigned int)sqlite3_column_int64(res, 11),
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
             sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : host->health_default_exec,
             sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : host->health_default_recipient,
             sqlite3_column_int(res, 21),
             sqlite3_column_text(res, 18),
             edit_command,
             sqlite3_column_text(res, 19),
-            (long unsigned int)sqlite3_column_int(res, 7),
-            (long unsigned int)sqlite3_column_int(res, 8),
-            (long unsigned int)sqlite3_column_int(res, 9),
+            (long unsigned int)sqlite3_column_int64(res, 7),
+            (long unsigned int)sqlite3_column_int64(res, 8),
+            (long unsigned int)sqlite3_column_int64(res, 9),
             rrdcalc_status2string(sqlite3_column_int(res, 22)),
             rrdcalc_status2string(sqlite3_column_int(res, 23)),
             sqlite3_column_int(res, 24),
-            (long unsigned int)sqlite3_column_int(res, 12),
-            (unsigned int)sqlite3_column_int(res, 5),
-            (unsigned int)sqlite3_column_int(res, 6),
-            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
-
-            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 26), (char *) sqlite3_column_text(res, 19), -1), //int instead of double, alarm_log rounds?
-            (long unsigned int)sqlite3_column_int(res, 27),
-            (sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
+            (long unsigned int)sqlite3_column_int64(res, 12),
+            (unsigned int)sqlite3_column_int64(res, 5),
+            (unsigned int)sqlite3_column_int64(res, 6),
+            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, (calculated_number) sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 19), -1),
+            sqlite3_column_type(res, 26) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, (calculated_number) sqlite3_column_double(res, 26), (char *) sqlite3_column_text(res, 19), -1),
+            (long unsigned int)sqlite3_column_int64(res, 27),
+            (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
         //not needed, it's already stored with replaced info
         char *replaced_info = NULL;
@@ -502,7 +501,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         buffer_strcat(wb, replaced_info);
         buffer_strcat(wb, "\",\n");
 
-        if(unlikely(sqlite3_column_int(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+        if(unlikely(sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
             buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
         }
 
@@ -510,14 +509,14 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         if (sqlite3_column_type(res, 25) == SQLITE_NULL)
             buffer_strcat(wb, "null");
         else
-            buffer_rrd_value(wb, sqlite3_column_double(res, 25)); //int instead of double, alarm_log rounds?
+            buffer_rrd_value(wb, (calculated_number) sqlite3_column_double(res, 25));
         buffer_strcat(wb, ",\n");
 
         buffer_strcat(wb, "\t\t\"old_value\":");
         if (sqlite3_column_type(res, 26) == SQLITE_NULL)
             buffer_strcat(wb, "null");
         else
-            buffer_rrd_value(wb, sqlite3_column_double(res, 26)); //int instead of double, alarm_log rounds?
+            buffer_rrd_value(wb, (calculated_number) sqlite3_column_double(res, 26));
         buffer_strcat(wb, "\n");
 
         buffer_strcat(wb, "\t}");
@@ -561,7 +560,7 @@ void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     int count=0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (count) buffer_strcat(wb, ",");
-        health_alarm_entry_sql2json(wb, sqlite3_column_int(res, 0), sqlite3_column_int(res, 1), host);
+        health_alarm_entry_sql2json(wb, (uint32_t) sqlite3_column_int64(res, 0), (uint32_t) sqlite3_column_int64(res, 1), host);
         count++;
     }
 
@@ -573,7 +572,7 @@ void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log table.
 */
-#define SQL_CLEANUP_HEALTH_LOG(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %ld);", guid, guid2, limit
+#define SQL_CLEANUP_HEALTH_LOG(guid,guid2,limit) "DELETE from health_log_%s where unique_id in (SELECT unique_id from health_log_%s order by unique_id asc LIMIT %lu);", guid, guid2, limit
 void sql_health_alarm_log_cleanup(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     static size_t rotate_every = 0;
@@ -648,7 +647,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     }
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW))
-        host->health_log_entries_written = sqlite3_column_int(res, 0);
+        host->health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -712,14 +711,14 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
-        uint32_t unique_id = sqlite3_column_int(res, 1);
+        uint32_t unique_id = (uint32_t) sqlite3_column_int64(res, 1);
         if(!unique_id) {
             error_report("HEALTH [%s]: Got invalid unique id. Ignoring it.", host->hostname);
             errored++;
             continue;
         }
 
-        uint32_t alarm_id = sqlite3_column_int(res, 2);
+        uint32_t alarm_id = (uint32_t) sqlite3_column_int64(res, 2);
         if(!alarm_id) {
             error_report("HEALTH [%s]: Got invalid alarm id. Ignoring it.", host->hostname);
             errored++;
@@ -729,7 +728,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         // Check if we got last_repeat field
         time_t last_repeat = 0;
         char* alarm_name = strdupz((char *) sqlite3_column_text(res, 14));
-        last_repeat = (time_t)sqlite3_column_int(res, 27);
+        last_repeat = (time_t)sqlite3_column_int64(res, 27);
 
         RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
         if (!rc) {
@@ -765,19 +764,19 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         uuid_copy(ae->config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 4)));
 
-        ae->alarm_event_id = sqlite3_column_int(res, 3);
-        ae->updated_by_id = sqlite3_column_int(res, 5);
-        ae->updates_id = sqlite3_column_int(res, 6);
+        ae->alarm_event_id = (uint32_t) sqlite3_column_int64(res, 3);
+        ae->updated_by_id = (uint32_t) sqlite3_column_int64(res, 5);
+        ae->updates_id = (uint32_t) sqlite3_column_int64(res, 6);
 
-        ae->when = sqlite3_column_int(res, 7);
-        ae->duration = sqlite3_column_int(res, 8);
-        ae->non_clear_duration = sqlite3_column_int(res, 9);
+        ae->when = (time_t) sqlite3_column_int64(res, 7);
+        ae->duration = (time_t) sqlite3_column_int64(res, 8);
+        ae->non_clear_duration = (time_t) sqlite3_column_int64(res, 9);
 
-        ae->flags = sqlite3_column_int64(res, 10);
+        ae->flags = (uint32_t) sqlite3_column_int64(res, 10);
         ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
 
-        ae->exec_run_timestamp = sqlite3_column_int(res, 11);
-        ae->delay_up_to_timestamp = sqlite3_column_int(res, 12);
+        ae->exec_run_timestamp = (time_t) sqlite3_column_int64(res, 11);
+        ae->delay_up_to_timestamp = (time_t) sqlite3_column_int64(res, 12);
 
         ae->name = strdupz((char *) sqlite3_column_text(res, 13));
         ae->hash_name = simple_hash(ae->name);
@@ -812,13 +811,13 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         else
             ae->info = NULL;
 
-        ae->exec_code   = sqlite3_column_int(res, 21);
-        ae->new_status  = sqlite3_column_int(res, 22);
-        ae->old_status  = sqlite3_column_int(res, 23);
-        ae->delay       = sqlite3_column_int(res, 24);
+        ae->exec_code   = (int) sqlite3_column_int(res, 21);
+        ae->new_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 22);
+        ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 23);
+        ae->delay       = (int) sqlite3_column_int(res, 24);
 
-        ae->new_value   = sqlite3_column_double(res, 25);
-        ae->old_value   = sqlite3_column_double(res, 26);
+        ae->new_value   = (calculated_number) sqlite3_column_double(res, 25);
+        ae->old_value   = (calculated_number) sqlite3_column_double(res, 26);
 
         ae->last_repeat = last_repeat;
 

@@ -494,6 +494,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         ae->hash_chart = simple_hash(ae->chart);
     }
 
+    uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
+
     if(family)
         ae->family = strdupz(family);
 
