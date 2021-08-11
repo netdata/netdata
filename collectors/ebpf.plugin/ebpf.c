@@ -105,7 +105,7 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &swap_config,
       .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE},
-    { .thread_name = "vfs", .config_name = "swap", .enabled = 0, .start_routine = ebpf_vfs_thread,
+    { .thread_name = "vfs", .config_name = "vfs", .enabled = 0, .start_routine = ebpf_vfs_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
@@ -114,17 +114,22 @@ ebpf_module_t ebpf_modules[] = {
       .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
-      .config_file = NETDATA_SYNC_CONFIG_FILE},
+      .config_file = NETDATA_FILESYSTEM_CONFIG_FILE},
     { .thread_name = "disk", .config_name = "disk", .enabled = 0, .start_routine = ebpf_disk_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
-      .config_file = NETDATA_SYNC_CONFIG_FILE},
+      .config_file = NETDATA_DISK_CONFIG_FILE},
     { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
-      .config_file = NETDATA_SYNC_CONFIG_FILE},
+      .config_file = NETDATA_MOUNT_CONFIG_FILE},
+    { .thread_name = "fd", .config_name = "fd", .enabled = 0, .start_routine = ebpf_fd_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fd_config,
+      .config_file = NETDATA_FD_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -197,6 +202,12 @@ static void ebpf_exit(int sig)
         ebpf_modules[EBPF_MODULE_VFS_IDX].enabled = 0;
         clean_vfs_pid_structures();
         freez(vfs_pid);
+    }
+
+    if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
+        clean_fd_pid_structures();
+        freez(fd_pid);
     }
 
     /*
@@ -1040,6 +1051,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd",
+                                    CONFIG_BOOLEAN_YES);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1118,21 +1136,22 @@ static void parse_args(int argc, char **argv)
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
-        {"help",       no_argument,    0,  'h' },
-        {"version",    no_argument,    0,  'v' },
-        {"global",     no_argument,    0,  'g' },
-        {"all",        no_argument,    0,  'a' },
-        {"cachestat",  no_argument,    0,  'c' },
-        {"dcstat",     no_argument,    0,  'd' },
-        {"disk",       no_argument,    0,  'k' },
-        {"filesystem", no_argument,    0,  'i' },
-        {"mount",      no_argument,    0,  'm' },
-        {"net",        no_argument,    0,  'n' },
-        {"process",    no_argument,    0,  'p' },
-        {"return",     no_argument,    0,  'r' },
-        {"sync",       no_argument,    0,  's' },
-        {"swap",       no_argument,    0,  'w' },
-        {"vfs",        no_argument,    0,  'f' },
+        {"help",           no_argument,    0,  'h' },
+        {"version",        no_argument,    0,  'v' },
+        {"global",         no_argument,    0,  'g' },
+        {"all",            no_argument,    0,  'a' },
+        {"cachestat",      no_argument,    0,  'c' },
+        {"dcstat",         no_argument,    0,  'd' },
+        {"disk",           no_argument,    0,  'k' },
+        {"filesystem",     no_argument,    0,  'i' },
+        {"filedescriptor", no_argument,    0,  'e' },
+        {"mount",          no_argument,    0,  'm' },
+        {"net",            no_argument,    0,  'n' },
+        {"process",        no_argument,    0,  'p' },
+        {"return",         no_argument,    0,  'r' },
+        {"sync",           no_argument,    0,  's' },
+        {"swap",           no_argument,    0,  'w' },
+        {"vfs",            no_argument,    0,  'f' },
         {0, 0, 0, 0}
     };
 
@@ -1215,6 +1234,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"mount\" chart, because it was started with the option \"--mount\" or \"-m\".");
+#endif
+                break;
+            }
+            case 'e': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_FD_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"filedescriptor\" chart, because it was started with the option \"--filedescriptor\" or \"-e\".");
 #endif
                 break;
             }
@@ -1544,6 +1571,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_DISK_IDX].start_routine},
         {"EBPF MOUNT" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_MOUNT_IDX].start_routine},
+        {"EBPF FD" , NULL, NULL, 1,
+             NULL, NULL, ebpf_modules[EBPF_MODULE_FD_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };
