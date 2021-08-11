@@ -30,6 +30,13 @@ static struct bpf_object *objects = NULL;
 
 static int read_thread_closed = 1;
 
+typedef struct hardirq_pub
+{
+    uint32_t len;
+    hardirq_val_t vals[NETDATA_HARDIRQ_MAX_IRQS];
+} hardirq_pub_t;
+static hardirq_pub_t hardirq_vals_pub = {};
+
 static hardirq_val_t *hardirq_hash_vals = NULL;
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
@@ -145,6 +152,7 @@ static void hardirq_read_hash(int mapfd)
     hardirq_key_t key = {};
     hardirq_key_t next_key = {};
 
+    uint32_t j = 0;
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
         // get val for this key.
         int test = bpf_map_lookup_elem(mapfd, &key, hardirq_hash_vals);
@@ -153,18 +161,26 @@ static void hardirq_read_hash(int mapfd)
             continue;
         }
 
-        // add up latency value for this IRQ across CPUs (or just 1).
+        // add up latency value for this IRQ across CPUs (or just 1) and
+        // publish it.
         uint64_t total_latency_across_cpus = 0;
         int i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
             total_latency_across_cpus += hardirq_hash_vals[i].latency;
         }
-
-        // TODO publish combined data to collector thread.
+        hardirq_vals_pub.vals[j].latency = total_latency_across_cpus;
+        strncpyz(
+            hardirq_vals_pub.vals[j].name,
+            hardirq_hash_vals[0].name,
+            NETDATA_HARDIRQ_NAME_LEN
+        );
 
         key = next_key;
+        j++;
     }
+
+    hardirq_vals_pub.len = j;
 }
 
 /**
