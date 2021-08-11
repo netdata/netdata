@@ -170,6 +170,7 @@ void aclk_query_free(aclk_query_t query)
     case CHART_CONFIG_UPDATED:
     case CHART_RESET:
     case RETENTION_UPDATED:
+    case UPDATE_NODE_INFO:
         freez(query->data.bin_payload.payload);
         break;
 
