@@ -23,7 +23,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 **macOS**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install=/usr/local/
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
 
 > See our [installation guide](../README.md) for details about [automatic updates](../README.md#automatic-updates) or
