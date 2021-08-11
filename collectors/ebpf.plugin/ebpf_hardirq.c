@@ -219,10 +219,10 @@ static void ebpf_create_hardirq_charts()
     ebpf_create_chart(
         "system",
         "hardirq_latency",
-        NULL,
+        "Hardware IRQ latency",
         "latency (milliseconds)",
         "interrupts",
-        "Hardware IRQ latency",
+        NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
         NULL, NULL, 0,
