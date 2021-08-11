@@ -64,6 +64,7 @@ jobs:
             .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} ${pkgfile}
           done
       - name: Failure Notification
+        if: ${{ failure() }}
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
@@ -73,13 +74,3 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed."
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && github.event_name != 'pull_request'
-            && startsWith(github.ref, 'refs/heads/master')
-            && (
-              contains(github.event.input.distros, join([matrix.distro, matrix.version], '-'))
-              || github.event.input.distros == 'all'
-            )
-          }}
