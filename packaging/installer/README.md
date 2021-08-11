@@ -48,7 +48,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 **macOS**
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install=/usr/local/
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
