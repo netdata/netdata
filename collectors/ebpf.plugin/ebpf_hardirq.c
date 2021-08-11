@@ -167,7 +167,7 @@ static void hardirq_read_hash(int mapfd)
         int i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
-            total_latency_across_cpus += hardirq_hash_vals[i].latency;
+            total_latency_across_cpus += hardirq_hash_vals[i].latency/1000;
         }
         hardirq_vals_pub.vals[j].latency = total_latency_across_cpus;
         strncpyz(
@@ -215,10 +215,10 @@ static void ebpf_create_hardirq_charts()
     ebpf_create_chart(
         "system",
         "hardirq_latency",
-        "Total time spent servicing hardware interrupts.",
-        "latency (milliseconds)",
-        "system",
         NULL,
+        "latency (milliseconds)",
+        "interrupts",
+        "Hardware IRQ latency",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
         NULL, NULL, 0,
@@ -263,8 +263,14 @@ static void hardirq_collector(ebpf_module_t *em)
         write_begin_chart("system", "hardirq_latency");
         uint32_t i;
         for (i = 0; i < hardirq_vals_pub.len; i++) {
+            char *name = hardirq_vals_pub.vals[i].name;
+            ebpf_write_global_dimension(
+                name,
+                name,
+                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
+            );
             write_chart_dimension(
-                hardirq_vals_pub.vals[i].name,
+                name,
                 hardirq_vals_pub.vals[i].latency
             );
         }
