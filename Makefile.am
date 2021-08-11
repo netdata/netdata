@@ -574,6 +574,8 @@ ACLK_NG_FILES = \
     aclk/https_client.h \
     aclk/aclk_charts_api.c \
     aclk/aclk_charts_api.h \
+    aclk/aclk_alarm_api.c \
+    aclk/aclk_alarm_api.h \
     mqtt_websockets/src/mqtt_wss_client.c \
     mqtt_websockets/src/include/mqtt_wss_client.h \
     mqtt_websockets/src/mqtt_wss_log.c \
