@@ -70,7 +70,6 @@ If you want to connect a node that is running on a Linux environment, the script
 ```
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
-
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
@@ -88,6 +87,9 @@ as user` setting. For example:
 To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
 given by Netdata Cloud into your node's terminal.
 
+```bash
+grep "run as user" /etc/netdata/netdata.conf 
+    # run as user = netdata
 ```
 
 The default user is `netdata`. Yours may be different, so pay attention to the output from `grep`. Switch to that user
