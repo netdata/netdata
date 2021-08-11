@@ -3,11 +3,6 @@
 name: Repository Packages
 on:
   workflow_dispatch:
-    inputs:
-      distros:
-        description: Distros to Build
-        default: all
-        required: true
 env:
   DO_NOT_TRACK: 1
 jobs:
@@ -21,18 +16,18 @@ jobs:
       # This needs to be kept in sync with the matrix in packaging.yml, but should only include the AMD64 lines.
       matrix:
         include:
-          - {distro: debian, version: "9", key: debian-9,  pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: debian, version: "10", key: debian-10, pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "16.04", key: ubuntu-16.04, pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "18.04", key: ubuntu-18.04, pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "20.04", key: ubuntu-20.04, pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "21.04", key: ubuntu-21.04, pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "7", key: centos-7, pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: centos, version: "8", key: centos-8, pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "33", key: fedora-33, pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: fedora, version: "34", key: fedora-34, pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.2", key: opensuse-15.2, pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.3", key: opensuse-15.3, pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
+          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+          - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
@@ -40,16 +35,13 @@ jobs:
       max-parallel: 8
     steps:
       - name: Checkout
-        if: contains(github.event.input.distros, matrix.key) || github.event.input.distros == 'all'
         uses: actions/checkout@v2
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Build Packages
-        if: contains(github.event.input.distros, matrix.key) || github.event.input.distros == 'all'
         shell: bash
         run: |
           docker run -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
-        if: contains(github.event.input.distros, matrix.key) || github.event.input.distros == 'all'
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
