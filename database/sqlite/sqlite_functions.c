@@ -977,16 +977,27 @@ failed:
     return host;
 }
 
-void db_execute(char *cmd)
+#define SQL_MAX_RETRY 100
+
+void db_execute(const char *cmd)
 {
     int rc;
-    char *err_msg;
-    rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to execute '%s', rc = %d (%s)", cmd, rc, err_msg);
-        sqlite3_free(err_msg);
+    int cnt = 0;
+    while (cnt < SQL_MAX_RETRY) {
+        char *err_msg;
+        rc = sqlite3_exec(db_meta, cmd, 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
+            sqlite3_free(err_msg);
+            if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            }
+            else break;
+        }
+        else
+            break;
+        ++cnt;
     }
-
     return;
 }
 

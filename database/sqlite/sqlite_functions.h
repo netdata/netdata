@@ -63,7 +63,7 @@ extern int find_uuid_type(uuid_t *uuid);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
-extern void db_execute(char *cmd);
+extern void db_execute(const char *cmd);
 extern int file_is_migrated(char *path);
 extern void add_migrated_file(char *path, uint64_t file_size);
 extern void db_unlock(void);

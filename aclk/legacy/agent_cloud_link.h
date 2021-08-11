@@ -55,6 +55,7 @@ int legacy_cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect();
 void aclk_connect();
 
+#ifdef ENABLE_ACLK
 int aclk_send_metadata(ACLK_METADATA_STATE state, RRDHOST *host);
 int legacy_aclk_send_info_metadata(ACLK_METADATA_STATE metadata_submitted, RRDHOST *host);
 void legacy_aclk_send_alarm_metadata(ACLK_METADATA_STATE metadata_submitted);
@@ -76,5 +77,6 @@ extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
 void legacy_aclk_host_state_update(RRDHOST *host, int connect);
 int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);
 void aclk_update_next_child_to_popcorn(void);
+#endif
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H
