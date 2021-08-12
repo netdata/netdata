@@ -30,14 +30,13 @@ static struct bpf_object *objects = NULL;
 
 static int read_thread_closed = 1;
 
-typedef struct hardirq_pub
-{
-    uint32_t len;
-    hardirq_val_t vals[NETDATA_HARDIRQ_MAX_IRQS];
-} hardirq_pub_t;
-static hardirq_pub_t hardirq_vals_pub = {};
+// store for "published" data from the reader thread, which the collector
+// thread will write to netdata agent.
+static avl_tree_lock hardirq_pub;
 
-static hardirq_val_t *hardirq_hash_vals = NULL;
+// temporary store for hard IRQ values we get from a per-CPU eBPF map.
+static hardirq_ebpf_val_t *hardirq_hash_vals = NULL;
+
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
@@ -107,7 +106,7 @@ static void ebpf_hardirq_disable_tracepoints()
  *
  * @param ptr thread data.
  */
-static void ebpf_hardirq_cleanup(void *ptr)
+static void hardirq_cleanup(void *ptr)
 {
     ebpf_hardirq_disable_tracepoints();
 
@@ -143,16 +142,41 @@ static void ebpf_hardirq_cleanup(void *ptr)
  *****************************************************************/
 
 /**
+ * Compare hard IRQ values.
+ *
+ * @param a `hardirq_val_t *`.
+ * @param b `hardirq_val_t *`.
+ *
+ * @return 0 if a==b, 1 if a>b, -1 if a<b.
+*/
+static int hardirq_val_cmp(void *a, void *b)
+{
+    hardirq_val_t *ptr1 = a;
+    hardirq_val_t *ptr2 = b;
+
+    if (ptr1->irq > ptr2->irq) {
+        return 1;
+    }
+    else if (ptr1->irq < ptr2->irq) {
+        return -1;
+    }
+    else {
+        return 0;
+    }
+}
+
+/**
  * Read the eBPF hash map identified by file descriptor `mapfd`.
  *
  * @param mapfd file descriptor for the eBPF hash map.
  */
 static void hardirq_read_hash(int mapfd)
 {
-    hardirq_key_t key = {};
-    hardirq_key_t next_key = {};
+    hardirq_ebpf_key_t key = {};
+    hardirq_ebpf_key_t next_key = {};
+    hardirq_val_t search_v = {};
+    hardirq_val_t *v = NULL;
 
-    uint32_t j = 0;
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
         // get val for this key.
         int test = bpf_map_lookup_elem(mapfd, &key, hardirq_hash_vals);
@@ -161,30 +185,65 @@ static void hardirq_read_hash(int mapfd)
             continue;
         }
 
-        // add up latency value for this IRQ across CPUs (or just 1) and
-        // publish it.
+        // is this IRQ saved yet?
+        //
+        // if not, make a new one, mark it as unsaved for now, and continue; we
+        // will insert it at the end after all of its values are correctly set,
+        // so that we can safely publish it to the collector within a single,
+        // short locked operation.
+        //
+        // otherwise simply continue; we will only update the latency, which
+        // can be republished safely without a lock.
+        //
+        // NOTE: lock isn't strictly necessary for this initial search, as only
+        // this thread does writing, but the AVL is using a read-write lock so
+        // there is no congestion.
+        bool v_is_new = false;
+        search_v.irq = key.irq;
+        v = (hardirq_val_t *)avl_search_lock(&hardirq_pub, (avl_t *)&search_v);
+        if (unlikely(v == NULL)) {
+            // latency/name can only be added reliably at a later time.
+            // when they're added, only then will we AVL insert.
+            v = callocz(1, sizeof(hardirq_val_t));
+            v->irq = key.irq;
+            v->dim_exists = false;
+
+            v_is_new = true;
+        }
+
+        // note two things:
+        // 1. we must add up latency value for this IRQ across all CPUs.
+        // 2. the name is unfortunately *not* available on all CPU maps - only
+        //    a single map contains the name, so we must find it. we only need
+        //    to copy it though if the IRQ is new for us.
         bool name_saved = false;
-        uint64_t total_latency_across_cpus = 0;
+        uint64_t total_latency = 0;
         int i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
-            total_latency_across_cpus += hardirq_hash_vals[i].latency/1000;
-            if (!name_saved && hardirq_hash_vals[i].name[i] != '\0') {
-                name_saved = true;
+            total_latency += hardirq_hash_vals[i].latency/1000;
+
+            // copy name for new IRQs.
+            if (v_is_new && !name_saved && hardirq_hash_vals[i].name[0] != '\0') {
                 strncpyz(
-                    hardirq_vals_pub.vals[j].name,
+                    v->name,
                     hardirq_hash_vals[i].name,
                     NETDATA_HARDIRQ_NAME_LEN
                 );
+                name_saved = true;
             }
         }
-        hardirq_vals_pub.vals[j].latency = total_latency_across_cpus;
+
+        // can now safely publish latency for existing IRQs.
+        v->latency = total_latency;
+
+        // can now safely publish new IRQ.
+        if (v_is_new) {
+            avl_insert_lock(&hardirq_pub, (avl_t *)v);
+        }
 
         key = next_key;
-        j++;
     }
-
-    hardirq_vals_pub.len = j;
 }
 
 /**
@@ -211,10 +270,7 @@ void *ebpf_hardirq_read_hash(void *ptr)
     return NULL;
 }
 
-/**
- * Create hard IRQ latency charts.
- */
-static void ebpf_create_hardirq_charts()
+static void hardirq_create_charts()
 {
     ebpf_create_chart(
         "system",
@@ -232,6 +288,27 @@ static void ebpf_create_hardirq_charts()
     fflush(stdout);
 }
 
+// callback for avl tree traversal on `hardirq_pub`.
+static int hardirq_write_dims(void *entry, void *data)
+{
+    UNUSED(data);
+
+    hardirq_val_t *v = entry;
+
+    // IRQs get dynamically added in, so add the dimension if we haven't yet.
+    if (!v->dim_exists) {
+        ebpf_write_global_dimension(
+            v->name, v->name,
+            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
+        );
+        v->dim_exists = true;
+    }
+
+    write_chart_dimension(v->name, v->latency);
+
+    return 1;
+}
+
 /**
 * Main loop for this collector.
 */
@@ -239,8 +316,10 @@ static void hardirq_collector(ebpf_module_t *em)
 {
     hardirq_hash_vals = callocz(
         (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
-        sizeof(hardirq_val_t)
+        sizeof(hardirq_ebpf_val_t)
     );
+
+    avl_init_lock(&hardirq_pub, hardirq_val_cmp);
 
     // create reader thread.
     hardirq_threads.thread = mallocz(sizeof(netdata_thread_t));
@@ -255,7 +334,7 @@ static void hardirq_collector(ebpf_module_t *em)
 
     // create chart.
     pthread_mutex_lock(&lock);
-    ebpf_create_hardirq_charts();
+    hardirq_create_charts();
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -264,20 +343,9 @@ static void hardirq_collector(ebpf_module_t *em)
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
         pthread_mutex_lock(&lock);
 
+        // write dims now for all hitherto discovered IRQs.
         write_begin_chart("system", "hardirq_latency");
-        uint32_t i;
-        for (i = 0; i < hardirq_vals_pub.len; i++) {
-            char *name = hardirq_vals_pub.vals[i].name;
-            ebpf_write_global_dimension(
-                name,
-                name,
-                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
-            );
-            write_chart_dimension(
-                name,
-                hardirq_vals_pub.vals[i].latency
-            );
-        }
+        avl_traverse_lock(&hardirq_pub, hardirq_write_dims, NULL);
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
@@ -297,7 +365,7 @@ static void hardirq_collector(ebpf_module_t *em)
  */
 void *ebpf_hardirq_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_hardirq_cleanup, ptr);
+    netdata_thread_cleanup_push(hardirq_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = hardirq_maps;

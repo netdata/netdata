@@ -130,7 +130,6 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fd_config,
       .config_file = NETDATA_FD_CONFIG_FILE},
-      .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = "hardirq", .config_name = "hardirq", .enabled = 0, .start_routine = ebpf_hardirq_thread,
       .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL,
@@ -302,8 +301,7 @@ inline void write_end_chart()
  */
 void write_chart_dimension(char *dim, long long value)
 {
-    int ret = printf("SET %s = %lld\n", dim, value);
-    UNUSED(ret);
+    printf("SET %s = %lld\n", dim, value);
 }
 
 /**
@@ -1065,6 +1063,8 @@ static void read_collector_values(int *disable_apps)
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_apps);
+        started++;
+    }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
                                     CONFIG_BOOLEAN_YES);

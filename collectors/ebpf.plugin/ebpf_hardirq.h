@@ -6,16 +6,28 @@
 #define NETDATA_EBPF_MODULE_NAME_HARDIRQ "hardirq"
 #define NETDATA_HARDIRQ_SLEEP_MS 650000ULL
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"
-
-// from kernel-collectors repo definitions, modified for inclusion here.
 #define NETDATA_HARDIRQ_NAME_LEN 32
 #define NETDATA_HARDIRQ_MAX_IRQS 1024L
-typedef struct hardirq_key {
+
+// these must match the kernel-collectors repo side, since they're used to get
+// from the eBPF map.
+typedef struct hardirq_ebpf_key {
     int irq;
-} hardirq_key_t;
-typedef struct hardirq_val {
+} hardirq_ebpf_key_t;
+typedef struct hardirq_ebpf_val {
     uint64_t latency;
     uint64_t ts;
+    char name[NETDATA_HARDIRQ_NAME_LEN];
+} hardirq_ebpf_val_t;
+
+typedef struct hardirq_val {
+    // must be at top for simplified AVL tree usage.
+    // if it's not at the top, we need to use `containerof` for almost all ops.
+    avl_t avl;
+
+    int irq;
+    uint64_t latency;
+    bool dim_exists;
     char name[NETDATA_HARDIRQ_NAME_LEN];
 } hardirq_val_t;
 
