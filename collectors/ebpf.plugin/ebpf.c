@@ -1242,7 +1242,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvgacdqnprsw", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgacdkieqmnprswf", long_options, &option_index);
         if (c == -1)
             break;
 
