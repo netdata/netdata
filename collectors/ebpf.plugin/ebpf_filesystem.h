@@ -13,6 +13,9 @@
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
 #define NETDATA_FILESYSTEM_READ_SLEEP_MS 600000ULL
 
+// Process configuration name
+#define NETDATA_FILESYSTEM_CONFIG_FILE "filesystem.conf"
+
 typedef struct netdata_fs_hist {
     uint32_t hist_id;
     uint32_t bin;

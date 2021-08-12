@@ -11,7 +11,7 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
-#define NETDATA_APPS_FILE_GROUP "file (eBPF)"
+#define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_VFS_GROUP "vfs (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net (eBPF)"
@@ -21,6 +21,7 @@
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
 #include "ebpf_disk.h"
+#include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_mount.h"
@@ -120,6 +121,7 @@ struct target {
     netdata_publish_dcstat_t dcstat;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
+    netdata_fd_stat_t fd;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;

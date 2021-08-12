@@ -14,6 +14,9 @@
 #define NETDATA_EBPF_MOUNT_ERRORS "error"
 #define NETDATA_EBPF_MOUNT_FAMILY "mount (eBPF)"
 
+// Process configuration name
+#define NETDATA_MOUNT_CONFIG_FILE "mount.conf"
+
 enum mount_counters {
     NETDATA_KEY_MOUNT_CALL,
     NETDATA_KEY_UMOUNT_CALL,

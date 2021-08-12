@@ -13,6 +13,9 @@
 
 #define NETDATA_LATENCY_DISK_SLEEP_MS 650000ULL
 
+// Process configuration name
+#define NETDATA_DISK_CONFIG_FILE "disk.conf"
+
 // Decode function extracted from: https://elixir.bootlin.com/linux/v5.10.8/source/include/linux/kdev_t.h#L7
 #define MINORBITS       20
 #define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))

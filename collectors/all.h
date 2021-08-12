@@ -154,7 +154,11 @@
 #define NETDATA_CHART_PRIO_EBPF_FILESYSTEM_CHARTS     2160
 
 // Mount Points
-#define NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS          2195
+#define NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS          2190
+
+// File descriptor
+#define NETDATA_CHART_PRIO_EBPF_FD_CHARTS             2195
+
 
 // NFS (server)
 

@@ -6,14 +6,19 @@
 
 **Merged pull requests:**
 
+- Properly handle reuploads of packages to PackageCloud. [\#11427](https://github.com/netdata/netdata/pull/11427) ([Ferroin](https://github.com/Ferroin))
+- Use DebHelper compat level 9 in repoconfig packages to support Ubuntu 16.04 [\#11426](https://github.com/netdata/netdata/pull/11426) ([Ferroin](https://github.com/Ferroin))
+- Remove Ubuntu 20.10 from repository config package builds. [\#11421](https://github.com/netdata/netdata/pull/11421) ([Ferroin](https://github.com/Ferroin))
 - Custom dash broken links [\#11413](https://github.com/netdata/netdata/pull/11413) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix CID372233 to CID 372236 [\#11411](https://github.com/netdata/netdata/pull/11411) ([underhood](https://github.com/underhood))
 - minor - Remove autoreconf warning [\#11407](https://github.com/netdata/netdata/pull/11407) ([underhood](https://github.com/underhood))
 - Fix bundled protobuf linkage on systems needing -latomic [\#11406](https://github.com/netdata/netdata/pull/11406) ([underhood](https://github.com/underhood))
 - replaced reference to raw.githubuser to a relative path [\#11405](https://github.com/netdata/netdata/pull/11405) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - remove "vernemq.queue\_messages\_in\_queues" from dashboard\_info.js [\#11403](https://github.com/netdata/netdata/pull/11403) ([ilyam8](https://github.com/ilyam8))
+- Split eBPF programs [\#11401](https://github.com/netdata/netdata/pull/11401) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use only stock configuration filenames as module names [\#11400](https://github.com/netdata/netdata/pull/11400) ([vlvkobal](https://github.com/vlvkobal))
 - Fix freebsd and macos plugin names [\#11398](https://github.com/netdata/netdata/pull/11398) ([vlvkobal](https://github.com/vlvkobal))
+- Add ACLK synchronization event loop [\#11396](https://github.com/netdata/netdata/pull/11396) ([stelfrag](https://github.com/stelfrag))
 - Add HTTP basic authentication to some exporting connectors [\#11394](https://github.com/netdata/netdata/pull/11394) ([vlvkobal](https://github.com/vlvkobal))
 - New Cloud chart related parsers and generators [\#11393](https://github.com/netdata/netdata/pull/11393) ([underhood](https://github.com/underhood))
 - Update perf.events and add new charts [\#11392](https://github.com/netdata/netdata/pull/11392) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -304,8 +309,6 @@
 - health: exclude cgroups net ifaces from packets dropped alarms [\#10806](https://github.com/netdata/netdata/pull/10806) ([ilyam8](https://github.com/ilyam8))
 - Don't show alarms for charts without data [\#10804](https://github.com/netdata/netdata/pull/10804) ([vlvkobal](https://github.com/vlvkobal))
 - claiming: increase curl connect-timeout and decrease number of claim attempts [\#10800](https://github.com/netdata/netdata/pull/10800) ([ilyam8](https://github.com/ilyam8))
-- Added Ubuntu 21.04 and Fedora 34 to our CI checks and binary package builds. [\#10791](https://github.com/netdata/netdata/pull/10791) ([Ferroin](https://github.com/Ferroin))
-- health: remove ram\_in\_swap alarm [\#10789](https://github.com/netdata/netdata/pull/10789) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 

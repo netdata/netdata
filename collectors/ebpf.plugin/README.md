@@ -210,6 +210,16 @@ When the integration is enabled, eBPF collector allocates memory for each proces
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
+-   `fd` :  This eBPF program creates charts that show information about calls to open files.
+-   `mount`: This eBPF program creates charts that show calls for syscalls mount(2) and umount(2).
+-   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
+-   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
+-   `process`: This eBPF program creates charts that show information about process life.
+    When in `return` mode, it also creates charts showing errors when these operations are executed.
+
+You can also enable the following eBPF programs:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
@@ -217,13 +227,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
     `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and 
     files are not found.
 -   `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
--   `filesystem`: This eBPF program creates charts that show latency information for selected filesystem.
--   `process`: This eBPF program creates charts that show information about process creation, calls to open files.
-    When in `return` mode, it also creates charts showing errors when these operations are executed.
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
--   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
+-   `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
+-   `swap` : This eBPF program creates charts that show information about swap access.
 
 ## Thread configuration
 
@@ -242,6 +247,7 @@ The following configuration files are available:
 - `cachestat.conf`: Configuration for the `cachestat` thread.
 - `dcstat.conf`: Configuration for the `dcstat` thread.
 - `disk.conf`: Configuration for the `disk` thread.
+- `fd.conf`: Configuration for the `file descriptor` thread.
 - `filesystem.conf`: Configuration for the `filesystem` thread.
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
