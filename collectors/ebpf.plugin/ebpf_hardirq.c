@@ -10,20 +10,120 @@ struct config hardirq_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 #define HARDIRQ_MAP_LATENCY 0
-static ebpf_local_maps_t hardirq_maps[] = {{.name = "tbl_hardirq", .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
-                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                        {.name = NULL, .internal_input = 0, .user_input = 0,
-                                         .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+#define HARDIRQ_MAP_LATENCY_STATIC 1
+static ebpf_local_maps_t hardirq_maps[] = {
+    {
+        .name = "tbl_hardirq",
+        .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
+        .user_input = 0,
+        .type = NETDATA_EBPF_MAP_STATIC,
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+    },
+    {
+        .name = "tbl_hardirq_static",
+        .internal_input = HARDIRQ_EBPF_STATIC_END,
+        .user_input = 0,
+        .type = NETDATA_EBPF_MAP_STATIC,
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+    },
+    /* end */
+    {
+        .name = NULL,
+        .internal_input = 0,
+        .user_input = 0,
+        .type = NETDATA_EBPF_MAP_CONTROLLER,
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+    }
+};
 
 static ebpf_data_t hardirq_data;
 
-char *tracepoint_irq_type = { "irq" } ;
-char *tracepoint_irq_entry = { "irq_handler_entry" };
-char *tracepoint_irq_exit = { "irq_handler_exit" };
-static int was_irq_entry_enabled = 0;
-static int was_irq_exit_enabled = 0;
+static ebpf_tracepoint_t hardirq_tracepoints[] = {
+    {.enabled = false, .class = "irq", .event = "irq_handler_entry"},
+    {.enabled = false, .class = "irq", .event = "irq_handler_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "thermal_apic_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "thermal_apic_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "threshold_apic_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "threshold_apic_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "error_apic_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "error_apic_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "deferred_error_apic_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "deferred_error_apic_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "spurious_apic_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "spurious_apic_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "call_function_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "call_function_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "call_function_single_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "call_function_single_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "reschedule_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "reschedule_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "local_timer_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "local_timer_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "irq_work_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "irq_work_exit"},
+    {.enabled = false, .class = "irq_vectors", .event = "x86_platform_ipi_entry"},
+    {.enabled = false, .class = "irq_vectors", .event = "x86_platform_ipi_exit"},
+    /* end */
+    {.enabled = false, .class = NULL, .event = NULL}
+};
+
+static hardirq_static_val_t hardirq_static_vals[] = {
+    {
+        .idx = HARDIRQ_EBPF_STATIC_APIC_THERMAL,
+        .name = "apic_thermal",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_APIC_THRESHOLD,
+        .name = "apic_threshold",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_APIC_ERROR,
+        .name = "apic_error",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_APIC_DEFERRED_ERROR,
+        .name = "apic_deferred_error",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_APIC_SPURIOUS,
+        .name = "apic_spurious",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_FUNC_CALL,
+        .name = "func_call",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_FUNC_CALL_SINGLE,
+        .name = "func_call_single",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_RESCHEDULE,
+        .name = "reschedule",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_LOCAL_TIMER,
+        .name = "local_timer",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_IRQ_WORK,
+        .name = "irq_work",
+        .latency = 0
+    },
+    {
+        .idx = HARDIRQ_EBPF_STATIC_X86_PLATFORM_IPI,
+        .name = "x86_platform_ipi",
+        .latency = 0
+    },
+};
 
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
@@ -34,72 +134,15 @@ static int read_thread_closed = 1;
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
 
-// temporary store for hard IRQ values we get from a per-CPU eBPF map.
-static hardirq_ebpf_val_t *hardirq_hash_vals = NULL;
+// tmp store for dynamic hard IRQ values we get from a per-CPU eBPF map.
+static hardirq_ebpf_val_t *hardirq_ebpf_vals = NULL;
+
+// tmp store for static hard IRQ values we get from a per-CPU eBPF map.
+static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
 
 static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
                                                     NULL, NULL, 1, NULL,
                                                     NULL, NULL };
-
-/**
- * Enable hard IRQ tracepoints needed for eBPF.
- *
- * @return 0 on success and -1 otherwise.
- */
-static int ebpf_hardirq_enable_tracepoints()
-{
-    int test = ebpf_is_tracepoint_enabled(
-        tracepoint_irq_type,
-        tracepoint_irq_entry
-    );
-    if (test == -1) {
-        return -1;
-    }
-    else if (!test) {
-        if (ebpf_enable_tracing_values(
-            tracepoint_irq_type,
-            tracepoint_irq_entry
-        )) {
-            return -1;
-        }
-    }
-    was_irq_entry_enabled = test;
-
-    test = ebpf_is_tracepoint_enabled(
-        tracepoint_irq_type,
-        tracepoint_irq_exit
-    );
-    if (test == -1) {
-        return -1;
-    } else if (!test) {
-        if (ebpf_enable_tracing_values(
-            tracepoint_irq_type,
-            tracepoint_irq_exit
-        )) {
-            return -1;
-        }
-    }
-    was_irq_exit_enabled = test;
-
-    return 0;
-}
-
-/**
- * Disable hard IRQ tracepoints needed for eBPF.
- */
-static void ebpf_hardirq_disable_tracepoints()
-{
-    char *default_message = { "Cannot disable the tracepoint" };
-    if (!was_irq_entry_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_irq_type, tracepoint_irq_entry))
-            error("%s %s/%s.", default_message, tracepoint_irq_type, tracepoint_irq_entry);
-    }
-
-    if (!was_irq_exit_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_irq_type, tracepoint_irq_exit))
-            error("%s %s/%s.", default_message, tracepoint_irq_type, tracepoint_irq_exit);
-    }
-}
 
 /**
  * Clean up the main thread.
@@ -108,7 +151,9 @@ static void ebpf_hardirq_disable_tracepoints()
  */
 static void hardirq_cleanup(void *ptr)
 {
-    ebpf_hardirq_disable_tracepoints();
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     if (!em->enabled) {
@@ -123,7 +168,8 @@ static void hardirq_cleanup(void *ptr)
         UNUSED(dt);
     }
 
-    freez(hardirq_hash_vals);
+    freez(hardirq_ebpf_vals);
+    freez(hardirq_ebpf_static_vals);
     freez(hardirq_threads.thread);
 
     if (probe_links) {
@@ -165,12 +211,7 @@ static int hardirq_val_cmp(void *a, void *b)
     }
 }
 
-/**
- * Read the eBPF hash map identified by file descriptor `mapfd`.
- *
- * @param mapfd file descriptor for the eBPF hash map.
- */
-static void hardirq_read_hash(int mapfd)
+static void hardirq_read_latency_map(int mapfd)
 {
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
@@ -179,7 +220,7 @@ static void hardirq_read_hash(int mapfd)
 
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
         // get val for this key.
-        int test = bpf_map_lookup_elem(mapfd, &key, hardirq_hash_vals);
+        int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_vals);
         if (unlikely(test < 0)) {
             key = next_key;
             continue;
@@ -221,13 +262,13 @@ static void hardirq_read_hash(int mapfd)
         int i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (i = 0; i < end; i++) {
-            total_latency += hardirq_hash_vals[i].latency/1000;
+            total_latency += hardirq_ebpf_vals[i].latency/1000;
 
             // copy name for new IRQs.
-            if (v_is_new && !name_saved && hardirq_hash_vals[i].name[0] != '\0') {
+            if (v_is_new && !name_saved && hardirq_ebpf_vals[i].name[0] != '\0') {
                 strncpyz(
                     v->name,
-                    hardirq_hash_vals[i].name,
+                    hardirq_ebpf_vals[i].name,
                     NETDATA_HARDIRQ_NAME_LEN
                 );
                 name_saved = true;
@@ -239,17 +280,41 @@ static void hardirq_read_hash(int mapfd)
 
         // can now safely publish new IRQ.
         if (v_is_new) {
-            avl_insert_lock(&hardirq_pub, (avl_t *)v);
+            avl_t *check = avl_insert_lock(&hardirq_pub, (avl_t *)v);
+            if (check != (avl_t *)v) {
+                error("Internal error, cannot insert the AVL tree.");
+            }
         }
 
         key = next_key;
     }
 }
 
+static void hardirq_read_latency_static_map(int mapfd)
+{
+    uint32_t i;
+    for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
+        uint32_t map_i = hardirq_static_vals[i].idx;
+        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_static_vals);
+        if (unlikely(test < 0)) {
+            continue;
+        }
+
+        uint64_t total_latency = 0;
+        int cpu_i;
+        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
+        for (cpu_i = 0; cpu_i < end; cpu_i++) {
+            total_latency += hardirq_ebpf_static_vals[cpu_i].latency/1000;
+        }
+
+        hardirq_static_vals[i].latency = total_latency;
+    }
+}
+
 /**
  * Read eBPF maps for hard IRQ.
  */
-void *ebpf_hardirq_read_hash(void *ptr)
+static void *hardirq_reader(void *ptr)
 {
     read_thread_closed = 0;
 
@@ -263,7 +328,8 @@ void *ebpf_hardirq_read_hash(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
 
-        hardirq_read_hash(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
+        hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
+        hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
 
     read_thread_closed = 1;
@@ -288,6 +354,17 @@ static void hardirq_create_charts()
     fflush(stdout);
 }
 
+static void hardirq_create_static_dims()
+{
+    uint32_t i;
+    for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
+        ebpf_write_global_dimension(
+            hardirq_static_vals[i].name, hardirq_static_vals[i].name,
+            ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]
+        );
+    }
+}
+
 // callback for avl tree traversal on `hardirq_pub`.
 static int hardirq_write_dims(void *entry, void *data)
 {
@@ -309,32 +386,48 @@ static int hardirq_write_dims(void *entry, void *data)
     return 1;
 }
 
+static void hardirq_write_static_dims()
+{
+    uint32_t i;
+    for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
+        write_chart_dimension(
+            hardirq_static_vals[i].name,
+            hardirq_static_vals[i].latency
+        );
+    }
+}
+
 /**
 * Main loop for this collector.
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
-    hardirq_hash_vals = callocz(
+    hardirq_ebpf_vals = callocz(
         (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
         sizeof(hardirq_ebpf_val_t)
+    );
+    hardirq_ebpf_static_vals = callocz(
+        (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
+        sizeof(hardirq_ebpf_static_val_t)
     );
 
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
 
     // create reader thread.
     hardirq_threads.thread = mallocz(sizeof(netdata_thread_t));
-    hardirq_threads.start_routine = ebpf_hardirq_read_hash;
+    hardirq_threads.start_routine = hardirq_reader;
     netdata_thread_create(
         hardirq_threads.thread,
         hardirq_threads.name,
         NETDATA_THREAD_OPTION_JOINABLE,
-        ebpf_hardirq_read_hash,
+        hardirq_reader,
         em
     );
 
-    // create chart.
+    // create chart and static dims.
     pthread_mutex_lock(&lock);
     hardirq_create_charts();
+    hardirq_create_static_dims();
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -346,6 +439,7 @@ static void hardirq_collector(ebpf_module_t *em)
         // write dims now for all hitherto discovered IRQs.
         write_begin_chart("system", "hardirq_latency");
         avl_traverse_lock(&hardirq_pub, hardirq_write_dims, NULL);
+        hardirq_write_static_dims();
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
@@ -380,7 +474,17 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    if (ebpf_hardirq_enable_tracepoints()) {
+    bool one_tp_succeeded = false;
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        if (ebpf_enable_tracepoint(&hardirq_tracepoints[i]) == -1) {
+            infoerr("failed to enable tracepoint %s:%s",
+                hardirq_tracepoints[i].class, hardirq_tracepoints[i].event);
+        }
+        else {
+            one_tp_succeeded = true;
+        }
+    }
+    if (!one_tp_succeeded) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endhardirq;
     }

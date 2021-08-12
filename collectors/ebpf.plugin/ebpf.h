@@ -88,6 +88,12 @@ enum ebpf_module_indexes {
     EBPF_MODULE_HARDIRQ_IDX
 };
 
+typedef struct ebpf_tracepoint {
+    bool enabled;
+    char *class;
+    char *event;
+} ebpf_tracepoint_t;
+
 // Copied from musl header
 #ifndef offsetof
 #if __GNUC__ > 3
@@ -202,6 +208,9 @@ extern void ebpf_create_charts_on_apps(char *name,
 extern void write_end_chart();
 
 extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
+
+extern int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
+extern int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 

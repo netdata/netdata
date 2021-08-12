@@ -741,6 +741,66 @@ void ebpf_print_help()
 
 /*****************************************************************
  *
+ *  TRACEPOINT MANAGEMENT FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Enable a tracepoint.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp)
+{
+    int test = ebpf_is_tracepoint_enabled(tp->class, tp->event);
+
+    // err?
+    if (test == -1) {
+        return -1;
+    }
+    // disabled?
+    else if (test == 0) {
+        // enable it then.
+        if (ebpf_enable_tracing_values(tp->class, tp->event)) {
+            return -1;
+        }
+    }
+
+    // enabled now or already was.
+    tp->enabled = true;
+
+    return 0;
+}
+
+/**
+ * Disable a tracepoint if it's enabled.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp)
+{
+    int test = ebpf_is_tracepoint_enabled(tp->class, tp->event);
+
+    // err?
+    if (test == -1) {
+        return -1;
+    }
+    // enabled?
+    else if (test == 1) {
+        // disable it then.
+        if (ebpf_disable_tracing_values(tp->class, tp->event)) {
+            return -1;
+        }
+    }
+
+    // disable now or already was.
+    tp->enabled = false;
+
+    return 0;
+}
+
+/*****************************************************************
+ *
  *  AUXILIAR FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
