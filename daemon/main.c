@@ -823,6 +823,7 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                             if(test_dbengine()) return 1;
 #endif
+                            if(test_sqlite()) return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
