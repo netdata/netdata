@@ -10,11 +10,6 @@
 
 const char *aclk_sync_config[] = {
     NULL,
-    "CREATE TABLE IF NOT EXISTS delete_dimension(host_id, chart_id, dim_id, chart_name, dimension_id, dimension_name);"
-    "CREATE TRIGGER IF NOT EXISTS tr_del_dim AFTER DELETE ON dimension " \
-    "BEGIN INSERT INTO delete_dimension (host_id, chart_id, dim_id, chart_name, dimension_id, dimension_name) " \
-    "SELECT c.host_id, c.chart_id, old.dim_id, c.type||'.'||c.id, old.id, old.name from chart c where c.chart_id = old.chart_id; end;",
-    NULL
 };
 
 int aclk_architecture = 0;
@@ -150,6 +145,7 @@ struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_confi
     uv_mutex_lock(&wc->cmd_mutex);
     queue_size = wc->queue_size;
     if (queue_size == 0) {
+        memset(&ret, 0, sizeof(ret));
         ret.opcode = ACLK_DATABASE_NOOP;
         ret.completion = NULL;
     } else {
@@ -238,13 +234,12 @@ static void timer_cb(uv_timer_t* handle)
     uv_update_time(handle->loop);
 
     struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_TIMER;
-    cmd.completion = NULL;
     aclk_database_enq_cmd_noblock(wc, &cmd);
 
     if (wc->cleanup_after && wc->cleanup_after < now_realtime_sec()) {
         cmd.opcode = ACLK_DATABASE_CLEANUP;
-        cmd.completion = NULL;
         if (!aclk_database_enq_cmd_noblock(wc, &cmd))
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
@@ -252,7 +247,6 @@ static void timer_cb(uv_timer_t* handle)
     if (wc->chart_updates) {
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
         cmd.count = ACLK_MAX_CHART_BATCH;
-        cmd.completion = NULL;
         cmd.param1 = ACLK_MAX_CHART_BATCH_COUNT;
         aclk_database_enq_cmd_noblock(wc, &cmd);
     }
@@ -260,7 +254,6 @@ static void timer_cb(uv_timer_t* handle)
     if (wc->alert_updates) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
         cmd.count = ACLK_MAX_ALERT_UPDATES;
-        cmd.completion = NULL;
         aclk_database_enq_cmd_noblock(wc, &cmd);
     }
 }
@@ -810,8 +803,8 @@ static int sql_check_aclk_table(void *data, int argc, char **argv, char **column
 
     debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
     struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_DELETE_HOST;
-    cmd.completion = NULL;
     cmd.data = strdupz((char *) argv[0]);
     aclk_database_enq_cmd_noblock(wc, &cmd);
     return 0;
@@ -822,8 +815,13 @@ static int sql_check_aclk_table(void *data, int argc, char **argv, char **column
 
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
 {
+    char *err_msg = NULL;
     debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
-    (int) sqlite3_exec(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, (void *) wc, NULL);
+    int rc = sqlite3_exec(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, (void *) wc, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
+        sqlite3_free(err_msg);
+    }
     return;
 }
 
@@ -833,10 +831,8 @@ void aclk_data_rotated(RRDHOST *host)
 
     debug(D_ACLK_SYNC,"Processing data base rotation event");
     struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_UPD_STATS;
-    cmd.data = NULL;
-    cmd.count = 0;
-    cmd.completion = NULL;
 
     rrd_wrlock();
     RRDHOST *this_host = localhost;
