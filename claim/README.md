@@ -213,7 +213,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Connect an agent running in macOS
 
-To connect a node that is running on a macOS environment the script that will be provided to you by Nedata Cloud is the [kickstart](/packaging/installer/methods/macos#install-netdata-with-kickstart) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
+To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos#install-netdata-with-kickstart) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
@@ -469,7 +469,6 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
-
 ### Claiming script
 
 A Space's administrator can also connect an Agent by directly calling the `netdata-claim.sh` script either with root privileges
