@@ -6,7 +6,7 @@
 #include "sqlite3.h"
 
 // TODO: To be added
-//#include "../../aclk/schema-wrappers/chart_stream.h"
+#include "../../aclk/schema-wrappers/chart_stream.h"
 
 #ifndef ACLK_MAX_CHART_BATCH
 #define ACLK_MAX_CHART_BATCH    (20)
@@ -123,7 +123,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_CHECK,
     ACLK_DATABASE_CHECK_ROTATION,
     ACLK_DATABASE_CLEANUP,
-    ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_INFO,
     ACLK_DATABASE_PUSH_ALERT,
@@ -133,8 +132,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_RESET_NODE,
     ACLK_DATABASE_SHUTDOWN,
-    ACLK_DATABASE_STATUS_CHART,
-    ACLK_DATABASE_SYNC_CHART_SEQ,
     ACLK_DATABASE_TIMER,
     ACLK_DATABASE_UPD_STATS,
     ACLK_DATABASE_MAX_OPCODE
@@ -212,14 +209,15 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 
 extern sqlite3 *db_meta;
 
-extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
-extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
+extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern void aclk_set_architecture(int mode);
+extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
+int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
+void aclk_data_rotated(RRDHOST *host);
 void sql_aclk_sync_init(void);
-void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
-void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
-void aclk_data_rotated(RRDHOST *host);
+void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 #endif //NETDATA_SQLITE_ACLK_H

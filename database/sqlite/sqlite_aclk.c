@@ -4,7 +4,7 @@
 #include "sqlite_aclk.h"
 
 // TODO: To be added
-//#include "sqlite_aclk_chart.h"
+#include "sqlite_aclk_chart.h"
 //#include "sqlite_aclk_alert.h"
 #include "sqlite_aclk_node.h"
 
@@ -168,6 +168,25 @@ struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_confi
     uv_mutex_unlock(&wc->cmd_mutex);
 
     return ret;
+}
+
+int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd)
+{
+    if (unlikely(!node_id || !cmd))
+        return 0;
+
+    uv_mutex_lock(&aclk_async_lock);
+    struct aclk_database_worker_config *wc = aclk_thread_head;
+
+    while (wc) {
+        if (!strcmp(wc->node_id, node_id))
+            break;
+        wc = wc->next;
+    }
+    if (wc)
+        aclk_database_enq_cmd(wc, cmd);
+    uv_mutex_unlock(&aclk_async_lock);
+    return (wc == NULL);
 }
 
 int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
@@ -356,42 +375,42 @@ void aclk_database_worker(void *arg)
                     break;
 
 // CHART / DIMENSION OPERATIONS
+                case ACLK_DATABASE_ADD_CHART:
+                    debug(D_ACLK_SYNC, "Adding chart event for %s", wc->host_guid);
+                    aclk_add_chart_event(wc, cmd);
+                    break;
+                case ACLK_DATABASE_ADD_DIMENSION:
+                    debug(D_ACLK_SYNC, "Adding dimension event for %s", wc->host_guid);
+                    aclk_add_dimension_event(wc, cmd);
+                    break;
                 case ACLK_DATABASE_PUSH_CHART:
                     debug(D_ACLK_SYNC, "Pushing chart info to the cloud for node %s", wc->host_guid);
-//                    aclk_push_chart_event(wc, cmd);
+                    aclk_send_chart_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_PUSH_CHART_CONFIG:
                     debug(D_ACLK_SYNC, "Pushing chart config info to the cloud for node %s", wc->host_guid);
-//                    aclk_push_chart_config(wc, cmd);
+                    aclk_send_chart_config(wc, cmd);
                     break;
                 case ACLK_DATABASE_CHART_ACK:
                     debug(D_ACLK_SYNC, "ACK chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
-//                    sql_set_chart_ack(wc, cmd);
+                    aclk_receive_chart_ack(wc, cmd);
                     break;
                 case ACLK_DATABASE_RESET_CHART:
                     debug(D_ACLK_SYNC, "RESET chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
-//                    sql_reset_chart_event(wc, cmd);
+                    aclk_receive_chart_reset(wc, cmd);
                     break;
-                case ACLK_DATABASE_STATUS_CHART:
-                    debug(D_ACLK_SYNC,"Requesting chart status for %s", wc->host_guid);
+//                case ACLK_DATABASE_STATUS_CHART:
+//                    debug(D_ACLK_SYNC,"Requesting chart status for %s", wc->host_guid);
 //                    aclk_status_chart_event(wc, cmd);
-                    break;
-                case ACLK_DATABASE_ADD_CHART:
-                    debug(D_ACLK_SYNC,"Adding chart event for %s", wc->host_guid);
-//                    aclk_add_chart_event(wc, cmd);
-                    break;
-                case ACLK_DATABASE_ADD_DIMENSION:
-                    debug(D_ACLK_SYNC,"Adding dimension event for %s", wc->host_guid);
-//                    aclk_add_dimension_event(wc, cmd);
-                    break;
-                case ACLK_DATABASE_DEDUP_CHART:
-                    debug(D_ACLK_SYNC,"Running chart deduplication for %s", wc->host_guid);
+//                    break;
+//                case ACLK_DATABASE_DEDUP_CHART:
+//                    debug(D_ACLK_SYNC,"Running chart deduplication for %s", wc->host_guid);
 //                    sql_chart_deduplicate(wc, cmd);
-                    break;
-                case ACLK_DATABASE_SYNC_CHART_SEQ:
-                    debug(D_ACLK_SYNC,"Calculatting chart sequence for %s", wc->host_guid);
+//                    break;
+//                case ACLK_DATABASE_SYNC_CHART_SEQ:
+//                    debug(D_ACLK_SYNC,"Calculatting chart sequence for %s", wc->host_guid);
 //                    sql_get_last_chart_sequence(wc, cmd);
-                    break;
+//                    break;
 
 // ALERTS
                 case ACLK_DATABASE_ADD_ALERT:

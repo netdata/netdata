@@ -423,6 +423,7 @@ struct rrddim_volatile {
 struct rrdset_volatile {
     char *old_title;
     char *old_context;
+    uuid_t hash_id;
     struct label *new_labels;
     struct label_index labels;
 };
