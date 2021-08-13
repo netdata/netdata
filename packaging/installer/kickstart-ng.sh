@@ -12,12 +12,12 @@
 #  TMPDIR                     specify where to save temporary files
 
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
+REPOCONFIG_VERSION="1-1"
 INTERACTIVE=1
 RELEASE_CHANNEL="nightly"
 
 setup_terminal() {
   TPUT_RESET=""
-  TPUT_YELLOW=""
   TPUT_WHITE=""
   TPUT_BGRED=""
   TPUT_BGGREEN=""
@@ -31,7 +31,6 @@ setup_terminal() {
     if [ $(($(tput colors 2> /dev/null))) -ge 8 ]; then
       # Enable colors
       TPUT_RESET="$(tput sgr 0)"
-      TPUT_YELLOW="$(tput setaf 3)"
       TPUT_WHITE="$(tput setaf 7)"
       TPUT_BGRED="$(tput setab 1)"
       TPUT_BGGREEN="$(tput setab 2)"
@@ -46,16 +45,16 @@ setup_terminal || echo > /dev/null
 
 # -----------------------------------------------------------------------------
 fatal() {
-  printf >&2 "%s" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
   exit 1
 }
 
 run_ok() {
-  printf >&2 "%s" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} \n\n"
+  printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
 }
 
 run_failed() {
-  printf >&2 "%s" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} \n\n"
+  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
 }
 
 ESCAPED_PRINT_METHOD=
@@ -63,6 +62,7 @@ ESCAPED_PRINT_METHOD=
 if printf "%q " test > /dev/null 2>&1; then
   ESCAPED_PRINT_METHOD="printfq"
 fi
+
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     # shellcheck disable=SC3050
@@ -74,7 +74,7 @@ escaped_print() {
 }
 
 progress() {
-  echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+  echo >&2 " --- ${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
 run_logfile="/dev/null"
@@ -96,38 +96,31 @@ run() {
     printf " ... "
   } >> "${run_logfile}"
 
-  printf >&2 "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+  printf >&2 "%s" "${info_console}${TPUT_BOLD}"
   escaped_print >&2 "${@}"
-  printf >&2 "%s" "${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_RESET}"
 
   "${@}"
 
   ret=$?
   if [ ${ret} -ne 0 ]; then
     run_failed
-    printf >> "${run_logfile}" "%s" "FAILED with exit code ${ret}\n"
+    printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
   else
     run_ok
-    printf >> "${run_logfile}" "OK\n"
+    printf "OK\n" >> "${run_logfile}"
   fi
 
   return ${ret}
 }
 
 fatal() {
-  printf >&2 "%s" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
   exit 1
 }
 
 warning() {
-  printf >&2 "%s" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*} \n\n"
-  if [ "${INTERACTIVE}" = "0" ]; then
-    fatal "Stopping due to non-interactive mode. Fix the issue or retry installation in an interactive mode."
-  else
-    echo "Press ENTER to attempt Netdata installation."
-    read -r
-    progress "OK, let's give it a try..."
-  fi
+  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
 }
 
 _cannot_use_tmpdir() {
@@ -203,7 +196,6 @@ get_system_info() {
       DISTRO="${ID}"
       SYSVERSION="${VERSION_ID}"
       SYSCODENAME="${VERSION_CODENAME}"
-      SYSARCH="$(uname -m)"
       ;;
     Darwin)
       SYSTYPE="Darwin"
@@ -271,43 +263,50 @@ try_package_install() {
       repo_subcmd="update"
       repo_prefix="debian/${SYSCODENAME}"
       pkg_type="deb"
-      pkg_suffix="all"
+      pkg_suffix="_all"
+      pkg_vsep="_"
       ;;
     ubuntu)
       pm_cmd="apt-get"
       repo_subcmd="update"
       repo_prefix="ubuntu/${SYSCODENAME}"
       pkg_type="deb"
-      pkg_suffix="all"
+      pkg_suffix="_all"
+      pkg_vsep="_"
       ;;
     centos)
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
+        repo_subcmd="makecache"
       else
         pm_cmd="yum"
+        repo_subcmd="refresh"
       fi
-      repo_subcmd="refresh"
       repo_prefix="el/${SYSVERSION}"
       pkg_type="rpm"
-      pkg_suffix="noarch"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
       ;;
     fedora)
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
+        repo_subcmd="makecache"
       else
         pm_cmd="yum"
+        repo_subcmd="refresh"
       fi
-      repo_subcmd="refresh"
       repo_prefix="fedora/${SYSVERSION}"
       pkg_type="rpm"
-      pkg_suffix="noarch"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
       ;;
     opensuse)
       pm_cmd="zypper"
       repo_subcmd="refresh"
       repo_prefix="opensuse/${SYSVERSION}"
       pkg_type="rpm"
-      pkg_suffix="noarch"
+      pkg_suffix=".noarch"
+      pkg_vsep="-"
       ;;
     *)
       warning "We do not provide native binary packages for ${DISTRO}."
@@ -316,8 +315,8 @@ try_package_install() {
   esac
 
   repoconfig_name="netdata-repo${release}"
-  repoconfig_file="${repoconfig_name}-${REPOCONFIG_VERSION}_${pkg_suffix}.${pkg_type}"
-  repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_name}/download.${pkg_type}"
+  repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
+  repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
 
   progress "Downloading repository configuration package."
   if download "${repoconfig_url}" "${repoconfig_file}"; then
@@ -325,13 +324,13 @@ try_package_install() {
     # shellcheck disable=SC2086
     if run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
       progress "Updating repository metadata."
-      if run ${pm_cmd} ${repo_subcmd}; then
+      if run ${pm_cmd} ${repo_subcmd} ${opts}; then
         progress "Installing Netdata package."
         # shellcheck disable=SC2086
         if run ${pm_cmd} install ${opts} netdata; then
           return 0
         else
-          wanring "Failed to install Netdata package."
+          warning "Failed to install Netdata package."
           progress "Attempting to uninstall repository configuration package."
           # shellcheck disable=SC2086
           run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
@@ -363,7 +362,9 @@ done
 
 get_system_info
 
-tmpdir="$(create_temp_directory)"
+tmpdir="$(create_tmp_directory)"
+progress "Using ${tmpdir} as a temporary directory."
+cd "${tmpdir}" || exit 1
 
 case "${SYSTYPE}" in
   Linux)
@@ -371,14 +372,14 @@ case "${SYSTYPE}" in
 
     case "$?" in
       0)
-        rm -f "${tmpdir}"
+        rm -rf "${tmpdir}"
         exit 0
         ;;
       1)
         fatal "Unable to install on this system."
         ;;
       2)
-        wanring "Could not install native binary packages, falling back to alternative installation method."
+        warning "Could not install native binary packages, falling back to alternative installation method."
         ;;
     esac
     ;;
