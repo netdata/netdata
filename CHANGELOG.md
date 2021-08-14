@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Force play timezone [\#11433](https://github.com/netdata/netdata/pull/11433) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Default to not using LTO for builds. [\#11432](https://github.com/netdata/netdata/pull/11432) ([Ferroin](https://github.com/Ferroin))
 - Properly handle reuploads of packages to PackageCloud. [\#11427](https://github.com/netdata/netdata/pull/11427) ([Ferroin](https://github.com/Ferroin))
 - Use DebHelper compat level 9 in repoconfig packages to support Ubuntu 16.04 [\#11426](https://github.com/netdata/netdata/pull/11426) ([Ferroin](https://github.com/Ferroin))
