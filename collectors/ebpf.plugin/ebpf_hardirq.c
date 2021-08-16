@@ -339,10 +339,10 @@ static void *hardirq_reader(void *ptr)
 static void hardirq_create_charts()
 {
     ebpf_create_chart(
-        "system",
+        NETDATA_EBPF_SYSTEM_GROUP,
         "hardirq_latency",
         "Hardware IRQ latency",
-        "latency (milliseconds)",
+        "milliseconds",
         "interrupts",
         NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -386,7 +386,7 @@ static int hardirq_write_dims(void *entry, void *data)
     return 1;
 }
 
-static void hardirq_write_static_dims()
+static inline void hardirq_write_static_dims()
 {
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -437,7 +437,7 @@ static void hardirq_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
-        write_begin_chart("system", "hardirq_latency");
+        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "hardirq_latency");
         avl_traverse_lock(&hardirq_pub, hardirq_write_dims, NULL);
         hardirq_write_static_dims();
         write_end_chart();
@@ -474,17 +474,7 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    bool one_tp_succeeded = false;
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        if (ebpf_enable_tracepoint(&hardirq_tracepoints[i]) == -1) {
-            infoerr("failed to enable tracepoint %s:%s",
-                hardirq_tracepoints[i].class, hardirq_tracepoints[i].event);
-        }
-        else {
-            one_tp_succeeded = true;
-        }
-    }
-    if (!one_tp_succeeded) {
+    if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
         em->enabled = CONFIG_BOOLEAN_NO;
         goto endhardirq;
     }

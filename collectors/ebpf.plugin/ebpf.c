@@ -799,6 +799,27 @@ int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp)
     return 0;
 }
 
+/**
+ * Enable multiple tracepoints on a list of tracepoints which end when the
+ * class is NULL.
+ *
+ * @return the number of successful enables.
+ */
+uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
+{
+    uint32_t cnt = 0;
+    for (int i = 0; tps[i].class != NULL; i++) {
+        if (ebpf_enable_tracepoint(&tps[i]) == -1) {
+            infoerr("failed to enable tracepoint %s:%s",
+                tps[i].class, tps[i].event);
+        }
+        else {
+            cnt += 1;
+        }
+    }
+    return cnt;
+}
+
 /*****************************************************************
  *
  *  AUXILIAR FUNCTIONS USED DURING INITIALIZATION

@@ -1,3 +1,3 @@
-c04f3832933315669b009d629fe9cbef33d8202aa9b57d45e3777e2385ae0c5b  netdata-kernel-collector-glibc-v0.7.6.1.tar.xz
-25e9ea852b5ec593be0d6329f1c62e0b6aa872ebc835462d3514a2c9fb9294ef  netdata-kernel-collector-musl-v0.7.6.1.tar.xz
-6704049d192bb47d2f26fee1ce9add0e93cfde62b0672c56cf4b5ea6bd6bf5e9  netdata-kernel-collector-static-v0.7.6.1.tar.xz
+3a2a6ae05c38d798b3230ba8018f1794530abf41d5826bc9e0f10bf688d63e3f  netdata-kernel-collector-glibc-v0.7.7.tar.xz
+29331d14a104db423cc5849b67be0796c5320f08bbd1fe5b76000bc0a60eaab1  netdata-kernel-collector-musl-v0.7.7.tar.xz
+60b09083653ae1e0f143c3c6ed0420bbcf7278f1997795bf8f72cc7e154db344  netdata-kernel-collector-static-v0.7.7.tar.xz

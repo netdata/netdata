@@ -211,6 +211,7 @@ extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
 
 extern int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 extern int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
+extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
