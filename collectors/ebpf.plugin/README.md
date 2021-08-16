@@ -47,7 +47,8 @@ collected in the previous and current seconds.
 
 ### System overview
 
-All charts on system overview are not enabled by default, because they would consume a lot of resources.
+All charts on system overview are not enabled by default, because they add around 100ns overhead for each function call, 
+this number is small for a human perspective, but the functions are called many times creating an impact on host.
 See the [configuration](#configuration) section for details about how to enable them.
 
 #### Swap
