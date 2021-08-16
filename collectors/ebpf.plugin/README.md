@@ -47,26 +47,27 @@ collected in the previous and current seconds.
 
 ### System overview
 
-All charts on system overview are not enabled by default, because they add around 100ns overhead for each function call, 
-this number is small for a human perspective, but the functions are called many times creating an impact on host.
+Not all charts within the System Overview menu are enabled by default, because they add around 100ns overhead for each 
+function call, this number is small for a human perspective, but the functions are called many times creating an impact 
+on host.
 See the [configuration](#configuration) section for details about how to enable them.
 
 #### Swap
 
-Inside swap submenu eBPF plugin creates the chart `swapcalls`, this chart is demonstrating when processes are calling
-functions `swap_readpage` and `swap_writepage`, functions responsible for doing IO in swap memory.
+Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are calling
+functions `swap_readpage` and `swap_writepage`, which are functions responsible for doing IO in swap memory.
 
 ### Memory
 
-In memory submenu eBPF plugin creates two submenus **page cache** and **synchronization**.
+In the memory submenu the eBPF plugin creates two submenus **page cache** and **synchronization**.
 
 #### Page cache
 
 This first submenu brings four charts that demonstrate statistics about page cache access.
 
 Page cache is adding `kprobes` for the kernel functions `add_to_page_cache_lru`, `mark_page_accessed`,
-`account_page_dirtied`, and `mark_buffer_dirty`. Netdata monitors page cache access giving an overall overview and also
-per application access.
+`account_page_dirtied`, and `mark_buffer_dirty`. Netdata monitors page cache access giving system-level and 
+application-level metrics.
 
 ##### Page cache ratio
 
@@ -75,8 +76,8 @@ The chart `cachestat_ratio` shows how processes are accessing page cache. In a n
 
 ##### Dirty pages
 
-On `cachestat_dirties` netdata demonstrates the number of pages that were modified. This chart reflects calls to function
-`mark_buffer_dirty`.
+On `cachestat_dirties` netdata demonstrates the number of pages that were modified. This chart shows the number of calls 
+to the function `mark_buffer_dirty`.
 
 ##### Page cache hits
 
@@ -100,7 +101,7 @@ They flush data for specific file descriptors.
 
 ##### Memory map sync
 
-The chart shows calls to `msync(2)` syscalls. This syscall flushes changes of a file that was mapped into memory using
+The chart shows calls to `msync(2)` syscalls. This syscall flushes changes to a file that was mapped into memory using
 `mmap(2)`.
 
 ##### File system sync
@@ -114,9 +115,9 @@ syscall to synchronize data according to its manual.
 
 ### Disk
 
-The eBPF plugin also shows a chart on Disk section when `disk` thread is enabled. This will create the
+The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
 chart `disk_latency_io` for each disk on the host. These charts use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
-`block:block_rq_issue` and `block:block_rq_complete` to measure the needed time for an IO event to be completed.
+`block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events..
 
 ### Filesystem
 
@@ -125,7 +126,7 @@ This group has two charts demonstrating how applications interact with the Linux
 #### File descriptor
 
 This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. Most
-software do not commonly call these functions directly, they are behind the system calls `open(2)`, `openat(2)`,
+software doesn't commonly call these functions directly, they are behind the system calls `open(2)`, `openat(2)`,
 and `close(2)`.
 
 #### File error
@@ -148,8 +149,8 @@ This chart shows the number of calls to the functions `vfs_read` and `vfs_write`
 
 #### IO bytes
 
-This chart also monitors `vfs_read` and `vfs_write` but,  instead of number of calls, it shows the total of bytes read 
-and written with these functions.
+This chart also monitors `vfs_read` and `vfs_write` but,  instead of number of the calls, it shows the total amount of 
+ bytes read and written with these functions.
 
 The Agent displays the number of bytes written as negative because they are moving down to disk.
 
@@ -163,8 +164,8 @@ This chart shows the number of calls to `vfs_create`. This function is responsib
 
 #### Synchronization
 
-This chart shows the number of calls to `vfs_fsync`. This function is responsible for performing a fsync or fdatasync 
-on a file. You can see more details on Synchronization
+This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync (2)` or 
+`fdatasync (2)` on a file. You can see more details on in the Synchronization section.
 
 #### Open
 
@@ -195,27 +196,27 @@ process and thread creation only.
 #### TCP functions
 
 This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf` and `tcp_close`, these functions are
-used to send, and receive data and to close connections when `TCP` protocol is used.
+used to send & receive data and to close connections when `TCP` protocol is used.
 
 #### TCP bandwidth
 
-Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing number of calls,
-it demonstrates the number of bytes sent and received.
+Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing number 
+ of calls, it demonstrates the number of bytes sent and received.
 
 #### TCP retransmit
 
-This chart demonstrates calls to functions `tcp_retransmit` that is responsible to execute the TCP retransmission when the
-receiver did not return the package during the expected time.
+This chart demonstrates calls to functions `tcp_retransmit` that is responsible for executing TCP retransmission when the
+receiver did not return the packet during the expected time.
 
 #### UDP functions
 
-This chart demonstrates calls to  functions `udp_sendmsg`, and `udp_recvmsg` responsible to send and receive data
-for connections when `UDP` protocol is used.
+This chart demonstrates calls to  functions `udp_sendmsg` and `udp_recvmsg`,  which are responsible for sending & 
+ receiving data for connections when the `UDP` protocol is used.
 
 #### UDP bandwidth
 
-Like previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`but,  instead of showing the number of calls,
-it monitors the number of bytes sent and received.
+Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the 
+number of calls, it monitors the number of bytes sent and received.
 
 ## Configuration
 
