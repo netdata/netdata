@@ -25,7 +25,6 @@ jobs:
           - 'archlinux:latest'
           - 'centos:7'
           - 'centos:8'
-          - 'clearlinux:latest'
           - 'debian:9'
           - 'debian:10'
           - 'fedora:33'
