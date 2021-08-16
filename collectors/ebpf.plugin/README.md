@@ -95,8 +95,8 @@ The **synchronization** submenu of Netdata monitors usage of various kernel sysc
 
 ##### File sync
 
-This chart shows calls to synchronization methods, `fsync()` and `fdatasync()`, to transfer all modified page caches for the 
-files on disk devices. These calls block until the disk reports that the transfer has been completed.
+This chart shows calls to synchronization methods, `fsync(2)` and `fdatasync(2)`, to transfer all modified page caches 
+ for the files on disk devices. These calls block until the disk reports that the transfer has been completed.
 They flush data for specific file descriptors.
 
 ##### Memory map sync
@@ -117,7 +117,7 @@ syscall to synchronize data according to its manual.
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
 chart `disk_latency_io` for each disk on the host. These charts use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
-`block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events..
+`block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events.
 
 ### Filesystem
 
@@ -149,7 +149,7 @@ This chart shows the number of calls to the functions `vfs_read` and `vfs_write`
 
 #### IO bytes
 
-This chart also monitors `vfs_read` and `vfs_write` but,  instead of number of the calls, it shows the total amount of 
+This chart also monitors `vfs_read` and `vfs_write` but, instead of the number of calls, it shows the total amount of 
  bytes read and written with these functions.
 
 The Agent displays the number of bytes written as negative because they are moving down to disk.
@@ -164,8 +164,8 @@ This chart shows the number of calls to `vfs_create`. This function is responsib
 
 #### Synchronization
 
-This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync (2)` or 
-`fdatasync (2)` on a file. You can see more details on in the Synchronization section.
+This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or 
+`fdatasync(2)` on a file. You can see more details on in the Synchronization section.
 
 #### Open
 
@@ -195,13 +195,13 @@ process and thread creation only.
 
 #### TCP functions
 
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf` and `tcp_close`, these functions are
+This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf` and `tcp_close`; these functions are
 used to send & receive data and to close connections when `TCP` protocol is used.
 
 #### TCP bandwidth
 
-Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing number 
- of calls, it demonstrates the number of bytes sent and received.
+Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing the 
+number of calls, it demonstrates the number of bytes sent and received.
 
 #### TCP retransmit
 
@@ -210,7 +210,7 @@ receiver did not return the packet during the expected time.
 
 #### UDP functions
 
-This chart demonstrates calls to  functions `udp_sendmsg` and `udp_recvmsg`,  which are responsible for sending & 
+This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`,  which are responsible for sending & 
  receiving data for connections when the `UDP` protocol is used.
 
 #### UDP bandwidth
