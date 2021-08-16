@@ -80,21 +80,20 @@ On `cachestat_dirties` netdata demonstrates the number of pages that were modifi
 ##### Page cache hits
 
 Netdata calls hits when an accessed page cache was not modified and we do not count pages that were added recently. This
-chart uses data from the four functions we are monitoring, mentioned above,.
+chart uses data from the four functions we are monitoring, mentioned above.
 
 ##### Page cache misses
 
 A page cache miss means that a page was not inside memory when the process tried to access it. This chart shows the result
 of the difference for calls between functions `add_to_page_cache_lru` and `account_page_dirtied`.
 
-#### Syncrhonization
+#### Synchronization
 
-The **synchronization** submenu Netdata monitors calls
-for different syscalls.
+The **synchronization** submenu of Netdata monitors usage of various kernel syscalls.
 
 ##### File sync
 
-This chart shows calls to synchronization methods, fsync() and fdatasync(), to transfer all modified page caches for the 
+This chart shows calls to synchronization methods, `fsync()` and `fdatasync()`, to transfer all modified page caches for the 
 files on disk devices. These calls block until the disk reports that the transfer has been completed.
 They flush data for specific file descriptors.
 
@@ -120,7 +119,7 @@ chart `disk_latency_io` for each disk on the host. These charts use [tracepoints
 
 ### Filesystem
 
-This group has two charts demonstrating how applications interacts with the Linux kernel to open and close file descriptors.
+This group has two charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
 
 #### File descriptor
 
