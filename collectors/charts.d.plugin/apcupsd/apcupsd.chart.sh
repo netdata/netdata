@@ -154,7 +154,7 @@ BEGIN {
 /^LOADPCT.*/   { load = \$3 * 100 };
 /^ITEMP.*/     { temp = \$3 * 100 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
-/^STATUS.*/    { online=(\$3 == \"ONLINE\" || \$3 == \"ONBATT\")?1:0 };
+/^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0 };
 END {
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;
