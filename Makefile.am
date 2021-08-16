@@ -57,7 +57,6 @@ dist_noinst_DATA = \
     contrib \
     docs \
     mqtt_websockets \
-    aclk/aclk-schemas \
     netdata.cppcheck \
     netdata.spec \
     package.json \
@@ -84,6 +83,8 @@ dist_noinst_DATA = \
     packaging/libwebsockets.version \
     packaging/mosquitto.checksums \
     packaging/mosquitto.version \
+    packaging/protobuf.checksums \
+    packaging/protobuf.version \
     packaging/version \
     $(NULL)
 
@@ -598,6 +599,22 @@ ACLK_NG_FILES = \
     aclk/schema-wrappers/schema_wrapper_utils.cc \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
+
+ACLK_NG_PROTO_DEFINITIONS = \
+    aclk/aclk-schemas/proto/aclk/v1/lib.proto \
+    aclk/aclk-schemas/proto/agent/v1/connection.proto \
+    aclk/aclk-schemas/proto/alarm/v1/config.proto \
+    aclk/aclk-schemas/proto/alarm/v1/stream.proto \
+    aclk/aclk-schemas/proto/chart/v1/config.proto \
+    aclk/aclk-schemas/proto/chart/v1/dimension.proto \
+    aclk/aclk-schemas/proto/chart/v1/instance.proto \
+    aclk/aclk-schemas/proto/chart/v1/stream.proto \
+    aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
+    aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto \
+    aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
+    $(NULL)
+
+dist_noinst_DATA += $(ACLK_NG_PROTO_DEFINITIONS)
 
 ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \

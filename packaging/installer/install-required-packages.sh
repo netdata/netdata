@@ -721,6 +721,20 @@ declare -A pkg_gcc=(
   ['default']="gcc"
 )
 
+# g++, required for building protobuf
+# All three cases of this not being required are systems that implicitly
+# include g++ when installing gcc.
+declare -A pkg_gxx=(
+  ['alpine']="g++"
+  ['arch']="NOTREQUIRED"
+  ['clearlinux']="c-basic"
+  ['debian']="g++"
+  ['gentoo']="NOTREQUIRED"
+  ['macos']="NOTREQUIRED"
+  ['ubuntu']="g++"
+  ['default']="gcc-c++"
+)
+
 declare -A pkg_gdb=(
   ['gentoo']="sys-devel/gdb"
   ['macos']="NOTREQUIRED"
@@ -1291,6 +1305,7 @@ packages() {
 
   require_cmd gcc ||
     require_cmd gcc-multilib || suitable_package gcc
+  require_cmd g++ || suitable_package gxx
 
   require_cmd make || suitable_package make
   require_cmd autoconf || suitable_package autoconf
