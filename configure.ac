@@ -144,9 +144,9 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [lto],
-    [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default autodetect@:>@])],
+    [AS_HELP_STRING([--enable-lto], [Link Time Optimizations @<:@default disabled@:>@])],
     ,
-    [enable_lto="detect"]
+    [enable_lto="no"]
 )
 AC_ARG_ENABLE(
     [https],

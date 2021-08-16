@@ -1475,6 +1475,38 @@ int unit_test(long delay, long shift)
     return ret;
 }
 
+int test_sqlite(void) {
+    sqlite3  *db_meta;
+    fprintf(stderr, "Testing SQLIte\n");
+
+    int rc = sqlite3_open(":memory:", &db_meta);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: DB init failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Create table failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
+        return 1;
+    }
+
+    rc = sqlite3_exec(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
+        return 1;
+    }
+    fprintf(stderr,"SQLite is OK\n");
+    return 0;
+}
+
+
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
 {

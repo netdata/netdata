@@ -232,7 +232,7 @@ USAGE: ${PROGRAM} [options]
   --disable-backend-prometheus-remote-write
   --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
   --disable-backend-mongodb
-  --enable-lto               Enable Link-Time-Optimization. Default: enabled
+  --enable-lto               Enable Link-Time-Optimization. Default: disabled
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
   --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
