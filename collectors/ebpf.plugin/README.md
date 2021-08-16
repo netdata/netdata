@@ -45,7 +45,7 @@ Mount Points and Applications. All the charts in this section update every secon
 The collector stores the actual value inside of its process, but charts only show the difference between the values
 collected in the previous and current seconds.
 
-### System Overview
+### System overview
 
 All charts on system overview are not enabled by default, because they would consume a lot of resources.
 See the [configuration](#configuration) section for details about how to enable them.
@@ -102,11 +102,11 @@ They flush data for specific file descriptors.
 The chart shows calls to `msync(2)` syscalls. This syscall flushes changes of a file that was mapped into memory using
 `mmap(2)`.
 
-##### File System sync
+##### File system sync
 
 This chart monitors calls demonstrating commits from filesystem caches to disk.
 
-##### File Range sync
+##### File range sync
 
 This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous 
 syscall to synchronize data according to its manual.
@@ -191,27 +191,27 @@ processes](https://en.wikipedia.org/wiki/Zombie_process).
 The functions responsible for ending tasks do not return values, so this chart contains information about failures on 
 process and thread creation only.
 
-#### TCP Functions
+#### TCP functions
 
 This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf` and `tcp_close`, these functions are
 used to send, and receive data and to close connections when `TCP` protocol is used.
 
-#### TCP Bandwidth
+#### TCP bandwidth
 
 Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing number of calls,
 it demonstrates the number of bytes sent and received.
 
-#### TCP Retransmit
+#### TCP retransmit
 
 This chart demonstrates calls to functions `tcp_retransmit` that is responsible to execute the TCP retransmission when the
 receiver did not return the package during the expected time.
 
-#### UDP Functions
+#### UDP functions
 
 This chart demonstrates calls to  functions `udp_sendmsg`, and `udp_recvmsg` responsible to send and receive data
 for connections when `UDP` protocol is used.
 
-#### UDP Bandwidth
+#### UDP bandwidth
 
 Like previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`but,  instead of showing the number of calls,
 it monitors the number of bytes sent and received.
@@ -244,7 +244,7 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 
 The `[global]` section defines settings for the whole eBPF collector.
 
-#### ebpf load mode
+#### eBPF load mode
 
 The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
 monitor, process, and display different kinds of information.
