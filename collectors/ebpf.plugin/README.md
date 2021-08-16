@@ -81,8 +81,8 @@ to the function `mark_buffer_dirty`.
 
 ##### Page cache hits
 
-Netdata calls hits when an accessed page cache was not modified and we do not count pages that were added recently. This
-chart uses data from the four functions we are monitoring, mentioned above.
+A page cache hit is when the page cache is successfully accessed with a read operation. We do not count pages that were 
+added relatively recently.
 
 ##### Page cache misses
 
