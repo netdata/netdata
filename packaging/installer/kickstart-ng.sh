@@ -318,6 +318,11 @@ try_package_install() {
   repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
   repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
 
+  # TODO: Need to verify availability of Netdata package before trying to install.
+  # Debian/Ubuntu should use `apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata`
+  # CentOS/Fedora should use `yum search -v netdata | grep -qE 'Repo *: netdata$'`
+  # openSUSE should use `zypper packages -r $(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|') | grep -E 'netdata '`
+
   progress "Downloading repository configuration package."
   if download "${repoconfig_url}" "${repoconfig_file}"; then
     progress "Installing repository configuration package."
