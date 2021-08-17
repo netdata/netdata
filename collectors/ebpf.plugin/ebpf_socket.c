@@ -70,7 +70,6 @@ netdata_socket_t *socket_values;
 
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
-static int *map_fd = NULL;
 static struct bpf_object *objects = NULL;
 static struct bpf_link **probe_links = NULL;
 
@@ -1459,7 +1458,7 @@ static void read_listen_table()
     uint16_t key = 0;
     uint16_t next_key = 0;
 
-    int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     uint8_t value;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, &value);
@@ -1498,8 +1497,8 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_time;
-    int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
-    int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
+    int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
+    int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -1526,7 +1525,7 @@ static void read_hash_global_tables()
     netdata_idx_t res[NETDATA_SOCKET_COUNTER];
 
     netdata_idx_t *val = socket_hash_values;
-    int fd = map_fd[NETDATA_SOCKET_GLOBAL_HASH_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_GLOBAL].map_fd;
     for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
@@ -1608,7 +1607,7 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
  */
 static void ebpf_socket_update_apps_data()
 {
-    int fd = map_fd[NETDATA_SOCKET_APPS_HASH_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
     struct pid_stat *pids = root_of_pids;
@@ -1948,14 +1947,6 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
     outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
-}
-
-/**
- * Set local function pointers, this function will never be compiled with static libraries
- */
-static void set_local_pointers()
-{
-    map_fd = socket_data.map_fd;
 }
 
 /**
@@ -2907,7 +2898,6 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
-    set_local_pointers();
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
