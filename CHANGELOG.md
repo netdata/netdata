@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- Remove ClearLinux from CI. [\#11438](https://github.com/netdata/netdata/pull/11438) ([Ferroin](https://github.com/Ferroin))
+- Add terra to blockchains apps groups [\#11437](https://github.com/netdata/netdata/pull/11437) ([etienne-napoleone](https://github.com/etienne-napoleone))
+- Fix issue \#11434 regarding inconsistent status check on  component. [\#11435](https://github.com/netdata/netdata/pull/11435) ([0x3333](https://github.com/0x3333))
 - Force play timezone [\#11433](https://github.com/netdata/netdata/pull/11433) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Default to not using LTO for builds. [\#11432](https://github.com/netdata/netdata/pull/11432) ([Ferroin](https://github.com/Ferroin))
 - Properly handle reuploads of packages to PackageCloud. [\#11427](https://github.com/netdata/netdata/pull/11427) ([Ferroin](https://github.com/Ferroin))
 - Use DebHelper compat level 9 in repoconfig packages to support Ubuntu 16.04 [\#11426](https://github.com/netdata/netdata/pull/11426) ([Ferroin](https://github.com/Ferroin))
+- Update SQLite version from v3.33.0 to 3.36.0 [\#11423](https://github.com/netdata/netdata/pull/11423) ([stelfrag](https://github.com/stelfrag))
 - Add SQLite unit tests [\#11422](https://github.com/netdata/netdata/pull/11422) ([stelfrag](https://github.com/stelfrag))
 - Remove Ubuntu 20.10 from repository config package builds. [\#11421](https://github.com/netdata/netdata/pull/11421) ([Ferroin](https://github.com/Ferroin))
 - Custom dash broken links [\#11413](https://github.com/netdata/netdata/pull/11413) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -32,6 +36,7 @@
 - CODEOWNERS: Remove knatsakis [\#11377](https://github.com/netdata/netdata/pull/11377) ([knatsakis](https://github.com/knatsakis))
 - Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
 - Update handling of builds of bundled dependencies. [\#11375](https://github.com/netdata/netdata/pull/11375) ([Ferroin](https://github.com/Ferroin))
+- Added support for bundling protobuf as part of the install. [\#11374](https://github.com/netdata/netdata/pull/11374) ([Ferroin](https://github.com/Ferroin))
 - Ebpf latency description [\#11363](https://github.com/netdata/netdata/pull/11363) ([thiagoftsm](https://github.com/thiagoftsm))
 - Properly handle eBPF plugin in RPM packages. [\#11362](https://github.com/netdata/netdata/pull/11362) ([Ferroin](https://github.com/Ferroin))
 - fix `gearman\_workers\_queued` alarm [\#11361](https://github.com/netdata/netdata/pull/11361) ([ilyam8](https://github.com/ilyam8))
@@ -255,7 +260,6 @@
 - Ebpf directory cache [\#10855](https://github.com/netdata/netdata/pull/10855) ([thiagoftsm](https://github.com/thiagoftsm))
 - prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 - implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
-- implements new https client for ACLK [\#10805](https://github.com/netdata/netdata/pull/10805) ([underhood](https://github.com/underhood))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -307,9 +311,6 @@
 - Fix coverity issue \(CID 367566\) [\#10813](https://github.com/netdata/netdata/pull/10813) ([stelfrag](https://github.com/stelfrag))
 - fix claiming via env vars in docker container [\#10811](https://github.com/netdata/netdata/pull/10811) ([ilyam8](https://github.com/ilyam8))
 - Fix eBPF compilation [\#10810](https://github.com/netdata/netdata/pull/10810) ([thiagoftsm](https://github.com/thiagoftsm))
-- update bug report template [\#10807](https://github.com/netdata/netdata/pull/10807) ([underhood](https://github.com/underhood))
-- health: exclude cgroups net ifaces from packets dropped alarms [\#10806](https://github.com/netdata/netdata/pull/10806) ([ilyam8](https://github.com/ilyam8))
-- Don't show alarms for charts without data [\#10804](https://github.com/netdata/netdata/pull/10804) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
