@@ -59,32 +59,42 @@ functions `swap_readpage` and `swap_writepage`, which are functions responsible 
 
 ### Memory
 
-In the memory submenu the eBPF plugin creates two submenus **page cache** and **synchronization**.
+In the memory submenu the eBPF plugin creates two submenus **page cache** and **synchronization** with the following
+organization:
+
+* Page Cache adds 
+  * Page cache ratio
+  * Dirty pages
+  * Page cache hits
+  * Page cache misses
+* Synchronization
+  * File sync
+  * Memory map sync
+  * File system sync
+  * File range sync
 
 #### Page cache
-
-This first submenu brings four charts that demonstrate statistics about page cache access.
 
 Page cache is adding `kprobes` for the kernel functions `add_to_page_cache_lru`, `mark_page_accessed`,
 `account_page_dirtied`, and `mark_buffer_dirty`. Netdata monitors page cache access giving system-level and 
 application-level metrics.
 
-##### Page cache ratio
+#### Page cache ratio
 
 The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around 
  100%, which means that the majority of the work on the machine is processed in memory.
 
-##### Dirty pages
+#### Dirty pages
 
 On `cachestat_dirties` netdata demonstrates the number of pages that were modified. This chart shows the number of calls 
 to the function `mark_buffer_dirty`.
 
-##### Page cache hits
+#### Page cache hits
 
 A page cache hit is when the page cache is successfully accessed with a read operation. We do not count pages that were 
 added relatively recently.
 
-##### Page cache misses
+#### Page cache misses
 
 A page cache miss means that a page was not inside memory when the process tried to access it. This chart shows the result
 of the difference for calls between functions `add_to_page_cache_lru` and `account_page_dirtied`.
@@ -93,22 +103,22 @@ of the difference for calls between functions `add_to_page_cache_lru` and `accou
 
 The **synchronization** submenu of Netdata monitors usage of various kernel syscalls.
 
-##### File sync
+#### File sync
 
 This chart shows calls to synchronization methods, `fsync(2)` and `fdatasync(2)`, to transfer all modified page caches 
  for the files on disk devices. These calls block until the disk reports that the transfer has been completed.
 They flush data for specific file descriptors.
 
-##### Memory map sync
+#### Memory map sync
 
 The chart shows calls to `msync(2)` syscalls. This syscall flushes changes to a file that was mapped into memory using
 `mmap(2)`.
 
-##### File system sync
+#### File system sync
 
 This chart monitors calls demonstrating commits from filesystem caches to disk.
 
-##### File range sync
+#### File range sync
 
 This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous 
 syscall to synchronize data according to its manual.
