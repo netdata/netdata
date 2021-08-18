@@ -6,6 +6,8 @@
 
 #include "aclk_util.h"
 
+#include "aclk.h"
+
 void aclk_send_alarm_log_health(struct alarm_log_health *log_health)
 {
     aclk_query_t query = aclk_query_new(ALARM_LOG_HEALTH);
