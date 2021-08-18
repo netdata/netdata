@@ -7,11 +7,10 @@ install_debian_like() {
   apt-get update
 
   # Install NetData
-  apt-get install -y "/packages/netdata_${VERSION}_${ARCH}.deb"
+  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"_*.deb || exit 1
 
   # Install testing tools
-  apt-get install -y --no-install-recommends \
-    curl netcat jq
+  apt-get install -y --no-install-recommends curl netcat jq || exit 1
 }
 
 install_fedora_like() {
@@ -23,10 +22,10 @@ install_fedora_like() {
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
   # Install NetData
-  "$PKGMGR" install -y /packages/netdata-"${pkg_version}"-*.rpm
+  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq
+  "$PKGMGR" install -y curl nc jq || exit 1
 }
 
 install_centos() {
@@ -38,13 +37,13 @@ install_centos() {
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
   # Install EPEL (needed for `jq`
-  "$PKGMGR" install -y epel-release
+  "$PKGMGR" install -y epel-release || exit 1
 
   # Install NetData
-  "$PKGMGR" install -y /packages/netdata-"${pkg_version}"-*.rpm
+  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq
+  "$PKGMGR" install -y curl nc jq || exit 1
 }
 
 install_suse_like() {
@@ -54,13 +53,45 @@ install_suse_like() {
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
   # Install NetData
-  # FIXME: Allow unsigned packages (for now) #7773
-  zypper install -y --allow-unsigned-rpm \
-    /packages/netdata-"${pkg_version}"-*.rpm
+  zypper install -y --allow-unsigned-rpm /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
-  zypper install -y --no-recommends \
-    curl netcat-openbsd jq
+  zypper install -y --no-recommends curl netcat-openbsd jq || exit 1
+}
+
+dump_log() {
+  cat ./netdata.log
+}
+
+wait_for() {
+  host="${1}"
+  port="${2}"
+  name="${3}"
+  timeout="30"
+
+  if command -v nc > /dev/null ; then
+    netcat="nc"
+  elif command -v netcat > /dev/null ; then
+    netcat="netcat"
+  else
+    printf "Unable to find a usable netcat command.\n"
+    return 1
+  fi
+
+  printf "Waiting for %s on %s:%s ... " "${name}" "${host}" "${port}"
+
+  sleep 30
+
+  i=0
+  while ! ${netcat} -z "${host}" "${port}"; do
+    sleep 1
+    if [ "$i" -gt "$timeout" ]; then
+      printf "Timed out!\n"
+      return 1
+    fi
+    i="$((i + 1))"
+  done
+  printf "OK\n"
 }
 
 case "${DISTRO}" in
@@ -81,3 +112,17 @@ case "${DISTRO}" in
     exit 1
     ;;
 esac
+
+trap dump_log EXIT
+
+/usr/sbin/netdata -D > ./netdata.log 2>&1 &
+
+wait_for localhost 19999 netdata || exit 1
+
+curl -sS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
+
+cat ./response
+
+jq '.version' ./response || exit 1
+
+trap - EXIT

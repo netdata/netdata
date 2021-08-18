@@ -27,6 +27,7 @@ jobs:
           - 'centos:8'
           - 'debian:9'
           - 'debian:10'
+          - 'debian:bullseye' # 11
           - 'fedora:33'
           - 'fedora:34'
           - 'ubuntu:16.04'
@@ -43,6 +44,8 @@ jobs:
           - distro: 'debian:9'
             pre: 'apt-get update'
           - distro: 'debian:10'
+            pre: 'apt-get update'
+          - distro: 'debian:bullseye' # 11
             pre: 'apt-get update'
           - distro: 'ubuntu:16.04'
             pre: 'apt-get update'
