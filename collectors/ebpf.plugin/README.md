@@ -167,7 +167,7 @@ This chart shows the number of calls to `vfs_create`. This function is responsib
 #### Synchronization
 
 This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or
-`fdatasync(2)` on a file. You can see more details on in the Synchronization section.
+`fdatasync(2)` in a file. You can see more details on in the Synchronization section.
 
 #### Open
 
@@ -178,7 +178,7 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 #### Process thread
 
 Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
-system calls: `fork(2)`, `vfork(2)` and `clone(2)`. In turn, each of these system calls uses either the function
+system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. In turn, each of these system calls uses either the function
 `_do_fork` (kernel older than `5.10.0`) or the function `do_fork` (latest kernels). To generate this chart, the eBPF
 collector monitors the cited functions to populate the `process` dimension, and monitors `sys_clone` to identify threads.
 
@@ -196,12 +196,12 @@ process and thread creation only.
 
 #### TCP functions
 
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf` and `tcp_close`; these functions are
+This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are
 used to send & receive data and to close connections when `TCP` protocol is used.
 
 #### TCP bandwidth
 
-Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf` but, instead of showing the
+Like the previous chart, this one also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the
 number of calls, it demonstrates the number of bytes sent and received.
 
 #### TCP retransmit
@@ -216,7 +216,7 @@ receiving data for connections when the `UDP` protocol is used.
 
 #### UDP bandwidth
 
-Like the previous section, this chart also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the
+Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the
 number of calls, it monitors the number of bytes sent and received.
 
 ## Configuration
