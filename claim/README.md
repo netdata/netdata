@@ -459,7 +459,6 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
-
 ### Claiming script
 
 A Space's administrator can also connect an Agent by directly calling the `netdata-claim.sh` script either with root privileges
