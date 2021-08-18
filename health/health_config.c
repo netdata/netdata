@@ -506,63 +506,34 @@ static inline void strip_quotes(char *s) {
 static inline void alert_config_free(struct alert_config *cfg)
 {
     freez(cfg->alarm);
-    cfg->alarm = NULL;
     freez(cfg->template_key);
-    cfg->template_key = NULL;
     freez(cfg->os);
-    cfg->os = NULL;
     freez(cfg->host);
-    cfg->host = NULL;
     freez(cfg->on);
-    cfg->on = NULL;
     freez(cfg->families);
-    cfg->families = NULL;
     freez(cfg->plugin);
-    cfg->plugin = NULL;
     freez(cfg->module);
-    cfg->module = NULL;
     freez(cfg->charts);
-    cfg->charts = NULL;
     freez(cfg->lookup);
-    cfg->lookup = NULL;
     freez(cfg->calc);
-    cfg->calc = NULL;
     freez(cfg->warn);
-    cfg->warn = NULL;
     freez(cfg->crit);
-    cfg->crit = NULL;
     freez(cfg->every);
-    cfg->every = NULL;
     freez(cfg->green);
-    cfg->green = NULL;
     freez(cfg->red);
-    cfg->red = NULL;
     freez(cfg->exec);
-    cfg->exec = NULL;
     freez(cfg->to);
-    cfg->to = NULL;
     freez(cfg->units);
-    cfg->units = NULL;
     freez(cfg->info);
-    cfg->info = NULL;
     freez(cfg->classification);
-    cfg->classification = NULL;
     freez(cfg->component);
-    cfg->component = NULL;
     freez(cfg->type);
-    cfg->type = NULL;
     freez(cfg->delay);
-    cfg->delay = NULL;
     freez(cfg->options);
-    cfg->options = NULL;
     freez(cfg->repeat);
-    cfg->repeat = NULL;
     freez(cfg->host_labels);
-    cfg->host_labels = NULL;
     freez(cfg->p_db_lookup_dimensions);
-    cfg->p_db_lookup_dimensions = NULL;
     freez(cfg->p_db_lookup_method);
-    cfg->p_db_lookup_method = NULL;
 }
 
 static int health_readfile(const char *filename, void *data) {

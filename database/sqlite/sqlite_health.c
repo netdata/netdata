@@ -1162,11 +1162,11 @@ void sql_select_alert_config(char *hash_str, BUFFER *wb)
         if (sqlite3_column_type(res_alert, 4) != SQLITE_NULL) {
             buffer_sprintf(wb, ",\n\t\t\"class\": \"%s\"", sqlite3_column_text(res_alert, 4));
         }
-        if (sqlite3_column_type(res_alert, 5) != SQLITE_NULL) {
-            buffer_sprintf(wb, ",\n\t\t\"component\": \"%s\"", sqlite3_column_text(res_alert, 5));
-        }
         if (sqlite3_column_type(res_alert, 6) != SQLITE_NULL) {
             buffer_sprintf(wb, ",\n\t\t\"type\": \"%s\"", sqlite3_column_text(res_alert, 6));
+        }
+        if (sqlite3_column_type(res_alert, 5) != SQLITE_NULL) {
+            buffer_sprintf(wb, ",\n\t\t\"component\": \"%s\"", sqlite3_column_text(res_alert, 5));
         }
         if (sqlite3_column_type(res_alert, 7) != SQLITE_NULL) {
             buffer_sprintf(wb, ",\n\t\t\"os\": \"%s\"", sqlite3_column_text(res_alert, 7));
