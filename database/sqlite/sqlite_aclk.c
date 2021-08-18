@@ -135,7 +135,9 @@ void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_d
     uv_mutex_unlock(&wc->cmd_mutex);
 
     /* wake up event loop */
-    fatal_assert(0 == uv_async_send(&wc->async));
+    int rc = uv_async_send(&wc->async);
+    if (unlikely(rc))
+        debug(D_ACLK_SYNC, "Failed to wake up event loop");
 }
 
 struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_config* wc)
