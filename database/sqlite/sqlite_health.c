@@ -359,7 +359,7 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_id, RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
-    char *guid = NULL, command[1000];
+    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -367,14 +367,14 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         return;
     }
 
-    guid = strdupz(host->machine_guid);
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower(host->host_uuid, uuid_str);
+    uuid_str[8] = '_';
+    uuid_str[13] = '_';
+    uuid_str[18] = '_';
+    uuid_str[23] = '_';
 
-    guid[8]='_';
-    guid[13]='_';
-    guid[18]='_';
-    guid[23]='_';
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LOG(guid));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LOG(uuid_str));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -385,7 +385,6 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
     rc = sqlite3_bind_int64(res, 1, unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind unique_id parameter to SQL_SELECT_HEALTH_LOG");
-        debug(D_HEALTH, "GREPME2: Failed to bind 1");
         goto failed;
     }
 
@@ -400,8 +399,8 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
 
-        char uuid_str[GUID_LEN + 1];
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), uuid_str);
+        char config_hash_id[GUID_LEN + 1];
+        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 4)), config_hash_id);
 
         char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 18));
 
@@ -450,7 +449,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             (unsigned int) sqlite3_column_int64(res, 1),
             (unsigned int) sqlite3_column_int64(res, 2),
             (unsigned int) sqlite3_column_int64(res, 3),
-            uuid_str,
+            config_hash_id,
             sqlite3_column_text(res, 13),
             sqlite3_column_text(res, 14),
             sqlite3_column_text(res, 15),
@@ -534,7 +533,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
 void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
-    char *guid = NULL, command[1000];
+    char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -542,14 +541,14 @@ void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
         return;
     }
 
-    guid = strdupz(host->machine_guid);
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower(host->host_uuid, uuid_str);
+    uuid_str[8] = '_';
+    uuid_str[13] = '_';
+    uuid_str[18] = '_';
+    uuid_str[23] = '_';
 
-    guid[8]='_';
-    guid[13]='_';
-    guid[18]='_';
-    guid[23]='_';
-
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_ALL_HEALTH_LOG(guid, host->health_log.max));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_ALL_HEALTH_LOG(uuid_str, host->health_log.max));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
