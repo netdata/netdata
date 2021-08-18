@@ -13,6 +13,12 @@ int sql_create_health_log_table(RRDHOST *host) {
     int rc;
     char *err_msg = NULL, command[MAX_HEALTH_SQL_SIZE + 1];
 
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+        return 1;
+    }
+
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(host->host_uuid, uuid_str);
     uuid_str[8] = '_';
@@ -21,12 +27,6 @@ int sql_create_health_log_table(RRDHOST *host) {
     uuid_str[23] = '_';
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
-        return 1;
-    }
 
     rc = sqlite3_exec(db_meta, command, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
@@ -64,7 +64,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     uuid_str[18] = '_';
     uuid_str[23] = '_';
 
-    sprintf(command, SQL_UPDATE_HEALTH_LOG(uuid_str));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -374,7 +374,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
     guid[18]='_';
     guid[23]='_';
 
-    sprintf(command, SQL_SELECT_HEALTH_LOG(guid));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_HEALTH_LOG(guid));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -549,7 +549,7 @@ void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host) {
     guid[18]='_';
     guid[23]='_';
 
-    sprintf(command, SQL_SELECT_ALL_HEALTH_LOG(guid, host->health_log.max));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_SELECT_ALL_HEALTH_LOG(guid, host->health_log.max));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -613,6 +613,10 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to cleanup health log table, rc = %d", rc);
 
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement to cleanup health log table");
+
     host->health_log_entries_written = rotate_every;
 }
 
@@ -645,6 +649,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
         error_report("Failed to prepare statement to count health log entries from db");
         return;
     }
+
     rc = sqlite3_step(res);
     if (likely(rc == SQLITE_ROW))
         host->health_log_entries_written = (size_t) sqlite3_column_int64(res, 0);
@@ -652,6 +657,8 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to count health log entries from db");
+
+    info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", host->hostname, uuid_str, host->health_log_entries_written);
 }
 
 static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
@@ -677,6 +684,7 @@ static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
+    ssize_t errored = 0, loaded = 0;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
     host->health_log_entries_written = 0;
@@ -705,9 +713,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        errno = 0;
-        ssize_t errored = 0;
-
         ALARM_ENTRY *ae = NULL;
 
         // check that we have valid ids
@@ -850,6 +855,8 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
             host->health_max_alarm_id = ae->alarm_id;
+
+        loaded++;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -861,7 +868,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     if (unlikely(!host->health_log.next_alarm_id || host->health_log.next_alarm_id <= host->health_max_alarm_id))
         host->health_log.next_alarm_id = host->health_max_alarm_id + 1;
 
-    //debug(D_HEALTH, "HEALTH [%s]: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", host->hostname, filename, loaded, updated, errored, duplicate);
+    info("HEALTH [%s]: Table health_log_%s, loaded %zd alarm entries, errors in %zd entries.", host->hostname, uuid_str, loaded, errored);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
