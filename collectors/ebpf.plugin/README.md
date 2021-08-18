@@ -39,18 +39,96 @@ section for details.
 
 ## Charts
 
-The eBPF collector creates an **eBPF** menu in the Agent's dashboard along with three sub-menus: **File**, **VFS**, and
-**Process**. All the charts in this section update every second. The collector stores the actual value inside of its
-process, but charts only show the difference between the values collected in the previous and current seconds.
+The eBPF collector creates an **eBPF** menu in the Agent's dashboard along with two sub-menus: **Socket**, and
+**Process**. The plugin also creates charts on different menus, like System Overview, Memory, Disks, Filesystem,
+Mount Points and Applications. All the charts in this section update every second.
 
-### File
+The collector stores the actual value inside of its process, but charts only show the difference between the values
+collected in the previous and current seconds.
 
-This group has two charts demonstrating how software interacts with the Linux kernel to open and close file descriptors.
+### System overview
+
+Not all charts within the System Overview menu are enabled by default, because they add around 100ns overhead for each
+function call, this number is small for a human perspective, but the functions are called many times creating an impact
+on host. See the [configuration](#configuration) section for details about how to enable them.
+
+#### Swap
+
+Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are calling
+functions `swap_readpage` and `swap_writepage`, which are functions responsible for doing IO in swap memory.
+
+### Memory
+
+In the memory submenu the eBPF plugin creates two submenus **page cache** and **synchronization** with the following
+organization:
+
+* Page Cache
+  * Page cache ratio
+  * Dirty pages
+  * Page cache hits
+  * Page cache misses
+* Synchronization
+  * File sync
+  * Memory map sync
+  * File system sync
+  * File range sync
+
+#### Page cache ratio
+
+The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around
+100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio Netdata
+monitors calls for kernel functions `add_to_page_cache_lru`, `mark_page_accessed`, `account_page_dirtied`, and
+`mark_buffer_dirty`.
+
+#### Dirty pages
+
+On `cachestat_dirties` Netdata demonstrates the number of pages that were modified. This chart shows the number of calls
+to the function `mark_buffer_dirty`.
+
+#### Page cache hits
+
+A page cache hit is when the page cache is successfully accessed with a read operation. We do not count pages that were
+added relatively recently.
+
+#### Page cache misses
+
+A page cache miss means that a page was not inside memory when the process tried to access it. This chart shows the result
+of the difference for calls between functions `add_to_page_cache_lru` and `account_page_dirtied`.
+
+#### File sync
+
+This chart shows calls to synchronization methods, `fsync(2)` and `fdatasync(2)`, to transfer all modified page caches
+for the files on disk devices. These calls block until the disk reports that the transfer has been completed. They flush
+data for specific file descriptors.
+
+#### Memory map sync
+
+The chart shows calls to `msync(2)` syscalls. This syscall flushes changes to a file that was mapped into memory using
+`mmap(2)`.
+
+#### File system sync
+
+This chart monitors calls demonstrating commits from filesystem caches to disk.
+
+#### File range sync
+
+This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous
+syscall to synchronize data according to its manual.
+
+### Disk
+
+The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
+chart `disk_latency_io` for each disk on the host. These charts use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
+`block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events.
+
+### Filesystem
+
+This group has two charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
 
 #### File descriptor
 
 This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. Most
-software do not commonly call these functions directly, but they are behind the system calls `open(2)`, `openat(2)`,
+software doesn't commonly call these functions directly, they are behind the system calls `open(2)`, `openat(2)`,
 and `close(2)`.
 
 #### File error
@@ -59,13 +137,13 @@ This chart shows the number of times some software tried and failed to open or c
 
 ### VFS
 
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
-filesystems. The functions present inside this API are used for all filesystems, so it's possible the charts in this
-group won't show _all_ the actions that occurred on your system.
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular filesystems.
+The functions presented inside this API are not used for filesystems, so it's possible that the charts in this section
+won't show _all_ the actions that occurred on your system.
 
 #### Deleted objects
 
-This chart monitors calls for `vfs_unlink`. This function is responsible for removing objects from the file system.
+This chart monitors calls to `vfs_unlink`. This function is responsible for removing objects from the file system.
 
 #### IO
 
@@ -73,8 +151,8 @@ This chart shows the number of calls to the functions `vfs_read` and `vfs_write`
 
 #### IO bytes
 
-This chart also monitors `vfs_read` and `vfs_write`, but instead shows the total of bytes read and written with these
-functions.
+This chart also monitors `vfs_read` and `vfs_write` but, instead of the number of calls, it shows the total amount of
+bytes read and written with these functions.
 
 The Agent displays the number of bytes written as negative because they are moving down to disk.
 
@@ -84,40 +162,62 @@ The Agent counts and shows the number of instances where a running program exper
 
 #### Create
 
-This chart shows the number of calls for `vfs_create`. This function is responsible to create files.
+This chart shows the number of calls to `vfs_create`. This function is responsible for creating files.
 
 #### Synchronization
 
-This chart shows the number of calls for `vfs_fsync`. This function is responsible to perform a fsync or fdatasync 
-on a file.
+This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or
+`fdatasync(2)` on a file. You can see more details in the Synchronization section.
 
 #### Open
 
-This chart shows the number of calls for `vfs_open`. This function is responsible to open files.
+This chart shows the number of calls to `vfs_open`. This function is responsible for opening files.
 
-### Process
-
-For this group, the eBPF collector monitors process/thread creation and process end, and then displays any errors in the
-following charts.
+### eBPF
 
 #### Process thread
 
 Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
-system calls: `fork(2)`, `vfork(2)` and `clone(2)`. In turn, each of these system calls use the function `_do_fork`. To
-generate this chart, the eBPF collector monitors `_do_fork` to populate the `process` dimension, and monitors
-`sys_clone` to identify threads.
+system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. In turn, each of these system calls uses either the function
+`_do_fork` (kernel older than `5.10.0`) or the function `do_fork` (latest kernels). To generate this chart, the eBPF
+collector monitors the cited functions to populate the `process` dimension, and monitors `sys_clone` to identify threads.
 
 #### Exit
 
 Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
 system that the task is finishing its work. The second step is to release the kernel information with the internal
-function `release_task`. The difference between the two dimensions can help you discover [zombie
-processes](https://en.wikipedia.org/wiki/Zombie_process).
+function `release_task`. The difference between the two dimensions can help you discover
+[zombie processes](https://en.wikipedia.org/wiki/Zombie_process).
 
 #### Task error
 
 The functions responsible for ending tasks do not return values, so this chart contains information about failures on
-process and thread creation.
+process and thread creation only.
+
+#### TCP functions
+
+This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are
+used to send & receive data and to close connections when `TCP` protocol is used.
+
+#### TCP bandwidth
+
+Like the previous chart, this one also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the
+number of calls, it demonstrates the number of bytes sent and received.
+
+#### TCP retransmit
+
+This chart demonstrates calls to function `tcp_retransmit` that is responsible for executing TCP retransmission when the
+receiver did not return the packet during the expected time.
+
+#### UDP functions
+
+This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`,  which are responsible for sending &
+receiving data for connections when the `UDP` protocol is used.
+
+#### UDP bandwidth
+
+Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the
+number of calls, it monitors the number of bytes sent and received.
 
 ## Configuration
 
@@ -147,7 +247,7 @@ cd /etc/netdata/   # Replace with your Netdata configuration directory, if not /
 
 The `[global]` section defines settings for the whole eBPF collector.
 
-#### ebpf load mode
+#### eBPF load mode
 
 The collector has two different eBPF programs. These programs monitor the same functions inside the kernel, but they
 monitor, process, and display different kinds of information.
