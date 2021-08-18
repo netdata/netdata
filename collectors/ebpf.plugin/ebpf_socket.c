@@ -484,7 +484,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21071,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
-                      3, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_FAMILY,
