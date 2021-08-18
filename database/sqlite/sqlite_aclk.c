@@ -47,9 +47,10 @@ void aclk_del_worker_thread(struct aclk_database_worker_config *wc)
 
     uv_mutex_lock(&aclk_async_lock);
     struct aclk_database_worker_config **tmp = &aclk_thread_head;
-    while ((*tmp) != wc)
+    while (*tmp && (*tmp) != wc)
         tmp = &(*tmp)->next;
-    *tmp = wc->next;
+    if (*tmp)
+        *tmp = wc->next;
     uv_mutex_unlock(&aclk_async_lock);
     return;
 }
