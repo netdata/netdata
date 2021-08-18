@@ -84,8 +84,15 @@ enum ebpf_module_indexes {
     EBPF_MODULE_FILESYSTEM_IDX,
     EBPF_MODULE_DISK_IDX,
     EBPF_MODULE_MOUNT_IDX,
-    EBPF_MODULE_FD_IDX
+    EBPF_MODULE_FD_IDX,
+    EBPF_MODULE_HARDIRQ_IDX
 };
+
+typedef struct ebpf_tracepoint {
+    bool enabled;
+    char *class;
+    char *event;
+} ebpf_tracepoint_t;
 
 // Copied from musl header
 #ifndef offsetof
@@ -201,6 +208,10 @@ extern void ebpf_create_charts_on_apps(char *name,
 extern void write_end_chart();
 
 extern void ebpf_cleanup_publish_syscall(netdata_publish_syscall_t *nps);
+
+extern int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
+extern int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
+extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 

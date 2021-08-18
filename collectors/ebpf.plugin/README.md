@@ -218,6 +218,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 -   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 -   `process`: This eBPF program creates charts that show information about process life.
     When in `return` mode, it also creates charts showing errors when these operations are executed.
+-   `hardirq`: This eBPF program creates charts that show information about
+    time spent servicing individual hardware interrupt requests (hard IRQs).
 
 You can also enable the following eBPF programs:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
@@ -249,6 +251,7 @@ The following configuration files are available:
 - `disk.conf`: Configuration for the `disk` thread.
 - `fd.conf`: Configuration for the `file descriptor` thread.
 - `filesystem.conf`: Configuration for the `filesystem` thread.
+- `hardirq.conf`: Configuration for the `hardirq` thread.
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
   also lets you specify which network the eBPF collector monitors.
