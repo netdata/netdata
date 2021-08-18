@@ -480,24 +480,8 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
             (long unsigned int)sqlite3_column_int64(res, 27),
             (sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
-        //not needed, it's already stored with replaced info
-        char *replaced_info = NULL;
-        if (likely(sqlite3_column_text(res, 20))) {
-            char *m = NULL;
-            replaced_info = strdupz((char *) sqlite3_column_text(res, 20));
-            size_t pos = 0;
-            while ((m = strstr(replaced_info + pos, "$family"))) {
-                char *buf = NULL;
-                pos = m - replaced_info;
-                buf = find_and_replace(replaced_info, "$family", (char *) sqlite3_column_text(res, 20) ? (const char *)sqlite3_column_text(res, 20) : "", m);
-                freez(replaced_info);
-                replaced_info = strdupz(buf);
-                freez(buf);
-            }
-        }
-
         buffer_strcat(wb, "\t\t\"info\":\"");
-        buffer_strcat(wb, replaced_info);
+        buffer_strcat(wb, (char *) sqlite3_column_text(res, 20));
         buffer_strcat(wb, "\",\n");
 
         if(unlikely(sqlite3_column_int64(res, 10) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
@@ -520,7 +504,7 @@ void health_alarm_entry_sql2json(BUFFER *wb, uint32_t unique_id, uint32_t alarm_
 
         buffer_strcat(wb, "\t}");
 
-        freez(replaced_info);
+        freez(edit_command);
     }
 
     failed:
