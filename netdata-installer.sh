@@ -236,6 +236,7 @@ USAGE: ${PROGRAM} [options]
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
   --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
+  --use-system-protobuf      Use a system copy of libprotobuf instead of bundling our own (default is to use the bundled copy).
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
@@ -278,6 +279,7 @@ while [ -n "${1}" ]; do
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
     "--use-system-lws") USE_SYSTEM_LWS=1 ;;
+    "--use-system-protobuf") USE_SYSTEM_PROTOBUF=1 ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
@@ -310,7 +312,10 @@ while [ -n "${1}" ]; do
     "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-kinesis/} --enable-backend-kinesis" ;;
     "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis" ;;
     "--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-prometheus-remote-write/} --enable-backend-prometheus-remote-write" ;;
-    "--disable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write" ;;
+    "--disable-backend-prometheus-remote-write")
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write"
+      NETDATA_DISABLE_PROMETHEUS=1
+      ;;
     "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb" ;;
     "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb" ;;
     "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto" ;;
@@ -722,6 +727,79 @@ bundle_libwebsockets() {
 }
 
 bundle_libwebsockets
+
+# -----------------------------------------------------------------------------
+
+build_protobuf() {
+  local env_cmd=''
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
+  fi
+
+  pushd "${1}" > /dev/null || return 1
+  run ${env_cmd} ./configure --disable-shared \
+                             --without-zlib \
+                             --disable-dependency-tracking \
+                             --with-pic || return 1
+  run ${env_cmd} ${make} -j$(find_processors) || return 1
+  popd > /dev/null || return 1
+}
+
+copy_protobuf() {
+  target_dir="${PWD}/externaldeps/protobuf"
+
+  run mkdir -p "${target_dir}" || return 1
+  run cp -a "${1}/src" "${target_dir}" || return 1
+}
+
+bundle_protobuf() {
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+    echo "Skipping protobuf"
+    return 0
+  fi
+
+  if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
+    echo "Skipping protobuf"
+    defer_error "You have requested use of a system copy of protobuf. This should work, but it is not recommended as it's very likely to break if you upgrade the currently installed version of protobuf."
+    return 0
+  fi
+
+  PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
+
+  tmp="$(mktemp -d -t netdata-protobuf-XXXXXX)"
+  PROTOBUF_PACKAGE_BASENAME="protobuf-cpp-${PROTOBUF_PACKAGE_VERSION}.tar.gz"
+
+  if fetch_and_verify "protobuf" \
+    "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_PACKAGE_VERSION}/${PROTOBUF_PACKAGE_BASENAME}" \
+    "${PROTOBUF_PACKAGE_BASENAME}" \
+    "${tmp}" \
+    "${NETDATA_LOCAL_TARBALL_VERRIDE_PROTOBUF}"; then
+    if run tar -xf "${tmp}/${PROTOBUF_PACKAGE_BASENAME}" -C "${tmp}" &&
+      build_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
+      copy_protobuf "${tmp}/protobuf-${PROTOBUF_PACKAGE_VERSION}" &&
+      rm -rf "${tmp}"; then
+      run_ok "protobuf built and prepared."
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
+    else
+      run_failed "Failed to build protobuf."
+      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+        exit 1
+      else
+        defer_error_highlighted "Failed to build protobuf. You may not be able to connect this node to Netdata Cloud."
+      fi
+    fi
+  else
+    run_failed "Unable to fetch sources for protobuf."
+    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
+      exit 1
+    else
+      defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
+    fi
+  fi
+}
+
+bundle_protobuf
 
 # -----------------------------------------------------------------------------
 

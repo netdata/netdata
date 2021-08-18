@@ -942,6 +942,10 @@ netdataDashboard.context = {
         info: 'CPU interrupts in detail. At the <a href="#menu_cpu">CPUs</a> section, interrupts are analyzed per CPU core.'
     },
 
+    'system.hardirq_latency': {
+        info: 'Total time spent servicing hardware interrupts.'
+    },
+
     'system.softirqs': {
         info: 'CPU softirqs in detail. At the <a href="#menu_cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
     },
