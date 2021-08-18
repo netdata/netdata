@@ -732,10 +732,9 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         // Check if we got last_repeat field
         time_t last_repeat = 0;
-        char* alarm_name = strdupz((char *) sqlite3_column_text(res, 14));
         last_repeat = (time_t)sqlite3_column_int64(res, 27);
 
-        RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
+        RRDCALC *rc = alarm_max_last_repeat(host, (char *) sqlite3_column_text(res, 14), simple_hash((char *) sqlite3_column_text(res, 14)));
         if (!rc) {
             for(rc = host->alarms; rc ; rc = rc->next) {
                 RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl_t *)rc);
@@ -744,7 +743,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
                 }
             }
 
-            rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
+            rc = alarm_max_last_repeat(host, (char *) sqlite3_column_text(res, 14), simple_hash((char *) sqlite3_column_text(res, 14)));
         }
 
         if(unlikely(rc)) {
@@ -756,8 +755,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
                 continue;
             }
         }
-
-        freez(alarm_name);
 
         ae = callocz(1, sizeof(ALARM_ENTRY));
 
