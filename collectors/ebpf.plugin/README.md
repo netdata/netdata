@@ -167,7 +167,7 @@ This chart shows the number of calls to `vfs_create`. This function is responsib
 #### Synchronization
 
 This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or
-`fdatasync(2)` in a file. You can see more details on in the Synchronization section.
+`fdatasync(2)` on a file. You can see more details in the Synchronization section.
 
 #### Open
 
