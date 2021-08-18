@@ -534,6 +534,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     freez(cfg->host_labels);
     freez(cfg->p_db_lookup_dimensions);
     freez(cfg->p_db_lookup_method);
+    freez(cfg);
 }
 
 static int health_readfile(const char *filename, void *data) {
