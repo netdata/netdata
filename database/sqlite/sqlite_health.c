@@ -1110,13 +1110,15 @@ void sql_select_alert_config(char *hash_str, BUFFER *wb)
     sqlite3_stmt *res_alert = NULL;
 
     uuid_t hash_id;
-    if (hash_str)
-        uuid_parse(hash_str, hash_id);
 
-    if (hash_str)
-        rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG_WITH_HASH, -1, &res_alert, 0);
-    else
+    if (hash_str) {
+        if (uuid_parse(hash_str, hash_id)) {
+            return;
+        } else
+            rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG_WITH_HASH, -1, &res_alert, 0);
+    } else
         rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG, -1, &res_alert, 0);
+
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch chart config with hash");
         return;
