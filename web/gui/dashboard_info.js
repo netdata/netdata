@@ -840,6 +840,11 @@ netdataDashboard.submenu = {
     'ip.kernel': {
         title: 'Kernel Functions',
         info: 'Next charts are made when <code>ebpf.plugin</code> is running on your host. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows calls for kernel functions per <a href="#menu_apps_submenu_net">application</a>.'
+    },
+
+    'apps.net': {
+        title: 'Network monitoring',
+        info: 'Netdata also gives a summary for eBPF charts in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     }
 };
 
@@ -1355,31 +1360,31 @@ netdataDashboard.context = {
     },
 
     'apps.total_bandwidth_sent': {
-        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
     },
 
     'apps.total_bandwidth_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
     },
 
     'apps.bandwidth_tcp_send': {
-        info: 'Calls for function <code>tcp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Calls for function <code>tcp_sendmsg</code>.'
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>.'
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retransmit_skb</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
     },
 
     'apps.bandwidth_udp_send': {
-        info: 'Calls for function <code>udp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Calls for function <code>udp_sendmsg</code>.'
     },
 
     'apps.bandwidth_udp_recv': {
-        info: 'Calls for function <code>udp_recvmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
+        info: 'Calls for function <code>udp_recvmsg</code>.'
     },
 
     'apps.dc_hit_ratio': {
