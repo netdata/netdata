@@ -1207,7 +1207,7 @@ netdataDashboard.context = {
 
     'ip.tcp_error': {
         title : 'TCP errors',
-        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
+        info: 'Failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
     },
 
     'ip.tcp_retransmit': {
@@ -1372,23 +1372,23 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_send': {
-        info: 'Calls to function <code>tcp_sendmsg</code>.'
+        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'Calls to functions <code>tcp_cleanup_rbuf</code>.'
+        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
+        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
     },
 
     'apps.bandwidth_udp_send': {
-        info: 'Calls for function <code>udp_sendmsg</code>.'
+        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
     },
 
     'apps.bandwidth_udp_recv': {
-        info: 'Calls for function <code>udp_recvmsg</code>.'
+        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
     },
 
     'apps.dc_hit_ratio': {
