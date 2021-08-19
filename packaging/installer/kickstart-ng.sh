@@ -235,6 +235,26 @@ get_distro_compat_name() {
   fi
 }
 
+# Check for the existence of a usable package in the repo.
+pkg_check() {
+  distro="${1}"
+
+  case "${distro}" in
+    debian|ubuntu)
+      apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
+      return $?
+      ;;
+    centos|fedora)
+      ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata$'
+      return $?
+      ;;
+    opensuse)
+      zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|')" | grep -E 'netdata '
+      return $?
+      ;;
+  esac
+}
+
 try_package_install() {
   if [ -z "${DISTRO}" ]; then
     echo "Unable to determine Linux distribution for native packages."
@@ -318,38 +338,41 @@ try_package_install() {
   repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
   repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
 
-  # TODO: Need to verify availability of Netdata package before trying to install.
-  # Debian/Ubuntu should use `apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata`
-  # CentOS/Fedora should use `yum search -v netdata | grep -qE 'Repo *: netdata$'`
-  # openSUSE should use `zypper packages -r $(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|') | grep -E 'netdata '`
-
   progress "Downloading repository configuration package."
-  if download "${repoconfig_url}" "${repoconfig_file}"; then
-    progress "Installing repository configuration package."
-    # shellcheck disable=SC2086
-    if run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
-      progress "Updating repository metadata."
-      if run ${pm_cmd} ${repo_subcmd} ${opts}; then
-        progress "Installing Netdata package."
-        # shellcheck disable=SC2086
-        if run ${pm_cmd} install ${opts} netdata; then
-          return 0
-        else
-          warning "Failed to install Netdata package."
-          progress "Attempting to uninstall repository configuration package."
-          # shellcheck disable=SC2086
-          run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
-          return 2
-        fi
-      else
-        fatal "Failed to update repository metadata."
-      fi
-    else
-      warning "Failed to install repository configuration package."
-      return 2
-    fi
-  else
+  if ! download "${repoconfig_url}" "${repoconfig_file}"; then
     warning "Failed to download repository configuration package."
+    return 2
+  fi
+
+  progress "Installing repository configuration package."
+  # shellcheck disable=SC2086
+  if ! run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
+    warning "Failed to install repository configuration package."
+    return 2
+  fi
+
+  progress "Updating repository metadata."
+  # shellcheck disable=SC2086
+  if ! run ${pm_cmd} ${repo_subcmd} ${opts}; then
+    fatal "Failed to update repository metadata."
+  fi
+
+  progress "Checking for usable Netdata package."
+  if ! pkg_check "${distro_compat_name}"; then
+    warning "Could not find a usable native packafe for ${distro} on ${SYSARCH}."
+    progress "Attempting to uninstall repository configuration package."
+    # shellcheck disable=SC2086
+    run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    return 2
+  fi
+
+  progress "Installing Netdata package."
+  # shellcheck disable=SC2086
+  if ! run ${pm_cmd} install ${opts} netdata; then
+    warning "Failed to install Netdata package."
+    progress "Attempting to uninstall repository configuration package."
+    # shellcheck disable=SC2086
+    run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
     return 2
   fi
 }
