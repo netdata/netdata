@@ -835,6 +835,11 @@ netdataDashboard.submenu = {
     'apps.file_access': {
         title: 'File Access',
         info: 'Netdata also gives a summary for this chart on <a href="#menu_filesystem_submenu_File_access">Filesystem submenu</a> (more details on <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file" target="_blank">eBPF plugin file chart section</a>).'
+    },
+
+    'ip.kernel': {
+        title: 'Kernel Functions',
+        info: 'Next charts are made when <code>ebpf.plugin</code> is running on your host. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows calls for kernel functions per <a href="#menu_apps_submenu_net">application</a>.'
     }
 };
 
@@ -1349,32 +1354,32 @@ netdataDashboard.context = {
         info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
-    'apps.bandwidth_sent': {
-        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
+    'apps.total_bandwidth_sent': {
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
-    'apps.bandwidth_recv': {
-        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    'apps.total_bandwidth_recv': {
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> and <code>udp_recvmsg</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.bandwidth_tcp_send': {
-        info: 'Calls for function <code>tcp_sendmsg</code>.'
+        info: 'Calls for function <code>tcp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.bandwidth_tcp_retransmit': {
-        info: 'Calls for functions <code>tcp_retransmit_skb</code>.'
+        info: 'Calls for functions <code>tcp_retransmit_skb</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.bandwidth_udp_send': {
-        info: 'Calls for function <code>udp_sendmsg</code>.'
+        info: 'Calls for function <code>udp_sendmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.bandwidth_udp_recv': {
-        info: 'Calls for function <code>udp_recvmsg</code>.'
+        info: 'Calls for function <code>udp_recvmsg</code>. Netdata also gives a summary for this chart in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     },
 
     'apps.dc_hit_ratio': {
