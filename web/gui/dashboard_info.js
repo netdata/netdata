@@ -1193,37 +1193,37 @@ netdataDashboard.context = {
 
     'ip.tcp_functions': {
         title : 'TCP calls',
-        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
     },
 
     'ip.total_tcp_bandwidth': {
         title : 'TCP bandwidth',
-        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+        info: 'Bytes sent and received by functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead of <code>tcp_recvmsg</code>, because the last one misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
     },
 
     'ip.tcp_error': {
         title : 'TCP errors',
-        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code>, and <code>tcp_close</code>.'
     },
 
     'ip.tcp_retransmit': {
         title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
+        info: 'Number of packets retransmitted by function <code>tcp_retransmit_skb</code>.'
     },
 
     'ip.udp_functions': {
         title : 'UDP calls',
-        info: 'Successful or failed calls to  functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+        info: 'Successful or failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
     },
 
     'ip.total_udp_bandwidth': {
         title : 'UDP bandwidth',
-        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+        info: 'Bytes sent and received by functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
     },
 
     'ip.udp_error': {
         title : 'UDP errors',
-        info: 'Failed calls that to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+        info: 'Failed calls to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
     },
 
 
@@ -1368,11 +1368,11 @@ netdataDashboard.context = {
     },
 
     'apps.bandwidth_tcp_send': {
-        info: 'Calls for function <code>tcp_sendmsg</code>.'
+        info: 'Calls to function <code>tcp_sendmsg</code>.'
     },
 
     'apps.bandwidth_tcp_recv': {
-        info: 'Calls for functions <code>tcp_cleanup_rbuf</code>.'
+        info: 'Calls to functions <code>tcp_cleanup_rbuf</code>.'
     },
 
     'apps.bandwidth_tcp_retransmit': {
