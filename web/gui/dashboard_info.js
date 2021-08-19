@@ -1181,6 +1181,42 @@ netdataDashboard.context = {
         info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
     },
 
+    'ip.tcp_functions': {
+        title : 'TCP calls',
+        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+    },
+
+    'ip.total_tcp_bandwidth': {
+        title : 'TCP bandwidth',
+        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'ip.tcp_error': {
+        title : 'TCP errors',
+        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
+    },
+
+    'ip.tcp_retransmit': {
+        title : 'TCP retransmit',
+        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
+    },
+
+    'ip.udp_functions': {
+        title : 'UDP calls',
+        info: 'Successful or failed calls to  functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+    },
+
+    'ip.total_udp_bandwidth': {
+        title : 'UDP bandwidth',
+        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+    },
+
+    'ip.udp_error': {
+        title : 'UDP errors',
+        info: 'Failed calls that to functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
+    },
+
+
     'ip.tcp_syn_queue': {
         info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
             'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
@@ -3638,36 +3674,6 @@ netdataDashboard.context = {
 
     // ------------------------------------------------------------------------
     // eBPF
-
-    'ebpf.tcp_functions': {
-        title : 'TCP calls',
-        info: 'Successful or failed calls to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
-    },
-
-    'ebpf.tcp_bandwidth': {
-        title : 'TCP bandwidth',
-        info: 'Bytes sent and received for functions <code>tcp_sendmsg</code> and <code>tcp_cleanup_rbuf</code>. We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
-    },
-
-    'ebpf.tcp_retransmit': {
-        title : 'TCP retransmit',
-        info: 'Number of packets retransmitted for function <code>tcp_retransmit_skb</code>.'
-    },
-
-    'ebpf.tcp_error': {
-        title : 'TCP errors',
-        info: 'Failed calls that to functions <code>tcp_sendmsg</code>, <code>tcp_cleanup_rbuf</code> and <code>tcp_close</code>.'
-    },
-
-    'ebpf.udp_functions': {
-        title : 'UDP calls',
-        info: 'Successful or failed calls to  functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
-
-    'ebpf.udp_bandwidth': {
-        title : 'UDP bandwidth',
-        info: 'Bytes sent and received for functions <code>udp_sendmsg</code> and <code>udp_recvmsg</code>.'
-    },
 
     'ebpf.process_thread': {
         title : 'Task creation',
