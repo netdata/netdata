@@ -105,6 +105,7 @@ typedef struct ebpf_tracepoint {
 
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
+#define NETDATA_EBPF_IP_FAMILY "ip"
 #define NETDATA_FILESYSTEM_FAMILY "filesystem"
 #define NETDATA_EBPF_MOUNT_GLOBAL_FAMILY "mount_points"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"

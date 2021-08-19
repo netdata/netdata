@@ -14,7 +14,7 @@
 #define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_VFS_GROUP "vfs (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
-#define NETDATA_APPS_NET_GROUP "net (eBPF)"
+#define NETDATA_APPS_NET_GROUP "net"
 #define NETDATA_APPS_CACHESTAT_GROUP "page cache (eBPF)"
 #define NETDATA_APPS_DCSTAT_GROUP "directory cache (eBPF)"
 

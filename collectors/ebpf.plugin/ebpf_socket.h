@@ -9,13 +9,6 @@
 
 // Vector indexes
 #define NETDATA_UDP_START 3
-#define NETDATA_RETRANSMIT_START 5
-
-#define NETDATA_SOCKET_APPS_HASH_TABLE 0
-#define NETDATA_SOCKET_IPV4_HASH_TABLE 1
-#define NETDATA_SOCKET_IPV6_HASH_TABLE 2
-#define NETDATA_SOCKET_GLOBAL_HASH_TABLE 4
-#define NETDATA_SOCKET_LISTEN_TABLE 5
 
 #define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
 
@@ -35,9 +28,12 @@
 
 enum ebpf_socket_table_list {
     NETDATA_SOCKET_TABLE_BANDWIDTH,
+    NETDATA_SOCKET_GLOBAL,
+    NETDATA_SOCKET_LPORTS,
     NETDATA_SOCKET_TABLE_IPV4,
     NETDATA_SOCKET_TABLE_IPV6,
-    NETDATA_SOCKET_TABLE_UDP
+    NETDATA_SOCKET_TABLE_UDP,
+    NETDATA_SOCKET_TABLE_CTRL
 };
 
 enum ebpf_socket_publish_index {
@@ -78,6 +74,7 @@ typedef enum ebpf_socket_idx {
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_GROUP "Socket"
+#define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
 #define NETDATA_NETWORK_CONNECTIONS_GROUP "Network connections"
 
 // Global chart name
