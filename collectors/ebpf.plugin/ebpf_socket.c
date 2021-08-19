@@ -308,30 +308,23 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 
     // We read bytes from function arguments, but bandiwdth is given in bits,
     // so we need to multiply by 8 to convert for the final value.
-    write_count_chart(
-      NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
-    write_io_chart(
-        NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write*8/1000,
-        socket_id_names[1], common_tcp.read*8/1000);
+    write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 3);
+    write_io_chart(NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY, socket_id_names[0],
+                   common_tcp.write*8/1000, socket_id_names[1], common_tcp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(
-          NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
+        write_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 2);
     }
-    write_count_chart(
-        NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
-        1);
+    write_count_chart(NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_IP_FAMILY,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],1);
 
-    write_count_chart(
-        NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
-        2);
-    write_io_chart(
-        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY,
-        socket_id_names[3],(long long)common_udp.write*8/100,
-        socket_id_names[4], (long long)common_udp.read*8/1000);
+    write_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY,
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],2);
+    write_io_chart(NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY,
+                   socket_id_names[3],(long long)common_udp.write*8/100,
+                   socket_id_names[4], (long long)common_udp.read*8/1000);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(
-            NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START],
-            2);
+        write_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_IP_FAMILY,
+                        &socket_publish_aggregated[NETDATA_UDP_START], 2);
     }
 }
 
@@ -464,11 +457,11 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
  */
 static void ebpf_create_global_charts(ebpf_module_t *em)
 {
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_FUNCTION_COUNT,
                       "Calls to internal functions",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21070,
@@ -476,9 +469,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       socket_publish_aggregated,
                       3, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_TCP_FUNCTION_BITS,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_TCP_FUNCTION_BITS,
                       "TCP bandwidth", EBPF_COMMON_DIMENSION_BITS,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21071,
@@ -487,11 +480,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+        ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                           NETDATA_TCP_FUNCTION_ERROR,
                           "TCP errors",
                           EBPF_COMMON_DIMENSION_CALL,
-                          NETDATA_SOCKET_GROUP,
+                          NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           21072,
@@ -500,11 +493,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           2, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_RETRANSMIT,
                       "Packages retransmitted",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21073,
@@ -512,11 +505,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
                       1, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_UDP_FUNCTION_COUNT,
                       "UDP calls",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21074,
@@ -524,9 +517,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_UDP_FUNCTION_BITS,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_UDP_FUNCTION_BITS,
                       "UDP bandwidth", EBPF_COMMON_DIMENSION_BITS,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21075,
@@ -535,11 +528,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+        ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                           NETDATA_UDP_FUNCTION_ERROR,
                           "UDP errors",
                           EBPF_COMMON_DIMENSION_CALL,
-                          NETDATA_SOCKET_GROUP,
+                          NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           21076,
