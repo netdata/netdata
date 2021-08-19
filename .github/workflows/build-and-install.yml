@@ -36,6 +36,7 @@ jobs:
           - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
+          - 'debian:bullseye' # 11
           - 'debian:10'
           - 'debian:9'
           - 'fedora:34'
@@ -70,6 +71,9 @@ jobs:
           - distro: 'centos:8'
             rmjsonc: 'dnf remove -y json-c-devel'
 
+          - distro: 'debian:bullseye' # 11
+            pre: 'apt-get update'
+            rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'debian:10'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
