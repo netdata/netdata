@@ -15,6 +15,7 @@
 #define EBPF_CFG_LOAD_MODE "ebpf load mode"
 #define EBPF_CFG_LOAD_MODE_DEFAULT "entry"
 #define EBPF_CFG_LOAD_MODE_RETURN "return"
+#define EBPF_MAX_MODE_LENGTH 6
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_PID_SIZE "pid table size"
