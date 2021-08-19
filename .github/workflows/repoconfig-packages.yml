@@ -18,6 +18,7 @@ jobs:
         include:
           - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
+          - {distro: debian, version: "11", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}

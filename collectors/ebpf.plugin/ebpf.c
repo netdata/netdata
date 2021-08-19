@@ -130,6 +130,11 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fd_config,
       .config_file = NETDATA_FD_CONFIG_FILE},
+    { .thread_name = "hardirq", .config_name = "hardirq", .enabled = 0, .start_routine = ebpf_hardirq_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
+      .config_file = NETDATA_HARDIRQ_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -296,8 +301,7 @@ inline void write_end_chart()
  */
 void write_chart_dimension(char *dim, long long value)
 {
-    int ret = printf("SET %s = %lld\n", dim, value);
-    UNUSED(ret);
+    printf("SET %s = %lld\n", dim, value);
 }
 
 /**
@@ -507,7 +511,9 @@ void ebpf_create_chart(char *type,
 {
     ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
 
-    ncd(move, end);
+    if (ncd) {
+        ncd(move, end);
+    }
 }
 
 /**
@@ -713,6 +719,8 @@ void ebpf_print_help()
             "\n"
             " --filesystem or -i  Enable chart related to filesystem run time.\n"
             "\n"
+            " --hardirq or -q     Enable chart related to hard IRQ latency.\n"
+            "\n"
             " --mount or -m       Enable charts related to mount monitoring.\n"
             "\n"
             " --net or -n         Enable network viewer charts.\n"
@@ -729,6 +737,87 @@ void ebpf_print_help()
             "\n"
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
+}
+
+/*****************************************************************
+ *
+ *  TRACEPOINT MANAGEMENT FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * Enable a tracepoint.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp)
+{
+    int test = ebpf_is_tracepoint_enabled(tp->class, tp->event);
+
+    // err?
+    if (test == -1) {
+        return -1;
+    }
+    // disabled?
+    else if (test == 0) {
+        // enable it then.
+        if (ebpf_enable_tracing_values(tp->class, tp->event)) {
+            return -1;
+        }
+    }
+
+    // enabled now or already was.
+    tp->enabled = true;
+
+    return 0;
+}
+
+/**
+ * Disable a tracepoint if it's enabled.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp)
+{
+    int test = ebpf_is_tracepoint_enabled(tp->class, tp->event);
+
+    // err?
+    if (test == -1) {
+        return -1;
+    }
+    // enabled?
+    else if (test == 1) {
+        // disable it then.
+        if (ebpf_disable_tracing_values(tp->class, tp->event)) {
+            return -1;
+        }
+    }
+
+    // disable now or already was.
+    tp->enabled = false;
+
+    return 0;
+}
+
+/**
+ * Enable multiple tracepoints on a list of tracepoints which end when the
+ * class is NULL.
+ *
+ * @return the number of successful enables.
+ */
+uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
+{
+    uint32_t cnt = 0;
+    for (int i = 0; tps[i].class != NULL; i++) {
+        if (ebpf_enable_tracepoint(&tps[i]) == -1) {
+            infoerr("failed to enable tracepoint %s:%s",
+                tps[i].class, tps[i].event);
+        }
+        else {
+            cnt += 1;
+        }
+    }
+    return cnt;
 }
 
 /*****************************************************************
@@ -1058,6 +1147,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
+                                    CONFIG_BOOLEAN_YES);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1145,6 +1241,7 @@ static void parse_args(int argc, char **argv)
         {"disk",           no_argument,    0,  'k' },
         {"filesystem",     no_argument,    0,  'i' },
         {"filedescriptor", no_argument,    0,  'e' },
+        {"hardirq",        no_argument,    0,  'q' },
         {"mount",          no_argument,    0,  'm' },
         {"net",            no_argument,    0,  'n' },
         {"process",        no_argument,    0,  'p' },
@@ -1166,7 +1263,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvgacdnprsw", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgacdkieqmnprswf", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1218,6 +1315,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, disable_apps);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"filesystem\" chart, because it was started with the option \"--filesystem\" or \"-i\".");
+#endif
+                break;
+            }
+            case 'q': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"hardirq\" chart, because it was started with the option \"--hardirq\" or \"-q\".");
 #endif
                 break;
             }
@@ -1573,6 +1678,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_MOUNT_IDX].start_routine},
         {"EBPF FD" , NULL, NULL, 1,
              NULL, NULL, ebpf_modules[EBPF_MODULE_FD_IDX].start_routine},
+        {"EBPF HARDIRQ" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_HARDIRQ_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };
