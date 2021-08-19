@@ -310,7 +310,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     // so we need to multiply by 8 to convert for the final value.
     write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY, socket_id_names[0],
-                   common_tcp.write*8/1000, socket_id_names[1], common_tcp.read*8/1000);
+                   common_tcp.write * 8/BITS_IN_A_KILOBIT, socket_id_names[1], common_tcp.read * 8/BITS_IN_A_KILOBIT);
     if (em->mode < MODE_ENTRY) {
         write_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 2);
     }
