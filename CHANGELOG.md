@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update ebpf documentation [\#11440](https://github.com/netdata/netdata/pull/11440) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove ClearLinux from CI. [\#11438](https://github.com/netdata/netdata/pull/11438) ([Ferroin](https://github.com/Ferroin))
 - Add terra to blockchains apps groups [\#11437](https://github.com/netdata/netdata/pull/11437) ([etienne-napoleone](https://github.com/etienne-napoleone))
 - Fix issue \#11434 regarding inconsistent status check on  component. [\#11435](https://github.com/netdata/netdata/pull/11435) ([0x3333](https://github.com/0x3333))
@@ -19,6 +20,7 @@
 - Adds NodeInstanceInfo API [\#11419](https://github.com/netdata/netdata/pull/11419) ([underhood](https://github.com/underhood))
 - Custom dash broken links [\#11413](https://github.com/netdata/netdata/pull/11413) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix CID372233 to CID 372236 [\#11411](https://github.com/netdata/netdata/pull/11411) ([underhood](https://github.com/underhood))
+- eBPF Hard IRQ latency [\#11410](https://github.com/netdata/netdata/pull/11410) ([UmanShahzad](https://github.com/UmanShahzad))
 - minor - Remove autoreconf warning [\#11407](https://github.com/netdata/netdata/pull/11407) ([underhood](https://github.com/underhood))
 - Fix bundled protobuf linkage on systems needing -latomic [\#11406](https://github.com/netdata/netdata/pull/11406) ([underhood](https://github.com/underhood))
 - replaced reference to raw.githubuser to a relative path [\#11405](https://github.com/netdata/netdata/pull/11405) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -54,6 +56,7 @@
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Adds aclk-schemas to dist\_noinst\_DATA [\#11338](https://github.com/netdata/netdata/pull/11338) ([underhood](https://github.com/underhood))
 - Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
+- Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
 - eBPF ZFS monitoring [\#11330](https://github.com/netdata/netdata/pull/11330) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix typo in analytics.c [\#11329](https://github.com/netdata/netdata/pull/11329) ([eltociear](https://github.com/eltociear))
 - add postgresql version to requirements section [\#11328](https://github.com/netdata/netdata/pull/11328) ([charoleizer](https://github.com/charoleizer))
@@ -308,9 +311,6 @@
 - health: apply adapter\_raid alarms for every logical/physical device [\#10820](https://github.com/netdata/netdata/pull/10820) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of nightly and release packages in GHA workflows. [\#10819](https://github.com/netdata/netdata/pull/10819) ([Ferroin](https://github.com/Ferroin))
 - health: log an error if any when send email notification [\#10818](https://github.com/netdata/netdata/pull/10818) ([ilyam8](https://github.com/ilyam8))
-- Ebpf extend sync [\#10814](https://github.com/netdata/netdata/pull/10814) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix coverity issue \(CID 367566\) [\#10813](https://github.com/netdata/netdata/pull/10813) ([stelfrag](https://github.com/stelfrag))
-- fix claiming via env vars in docker container [\#10811](https://github.com/netdata/netdata/pull/10811) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
