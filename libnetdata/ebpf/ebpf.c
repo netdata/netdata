@@ -551,16 +551,13 @@ static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t
 
 /**
  * @param modules   structure that will be updated
- * @param user_cfg  is this an user configuration?
  */
-void ebpf_update_module_using_config(ebpf_module_t *modules, int user_cfg)
+void ebpf_update_module_using_config(ebpf_module_t *modules)
 {
-    if (user_cfg) {
-        char default_value[EBPF_MAX_MODE_LENGTH + 1];
-        ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
-        char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
-        modules->mode = ebpf_select_mode(mode);
-    }
+    char default_value[EBPF_MAX_MODE_LENGTH + 1];
+    ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
+    char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
+    modules->mode = ebpf_select_mode(mode);
 
     modules->update_time = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
                                                      EBPF_CFG_UPDATE_EVERY, modules->update_time);
@@ -587,17 +584,15 @@ void ebpf_update_module(ebpf_module_t *em)
 {
     char filename[FILENAME_MAX+1];
     ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_user_config_dir, em->config_file);
-    int from_user = 1;
     if (!ebpf_load_config(em->cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, em->config_file);
-        from_user = 0;
         if (!ebpf_load_config(em->cfg, filename)) {
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
     }
 
-    ebpf_update_module_using_config(em, from_user);
+    ebpf_update_module_using_config(em);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
