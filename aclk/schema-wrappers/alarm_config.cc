@@ -138,14 +138,10 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
 char *parse_send_alarm_configuration(const char *data, size_t len)
 {
     SendAlarmConfiguration msg;
-    try {
-        if (!msg.ParseFromArray(data, len))
-            return NULL;
-        if (!msg.config_hash().c_str())
-            return NULL;
-        return strdupz(msg.config_hash().c_str());
-    } catch (...) {
+    if (!msg.ParseFromArray(data, len))
         return NULL;
-    }
+    if (!msg.config_hash().c_str())
+        return NULL;
+    return strdupz(msg.config_hash().c_str());
 }
 
