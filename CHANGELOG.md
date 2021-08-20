@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update ebpf socket [\#11441](https://github.com/netdata/netdata/pull/11441) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update ebpf documentation [\#11440](https://github.com/netdata/netdata/pull/11440) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove ClearLinux from CI. [\#11438](https://github.com/netdata/netdata/pull/11438) ([Ferroin](https://github.com/Ferroin))
 - Add terra to blockchains apps groups [\#11437](https://github.com/netdata/netdata/pull/11437) ([etienne-napoleone](https://github.com/etienne-napoleone))
