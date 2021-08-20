@@ -960,6 +960,10 @@ netdataDashboard.context = {
         info: 'CPU softirqs in detail. At the <a href="#menu_cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
     },
 
+    'system.softirq_latency': {
+        info: 'Total time spent servicing software interrupts.'
+    },
+
     'system.processes': {
         info: 'System processes. <b>Running</b> are the processes in the CPU. <b>Blocked</b> are processes that are willing to enter the CPU, but they cannot, e.g. because they wait for disk activity.'
     },

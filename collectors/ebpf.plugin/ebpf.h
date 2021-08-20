@@ -85,7 +85,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_DISK_IDX,
     EBPF_MODULE_MOUNT_IDX,
     EBPF_MODULE_FD_IDX,
-    EBPF_MODULE_HARDIRQ_IDX
+    EBPF_MODULE_HARDIRQ_IDX,
+    EBPF_MODULE_SOFTIRQ_IDX
 };
 
 typedef struct ebpf_tracepoint {

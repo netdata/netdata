@@ -23,12 +23,13 @@
 #include "ebpf_disk.h"
 #include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
+#include "ebpf_hardirq.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_mount.h"
+#include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
-#include "ebpf_hardirq.h"
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
