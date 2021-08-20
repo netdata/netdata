@@ -67,7 +67,7 @@ struct config collector_config = { .first_section = NULL,
 int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
-static int isrh;
+int isrh = 0;
 uint32_t finalized_threads = 1;
 
 pthread_mutex_t lock;

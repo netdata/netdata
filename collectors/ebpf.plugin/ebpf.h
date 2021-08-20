@@ -144,6 +144,7 @@ extern pthread_mutex_t lock;
 extern int close_ebpf_plugin;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
+extern int isrh;
 extern char *ebpf_plugin_dir;
 extern char kernel_string[64];
 
