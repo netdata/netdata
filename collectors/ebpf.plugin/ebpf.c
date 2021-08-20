@@ -1245,6 +1245,7 @@ void set_global_variables()
 
     isrh = get_redhat_release();
     pid_max = get_system_pid_max();
+    running_on_kernel = get_kernel_version(kernel_string, 63);
 }
 
 /**
@@ -1654,7 +1655,6 @@ int main(int argc, char **argv)
     ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
 
-    running_on_kernel = get_kernel_version(kernel_string, 63);
     if (!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
         return 2;
