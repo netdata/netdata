@@ -3,8 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_sync.h"
 
-static ebpf_data_t sync_data;
-
 static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] = { "sync", "syncfs",  "msync", "fsync", "fdatasync",
                                                                    "sync_file_range" };
 static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END];
@@ -75,14 +73,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (!w->probe_links && w->enabled) {
-            fill_ebpf_data(&w->kernel_info);
-            if (ebpf_update_kernel(&w->kernel_info)) {
-                em->thread_name = saved_name;
-                error("Cannot update the kernel for eBPF module %s", w->syscall);
-                return -1;
-            }
             em->thread_name = w->syscall;
-            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects, w->kernel_info.map_fd);
+            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects, NULL);
             if (!w->probe_links) {
                 em->thread_name = saved_name;
                 return -1;
@@ -249,8 +241,6 @@ void ebpf_sync_cleanup_objects()
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->probe_links) {
-            freez(w->kernel_info.map_fd);
-
             struct bpf_program *prog;
             size_t j = 0 ;
             bpf_object__for_each_program(prog, w->objects) {
@@ -380,7 +370,6 @@ void *ebpf_sync_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = sync_maps;
-    fill_ebpf_data(&sync_data);
 
     ebpf_sync_parse_syscalls();
 
