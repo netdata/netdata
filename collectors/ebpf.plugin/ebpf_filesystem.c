@@ -450,12 +450,12 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
  *
  * Read the table with number of calls for all functions
  */
-static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
+static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd)
 {
     netdata_idx_t *values = filesystem_hash_values;
     uint32_t key;
     uint32_t idx;
-    int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
+ //   int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
     for (key = 0; key < NETDATA_KEY_CALLS_SYNC; key++) {
         netdata_ebpf_histogram_t *w = select_hist(efp, &idx, key);
         if (!w) {
@@ -493,7 +493,7 @@ static void read_filesystem_tables()
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
-            read_filesystem_table(efp);
+            read_filesystem_table(efp, fs_maps[i].map_fd);
         }
     }
 }
