@@ -961,7 +961,7 @@ netdataDashboard.context = {
     },
 
     'system.softirq_latency': {
-        info: 'Total time spent servicing software interrupts.'
+        info: 'Total time spent servicing software interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/softirqs_example.txt" target="_blank">softirqs</a> from BCC tools.'
     },
 
     'system.processes': {
