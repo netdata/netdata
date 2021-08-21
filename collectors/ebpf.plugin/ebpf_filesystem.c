@@ -8,6 +8,28 @@ struct config fs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_xfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_nfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_zfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_btrfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                       {.name = "tbl_ext_addr", .internal_input = 1,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = NULL, .internal_input = 0, .user_input = 0,
+                                       .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
 ebpf_filesystem_partitions_t localfs[] =
     {{.filesystem = "ext4",
       .optional_filesystem = NULL,
@@ -603,6 +625,7 @@ void *ebpf_filesystem_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = fs_maps;
     ebpf_update_filesystem();
 
     if (!em->enabled)
