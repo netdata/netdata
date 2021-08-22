@@ -222,17 +222,9 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
-            ebpf_data_t *ed = &efp->kernel_info;
-            fill_ebpf_data(ed);
-
-            if (ebpf_update_kernel(ed)) {
-                em->thread_name = saved_name;
-                return -1;
-            }
-
             em->thread_name = efp->filesystem;
             efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string,
-                                                 &efp->objects, ed->map_fd);
+                                                 &efp->objects, NULL);
             if (!efp->probe_links) {
                 em->thread_name = saved_name;
                 return -1;
@@ -240,8 +232,9 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
 
             // Nedeed for filesystems like btrfs
-            if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function))
-                ebpf_load_addresses(&efp->addresses, efp->kernel_info.map_fd[NETDATA_ADDR_FS_TABLE]);
+            if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
+                ebpf_load_addresses(&efp->addresses, fs_maps[i + 1].map_fd);
+            }
         }
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
@@ -353,7 +346,6 @@ void ebpf_filesystem_cleanup_ebpf_data()
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (efp->probe_links) {
-            freez(efp->kernel_info.map_fd);
             freez(efp->family_name);
 
             freez(efp->hread.name);
@@ -455,7 +447,6 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd)
     netdata_idx_t *values = filesystem_hash_values;
     uint32_t key;
     uint32_t idx;
- //   int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
     for (key = 0; key < NETDATA_KEY_CALLS_SYNC; key++) {
         netdata_ebpf_histogram_t *w = select_hist(efp, &idx, key);
         if (!w) {
