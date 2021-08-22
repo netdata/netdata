@@ -64,13 +64,19 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int get_kernel_version(char *out, int size)
+/**
+ * Get Kernel version
+ *
+ * Get the current kernel from /proc and returns an integer value representing it
+ *
+ * @return it returns a value representing the kernel version.
+ */
+int ebpf_get_kernel_version()
 {
     char major[16], minor[16], patch[16];
     char ver[VERSION_STRING_LEN];
     char *version = ver;
 
-    out[0] = '\0';
     int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
     if (fd < 0)
         return -1;
@@ -103,10 +109,6 @@ int get_kernel_version(char *out, int size)
     while (*version && *version != '\n' && *version != '-')
         *move++ = *version++;
     *move = '\0';
-
-    fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
-    if (fd > size)
-        error("The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)str2l(patch));
 }

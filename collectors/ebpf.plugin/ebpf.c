@@ -1231,7 +1231,7 @@ void set_global_variables()
 
     isrh = get_redhat_release();
     pid_max = get_system_pid_max();
-    running_on_kernel = get_kernel_version(kernel_string, 63);
+    running_on_kernel = ebpf_get_kernel_version();
     ebpf_update_kernel(kernel_string, 63, isrh, running_on_kernel);
 }
 

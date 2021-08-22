@@ -166,7 +166,7 @@ typedef struct ebpf_module {
     const char *config_file;
 } ebpf_module_t;
 
-extern int get_kernel_version(char *out, int size);
+extern int ebpf_get_kernel_version();
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 extern char *ebpf_kernel_suffix(int version, int isrh);
