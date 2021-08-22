@@ -663,7 +663,6 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
     process_enabled = em->enabled;
-    fill_ebpf_data(&process_data);
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);

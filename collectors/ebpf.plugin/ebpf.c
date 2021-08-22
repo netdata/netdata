@@ -971,20 +971,6 @@ static void ebpf_allocate_common_vectors()
 }
 
 /**
- * Fill the ebpf_data structure with default values
- *
- * @param ef the pointer to set default values
- */
-void fill_ebpf_data(ebpf_data_t *ef)
-{
-    memset(ef, 0, sizeof(ebpf_data_t));
-    ef->kernel_string = kernel_string;
-    ef->running_on_kernel = running_on_kernel;
-    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
-    ef->isrh = isrh;
-}
-
-/**
  * Define how to load the ebpf programs
  *
  * @param ptr the option given by users

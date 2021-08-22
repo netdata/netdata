@@ -197,8 +197,6 @@ extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t 
 extern void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
                            char *dread, long long vread);
 
-extern void fill_ebpf_data(ebpf_data_t *ef);
-
 extern void ebpf_create_charts_on_apps(char *name,
                                        char *title,
                                        char *units,
