@@ -561,8 +561,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(global_process_stats);
     freez(current_apps_data);
 
-    freez(process_data.map_fd);
-
     if (probe_links) {
         struct bpf_program *prog;
         size_t i = 0 ;
@@ -667,15 +665,10 @@ void *ebpf_process_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
 
-    if (ebpf_update_kernel(&process_data)) {
-        pthread_mutex_unlock(&lock);
-        goto endprocess;
-    }
-
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;

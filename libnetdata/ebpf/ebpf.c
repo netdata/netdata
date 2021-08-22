@@ -272,14 +272,24 @@ char *ebpf_kernel_suffix(int version, int isrh)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int ebpf_update_kernel(ebpf_data_t *ed)
+/**
+ *  Update Kernel
+ *
+ *  Update string used to load eBPF programs
+ *
+ * @param ks      vector to store the value
+ * @param length  available length to store kernel
+ * @param isrh    Is a Red Hat distribution?
+ * @param version the kernel version
+ */
+void ebpf_update_kernel(char *ks, size_t length, int isrh, int version)
 {
-    char *kernel = ebpf_kernel_suffix(ed->running_on_kernel, (ed->isrh < 0) ? 0 : 1);
-    size_t length = strlen(kernel);
-    strncpyz(ed->kernel_string, kernel, length);
-    ed->kernel_string[length] = '\0';
-
-    return 0;
+    char *kernel = ebpf_kernel_suffix(version, (isrh < 0) ? 0 : 1);
+    size_t len = strlen(kernel);
+    if (len > length)
+        len = length - 1;
+    strncpyz(ks, kernel, len);
+    ks[len] = '\0';
 }
 
 static int select_file(char *name, const char *program, size_t length, int mode, char *kernel_string)

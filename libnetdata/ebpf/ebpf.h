@@ -170,7 +170,7 @@ extern int get_kernel_version(char *out, int size);
 extern int get_redhat_release();
 extern int has_condition_to_run(int version);
 extern char *ebpf_kernel_suffix(int version, int isrh);
-extern int ebpf_update_kernel(ebpf_data_t *ef);
+extern void ebpf_update_kernel(char *ks, size_t length, int isrh, int version);
 extern struct bpf_link **ebpf_load_program(char *plugins_dir,
                              ebpf_module_t *em,
                              char *kernel_string,
