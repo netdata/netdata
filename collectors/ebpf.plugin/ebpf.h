@@ -224,6 +224,7 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
+#define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
 
 // Common variables
 extern int debug_enabled;

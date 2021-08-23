@@ -38,7 +38,8 @@ static ebpf_tracepoint_t softirq_tracepoints[] = {
     {.enabled = false, .class = NULL, .event = NULL}
 };
 
-// these must be in the order defined by the kernel.
+// these must be in the order defined by the kernel:
+// https://elixir.bootlin.com/linux/v5.12.19/source/include/trace/events/irq.h#L13
 static softirq_val_t softirq_vals[] = {
     {.name = "HI", .latency = 0},
     {.name = "TIMER", .latency = 0},
@@ -157,7 +158,7 @@ static void softirq_create_charts()
         NETDATA_EBPF_SYSTEM_GROUP,
         "softirq_latency",
         "Software IRQ latency",
-        "milliseconds",
+        EBPF_COMMON_DIMENSION_MILLISECONDS,
         "softirqs",
         NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
