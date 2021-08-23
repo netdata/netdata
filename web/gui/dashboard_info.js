@@ -953,7 +953,7 @@ netdataDashboard.context = {
     },
 
     'system.hardirq_latency': {
-        info: 'Total time spent servicing hardware interrupts.'
+        info: 'Total time spent servicing hardware interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/hardirqs_example.txt" target="_blank">hardirqs</a> from BCC tools.'
     },
 
     'system.softirqs': {
