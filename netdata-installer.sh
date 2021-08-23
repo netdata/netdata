@@ -738,11 +738,16 @@ build_protobuf() {
   fi
 
   pushd "${1}" > /dev/null || return 1
-  run ${env_cmd} ./configure --disable-shared \
-                             --without-zlib \
-                             --disable-dependency-tracking \
-                             --with-pic || return 1
-  run ${env_cmd} ${make} -j$(find_processors) || return 1
+  if ! run ${env_cmd} ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic; then
+    popd > /dev/null || return 1
+    return 1
+  fi
+
+  if ! run ${env_cmd} $make -j$(find_processors); then
+    popd > /dev/null || return 1
+    return 1
+  fi
+
   popd > /dev/null || return 1
 }
 
