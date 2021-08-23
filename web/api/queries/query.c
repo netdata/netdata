@@ -922,13 +922,13 @@ static RRDR *rrd2rrdr_fixedstep(
     // an integer number of values per point
     long points_wanted = (before_wanted - after_requested) / (update_every * group);
 
-    time_t after_wanted  = before_wanted - (points_wanted * group * update_every) + update_every;
+    time_t after_wanted  = before_wanted - (points_wanted * group * update_every);
     if(unlikely(after_wanted < first_entry_t)) {
         // hm... we go to the past, calculate again points_wanted using all the db from before_wanted to the beginning
         points_wanted = (before_wanted - first_entry_t) / group;
 
         // recalculate after wanted with the new number of points
-        after_wanted  = before_wanted - (points_wanted * group * update_every) + update_every;
+        after_wanted  = before_wanted - (points_wanted * group * update_every);
 
         if(unlikely(after_wanted < first_entry_t)) {
             #ifdef NETDATA_INTERNAL_CHECKS
