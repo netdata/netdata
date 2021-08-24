@@ -11,10 +11,21 @@
 #
 #  TMPDIR                     specify where to save temporary files
 
+# -----------------------------------------------------------------------------
+# Constants
+
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
+
+# -----------------------------------------------------------------------------
+# Defaults for environment variables
+
 INTERACTIVE=1
 RELEASE_CHANNEL="nightly"
+NETDATA_CLAIM_URL="https://app.netdata.cloud"
+
+# -----------------------------------------------------------------------------
+# Utility functions
 
 setup_terminal() {
   TPUT_RESET=""
@@ -41,9 +52,7 @@ setup_terminal() {
 
   return 0
 }
-setup_terminal || echo > /dev/null
 
-# -----------------------------------------------------------------------------
 fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
   exit 1
@@ -217,6 +226,35 @@ str_in_list() {
 }
 
 # ------------------------------------------
+# Claiming support code
+
+check_claim_opts() {
+# shellcheck disable=SC2235,SC2030
+  if [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+    fatal "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
+  fi
+}
+
+claim() {
+  progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
+  if [ -z "${NETDATA_PREFIX}" ] ; then
+    NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
+  else
+    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+  fi
+
+  # shellcheck disable=SC2086
+  if "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}; then
+    progress "Successfully claimed node"
+  else
+    warning "Unable to claim node, you must do so manually."
+    if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+      exit 1
+    fi
+  fi
+}
+
+# ------------------------------------------
 # Native package install code.
 
 get_distro_compat_name() {
@@ -378,12 +416,32 @@ try_package_install() {
 }
 
 # ------------------------------------------
+# Main program
+
+setup_terminal || echo > /dev/null
 
 while [ -n "${1}" ]; do
   case "${1}" in
     "--dont-wait") INTERACTIVE=0 ;;
     "--non-interactive") INTERACTIVE=0 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--claim-token")
+      NETDATA_CLAIM_TOKEN="${2}"
+      shift 1
+      ;;
+    "--claim-rooms")
+      NETDATA_CLAIM_ROOMS="${2}"
+      shift 1
+      ;;
+    "--claim-url")
+      NETDATA_CLAIM_URL="${2}"
+      shift 1
+      ;;
+    "--claim-*")
+      optname="$(echo "${1}" | cut -d '-' -f 4-)"
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname} ${2}"
+      shift 1
+      ;;
   esac
   shift 1
 done
@@ -399,10 +457,6 @@ case "${SYSTYPE}" in
     try_package_install
 
     case "$?" in
-      0)
-        rm -rf "${tmpdir}"
-        exit 0
-        ;;
       1)
         fatal "Unable to install on this system."
         ;;
@@ -418,3 +472,9 @@ case "${SYSTYPE}" in
     fatal "This script currently does not support installation on FreeBSD."
     ;;
 esac
+
+if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  claim
+fi
+
+rm -rf "${tmpdir}"
