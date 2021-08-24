@@ -205,6 +205,20 @@ get_system_info() {
       DISTRO="${ID}"
       SYSVERSION="${VERSION_ID}"
       SYSCODENAME="${VERSION_CODENAME}"
+
+      supported_compat_names="debian ubuntu centos fedora opensuse"
+
+      if str_in_list "${DISTRO}" "${supported_compat_names}"; then
+        DISTRO_COMPAT_NAME="${DISTRO}"
+      else
+        case "${DISTRO}" in
+          rhel)
+            DISTRO_COMPAT_NAME="centos"
+            ;;
+          *)
+            DISTRO_COMPAT_NAME="unknown"
+        esac
+      fi
       ;;
     Darwin)
       SYSTYPE="Darwin"
@@ -257,27 +271,39 @@ claim() {
 # ------------------------------------------
 # Native package install code.
 
-get_distro_compat_name() {
+get_DISTRO_COMPAT_NAME() {
   supported_compat_names="debian ubuntu centos fedora opensuse"
 
   if str_in_list "${DISTRO}" "${supported_compat_names}"; then
-    distro_compat_name="${DISTRO}"
+    DISTRO_COMPAT_NAME="${DISTRO}"
   else
     case "${DISTRO}" in
       rhel)
-        distro_compat_name="centos"
+        DISTRO_COMPAT_NAME="centos"
         ;;
       *)
-        distro_compat_name="unknown"
+        DISTRO_COMPAT_NAME="unknown"
     esac
   fi
 }
 
-# Check for the existence of a usable package in the repo.
-pkg_check() {
-  distro="${1}"
+# Check for an already installed package with a given name.
+pkg_installed_check() {
+  case "${DISTRO_COMPAT_NAME}" in
+    debian|ubuntu)
+      dpkg -l "${1}" > /dev/null 2>&1
+      return $?
+      ;;
+    centos|fedora|opensuse)
+      rpm -q "${1}" > /dev/null 2>&1
+      return $?
+      ;;
+  esac
+}
 
-  case "${distro}" in
+# Check for the existence of a usable package in the repo.
+pkg_avail_check() {
+  case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
@@ -290,6 +316,9 @@ pkg_check() {
       zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|')" | grep -E 'netdata '
       return $?
       ;;
+    *)
+      return 1
+      ;;
   esac
 }
 
@@ -300,8 +329,6 @@ try_package_install() {
   fi
 
   progress "Attempting to install using native packages..."
-
-  get_distro_compat_name
 
   if [ "${RELEASE_CHANNEL}" = "nightly" ]; then
     release="-edge"
@@ -315,7 +342,7 @@ try_package_install() {
     opts=""
   fi
 
-  case "${distro_compat_name}" in
+  case "${DISTRO_COMPAT_NAME}" in
     debian)
       pm_cmd="apt-get"
       repo_subcmd="update"
@@ -367,7 +394,7 @@ try_package_install() {
       pkg_vsep="-"
       ;;
     *)
-      warning "We do not provide native binary packages for ${DISTRO}."
+      warning "We do not provide native packages for ${DISTRO}."
       return 2
       ;;
   esac
@@ -376,28 +403,32 @@ try_package_install() {
   repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
   repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
 
-  progress "Downloading repository configuration package."
-  if ! download "${repoconfig_url}" "${repoconfig_file}"; then
-    warning "Failed to download repository configuration package."
-    return 2
-  fi
+  if ! pkg_installed "${repoconfig_name}"; then
+    progress "Downloading repository configuration package."
+    if ! download "${repoconfig_url}" "${repoconfig_file}"; then
+      warning "Failed to download repository configuration package."
+      return 2
+    fi
 
-  progress "Installing repository configuration package."
-  # shellcheck disable=SC2086
-  if ! run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
-    warning "Failed to install repository configuration package."
-    return 2
-  fi
+    progress "Installing repository configuration package."
+    # shellcheck disable=SC2086
+    if ! run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
+      warning "Failed to install repository configuration package."
+      return 2
+    fi
 
-  progress "Updating repository metadata."
-  # shellcheck disable=SC2086
-  if ! run ${pm_cmd} ${repo_subcmd} ${opts}; then
-    fatal "Failed to update repository metadata."
+    progress "Updating repository metadata."
+    # shellcheck disable=SC2086
+    if ! run ${pm_cmd} ${repo_subcmd} ${opts}; then
+      fatal "Failed to update repository metadata."
+    fi
+  else
+    progress "Repository configuration is already present, attempting to install netdata."
   fi
 
   progress "Checking for usable Netdata package."
-  if ! pkg_check "${distro_compat_name}"; then
-    warning "Could not find a usable native packafe for ${distro} on ${SYSARCH}."
+  if ! pkg_avail_check "${DISTRO_COMPAT_NAME}"; then
+    warning "Could not find a usable native packafe for ${DISTRO} on ${SYSARCH}."
     progress "Attempting to uninstall repository configuration package."
     # shellcheck disable=SC2086
     run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
