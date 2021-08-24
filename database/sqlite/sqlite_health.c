@@ -446,22 +446,6 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     info("HEALTH [%s]: Table health_log_%s, contains %lu entries.", host->hostname, uuid_str, host->health_log_entries_written);
 }
 
-static uint32_t is_valid_alarm_id(RRDHOST *host, const char *chart, const char *name, uint32_t alarm_id)
-{
-    uint32_t hash_chart = simple_hash(chart);
-    uint32_t hash_name = simple_hash(name);
-
-    ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if (unlikely(
-            ae->alarm_id == alarm_id && (!(ae->hash_name == hash_name && ae->hash_chart == hash_chart &&
-                                           !strcmp(name, ae->name) && !strcmp(chart, ae->chart))))) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
 /* Health related SQL queries
    Load from the health log table
 */
@@ -544,9 +528,6 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         ae = callocz(1, sizeof(ALARM_ENTRY));
 
         ae->unique_id = unique_id;
-
-        if (!is_valid_alarm_id(host, (const char *) sqlite3_column_text(res, 14), (const char *) sqlite3_column_text(res, 13), alarm_id))
-            alarm_id = rrdcalc_get_unique_id(host, (const char *) sqlite3_column_text(res, 14), (const char *) sqlite3_column_text(res, 13), NULL);
         ae->alarm_id = alarm_id;
 
         if (sqlite3_column_type(res, 4) != SQLITE_NULL)
