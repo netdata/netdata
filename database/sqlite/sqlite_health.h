@@ -11,7 +11,6 @@ extern int sql_create_health_log_table(RRDHOST *host);
 extern void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae);
 extern void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae);
 extern void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-extern void sql_health_alarm_log_select_all(BUFFER *wb, RRDHOST *host);
 extern void sql_health_alarm_log_cleanup(RRDHOST *host);
 extern void sql_select_alert_config(char *hash_str, BUFFER *wb);
 extern int alert_hash_and_store_config(uuid_t hash_id, struct alert_config *cfg);
