@@ -6,25 +6,32 @@
 #  --dont-wait                do not prompt for user input
 #  --non-interactive          do not prompt for user input
 #  --stable-channel           install a stable version instead of a nightly build
+#  --reinstall                explicitly reinstall instead of updating any existing install
+#  --claim-token              use a specified token for claiming to Netdata Cloud
+#  --claim-rooms              when claiming, add the node to the specified rooms
+#  --claim-only               when running against an existing install, only try to claim it, not update it
+#  --claim-*                  specify other options for the claiming script
 #
 # Environment options:
 #
 #  TMPDIR                     specify where to save temporary files
+#  ROOTCMD                    specify a command to use to run programs with root privileges
 
-# -----------------------------------------------------------------------------
+# ======================================================================
 # Constants
 
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
+PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
-# -----------------------------------------------------------------------------
+# ======================================================================
 # Defaults for environment variables
 
 INTERACTIVE=1
 RELEASE_CHANNEL="nightly"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 
-# -----------------------------------------------------------------------------
+# ======================================================================
 # Utility functions
 
 setup_terminal() {
@@ -239,7 +246,121 @@ str_in_list() {
   return $?
 }
 
-# ------------------------------------------
+confirm_root_support() {
+  if [ "$(id -u)" -ne "0" ]; then
+    if [ -z "${ROOTCMD}" ] && command -v sudo > /dev/null; then
+      ROOTCMD="sudo"
+    fi
+
+    if [ -z "${ROOTCMD}" ] && command -v doas > /dev/null; then
+      ROOTCMD="doas"
+    fi
+
+    if [ -z "${ROOTCMD}" ] && command -v pkexec > /dev/null; then
+      ROOTCMD="pkexec"
+    fi
+
+    if [ -z "${ROOTCMD}" ]; then
+      fatal "We need root privileges to continue, but cannot find a way to gain them. Either re-run this script as root, or set \$ROOTCMD to a command that can be used to gain root privileges"
+    fi
+  fi
+}
+
+# ======================================================================
+# Existing install handling code
+
+update() {
+  updater="${ndprefix}/usr/libexec/netdata/netdata-updater.sh"
+
+  if [ -x "${updater}" ]; then
+    if run ${ROOTCMD} "${updater}" --not-running-from-cron; then
+      progress "Updated existing install at ${ndprefix}"
+      return 0
+    else
+      fatal "Failed to update existing Netdata install at ${ndprefix}"
+    fi
+  else
+    return 1
+  fi
+}
+
+check_for_existing_install() {
+  if pkg_installed netdata; then
+    ndprefix="/"
+  else
+    ndpath="$(command -v netdata 2>/dev/null)"
+    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
+      ndpath="/opt/netdata/bin/netdata"
+    fi
+
+    if [ -n "${ndprefix}" ]; then
+      ndprefix="$(dirname "$(dirname "${ndpath}")")"
+    fi
+
+    if [ "${ndprefix}" = /usr ] ; then
+      ndprefix="/"
+    fi
+  fi
+
+  if [ -n "${ndprefix}" ]; then
+    typefile="${ndprefix}/etc/netdata/.install-type"
+    if [ -r "${typefile}" ]; then
+      # shellcheck disable=SC1090
+      . "${typefile}"
+    else
+      INSTALL_TYPE="unknown"
+    fi
+  else
+    return 1
+  fi
+}
+
+handle_existing_install() {
+  if ! check_for_existing_install; then
+    progress "No existing install found, assuming this is a new installation."
+    return 0
+  fi
+
+  if [ -n "${ndprefix}" ]; then
+    case "${INSTALL_TYPE}" in
+      kickstart-*|legacy-*|manual-static)
+        if [ -z "${NETDATA_REINSTALL}" ]; then
+          if [ -n "${NETDATA_NO_UPDATE}" ]; then
+            if ! update; then
+              warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
+            fi
+          fi
+
+          if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+            progress "Attempting to claim existing install at ${ndprefix}."
+            claim
+          fi
+        else
+          progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
+        fi
+        ;;
+      binpkg-*)
+        if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+          progress "Attempting to claim existing install at ${ndprefix}."
+          claim
+        fi
+        ;;
+      oci)
+        fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
+        ;;
+      unknown)
+        fatal "Found an existing netdata install at ${ndprefix}, but could not determine the install type, refusing to proceed."
+        ;;
+      *)
+        fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
+        ;;
+    esac
+  else
+    progress "No existing installations of netdata found, assuming this is a fresh install."
+  fi
+}
+
+# ======================================================================
 # Claiming support code
 
 check_claim_opts() {
@@ -268,27 +389,11 @@ claim() {
   fi
 }
 
-# ------------------------------------------
+# ======================================================================
 # Native package install code.
 
-get_DISTRO_COMPAT_NAME() {
-  supported_compat_names="debian ubuntu centos fedora opensuse"
-
-  if str_in_list "${DISTRO}" "${supported_compat_names}"; then
-    DISTRO_COMPAT_NAME="${DISTRO}"
-  else
-    case "${DISTRO}" in
-      rhel)
-        DISTRO_COMPAT_NAME="centos"
-        ;;
-      *)
-        DISTRO_COMPAT_NAME="unknown"
-    esac
-  fi
-}
-
 # Check for an already installed package with a given name.
-pkg_installed_check() {
+pkg_installed() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       dpkg -l "${1}" > /dev/null 2>&1
@@ -305,15 +410,15 @@ pkg_installed_check() {
 pkg_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
+      ${ROOTCMD} apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
       ;;
     centos|fedora)
-      ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata$'
+      ${ROOTCMD} ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata$'
       return $?
       ;;
     opensuse)
-      zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|')" | grep -E 'netdata '
+      ${ROOTCMD} zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|')" | grep -E 'netdata '
       return $?
       ;;
     *)
@@ -412,14 +517,14 @@ try_package_install() {
 
     progress "Installing repository configuration package."
     # shellcheck disable=SC2086
-    if ! run ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
+    if ! run ${ROOTCMD} ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
 
     progress "Updating repository metadata."
     # shellcheck disable=SC2086
-    if ! run ${pm_cmd} ${repo_subcmd} ${opts}; then
+    if ! run ${ROOTCMD} ${pm_cmd} ${repo_subcmd} ${opts}; then
       fatal "Failed to update repository metadata."
     fi
   else
@@ -431,22 +536,22 @@ try_package_install() {
     warning "Could not find a usable native packafe for ${DISTRO} on ${SYSARCH}."
     progress "Attempting to uninstall repository configuration package."
     # shellcheck disable=SC2086
-    run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
     return 2
   fi
 
   progress "Installing Netdata package."
   # shellcheck disable=SC2086
-  if ! run ${pm_cmd} install ${opts} netdata; then
+  if ! run ${ROOTCMD} ${pm_cmd} install ${opts} netdata; then
     warning "Failed to install Netdata package."
     progress "Attempting to uninstall repository configuration package."
     # shellcheck disable=SC2086
-    run ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
     return 2
   fi
 }
 
-# ------------------------------------------
+# ======================================================================
 # Main program
 
 setup_terminal || echo > /dev/null
@@ -456,6 +561,8 @@ while [ -n "${1}" ]; do
     "--dont-wait") INTERACTIVE=0 ;;
     "--non-interactive") INTERACTIVE=0 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--reinstall") NETDATA_REINSTALL=1 ;;
+    "--claim-only") NETDATA_NO_UPDATE=1 ;;
     "--claim-token")
       NETDATA_CLAIM_TOKEN="${2}"
       shift 1
@@ -477,11 +584,14 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+confirm_root_support
 get_system_info
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."
 cd "${tmpdir}" || exit 1
+
+handle_existing_install
 
 case "${SYSTYPE}" in
   Linux)
