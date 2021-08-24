@@ -953,11 +953,15 @@ netdataDashboard.context = {
     },
 
     'system.hardirq_latency': {
-        info: 'Total time spent servicing hardware interrupts.'
+        info: 'Total time spent servicing hardware interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/hardirqs_example.txt" target="_blank">hardirqs</a> from BCC tools.'
     },
 
     'system.softirqs': {
         info: 'CPU softirqs in detail. At the <a href="#menu_cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
+    },
+
+    'system.softirq_latency': {
+        info: 'Total time spent servicing software interrupts. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/softirqs_example.txt" target="_blank">softirqs</a> from BCC tools.'
     },
 
     'system.processes': {
