@@ -657,8 +657,7 @@ if test "${with_bundled_protobuf}" != "no"; then
     fi
     AC_MSG_RESULT([${bundled_proto_avail}])
     if test "${with_bundled_protobuf}" == "yes" -a "${bundled_proto_avail}" != "yes"; then
-        AC_MSG_WARN([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found, skipping ACLK NG])
-        aclk_ng="no"
+        AC_MSG_ERROR([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found])
     fi
     if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
         with_bundled_protobuf="yes"
