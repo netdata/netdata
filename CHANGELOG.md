@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Check for failed protobuf configure or make [\#11450](https://github.com/netdata/netdata/pull/11450) ([MrZammler](https://github.com/MrZammler))
 - update "Install Netdata on Synology" guide [\#11449](https://github.com/netdata/netdata/pull/11449) ([ilyam8](https://github.com/ilyam8))
+- eBPF Soft IRQ latency [\#11445](https://github.com/netdata/netdata/pull/11445) ([UmanShahzad](https://github.com/UmanShahzad))
 - Update ebpf socket [\#11441](https://github.com/netdata/netdata/pull/11441) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update ebpf documentation [\#11440](https://github.com/netdata/netdata/pull/11440) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove ClearLinux from CI. [\#11438](https://github.com/netdata/netdata/pull/11438) ([Ferroin](https://github.com/Ferroin))
@@ -310,8 +312,6 @@
 - installer: update go.d.plugin version to v0.28.1 [\#10826](https://github.com/netdata/netdata/pull/10826) ([ilyam8](https://github.com/ilyam8))
 - alarm\(irc\): add support to change IRC\_PORT [\#10824](https://github.com/netdata/netdata/pull/10824) ([RaitoBezarius](https://github.com/RaitoBezarius))
 - Update syntax for Caddy v2 [\#10823](https://github.com/netdata/netdata/pull/10823) ([salazarp](https://github.com/salazarp))
-- health: apply adapter\_raid alarms for every logical/physical device [\#10820](https://github.com/netdata/netdata/pull/10820) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of nightly and release packages in GHA workflows. [\#10819](https://github.com/netdata/netdata/pull/10819) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
