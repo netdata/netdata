@@ -97,6 +97,8 @@ setup_terminal() {
     fi
   fi
 
+  echo "${TPUT_RESET}"
+
   return 0
 }
 
@@ -259,11 +261,15 @@ get_system_info() {
         DISTRO_COMPAT_NAME="${DISTRO}"
       else
         case "${DISTRO}" in
+          opensuse-leap)
+            DISTRO_COMPAT_NAME="opensuse"
+            ;;
           rhel)
             DISTRO_COMPAT_NAME="centos"
             ;;
           *)
             DISTRO_COMPAT_NAME="unknown"
+            ;;
         esac
       fi
       ;;
@@ -454,7 +460,8 @@ pkg_avail_check() {
       return $?
       ;;
     centos|fedora)
-      ${ROOTCMD} ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata$'
+      # shellcheck disable=SC2086
+      ${ROOTCMD} ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
       ;;
     opensuse)
@@ -482,9 +489,9 @@ try_package_install() {
   fi
 
   if [ "${INTERACTIVE}" = "0" ]; then
-    opts="-y"
+    interactive_opts="-y"
   else
-    opts=""
+    interactive_opts=""
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
@@ -495,6 +502,9 @@ try_package_install() {
       pkg_type="deb"
       pkg_suffix="_all"
       pkg_vsep="_"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="uninstall"
       ;;
     ubuntu)
       pm_cmd="apt-get"
@@ -503,6 +513,9 @@ try_package_install() {
       pkg_type="deb"
       pkg_suffix="_all"
       pkg_vsep="_"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="uninstall"
       ;;
     centos)
       if command -v dnf > /dev/null; then
@@ -516,6 +529,9 @@ try_package_install() {
       pkg_type="rpm"
       pkg_suffix=".noarch"
       pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="remove"
       ;;
     fedora)
       if command -v dnf > /dev/null; then
@@ -529,14 +545,20 @@ try_package_install() {
       pkg_type="rpm"
       pkg_suffix=".noarch"
       pkg_vsep="-"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      uninstall_subcmd="remove"
       ;;
     opensuse)
       pm_cmd="zypper"
-      repo_subcmd="refresh"
+      repo_subcmd="--gpg-auto-import-keys refresh"
       repo_prefix="opensuse/${SYSVERSION}"
       pkg_type="rpm"
       pkg_suffix=".noarch"
       pkg_vsep="-"
+      pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
+      repo_update_opts=""
+      uninstall_subcmd="remove"
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
@@ -557,14 +579,14 @@ try_package_install() {
 
     progress "Installing repository configuration package."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} ${pm_cmd} install ${opts} "./${repoconfig_file}"; then
+    if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} "./${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
 
     progress "Updating repository metadata."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} ${pm_cmd} ${repo_subcmd} ${opts}; then
+    if ! run ${ROOTCMD} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
       fatal "Failed to update repository metadata."
     fi
   else
@@ -577,19 +599,19 @@ try_package_install() {
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+      run ${ROOTCMD} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
 
   progress "Installing Netdata package."
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} ${pm_cmd} install ${opts} netdata; then
+  if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} netdata; then
     warning "Failed to install Netdata package."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+      run ${ROOTCMD} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
