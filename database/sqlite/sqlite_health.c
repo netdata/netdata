@@ -929,7 +929,7 @@ void sql_select_alert_config(char *hash_str, BUFFER *wb)
             buffer_strcat(wb, "\t\n");
         c++;
 
-        char uuid_str[36 + 1];
+        char uuid_str[GUID_LEN + 1];
         uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(res_alert, 0)), uuid_str);
 
         buffer_sprintf(wb, "\t{\n");
@@ -1119,7 +1119,7 @@ int alert_hash_and_store_config(
     EVP_MD_CTX_destroy(evpctx);
     fatal_assert(hash_len > sizeof(uuid_t));
 
-    char uuid_str[36 + 1];
+    char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower(*((uuid_t *)&hash_value), uuid_str);
     uuid_copy(hash_id, *((uuid_t *)&hash_value));
 

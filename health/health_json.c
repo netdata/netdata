@@ -191,7 +191,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
         }
     }
 
-    char hash_id[37];
+    char hash_id[GUID_LEN + 1];
     uuid_unparse_lower(rc->config_hash_id, hash_id);
 
     buffer_sprintf(wb,
