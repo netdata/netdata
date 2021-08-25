@@ -601,19 +601,11 @@ bundle_libmosquitto() {
       run_ok "libmosquitto built and prepared."
     else
       run_failed "Failed to build libmosquitto."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-      fi
+      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libmosquitto."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-    fi
+    defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
   fi
 }
 
@@ -710,19 +702,11 @@ bundle_libwebsockets() {
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws"
     else
       run_failed "Failed to build libwebsockets."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
-      fi
+      defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for libwebsockets."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
-    fi
+    defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
   fi
 }
 
@@ -788,19 +772,11 @@ bundle_protobuf() {
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
     else
       run_failed "Failed to build protobuf."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Failed to build protobuf. You may not be able to connect this node to Netdata Cloud."
-      fi
+      defer_error_highlighted "Failed to build protobuf. You may not be able to connect this node to Netdata Cloud."
     fi
   else
     run_failed "Unable to fetch sources for protobuf."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
-    fi
+    defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
   fi
 }
 
@@ -949,19 +925,11 @@ bundle_jsonc() {
       run_ok "JSON-C built and prepared."
     else
       run_failed "Failed to build JSON-C."
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        exit 1
-      else
-        defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
-      fi
+      defer_error_highlighted "Failed to build JSON-C. Netdata Cloud support will be disabled."
     fi
   else
     run_failed "Unable to fetch sources for JSON-C."
-    if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-      exit 1
-    else
-      defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
-    fi
+    defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
   fi
 }
 
