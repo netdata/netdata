@@ -5,12 +5,14 @@
 # Other options:
 #  --dont-wait                do not prompt for user input
 #  --non-interactive          do not prompt for user input
+#  --interactive              prompt for user input even if there is no controlling terminal
 #  --stable-channel           install a stable version instead of a nightly build
 #  --reinstall                explicitly reinstall instead of updating any existing install
 #  --claim-token              use a specified token for claiming to Netdata Cloud
 #  --claim-rooms              when claiming, add the node to the specified rooms
 #  --claim-only               when running against an existing install, only try to claim it, not update it
 #  --claim-*                  specify other options for the claiming script
+#  --no-cleanup               don't do any cleanup steps, intended for debugging the installer
 #
 # Environment options:
 #
@@ -27,9 +29,47 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # ======================================================================
 # Defaults for environment variables
 
-INTERACTIVE=1
 RELEASE_CHANNEL="nightly"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
+
+if [ ! -t 1 ]; then
+  INTERACTIVE=0
+else
+  INTERACTIVE=1
+fi
+
+# ======================================================================
+# Usage info
+
+usage() {
+  cat << HEREDOC
+USAGE: kickstart.sh [options]
+       where options include:
+
+  --dont-wait                Do not prompt for user input. (default: prompt if there is a controlling terminal)
+  --non-interactive          Do not prompt for user input.
+  --interactive              Prompt for user input even if there is no controlling terminal.
+  --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
+  --nightly-channel          Install a nightly build instead of a stable version
+  --reinstall                Explicitly reinstall instead of updating any existing install.
+  --claim-token              Use a specified token for claiming to Netdata Cloud.
+  --claim-rooms              When claiming, add the node to the specified rooms.
+  --claim-only               If there is an existing install, only try to claim it, not update it.
+  --claim-*                  Specify other options for the claiming script.
+  --no-cleanup               Don't do any cleanup steps. This is intended to help with debuggint the installer.
+
+Additionally, this script may use the following environment variables:
+
+  TMPDIR:                    Used to specify where to put temporary files. On most systems, the default we select
+                             automatically should be fine. The user running the script needs to both be able to
+                             write files to the temporary directory, and run files from that location.
+  ROOTCMD:                   Used to specify a command to use to run another command with root privileges if needed. By
+                             default we try to use sudo, doas, or pkexec (in that order of preference), but if
+                             you need special options for one of those to work, or have a different tool to do
+                             the same thing on your system, you can specify it here.
+
+HEREDOC
+}
 
 # ======================================================================
 # Utility functions
@@ -533,10 +573,12 @@ try_package_install() {
 
   progress "Checking for usable Netdata package."
   if ! pkg_avail_check "${DISTRO_COMPAT_NAME}"; then
-    warning "Could not find a usable native packafe for ${DISTRO} on ${SYSARCH}."
-    progress "Attempting to uninstall repository configuration package."
-    # shellcheck disable=SC2086
-    run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    warning "Could not find a usable native package for ${DISTRO} on ${SYSARCH}."
+    if [ -z "${NO_CLEANUP}" ]; then
+      progress "Attempting to uninstall repository configuration package."
+      # shellcheck disable=SC2086
+      run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    fi
     return 2
   fi
 
@@ -544,9 +586,11 @@ try_package_install() {
   # shellcheck disable=SC2086
   if ! run ${ROOTCMD} ${pm_cmd} install ${opts} netdata; then
     warning "Failed to install Netdata package."
-    progress "Attempting to uninstall repository configuration package."
-    # shellcheck disable=SC2086
-    run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    if [ -z "${NO_CLEANUP}" ]; then
+      progress "Attempting to uninstall repository configuration package."
+      # shellcheck disable=SC2086
+      run ${ROOTCMD} ${pm_cmd} uninstall ${opts} "${repoconfig_name}"
+    fi
     return 2
   fi
 }
@@ -558,8 +602,14 @@ setup_terminal || echo > /dev/null
 
 while [ -n "${1}" ]; do
   case "${1}" in
+    "--help")
+      usage
+      exit 0
+      ;;
+    "--no-cleanup") NO_CLEANUP=1 ;;
     "--dont-wait") INTERACTIVE=0 ;;
     "--non-interactive") INTERACTIVE=0 ;;
+    "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--claim-only") NETDATA_NO_UPDATE=1 ;;
@@ -618,4 +668,6 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
 fi
 
-rm -rf "${tmpdir}"
+if [ -z "${NO_CLEANUP}" ]; then
+  rm -rf "${tmpdir}"
+fi
