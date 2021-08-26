@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix postgres replication\_slot chart on standby [\#11455](https://github.com/netdata/netdata/pull/11455) ([anayrat](https://github.com/anayrat))
+- Fix ram level alarms [\#11452](https://github.com/netdata/netdata/pull/11452) ([ilyam8](https://github.com/ilyam8))
 - Check for failed protobuf configure or make [\#11450](https://github.com/netdata/netdata/pull/11450) ([MrZammler](https://github.com/MrZammler))
 - update "Install Netdata on Synology" guide [\#11449](https://github.com/netdata/netdata/pull/11449) ([ilyam8](https://github.com/ilyam8))
+- Don’t bail early if we fail to build cloud deps with required cloud. [\#11446](https://github.com/netdata/netdata/pull/11446) ([Ferroin](https://github.com/Ferroin))
 - eBPF Soft IRQ latency [\#11445](https://github.com/netdata/netdata/pull/11445) ([UmanShahzad](https://github.com/UmanShahzad))
 - Update ebpf socket [\#11441](https://github.com/netdata/netdata/pull/11441) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update ebpf documentation [\#11440](https://github.com/netdata/netdata/pull/11440) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -283,7 +286,6 @@
 - Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
 - Add a CRASH event when the agent fails to properly shutdown [\#10893](https://github.com/netdata/netdata/pull/10893) ([stelfrag](https://github.com/stelfrag))
 - Bumped version of OpenSSL bundled in static builds to 1.1.1k. [\#10884](https://github.com/netdata/netdata/pull/10884) ([Ferroin](https://github.com/Ferroin))
-- Fix incorrect health log entries [\#10822](https://github.com/netdata/netdata/pull/10822) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
@@ -308,10 +310,6 @@
 - Fix broken link in StatsD guide [\#10831](https://github.com/netdata/netdata/pull/10831) ([joelhans](https://github.com/joelhans))
 - health: add collector prefix to the external collectors alarms/templates [\#10830](https://github.com/netdata/netdata/pull/10830) ([ilyam8](https://github.com/ilyam8))
 - health: remove exporting\_metrics\_lost template [\#10829](https://github.com/netdata/netdata/pull/10829) ([ilyam8](https://github.com/ilyam8))
-- Fix name of PackageCLoud API token secret in workflows. [\#10828](https://github.com/netdata/netdata/pull/10828) ([Ferroin](https://github.com/Ferroin))
-- installer: update go.d.plugin version to v0.28.1 [\#10826](https://github.com/netdata/netdata/pull/10826) ([ilyam8](https://github.com/ilyam8))
-- alarm\(irc\): add support to change IRC\_PORT [\#10824](https://github.com/netdata/netdata/pull/10824) ([RaitoBezarius](https://github.com/RaitoBezarius))
-- Update syntax for Caddy v2 [\#10823](https://github.com/netdata/netdata/pull/10823) ([salazarp](https://github.com/salazarp))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
