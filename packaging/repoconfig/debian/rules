@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 TOP = $(CURDIR)/debian/netdata-repo
-TOP_EDGE = $(CURDIR)/debian/netdata-edge-repo
+TOP_EDGE = $(CURDIR)/debian/netdata-repo-edge
 TEMPTOP = $(CURDIR)/debian/tmp
 
 %:
