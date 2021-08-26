@@ -465,7 +465,7 @@ pkg_avail_check() {
       return $?
       ;;
     opensuse)
-      ${ROOTCMD} zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|')" | grep -E 'netdata '
+      ${ROOTCMD} zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|' | tr -d ' ')" | grep -E 'netdata '
       return $?
       ;;
     *)
