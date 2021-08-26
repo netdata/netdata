@@ -456,7 +456,7 @@ pkg_installed() {
 pkg_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      ${ROOTCMD} apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
+      ${ROOTCMD} env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
       ;;
     centos|fedora)
@@ -490,8 +490,10 @@ try_package_install() {
 
   if [ "${INTERACTIVE}" = "0" ]; then
     interactive_opts="-y"
+    env="DEBIAN_FRONTEND=noninteractive"
   else
     interactive_opts=""
+    env=""
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
@@ -579,14 +581,14 @@ try_package_install() {
 
     progress "Installing repository configuration package."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} "${TMPDIR}/${repoconfig_file}"; then
+    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${TMPDIR}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
 
     progress "Updating repository metadata."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+    if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
       fatal "Failed to update repository metadata."
     fi
   else
@@ -599,19 +601,19 @@ try_package_install() {
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run ${ROOTCMD} ${pm_cmd} env ${env} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
 
   progress "Installing Netdata package."
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} netdata; then
+  if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} netdata; then
     warning "Failed to install Netdata package."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
