@@ -572,14 +572,14 @@ try_package_install() {
 
   if ! pkg_installed "${repoconfig_name}"; then
     progress "Downloading repository configuration package."
-    if ! download "${repoconfig_url}" "${repoconfig_file}"; then
+    if ! download "${repoconfig_url}" "${TMPDIR}/${repoconfig_file}"; then
       warning "Failed to download repository configuration package."
       return 2
     fi
 
     progress "Installing repository configuration package."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} "./${repoconfig_file}"; then
+    if ! run ${ROOTCMD} ${pm_cmd} install ${pkg_install_opts} "${TMPDIR}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
