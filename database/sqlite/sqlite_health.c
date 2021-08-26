@@ -20,11 +20,7 @@ int sql_create_health_log_table(RRDHOST *host) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CREATE_HEALTH_LOG_TABLE(uuid_str));
 
@@ -58,11 +54,7 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_UPDATE_HEALTH_LOG(uuid_str));
 
@@ -130,11 +122,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_INSERT_HEALTH_LOG(uuid_str));
 
@@ -380,11 +368,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG(uuid_str, uuid_str, host->health_log_entries_written - rotate_every));
 
@@ -421,11 +405,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_COUNT_HEALTH_LOG(uuid_str));
 
@@ -465,11 +445,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     }
 
     char uuid_str[GUID_LEN + 1];
-    uuid_unparse_lower(host->host_uuid, uuid_str);
-    uuid_str[8] = '_';
-    uuid_str[13] = '_';
-    uuid_str[18] = '_';
-    uuid_str[23] = '_';
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str, host->health_log.max));
 

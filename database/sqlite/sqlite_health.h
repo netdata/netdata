@@ -14,5 +14,4 @@ extern void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 extern void sql_health_alarm_log_cleanup(RRDHOST *host);
 extern void sql_select_alert_config(char *hash_str, BUFFER *wb);
 extern int alert_hash_and_store_config(uuid_t hash_id, struct alert_config *cfg);
-
 #endif //NETDATA_SQLITE_HEALTH_H
