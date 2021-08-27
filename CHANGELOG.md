@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Use correct release codename for Debian 11 repoconfig packages. [\#11459](https://github.com/netdata/netdata/pull/11459) ([Ferroin](https://github.com/Ferroin))
+- Fix edge repository configuration DEB packages. [\#11458](https://github.com/netdata/netdata/pull/11458) ([Ferroin](https://github.com/Ferroin))
 - Fix postgres replication\_slot chart on standby [\#11455](https://github.com/netdata/netdata/pull/11455) ([anayrat](https://github.com/anayrat))
 - Fix ram level alarms [\#11452](https://github.com/netdata/netdata/pull/11452) ([ilyam8](https://github.com/ilyam8))
 - Check for failed protobuf configure or make [\#11450](https://github.com/netdata/netdata/pull/11450) ([MrZammler](https://github.com/MrZammler))
@@ -42,6 +44,8 @@
 - charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
 - Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
 - Specify module for threads [\#11387](https://github.com/netdata/netdata/pull/11387) ([thiagoftsm](https://github.com/thiagoftsm))
+- add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([rgiovanardi](https://github.com/rgiovanardi))
+- add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([rgiovanardi](https://github.com/rgiovanardi))
 - Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - CODEOWNERS: Remove knatsakis [\#11377](https://github.com/netdata/netdata/pull/11377) ([knatsakis](https://github.com/knatsakis))
 - Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
@@ -270,7 +274,6 @@
 - Dashboard version 2.17.0 [\#10856](https://github.com/netdata/netdata/pull/10856) ([allelos](https://github.com/allelos))
 - Ebpf directory cache [\#10855](https://github.com/netdata/netdata/pull/10855) ([thiagoftsm](https://github.com/thiagoftsm))
 - prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
-- implements ACLK env endpoint [\#10833](https://github.com/netdata/netdata/pull/10833) ([underhood](https://github.com/underhood))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -307,9 +310,6 @@
 - add Installation method to the bug template [\#10836](https://github.com/netdata/netdata/pull/10836) ([ilyam8](https://github.com/ilyam8))
 - Add lock check to avoid shutdown when compiled with internal and locking checks [\#10835](https://github.com/netdata/netdata/pull/10835) ([stelfrag](https://github.com/stelfrag))
 - health: apply megacli alarms for all adapters/physical disks [\#10834](https://github.com/netdata/netdata/pull/10834) ([ilyam8](https://github.com/ilyam8))
-- Fix broken link in StatsD guide [\#10831](https://github.com/netdata/netdata/pull/10831) ([joelhans](https://github.com/joelhans))
-- health: add collector prefix to the external collectors alarms/templates [\#10830](https://github.com/netdata/netdata/pull/10830) ([ilyam8](https://github.com/ilyam8))
-- health: remove exporting\_metrics\_lost template [\#10829](https://github.com/netdata/netdata/pull/10829) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
