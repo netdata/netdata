@@ -1064,7 +1064,7 @@ char *ng_aclk_state_json(void)
         tmp = json_object_new_string(agent_id);
         freez(agent_id);
     } else
-        tmp = json_object_new_null();
+        tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
     tmp = json_object_new_boolean(aclk_connected);
