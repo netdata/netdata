@@ -1014,3 +1014,8 @@ void aclk_send_node_instances()
     }
     freez(list_head);
 }
+
+void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+{
+    aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
+}

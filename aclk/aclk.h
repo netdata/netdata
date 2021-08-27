@@ -47,4 +47,6 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd);
 
 void aclk_send_node_instances(void);
 
+void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
+
 #endif /* ACLK_H */
