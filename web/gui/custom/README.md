@@ -39,6 +39,10 @@ that directory and called `index.html`.\
 Note: index.html has a different syntax. Don't use it as a template for simple
 custom dashboards.
 
+> Some operating systems will use `/opt/netdata/usr/share/netdata/web` as the web directory. If you're not sure where
+> yours is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname
+> of your node, and find the `# web files directory = ` setting. The value listed is the web directory for your system.
+
 ## Example empty dashboard
 
 If you need to create a new dashboard on an empty page, we suggest the following
