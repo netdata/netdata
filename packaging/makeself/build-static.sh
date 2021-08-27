@@ -55,7 +55,7 @@ if [ -t 1 ]; then
     "${DOCKER_CONTAINER_NAME}" \
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 else
-  run docker run -e BUIDLARCH="${BUILDARCH}" -v "$(pwd)":/usr/src/netdata.git:rw \
+  run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/usr/src/netdata.git:rw \
     "${DOCKER_CONTAINER_NAME}" \
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 fi

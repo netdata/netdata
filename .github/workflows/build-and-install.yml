@@ -22,8 +22,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Build
-        run: |
-          .github/scripts/build-static.sh ${{ matrix.arch }}
+        run: .github/scripts/build-static.sh ${{ matrix.arch }}
   source-build:
     name: Build & Install
     strategy:
