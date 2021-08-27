@@ -475,6 +475,25 @@ void sql_health_alarm_log_load(RRDHOST *host) {
             continue;
         }
 
+        //need name, chart and family
+        if (sqlite3_column_type(res, 13) == SQLITE_NULL) {
+            error_report("HEALTH [%s]: Got null name field. Ignoring it.", host->hostname);
+            errored++;
+            continue;
+        }
+
+        if (sqlite3_column_type(res, 14) == SQLITE_NULL) {
+            error_report("HEALTH [%s]: Got null chart field. Ignoring it.", host->hostname);
+            errored++;
+            continue;
+        }
+
+        if (sqlite3_column_type(res, 15) == SQLITE_NULL) {
+            error_report("HEALTH [%s]: Got null family field. Ignoring it.", host->hostname);
+            errored++;
+            continue;
+        }
+
         // Check if we got last_repeat field
         time_t last_repeat = 0;
         last_repeat = (time_t)sqlite3_column_int64(res, 27);
