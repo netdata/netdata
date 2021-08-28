@@ -26,6 +26,7 @@
 #include "ebpf_hardirq.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_mount.h"
+#include "ebpf_oomkill.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
