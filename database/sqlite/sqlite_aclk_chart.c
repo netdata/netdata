@@ -382,6 +382,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         goto bind_fail;
 
     struct chart_config_updated chart_config;
+    chart_config.config_hash  = NULL;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         chart_config.type = strdupz((char *)sqlite3_column_text(res, 0));
@@ -396,10 +397,13 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         chart_config.config_hash = strdupz(hash_id);
     }
 
-    debug(D_ACLK_SYNC,"Sending chart config for %s", hash_id);
-
-    aclk_chart_config_updated(&chart_config, 1);
-    destroy_chart_config_updated(&chart_config);
+    if (likely(chart_config.config_hash)) {
+        debug(D_ACLK_SYNC, "Sending chart config for %s", hash_id);
+        aclk_chart_config_updated(&chart_config, 1);
+        destroy_chart_config_updated(&chart_config);
+    }
+    else
+        info("DEBUG: Chart config for %s not found", hash_id);
 
     bind_fail:
         rc = sqlite3_finalize(res);
