@@ -63,16 +63,17 @@ static void oomkill_cleanup(void *ptr)
 
 static void oomkill_write_data()
 {
+    uint32_t curr_key = 0;
     uint32_t key = 0;
-    uint32_t next_key = 0;
     int mapfd = oomkill_maps[OOMKILL_MAP_KILLCNT].map_fd;
-    while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
+    while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
+        curr_key = key;
+
         int test;
 
         // get val for this key.
         test = bpf_map_lookup_elem(mapfd, &key, oomkill_ebpf_vals);
         if (unlikely(test < 0)) {
-            key = next_key;
             continue;
         }
 
@@ -106,6 +107,7 @@ static void oomkill_write_data()
 
         // write dim.
         comm[NETDATA_OOMKILL_TASK_COMM_LEN-1] = '\0';
+        info("comm=%s killcnt=%lu", comm, total_killcnt);
         ebpf_write_global_dimension(
             comm, comm,
             ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]
@@ -144,7 +146,6 @@ static void oomkill_collector(ebpf_module_t *em)
         sizeof(oomkill_ebpf_val_t)
     );
 
-    info("creating chart");
     // create chart.
     pthread_mutex_lock(&lock);
     oomkill_create_charts();
@@ -152,18 +153,15 @@ static void oomkill_collector(ebpf_module_t *em)
 
     // loop and read until ebpf plugin is closed.
     while (!close_ebpf_plugin) {
-        info("waiting to write data");
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
         pthread_mutex_lock(&lock);
 
         // write everything from the ebpf map.
-        info("writing data");
         write_begin_chart(NETDATA_EBPF_APPS_GROUP, "oomkills");
         oomkill_write_data();
         write_end_chart();
 
-        info("done writing data");
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
