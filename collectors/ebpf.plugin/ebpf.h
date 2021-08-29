@@ -114,6 +114,7 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
+#define NETDATA_EBPF_APPS_GROUP "apps"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
 
 // Log file
@@ -226,6 +227,7 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
+#define EBPF_COMMON_DIMENSION_KILLS "kills"
 
 // Common variables
 extern int debug_enabled;

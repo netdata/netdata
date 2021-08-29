@@ -69,6 +69,5 @@ typedef struct hardirq_static_val {
 
 extern struct config hardirq_config;
 extern void *ebpf_hardirq_thread(void *ptr);
-extern void ebpf_hardirq_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 #endif /* NETDATA_EBPF_HARDIRQ_H */
