@@ -879,6 +879,10 @@ if test "$enable_cloud" != "no" -a "$aclk_legacy" != "no"; then
     fi
 fi
 
+if test "$enable_cloud" = "yes" -a "$enable_aclk" != "yes"; then
+    AC_MSG_ERROR([Neither ACLK-NG nor ACLK-Legacy can be built but --enable-cloud was requested])
+fi
+
 AC_SUBST([enable_cloud])
 AC_SUBST([enable_aclk])
 AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])

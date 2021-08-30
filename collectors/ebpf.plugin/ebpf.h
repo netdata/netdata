@@ -85,7 +85,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_DISK_IDX,
     EBPF_MODULE_MOUNT_IDX,
     EBPF_MODULE_FD_IDX,
-    EBPF_MODULE_HARDIRQ_IDX
+    EBPF_MODULE_HARDIRQ_IDX,
+    EBPF_MODULE_SOFTIRQ_IDX
 };
 
 typedef struct ebpf_tracepoint {
@@ -105,6 +106,7 @@ typedef struct ebpf_tracepoint {
 
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
+#define NETDATA_EBPF_IP_FAMILY "ip"
 #define NETDATA_FILESYSTEM_FAMILY "filesystem"
 #define NETDATA_EBPF_MOUNT_GLOBAL_FAMILY "mount_points"
 #define NETDATA_EBPF_CHART_TYPE_LINE "line"
@@ -222,6 +224,7 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
+#define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
 
 // Common variables
 extern int debug_enabled;

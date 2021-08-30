@@ -47,9 +47,10 @@ void aclk_del_worker_thread(struct aclk_database_worker_config *wc)
 
     uv_mutex_lock(&aclk_async_lock);
     struct aclk_database_worker_config **tmp = &aclk_thread_head;
-    while ((*tmp) != wc)
+    while (*tmp && (*tmp) != wc)
         tmp = &(*tmp)->next;
-    *tmp = wc->next;
+    if (*tmp)
+        *tmp = wc->next;
     uv_mutex_unlock(&aclk_async_lock);
     return;
 }
@@ -134,7 +135,9 @@ void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_d
     uv_mutex_unlock(&wc->cmd_mutex);
 
     /* wake up event loop */
-    fatal_assert(0 == uv_async_send(&wc->async));
+    int rc = uv_async_send(&wc->async);
+    if (unlikely(rc))
+        debug(D_ACLK_SYNC, "Failed to wake up event loop");
 }
 
 struct aclk_database_cmd aclk_database_deq_cmd(struct aclk_database_worker_config* wc)

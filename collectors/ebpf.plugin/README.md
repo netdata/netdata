@@ -320,6 +320,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
     When in `return` mode, it also creates charts showing errors when these operations are executed.
 -   `hardirq`: This eBPF program creates charts that show information about
     time spent servicing individual hardware interrupt requests (hard IRQs).
+-   `softirq`: This eBPF program creates charts that show information about
+    time spent servicing individual software interrupt requests (soft IRQs).
 
 You can also enable the following eBPF programs:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
@@ -355,6 +357,7 @@ The following configuration files are available:
 - `process.conf`: Configuration for the `process` thread.
 - `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
   also lets you specify which network the eBPF collector monitors.
+- `softirq.conf`: Configuration for the `softirq` thread.
 - `sync.conf`: Configuration for the `sync` thread.
 - `vfs.conf`: Configuration for the `vfs` thread.
 

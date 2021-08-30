@@ -576,8 +576,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (
@@ -615,8 +627,20 @@ FROM
         slot_type,
         COALESCE (
           floor(
-            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
-             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+            CASE WHEN pg_is_in_recovery()
+            THEN (
+              pg_wal_lsn_diff(pg_last_wal_receive_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_wal_lsn_diff(restart_lsn, '0/0') %% s.val)
+            ) / s.val
+            ELSE (
+              pg_wal_lsn_diff(pg_current_wal_lsn(), slot.restart_lsn)
+              -- this is needed to account for whole WAL retention and
+              -- not only size retention
+              + (pg_walfile_name_offset(restart_lsn)).file_offset
+            ) / s.val
+            END
           ),0) AS replslot_wal_keep
     FROM pg_replication_slots slot
     LEFT JOIN (

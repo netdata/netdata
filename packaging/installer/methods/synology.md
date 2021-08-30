@@ -33,6 +33,14 @@ chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/net
 chown -R netdata:root /opt/netdata/var/log/netdata
 ```
 
+4. Uncomment and set `web files owner` to `root`, and `web files group` to `netdata` in
+   the `/opt/netdata/etc/netdata/netdata.conf`.
+5. Restart Netdata
+
+```sh
+/etc/rc.netdata restart
+```
+
 ## Create startup script
 
 Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as an operating system, so no init script is

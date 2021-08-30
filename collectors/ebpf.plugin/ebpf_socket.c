@@ -11,23 +11,43 @@
  *
  *****************************************************************/
 
-static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "sent", "received", "close", "sent",
-                                                                   "received", "retransmitted" };
-static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_sendmsg", "tcp_cleanup_rbuf", "tcp_close",
-                                                            "udp_sendmsg", "udp_recvmsg", "tcp_retransmit_skb" };
+static char *socket_dimension_names[NETDATA_MAX_SOCKET_VECTOR] = { "received", "sent", "close",
+                                                                   "received", "sent", "retransmitted" };
+static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_cleanup_rbuf", "tcp_sendmsg",  "tcp_close",
+                                                            "udp_recvmsg", "udp_sendmsg", "tcp_retransmit_skb" };
 
 static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
+                                           .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          {.name = "tbl_global_sock",
+                                           .internal_input = NETDATA_SOCKET_COUNTER,
+                                           .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          {.name = "tbl_lports",
+                                           .internal_input = NETDATA_SOCKET_COUNTER,
+                                           .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = "tbl_conn_ipv4",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
+                                           .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = "tbl_conn_ipv6",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED},
-                                          {.name = "tbl_nv_udp_conn_stats",
+                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
+                                           .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          {.name = "tbl_nv_udp",
                                            .internal_input = NETDATA_COMPILED_UDP_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED},
+                                           .user_input = NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED,
+                                           .type = NETDATA_EBPF_MAP_STATIC,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          {.name = "socket_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                           .user_input = 0,
+                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
                                           {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 static netdata_idx_t *socket_hash_values = NULL;
@@ -50,7 +70,6 @@ netdata_socket_t *socket_values;
 
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 
-static int *map_fd = NULL;
 static struct bpf_object *objects = NULL;
 static struct bpf_link **probe_links = NULL;
 
@@ -289,30 +308,24 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 
     // We read bytes from function arguments, but bandiwdth is given in bits,
     // so we need to multiply by 8 to convert for the final value.
-    write_count_chart(
-      NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 3);
-    write_io_chart(
-        NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_FAMILY, socket_id_names[0], common_tcp.write*8/1000,
-        socket_id_names[1], common_tcp.read*8/1000);
+    write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 3);
+    write_io_chart(NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY, socket_id_names[0],
+                   common_tcp.read * 8/BITS_IN_A_KILOBIT, socket_id_names[1],
+                   common_tcp.write * 8/BITS_IN_A_KILOBIT);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(
-          NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, socket_publish_aggregated, 2);
+        write_err_chart(NETDATA_TCP_FUNCTION_ERROR, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 2);
     }
-    write_count_chart(
-        NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
-        1);
+    write_count_chart(NETDATA_TCP_RETRANSMIT, NETDATA_EBPF_IP_FAMILY,
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],1);
 
-    write_count_chart(
-        NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
-        2);
-    write_io_chart(
-        NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_FAMILY,
-        socket_id_names[3],(long long)common_udp.write*8/100,
-        socket_id_names[4], (long long)common_udp.read*8/1000);
+    write_count_chart(NETDATA_UDP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY,
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],2);
+    write_io_chart(NETDATA_UDP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY,
+                   socket_id_names[3], (long long)common_udp.read * 8/BITS_IN_A_KILOBIT,
+                   socket_id_names[4], (long long)common_udp.write * 8/BITS_IN_A_KILOBIT);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(
-            NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_FAMILY, &socket_publish_aggregated[NETDATA_UDP_START],
-            2);
+        write_err_chart(NETDATA_UDP_FUNCTION_ERROR, NETDATA_EBPF_IP_FAMILY,
+                        &socket_publish_aggregated[NETDATA_UDP_START], 2);
     }
 }
 
@@ -445,11 +458,11 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
  */
 static void ebpf_create_global_charts(ebpf_module_t *em)
 {
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_FUNCTION_COUNT,
                       "Calls to internal functions",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21070,
@@ -457,22 +470,22 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       socket_publish_aggregated,
                       3, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_TCP_FUNCTION_BITS,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_TCP_FUNCTION_BITS,
                       "TCP bandwidth", EBPF_COMMON_DIMENSION_BITS,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21071,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
-                      3, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+        ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                           NETDATA_TCP_FUNCTION_ERROR,
                           "TCP errors",
                           EBPF_COMMON_DIMENSION_CALL,
-                          NETDATA_SOCKET_GROUP,
+                          NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           21072,
@@ -481,11 +494,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           2, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_TCP_RETRANSMIT,
                       "Packages retransmitted",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21073,
@@ -493,11 +506,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
                       1, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_UDP_FUNCTION_COUNT,
                       "UDP calls",
                       EBPF_COMMON_DIMENSION_CALL,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21074,
@@ -505,9 +518,9 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                       2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY, NETDATA_UDP_FUNCTION_BITS,
+    ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_UDP_FUNCTION_BITS,
                       "UDP bandwidth", EBPF_COMMON_DIMENSION_BITS,
-                      NETDATA_SOCKET_GROUP,
+                      NETDATA_SOCKET_KERNEL_FUNCTIONS,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21075,
@@ -516,11 +529,11 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       2, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+        ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                           NETDATA_UDP_FUNCTION_ERROR,
                           "UDP errors",
                           EBPF_COMMON_DIMENSION_CALL,
-                          NETDATA_SOCKET_GROUP,
+                          NETDATA_SOCKET_KERNEL_FUNCTIONS,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           21076,
@@ -1439,7 +1452,7 @@ static void read_listen_table()
     uint16_t key = 0;
     uint16_t next_key = 0;
 
-    int fd = map_fd[NETDATA_SOCKET_LISTEN_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     uint8_t value;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(fd, &key, &value);
@@ -1478,8 +1491,8 @@ void *ebpf_socket_read_hash(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_time;
-    int fd_ipv4 = map_fd[NETDATA_SOCKET_IPV4_HASH_TABLE];
-    int fd_ipv6 = map_fd[NETDATA_SOCKET_IPV6_HASH_TABLE];
+    int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
+    int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -1506,7 +1519,7 @@ static void read_hash_global_tables()
     netdata_idx_t res[NETDATA_SOCKET_COUNTER];
 
     netdata_idx_t *val = socket_hash_values;
-    int fd = map_fd[NETDATA_SOCKET_GLOBAL_HASH_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_GLOBAL].map_fd;
     for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, val)) {
             uint64_t total = 0;
@@ -1588,7 +1601,7 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out)
  */
 static void ebpf_socket_update_apps_data()
 {
-    int fd = map_fd[NETDATA_SOCKET_APPS_HASH_TABLE];
+    int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
     struct pid_stat *pids = root_of_pids;
@@ -1928,14 +1941,6 @@ static void ebpf_socket_allocate_global_vectors(size_t length)
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
     outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
-}
-
-/**
- * Set local function pointers, this function will never be compiled with static libraries
- */
-static void set_local_pointers()
-{
-    map_fd = socket_data.map_fd;
 }
 
 /**
@@ -2887,7 +2892,6 @@ void *ebpf_socket_thread(void *ptr)
         goto endsocket;
     }
 
-    set_local_pointers();
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 

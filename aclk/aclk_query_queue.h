@@ -23,7 +23,9 @@ typedef enum {
     CHART_CONFIG_UPDATED,
     CHART_RESET,
     RETENTION_UPDATED,
-    UPDATE_NODE_INFO
+    UPDATE_NODE_INFO,
+    ALARM_LOG_HEALTH,
+    ALARM_PROVIDE_CFG
 } aclk_query_type_t;
 
 struct aclk_query_metadata {
