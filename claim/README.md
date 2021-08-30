@@ -64,6 +64,8 @@ finished onboarding.
 To connect a node, select which War Rooms you want to add this node to with the dropdown, then copy and paste the script
 given by Netdata Cloud into your node's terminal.
 
+When coming from  [Nodes view page](learn.netdata.cloud/docs/cloud/visualize/nodes) the room parameter is already defined to current War Room.
+
 ### Connect an agent running in Linux
 
 If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
