@@ -2886,7 +2886,7 @@ void *ebpf_socket_thread(void *ptr)
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endsocket;

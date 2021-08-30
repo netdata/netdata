@@ -450,7 +450,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
 }
 
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
-                                    struct bpf_object **obj, int *map_fd)
+                                    struct bpf_object **obj)
 {
     char lpath[4096];
     char lname[128];

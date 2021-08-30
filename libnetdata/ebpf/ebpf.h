@@ -174,8 +174,7 @@ extern void ebpf_update_kernel(char *ks, size_t length, int isrh, int version);
 extern struct bpf_link **ebpf_load_program(char *plugins_dir,
                              ebpf_module_t *em,
                              char *kernel_string,
-                             struct bpf_object **obj,
-                             int *map_fd);
+                             struct bpf_object **obj);
 
 extern void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 extern int ebpf_load_config(struct config *config, char *filename);

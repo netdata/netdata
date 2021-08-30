@@ -666,7 +666,7 @@ void *ebpf_process_thread(void *ptr)
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;

@@ -901,7 +901,7 @@ void *ebpf_vfs_thread(void *ptr)
     if (!em->enabled)
         goto endvfs;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endvfs;
     }

@@ -641,7 +641,7 @@ void *ebpf_cachestat_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_cachestat_allocate_global_vectors(NETDATA_CACHESTAT_END);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endcachestat;

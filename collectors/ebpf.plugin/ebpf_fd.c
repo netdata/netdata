@@ -503,7 +503,7 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_fd_allocate_global_vectors();
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endfd;
     }

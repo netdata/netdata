@@ -253,7 +253,7 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endsoftirq;
     }

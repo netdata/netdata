@@ -223,8 +223,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->thread_name = efp->filesystem;
-            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string,
-                                                 &efp->objects, NULL);
+            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &efp->objects);
             if (!efp->probe_links) {
                 em->thread_name = saved_name;
                 return -1;

@@ -473,7 +473,7 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, NULL);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endhardirq;
     }
