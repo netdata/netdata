@@ -398,14 +398,13 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     return links;
 }
 
-static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *obj)
+static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
 {
     if (!em->maps)
         return;
 
     ebpf_local_maps_t *maps = em->maps;
     struct bpf_map *map;
-    size_t i = 0;
     bpf_map__for_each(map, obj)
     {
         int fd = bpf_map__fd(map);
@@ -420,9 +419,6 @@ static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *
                 j++;
             }
         }
-        if (map_fd)
-            map_fd[i] = fd;
-        i++;
     }
 }
 
@@ -479,7 +475,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
     }
 
-    ebpf_update_maps(em, map_fd, *obj);
+    ebpf_update_maps(em, *obj);
     ebpf_update_controller(em, *obj);
 
     size_t count_programs =  ebpf_count_programs(*obj);
