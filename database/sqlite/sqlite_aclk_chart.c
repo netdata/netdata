@@ -226,6 +226,8 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 {
 #ifdef ENABLE_ACLK
     int rc;
+
+    wc->chart_pending = 0;
     if (unlikely(!wc->chart_updates)) {
         debug(D_ACLK_SYNC,"Ignoring chart push event, updates have been turned off for node %s", wc->node_id);
         return;
@@ -472,12 +474,28 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
                        wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_execute(buffer_tostring(sql));
         db_unlock();
+        wc->chart_sequence_id = 0;
+        wc->chart_timestamp = 0;
+
+        RRDHOST *host = wc->host;
+        rrdhost_rdlock(host);
+        RRDSET *st;
+        rrdset_foreach_read(st, host) {
+            rrdset_rdlock(st);
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+            }
+            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+            rrdset_unlock(st);
+        }
+        rrdhost_unlock(host);
+    }
+    else {
         //sql_chart_deduplicate(wc, cmd);
+        sql_get_last_chart_sequence(wc, cmd);
     }
     buffer_free(sql);
-//    sql_chart_deduplicate(wc, cmd);
-    sql_get_last_chart_sequence(wc, cmd);
-    // Start sending updates
     wc->chart_updates = 1;
     return;
 }
@@ -496,7 +514,7 @@ void aclk_get_chart_config(char **hash_id)
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_PUSH_CHART_CONFIG;
     for (int i = 0; hash_id[i]; ++i) {
-        // TODO: Verify as have a valid hash_id
+        // TODO: Verify that we have a valid hash_id
         debug(D_ACLK_SYNC,"Request %d for chart config with hash [%s] received", i, hash_id[i]);
         cmd.data_param = (void *)strdupz(hash_id[i]);
         aclk_database_enq_cmd(wc, &cmd);
@@ -675,7 +693,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     RRDHOST *host = localhost;
     while(host) {
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
-            //            rrd_unlock();
+            rrd_unlock();
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
             if (likely(wc)) {
                 //                if (unlikely(!wc->chart_updates)) {
@@ -684,8 +702,9 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 //                    cmd.completion = NULL;
                 //                    aclk_database_enq_cmd(wc, &cmd);
                 //                }
-                wc->chart_reset_count++;
 
+                wc->chart_reset_count++;
+                wc->chart_updates = 0;
                 wc->batch_id = batch_id;
                 wc->batch_created = now_realtime_sec();
                 info("DEBUG: START streaming charts for %s (%s) enabled -- last streamed sequence %"PRIu64" t=%ld  (reset count=%d)", node_id, wc->uuid_str,
@@ -693,43 +712,28 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 // If mismatch detected
                 if (sequence_id > wc->chart_sequence_id || wc->chart_reset_count > 10) {
                     info("DEBUG: Full resync requested -- reset_count=%d", wc->chart_reset_count);
-
-                    rrdhost_rdlock(host);
-                    RRDSET *st;
-                    rrdset_foreach_read(st, host) {
-                        rrdset_rdlock(st);
-                        RRDDIM *rd;
-                        rrddim_foreach_read(rd, st) {
-                            rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
-                        }
-                        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-                        rrdset_unlock(st);
-                    }
-                    rrdhost_unlock(host);
-                    rrd_unlock();
-
-                    // Need to scan offline charts as well
-
                     chart_reset_t chart_reset;
                     chart_reset.node_id = strdupz(node_id);
                     chart_reset.claim_id = is_agent_claimed();
                     chart_reset.reason = SEQ_ID_NOT_EXISTS;
                     aclk_chart_reset(chart_reset);
-                    wc->chart_updates = 0;
+//                    wc->chart_updates = 0;
                     wc->chart_reset_count = -1;
                     return;
                 } else {
                     struct aclk_database_cmd cmd;
                     // TODO: handle timestamp
-
-                    if (!wc->chart_reset_count)
-                        wc->chart_delay = now_realtime_sec() + 60;
-                    else
-                        wc->chart_delay = 0;
+//                    if (!wc->chart_reset_count)
+//                        wc->chart_delay = now_realtime_sec() + 60;
+//                    else
+//                        wc->chart_delay = 0;
 
                     if (sequence_id < wc->chart_sequence_id) { // || created_at != wc->chart_timestamp) {
-                        wc->chart_updates = 0;
-                        info("DEBUG: Synchonization mismatch detected");
+//                        wc->chart_updates = 0;
+                        if (sequence_id)
+                            info("DEBUG: Synchonization mismatch detected");
+                        else
+                            info("DEBUG: Synchonization mismatch detected; full resync ACKed from the cloud");
                         cmd.opcode = ACLK_DATABASE_RESET_CHART;
                         cmd.param1 = sequence_id + 1;
                         cmd.completion = NULL;
@@ -741,7 +745,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
             }
             else
                 error("ACLK synchronization thread is not active for host %s", host->hostname);
-            rrd_unlock();
             return;
         }
         host = host->next;

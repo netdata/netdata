@@ -9,10 +9,10 @@
 #include "../../aclk/schema-wrappers/chart_stream.h"
 
 #ifndef ACLK_MAX_CHART_BATCH
-#define ACLK_MAX_CHART_BATCH    (20)
+#define ACLK_MAX_CHART_BATCH    (200)
 #endif
 #ifndef ACLK_MAX_CHART_BATCH_COUNT
-#define ACLK_MAX_CHART_BATCH_COUNT (5)
+#define ACLK_MAX_CHART_BATCH_COUNT (10)
 #endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_SYNC_RETRY_COUNT   "10"
@@ -84,7 +84,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
     return strdupz(uuid_str);
 }
 
-#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY AUTOINCREMENT, " \
+#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY, " \
         "date_created, date_updated, date_submitted, status, uuid, type, unique_id, " \
         "update_count default 1, unique(uuid, status));"
 
@@ -154,7 +154,7 @@ struct aclk_database_cmd {
     struct aclk_completion *completion;
 };
 
-#define ACLK_DATABASE_CMD_Q_MAX_SIZE (2048)
+#define ACLK_DATABASE_CMD_Q_MAX_SIZE (16384)
 
 struct aclk_database_cmdqueue {
     unsigned head, tail;
@@ -186,6 +186,9 @@ struct aclk_database_worker_config {
     int chart_updates;
     int alert_updates;
     time_t batch_created;
+    int node_info_send;
+    int chart_pending;
+    int chart_reset_count;
     struct aclk_database_worker_config  *next;
 };
 
