@@ -30,21 +30,21 @@ static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc
 
 static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
-    int payload_sent = 0;
+    int send_status = 0;
 
-    BUFFER *sql = buffer_create(1024);
-
-    buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
-                       "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
-                        uuid_str, uuid_str);
-
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to check payload data");
+    if (unlikely(!res)) {
+        BUFFER *sql = buffer_create(1024);
+        buffer_sprintf(sql,"SELECT 1 FROM aclk_chart_latest_%s acl, aclk_chart_payload_%s acp "
+                            "WHERE acl.unique_id = acp.unique_id AND acl.uuid = @uuid AND acp.payload = @payload;",
+                       uuid_str, uuid_str);
+        rc = prepare_statement(db_meta, (char *) buffer_tostring(sql), &res);
         buffer_free(sql);
-        return 0;
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to check payload data");
+            return 0;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, uuid , sizeof(*uuid), SQLITE_STATIC);
@@ -56,35 +56,38 @@ static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payl
         goto bind_fail;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        payload_sent = sqlite3_column_int(res, 0);
+        send_status = sqlite3_column_int(res, 0);
     }
 
 bind_fail:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
         error_report("Failed to reset statement in check payload, rc = %d", rc);
-    buffer_free(sql);
-    return payload_sent;
+    return send_status;
 }
 
 static int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, ACLK_PAYLOAD_TYPE payload_type,
                            void *payload, size_t payload_size)
 {
-    sqlite3_stmt *res_chart = NULL;
+    static __thread sqlite3_stmt *res_chart = NULL;
     int rc;
 
-    if (likely(payload_sent(uuid_str, uuid, payload, payload_size)))
+    rc = payload_sent(uuid_str, uuid, payload, payload_size);
+    if (rc == 1)
         return 0;
 
-    BUFFER *sql = buffer_create(1024);
+    if (unlikely(!res_chart)) {
+        BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
-                 "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", uuid_str);
+        buffer_sprintf(sql,"INSERT INTO aclk_chart_payload_%s (unique_id, uuid, claim_id, date_created, type, payload) " \
+                            "VALUES (@unique_id, @uuid, @claim_id, strftime('%%s','now'), @type, @payload);", uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_chart, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to store chart payload data");
+        rc = prepare_statement(db_meta, (char *) buffer_tostring(sql), &res_chart);
         buffer_free(sql);
-        return 1;
+
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to store chart payload data");
+            return 1;
+        }
     }
 
     uuid_t unique_uuid;
@@ -118,9 +121,8 @@ static int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, 
         error_report("Failed store chart payload event, rc = %d", rc);
 
 bind_fail:
-    if (unlikely(sqlite3_finalize(res_chart) != SQLITE_OK))
+    if (unlikely(sqlite3_reset(res_chart) != SQLITE_OK))
         error_report("Failed to reset statement in store chart payload, rc = %d", rc);
-    buffer_free(sql);
     return (rc != SQLITE_DONE);
 }
 
@@ -212,6 +214,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         freez(payload);
         freez(claim_id);
     }
+    rrddim_flag_clear(rd, RRDDIM_FLAG_ACLK);
 #else
     UNUSED(wc);
     UNUSED(cmd);
@@ -303,6 +306,8 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         if (likely(first_sequence)) {
             buffer_flush(sql);
+
+            db_lock();
             buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted=strftime('%%s','now') "
                                 "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                                 wc->uuid_str, first_sequence, last_sequence);
@@ -315,6 +320,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
                                 " ;",
                                 wc->uuid_str, wc->uuid_str, first_sequence, last_sequence);
             db_execute(buffer_tostring(sql));
+            db_unlock();
 
             aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
             wc->chart_sequence_id = last_sequence;
@@ -458,8 +464,18 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
     buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted = NULL WHERE sequence_id >= %"PRIu64";",
                    wc->uuid_str, cmd.param1);
     db_execute(buffer_tostring(sql));
+    if (cmd.param1 == 1) {
+        db_lock();
+        buffer_flush(sql);
+        info("DEBUG: Deleting all data for %s", wc->uuid_str);
+        buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; DELETE FROM aclk_chart_latest_%s;",
+                       wc->uuid_str, wc->uuid_str, wc->uuid_str);
+        db_execute(buffer_tostring(sql));
+        db_unlock();
+        //sql_chart_deduplicate(wc, cmd);
+    }
     buffer_free(sql);
-    sql_chart_deduplicate(wc, cmd);
+//    sql_chart_deduplicate(wc, cmd);
     sql_get_last_chart_sequence(wc, cmd);
     // Start sending updates
     wc->chart_updates = 1;
@@ -545,8 +561,11 @@ int sql_queue_chart_to_aclk(RRDSET *st)
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
-    return sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
-                                   rd, ACLK_DATABASE_ADD_DIMENSION);
+    int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
+                                     rd, ACLK_DATABASE_ADD_DIMENSION);
+    if (likely(!rc))
+        rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
+    return rc;
 }
 
 void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
@@ -555,6 +574,7 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
 
     BUFFER *sql = buffer_create(1024);
 
+    db_lock();
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
 
@@ -595,6 +615,7 @@ void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_d
     buffer_flush(sql);
     buffer_sprintf(sql, "DROP TABLE IF EXISTS t_%s;", wc->uuid_str);
     db_execute(buffer_tostring(sql));
+    db_unlock();
 
     sql_get_last_chart_sequence(wc, cmd);
 
@@ -654,48 +675,74 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     RRDHOST *host = localhost;
     while(host) {
         if (host->node_id && !(uuid_compare(*host->node_id, node_uuid))) {
+            //            rrd_unlock();
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
             if (likely(wc)) {
-                struct aclk_database_cmd cmd;
-                memset(&cmd, 0, sizeof(cmd));
-                if (unlikely(!wc->chart_updates)) {
-                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
-                    aclk_database_enq_cmd(wc, &cmd);
-                }
+                //                if (unlikely(!wc->chart_updates)) {
+                //                    struct aclk_database_cmd cmd;
+                //                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
+                //                    cmd.completion = NULL;
+                //                    aclk_database_enq_cmd(wc, &cmd);
+                //                }
+                wc->chart_reset_count++;
 
                 wc->batch_id = batch_id;
                 wc->batch_created = now_realtime_sec();
+                info("DEBUG: START streaming charts for %s (%s) enabled -- last streamed sequence %"PRIu64" t=%ld  (reset count=%d)", node_id, wc->uuid_str,
+                     wc->chart_sequence_id, wc->chart_timestamp, wc->chart_reset_count);
                 // If mismatch detected
-                if (sequence_id > wc->chart_sequence_id) {
-                    debug(D_ACLK_SYNC,"Request for resync for node %s -- last streamed sequence %"PRIu64" t=%ld", node_id,
-                          wc->chart_sequence_id, wc->chart_timestamp);
+                if (sequence_id > wc->chart_sequence_id || wc->chart_reset_count > 10) {
+                    info("DEBUG: Full resync requested -- reset_count=%d", wc->chart_reset_count);
+
+                    rrdhost_rdlock(host);
+                    RRDSET *st;
+                    rrdset_foreach_read(st, host) {
+                        rrdset_rdlock(st);
+                        RRDDIM *rd;
+                        rrddim_foreach_read(rd, st) {
+                            rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+                        }
+                        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+                        rrdset_unlock(st);
+                    }
+                    rrdhost_unlock(host);
+                    rrd_unlock();
+
+                    // Need to scan offline charts as well
+
                     chart_reset_t chart_reset;
                     chart_reset.node_id = strdupz(node_id);
                     chart_reset.claim_id = is_agent_claimed();
                     chart_reset.reason = SEQ_ID_NOT_EXISTS;
                     aclk_chart_reset(chart_reset);
                     wc->chart_updates = 0;
+                    wc->chart_reset_count = -1;
+                    return;
                 } else {
-                    // TODO: handle timestamp (created_at != wc->chart_timestamp)
-                    if (sequence_id < wc->chart_sequence_id) {
+                    struct aclk_database_cmd cmd;
+                    // TODO: handle timestamp
+
+                    if (!wc->chart_reset_count)
+                        wc->chart_delay = now_realtime_sec() + 60;
+                    else
+                        wc->chart_delay = 0;
+
+                    if (sequence_id < wc->chart_sequence_id) { // || created_at != wc->chart_timestamp) {
                         wc->chart_updates = 0;
-                        debug(D_ACLK_SYNC,"Synchonization mismatch for node %s. Last sequence id %"PRIu64, node_id,
-                              wc->chart_sequence_id);
+                        info("DEBUG: Synchonization mismatch detected");
                         cmd.opcode = ACLK_DATABASE_RESET_CHART;
                         cmd.param1 = sequence_id + 1;
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     }
-                    else {
-                        debug(D_ACLK_SYNC,"START streaming for node %s enabled -- last streamed sequence %"PRIu64" t=%ld", node_id,
-                              wc->chart_sequence_id, wc->chart_timestamp);
+                    else
                         wc->chart_updates = 1;
-                    }
                 }
             }
             else
                 error("ACLK synchronization thread is not active for host %s", host->hostname);
-            break;
+            rrd_unlock();
+            return;
         }
         host = host->next;
     }
