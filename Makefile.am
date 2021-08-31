@@ -233,6 +233,23 @@ HEALTH_PLUGIN_FILES = \
     health/health_log.c \
     $(NULL)
 
+if ENABLE_ML
+ML_FILES = \
+    ml/kmeans/KMeans.h \
+    ml/kmeans/KMeans.cc \
+    ml/kmeans/SamplesBuffer.h \
+    ml/kmeans/SamplesBuffer.cc \
+    ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/ml.h \
+    $(NULL)
+endif
+
+if ENABLE_ML_TESTS
+ML_TESTS_FILES = \
+    ml/kmeans/Tests.cc \
+    $(NULL)
+endif
+
 IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
     collectors/idlejitter.plugin/plugin_idlejitter.h \
@@ -863,6 +880,8 @@ NETDATA_FILES = \
     $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
+    $(ML_FILES) \
+    $(ML_TESTS_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
@@ -941,6 +960,11 @@ netdata_LDADD = \
 if ACLK_NG
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
         $(OPTIONAL_ATOMIC_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_ML_TESTS
+    netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
         $(NULL)
 endif
 

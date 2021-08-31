@@ -184,6 +184,18 @@ AC_ARG_WITH(
     [with_bundled_protobuf="$withval"],
     [with_bundled_protobuf="detect"]
 )
+AC_ARG_ENABLE(
+    [ml],
+    [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@no@:>@])],
+    [enable_ml="yes"],
+    [enable_ml="no"]
+)
+AC_ARG_ENABLE(
+    [ml_tests],
+    [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
+    [enable_ml_tests="yes"],
+    [enable_ml_tests="no"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -1190,6 +1202,41 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# gtest/gmock
+
+AC_MSG_CHECKING([if gtest and gmock can be found])
+
+PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
+PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+
+if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
+    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
+    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
+    have_gtest="yes"
+else
+    have_gtest="no"
+fi
+
+AC_MSG_RESULT([${have_gtest}])
+
+# -----------------------------------------------------------------------------
+# ml - anomaly detection
+
+AM_CONDITIONAL([ENABLE_ML], [test "${enable_ml}" = "yes"])
+if test "${enable_ml}" = "yes"; then
+    AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_LIBS=""
+fi
+
+AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${enable_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"])
+if test "${enable_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+    AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
+    OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
+    OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
+fi
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
@@ -1589,7 +1636,7 @@ CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_NG_CFLAGS}"
+    ${OPTIONAL_ACLK_NG_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1642,6 +1689,12 @@ AC_SUBST([OPTIONAL_LWS_LIBS])
 AC_SUBST([OPTIONAL_ACLK_NG_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_LIBS])
+AC_SUBST([OPTIONAL_GTEST_CFLAGS])
+AC_SUBST([OPTIONAL_GTEST_LIBS])
+AC_SUBST([OPTIONAL_ML_CFLAGS])
+AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
+AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1731,6 +1784,8 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
+    ml/Makefile
+    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
