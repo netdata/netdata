@@ -1443,6 +1443,11 @@ restart_after_removal:
                         continue;
                     }
 
+                    if (rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)) {
+                        last = rd;
+                        rd = rd->next;
+                        continue;
+                    }
                     rrddim_flag_set(rd, RRDDIM_FLAG_ARCHIVED);
                     while (rd->variables)
                         rrddimvar_free(rd->variables);
