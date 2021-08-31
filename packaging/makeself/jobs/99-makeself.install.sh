@@ -102,7 +102,7 @@ if [ "${BUILDARCH}" = "x86_64" ]; then
   [ -f "netdata-latest.gz.run" ] && rm "netdata-latest.gz.run"
   run ln -s "artifacts/${FILE}" "netdata-latest.gz.run"
   [ -f "artifacts/netdata-${VERSION}.gz.run" ] && rm "netdata-${VERSION}.gz.run"
-  run ln -s "artifacts/${FILE}" "artifacts/netdata-${VERSION}.gz.run"
+  run ln -s "./${FILE}" "artifacts/netdata-${VERSION}.gz.run"
 fi
 
 echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"
