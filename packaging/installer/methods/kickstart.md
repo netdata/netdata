@@ -11,11 +11,19 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 This page covers detailed instructions on using and configuring the automatic one-line installation script named
 `kickstart.sh`.
 
-This method is fully automatic on all Linux distributions. To install Netdata from source, including all dependencies
+This method is fully automatic on all Linux distributions and macOS environments. To install Netdata from source, including all dependencies
 required to connect to Netdata Cloud, and get _automatic nightly updates_, run the following as your normal user:
+
+**Linux**
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+```
+
+**macOS**
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
 
 > See our [installation guide](../README.md) for details about [automatic updates](../README.md#automatic-updates) or
@@ -73,6 +81,8 @@ For example:
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token=TOKEN --claim-rooms=ROOM1,ROOM2
 ```
+
+Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](#connect-an-agent-without-root-privileges) section.
 
 ## Verify script integrity
 
