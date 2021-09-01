@@ -16,6 +16,7 @@
 - update "Install Netdata on Synology" guide [\#11449](https://github.com/netdata/netdata/pull/11449) ([ilyam8](https://github.com/ilyam8))
 - Don’t bail early if we fail to build cloud deps with required cloud. [\#11446](https://github.com/netdata/netdata/pull/11446) ([Ferroin](https://github.com/Ferroin))
 - eBPF Soft IRQ latency [\#11445](https://github.com/netdata/netdata/pull/11445) ([UmanShahzad](https://github.com/UmanShahzad))
+- Installation review [\#11442](https://github.com/netdata/netdata/pull/11442) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update ebpf socket [\#11441](https://github.com/netdata/netdata/pull/11441) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update ebpf documentation [\#11440](https://github.com/netdata/netdata/pull/11440) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove ClearLinux from CI. [\#11438](https://github.com/netdata/netdata/pull/11438) ([Ferroin](https://github.com/Ferroin))
@@ -276,7 +277,6 @@
 - ACLK Passwd endpoint update [\#10859](https://github.com/netdata/netdata/pull/10859) ([underhood](https://github.com/underhood))
 - Dashboard version 2.17.0 [\#10856](https://github.com/netdata/netdata/pull/10856) ([allelos](https://github.com/allelos))
 - Ebpf directory cache [\#10855](https://github.com/netdata/netdata/pull/10855) ([thiagoftsm](https://github.com/thiagoftsm))
-- prevents mqtt connection attempt on OTP failure [\#10839](https://github.com/netdata/netdata/pull/10839) ([underhood](https://github.com/underhood))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
