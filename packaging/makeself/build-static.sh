@@ -39,7 +39,7 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # inside the container and runs the script install-alpine-packages.sh
   # (also inside the container)
   #
-  run docker rmi alpine:3.12
+  run docker pull alpine:3.12
 
   run docker run --platform=${platform} -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.12 \
     /bin/sh /usr/src/netdata.git/packaging/makeself/install-alpine-packages.sh
