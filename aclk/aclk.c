@@ -617,8 +617,8 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             return 1;
 
         if (aclk_env->encoding == ACLK_ENC_PROTO) {
-            if (!aclk_env_has_capa("proto_node_chart")) {
-                error ("Can't encoding=proto without at least \"proto_node_chart\" capability.");
+            if (!aclk_env_has_capa("proto")) {
+                error ("Can't encoding=proto without at least \"proto\" capability.");
                 continue;
             }
             info("Switching ACLK to new protobuf protocol");
