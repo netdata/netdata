@@ -14,8 +14,6 @@ extern time_t aclk_block_until;
 
 extern int disconnect_req;
 
-extern aclk_env_t *aclk_env;
-
 void *aclk_main(void *ptr);
 
 extern netdata_mutex_t aclk_shared_state_mutex;

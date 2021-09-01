@@ -49,6 +49,8 @@ typedef struct {
     aclk_backoff_t backoff;
 } aclk_env_t;
 
+extern aclk_env_t *aclk_env;
+
 aclk_encoding_type_t aclk_encoding_type_t_from_str(const char *str);
 aclk_transport_type_t aclk_transport_type_t_from_str(const char *str);
 
