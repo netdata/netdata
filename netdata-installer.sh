@@ -121,7 +121,7 @@ run_logfile="netdata-installer.log"
 # set default make options
 if [ -z "${MAKEOPTS}" ]; then
   MAKEOPTS="-j$(find_processors)"
-elif echo "${MAKEOPTS}" | grep -vqF "-j"; then
+elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
   MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
 fi
 
