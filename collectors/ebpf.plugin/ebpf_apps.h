@@ -421,6 +421,8 @@ extern void cleanup_exited_pids();
 
 extern int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
+extern int get_pid_comm(pid_t pid, size_t n, char *dest);
+
 extern size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
                                                            int fd,
                                                            struct pid_on_target *pids);
