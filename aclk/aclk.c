@@ -181,7 +181,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 
 //TODO prevent big buffer on stack
 #define RX_MSGLEN_MAX 4096
-static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
+static void msg_callback_old_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
     char cmsg[RX_MSGLEN_MAX];
     size_t len = (msglen < RX_MSGLEN_MAX - 1) ? msglen : (RX_MSGLEN_MAX - 1);
@@ -225,7 +225,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-static void msg_callback_new(const char *topic, const void *msg, size_t msglen, int qos)
+static void msg_callback_new_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
     if (msglen > RX_MSGLEN_MAX)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
@@ -262,7 +262,14 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
 
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
-#endif
+
+static inline void msg_callback(const char *topic, const void *msg, size_t msglen, int qos) {
+    if (aclk_use_new_cloud_arch)
+        msg_callback_new_protocol(topic, msg, msglen, qos);
+    else
+        msg_callback_old_protocol(topic, msg, msglen, qos);
+}
+#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 static void puback_callback(uint16_t packet_id)
 {
@@ -769,9 +776,9 @@ void *aclk_main(void *ptr)
         goto exit;
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, (aclk_use_new_cloud_arch ? msg_callback_new : msg_callback), puback_callback))) {
-#else
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+#else
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback_old_protocol, puback_callback))) {
 #endif
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
