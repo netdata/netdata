@@ -607,6 +607,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
 #if defined(ENABLE_NEW_CLOUD_PROTOCOL) && defined(ACLK_NEWARCH_DEVMODE)
         aclk_use_new_cloud_arch = 1;
+        info("Switching ACLK to new protobuf protocol. Due to #define ACLK_NEWARCH_DEVMODE.");
 #else
         aclk_use_new_cloud_arch = 0;
 #endif
@@ -639,7 +640,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
                 error ("Can't encoding=proto without at least \"proto\" capability.");
                 continue;
             }
-            info("Switching ACLK to new protobuf protocol");
+            info("Switching ACLK to new protobuf protocol. Due to /env response.");
             aclk_use_new_cloud_arch = 1;
         }
 #endif
