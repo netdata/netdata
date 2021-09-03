@@ -113,14 +113,14 @@ static void oomkill_write_data()
 static void oomkill_create_charts()
 {
     ebpf_create_chart(
-        NETDATA_EBPF_APPS_GROUP,
+        NETDATA_EBPF_MEMORY_GROUP,
         "oomkills",
         "OOM kills",
         EBPF_COMMON_DIMENSION_KILLS,
-        "mem",
+        "system",
         NULL,
         NETDATA_EBPF_CHART_TYPE_LINE,
-        20020,
+        NETDATA_CHART_PRIO_MEM_SYSTEM_OOM_KILL_PROC,
         NULL, NULL, 0,
         NETDATA_EBPF_MODULE_NAME_OOMKILL
     );
