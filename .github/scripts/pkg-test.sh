@@ -6,7 +6,7 @@ install_debian_like() {
 
   apt-get update
 
-  # Install NetData
+  # Install Netdata
   apt-get install -y /netdata/artifacts/netdata_"${VERSION}"_*.deb || exit 1
 
   # Install testing tools
@@ -21,7 +21,7 @@ install_fedora_like() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
-  # Install NetData
+  # Install Netdata
   "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
@@ -39,7 +39,7 @@ install_centos() {
   # Install EPEL (needed for `jq`
   "$PKGMGR" install -y epel-release || exit 1
 
-  # Install NetData
+  # Install Netdata
   "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
@@ -52,7 +52,7 @@ install_suse_like() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
-  # Install NetData
+  # Install Netdata
   zypper install -y --allow-unsigned-rpm /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
