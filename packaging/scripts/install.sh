@@ -6,7 +6,7 @@ install_debian_like() {
 
   apt-get update
 
-  # Install NetData
+  # Install Netdata
   apt-get install -y "/packages/netdata_${VERSION}_${ARCH}.deb"
 
   # Install testing tools
@@ -22,7 +22,7 @@ install_fedora_like() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
-  # Install NetData
+  # Install Netdata
   "$PKGMGR" install -y /packages/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
@@ -40,7 +40,7 @@ install_centos() {
   # Install EPEL (needed for `jq`
   "$PKGMGR" install -y epel-release
 
-  # Install NetData
+  # Install Netdata
   "$PKGMGR" install -y /packages/netdata-"${pkg_version}"-*.rpm
 
   # Install testing tools
@@ -53,7 +53,7 @@ install_suse_like() {
 
   pkg_version="$(echo "${VERSION}" | tr - .)"
 
-  # Install NetData
+  # Install Netdata
   # FIXME: Allow unsigned packages (for now) #7773
   zypper install -y --allow-unsigned-rpm \
     /packages/netdata-"${pkg_version}"-*.rpm
