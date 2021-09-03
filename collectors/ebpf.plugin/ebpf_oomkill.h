@@ -8,17 +8,9 @@
  *  for inclusion here.
  *****************************************************************/
 
-#define NETDATA_OOMKILL_MAX_ENTRIES 128
-#define NETDATA_OOMKILL_TASK_COMM_LEN 16
+#define NETDATA_OOMKILL_MAX_ENTRIES 64
 
-typedef struct oomkill_ebpf_val {
-    // how many times a process was killed.
-    uint32_t killcnt;
-
-    // command of the process as obtained from the kernel's task_struct for the
-    // OOM killed process.
-    char comm[NETDATA_OOMKILL_TASK_COMM_LEN];
-} oomkill_ebpf_val_t;
+typedef uint8_t oomkill_ebpf_val_t;
 
 /*****************************************************************
  * below this is eBPF plugin-specific code.

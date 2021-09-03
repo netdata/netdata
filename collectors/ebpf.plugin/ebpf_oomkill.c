@@ -30,6 +30,12 @@ static ebpf_local_maps_t oomkill_maps[] = {
 
 static ebpf_data_t oomkill_data;
 
+static ebpf_tracepoint_t oomkill_tracepoints[] = {
+    {.enabled = false, .class = "oom", .event = "mark_victim"},
+    /* end */
+    {.enabled = false, .class = NULL, .event = NULL}
+};
+
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
@@ -78,12 +84,8 @@ static void oomkill_write_data()
         }
 
         // now delete it, since we have a user-space copy, and never need this
-        // entry again.
-        // NOTE: normally this could lead to a race between user & kernel space
-        // in an SMP setting for kernels >=4.15, but because it shouldn't
-        // really ever happen that the same PID gets OOM killed more than once,
-        // kernel space is effectively not writing more than once, so we can be
-        // guaranteed that there is no race here.
+        // entry again. there's no race here, because the PID will only get OOM
+        // killed once.
         test = bpf_map_delete_elem(mapfd, &key);
         if (unlikely(test < 0)) {
             // since there's only 1 thread doing these deletions, it should be
@@ -91,28 +93,20 @@ static void oomkill_write_data()
             error("key unexpectedly not available for deletion.");
         }
 
-        char *comm = NULL;
-        uint64_t total_killcnt = 0;
-        int cpu_i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
-        for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_killcnt += oomkill_ebpf_vals[cpu_i].killcnt;
-            if (comm == NULL && oomkill_ebpf_vals[cpu_i].comm[0] != '\0') {
-                comm = oomkill_ebpf_vals[cpu_i].comm;
-            }
-        }
-        if (comm == NULL) {
+        // get command name from PID.
+        char comm[MAX_COMPARE_NAME+1];
+        test = get_pid_comm(key, sizeof(comm), comm);
+        if (test == -1) {
             continue;
         }
 
         // write dim.
-        comm[NETDATA_OOMKILL_TASK_COMM_LEN-1] = '\0';
-        info("comm=%s killcnt=%lu", comm, total_killcnt);
+        info("comm=%s", comm);
         ebpf_write_global_dimension(
             comm, comm,
             ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]
         );
-        write_chart_dimension(comm, total_killcnt);
+        write_chart_dimension(comm, 1);
     }
 }
 
@@ -187,6 +181,11 @@ void *ebpf_oomkill_thread(void *ptr)
     }
 
     if (ebpf_update_kernel(&oomkill_data)) {
+        goto endoomkill;
+    }
+
+    if (ebpf_enable_tracepoints(oomkill_tracepoints) == 0) {
+        em->enabled = CONFIG_BOOLEAN_NO;
         goto endoomkill;
     }
 
