@@ -101,7 +101,6 @@ static void oomkill_write_data()
         }
 
         // write dim.
-        info("comm=%s", comm);
         ebpf_write_global_dimension(
             comm, comm,
             ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]
@@ -152,7 +151,7 @@ static void oomkill_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write everything from the ebpf map.
-        write_begin_chart(NETDATA_EBPF_APPS_GROUP, "oomkills");
+        write_begin_chart(NETDATA_EBPF_MEMORY_GROUP, "oomkills");
         oomkill_write_data();
         write_end_chart();
 
