@@ -2441,7 +2441,7 @@ void *statsd_main(void *ptr) {
         char title[100 + 1];
 
         snprintfz(id, 100, "plugin_statsd_collector%d_cpu", i + 1);
-        snprintfz(title, 100, "NetData statsd collector thread No %d CPU usage", i + 1);
+        snprintfz(title, 100, "Netdata statsd collector thread No %d CPU usage", i + 1);
 
         statsd.collection_threads_status[i].st_cpu = rrdset_create_localhost(
                 "netdata"

@@ -2137,12 +2137,12 @@ send_dynatrace() {
   [ "${SEND_DYNATRACE}" != "YES" ] && return 1
 
   local dynatrace_url="${DYNATRACE_SERVER}/e/${DYNATRACE_SPACE}/api/v1/events"
-  local description="NetData Notification for: ${host} ${chart}.${name} is ${status}"
+  local description="Netdata Notification for: ${host} ${chart}.${name} is ${status}"
   local payload=""
 
   payload=$(cat <<EOF
 {
-  "title": "NetData Alarm from ${host}",
+  "title": "Netdata Alarm from ${host}",
   "source" : "${DYNATRACE_ANNOTATION_TYPE}",
   "description" : "${description}",
   "eventType": "${DYNATRACE_EVENT}",

@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: NetData API
+  title: Netdata API
   description: Real-time performance and health monitoring.
   version: 1.11.1_rolling
 paths:
@@ -1082,7 +1082,7 @@ components:
           description: The title of the chart.
         priority:
           type: number
-          description: The relative priority of the chart. NetData does not care about
+          description: The relative priority of the chart. Netdata does not care about
             priorities. This is just an indication of importance for the chart
             viewers to sort charts of higher priority (lower number) closer to
             the top. Priority sorting should only be used among charts of the
