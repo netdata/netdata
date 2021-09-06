@@ -90,12 +90,19 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
 
-FILE="netdata-${VERSION}.gz.run"
+FILE="netdata-${BUILDARCH}-${VERSION}.gz.run"
 
 run mkdir -p artifacts
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
 
-[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
-run ln -s "artifacts/${FILE}" netdata-latest.gz.run
+[ -f "netdata-${BUILDARCH}-latest.gz.run" ] && rm "netdata-${BUILDARCH}-latest.gz.run"
+run ln -s "artifacts/${FILE}" "netdata-${BUILDARCH}-latest.gz.run"
+
+if [ "${BUILDARCH}" = "x86_64" ]; then
+  [ -f "netdata-latest.gz.run" ] && rm "netdata-latest.gz.run"
+  run ln -s "artifacts/${FILE}" "netdata-latest.gz.run"
+  [ -f "artifacts/netdata-${VERSION}.gz.run" ] && rm "netdata-${VERSION}.gz.run"
+  run ln -s "./${FILE}" "artifacts/netdata-${VERSION}.gz.run"
+fi
 
 echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"

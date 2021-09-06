@@ -7,6 +7,7 @@ set -e
 # shellcheck source=.github/scripts/functions.sh
 . "$(dirname "$0")/functions.sh"
 
+BUILDARCH="${1}"
 NAME="${NAME:-netdata}"
 VERSION="${VERSION:-"$(git describe)"}"
 BASENAME="$NAME-$VERSION"
@@ -18,10 +19,10 @@ prepare_build() {
   ) >&2
 }
 
-build_static_x86_64() {
-  progress "Building static x86_64"
+build_static() {
+  progress "Building static ${BUILDARCH}"
   (
-    USER="" ./packaging/makeself/build-x86_64-static.sh
+    USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
   ) >&2
 }
 
@@ -36,7 +37,7 @@ prepare_assets() {
   ) >&2
 }
 
-steps="prepare_build build_static_x86_64"
+steps="prepare_build build_static"
 steps="$steps prepare_assets"
 
 _main() {

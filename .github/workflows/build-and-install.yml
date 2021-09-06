@@ -9,18 +9,20 @@ env:
   DO_NOT_TRACK: 1
 jobs:
   static-build:
-    name: Build (x86_64)
+    name: Static Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - 'x86_64'
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
+          fetch-depth: 0
           submodules: recursive
-      - run: |
-          git fetch --prune --unshallow --tags
       - name: Build
-        run: |
-          .github/scripts/build-static-x86_64.sh
+        run: .github/scripts/build-static.sh ${{ matrix.arch }}
   source-build:
     name: Build & Install
     strategy:
