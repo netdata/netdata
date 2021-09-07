@@ -1048,7 +1048,7 @@ fi
 if [ -d ./.git ] ; then
   echo >&2
   progress "Updating tags in git to ensure a consistent version number"
-  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
+  run git fetch -t || true
 fi
 
 # -----------------------------------------------------------------------------

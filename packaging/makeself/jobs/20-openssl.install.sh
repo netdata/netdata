@@ -6,6 +6,7 @@
 
 version="$(cat "$(dirname "${0}")/../openssl.version")"
 
+export CFLAGS='-fno-lto'
 export LDFLAGS='-static'
 export PKG_CONFIG="pkg-config --static"
 
