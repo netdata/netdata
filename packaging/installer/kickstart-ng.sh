@@ -13,9 +13,14 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # Defaults for environment variables
 
 RELEASE_CHANNEL="nightly"
-NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_USER_CONFIG_DIR="/etc/netdata"
+NETDATA_AUTO_UPDATES="1"
+NETDATA_ONLY_NATIVE=1
+NETDATA_ONLY_STATIC=1
+
+NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
+NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 
 if [ ! -t 1 ]; then
   INTERACTIVE=0
@@ -33,10 +38,15 @@ USAGE: kickstart.sh [options]
 
   --dont-wait                Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --non-interactive          Do not prompt for user input.
+  --dont-start-it            Do not start the agent by default (only for static installs or local builds)
   --interactive              Prompt for user input even if there is no controlling terminal.
   --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
   --nightly-channel          Install a nightly build instead of a stable version
+  --no-updates               Do not enable automatic updates (default: enable automatic updates)
+  --auto-update              Enable automatic updates.
   --disable-telemetry        Opt-out of anonymous statistics.
+  --native-only              Only install if native binary packages are available.
+  --static-only              Only install if a static build is available.
   --reinstall                Explicitly reinstall instead of updating any existing install.
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
@@ -220,6 +230,18 @@ download() {
   fi
 }
 
+safe_sha256sum() {
+  # Within the context of the installer, we only use -c option that is common between the two commands
+  # We will have to reconsider if we start using non-common options
+  if command -v sha256sum > /dev/null 2>&1; then
+    sha256sum "$@"
+  elif command -v shasum > /dev/null 2>&1; then
+    shasum -a 256 "$@"
+  else
+    fatal "I could not find a suitable checksum binary to use"
+  fi
+}
+
 get_system_info() {
   case "$(uname -s)" in
     Linux)
@@ -241,6 +263,7 @@ get_system_info() {
       DISTRO="${ID}"
       SYSVERSION="${VERSION_ID}"
       SYSCODENAME="${VERSION_CODENAME}"
+      SYSARCH="$(uname -m)"
 
       supported_compat_names="debian ubuntu centos fedora opensuse"
 
@@ -263,10 +286,12 @@ get_system_info() {
     Darwin)
       SYSTYPE="Darwin"
       SYSVERSION="$(sw_vers -buildVersion)"
+      SYSARCH="$(uname -m)"
       ;;
     FreebSD)
       SYSTYPE="FreeBSD"
       SYSVERSION="$(uname -K)"
+      SYSARCH="$(uname -m)"
       ;;
     *)
       fatal "Unsupported system type detected. Netdata cannot be installed on this system using this script."
@@ -565,14 +590,14 @@ try_package_install() {
 
   if ! pkg_installed "${repoconfig_name}"; then
     progress "Downloading repository configuration package."
-    if ! download "${repoconfig_url}" "${TMPDIR}/${repoconfig_file}"; then
+    if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to download repository configuration package."
       return 2
     fi
 
     progress "Installing repository configuration package."
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${TMPDIR}/${repoconfig_file}"; then
+    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
@@ -611,6 +636,58 @@ try_package_install() {
 }
 
 # ======================================================================
+# Static build install code
+
+set_static_archive_urls() {
+  if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-${latest}.gz.run"
+    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
+  else
+    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-latest.gz.run"
+    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/sha256sums.txt"
+  fi
+}
+
+try_static_install() {
+  set_static_archive_urls "${RELEASE_CHANNEL}"
+  progress "Downloading static netdata binary: ${NETDATA_STATIC_ARCHIVE_URL}"
+
+  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${tmpdir}/netdata-${SYSARCH}-latest.gz.run"; then
+    warning "Unable to download static build archive for ${SYSARCH}."
+    return 2
+  fi
+
+  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+    fatal "Unabl to fetch checksums to verify static build archive."
+  fi
+
+  if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    fatal "Static binary checksum validation failed. Stopping Netdata Agent installation and leaving binary in ${tmpdir}. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
+  fi
+
+  if [ "${INTERACTIVE}" -eq 0 ]; then
+    opts="${opts} --accept"
+  fi
+
+  progress "Installing netdata"
+  # shellcheck disable=SC2086
+  if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
+    fatal "Failed to install static build of Netdataon ${SYSARCH}."
+  fi
+
+  install_type_file="/opt/netdata/etc/netdata/.install-type"
+  if [ -f "${install_type_file}" ]; then
+    # shellcheck disable=SC1090
+    . "${install_type_file}"
+    cat > "${install_type_file}" <<- EOF
+	INSTALL_TYPE='kickstart-static'
+	PREBUILT_ARCH='${PREBUILT_ARCH}'
+	EOF
+  fi
+}
+
+# ======================================================================
 # Main program
 
 setup_terminal || echo > /dev/null
@@ -626,9 +703,23 @@ while [ -n "${1}" ]; do
     "--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--no-updates") NETDATA_AUTO_UPDATES="" ;;
+    "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="0" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--claim-only") NETDATA_NO_UPDATE=1 ;;
+    "--native-only")
+      NETDATA_ONLY_NATIVE=1
+      NETDATA_ONLY_STATIC=0
+      ;;
+    "--static-only")
+      NETDATA_ONLY_STATIC=1
+      NETDATA_ONLY_NATIVE=0
+      ;;
+    "--dont-start-it")
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+      NETDATA_CLAIM_EXTRA=" -daemon-not-running"
+      ;;
     "--claim-token")
       NETDATA_CLAIM_TOKEN="${2}"
       shift 1
@@ -671,16 +762,46 @@ handle_existing_install
 
 case "${SYSTYPE}" in
   Linux)
-    try_package_install
+    if [ "${NETDATA_ONLY_STATIC}" -ne 1 ]; then
+      try_package_install
 
-    case "$?" in
-      1)
-        fatal "Unable to install on this system."
-        ;;
-      2)
-        warning "Could not install native binary packages, falling back to alternative installation method."
-        ;;
-    esac
+      case "$?" in
+        0)
+          NETDATA_INSTALL_SUCCESSFUL=1
+          ;;
+        1)
+          fatal "Unable to install on this system."
+          ;;
+        2)
+          if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+            fatal "Could not install native binary packages."
+          else
+            warning "Could not install native binary packages, falling back to alternative installation method."
+          fi
+          ;;
+      esac
+    fi
+
+    if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+      try_static_install
+
+      case "$?" in
+        0)
+          NETDATA_INSTALL_SUCCESSFUL=1
+          NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
+          ;;
+        1)
+          fatal "Unable to install on this system."
+          ;;
+        2)
+          if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+            fatal "Could not install static build."
+          else
+            warning "Could not install static build, falling back to alternative installation method."
+          fi
+          ;;
+      esac
+    fi
     ;;
   Darwin)
     fatal "This script currently does not support installation on macOS."
