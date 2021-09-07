@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - name: Check files
         run: |
-          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '*\.js|node\.d\.plugin\.in' ; then
+          if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '*\.js|node\.d\.plugin\.in' ; then
             echo 'run_eslint=1' >> $GITHUB_ENV
           fi
       - name: Run eslint
