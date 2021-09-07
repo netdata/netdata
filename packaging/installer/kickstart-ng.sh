@@ -411,8 +411,12 @@ claim() {
     NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
+  if ! pgrep netdata > /dev/null; then
+    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+  fi
+
   # shellcheck disable=SC2086
-  if "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}; then
+  if ${ROOTCMD} "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
   else
     warning "Unable to claim node, you must do so manually."
@@ -639,8 +643,18 @@ while [ -n "${1}" ]; do
       ;;
     "--claim-*")
       optname="$(echo "${1}" | cut -d '-' -f 4-)"
-      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname} ${2}"
-      shift 1
+      case "${optname}" in
+        id|proxy|user|hostname)
+          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname} ${2}"
+          shift 1
+          ;;
+        verbose|insecure|noproxy|noreload|daemon-not-running)
+          NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}"
+          ;;
+        *)
+          warning "Ignoring unrecognized claiming option ${optname}"
+          ;;
+      esac
       ;;
   esac
   shift 1
