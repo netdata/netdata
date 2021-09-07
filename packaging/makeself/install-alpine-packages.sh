@@ -30,7 +30,7 @@ apk add --no-cache -U \
   make \
   ncurses \
   netcat-openbsd \
-  openssh-client-default \
+  openssh \
   pkgconfig \
   protobuf-dev \
   snappy-dev \
