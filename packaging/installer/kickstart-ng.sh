@@ -1,23 +1,6 @@
 #!/bin/sh
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Other options:
-#  --dont-wait                do not prompt for user input
-#  --non-interactive          do not prompt for user input
-#  --interactive              prompt for user input even if there is no controlling terminal
-#  --stable-channel           install a stable version instead of a nightly build
-#  --reinstall                explicitly reinstall instead of updating any existing install
-#  --claim-token              use a specified token for claiming to Netdata Cloud
-#  --claim-rooms              when claiming, add the node to the specified rooms
-#  --claim-only               when running against an existing install, only try to claim it, not update it
-#  --claim-*                  specify other options for the claiming script
-#  --no-cleanup               don't do any cleanup steps, intended for debugging the installer
-#
-# Environment options:
-#
-#  TMPDIR                     specify where to save temporary files
-#  ROOTCMD                    specify a command to use to run programs with root privileges
 
 # ======================================================================
 # Constants
@@ -30,7 +13,9 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # Defaults for environment variables
 
 RELEASE_CHANNEL="nightly"
+NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_USER_CONFIG_DIR="/etc/netdata"
 
 if [ ! -t 1 ]; then
   INTERACTIVE=0
@@ -51,6 +36,7 @@ USAGE: kickstart.sh [options]
   --interactive              Prompt for user input even if there is no controlling terminal.
   --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
   --nightly-channel          Install a nightly build instead of a stable version
+  --disable-telemetry        Opt-out of anonymous statistics.
   --reinstall                Explicitly reinstall instead of updating any existing install.
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
@@ -67,6 +53,7 @@ Additionally, this script may use the following environment variables:
                              default we try to use sudo, doas, or pkexec (in that order of preference), but if
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
+  DO_NOT_TRACK               If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
 
 HEREDOC
 }
@@ -635,6 +622,7 @@ while [ -n "${1}" ]; do
     "--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="0" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--claim-only") NETDATA_NO_UPDATE=1 ;;
     "--claim-token")
@@ -687,6 +675,10 @@ case "${SYSTYPE}" in
     fatal "This script currently does not support installation on FreeBSD."
     ;;
 esac
+
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+fi
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
