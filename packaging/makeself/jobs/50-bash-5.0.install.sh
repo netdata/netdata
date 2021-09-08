@@ -11,7 +11,6 @@ export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 run ./configure \
   --prefix="${NETDATA_INSTALL_PATH}" \
   --with-gnu-ld \
-  --with-installed-readline \
   --without-bash-malloc \
   --enable-static-link \
   --enable-net-redirections \

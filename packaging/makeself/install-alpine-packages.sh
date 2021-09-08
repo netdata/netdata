@@ -29,14 +29,10 @@ apk add --no-cache -U \
   lz4-static \
   make \
   ncurses \
-  ncurses-dev \
-  ncurses-static \
   netcat-openbsd \
   openssh \
   pkgconfig \
   protobuf-dev \
-  readline-dev \
-  readline-static \
   snappy-dev \
   util-linux-dev \
   wget \
