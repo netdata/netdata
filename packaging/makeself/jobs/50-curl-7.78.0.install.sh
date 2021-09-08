@@ -15,7 +15,6 @@ run autoreconf -fi
 
 run ./configure \
   --prefix="${NETDATA_INSTALL_PATH}" \
-  --with-gnu-ld \
   --enable-optimize \
   --disable-shared \
   --enable-static \
