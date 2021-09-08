@@ -33,6 +33,8 @@ apk add --no-cache -U \
   openssh \
   pkgconfig \
   protobuf-dev \
+  readline-dev \
+  readline-static \
   snappy-dev \
   util-linux-dev \
   wget \
