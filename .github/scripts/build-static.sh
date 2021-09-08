@@ -10,7 +10,7 @@ set -e
 BUILDARCH="${1}"
 NAME="${NAME:-netdata}"
 VERSION="${VERSION:-"$(git describe)"}"
-BASENAME="$NAME-$VERSION"
+BASENAME="$NAME-$BUILDARCH-$VERSION"
 
 prepare_build() {
   progress "Preparing build"
