@@ -29,6 +29,8 @@ apk add --no-cache -U \
   lz4-static \
   make \
   ncurses \
+  ncurses-dev \
+  ncurses-static \
   netcat-openbsd \
   openssh \
   pkgconfig \
