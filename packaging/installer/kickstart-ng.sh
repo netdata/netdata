@@ -804,10 +804,22 @@ case "${SYSTYPE}" in
     fi
     ;;
   Darwin)
-    fatal "This script currently does not support installation on macOS."
+    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+      fatal "User requested native package, but native packages are notavailable for macOS. Try installing without \`--only-native\` option."
+    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+      fatal "User requested static build, but static builds are notavailable for macOS. Try installing without \`--only-static\` option."
+    else
+      fatal "This script currently does not support installation on macOS."
+    fi
     ;;
   FreeBSD)
-    fatal "This script currently does not support installation on FreeBSD."
+    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+      fatal "User requested native package, but native packages are notavailable for FreeBSD. Try installing without \`--only-native\` option."
+    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+      fatal "User requested static build, but static builds are notavailable for FreeBSD. Try installing without \`--only-static\` option."
+    else
+      fatal "This script currently does not support installation on FreeBSD."
+    fi
     ;;
 esac
 
