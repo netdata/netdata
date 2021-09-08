@@ -21,7 +21,6 @@ run ./configure \
   --enable-http \
   --disable-ldap \
   --disable-ldaps \
-  --disalbe-rtsp \
   --enable-proxy \
   --disable-dict \
   --disable-telnet \
@@ -33,7 +32,8 @@ run ./configure \
   --disable-gopher \
   --enable-ipv6 \
   --enable-cookies \
-  --with-ca-fallback
+  --with-ca-fallback \
+  --with-openssl
 
 # Curl autoconf does not honour the curl_LDFLAGS environment variable
 run sed -i -e "s/curl_LDFLAGS =/curl_LDFLAGS = -all-static/" src/Makefile
