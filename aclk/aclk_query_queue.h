@@ -91,4 +91,12 @@ void aclk_queue_flush(void);
 
 void aclk_queue_lock(void);
 
+#define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
+    if (likely(query->data.bin_payload.payload)) {                                                                     \
+        aclk_queue_query(query);                                                                                       \
+    } else {                                                                                                           \
+        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
+        aclk_query_free(query);                                                                                        \
+    }
+
 #endif /* NETDATA_ACLK_QUERY_QUEUE_H */

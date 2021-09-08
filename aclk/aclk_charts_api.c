@@ -5,14 +5,6 @@
 
 #define CHART_DIM_UPDATE_NAME "ChartsAndDimensionsUpdated"
 
-#define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
-    if (likely(query->data.bin_payload.payload)) {                                                                     \
-        aclk_queue_query(query);                                                                                       \
-    } else {                                                                                                           \
-        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
-        aclk_query_free(query);                                                                                        \
-    }
-
 void aclk_chart_inst_update(char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions)
 {
     aclk_query_t query = aclk_query_new(CHART_DIMS_UPDATE);
