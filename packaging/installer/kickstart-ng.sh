@@ -383,7 +383,7 @@ handle_existing_install() {
     case "${INSTALL_TYPE}" in
       kickstart-*|legacy-*|manual-static)
         if [ -z "${NETDATA_REINSTALL}" ]; then
-          if [ -n "${NETDATA_NO_UPDATE}" ]; then
+          if [ "${NETDATA_NO_UPDATE}" -eq 0 ]; then
             if ! update; then
               warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
             fi
@@ -392,6 +392,8 @@ handle_existing_install() {
           if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
             progress "Attempting to claim existing install at ${ndprefix}."
             claim
+          elif [ "${NETDATA_NO_UPDATE}" -eq 1 ]; then
+            fatal "User asked to claim, but did not proide a claiming token."
           fi
         else
           progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
@@ -425,6 +427,8 @@ check_claim_opts() {
 # shellcheck disable=SC2235,SC2030
   if [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
     fatal "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
+  elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
+    fatal "Invalid claiming options, a claiming token must be specified."
   fi
 }
 
@@ -718,7 +722,6 @@ while [ -n "${1}" ]; do
       ;;
     "--dont-start-it")
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
-      NETDATA_CLAIM_EXTRA=" -daemon-not-running"
       ;;
     "--claim-token")
       NETDATA_CLAIM_TOKEN="${2}"
@@ -751,6 +754,7 @@ while [ -n "${1}" ]; do
   shift 1
 done
 
+check_claim_opts
 confirm_root_support
 get_system_info
 
