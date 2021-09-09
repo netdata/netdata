@@ -469,6 +469,9 @@ pkg_installed() {
       rpm -q "${1}" > /dev/null 2>&1
       return $?
       ;;
+    *)
+      return 1
+      ;;
   esac
 }
 
