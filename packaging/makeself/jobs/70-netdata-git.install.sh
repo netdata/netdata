@@ -31,6 +31,7 @@ run ./netdata-installer.sh \
   --dont-wait \
   --dont-start-it \
   --require-cloud \
+  --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things
 
 # Properly mark the install type
