@@ -47,6 +47,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Test Build
+        uses: docker/build-push-action@v2
+        with:
+          load: true
+          push: false
+          tags: netdata/netdata:test
+      - name: Test Image
+        run: .github/scripts/docker-test.sh
       - name: Docker Build
         uses: docker/build-push-action@v2
         with:
