@@ -52,7 +52,7 @@ USAGE: kickstart.sh [options]
   --claim-rooms              When claiming, add the node to the specified rooms.
   --claim-only               If there is an existing install, only try to claim it, not update it.
   --claim-*                  Specify other options for the claiming script.
-  --no-cleanup               Don't do any cleanup steps. This is intended to help with debuggint the installer.
+  --no-cleanup               Don't do any cleanup steps. This is intended to help with debugging the installer.
 
 Additionally, this script may use the following environment variables:
 
@@ -663,7 +663,7 @@ try_static_install() {
   fi
 
   if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
-    fatal "Unabl to fetch checksums to verify static build archive."
+    fatal "Unable to fetch checksums to verify static build archive."
   fi
 
   if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
@@ -809,18 +809,18 @@ case "${SYSTYPE}" in
     ;;
   Darwin)
     if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are notavailable for macOS. Try installing without \`--only-native\` option."
+      fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option."
     elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are notavailable for macOS. Try installing without \`--only-static\` option."
+      fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option."
     else
       fatal "This script currently does not support installation on macOS."
     fi
     ;;
   FreeBSD)
     if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are notavailable for FreeBSD. Try installing without \`--only-native\` option."
+      fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option."
     elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are notavailable for FreeBSD. Try installing without \`--only-static\` option."
+      fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option."
     else
       fatal "This script currently does not support installation on FreeBSD."
     fi
