@@ -836,8 +836,14 @@ install_local_build_dependencies() {
       opts="--dont-wait --non-interactive"
     fi
 
+    if [ "${SYSTYPE}" = "Darwin" ]; then
+      sudo=""
+    else
+      sudo="${ROOTCMD}"
+    fi
+
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+    if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
       warning "It failed to install all the required packages, but installation might still be possible."
     fi
   fi
