@@ -13,10 +13,10 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # ======================================================================
 # Defaults for environment variables
 
+INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
-NETDATA_DISABLE_CLOUD=0
-NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_DISABLE_CLOUD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
@@ -445,6 +445,17 @@ handle_existing_install() {
       fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
       ;;
   esac
+}
+
+soft_disable_cloud() {
+  cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
+
+  mkdir -p "${cloud_prefix}"
+
+  cat > "${cloud_prefix}/cloud.conf" << EOF
+[global]
+  enabled = no
+EOF
 }
 
 confirm_install_prefix() {
@@ -1088,6 +1099,8 @@ fi
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
+elif [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+  soft_disable_cloud
 fi
 
 if [ -z "${NO_CLEANUP}" ]; then
