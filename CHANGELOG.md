@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update claim README.md [\#11492](https://github.com/netdata/netdata/pull/11492) ([car12o](https://github.com/car12o))
+- Fix issues in Alarm API [\#11491](https://github.com/netdata/netdata/pull/11491) ([underhood](https://github.com/underhood))
 - Revert "add Travis ctrl file for checking if changes happened" [\#11486](https://github.com/netdata/netdata/pull/11486) ([Ferroin](https://github.com/Ferroin))
 - Clean netdata naming [\#11484](https://github.com/netdata/netdata/pull/11484) ([andrewm4894](https://github.com/andrewm4894))
 - remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
@@ -306,9 +308,6 @@
 - Properly handle different netcat command names in binary package test code. [\#10883](https://github.com/netdata/netdata/pull/10883) ([Ferroin](https://github.com/Ferroin))
 - Add carrier and mtu charts for network interfaces [\#10866](https://github.com/netdata/netdata/pull/10866) ([vlvkobal](https://github.com/vlvkobal))
 - Fix typo in main.h [\#10858](https://github.com/netdata/netdata/pull/10858) ([eltociear](https://github.com/eltociear))
-- health: improve alarms infos [\#10853](https://github.com/netdata/netdata/pull/10853) ([ilyam8](https://github.com/ilyam8))
-- minor - add info about --aclk-ng into netdata-installer [\#10852](https://github.com/netdata/netdata/pull/10852) ([underhood](https://github.com/underhood))
-- mqtt-c coverity fix [\#10851](https://github.com/netdata/netdata/pull/10851) ([underhood](https://github.com/underhood))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
