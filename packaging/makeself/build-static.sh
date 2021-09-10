@@ -21,7 +21,7 @@ esac
 
 DOCKER_CONTAINER_NAME="netdata-package-${BUILDARCH}-static-alpine312"
 
-if [ "${BUILDARCH}" != "$(uname -a)" ]; then
+if [ "${BUILDARCH}" != "$(uname -m)" ]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
 fi
 
