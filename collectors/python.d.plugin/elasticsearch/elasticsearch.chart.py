@@ -525,8 +525,7 @@ def convert_index_store_size_to_bytes(size):
 def convert_index_null_value(value):
     if value is None:
         return -1
-    else:
-        return value
+    return value
 
 
 def convert_index_health(health):
