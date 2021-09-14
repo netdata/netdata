@@ -6,27 +6,32 @@
 
 using namespace ml;
 
-void ml_init(void) {
-    Cfg.readMLConfig();
-}
-
 /*
  * Assumptions:
  *  1) hosts outlive their sets, and sets outlive their dimensions,
  *  2) dimensions always have a set that has a host.
  */
+
+void ml_init(void) {
+    Cfg.readMLConfig();
+}
+
 void ml_new_host(RRDHOST *RH) {
     if (simple_pattern_matches(Cfg.SP_HostsToSkip, RH->hostname))
         return;
 
     Host *H = new Host(RH);
     RH->ml_host = static_cast<ml_host_t>(H);
+
+    H->startTrainingThread();
 }
 
 void ml_delete_host(RRDHOST *RH) {
     Host *H = static_cast<Host *>(RH->ml_host);
     if (!H)
         return;
+
+    H->stopTrainingThread();
 
     delete H;
     RH->ml_host = nullptr;
@@ -57,4 +62,15 @@ void ml_delete_dimension(RRDDIM *RD) {
 
     delete D;
     RD->state->ml_dimension = nullptr;
+}
+
+bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
+    Dimension *D = static_cast<Dimension *>(RD->state->ml_dimension);
+    if (!D)
+        return false;
+
+    D->addValue(Value, Exists);
+    bool Result = D->predict().second;
+    error("Dimension %s anomaly bit %d", RD->name, Result);
+    return Result;
 }

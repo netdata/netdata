@@ -9,16 +9,18 @@ extern "C" {
 
 #include "daemon/common.h"
 
-void ml_init(void);
-
 typedef void* ml_host_t;
 typedef void* ml_dimension_t;
+
+void ml_init(void);
 
 void ml_new_host(RRDHOST *RH);
 void ml_delete_host(RRDHOST *RH);
 
 void ml_new_dimension(RRDDIM *RD);
 void ml_delete_dimension(RRDDIM *RD);
+
+bool ml_is_anomalous(RRDDIM *RD, double value, bool exists);
 
 #if defined(ENABLE_ML_TESTS)
 int test_ml(int argc, char *argv[]);

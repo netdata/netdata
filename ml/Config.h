@@ -9,6 +9,16 @@ namespace ml {
 
 class Config {
 public:
+    Seconds TrainSecs;
+    Seconds MinTrainSecs;
+    Seconds TrainEvery;
+
+    unsigned DiffN;
+    unsigned SmoothN;
+    unsigned LagN;
+
+    double DimensionAnomalyScoreThreshold;
+
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 

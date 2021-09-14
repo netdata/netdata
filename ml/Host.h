@@ -16,14 +16,31 @@ public:
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
 
-private:
+    virtual ~RrdHost() {};
+
+protected:
     RRDHOST *RH;
 
     std::mutex Mutex;
     std::map<RRDDIM *, Dimension *> DimensionsMap;
 };
 
-using Host = RrdHost;
+class TrainableHost : public RrdHost {
+public:
+    TrainableHost(RRDHOST *RH) : RrdHost(RH) {}
+
+    void startTrainingThread();
+    void stopTrainingThread();
+
+private:
+    void train();
+    void trainOne(TimePoint &Now);
+
+private:
+    std::thread TrainingThread;
+};
+
+using Host = TrainableHost;
 
 } // namespace ml
 
