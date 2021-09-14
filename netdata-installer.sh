@@ -118,6 +118,13 @@ download_go() {
 # make sure we save all commands we run
 run_logfile="netdata-installer.log"
 
+# set default make options
+if [ -z "${MAKEOPTS}" ]; then
+  MAKEOPTS="-j$(find_processors)"
+elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
+  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
+fi
+
 # -----------------------------------------------------------------------------
 # fix PKG_CHECK_MODULES error
 
@@ -549,7 +556,7 @@ build_libmosquitto() {
   fi
 
   if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} ${make} -j$(find_processors) -C "${1}/lib"
+    run ${env_cmd} ${make} ${MAKEOPTS} -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
@@ -561,7 +568,7 @@ build_libmosquitto() {
     else
       run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run ${env_cmd} ${make} -j$(find_processors) -C lib
+    run ${env_cmd} ${make} ${MAKEOPTS} -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -657,7 +664,7 @@ EOF
       $CMAKE_FLAGS \
       .
   fi
-  run ${env_cmd} ${make} -j$(find_processors)
+  run ${env_cmd} ${make} ${MAKEOPTS}
   popd > /dev/null || exit 1
 }
 
@@ -727,7 +734,7 @@ build_protobuf() {
     return 1
   fi
 
-  if ! run ${env_cmd} $make -j$(find_processors); then
+  if ! run ${env_cmd} $make ${MAKEOPTS}; then
     popd > /dev/null || return 1
     return 1
   fi
@@ -803,7 +810,7 @@ build_judy() {
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
     run ${env_cmd} autoconf &&
     run ${env_cmd} ./configure &&
-    run ${env_cmd} ${make} -j$(find_processors) -C src &&
+    run ${env_cmd} ${make} ${MAKEOPTS} -C src &&
     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
     popd > /dev/null || return 1
   else
@@ -881,7 +888,7 @@ build_jsonc() {
 
   pushd "${1}" > /dev/null || exit 1
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  run ${env_cmd} ${make} -j$(find_processors)
+  run ${env_cmd} ${make} ${MAKEOPTS}
   popd > /dev/null || exit 1
 }
 
@@ -939,7 +946,7 @@ bundle_jsonc
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} -j$(find_processors) install
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   popd > /dev/null || exit 1
 }
 
@@ -1050,7 +1057,7 @@ run $make clean
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run $make -j$(find_processors) || exit 1
+run $make ${MAKEOPTS} || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
@@ -1925,6 +1932,7 @@ cat << EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 LDFLAGS="${LDFLAGS}"
+MAKEOPTS="${MAKEOPTS}"
 NETDATA_TMPDIR="${TMPDIR}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
