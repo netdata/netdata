@@ -22,5 +22,6 @@ typedef uint8_t oomkill_ebpf_val_t;
 
 extern struct config oomkill_config;
 extern void *ebpf_oomkill_thread(void *ptr);
+extern void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 #endif /* NETDATA_EBPF_OOMKILL_H */

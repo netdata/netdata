@@ -39,9 +39,6 @@ static ebpf_tracepoint_t oomkill_tracepoints[] = {
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
-// tmp store for oomkill values we get from a per-CPU eBPF map.
-static oomkill_ebpf_val_t *oomkill_ebpf_vals = NULL;
-
 /**
  * Clean up the main thread.
  *
@@ -53,8 +50,6 @@ static void oomkill_cleanup(void *ptr)
     if (!em->enabled) {
         return;
     }
-
-    freez(oomkill_ebpf_vals);
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -69,62 +64,46 @@ static void oomkill_cleanup(void *ptr)
 
 static void oomkill_write_data()
 {
+    // the first `i` entries of `keys` will contain the currently active PIDs
+    // in the eBPF map.
+    uint32_t i = 0;
+    int32_t keys[NETDATA_OOMKILL_MAX_ENTRIES] = {0};
+
     uint32_t curr_key = 0;
     uint32_t key = 0;
     int mapfd = oomkill_maps[OOMKILL_MAP_KILLCNT].map_fd;
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
-        int test;
+        keys[i] = key;
+        i += 1;
 
-        // get val for this key.
-        test = bpf_map_lookup_elem(mapfd, &key, oomkill_ebpf_vals);
-        if (unlikely(test < 0)) {
-            continue;
-        }
-
-        // now delete it, since we have a user-space copy, and never need this
-        // entry again. there's no race here, because the PID will only get OOM
-        // killed once.
-        test = bpf_map_delete_elem(mapfd, &key);
+        // delete this key now that we've recorded its existence. there's no
+        // race here, as the same PID will only get OOM killed once.
+        int test = bpf_map_delete_elem(mapfd, &key);
         if (unlikely(test < 0)) {
             // since there's only 1 thread doing these deletions, it should be
             // impossible to get this condition.
             error("key unexpectedly not available for deletion.");
         }
-
-        // get command name from PID.
-        char comm[MAX_COMPARE_NAME+1];
-        test = get_pid_comm(key, sizeof(comm), comm);
-        if (test == -1) {
-            continue;
-        }
-
-        // write dim.
-        ebpf_write_global_dimension(
-            comm, comm,
-            ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]
-        );
-        write_chart_dimension(comm, 1);
     }
-}
 
-static void oomkill_create_charts()
-{
-    ebpf_create_chart(
-        NETDATA_EBPF_MEMORY_GROUP,
-        "oomkills",
-        "OOM kills",
-        EBPF_COMMON_DIMENSION_KILLS,
-        "system",
-        NULL,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_CHART_PRIO_MEM_SYSTEM_OOM_KILL_PROC,
-        NULL, NULL, 0,
-        NETDATA_EBPF_MODULE_NAME_OOMKILL
-    );
-
-    fflush(stdout);
+    // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
+    struct target *w;
+    for (w = apps_groups_root_target; w != NULL; w = w->next) {
+        if (likely(w->exposed && w->processes)) {
+            int32_t pid = w->root_pid->pid;
+            bool was_oomkilled = false;
+            uint32_t j;
+            for (j = 0; j < i; j++) {
+                if (pid == keys[j]) {
+                    was_oomkilled = true;
+                    break;
+                }
+            }
+            write_chart_dimension(w->name, was_oomkilled);
+        }
+    }
 }
 
 /**
@@ -134,16 +113,6 @@ static void oomkill_collector(ebpf_module_t *em)
 {
     UNUSED(em);
 
-    oomkill_ebpf_vals = callocz(
-        (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs,
-        sizeof(oomkill_ebpf_val_t)
-    );
-
-    // create chart.
-    pthread_mutex_lock(&lock);
-    oomkill_create_charts();
-    pthread_mutex_unlock(&lock);
-
     // loop and read until ebpf plugin is closed.
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
@@ -151,13 +120,35 @@ static void oomkill_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write everything from the ebpf map.
-        write_begin_chart(NETDATA_EBPF_MEMORY_GROUP, "oomkills");
+        write_begin_chart(NETDATA_EBPF_APPS_GROUP, "oomkills");
         oomkill_write_data();
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
     }
+}
+
+/**
+ * Create apps charts
+ *
+ * Call ebpf_create_chart to create the charts on apps submenu.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
+{
+    UNUSED(em);
+
+    struct target *root = ptr;
+    ebpf_create_charts_on_apps("oomkills",
+                               "OOM kills",
+                               EBPF_COMMON_DIMENSION_KILLS,
+                               "mem",
+                               NETDATA_EBPF_CHART_TYPE_LINE,
+                               20020,
+                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                               root, NETDATA_EBPF_MODULE_NAME_OOMKILL);
 }
 
 /**
