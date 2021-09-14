@@ -17,7 +17,7 @@ fi
 
 # These options control which packages we are going to install
 # They can be pre-set, but also can be controlled with command line options
-PACKAGES_NETDATA=${PACKAGES_NETDATA-0}
+PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_NODEJS=${PACKAGES_NETDATA_NODEJS-0}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-0}
