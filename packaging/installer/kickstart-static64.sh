@@ -222,7 +222,7 @@ claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   NETDATA_CLAIM_PATH=/opt/netdata/bin/netdata-claim.sh
 
-  if "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
+  if ${sudo} "${NETDATA_CLAIM_PATH}" -token=${NETDATA_CLAIM_TOKEN} -rooms=${NETDATA_CLAIM_ROOMS} -url=${NETDATA_CLAIM_URL} ${NETDATA_CLAIM_EXTRA}; then
     progress "Successfully claimed node"
     return 0
   else
