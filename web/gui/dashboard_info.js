@@ -810,28 +810,23 @@ netdataDashboard.submenu = {
         info: 'Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_vfs">Filesystem submenu</a>.'
     },
 
-    'filesystem.EXT4_latency': {
-        title: 'EXT4 Latency',
+    'filesystem.ext4_latency': {
         info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O), run queue latency and all events related to the monitored action. Based on the eBPF <a href="http://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html" target="_blank">ext4dist</a> from BCC tools.'
     },
 
-    'filesystem.XFS_latency': {
-        title: 'XFS Latency',
+    'filesystem.xfs_latency': {
         info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O), run queue latency and all events related to the monitored action. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/xfsdist_example.txt" target="_blank">xfsdist</a> from BCC tools.'
     },
 
-    'filesystem.NFS_latency': {
-        title: 'NFS Latency',
+    'filesystem.nfs_latency': {
         info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O), run queue latency and all events related to the monitored action. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/nfsdist_example.txt" target="_blank">nfsdist</a> from BCC tools.'
     },
 
-    'filesystem.ZFS_latency': {
-        title: 'ZFS Latency',
+    'filesystem.zfs_latency': {
         info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, this spans disk I/O, file system operations (lock, I/O), run queue latency and all events related to the monitored action. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/zfsdist_example.txt" target="_blank">zfsdist</a> from BCC tools.'
     },
 
-    'filesystem.BTRFS_latency': {
-        title: 'BTRFS Latency',
+    'filesystem.btrfs_latency': {
         info: 'Latency is the time it takes for an event to be completed. We calculate the difference between the calling and return times, we get the logarithmic for the final result and we sum one value to the respective bin. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/btrfsdist_example.txt" target="_blank">btrfsdist</a> from BCC tools.'
     },
 
