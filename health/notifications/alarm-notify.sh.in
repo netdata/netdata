@@ -1351,7 +1351,7 @@ send_telegram() {
 # Microsoft Team sender
 
 send_msteams() {
-
+  goto_url_msteams="${goto_url}&utm_medium=msteams"
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
   [ "${SEND_MSTEAMS}" != "YES" ] && return 1
@@ -1379,7 +1379,7 @@ send_msteams() {
                 "@type": "OpenUri",
                 "name": "Netdata",
                 "targets": [
-                { "os": "default", "uri": "${goto_url}" }
+                { "os": "default", "uri": "${goto_url_msteams}" }
                 ]
             }
             ]
@@ -1408,6 +1408,7 @@ EOF
 # slack sender
 
 send_slack() {
+  goto_url_slack="${goto_url}&utm_medium=slack"
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
   [ "${SEND_SLACK}" != "YES" ] && return 1
@@ -1444,7 +1445,7 @@ send_slack() {
                     "fallback": "${alarm} - ${chart} (${family}) - ${info}",
                     "color": "${color}",
                     "title": "${alarm}",
-                    "title_link": "${goto_url}",
+                    "title_link": "${goto_url_slack}",
                     "text": "${info}",
                     "fields": [
                         {
@@ -1483,6 +1484,7 @@ EOF
 # rocketchat sender
 
 send_rocketchat() {
+  goto_url_rocketchat="${goto_url}&utm_medium=rocketchat"
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
   [ "${SEND_ROCKETCHAT}" != "YES" ] && return 1
@@ -1506,7 +1508,7 @@ send_rocketchat() {
                 {
                     "color": "${color}",
                     "title": "${alarm}",
-                    "title_link": "${goto_url}",
+                    "title_link": "${goto_url_rocketchat}",
                     "text": "${info}",
                     "fields": [
                         {
@@ -1546,6 +1548,7 @@ EOF
 # alerta sender
 
 send_alerta() {
+  goto_url_alerta="${goto_url}&utm_medium=alerta"
   local webhook="${1}" channels="${2}" httpcode sent=0 channel severity resource event payload auth
 
   [ "${SEND_ALERTA}" != "YES" ] && return 1
@@ -1584,7 +1587,7 @@ send_alerta() {
                 "chart": "${chart}",
                 "family": "${family}",
                 "source": "${src}",
-                "moreInfo": "<a href=\"${goto_url}\">View Netdata</a>"
+                "moreInfo": "<a href=\"${goto_url_alerta}\">View Netdata</a>"
             },
             "origin": "netdata/${host}",
             "type": "netdataAlarm",
@@ -1618,6 +1621,7 @@ EOF
 # flock sender
 
 send_flock() {
+  goto_url_flock="${goto_url}&utm_medium=flock"
   local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
   [ "${SEND_FLOCK}" != "YES" ] && return 1
@@ -1642,7 +1646,7 @@ send_flock() {
                     \"description\": \"${chart} (${family}) - ${info}\",
                     \"color\": \"${color}\",
                     \"title\": \"${alarm}\",
-                    \"url\": \"${goto_url}\",
+                    \"url\": \"${goto_url_flock}\",
                     \"text\": \"${info}\",
                     \"views\": {
                         \"image\": {
@@ -1671,6 +1675,7 @@ send_flock() {
 # discord sender
 
 send_discord() {
+  goto_url_discord="${goto_url}&utm_medium=discord"
   local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload username
 
   [ "${SEND_DISCORD}" != "YES" ] && return 1
@@ -1697,7 +1702,7 @@ send_discord() {
                 {
                     "color": "${color}",
                     "title": "${alarm}",
-                    "title_link": "${goto_url}",
+                    "title_link": "${goto_url_discord}",
                     "text": "${info}",
                     "fields": [
                         {
@@ -1763,6 +1768,7 @@ send_fleep() {
 # Prowl sender
 
 send_prowl() {
+  goto_url_prowl="${goto_url}&utm_medium=prowl"
   local httpcode sent=0 data message keys prio=0 alarm_url event
   if [ "${SEND_PROWL}" = "YES" ]; then
     message="$(urlencode "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}")"
@@ -1781,7 +1787,7 @@ send_prowl() {
     esac
     prio="priority=${prio}"
 
-    alarm_url="$(urlencode ${goto_url})"
+    alarm_url="$(urlencode ${goto_url_prowl})"
     alarm_url="url=${alarm_url}"
     event="$(urlencode "${host} ${status_message}")"
     event="event=${event}"
@@ -1874,6 +1880,7 @@ send_awssns() {
 # Matrix sender
 
 send_matrix() {
+  goto_url_matrix="${goto_url}&utm_medium=matrix"
   local homeserver="${1}" webhook accesstoken rooms="${2}" httpcode sent=0 payload
 
   [ "${SEND_MATRIX}" != "YES" ] && return 1
@@ -1895,8 +1902,8 @@ send_matrix() {
   {
     "msgtype": "m.notice",
     "format": "org.matrix.custom.html",
-      "formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart} (${family})<br><a href=\"${goto_url}\">${alarm}</a><br><i>${info}</i>",
-      "body": "${emoji} ${host} ${status_message} - ${name//_/ } ${chart} (${family}) ${goto_url} ${alarm} ${info}"
+      "formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart} (${family})<br><a href=\"${goto_url_matrix}\">${alarm}</a><br><i>${info}</i>",
+      "body": "${emoji} ${host} ${status_message} - ${name//_/ } ${chart} (${family}) ${goto_url_matrix} ${alarm} ${info}"
   }
 EOF
     )"
@@ -2022,6 +2029,7 @@ send_sms() {
 # hangouts sender
 
 send_hangouts() {
+  goto_url_hangouts="${goto_url}&utm_medium=hangouts"
   local rooms="${1}" httpcode sent=0 room color payload webhook thread
 
   [ "${SEND_HANGOUTS}" != "YES" ] && return 1
@@ -2063,7 +2071,7 @@ send_hangouts() {
                         "iconUrl": "${image}",
                         "onClick": {
                           "openLink": {
-                            "url": "${goto_url}"
+                            "url": "${goto_url_hangouts}"
                           }
                         }
                       }
@@ -2095,7 +2103,7 @@ send_hangouts() {
                             "text": "Go to ${host}",
                             "onClick": {
                               "openLink": {
-                                "url": "${goto_url}"
+                                "url": "${goto_url_hangouts}"
                               }
                             }
                           }
@@ -2294,6 +2302,7 @@ urlencode "${value_string}" >/dev/null
 url_value_string="${REPLY}"
 
 redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
+utm_params="utm_source=alarm-notify-${status,,}&utm_campaign=${url_chart}&utm_term=${url_family}&utm_content=${url_name}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
@@ -2308,11 +2317,11 @@ if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
 fi
 
 if [ ${GOTOCLOUD} -eq 0 ]; then
-  goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
+  goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}&${utm_params}"
 else
     # Temporarily disable alarm redirection, as the cloud endpoint no longer exists. This functionality will be restored after discussion on #9487. For now, just lead to netdata.cloud
     # Re-allow alarm redirection, for alarms 2.0, new template
-  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+  goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentId=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}&${utm_params}"
 fi
 
 # the severity of the alarm
@@ -2488,13 +2497,14 @@ SENT_DISCORD=$?
 # -----------------------------------------------------------------------------
 # send the pushover notification
 
-send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "${status}" "${host} ${status_message} - ${name//_/ } - ${chart}" "
+goto_url_pushover="${goto_url}&utm_medium=pushover"
+send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url_pushover}" "${status}" "${host} ${status_message} - ${name//_/ } - ${chart}" "
 <font color=\"${color}\"><b>${alarm}</b></font>${info_html}<br/>&nbsp;
 <small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
 <small><b>${family}</b><br/>Family<br/>&nbsp;</small>
 <small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
 <small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>
-<a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
+<a href=\"${goto_url_pushover}\">View Netdata</a><br/>&nbsp;
 <small><small>The source of this alarm is line ${src}</small></small>
 "
 
@@ -2503,7 +2513,8 @@ SENT_PUSHOVER=$?
 # -----------------------------------------------------------------------------
 # send the pushbullet notification
 
-send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\\n
+goto_url_pushbullet="${goto_url}&utm_medium=pushbullet"
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url_pushbullet}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\\n
 Severity: ${severity}\\n
 Chart: ${chart}\\n
 Family: ${family}\\n
@@ -2548,10 +2559,11 @@ SENT_KAVENEGAR=$?
 # -----------------------------------------------------------------------------
 # send the telegram.org message
 
+goto_url_telegram="${goto_url}&utm_medium=telegram"
 # https://core.telegram.org/bots/api#formatting-options
 send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${host} ${status_message} - <b>${name//_/ }</b>
 ${chart} (${family})
-<a href=\"${goto_url}\">${alarm}</a>
+<a href=\"${goto_url_telegram}\">${alarm}</a>
 <i>${info}</i>"
 
 SENT_TELEGRAM=$?
@@ -2618,12 +2630,13 @@ SENT_CUSTOM=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
+goto_url_hipchat="${goto_url}&utm_medium=hipchat"
 send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
 ${host} ${status_message}<br/> \
 <b>${alarm}</b> ${info_html}<br/> \
 <b>${chart}</b> (family <b>${family}</b>)<br/> \
 <b>${date}${raised_for_html}</b><br/> \
-<a href=\\\"${goto_url}\\\">View netdata dashboard</a> \
+<a href=\\\"${goto_url_hipchat}\\\">View netdata dashboard</a> \
 (source of alarm ${src}) \
 "
 
@@ -2653,6 +2666,7 @@ SENT_SYSLOG=$?
 # -----------------------------------------------------------------------------
 # send the email
 
+goto_url_email="${goto_url}&utm_medium=email"
 IFS='' read -r -d '' email_plaintext_part <<EOF
 Content-Type: text/plain; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
@@ -2666,7 +2680,7 @@ ${raised_for}
 Chart   : ${chart}
 Family  : ${family}
 Severity: ${severity}
-URL     : ${goto_url}
+URL     : ${goto_url_email}
 Source  : ${src}
 Date    : ${date}
 Notification generated on ${host}
@@ -3096,7 +3110,7 @@ Content-Transfer-Encoding: 8bit
                               <td
                                 align="center" bgcolor="${border_color}" role="presentation" style="border:none;border-radius:3px;cursor:auto;height:44px;background:${border_color};" valign="middle">
                                 <p style="display:block;background:${border_color};color:#ffffff;font-size:13px;font-weight:600;line-height:44px;margin:0;text-decoration:none;text-transform:none;mso-padding-alt:0px;border-radius:3px;">
-                                  <a href="${goto_url}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
+                                  <a href="${goto_url_email}" style="color: ${action_text_color}; text-decoration: none; width: 100%; display: inline-block">GO TO CHART</a>
                                 </p>
                               </td>
                             </tr>
