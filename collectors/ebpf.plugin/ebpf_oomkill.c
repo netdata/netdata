@@ -88,19 +88,29 @@ static void oomkill_write_data()
         }
     }
 
+    // the majority of the time we won't have any data to show, so exit early.
+    if (likely(i == 0)) {
+        return;
+    }
+
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (likely(w->exposed && w->processes)) {
-            int32_t pid = w->root_pid->pid;
             bool was_oomkilled = false;
-            uint32_t j;
-            for (j = 0; j < i; j++) {
-                if (pid == keys[j]) {
-                    was_oomkilled = true;
-                    break;
+            struct pid_on_target *pids = w->root_pid;
+            while (pids) {
+                uint32_t j;
+                for (j = 0; j < i; j++) {
+                    if (pids->pid == keys[j]) {
+                        was_oomkilled = true;
+                        goto write_dim;
+                    }
                 }
+                pids = pids->next;
             }
+
+        write_dim:;
             write_chart_dimension(w->name, was_oomkilled);
         }
     }
