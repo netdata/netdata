@@ -9,7 +9,7 @@
 #define NETDATA_FD_SLEEP_MS 850000ULL
 
 // Menu group
-#define NETDATA_FILE_GROUP "File_access"
+#define NETDATA_FILE_GROUP "file_access"
 
 // Global chart name
 #define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
