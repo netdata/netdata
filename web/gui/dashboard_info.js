@@ -840,12 +840,12 @@ netdataDashboard.submenu = {
     },
 
     'ip.kernel': {
-        title: 'Kernel Functions',
+        title: 'kernel functions',
         info: 'Next charts are made when <code>ebpf.plugin</code> is running on your host. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows calls for kernel functions per <a href="#menu_apps_submenu_net">application</a>.'
     },
 
     'apps.net': {
-        title: 'Network monitoring',
+        title: 'network monitoring',
         info: 'Netdata also gives a summary for eBPF charts in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     }
 };
