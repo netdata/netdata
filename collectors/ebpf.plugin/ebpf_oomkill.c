@@ -150,7 +150,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                                "OOM kills",
                                EBPF_COMMON_DIMENSION_KILLS,
                                "mem",
-                               NETDATA_EBPF_CHART_TYPE_LINE,
+                               NETDATA_EBPF_CHART_TYPE_STACKED,
                                20020,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                                root, NETDATA_EBPF_MODULE_NAME_OOMKILL);
