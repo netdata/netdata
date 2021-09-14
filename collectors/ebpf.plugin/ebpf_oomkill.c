@@ -88,11 +88,6 @@ static void oomkill_write_data()
         }
     }
 
-    // the majority of the time we won't have any data to show, so exit early.
-    if (likely(i == 0)) {
-        return;
-    }
-
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
