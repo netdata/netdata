@@ -20,7 +20,7 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
-    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, alarm text, template text, "
+    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
     "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
