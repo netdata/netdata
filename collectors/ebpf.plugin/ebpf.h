@@ -114,7 +114,6 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_CHART_TYPE_STACKED "stacked"
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
-#define NETDATA_EBPF_APPS_GROUP "apps"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
 
 // Log file

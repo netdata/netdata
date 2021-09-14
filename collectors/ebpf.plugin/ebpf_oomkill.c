@@ -125,7 +125,7 @@ static void oomkill_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write everything from the ebpf map.
-        write_begin_chart(NETDATA_EBPF_APPS_GROUP, "oomkills");
+        write_begin_chart(NETDATA_APPS_FAMILY, "oomkills");
         oomkill_write_data();
         write_end_chart();
 
