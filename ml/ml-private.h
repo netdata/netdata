@@ -1,14 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef ML_PRIVATE_H
 #define ML_PRIVATE_H
 
-#include "config.h"
-
 #include "kmeans/KMeans.h"
-
-extern "C" {
-
 #include "ml/ml.h"
 
-}
+#include <map>
+#include <mutex>
 
-#endif // ML_PRIVATE_H
+#endif /* ML_PRIVATE_H */

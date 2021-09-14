@@ -235,12 +235,19 @@ HEALTH_PLUGIN_FILES = \
 
 if ENABLE_ML
 ML_FILES = \
+    ml/Config.h \
+    ml/Config.cc \
+    ml/Dimension.h \
+    ml/Host.h \
+    ml/Host.cc \
     ml/kmeans/KMeans.h \
     ml/kmeans/KMeans.cc \
     ml/kmeans/SamplesBuffer.h \
     ml/kmeans/SamplesBuffer.cc \
     ml/kmeans/dlib/dlib/all/source.cpp \
     ml/ml.h \
+    ml/ml.cc \
+    ml/ml-private.h \
     $(NULL)
 endif
 
