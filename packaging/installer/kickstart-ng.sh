@@ -55,6 +55,7 @@ USAGE: kickstart.sh [options]
   --reinstall                Explicitly reinstall instead of updating any existing install.
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
+  --install                  Specify an installation prefix for local builds (default: autodetect based on system type).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
   --claim-only               If there is an existing install, only try to claim it, not update it.
