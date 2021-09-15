@@ -712,7 +712,7 @@ while [ -n "${1}" ]; do
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--no-updates") NETDATA_AUTO_UPDATES="" ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
-    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="0" ;;
+    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="1" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--claim-only") NETDATA_NO_UPDATE=1 ;;
     "--native-only")
@@ -830,7 +830,7 @@ case "${SYSTYPE}" in
     ;;
 esac
 
-if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
