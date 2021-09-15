@@ -479,16 +479,16 @@ pkg_installed() {
 pkg_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      ${ROOTCMD} env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
+      env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
       return $?
       ;;
     centos|fedora)
       # shellcheck disable=SC2086
-      ${ROOTCMD} ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
+      ${pm_cmd} search -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
       ;;
     opensuse)
-      ${ROOTCMD} zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|' | tr -d ' ')" | grep -E 'netdata '
+      zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|' | tr -d ' ')" | grep -E 'netdata '
       return $?
       ;;
     *)
@@ -687,7 +687,7 @@ try_static_install() {
   if [ -f "${install_type_file}" ]; then
     # shellcheck disable=SC1090
     . "${install_type_file}"
-    cat > "${install_type_file}" <<- EOF
+    ${ROOTCMD} cat > "${install_type_file}" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
@@ -831,7 +831,7 @@ case "${SYSTYPE}" in
 esac
 
 if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
-  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+  run ${ROOTCMD} touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
@@ -839,5 +839,5 @@ if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
 fi
 
 if [ -z "${NO_CLEANUP}" ]; then
-  rm -rf "${tmpdir}"
+  ${ROOTCMD} rm -rf "${tmpdir}"
 fi
