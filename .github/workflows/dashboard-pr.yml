@@ -31,18 +31,13 @@ jobs:
       - name: Update Files
         run: |
           web/gui/bundle_dashboard.py ${{ github.event.inputs.dashboard_version }}
-      - name: Commit Changes
-        uses: swinton/commit@v2.x
-        env:
-          GH_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
         with:
-          files: ${{ env.COMMIT_FILES }} # Created by the bundle_dashboard.py script.
+          title: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
+          body: 'See https://github.com/netdata/dashboard/releases/tag/${{ github.event.inputs.dashboard_version }} for changes.'
+          branch: dashboard-${{ github.events.inputs.dashboard_version }}
+          branch-suffix: timestamp
+          delete-branch: true
           commit-message: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
-          ref: refs/heads/dashboard-${{ github.event.inputs.dashboard_version }}
-      - name: Create PR
-        uses: repo-sync/pull-request@v2
-        with:
-          source_branch: dashboard-${{ github.event.inputs.dashboard_version }}
-          pr_title: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
-          pr_body: 'See https://github.com/netdata/dashboard/releases/tag/${{ github.event.inputs.dashboard_version }} for changes.'
-          github_token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
