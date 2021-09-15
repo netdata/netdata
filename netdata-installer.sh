@@ -1665,6 +1665,12 @@ remove_old_ebpf() {
     echo >&2 "Removing old ebpf_kernel_reject_list.txt."
     rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
   fi
+
+  # Remove old reset script
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh" ]; then
+    echo >&2 "Removing old reset_netdata_trace.sh."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh"
+  fi
 }
 
 install_ebpf() {
