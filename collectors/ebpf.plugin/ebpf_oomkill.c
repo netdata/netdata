@@ -99,6 +99,8 @@ static void oomkill_write_data()
                 for (j = 0; j < i; j++) {
                     if (pids->pid == keys[j]) {
                         was_oomkilled = true;
+                        // set to 0 so we consider it "done".
+                        keys[j] = 0;
                         goto write_dim;
                     }
                 }
@@ -108,6 +110,23 @@ static void oomkill_write_data()
         write_dim:;
             write_chart_dimension(w->name, was_oomkilled);
         }
+    }
+
+    // for any remaining keys for which we couldn't find a group, this could be
+    // for various reasons, but the primary one is that the PID has not yet
+    // been picked up by the process thread when parsing the proc filesystem.
+    // since it's been OOM killed, it will never be parsed in the future, so
+    // we have no choice but to dump it into `other`.
+    uint32_t j;
+    uint32_t rem_count = 0;
+    for (j = 0; j < i; j++) {
+        int32_t key = keys[j];
+        if (key != 0) {
+            rem_count += 1;
+        }
+    }
+    if (rem_count > 0) {
+        write_chart_dimension("other", rem_count);
     }
 }
 
