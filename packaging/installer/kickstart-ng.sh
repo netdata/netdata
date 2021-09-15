@@ -375,6 +375,8 @@ handle_existing_install() {
     case "${INSTALL_TYPE}" in
       kickstart-*|legacy-*|manual-static)
         if [ -z "${NETDATA_REINSTALL}" ]; then
+          ret=0
+
           if [ "${NETDATA_NO_UPDATE}" -eq 0 ]; then
             if ! update; then
               warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
@@ -384,18 +386,26 @@ handle_existing_install() {
           if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
             progress "Attempting to claim existing install at ${ndprefix}."
             claim
+            ret=$?
           elif [ "${NETDATA_NO_UPDATE}" -eq 1 ]; then
             fatal "User asked to claim, but did not proide a claiming token."
           fi
+
+          exit $ret
         else
           progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
         fi
         ;;
       binpkg-*)
+        ret=0
+
         if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
           progress "Attempting to claim existing install at ${ndprefix}."
           claim
+          ret=$?
         fi
+
+        exit $ret
         ;;
       oci)
         fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
