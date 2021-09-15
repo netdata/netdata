@@ -16,12 +16,7 @@ userebpfconfigdir=$(configdir)/ebpf.d
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(userebpfconfigdir)
 
-dist_plugins_SCRIPTS = \
-    reset_netdata_trace.sh \
-    $(NULL)
-
 dist_noinst_DATA = \
-    reset_netdata_trace.sh.in \
     README.md \
     $(NULL)
 
