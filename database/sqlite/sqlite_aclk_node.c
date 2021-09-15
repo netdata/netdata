@@ -4,7 +4,6 @@
 #include "sqlite_aclk_node.h"
 
 #ifdef ENABLE_ACLK
-#include "../../aclk/aclk.h"
 #include "../../aclk/aclk_charts_api.h"
 #endif
 
@@ -86,4 +85,3 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     return;
 }
-
