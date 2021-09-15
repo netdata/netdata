@@ -169,11 +169,6 @@ run() {
   return ${ret}
 }
 
-fatal() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
-  exit 1
-}
-
 warning() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
 }
@@ -182,13 +177,13 @@ _cannot_use_tmpdir() {
   testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
   ret=0
 
-  if [ -z "${testfile}" ] ; then
+  if [ -z "${testfile}" ]; then
     return "${ret}"
   fi
 
-  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
-    if chmod +x "${testfile}" ; then
-      if [ "$("${testfile}")" = "SUCCESS" ] ; then
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}"; then
+    if chmod +x "${testfile}"; then
+      if [ "$("${testfile}")" = "SUCCESS" ]; then
         ret=1
       fi
     fi
@@ -199,9 +194,9 @@ _cannot_use_tmpdir() {
 }
 
 create_tmp_directory() {
-  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}" ; then
-    if _cannot_use_tmpdir /tmp ; then
-      if _cannot_use_tmpdir "${PWD}" ; then
+  if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
+    if _cannot_use_tmpdir /tmp; then
+      if _cannot_use_tmpdir "${PWD}"; then
         echo >&2
         echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
         exit 1
@@ -347,7 +342,7 @@ check_for_existing_install() {
     ndprefix="/"
   else
     ndpath="$(command -v netdata 2>/dev/null)"
-    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ] ; then
+    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
       ndpath="/opt/netdata/bin/netdata"
     fi
 
@@ -355,7 +350,7 @@ check_for_existing_install() {
       ndprefix="$(dirname "$(dirname "${ndpath}")")"
     fi
 
-    if [ "${ndprefix}" = /usr ] ; then
+    if [ "${ndprefix}" = /usr ]; then
       ndprefix="/"
     fi
   fi
@@ -374,10 +369,7 @@ check_for_existing_install() {
 }
 
 handle_existing_install() {
-  if ! check_for_existing_install; then
-    progress "No existing install found, assuming this is a new installation."
-    return 0
-  fi
+  check_for_existing_install
 
   if [ -n "${ndprefix}" ]; then
     case "${INSTALL_TYPE}" in
@@ -434,7 +426,7 @@ check_claim_opts() {
 
 claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${NETDATA_PREFIX}" ] ; then
+  if [ -z "${NETDATA_PREFIX}" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
   else
     NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
