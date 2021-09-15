@@ -280,7 +280,7 @@ get_system_info() {
       SYSVERSION="$(sw_vers -buildVersion)"
       SYSARCH="$(uname -m)"
       ;;
-    FreebSD)
+    FreeBSD)
       SYSTYPE="FreeBSD"
       SYSVERSION="$(uname -K)"
       SYSARCH="$(uname -m)"
@@ -679,7 +679,7 @@ try_static_install() {
   progress "Installing netdata"
   # shellcheck disable=SC2086
   if ! run ${ROOTCMD} sh "${tmpdir}/netdata-${SYSARCH}-latest.gz.run" ${opts} -- ${NETDATA_AUTO_UPDATES:+--auto-update} ${NETDATA_INSTALLER_OPTIONS}; then
-    fatal "Failed to install static build of Netdataon ${SYSARCH}."
+    fatal "Failed to install static build of Netdata on ${SYSARCH}."
   fi
 
   install_type_file="/opt/netdata/etc/netdata/.install-type"
