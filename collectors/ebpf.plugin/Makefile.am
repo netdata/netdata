@@ -3,10 +3,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-CLEANFILES = \
-    reset_netdata_trace.sh \
-    $(NULL)
-
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
@@ -16,12 +12,7 @@ userebpfconfigdir=$(configdir)/ebpf.d
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(userebpfconfigdir)
 
-dist_plugins_SCRIPTS = \
-    reset_netdata_trace.sh \
-    $(NULL)
-
 dist_noinst_DATA = \
-    reset_netdata_trace.sh.in \
     README.md \
     $(NULL)
 
