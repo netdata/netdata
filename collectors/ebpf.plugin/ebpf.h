@@ -86,7 +86,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_MOUNT_IDX,
     EBPF_MODULE_FD_IDX,
     EBPF_MODULE_HARDIRQ_IDX,
-    EBPF_MODULE_SOFTIRQ_IDX
+    EBPF_MODULE_SOFTIRQ_IDX,
+    EBPF_MODULE_OOMKILL_IDX
 };
 
 typedef struct ebpf_tracepoint {
@@ -225,6 +226,7 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
+#define EBPF_COMMON_DIMENSION_KILLS "kills"
 
 // Common variables
 extern int debug_enabled;

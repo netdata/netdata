@@ -322,6 +322,10 @@ The eBPF collector enables and runs the following eBPF programs by default:
     time spent servicing individual hardware interrupt requests (hard IRQs).
 -   `softirq`: This eBPF program creates charts that show information about
     time spent servicing individual software interrupt requests (soft IRQs).
+-   `oomkill`: This eBPF program creates a chart that shows OOM kills for all
+    applications recognized via the `apps.plugin` integration. Note that this
+    program will show application charts regardless of whether apps integration
+    is turned on or off.
 
 You can also enable the following eBPF programs:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with

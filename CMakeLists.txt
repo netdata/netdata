@@ -500,6 +500,8 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_mount.h
         collectors/ebpf.plugin/ebpf_filesystem.c
         collectors/ebpf.plugin/ebpf_filesystem.h
+        collectors/ebpf.plugin/ebpf_oomkill.c
+        collectors/ebpf.plugin/ebpf_oomkill.h
         collectors/ebpf.plugin/ebpf_process.c
         collectors/ebpf.plugin/ebpf_process.h
         collectors/ebpf.plugin/ebpf_socket.c

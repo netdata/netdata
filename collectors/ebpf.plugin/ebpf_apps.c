@@ -910,6 +910,33 @@ static inline void del_pid_entry(pid_t pid)
 }
 
 /**
+ * Get command string associated with a PID.
+ * This can only safely be used when holding the `collect_data_mutex` lock.
+ *
+ * @param pid the pid to search the data.
+ * @param n the maximum amount of bytes to copy into dest.
+ *          if this is greater than the size of the command, it is clipped.
+ * @param dest the target memory buffer to write the command into.
+ * @return -1 if the PID hasn't been scraped yet, 0 otherwise.
+ */
+int get_pid_comm(pid_t pid, size_t n, char *dest)
+{
+    struct pid_stat *stat;
+
+    stat = all_pids[pid];
+    if (unlikely(stat == NULL)) {
+        return -1;
+    }
+
+    if (unlikely(n > sizeof(stat->comm))) {
+        n = sizeof(stat->comm);
+    }
+
+    strncpyz(dest, stat->comm, n);
+    return 0;
+}
+
+/**
  * Cleanup variable from other threads
  *
  * @param pid current pid.

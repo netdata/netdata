@@ -30,6 +30,5 @@ typedef struct sofirq_val {
 
 extern struct config softirq_config;
 extern void *ebpf_softirq_thread(void *ptr);
-extern void ebpf_softirq_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 #endif /* NETDATA_EBPF_SOFTIRQ_H */

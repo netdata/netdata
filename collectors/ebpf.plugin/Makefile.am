@@ -31,6 +31,7 @@ dist_ebpfconfig_DATA = \
     ebpf.d/hardirq.conf \
     ebpf.d/mount.conf \
     ebpf.d/network.conf \
+    ebpf.d/oomkill.conf \
     ebpf.d/process.conf \
     ebpf.d/softirq.conf \
     ebpf.d/sync.conf \
