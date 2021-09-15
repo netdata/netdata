@@ -939,7 +939,7 @@ send_email() {
     fi
 
     [ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
-    [ -n "${sender_name}" ] && ${sendmail} -F 2>&1 | grep -q "requires an argument" && opts+=(-F "${sender_name}")
+    [ -n "${sender_name}" ] && ${sendmail} -F 2>&1 | head -1 | grep -qv "sendmail: unrecognized option: F" && opts+=(-F "${sender_name}")
 
     if [ "${debug}" = "1" ]; then
       echo >&2 "--- BEGIN sendmail command ---"
