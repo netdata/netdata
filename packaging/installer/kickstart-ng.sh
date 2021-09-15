@@ -197,9 +197,7 @@ create_tmp_directory() {
   if [ -z "${TMPDIR}" ] || _cannot_use_tmpdir "${TMPDIR}"; then
     if _cannot_use_tmpdir /tmp; then
       if _cannot_use_tmpdir "${PWD}"; then
-        echo >&2
-        echo >&2 "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
-        exit 1
+        fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again."
       else
         TMPDIR="${PWD}"
       fi
@@ -248,8 +246,7 @@ get_system_info() {
       elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
         os_release_file="/usr/lib/os-release"
       else
-        echo >&2 "Cannot find an os-release file ..."
-        return 1
+        fatal "Cannot find an os-release file ..."
       fi
 
       # shellcheck disable=SC1090
@@ -377,7 +374,7 @@ handle_existing_install() {
         if [ -z "${NETDATA_REINSTALL}" ]; then
           ret=0
 
-          if [ "${NETDATA_NO_UPDATE}" -eq 0 ]; then
+          if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
             if ! update; then
               warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
             fi
@@ -387,7 +384,7 @@ handle_existing_install() {
             progress "Attempting to claim existing install at ${ndprefix}."
             claim
             ret=$?
-          elif [ "${NETDATA_NO_UPDATE}" -eq 1 ]; then
+          elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
             fatal "User asked to claim, but did not proide a claiming token."
           fi
 
@@ -501,7 +498,7 @@ pkg_avail_check() {
 
 try_package_install() {
   if [ -z "${DISTRO}" ]; then
-    echo "Unable to determine Linux distribution for native packages."
+    warning "Unable to determine Linux distribution for native packages."
     return 1
   fi
 
@@ -716,7 +713,7 @@ while [ -n "${1}" ]; do
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="1" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
-    "--claim-only") NETDATA_NO_UPDATE=1 ;;
+    "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
