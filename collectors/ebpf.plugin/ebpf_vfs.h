@@ -39,7 +39,7 @@
 #define NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR "vfs_create_error"
 
 // Group used on Dashboard
-#define NETDATA_VFS_GROUP "VFS (eBPF)"
+#define NETDATA_VFS_GROUP "vfs"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
