@@ -845,7 +845,7 @@ netdataDashboard.submenu = {
     },
 
     'apps.net': {
-        title: 'network monitoring',
+        title: 'network',
         info: 'Netdata also gives a summary for eBPF charts in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
     }
 };
