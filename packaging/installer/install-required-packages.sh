@@ -417,10 +417,12 @@ detect_package_manager_from_distribution() {
       ;;
 
     centos* | clearos*)
-      package_installer="install_yum"
+      package_installer=""
       tree="centos"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
-        echo >&2 "command 'yum' is required to install packages on a '${distribution} ${version}' system."
+        echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
       ;;
@@ -428,8 +430,8 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${yum}" ] && package_installer="install_yum"
       [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -497,7 +499,11 @@ check_package_manager() {
     dnf)
       [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_dnf"
-      tree="rhel"
+      if [ "${distribution}" = "centos" ]; then
+        tree="centos"
+      else
+        tree="rhel"
+      fi
       detection="user-input"
       return 0
       ;;
