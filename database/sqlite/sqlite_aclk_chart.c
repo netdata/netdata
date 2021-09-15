@@ -477,6 +477,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         wc->chart_sequence_id = 0;
         wc->chart_timestamp = 0;
 
+#ifdef ENABLE_ACLK
         RRDHOST *host = wc->host;
         rrdhost_rdlock(host);
         RRDSET *st;
@@ -490,6 +491,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
             rrdset_unlock(st);
         }
         rrdhost_unlock(host);
+#endif
     }
     else {
         //sql_chart_deduplicate(wc, cmd);
