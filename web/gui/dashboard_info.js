@@ -803,10 +803,12 @@ netdataDashboard.submenu = {
     },
 
     'filesystem.vfs': {
+        title: 'vfs (eBPF)',
         info: 'Monitor calls for functions used to manipulate <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#vfs" target="_blank">File Systems</a>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows Virtual File System per <a href="#menu_apps_submenu_vfs">application</a>.'
     },
 
     'apps.vfs': {
+        title: 'vfs (eBPF)',
         info: 'Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_vfs">Filesystem submenu</a>.'
     },
 
