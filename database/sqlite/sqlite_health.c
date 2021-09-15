@@ -877,6 +877,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     return 1;
 }
 
+#define DIGEST_ALERT_CONFIG_VAL(v) ((v) ? EVP_DigestUpdate(evpctx, (v), strlen((v))) : EVP_DigestUpdate(evpctx, "", 1))
 int alert_hash_and_store_config(
     uuid_t hash_id,
     struct alert_config *cfg)
@@ -887,34 +888,33 @@ int alert_hash_and_store_config(
     evpctx = EVP_MD_CTX_create();
     EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
 
-    cfg->alarm ? EVP_DigestUpdate(evpctx, cfg->alarm, strlen(cfg->alarm)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->template_key ? EVP_DigestUpdate(evpctx, cfg->template_key, strlen(cfg->template_key)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-
-    cfg->os ? EVP_DigestUpdate(evpctx, cfg->os, strlen(cfg->os)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->host ? EVP_DigestUpdate(evpctx, cfg->host, strlen(cfg->host)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->on ? EVP_DigestUpdate(evpctx, cfg->on, strlen(cfg->on)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->families ? EVP_DigestUpdate(evpctx, cfg->families, strlen(cfg->families)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->plugin ? EVP_DigestUpdate(evpctx, cfg->plugin, strlen(cfg->plugin)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->module ? EVP_DigestUpdate(evpctx, cfg->module, strlen(cfg->module)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->charts ? EVP_DigestUpdate(evpctx, cfg->charts, strlen(cfg->charts)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->lookup ? EVP_DigestUpdate(evpctx, cfg->lookup, strlen(cfg->lookup)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->calc ? EVP_DigestUpdate(evpctx, cfg->calc, strlen(cfg->calc)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->every ? EVP_DigestUpdate(evpctx, cfg->every, strlen(cfg->every)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->green ? EVP_DigestUpdate(evpctx, cfg->green, strlen(cfg->green)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->red ? EVP_DigestUpdate(evpctx, cfg->red, strlen(cfg->red)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->warn ? EVP_DigestUpdate(evpctx, cfg->warn, strlen(cfg->warn)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->crit ? EVP_DigestUpdate(evpctx, cfg->crit, strlen(cfg->crit)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->exec ? EVP_DigestUpdate(evpctx, cfg->exec, strlen(cfg->exec)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->to ? EVP_DigestUpdate(evpctx, cfg->to, strlen(cfg->to)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->units ? EVP_DigestUpdate(evpctx, cfg->units, strlen(cfg->units)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->info ? EVP_DigestUpdate(evpctx, cfg->info, strlen(cfg->info)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->classification ? EVP_DigestUpdate(evpctx, cfg->classification, strlen(cfg->classification)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->component ? EVP_DigestUpdate(evpctx, cfg->component, strlen(cfg->component)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->type ? EVP_DigestUpdate(evpctx, cfg->type, strlen(cfg->type)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->delay ? EVP_DigestUpdate(evpctx, cfg->delay, strlen(cfg->delay)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->options ? EVP_DigestUpdate(evpctx, cfg->options, strlen(cfg->options)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->repeat ? EVP_DigestUpdate(evpctx, cfg->repeat, strlen(cfg->repeat)) : EVP_DigestUpdate(evpctx, "NULL", 4);
-    cfg->host_labels ? EVP_DigestUpdate(evpctx, cfg->host_labels, strlen(cfg->host_labels)) : EVP_DigestUpdate(evpctx, "NULL", 4);
+    DIGEST_ALERT_CONFIG_VAL(cfg->alarm);
+    DIGEST_ALERT_CONFIG_VAL(cfg->template_key);
+    DIGEST_ALERT_CONFIG_VAL(cfg->os);
+    DIGEST_ALERT_CONFIG_VAL(cfg->host);
+    DIGEST_ALERT_CONFIG_VAL(cfg->on);
+    DIGEST_ALERT_CONFIG_VAL(cfg->families);
+    DIGEST_ALERT_CONFIG_VAL(cfg->plugin);
+    DIGEST_ALERT_CONFIG_VAL(cfg->module);
+    DIGEST_ALERT_CONFIG_VAL(cfg->charts);
+    DIGEST_ALERT_CONFIG_VAL(cfg->lookup);
+    DIGEST_ALERT_CONFIG_VAL(cfg->calc);
+    DIGEST_ALERT_CONFIG_VAL(cfg->every);
+    DIGEST_ALERT_CONFIG_VAL(cfg->green);
+    DIGEST_ALERT_CONFIG_VAL(cfg->red);
+    DIGEST_ALERT_CONFIG_VAL(cfg->warn);
+    DIGEST_ALERT_CONFIG_VAL(cfg->crit);
+    DIGEST_ALERT_CONFIG_VAL(cfg->exec);
+    DIGEST_ALERT_CONFIG_VAL(cfg->to);
+    DIGEST_ALERT_CONFIG_VAL(cfg->units);
+    DIGEST_ALERT_CONFIG_VAL(cfg->info);
+    DIGEST_ALERT_CONFIG_VAL(cfg->classification);
+    DIGEST_ALERT_CONFIG_VAL(cfg->component);
+    DIGEST_ALERT_CONFIG_VAL(cfg->type);
+    DIGEST_ALERT_CONFIG_VAL(cfg->delay);
+    DIGEST_ALERT_CONFIG_VAL(cfg->options);
+    DIGEST_ALERT_CONFIG_VAL(cfg->repeat);
+    DIGEST_ALERT_CONFIG_VAL(cfg->host_labels);
 
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
