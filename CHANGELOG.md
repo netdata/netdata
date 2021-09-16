@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- remove `reset\_netdata\_trace.sh` from netdata.service [\#11517](https://github.com/netdata/netdata/pull/11517) ([ilyam8](https://github.com/ilyam8))
+- Remove unused script [\#11516](https://github.com/netdata/netdata/pull/11516) ([thiagoftsm](https://github.com/thiagoftsm))
+- Convert uppercase to lowercase for eBPF submenus [\#11511](https://github.com/netdata/netdata/pull/11511) ([thiagoftsm](https://github.com/thiagoftsm))
+- Better check for supported -F parameter in sendmail [\#11506](https://github.com/netdata/netdata/pull/11506) ([MrZammler](https://github.com/MrZammler))
+- v2.19.9 [\#11505](https://github.com/netdata/netdata/pull/11505) ([allelos](https://github.com/allelos))
 - Fix elasticsearch null values returned by \_cat/indices API [\#11501](https://github.com/netdata/netdata/pull/11501) ([vpiserchia](https://github.com/vpiserchia))
 - Update claim README.md [\#11492](https://github.com/netdata/netdata/pull/11492) ([car12o](https://github.com/car12o))
 - Fix issues in Alarm API [\#11491](https://github.com/netdata/netdata/pull/11491) ([underhood](https://github.com/underhood))
@@ -14,6 +19,7 @@
 - remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
 - Allow arbitrary options to be passed to make from netdata-installer.sh. [\#11479](https://github.com/netdata/netdata/pull/11479) ([Ferroin](https://github.com/Ferroin))
 - eBPF vsn bump to v0.7.9.1 [\#11471](https://github.com/netdata/netdata/pull/11471) ([UmanShahzad](https://github.com/UmanShahzad))
+- eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Embed build architecture in static build archive names. [\#11463](https://github.com/netdata/netdata/pull/11463) ([Ferroin](https://github.com/Ferroin))
 - add a note how to find web files directory for custom dashboards [\#11461](https://github.com/netdata/netdata/pull/11461) ([ilyam8](https://github.com/ilyam8))
 - Use correct release codename for Debian 11 repoconfig packages. [\#11459](https://github.com/netdata/netdata/pull/11459) ([Ferroin](https://github.com/Ferroin))
@@ -150,16 +156,11 @@
 - VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
 - add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
 - rename default from job 'local' to 'anomalies' [\#11178](https://github.com/netdata/netdata/pull/11178) ([andrewm4894](https://github.com/andrewm4894))
-- health: add system clock synchronization state alarm [\#11177](https://github.com/netdata/netdata/pull/11177) ([ilyam8](https://github.com/ilyam8))
 - Fix broken links [\#11175](https://github.com/netdata/netdata/pull/11175) ([joelhans](https://github.com/joelhans))
 - mqtt\_websockets FreeBSD fix [\#11172](https://github.com/netdata/netdata/pull/11172) ([underhood](https://github.com/underhood))
 - Fix typo in aclk.c [\#11170](https://github.com/netdata/netdata/pull/11170) ([eltociear](https://github.com/eltociear))
-- Adding more postgres metrics [\#11169](https://github.com/netdata/netdata/pull/11169) ([filip-plata](https://github.com/filip-plata))
-- health: add python.d/go.d jobs last\_collected\_secs alarms [\#11168](https://github.com/netdata/netdata/pull/11168) ([ilyam8](https://github.com/ilyam8))
 - Update news in main README for latest release [\#11165](https://github.com/netdata/netdata/pull/11165) ([joelhans](https://github.com/joelhans))
 - Query the size of the hw.intrnames mib instead of using of a fixed va… [\#11159](https://github.com/netdata/netdata/pull/11159) ([MikaelUrankar](https://github.com/MikaelUrankar))
-- Store info about the installation type for later retrieval. [\#11157](https://github.com/netdata/netdata/pull/11157) ([Ferroin](https://github.com/Ferroin))
-- health: make stocks alarms less sensitive \(2\) [\#11153](https://github.com/netdata/netdata/pull/11153) ([ilyam8](https://github.com/ilyam8))
 - Move parser from children to main thread [\#11152](https://github.com/netdata/netdata/pull/11152) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove deprecated options. [\#11149](https://github.com/netdata/netdata/pull/11149) ([vkalintiris](https://github.com/vkalintiris))
 - Fixes mqtt\_websockets on MacOS [\#11145](https://github.com/netdata/netdata/pull/11145) ([underhood](https://github.com/underhood))
@@ -167,7 +168,6 @@
 - Remove an unnecessary check for cgroup v1 [\#11137](https://github.com/netdata/netdata/pull/11137) ([vlvkobal](https://github.com/vlvkobal))
 - Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
 - Remove unecessary relative paths when including headers. [\#11124](https://github.com/netdata/netdata/pull/11124) ([vkalintiris](https://github.com/vkalintiris))
-- Move mdstat charts near to Disks [\#11119](https://github.com/netdata/netdata/pull/11119) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ebpf swap [\#11090](https://github.com/netdata/netdata/pull/11090) ([thiagoftsm](https://github.com/thiagoftsm))
 - Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
 
@@ -279,10 +279,6 @@
 - Add a plugin for the system clock synchronization state [\#10895](https://github.com/netdata/netdata/pull/10895) ([vlvkobal](https://github.com/vlvkobal))
 - Provide more agent analytics to posthog [\#10887](https://github.com/netdata/netdata/pull/10887) ([MrZammler](https://github.com/MrZammler))
 - Add a chart for out of memory kills [\#10880](https://github.com/netdata/netdata/pull/10880) ([vlvkobal](https://github.com/vlvkobal))
-- Remove RewriteEngine for dedicated vHost [\#10873](https://github.com/netdata/netdata/pull/10873) ([Steve8291](https://github.com/Steve8291))
-- python.d\(smartd\_log\): collect attribute 249 -- NAND Writes 1GiB [\#10872](https://github.com/netdata/netdata/pull/10872) ([RaitoBezarius](https://github.com/RaitoBezarius))
-- Improvements to dash-example.html [\#10870](https://github.com/netdata/netdata/pull/10870) ([tnyeanderson](https://github.com/tnyeanderson))
-- Replace references to Google Analytics with Posthog where relevant [\#10868](https://github.com/netdata/netdata/pull/10868) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -306,7 +302,6 @@
 **Merged pull requests:**
 
 - Properly handle different netcat command names in binary package test code. [\#10883](https://github.com/netdata/netdata/pull/10883) ([Ferroin](https://github.com/Ferroin))
-- Add carrier and mtu charts for network interfaces [\#10866](https://github.com/netdata/netdata/pull/10866) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
