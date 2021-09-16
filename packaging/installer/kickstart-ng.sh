@@ -713,6 +713,7 @@ try_static_install() {
   install_type_file="/opt/netdata/etc/netdata/.install-type"
   if [ -f "${install_type_file}" ]; then
     ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
+    ${ROOTCMD} chow "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
     # shellcheck disable=SC1091
     . "${tmpdir}/install-type"
     cat > "${tmpdir}/install-type" <<- EOF
