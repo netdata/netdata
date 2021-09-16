@@ -141,11 +141,3 @@ TEST(SamplesBufferTest, NS_8_NDPS_3_DN_2_SN_4_LN_1) {
 
     delete[] CNs;
 }
-
-int test_ml(int argc, char *argv[]) {
-    (void) argc;
-    (void) argv;
-
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

@@ -74,3 +74,17 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     error("Dimension %s anomaly bit %d", RD->name, Result);
     return Result;
 }
+
+#if defined(ENABLE_ML_TESTS)
+
+#include "gtest/gtest.h"
+
+int test_ml(int argc, char *argv[]) {
+    (void) argc;
+    (void) argv;
+
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+#endif // ENABLE_ML_TESTS

@@ -240,6 +240,10 @@ ML_FILES = \
 
 if ENABLE_ML
 ML_FILES += \
+    ml/BitBufferCounter.h \
+    ml/BitBufferCounter.cc \
+    ml/BitRateWindow.h \
+    ml/BitRateWindow.cc \
     ml/Config.h \
     ml/Config.cc \
     ml/Dimension.cc \
@@ -260,6 +264,7 @@ endif
 if ENABLE_ML_TESTS
 ML_TESTS_FILES = \
     ml/kmeans/Tests.cc \
+    ml/Tests.cc \
     $(NULL)
 endif
 
