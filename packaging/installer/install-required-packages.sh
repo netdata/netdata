@@ -417,12 +417,12 @@ detect_package_manager_from_distribution() {
       ;;
 
     centos* | clearos*)
-      echo >&2 "You should have EPEL enabled to install all the prerequisites."
-      echo >&2 "Check: http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/"
-      package_installer="install_yum"
+      package_installer=""
       tree="centos"
+      [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${yum}" ]; then
-        echo >&2 "command 'yum' is required to install packages on a '${distribution} ${version}' system."
+        echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
       ;;
@@ -430,8 +430,8 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${yum}" ] && package_installer="install_yum"
       [ -n "${dnf}" ] && package_installer="install_dnf"
+      [ -n "${yum}" ] && package_installer="install_yum"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
@@ -499,7 +499,11 @@ check_package_manager() {
     dnf)
       [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${dnf}" ] && echo >&2 "${1} is not available." && return 1
       package_installer="install_dnf"
-      tree="rhel"
+      if [ "${distribution}" = "centos" ]; then
+        tree="centos"
+      else
+        tree="rhel"
+      fi
       detection="user-input"
       return 0
       ;;
@@ -1548,13 +1552,6 @@ validate_tree_centos() {
 
   echo >&2 " > CentOS Version: ${version} ..."
 
-  echo >&2 " > Checking for epel ..."
-  if ! rpm -qa | grep epel > /dev/null; then
-    if prompt "epel not found, shall I install it?"; then
-      run ${sudo} yum ${opts} install epel-release
-    fi
-  fi
-
   if [[ "${version}" =~ ^8(\..*)?$ ]]; then
     echo >&2 " > Checking for config-manager ..."
     if ! run yum ${sudo} config-manager; then
@@ -1567,13 +1564,6 @@ validate_tree_centos() {
     if ! run yum ${sudo} repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
         run ${sudo} yum ${opts} config-manager --set-enabled powertools
-      fi
-    fi
-
-    echo >&2 " > Checking for Okay ..."
-    if ! rpm -qa | grep okay > /dev/null; then
-      if prompt "okay not found, shall I install it?"; then
-        run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-5.el8.noarch.rpm
       fi
     fi
 
@@ -1619,7 +1609,7 @@ install_yum() {
   read -r -a yum_opts <<< "${opts}"
 
   # install the required packages
-  run ${sudo} yum "${yum_opts[@]}" install "${@}" # --enablerepo=epel-testing
+  run ${sudo} yum "${yum_opts[@]}" install "${@}"
 }
 
 # -----------------------------------------------------------------------------
