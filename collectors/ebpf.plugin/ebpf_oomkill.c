@@ -28,8 +28,6 @@ static ebpf_local_maps_t oomkill_maps[] = {
     }
 };
 
-static ebpf_data_t oomkill_data;
-
 static ebpf_tracepoint_t oomkill_tracepoints[] = {
     {.enabled = false, .class = "oom", .event = "mark_victim"},
     /* end */
