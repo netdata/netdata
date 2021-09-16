@@ -8,13 +8,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/R
 
 # External build-system
 
-This wraps the build-system in Docker so that the host system and the target system are
-decoupled. This allows:
+This code wraps the build-system in Docker so that the host system and the target system are
+decoupled. It allows:
 
--   Cross-compilation (e.g. linux development from macOS)
--   Cross-distro (e.g. using CentOS user-land while developing on Debian)
--   Multi-host scenarios (e.g. parent-child configurations)
--   Bleeding-edge sceneraios (e.g. using the ACLK (**currently for internal-use only**))
+-   Cross-compilation, e.g. linux development from macOS
+-   Cross-distro, e.g. using CentOS user-land while developing on Debian
+-   Multi-host scenarios, e.g. parent-child configurations
+-   Bleeding-edge sceneraios, e.g. using the ACLK (**currently for internal-use only**)
 
 The advantage of these scenarios is that they allow **reproducible** builds and testing
 for developers. This is the first iteration of the build-system to allow the team to use
@@ -28,7 +28,7 @@ infrastructure (these parts of the code are not public), or with external broker
 export metrics). Note: no external TSDB scenarios are available in the first iteration,
 they will be added in subsequent iterations.
 
-This differs from the packaging dockerfiles as it designed to be used for local development.
+This differs from the packaging dockerfiles as it is designed to be used for local development.
 The main difference is that these files are designed to support incremental compilation in
 the following way:
 
