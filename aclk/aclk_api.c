@@ -197,7 +197,7 @@ struct label *add_aclk_host_labels(struct label *label) {
 
 char *aclk_state(void) {
 #ifndef ENABLE_ACLK
-    return strdupz("ACLK Available: No\n");
+    return strdupz("ACLK Available: No");
 #else
 #ifdef ACLK_NG
     if (aclk_ng)
@@ -213,7 +213,7 @@ char *aclk_state(void) {
 
 char *aclk_state_json(void) {
 #ifndef ENABLE_ACLK
-    return strdupz("{\"aclk-available\": false}\n");
+    return strdupz("{\"aclk-available\": false}");
 #else
 #ifdef ACLK_NG
     if (aclk_ng)
