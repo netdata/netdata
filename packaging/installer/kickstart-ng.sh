@@ -14,6 +14,7 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 RELEASE_CHANNEL="nightly"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_CLAIM_ONLY=0
 NETDATA_USER_CONFIG_DIR="/etc/netdata"
 NETDATA_AUTO_UPDATES="1"
 NETDATA_ONLY_NATIVE=0
@@ -333,7 +334,7 @@ update() {
   fi
 }
 
-check_for_existing_install() {
+handle_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
   else
@@ -342,7 +343,7 @@ check_for_existing_install() {
       ndpath="/opt/netdata/bin/netdata"
     fi
 
-    if [ -n "${ndprefix}" ]; then
+    if [ -n "${ndpath}" ]; then
       ndprefix="$(dirname "$(dirname "${ndpath}")")"
     fi
 
@@ -354,18 +355,13 @@ check_for_existing_install() {
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
     if [ -r "${typefile}" ]; then
-      # shellcheck disable=SC1090
-      . "${typefile}"
+      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
+      # shellcheck disable=SC1091
+      . "${tmpdir}/install-type"
     else
       INSTALL_TYPE="unknown"
     fi
-  else
-    return 1
   fi
-}
-
-handle_existing_install() {
-  check_for_existing_install
 
   if [ -n "${ndprefix}" ]; then
     case "${INSTALL_TYPE}" in
@@ -407,7 +403,29 @@ handle_existing_install() {
         fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
         ;;
       unknown)
-        fatal "Found an existing netdata install at ${ndprefix}, but could not determine the install type, refusing to proceed."
+        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
+
+        if [ -z "${NETDATA_REINSTALL}" ]; then
+          ret=0
+
+          if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+            if ! update; then
+              warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
+            fi
+          fi
+
+          if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+            progress "Attempting to claim existing install at ${ndprefix}."
+            claim
+            ret=$?
+          elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
+            fatal "User asked to claim, but did not proide a claiming token."
+          fi
+
+          exit $ret
+        else
+          progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
+        fi
         ;;
       *)
         fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
@@ -683,8 +701,9 @@ try_static_install() {
 
   install_type_file="/opt/netdata/etc/netdata/.install-type"
   if [ -f "${install_type_file}" ]; then
-    # shellcheck disable=SC1090
-    . "${install_type_file}"
+    ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
+    # shellcheck disable=SC1091
+    . "${tmpdir}/install-type"
     ${ROOTCMD} cat > "${install_type_file}" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
