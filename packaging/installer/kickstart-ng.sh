@@ -36,10 +36,9 @@ usage() {
 USAGE: kickstart.sh [options]
        where options include:
 
-  --dont-wait                Do not prompt for user input. (default: prompt if there is a controlling terminal)
-  --non-interactive          Do not prompt for user input.
-  --dont-start-it            Do not start the agent by default (only for static installs or local builds)
+  --non-interactive          Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --interactive              Prompt for user input even if there is no controlling terminal.
+  --dont-start-it            Do not start the agent by default (only for static installs or local builds)
   --stable-channel           Install a stable version instead of a nightly build (default: install a nightly build)
   --nightly-channel          Install a nightly build instead of a stable version
   --no-updates               Do not enable automatic updates (default: enable automatic updates)
@@ -705,8 +704,7 @@ while [ -n "${1}" ]; do
       exit 0
       ;;
     "--no-cleanup") NO_CLEANUP=1 ;;
-    "--dont-wait") INTERACTIVE=0 ;;
-    "--non-interactive") INTERACTIVE=0 ;;
+    "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--no-updates") NETDATA_AUTO_UPDATES="" ;;
