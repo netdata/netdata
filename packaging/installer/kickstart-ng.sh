@@ -704,10 +704,12 @@ try_static_install() {
     ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
     # shellcheck disable=SC1091
     . "${tmpdir}/install-type"
-    ${ROOTCMD} cat > "${install_type_file}" <<- EOF
+    cat > "${tmpdir}/install-type}" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
+    ${ROOTCMD} chown netdata:netdata "${tmpdir}/install-type"
+    ${ROOTCMD} cp "${tmpdir}/install-type" "${install_type_file}"
   fi
 }
 
