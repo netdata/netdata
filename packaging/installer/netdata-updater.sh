@@ -442,7 +442,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
 
   echo >&2 "Switching back to ${PREVDIR}"
-  cd "${PREVDIR}" || exit 1
+  cd "${PREVDIR}"
 else
   # the installer updates this script - so we run and exit in a single line
   update && exit 0
