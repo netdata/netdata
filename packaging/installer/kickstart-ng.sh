@@ -537,6 +537,7 @@ try_package_install() {
 
   case "${DISTRO_COMPAT_NAME}" in
     debian)
+      needs_early_refresh=1
       pm_cmd="apt-get"
       repo_subcmd="update"
       repo_prefix="debian/${SYSCODENAME}"
@@ -548,6 +549,7 @@ try_package_install() {
       uninstall_subcmd="uninstall"
       ;;
     ubuntu)
+      needs_early_refresh=1
       pm_cmd="apt-get"
       repo_subcmd="update"
       repo_prefix="ubuntu/${SYSCODENAME}"
@@ -616,6 +618,15 @@ try_package_install() {
     if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to download repository configuration package."
       return 2
+    fi
+
+    if [ -n "${needs_early_refresh}" ]; then
+      progress "Updating repository metadata."
+      # shellcheck disable=SC2086
+      if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+        warning "Failed to refresh repository metadata."
+        return 2
+      fi
     fi
 
     progress "Installing repository configuration package."
