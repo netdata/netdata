@@ -1573,7 +1573,7 @@ validate_tree_centos() {
     echo >&2 " > Installing Judy-devel directly ..."
     run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
-  elif [[ "${version}" =~ ^7\..*$ ]]; then
+  elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
     echo >&2 " > Checking for EPEL ..."
     if ! rpm -qa | grep epel-release > /dev/null; then
       if prompt "EPEL not found, shall I install it?"; then
