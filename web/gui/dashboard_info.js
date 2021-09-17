@@ -1580,8 +1580,24 @@ netdataDashboard.context = {
         info: 'Amount of data transferred to and from disk.'
     },
 
+    'disk_ext.io': {
+        info: 'Amount of discarded data that are no longer in use by a mounted file system.'
+    },
+
     'disk.ops': {
         info: 'Completed disk I/O operations. Keep in mind the number of operations requested might be higher, since the system is able to merge adjacent to each other (see merged operations chart).'
+    },
+
+    'disk_ext.ops': {
+        info: 'Number (after merges) of completed discard/flush requests.<br>'+
+        '<code>Discard</code> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
+        'They are useful for solid-state drivers (SSDs) and thinly-provisioned storage. '+
+        'Discarding/trimming enables the SSD to handle garbage collection more efficiently, '+
+        'which would otherwise slow future write operations to the involved blocks down.<br>'+
+        '<code>Flush</code> operations transfer all modified in-core data (i.e., modified buffer cache pages) to the disk device '+
+        'so that all changed information can be retrieved even if the system crashes or is rebooted. '+
+        'Flush requests are executed by disks. Flush requests are not tracked for partitions. '+
+        'Before being merged, flush operations are counted as writes.'
     },
 
     'disk.qops': {
@@ -1593,14 +1609,16 @@ netdataDashboard.context = {
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
     'disk_ext.iotime': {
-        height: 0.5
+        height: 0.5,
+        info: 'The sum of the duration of all completed discard/flush operations. This number can exceed the interval if the disk is able to execute discard/flush operations in parallel.'
     },
     'disk.mops': {
         height: 0.5,
         info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
     },
     'disk_ext.mops': {
-        height: 0.5
+        height: 0.5,
+        info: 'The number of merged discard disk operations. Discard operations which are adjacent to each other may be merged for efficiency.'
     },
     'disk.svctm': {
         height: 0.5,
@@ -1615,7 +1633,8 @@ netdataDashboard.context = {
         info: 'The average I/O operation size.'
     },
     'disk_ext.avgsz': {
-        height: 0.5
+        height: 0.5,
+        info: 'The average discard operation size.'
     },
     'disk.await': {
         height: 0.5,
@@ -1623,7 +1642,7 @@ netdataDashboard.context = {
     },
     'disk_ext.await': {
         height: 0.5,
-        info: 'The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
+        info: 'The average time for discard/flush requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
     'disk.space': {
