@@ -54,6 +54,9 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
     `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
     more examples.
+-   Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
+    joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
+    This comes in handy if your `info` line consists of several sentences.  
 
 | line                                                | required        | functionality                                                                         |
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
