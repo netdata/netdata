@@ -1019,3 +1019,58 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 {
     aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
 }
+
+char *ng_aclk_state(void)
+{
+    BUFFER *wb = buffer_create(1024);
+    char *ret;
+
+    buffer_strcat(wb,
+        "ACLK Available: Yes\n"
+        "ACLK Implementation: Next Generation\n"
+        "Claimed: "
+    );
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+        buffer_strcat(wb, "No\n");
+    else {
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\n", agent_id);
+        freez(agent_id);
+    }
+
+    buffer_sprintf(wb, "Online: %s", aclk_connected ? "Yes" : "No");
+
+    ret = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+    return ret;
+}
+
+char *ng_aclk_state_json(void)
+{
+    json_object *tmp, *msg = json_object_new_object();
+
+    tmp = json_object_new_boolean(1);
+    json_object_object_add(msg, "aclk-available", tmp);
+
+    tmp = json_object_new_string("Next Generation");
+    json_object_object_add(msg, "aclk-implementation", tmp);
+
+    char *agent_id = is_agent_claimed();
+    tmp = json_object_new_boolean(agent_id != NULL);
+    json_object_object_add(msg, "agent-claimed", tmp);
+
+    if (agent_id) {
+        tmp = json_object_new_string(agent_id);
+        freez(agent_id);
+    } else
+        tmp = NULL;
+    json_object_object_add(msg, "claimed-id", tmp);
+
+    tmp = json_object_new_boolean(aclk_connected);
+    json_object_object_add(msg, "online", tmp);
+
+    char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
+    json_object_put(msg);
+    return str;
+}
