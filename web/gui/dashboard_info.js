@@ -849,7 +849,31 @@ netdataDashboard.submenu = {
     'apps.net': {
         title: 'network',
         info: 'Netdata also gives a summary for eBPF charts in <a href="#menu_ip_submenu_kernel">Networking Stack submenu</a>.'
-    }
+    },
+
+    'system.ipc semaphores': {
+        info: 'System V semaphores is an inter-process communication (IPC) mechanism. '+
+        'It allows processes or threads within a process to synchronize their actions. '+
+        'They are often used to monitor and control the availability of system resources such as shared memory segments. ' +
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. ' +
+        'To see the host IPC semaphore information, run <code>ipcs -us</code>. For limits, run <code>ipcs -ls</code>.'
+    },
+
+    'system.ipc shared memory': {
+        info: 'System V shared memory is an inter-process communication (IPC) mechanism. '+
+        'It allows processes to communicate information by sharing a region of memory. '+
+        'It is the fastest form of inter-process communication available since no kernel involvement occurs when data is passed between the processes (no copying). '+
+        'Typically, processes must synchronize their access to a shared memory object, using, for example, POSIX semaphores. '+
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. '+
+        'To see the host IPC shared memory information, run <code>ipcs -um</code>. For limits, run <code>ipcs -lm</code>.'
+    },
+
+    'system.ipc message queues': {
+        info: 'System V message queues is an inter-process communication (IPC) mechanism. '+
+        'It allow processes to exchange data in the form of messages. '+
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. ' +
+        'To see the host IPC messages information, run <code>ipcs -uq</code>. For limits, run <code>ipcs -lq</code>.'
+    },
 };
 
 
@@ -1013,6 +1037,35 @@ netdataDashboard.context = {
 
     'system.swap': {
         info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
+    },
+
+    'system.ipc_semaphores': {
+        info: 'Number of allocated System V IPC semaphores. '+
+        'The system-wide limit on the number of semaphores in all semaphore sets is specified in <code>/proc/sys/kernel/sem</code> file (2nd field).'
+    },
+
+    'system.ipc_semaphore_arrays': {
+        info: 'Number of used System V IPC semaphore arrays (sets). Semaphores support semaphore sets where each one is a counting semaphore. '+
+        'So when an application requests semaphores, the kernel releases them in sets. '+
+        'The system-wide limit on the maximum number of semaphore sets is specified in <code>/proc/sys/kernel/sem</code> file (4th field).'
+    },
+
+    'system.shared_memory_segments': {
+        info: 'Number of allocated System V IPC memory segments. '+
+        'The system-wide maximum number of shared memory segments that can be created is specified in <code>/proc/sys/kernel/shmmni</code> file.'
+    },
+
+    'system.shared_memory_bytes': {
+        info: 'Amount of memory currently used by System V IPC memory segments. '+
+        'The run-time limit on the maximum  shared memory segment size that can be created is specified in <code>/proc/sys/kernel/shmmax</code> file.'
+    },
+
+    'system.message_queue_messages': {
+        info: 'Number of messages that are currently present in System V IPC message queues.'
+    },
+
+    'system.message_queue_bytes': {
+        info: 'Amount of memory currently used by messages in System V IPC message queues.'
     },
 
     // ------------------------------------------------------------------------
