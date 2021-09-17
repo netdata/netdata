@@ -21,13 +21,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Create Branch
-        # This is needed because we want to do a PR, and the commit
-        # action used below requires the branch it is commiting to to
-        # already exist.
-        run: |
-          git checkout -b dashboard-${{ github.event.inputs.dashboard_version }}
-          git push -u origin dashboard-${{ github.event.inputs.dashboard_version }}
       - name: Update Files
         run: |
           web/gui/bundle_dashboard.py ${{ github.event.inputs.dashboard_version }}
