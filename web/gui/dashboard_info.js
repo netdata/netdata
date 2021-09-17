@@ -854,11 +854,8 @@ netdataDashboard.submenu = {
     'system.ipc semaphores': {
         info: 'System V semaphores is an inter-process communication (IPC) mechanism. '+
         'It allows processes or threads within a process to synchronize their actions. '+
-        'A semaphore is a value in a designated place in operating system (or kernel) storage that each process can check and then change. '+
-        'Depending on the value that is found, the process can use the resource or will find that it is already in use and must wait for some period before trying again. '+
         'They are often used to monitor and control the availability of system resources such as shared memory segments. ' +
-        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a> and '+
-        '<a href="https://man7.org/linux/man-pages/man7/sem_overview.7.html" target="_blank">sem_overview(7)</a>. ' +
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. ' +
         'To see the host IPC semaphore information, run <code>ipcs -us</code>. For limits, run <code>ipcs -ls</code>.'
     },
 
@@ -867,16 +864,14 @@ netdataDashboard.submenu = {
         'It allows allows processes to communicate information by sharing a region of memory. '+
         'It is the fastest form of inter-process communication available since no kernel involvement occurs when data is passed between the processes (no copying). '+
         'Typically, processes must synchronize their access to a shared memory object, using, for example, POSIX semaphores. '+
-        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a> and '+
-        '<a href="https://man7.org/linux/man-pages/man7/shm_overview.7.html" target="_blank">shm_overview(7)</a>. '+
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. '+
         'To see the host IPC shared memory information, run <code>ipcs -um</code>. For limits, run <code>ipcs -lm</code>.'
     },
 
     'system.ipc message queues': {
         info: 'System V message queues is an inter-process communication (IPC) mechanism. '+
         'It allow processes to exchange data in the form of messages. '+
-        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a> and '+
-        '<a href="https://man7.org/linux/man-pages/man7/mq_overview.7.html" target="_blank">mq_overview(7)</a>. ' +
+        'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. ' +
         'To see the host IPC messages information, run <code>ipcs -uq</code>. For limits, run <code>ipcs -lq</code>.'
     },
 };
