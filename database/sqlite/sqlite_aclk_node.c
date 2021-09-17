@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_node.h"
 
-#ifdef ENABLE_ACLK
+#ifdef ACLK_NG
 #include "../../aclk/aclk_charts_api.h"
 #endif
 
@@ -11,7 +11,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 {
     UNUSED(cmd);
 
-#ifdef ENABLE_ACLK
+#ifdef ACLK_NG
     struct update_node_info node_info;
 
     rrd_wrlock();
@@ -36,7 +36,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     node_info.data.disk_space = host->system_info->host_disk_space;
     node_info.data.version = VERSION;
     node_info.data.release_channel = "nightly";
-    node_info.data.timezone = host->abbrev_timezone;
+    node_info.data.timezone = (char *) host->abbrev_timezone;
     node_info.data.virtualization_type = host->system_info->virtualization;
     node_info.data.container_type = host->system_info->container;
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
