@@ -861,7 +861,7 @@ netdataDashboard.submenu = {
 
     'system.ipc shared memory': {
         info: 'System V shared memory is an inter-process communication (IPC) mechanism. '+
-        'It allows allows processes to communicate information by sharing a region of memory. '+
+        'It allows processes to communicate information by sharing a region of memory. '+
         'It is the fastest form of inter-process communication available since no kernel involvement occurs when data is passed between the processes (no copying). '+
         'Typically, processes must synchronize their access to a shared memory object, using, for example, POSIX semaphores. '+
         'For details, see <a href="https://man7.org/linux/man-pages/man7/svipc.7.html" target="_blank">svipc(7)</a>. '+
