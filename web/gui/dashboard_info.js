@@ -1663,7 +1663,7 @@ netdataDashboard.context = {
     },
     'disk.bcache_rates': {
         info: 'Throttling rates. '+
-        'To avoid congestions bcache tracks latency to the cache device, and gradually throttles traffic if the latency exceeds a threshold.' +
+        'To avoid congestions bcache tracks latency to the cache device, and gradually throttles traffic if the latency exceeds a threshold. ' +
         'If the writeback percentage is nonzero, bcache tries to keep around this percentage of the cache dirty by '+
         'throttling background writeback and using a PD controller to smoothly adjust the rate.'
     },
