@@ -1590,11 +1590,11 @@ netdataDashboard.context = {
 
     'disk_ext.ops': {
         info: 'Number (after merges) of completed discard/flush requests.<br>'+
-        '<code>Discard</code> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
+        '<b>Discard</b> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
         'They are useful for solid-state drivers (SSDs) and thinly-provisioned storage. '+
         'Discarding/trimming enables the SSD to handle garbage collection more efficiently, '+
         'which would otherwise slow future write operations to the involved blocks down.<br>'+
-        '<code>Flush</code> operations transfer all modified in-core data (i.e., modified buffer cache pages) to the disk device '+
+        '<b>Flush</b> operations transfer all modified in-core data (i.e., modified buffer cache pages) to the disk device '+
         'so that all changed information can be retrieved even if the system crashes or is rebooted. '+
         'Flush requests are executed by disks. Flush requests are not tracked for partitions. '+
         'Before being merged, flush operations are counted as writes.'
