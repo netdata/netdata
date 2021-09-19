@@ -3,15 +3,19 @@
 #ifndef ML_HOST_H
 #define ML_HOST_H
 
-#include "ml-private.h"
-
+#include "BitRateWindow.h"
+#include "Config.h"
 #include "Dimension.h"
+
+#include "ml-private.h"
 
 namespace ml {
 
 class RrdHost {
 public:
     RrdHost(RRDHOST *RH) : RH(RH) {}
+
+    RRDHOST *getRH() { return RH; }
 
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
@@ -29,18 +33,36 @@ class TrainableHost : public RrdHost {
 public:
     TrainableHost(RRDHOST *RH) : RrdHost(RH) {}
 
-    void startTrainingThread();
-    void stopTrainingThread();
-
-private:
     void train();
     void trainOne(TimePoint &Now);
+};
+
+class DetectableHost : public TrainableHost {
+public:
+    DetectableHost(RRDHOST *RH) : TrainableHost(RH) {}
+
+    void startAnomalyDetectionThreads();
+    void stopAnomalyDetectionThreads();
+
+private:
+    void detect();
+    void detectOnce();
 
 private:
     std::thread TrainingThread;
+    std::thread DetectionThread;
+
+    BitRateWindow BRW{
+        static_cast<size_t>(Cfg.ADWindowSize),
+        2 * static_cast<size_t>(Cfg.ADWindowSize),
+        10,
+        static_cast<size_t>(Cfg.ADWindowSize * Cfg.ADWindowRateThreshold)
+    };
+
+    CalculatedNumber AnomalyRate{0.0};
 };
 
-using Host = TrainableHost;
+using Host = DetectableHost;
 
 } // namespace ml
 

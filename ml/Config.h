@@ -18,6 +18,11 @@ public:
     unsigned LagN;
 
     double DimensionAnomalyScoreThreshold;
+    double HostAnomalyRateThreshold;
+
+    double ADWindowSize;
+    double ADWindowRateThreshold;
+    double ADDimensionRateThreshold;
 
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;

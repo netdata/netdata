@@ -3,6 +3,9 @@
 #ifndef ML_DIMENSION_H
 #define ML_DIMENSION_H
 
+#include "BitBufferCounter.h"
+#include "Config.h"
+
 #include "ml-private.h"
 
 namespace ml {
@@ -70,7 +73,29 @@ private:
     std::vector<CalculatedNumber> CNs;
 };
 
-using Dimension = PredictableDimension;
+class DetectableDimension : public PredictableDimension {
+public:
+    DetectableDimension(RRDDIM *RD) : PredictableDimension(RD) {}
+
+    std::pair<bool, double> detect(size_t WindowLength, bool Reset) {
+        bool AnomalyBit = isAnomalous();
+
+        if (Reset)
+            NumSetBits = BBC.numSetBits();
+
+        NumSetBits += AnomalyBit;
+        BBC.insert(AnomalyBit);
+
+        double AnomalyRate = static_cast<double>(NumSetBits) / WindowLength;
+        return { AnomalyBit, AnomalyRate };
+    }
+
+private:
+    BitBufferCounter BBC{static_cast<size_t>(Cfg.ADWindowSize)};
+    size_t NumSetBits{0};
+};
+
+using Dimension = DetectableDimension;
 
 } // namespace ml
 

@@ -23,7 +23,7 @@ void ml_new_host(RRDHOST *RH) {
     Host *H = new Host(RH);
     RH->ml_host = static_cast<ml_host_t>(H);
 
-    H->startTrainingThread();
+    H->startAnomalyDetectionThreads();
 }
 
 void ml_delete_host(RRDHOST *RH) {
@@ -31,7 +31,7 @@ void ml_delete_host(RRDHOST *RH) {
     if (!H)
         return;
 
-    H->stopTrainingThread();
+    H->stopAnomalyDetectionThreads();
 
     delete H;
     RH->ml_host = nullptr;

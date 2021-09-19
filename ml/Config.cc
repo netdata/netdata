@@ -26,6 +26,11 @@ void Config::readMLConfig(void) {
     Cfg.LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
 
     Cfg.DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
+    Cfg.HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.2);
+
+    Cfg.ADWindowSize = config_get_float(ConfigSectionML, "window minimum size", 30);
+    Cfg.ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
+    Cfg.ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.1);
 
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
