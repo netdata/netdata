@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- docs\(health\): add a note about handling backslashes in configuration files [\#11527](https://github.com/netdata/netdata/pull/11527) ([ilyam8](https://github.com/ilyam8))
+- add ipc semaphores charts info [\#11523](https://github.com/netdata/netdata/pull/11523) ([ilyam8](https://github.com/ilyam8))
+- Update dashboard to version v2.20.0. [\#11521](https://github.com/netdata/netdata/pull/11521) ([netdatabot](https://github.com/netdatabot))
 - remove `reset\_netdata\_trace.sh` from netdata.service [\#11517](https://github.com/netdata/netdata/pull/11517) ([ilyam8](https://github.com/ilyam8))
 - Remove unused script [\#11516](https://github.com/netdata/netdata/pull/11516) ([thiagoftsm](https://github.com/thiagoftsm))
+- Clean up dependency handling for CentOS/RHEL [\#11515](https://github.com/netdata/netdata/pull/11515) ([Ferroin](https://github.com/Ferroin))
 - Convert uppercase to lowercase for eBPF submenus [\#11511](https://github.com/netdata/netdata/pull/11511) ([thiagoftsm](https://github.com/thiagoftsm))
+- Improved some wordings of the file README.md, only a lifecycle test! [\#11510](https://github.com/netdata/netdata/pull/11510) ([siamaktavakoli](https://github.com/siamaktavakoli))
+- Install basic netdata deps by default. [\#11508](https://github.com/netdata/netdata/pull/11508) ([Ferroin](https://github.com/Ferroin))
 - Better check for supported -F parameter in sendmail [\#11506](https://github.com/netdata/netdata/pull/11506) ([MrZammler](https://github.com/MrZammler))
 - v2.19.9 [\#11505](https://github.com/netdata/netdata/pull/11505) ([allelos](https://github.com/allelos))
 - Fix elasticsearch null values returned by \_cat/indices API [\#11501](https://github.com/netdata/netdata/pull/11501) ([vpiserchia](https://github.com/vpiserchia))
@@ -21,6 +27,7 @@
 - eBPF vsn bump to v0.7.9.1 [\#11471](https://github.com/netdata/netdata/pull/11471) ([UmanShahzad](https://github.com/UmanShahzad))
 - eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Embed build architecture in static build archive names. [\#11463](https://github.com/netdata/netdata/pull/11463) ([Ferroin](https://github.com/Ferroin))
+- Adds aclk/cloud state command to netdatacli [\#11462](https://github.com/netdata/netdata/pull/11462) ([underhood](https://github.com/underhood))
 - add a note how to find web files directory for custom dashboards [\#11461](https://github.com/netdata/netdata/pull/11461) ([ilyam8](https://github.com/ilyam8))
 - Use correct release codename for Debian 11 repoconfig packages. [\#11459](https://github.com/netdata/netdata/pull/11459) ([Ferroin](https://github.com/Ferroin))
 - Fix edge repository configuration DEB packages. [\#11458](https://github.com/netdata/netdata/pull/11458) ([Ferroin](https://github.com/Ferroin))
@@ -156,19 +163,11 @@
 - VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
 - add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
 - rename default from job 'local' to 'anomalies' [\#11178](https://github.com/netdata/netdata/pull/11178) ([andrewm4894](https://github.com/andrewm4894))
-- Fix broken links [\#11175](https://github.com/netdata/netdata/pull/11175) ([joelhans](https://github.com/joelhans))
-- mqtt\_websockets FreeBSD fix [\#11172](https://github.com/netdata/netdata/pull/11172) ([underhood](https://github.com/underhood))
-- Fix typo in aclk.c [\#11170](https://github.com/netdata/netdata/pull/11170) ([eltociear](https://github.com/eltociear))
 - Update news in main README for latest release [\#11165](https://github.com/netdata/netdata/pull/11165) ([joelhans](https://github.com/joelhans))
-- Query the size of the hw.intrnames mib instead of using of a fixed va… [\#11159](https://github.com/netdata/netdata/pull/11159) ([MikaelUrankar](https://github.com/MikaelUrankar))
 - Move parser from children to main thread [\#11152](https://github.com/netdata/netdata/pull/11152) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove deprecated options. [\#11149](https://github.com/netdata/netdata/pull/11149) ([vkalintiris](https://github.com/vkalintiris))
-- Fixes mqtt\_websockets on MacOS [\#11145](https://github.com/netdata/netdata/pull/11145) ([underhood](https://github.com/underhood))
 - Removed Fedora 32 from CI. [\#11143](https://github.com/netdata/netdata/pull/11143) ([Ferroin](https://github.com/Ferroin))
-- Remove an unnecessary check for cgroup v1 [\#11137](https://github.com/netdata/netdata/pull/11137) ([vlvkobal](https://github.com/vlvkobal))
 - Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
-- Remove unecessary relative paths when including headers. [\#11124](https://github.com/netdata/netdata/pull/11124) ([vkalintiris](https://github.com/vkalintiris))
-- Ebpf swap [\#11090](https://github.com/netdata/netdata/pull/11090) ([thiagoftsm](https://github.com/thiagoftsm))
 - Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
@@ -277,8 +276,6 @@
 - health: add systemdunits alarms [\#10906](https://github.com/netdata/netdata/pull/10906) ([ilyam8](https://github.com/ilyam8))
 - web/gui: add systemdunits info to the dashboard\_info.js [\#10904](https://github.com/netdata/netdata/pull/10904) ([ilyam8](https://github.com/ilyam8))
 - Add a plugin for the system clock synchronization state [\#10895](https://github.com/netdata/netdata/pull/10895) ([vlvkobal](https://github.com/vlvkobal))
-- Provide more agent analytics to posthog [\#10887](https://github.com/netdata/netdata/pull/10887) ([MrZammler](https://github.com/MrZammler))
-- Add a chart for out of memory kills [\#10880](https://github.com/netdata/netdata/pull/10880) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -291,17 +288,10 @@
 - Update CODEOWNERS [\#10928](https://github.com/netdata/netdata/pull/10928) ([knatsakis](https://github.com/knatsakis))
 - Update news and GIF in README, fix typo [\#10900](https://github.com/netdata/netdata/pull/10900) ([joelhans](https://github.com/joelhans))
 - Update README.md [\#10898](https://github.com/netdata/netdata/pull/10898) ([slimanio](https://github.com/slimanio))
-- Fixed bundling of ACLK-NG components in dist tarballs. [\#10894](https://github.com/netdata/netdata/pull/10894) ([Ferroin](https://github.com/Ferroin))
-- Add a CRASH event when the agent fails to properly shutdown [\#10893](https://github.com/netdata/netdata/pull/10893) ([stelfrag](https://github.com/stelfrag))
-- Bumped version of OpenSSL bundled in static builds to 1.1.1k. [\#10884](https://github.com/netdata/netdata/pull/10884) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.29.3...v1.30.0)
-
-**Merged pull requests:**
-
-- Properly handle different netcat command names in binary package test code. [\#10883](https://github.com/netdata/netdata/pull/10883) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.29.3](https://github.com/netdata/netdata/tree/v1.29.3) (2021-02-23)
 
