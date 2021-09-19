@@ -295,9 +295,6 @@ RRDHOST *rrdhost_create(const char *hostname,
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
-
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
     }
 
     RRDHOST *t = rrdhost_index_add(host);
@@ -313,6 +310,23 @@ RRDHOST *rrdhost_create(const char *hostname,
         if (unlikely(rc))
             error_report("Failed to store machine GUID to the database");
         sql_load_node_id(host);
+        if (host->health_enabled) {
+            if (!file_is_migrated(host->health_log_filename)) {
+                int rc = sql_create_health_log_table(host);
+                if (unlikely(rc)) {
+                    error_report("Failed to create health log table in the database");
+                    health_alarm_log_load(host);
+                    health_alarm_log_open(host);
+                }
+                else {
+                    health_alarm_log_load(host);
+                    add_migrated_file(host->health_log_filename, 0);
+                }
+            } else {
+                sql_create_health_log_table(host);
+                sql_health_alarm_log_load(host);
+            }
+        }
     }
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -506,8 +520,21 @@ void rrdhost_update(RRDHOST *host
             health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
             rrdhost_unlock(host);
 
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
+            if (!file_is_migrated(host->health_log_filename)) {
+                int rc = sql_create_health_log_table(host);
+                if (unlikely(rc)) {
+                    error_report("Failed to create health log table in the database");
+
+                    health_alarm_log_load(host);
+                    health_alarm_log_open(host);
+                } else {
+                    health_alarm_log_load(host);
+                    add_migrated_file(host->health_log_filename, 0);
+                }
+            } else {
+                sql_create_health_log_table(host);
+                sql_health_alarm_log_load(host);
+            }
         }
         rrd_hosts_available++;
         info("Host %s is not in archived mode anymore", host->hostname);

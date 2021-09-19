@@ -35,6 +35,7 @@ struct pg_cache_page_index;
 #include "rrdcalctemplate.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
+#include "sqlite/sqlite_health.h"
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
@@ -650,6 +651,7 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    uuid_t config_hash_id;
 
     time_t when;
     time_t duration;

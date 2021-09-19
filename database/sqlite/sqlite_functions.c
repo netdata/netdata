@@ -20,6 +20,12 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
+    "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
+    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
+    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
+    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
+    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
     "delete from chart_active;",
     "delete from dimension_active;",
     "delete from chart where chart_id not in (select chart_id from dimension);",
@@ -32,7 +38,7 @@ sqlite3 *db_meta = NULL;
 
 static uv_mutex_t sqlite_transaction_lock;
 
-static int execute_insert(sqlite3_stmt *res)
+int execute_insert(sqlite3_stmt *res)
 {
     int rc;
 
@@ -66,7 +72,7 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     statements[idx++] = res;
 }
 
-static int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement) {
+int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement) {
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
     if (likely(rc == SQLITE_OK))
         add_stmt_to_list(*statement);
