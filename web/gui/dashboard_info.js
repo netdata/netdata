@@ -1261,7 +1261,7 @@ netdataDashboard.context = {
     },
     'md.operation_speed': {
         info: 'Speed of the ongoing operation. '+
-        'Resyncing speed limits are specified in <code>/proc/sys/dev/raid/{speed_limit_min,speed_limit_max}</code> files. '+
+        'The system-wide rebuild speed limits are specified in <code>/proc/sys/dev/raid/{speed_limit_min,speed_limit_max}</code> files. '+
         'These options are good for tweaking rebuilt process and may increase overall system load, cpu and memory usage.'
     },
     'md.mismatch_cnt': {
