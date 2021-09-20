@@ -20,7 +20,7 @@ fi
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_NODEJS=${PACKAGES_NETDATA_NODEJS-0}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
-PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-0}
+PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
 PACKAGES_NETDATA_PYTHON_MYSQL=${PACKAGES_NETDATA_PYTHON_MYSQL-0}
 PACKAGES_NETDATA_PYTHON_POSTGRES=${PACKAGES_NETDATA_PYTHON_POSTGRES-0}
 PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
@@ -31,8 +31,8 @@ PACKAGES_FIREQOS=${PACKAGES_FIREQOS-0}
 PACKAGES_UPDATE_IPSETS=${PACKAGES_UPDATE_IPSETS-0}
 PACKAGES_NETDATA_DEMO_SITE=${PACKAGES_NETDATA_DEMO_SITE-0}
 PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
-PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-0}
-PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-0}
+PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-1}
+PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-1}
 
 # needed commands
 lsb_release=$(command -v lsb_release 2> /dev/null)
@@ -1573,6 +1573,13 @@ validate_tree_centos() {
     echo >&2 " > Installing Judy-devel directly ..."
     run ${sudo} yum ${opts} install http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.3.0+757+d382997d.x86_64.rpm
 
+  elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
+    echo >&2 " > Checking for EPEL ..."
+    if ! rpm -qa | grep epel-release > /dev/null; then
+      if prompt "EPEL not found, shall I install it?"; then
+        run ${sudo} yum ${opts} install epel-release
+      fi
+    fi
   elif [[ "${version}" =~ ^6\..*$ ]]; then
     echo >&2 " > Detected CentOS 6.x ..."
     echo >&2 " > Checking for Okay ..."
