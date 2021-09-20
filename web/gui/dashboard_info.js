@@ -1633,8 +1633,24 @@ netdataDashboard.context = {
         info: 'Amount of data transferred to and from disk.'
     },
 
+    'disk_ext.io': {
+        info: 'Amount of discarded data that are no longer in use by a mounted file system.'
+    },
+
     'disk.ops': {
         info: 'Completed disk I/O operations. Keep in mind the number of operations requested might be higher, since the system is able to merge adjacent to each other (see merged operations chart).'
+    },
+
+    'disk_ext.ops': {
+        info: '<p>Number (after merges) of completed discard/flush requests.</p>'+
+        '<p><b>Discard</b> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
+        'They are useful for solid-state drivers (SSDs) and thinly-provisioned storage. '+
+        'Discarding/trimming enables the SSD to handle garbage collection more efficiently, '+
+        'which would otherwise slow future write operations to the involved blocks down.</p>'+
+        '<p><b>Flush</b> operations transfer all modified in-core data (i.e., modified buffer cache pages) to the disk device '+
+        'so that all changed information can be retrieved even if the system crashes or is rebooted. '+
+        'Flush requests are executed by disks. Flush requests are not tracked for partitions. '+
+        'Before being merged, flush operations are counted as writes.</p>'
     },
 
     'disk.qops': {
@@ -1646,14 +1662,16 @@ netdataDashboard.context = {
         info: 'The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute I/O operations in parallel.'
     },
     'disk_ext.iotime': {
-        height: 0.5
+        height: 0.5,
+        info: 'The sum of the duration of all completed discard/flush operations. This number can exceed the interval if the disk is able to execute discard/flush operations in parallel.'
     },
     'disk.mops': {
         height: 0.5,
         info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
     },
     'disk_ext.mops': {
-        height: 0.5
+        height: 0.5,
+        info: 'The number of merged discard disk operations. Discard operations which are adjacent to each other may be merged for efficiency.'
     },
     'disk.svctm': {
         height: 0.5,
@@ -1668,7 +1686,8 @@ netdataDashboard.context = {
         info: 'The average I/O operation size.'
     },
     'disk_ext.avgsz': {
-        height: 0.5
+        height: 0.5,
+        info: 'The average discard operation size.'
     },
     'disk.await': {
         height: 0.5,
@@ -1676,7 +1695,7 @@ netdataDashboard.context = {
     },
     'disk_ext.await': {
         height: 0.5,
-        info: 'The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
+        info: 'The average time for discard/flush requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.'
     },
 
     'disk.space': {
@@ -1684,6 +1703,50 @@ netdataDashboard.context = {
     },
     'disk.inodes': {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
+    },
+
+    'disk.bcache_hit_ratio': {
+        info: '<p><b>Bcache (block cache)</b> is a cache in the block layer of Linux kernel, '+
+        'which is used for accessing secondary storage devices. '+
+        'It allows one or more fast storage devices, such as flash-based solid-state drives (SSDs), '+
+        'to act as a cache for one or more slower storage devices, such as hard disk drives (HDDs).</p>'+
+        '<p>Percentage of data requests that were fulfilled right from the block cache. '+
+        'Hits and misses are counted per individual IO as bcache sees them. '+
+        'A partial hit is counted as a miss.</p>'
+    },
+    'disk.bcache_rates': {
+        info: 'Throttling rates. '+
+        'To avoid congestions bcache tracks latency to the cache device, and gradually throttles traffic if the latency exceeds a threshold. ' +
+        'If the writeback percentage is nonzero, bcache tries to keep around this percentage of the cache dirty by '+
+        'throttling background writeback and using a PD controller to smoothly adjust the rate.'
+    },
+    'disk.bcache_size': {
+        info: 'Amount of dirty data for this backing device in the cache.'
+    },
+    'disk.bcache_usage': {
+        info: 'Percentage of cache device which does not contain dirty data, and could potentially be used for writeback.'
+    },
+    'disk.bcache_cache_read_races': {
+        info: '<b>Read races</b> happen when a bucket was reused and invalidated while data was being read from the cache. '+
+        'When this occurs the data is reread from the backing device. '+
+        '<b>IO errors</b> are decayed by the half life. '+
+        'If the decaying count reaches the limit, dirty data is written out and the cache is disabled.'
+    },
+    'disk.bcache': {
+        info: 'Hits and misses are counted per individual IO as bcache sees them; a partial hit is counted as a miss. '+
+        'Collisions happen when data was going to be inserted into the cache from a cache miss, '+
+        'but raced with a write and data was already present. '+
+        'Cache miss reads are rounded up to the readahead size, but without overlapping existing cache entries.'
+    },
+    'disk.bcache_bypass': {
+        info: 'Hits and misses for IO that is intended to skip the cache.'
+    },
+    'disk.bcache_cache_alloc': {
+        info: 'Working set size. '+
+        '<b>Unused</b> is the percentage of the cache that does not contain any data. '+
+        '<b>Dirty</b> is the data that is modified in the cache but not yet written to the permanent storage. '+
+        '<b>Clean</b> data matches the data stored on the permanent storage. '+
+        '<b>Metadata</b> is bcache\'s metadata overhead. '
     },
 
     // ------------------------------------------------------------------------
