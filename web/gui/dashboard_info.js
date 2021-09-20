@@ -137,9 +137,9 @@ netdataDashboard.menu = {
         title: 'MD arrays',
         icon: '<i class="fas fa-hdd"></i>',
         info: '<p>RAID devices are virtual devices created from two or more real block devices. '+
-        '<a href="https://man7.org/linux/man-pages/man4/md.4.html" target="blank">Linux Software RAID</a> devices are '+
+        '<a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">Linux Software RAID</a> devices are '+
         'implemented through the md (Multiple Devices) device driver.</p>'+
-        '<p>Netdata monitors the current status of MD arrays reading <a href="https://raid.wiki.kernel.org/index.php/Mdstat" target="blank">/proc/mdstat</a> and '+
+        '<p>Netdata monitors the current status of MD arrays reading <a href="https://raid.wiki.kernel.org/index.php/Mdstat" target="_blank">/proc/mdstat</a> and '+
         '<code>/sys/block/%s/md/mismatch_cnt</code> files.</p>'
     },
 
@@ -1271,7 +1271,7 @@ netdataDashboard.context = {
         'Mismatches can not be interpreted very reliably on RAID1 or RAID10, especially when the device is used for swap. '+
         'On a truly clean RAID5 or RAID6 array, any mismatches should indicate a hardware problem at some level - '+
         'software issues should never cause such a mismatch. '+
-        'For details, see <a href="https://man7.org/linux/man-pages/man4/md.4.html" target="blank">md(4)</a>.'
+        'For details, see <a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">md(4)</a>.'
     },
 
     // ------------------------------------------------------------------------
