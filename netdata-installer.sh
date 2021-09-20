@@ -965,6 +965,7 @@ rename_libbpf_packaging() {
 
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
+  mkdir root build
   run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   popd > /dev/null || exit 1
 }
