@@ -286,7 +286,10 @@ while [ -n "${1}" ]; do
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
     "--use-system-lws") USE_SYSTEM_LWS=1 ;;
-    "--use-system-protobuf") USE_SYSTEM_PROTOBUF=1 ;;
+    "--use-system-protobuf")
+      USE_SYSTEM_PROTOBUF=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--without-bundled-protobuf/} --without-bundled-protobuf"
+    ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
