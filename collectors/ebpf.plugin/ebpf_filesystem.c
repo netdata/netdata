@@ -8,6 +8,28 @@ struct config fs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_xfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_nfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_zfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = "tbl_btrfs", .internal_input = NETDATA_KEY_CALLS_SYNC,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                       {.name = "tbl_ext_addr", .internal_input = 1,
+                                       .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                      {.name = NULL, .internal_input = 0, .user_input = 0,
+                                       .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
 ebpf_filesystem_partitions_t localfs[] =
     {{.filesystem = "ext4",
       .optional_filesystem = NULL,
@@ -200,17 +222,8 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
-            ebpf_data_t *ed = &efp->kernel_info;
-            fill_ebpf_data(ed);
-
-            if (ebpf_update_kernel(ed)) {
-                em->thread_name = saved_name;
-                return -1;
-            }
-
             em->thread_name = efp->filesystem;
-            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string,
-                                                 &efp->objects, ed->map_fd);
+            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &efp->objects);
             if (!efp->probe_links) {
                 em->thread_name = saved_name;
                 return -1;
@@ -218,8 +231,9 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
 
             // Nedeed for filesystems like btrfs
-            if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function))
-                ebpf_load_addresses(&efp->addresses, efp->kernel_info.map_fd[NETDATA_ADDR_FS_TABLE]);
+            if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
+                ebpf_load_addresses(&efp->addresses, fs_maps[i + 1].map_fd);
+            }
         }
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
@@ -331,7 +345,6 @@ void ebpf_filesystem_cleanup_ebpf_data()
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (efp->probe_links) {
-            freez(efp->kernel_info.map_fd);
             freez(efp->family_name);
 
             freez(efp->hread.name);
@@ -428,12 +441,11 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
  *
  * Read the table with number of calls for all functions
  */
-static void read_filesystem_table(ebpf_filesystem_partitions_t *efp)
+static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd)
 {
     netdata_idx_t *values = filesystem_hash_values;
     uint32_t key;
     uint32_t idx;
-    int fd = efp->kernel_info.map_fd[NETDATA_MAIN_FS_TABLE];
     for (key = 0; key < NETDATA_KEY_CALLS_SYNC; key++) {
         netdata_ebpf_histogram_t *w = select_hist(efp, &idx, key);
         if (!w) {
@@ -471,7 +483,7 @@ static void read_filesystem_tables()
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
-            read_filesystem_table(efp);
+            read_filesystem_table(efp, fs_maps[i].map_fd);
         }
     }
 }
@@ -603,6 +615,7 @@ void *ebpf_filesystem_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    em->maps = fs_maps;
     ebpf_update_filesystem();
 
     if (!em->enabled)

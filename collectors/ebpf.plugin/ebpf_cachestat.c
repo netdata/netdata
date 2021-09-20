@@ -3,7 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_cachestat.h"
 
-static ebpf_data_t cachestat_data;
 netdata_publish_cachestat_t **cachestat_pid;
 
 static struct bpf_link **probe_links = NULL;
@@ -633,7 +632,6 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = cachestat_maps;
-    fill_ebpf_data(&cachestat_data);
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
@@ -642,12 +640,8 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_cachestat_allocate_global_vectors(NETDATA_CACHESTAT_END);
-    if (ebpf_update_kernel(&cachestat_data)) {
-        pthread_mutex_unlock(&lock);
-        goto endcachestat;
-    }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, cachestat_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endcachestat;

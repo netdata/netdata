@@ -29,7 +29,6 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
                            .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                      .rwlock = AVL_LOCK_INITIALIZER } };
 
-static ebpf_data_t fd_data;
 static struct bpf_link **probe_links = NULL;
 static struct bpf_object *objects = NULL;
 
@@ -82,7 +81,6 @@ static void ebpf_fd_cleanup(void *ptr)
     }
 
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
-    freez(fd_data.map_fd);
     freez(fd_thread.thread);
     freez(fd_values);
     freez(fd_vector);
@@ -499,17 +497,13 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fd_maps;
-    fill_ebpf_data(&fd_data);
 
     if (!em->enabled)
         goto endfd;
 
-    if (ebpf_update_kernel(&fd_data))
-        goto endfd;
-
     ebpf_fd_allocate_global_vectors();
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, fd_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endfd;
     }

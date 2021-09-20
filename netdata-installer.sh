@@ -944,8 +944,28 @@ bundle_jsonc
 
 # -----------------------------------------------------------------------------
 
+get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
+rename_libbpf_packaging() {
+  if [ "$(get_kernel_version)" -ge "005004014" ]; then
+    cp packaging/current_libbpf.checksums packaging/libbpf.checksums
+    cp packaging/current_libbpf.version packaging/libbpf.version
+  else
+    cp packaging/libbpf_0_0_9.checksums packaging/libbpf.checksums
+    cp packaging/libbpf_0_0_9.version packaging/libbpf.version
+  fi
+}
+
+
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
+  mkdir root build
   run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   popd > /dev/null || exit 1
 }
@@ -969,6 +989,8 @@ bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
+
+  rename_libbpf_packaging
 
   progress "Prepare libbpf"
 
@@ -1568,27 +1590,6 @@ install_go() {
 }
 
 install_go
-
-function get_kernel_version() {
-  r="$(uname -r | cut -f 1 -d '-')"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
-
-function get_rh_version() {
-  if [ ! -f /etc/redhat-release ]; then
-    printf "000000000"
-    return
-  fi
-
-  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
 
 detect_libc() {
   libc=

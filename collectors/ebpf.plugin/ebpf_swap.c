@@ -15,7 +15,6 @@ static netdata_idx_t *swap_values = NULL;
 
 netdata_publish_swap_t **swap_pid = NULL;
 
-static ebpf_data_t swap_data;
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -421,18 +420,13 @@ void *ebpf_swap_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = swap_maps;
-    fill_ebpf_data(&swap_data);
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
 
     if (!em->enabled)
         goto endswap;
 
-    if (ebpf_update_kernel(&swap_data)) {
-        goto endswap;
-    }
-
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, swap_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endswap;
     }

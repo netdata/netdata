@@ -18,8 +18,6 @@ static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_in
                                         {.name = NULL, .internal_input = 0, .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
-static ebpf_data_t disk_data;
-
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
@@ -792,14 +790,8 @@ void *ebpf_disk_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = disk_maps;
 
-    fill_ebpf_data(&disk_data);
-
     if (!em->enabled)
         goto enddisk;
-
-    if (ebpf_update_kernel(&disk_data)) {
-        goto enddisk;
-    }
 
     if (ebpf_disk_enable_tracepoints()) {
         em->enabled = CONFIG_BOOLEAN_NO;
@@ -817,7 +809,7 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, disk_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto enddisk;
     }

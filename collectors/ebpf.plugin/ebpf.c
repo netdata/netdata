@@ -67,7 +67,7 @@ struct config collector_config = { .first_section = NULL,
 int running_on_kernel = 0;
 char kernel_string[64];
 int ebpf_nprocs;
-static int isrh;
+int isrh = 0;
 uint32_t finalized_threads = 1;
 
 pthread_mutex_t lock;
@@ -971,20 +971,6 @@ static void ebpf_allocate_common_vectors()
 }
 
 /**
- * Fill the ebpf_data structure with default values
- *
- * @param ef the pointer to set default values
- */
-void fill_ebpf_data(ebpf_data_t *ef)
-{
-    memset(ef, 0, sizeof(ebpf_data_t));
-    ef->kernel_string = kernel_string;
-    ef->running_on_kernel = running_on_kernel;
-    ef->map_fd = callocz(EBPF_MAX_MAPS, sizeof(int));
-    ef->isrh = isrh;
-}
-
-/**
  * Define how to load the ebpf programs
  *
  * @param ptr the option given by users
@@ -1245,6 +1231,8 @@ void set_global_variables()
 
     isrh = get_redhat_release();
     pid_max = get_system_pid_max();
+    running_on_kernel = ebpf_get_kernel_version();
+    ebpf_update_kernel(kernel_string, 63, isrh, running_on_kernel);
 }
 
 /**
@@ -1654,7 +1642,6 @@ int main(int argc, char **argv)
     ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
 
-    running_on_kernel = get_kernel_version(kernel_string, 63);
     if (!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
         return 2;

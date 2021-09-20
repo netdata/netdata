@@ -54,8 +54,6 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-static ebpf_data_t socket_data;
-
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
@@ -1900,7 +1898,6 @@ static void ebpf_socket_cleanup(void *ptr)
     clean_hostnames(network_viewer_opt.excluded_hostnames);
 
     pthread_mutex_destroy(&nv_mutex);
-    freez(socket_data.map_fd);
 
     freez(socket_threads.thread);
 
@@ -2869,7 +2866,6 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = socket_maps;
-    fill_ebpf_data(&socket_data);
 
     parse_network_viewer_section(&socket_config);
     parse_service_name_section(&socket_config);
@@ -2887,15 +2883,10 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_socket_allocate_global_vectors(NETDATA_MAX_SOCKET_VECTOR);
     initialize_inbound_outbound();
 
-    if (ebpf_update_kernel(&socket_data)) {
-        pthread_mutex_unlock(&lock);
-        goto endsocket;
-    }
-
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, socket_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endsocket;

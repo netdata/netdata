@@ -28,8 +28,6 @@ static ebpf_local_maps_t oomkill_maps[] = {
     }
 };
 
-static ebpf_data_t oomkill_data;
-
 static ebpf_tracepoint_t oomkill_tracepoints[] = {
     {.enabled = false, .class = "oom", .event = "mark_victim"},
     /* end */
@@ -188,13 +186,7 @@ void *ebpf_oomkill_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = oomkill_maps;
 
-    fill_ebpf_data(&oomkill_data);
-
     if (!em->enabled) {
-        goto endoomkill;
-    }
-
-    if (ebpf_update_kernel(&oomkill_data)) {
         goto endoomkill;
     }
 
@@ -203,7 +195,7 @@ void *ebpf_oomkill_thread(void *ptr)
         goto endoomkill;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, oomkill_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endoomkill;
     }

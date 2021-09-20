@@ -36,8 +36,6 @@ static ebpf_local_maps_t hardirq_maps[] = {
     }
 };
 
-static ebpf_data_t hardirq_data;
-
 #define HARDIRQ_TP_CLASS_IRQ "irq"
 #define HARDIRQ_TP_CLASS_IRQ_VECTORS "irq_vectors"
 static ebpf_tracepoint_t hardirq_tracepoints[] = {
@@ -466,13 +464,7 @@ void *ebpf_hardirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = hardirq_maps;
 
-    fill_ebpf_data(&hardirq_data);
-
     if (!em->enabled) {
-        goto endhardirq;
-    }
-
-    if (ebpf_update_kernel(&hardirq_data)) {
         goto endhardirq;
     }
 
@@ -481,7 +473,7 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, hardirq_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endhardirq;
     }

@@ -7,8 +7,6 @@ static char *dcstat_counter_dimension_name[NETDATA_DCSTAT_IDX_END] = { "ratio", 
 static netdata_syscall_stat_t dcstat_counter_aggregated_data[NETDATA_DCSTAT_IDX_END];
 static netdata_publish_syscall_t dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_END];
 
-static ebpf_data_t dcstat_data;
-
 netdata_dcstat_pid_t *dcstat_vector = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 
@@ -583,7 +581,6 @@ void *ebpf_dcstat_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = dcstat_maps;
-    fill_ebpf_data(&dcstat_data);
 
     ebpf_update_pid_table(&dcstat_maps[NETDATA_DCSTAT_PID_STATS], em);
 
@@ -596,7 +593,7 @@ void *ebpf_dcstat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, dcstat_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto enddcstat;

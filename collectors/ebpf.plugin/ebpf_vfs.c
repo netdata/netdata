@@ -16,8 +16,6 @@ static netdata_publish_syscall_t vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_vfs_t *vfs_vector = NULL;
 
-static ebpf_data_t vfs_data;
-
 static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                         .user_input = 0, .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
@@ -84,7 +82,6 @@ static void ebpf_vfs_cleanup(void *ptr)
         UNUSED(dt);
     }
 
-    freez(vfs_data.map_fd);
     freez(vfs_hash_values);
     freez(vfs_vector);
 
@@ -896,7 +893,6 @@ void *ebpf_vfs_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = vfs_maps;
-    fill_ebpf_data(&vfs_data);
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
 
@@ -905,11 +901,7 @@ void *ebpf_vfs_thread(void *ptr)
     if (!em->enabled)
         goto endvfs;
 
-    if (ebpf_update_kernel(&vfs_data)) {
-        goto endvfs;
-    }
-
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, vfs_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endvfs;
     }

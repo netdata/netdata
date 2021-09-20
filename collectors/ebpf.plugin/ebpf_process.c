@@ -34,8 +34,6 @@ static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
-static ebpf_data_t process_data;
-
 ebpf_process_stat_t **global_process_stats = NULL;
 ebpf_process_publish_apps_t **current_apps_data = NULL;
 
@@ -561,8 +559,6 @@ static void ebpf_process_cleanup(void *ptr)
     freez(global_process_stats);
     freez(current_apps_data);
 
-    freez(process_data.map_fd);
-
     if (probe_links) {
         struct bpf_program *prog;
         size_t i = 0 ;
@@ -609,7 +605,7 @@ static void change_syscalls()
  */
 static void set_local_pointers()
 {
-    if (process_data.isrh >= NETDATA_MINIMUM_RH_VERSION && process_data.isrh < NETDATA_RH_8)
+    if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
         change_syscalls();
 }
 
@@ -663,20 +659,14 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
     process_enabled = em->enabled;
-    fill_ebpf_data(&process_data);
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
 
-    if (ebpf_update_kernel(&process_data)) {
-        pthread_mutex_unlock(&lock);
-        goto endprocess;
-    }
-
     ebpf_update_pid_table(&process_maps[0], em);
 
     set_local_pointers();
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, process_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         pthread_mutex_unlock(&lock);
         goto endprocess;

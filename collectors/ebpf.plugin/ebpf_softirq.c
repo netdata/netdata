@@ -28,8 +28,6 @@ static ebpf_local_maps_t softirq_maps[] = {
     }
 };
 
-static ebpf_data_t softirq_data;
-
 #define SOFTIRQ_TP_CLASS_IRQ "irq"
 static ebpf_tracepoint_t softirq_tracepoints[] = {
     {.enabled = false, .class = SOFTIRQ_TP_CLASS_IRQ, .event = "softirq_entry"},
@@ -246,13 +244,7 @@ void *ebpf_softirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = softirq_maps;
 
-    fill_ebpf_data(&softirq_data);
-
     if (!em->enabled) {
-        goto endsoftirq;
-    }
-
-    if (ebpf_update_kernel(&softirq_data)) {
         goto endsoftirq;
     }
 
@@ -261,7 +253,7 @@ void *ebpf_softirq_thread(void *ptr)
         goto endsoftirq;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, softirq_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endsoftirq;
     }
