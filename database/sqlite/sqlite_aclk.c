@@ -6,7 +6,7 @@
 // TODO: To be added
 //#include "sqlite_aclk_chart.h"
 //#include "sqlite_aclk_alert.h"
-//#include "sqlite_aclk_node.h"
+#include "sqlite_aclk_node.h"
 
 const char *aclk_sync_config[] = {
     NULL,
@@ -412,13 +412,9 @@ void aclk_database_worker(void *arg)
                     break;
 
 // NODE OPERATIONS
-                case ACLK_DATABASE_RESET_NODE:
-                    debug(D_ACLK_SYNC,"Resetting the node instance id of %s", (char *) cmd.data);
-//                    aclk_reset_node_event(wc, cmd);
-                    break;
                 case ACLK_DATABASE_NODE_INFO:
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
-//                    sql_build_node_info(wc, cmd);
+                    sql_build_node_info(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_STATS:
 //                    sql_update_metric_statistics(wc, cmd);
