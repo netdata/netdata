@@ -136,11 +136,11 @@ netdataDashboard.menu = {
     'mdstat': {
         title: 'MD arrays',
         icon: '<i class="fas fa-hdd"></i>',
-        info: 'RAID devices are virtual devices created from two or more real block devices. '+
+        info: '<p>RAID devices are virtual devices created from two or more real block devices. '+
         '<a href="https://man7.org/linux/man-pages/man4/md.4.html" target="blank">Linux Software RAID</a> devices are '+
-        'implemented through the md (Multiple Devices) device driver. '+
-        'Netdata monitors the current status of MD arrays reading <a href="https://raid.wiki.kernel.org/index.php/Mdstat" target="blank">/proc/mdstat</a> and '+
-        '<code>/sys/block/%s/md/mismatch_cnt</code> files.'
+        'implemented through the md (Multiple Devices) device driver.</p>'+
+        '<p>Netdata monitors the current status of MD arrays reading <a href="https://raid.wiki.kernel.org/index.php/Mdstat" target="blank">/proc/mdstat</a> and '+
+        '<code>/sys/block/%s/md/mismatch_cnt</code> files.</p>'
     },
 
     'sensors': {
