@@ -9,6 +9,7 @@
 #include <chrono>
 #include <map>
 #include <mutex>
+#include <sstream>
 
 namespace ml {
 

@@ -75,6 +75,51 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     return Result;
 }
 
+char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
+                            int AnomalyDetectorVersion, time_t After, time_t Before) {
+    if (!RH || !RH->ml_host) {
+        error("No host");
+        return nullptr;
+    }
+
+    Host *H = static_cast<Host *>(RH->ml_host);
+    std::vector<std::pair<time_t, time_t>> TimeRanges;
+
+    bool Res = H->getAnomaliesInRange(TimeRanges, AnomalyDetectorName,
+                                                  AnomalyDetectorVersion,
+                                                  H->getUUID(),
+                                                  After, Before);
+    if (!Res) {
+        error("DB result is empty");
+        return nullptr;
+    }
+
+    nlohmann::json Json = TimeRanges;
+    return strdup(Json.dump(4).c_str());
+}
+
+char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
+                                int AnomalyDetectorVersion, time_t After, time_t Before) {
+    if (!RH || !RH->ml_host) {
+        error("No host");
+        return nullptr;
+    }
+
+    Host *H = static_cast<Host *>(RH->ml_host);
+
+    nlohmann::json Json;
+    bool Res = H->getAnomalyInfo(Json, AnomalyDetectorName,
+                                       AnomalyDetectorVersion,
+                                       H->getUUID(),
+                                       After, Before);
+    if (!Res) {
+        error("DB result is empty");
+        return nullptr;
+    }
+
+    return strdup(Json.dump(4).c_str());
+}
+
 #if defined(ENABLE_ML_TESTS)
 
 #include "gtest/gtest.h"

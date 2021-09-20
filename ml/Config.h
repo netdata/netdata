@@ -27,6 +27,8 @@ public:
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
+    std::string AnomalyDBPath;
+
     void readMLConfig();
 };
 

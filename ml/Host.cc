@@ -162,6 +162,7 @@ void DetectableHost::detectOnce() {
     BitRateWindow::Edge Edge = P.first;
     size_t WindowLength = P.second;
 
+    // TODO: check if we should reset on idle's loop as well.
     bool ResetBitCounter = (Edge.first == BitRateWindow::State::BelowThreshold) &&
                            (Edge.second == BitRateWindow::State::BelowThreshold);
     bool NewAnomalyEvent = (Edge.first == BitRateWindow::State::AboveThreshold) &&
@@ -185,8 +186,8 @@ void DetectableHost::detectOnce() {
             if (IsAnomalous)
                 NumAnomalousDimensions += 1;
 
-            if (AnomalyRate >= Cfg.ADDimensionRateThreshold)
-                DimsOverThreshold.push_back({ AnomalyRate, D->getRD()->id });
+            if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
+                DimsOverThreshold.push_back({ AnomalyRate, D->getID() });
         }
 
         if (NumAnomalousDimensions)
@@ -204,7 +205,7 @@ void DetectableHost::detectOnce() {
         updateADChart(getRH(), P, ResetBitCounter, NewAnomalyEvent, 100 * AnomalyRate);
     }
 
-    if (!NewAnomalyEvent)
+    if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
         return;
 
     std::sort(DimsOverThreshold.begin(), DimsOverThreshold.end());
@@ -212,6 +213,9 @@ void DetectableHost::detectOnce() {
 
     nlohmann::json JsonResult = DimsOverThreshold;
     error("--->>> JSON <<<---\n%s", JsonResult.dump(4).c_str());
+
+    time_t Now = now_realtime_sec();
+    DB.insertAnomaly("AD1", 1, getUUID(), Now - WindowLength, Now, JsonResult.dump(4));
 }
 
 void DetectableHost::detect() {

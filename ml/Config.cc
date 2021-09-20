@@ -37,4 +37,8 @@ void Config::readMLConfig(void) {
 
     std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training", "!system.cpu *");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+
+    std::stringstream SS;
+    SS << netdata_configured_cache_dir << "/anomaly-detection.db";
+    Cfg.AnomalyDBPath = SS.str();
 }

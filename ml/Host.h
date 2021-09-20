@@ -5,6 +5,7 @@
 
 #include "BitRateWindow.h"
 #include "Config.h"
+#include "Database.h"
 #include "Dimension.h"
 
 #include "ml-private.h"
@@ -16,6 +17,12 @@ public:
     RrdHost(RRDHOST *RH) : RH(RH) {}
 
     RRDHOST *getRH() { return RH; }
+
+    std::string getUUID() {
+        char S[UUID_STR_LEN];
+        uuid_unparse_lower(RH->host_uuid, S);
+        return S;
+    }
 
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
@@ -44,6 +51,16 @@ public:
     void startAnomalyDetectionThreads();
     void stopAnomalyDetectionThreads();
 
+    template<typename ...ArgTypes>
+    bool getAnomalyInfo(ArgTypes&&... Args) {
+        return DB.getAnomalyInfo(Args...);
+    }
+
+    template<typename ...ArgTypes>
+    bool getAnomaliesInRange(ArgTypes&&... Args) {
+        return DB.getAnomaliesInRange(Args...);
+    }
+
 private:
     void detect();
     void detectOnce();
@@ -60,6 +77,8 @@ private:
     };
 
     CalculatedNumber AnomalyRate{0.0};
+
+    Database DB{Cfg.AnomalyDBPath};
 };
 
 using Host = DetectableHost;

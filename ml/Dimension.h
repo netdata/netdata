@@ -22,6 +22,12 @@ public:
 
     Seconds updateEvery() const { return Seconds{RD->update_every}; }
 
+    std::string getID() const {
+        std::stringstream SS;
+        SS << RD->rrdset->id << "|" << RD->name;
+        return SS.str();
+    }
+
     virtual ~RrdDimension() {}
 
 private:

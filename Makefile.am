@@ -246,6 +246,8 @@ ML_FILES += \
     ml/BitRateWindow.cc \
     ml/Config.h \
     ml/Config.cc \
+    ml/Database.h \
+    ml/Database.cc \
     ml/Dimension.cc \
     ml/Dimension.h \
     ml/Host.h \
