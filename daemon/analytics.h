@@ -91,6 +91,7 @@ extern void analytics_log_prometheus(void);
 extern void analytics_log_dashboard(void);
 extern void analytics_gather_mutable_meta_data(void);
 extern void analytics_report_oom_score(long long int score);
+extern void get_system_timezone(void);
 
 extern struct analytics_data analytics_data;
 

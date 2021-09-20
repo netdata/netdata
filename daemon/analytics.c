@@ -709,7 +709,7 @@ void set_late_global_environment()
     analytics_get_install_type();
 }
 
-static void get_system_timezone(void)
+void get_system_timezone(void)
 {
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
@@ -730,7 +730,7 @@ static void get_system_timezone(void)
     // use the contents of /etc/timezone
     if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
         timezone = buffer;
-        info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+        info("TIMEZONE: using the contents of /etc/timezone");
     }
 
     // read the link /etc/localtime
@@ -915,8 +915,6 @@ void set_global_environment()
     setenv("NETDATA_LISTEN_PORT", default_port, 1);
     if (clean)
         freez(default_port);
-
-    get_system_timezone();
 
     // set the path we need
     char path[1024 + 1], *p = getenv("PATH");
