@@ -1265,9 +1265,10 @@ netdataDashboard.context = {
         'These options are good for tweaking rebuilt process and may increase overall system load, cpu and memory usage.'
     },
     'md.mismatch_cnt': {
-        info: 'Number of sectors that were re-written, or (for <b>check</b>) would have been re-written. '+
+        info: 'When performing <b>check</b> and <b>repair</b>, and possibly when performing <b>resync</b>, md will count the number of errors that are found. '+
         'A count of mismatches is recorded in the <code>sysfs</code> file <code>md/mismatch_cnt</code>. '+
-        'This value may be larger than the number of actual errors by a factor of the number of sectors in a page. '+
+        'This value is the number of sectors that were re-written, or (for <b>check</b>) would have been re-written. '+
+        'It may be larger than the number of actual errors by a factor of the number of sectors in a page. '+
         'Mismatches can not be interpreted very reliably on RAID1 or RAID10, especially when the device is used for swap. '+
         'On a truly clean RAID5 or RAID6 array, any mismatches should indicate a hardware problem at some level - '+
         'software issues should never cause such a mismatch. '+
