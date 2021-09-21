@@ -452,6 +452,8 @@ claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   if [ -z "${NETDATA_PREFIX}" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
+  elif [ "${NETDATA_PREFIX}" = "/opt/netdata" ]; then
+    NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
   else
     NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
