@@ -47,7 +47,8 @@ netdataDashboard.menu = {
     'net': {
         title: 'Network Interfaces',
         icon: '<i class="fas fa-sitemap"></i>',
-        info: 'Performance metrics for network interfaces.'
+        info: '<p>Performance metrics for network interfaces.</p>'+
+        '<p>Netdata retrieves this data reading the <code>/proc/net/dev</code> file and <code>/sys/class/net/</code> directory.</p>'
     },
 
     'wireless': {
@@ -1641,7 +1642,8 @@ netdataDashboard.context = {
                 else
                     return '';
             }
-        ]
+        ],
+        info: 'The amount of traffic that the interface has received and sent.'
     },
 
     // ------------------------------------------------------------------------
