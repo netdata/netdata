@@ -135,7 +135,12 @@ netdataDashboard.menu = {
 
     'mdstat': {
         title: 'MD arrays',
-        icon: '<i class="fas fa-hdd"></i>'
+        icon: '<i class="fas fa-hdd"></i>',
+        info: '<p>RAID devices are virtual devices created from two or more real block devices. '+
+        '<a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">Linux Software RAID</a> devices are '+
+        'implemented through the md (Multiple Devices) device driver.</p>'+
+        '<p>Netdata monitors the current status of MD arrays reading <a href="https://raid.wiki.kernel.org/index.php/Mdstat" target="_blank">/proc/mdstat</a> and '+
+        '<code>/sys/block/%s/md/mismatch_cnt</code> files.</p>'
     },
 
     'sensors': {
@@ -1233,6 +1238,41 @@ netdataDashboard.context = {
 
     'filesystem.dc_reference': {
         info: 'Counters of file accesses. <code>Reference</code> is when there is a file access and the file is not present in the directory cache. <code>Miss</code> is when there is file access and the file is not found in the filesystem. <code>Slow</code> is when there is a file access and the file is present in the filesystem but not in the directory cache. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'md.health': {
+        info: 'Number of failed devices per MD array. '+
+        'Netdata retrieves this data from the <b>[n/m]</b> field of the md status line. '+
+        'It means that ideally the array would have <b>n</b> devices however, currently, <b>m</b> devices are in use. '+
+        '<code>failed disks</code> is <b>n-m</b>.'
+    },
+    'md.disks': {
+        info: 'Number of devices in use and in the down state. '+
+        'Netdata retrieves this data from the <b>[n/m]</b> field of the md status line. '+
+        'It means that ideally the array would have <b>n</b> devices however, currently, <b>m</b> devices are in use. '+
+        '<code>inuse</code> is <b>m</b>, <code>down</code> is <b>n-m</b>.'
+    },
+    'md.status': {
+        info: 'Completion progress of the ongoing operation.'
+    },
+    'md.expected_time_until_operation_finish': {
+        info: 'Estimated time to complete the ongoing operation. '+
+        'The time is only an approximation since the operation speed will vary according to other I/O demands.'
+    },
+    'md.operation_speed': {
+        info: 'Speed of the ongoing operation. '+
+        'The system-wide rebuild speed limits are specified in <code>/proc/sys/dev/raid/{speed_limit_min,speed_limit_max}</code> files. '+
+        'These options are good for tweaking rebuilt process and may increase overall system load, cpu and memory usage.'
+    },
+    'md.mismatch_cnt': {
+        info: 'When performing <b>check</b> and <b>repair</b>, and possibly when performing <b>resync</b>, md will count the number of errors that are found. '+
+        'A count of mismatches is recorded in the <code>sysfs</code> file <code>md/mismatch_cnt</code>. '+
+        'This value is the number of sectors that were re-written, or (for <b>check</b>) would have been re-written. '+
+        'It may be larger than the number of actual errors by a factor of the number of sectors in a page. '+
+        'Mismatches can not be interpreted very reliably on RAID1 or RAID10, especially when the device is used for swap. '+
+        'On a truly clean RAID5 or RAID6 array, any mismatches should indicate a hardware problem at some level - '+
+        'software issues should never cause such a mismatch. '+
+        'For details, see <a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">md(4)</a>.'
     },
 
     // ------------------------------------------------------------------------
