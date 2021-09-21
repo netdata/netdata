@@ -1735,11 +1735,11 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // IPVS
     'ipvs.sockets': {
-        info: 'Summary connections rate of all services and their servers. '+
+        info: 'Summary connection rate of all services and their servers. '+
         'To see the IPVS connection table, run <code>ipvsadm -Lnc</code>.'
     },
     'ipvs.packets': {
-        info: 'Summary packets rate of all services and their servers.'
+        info: 'Summary packet rate of all services and their servers.'
     },
     'ipvs.net': {
         info: 'Summary throughput of all services and their servers.'
