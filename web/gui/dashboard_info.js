@@ -1185,7 +1185,13 @@ netdataDashboard.context = {
     },
 
     'mem.kernel': {
-        info: 'The total amount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
+        info: 'The total amount of memory being used by the kernel. '+
+        '<b>Slab</b> is the memory used by the kernel to cache data structures for its own use. '+
+        '<b>KernelStack</b> is the memory allocated for each task done by the kernel. '+
+        '<b>PageTables</b> is the memory dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). '+
+        '<b>VmallocUsed</b> is the memory being used as virtual address space. '+
+        '<b>Percpu</b> is the memory allocated to the per-CPU allocator used to back per-CPU allocations (excludes the cost of metadata). '+
+        'When you create a per-CPU variable, each processor on the system gets its own copy of that variable.'
     },
 
     'mem.slab': {
@@ -1198,6 +1204,10 @@ netdataDashboard.context = {
 
     'mem.transparent_hugepages': {
         info: 'Transparent HugePages (THP) is backing virtual memory with huge pages, supporting automatic promotion and demotion of page sizes. It works for all applications for anonymous memory mappings and tmpfs/shmem.'
+    },
+
+    'mem.hwcorrupt': {
+        info: 'The amount of memory with physical corruption problems, identified by <a href="https://en.wikipedia.org/wiki/ECC_memory" target="_blank">ECC</a> and set aside by the kernel so it does not get used.'
     },
 
     'mem.cachestat_ratio': {
