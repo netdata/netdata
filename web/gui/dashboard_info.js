@@ -1185,7 +1185,8 @@ netdataDashboard.context = {
         '<b>KernelStack</b> is the memory allocated for each task done by the kernel. '+
         '<b>PageTables</b> is the memory dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). '+
         '<b>VmallocUsed</b> is the memory being used as virtual address space. '+
-        '<b>Percpu</b> is the memory allocated to the per-cpu allocator used to back per-cpu allocations (excludes the cost of metadata).'
+        '<b>Percpu</b> is the memory allocated to the per-CPU allocator used to back per-CPU allocations (excludes the cost of metadata). '+
+        'When you create a per-CPU variable, each processor on the system gets its own copy of that variable.'
     },
 
     'mem.slab': {
