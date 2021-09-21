@@ -566,7 +566,6 @@ try_package_install() {
         repo_subcmd="makecache"
       else
         pm_cmd="yum"
-        repo_subcmd="refresh"
       fi
       repo_prefix="el/${SYSVERSION}"
       pkg_type="rpm"
@@ -582,7 +581,6 @@ try_package_install() {
         repo_subcmd="makecache"
       else
         pm_cmd="yum"
-        repo_subcmd="refresh"
       fi
       repo_prefix="fedora/${SYSVERSION}"
       pkg_type="rpm"
@@ -636,10 +634,12 @@ try_package_install() {
       return 2
     fi
 
-    progress "Updating repository metadata."
-    # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-      fatal "Failed to update repository metadata."
+    if [ -n "${repo_subcmd}" ]; then
+      progress "Updating repository metadata."
+      # shellcheck disable=SC2086
+      if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+        fatal "Failed to update repository metadata."
+      fi
     fi
   else
     progress "Repository configuration is already present, attempting to install netdata."
