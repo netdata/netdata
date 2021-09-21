@@ -491,8 +491,8 @@ pkg_installed() {
   esac
 }
 
-# Check for the existence of a usable package in the repo.
-pkg_avail_check() {
+# Check for the existence of a usable netdata package in the repo.
+netdata_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
@@ -511,6 +511,32 @@ pkg_avail_check() {
       return 1
       ;;
   esac
+}
+
+# Check for any distro-specific dependencies we know we need.
+check_special_native_deps() {
+  if [ "${DISTRO_COMPAT_NAME}" = "centos" ] && [ "${SYSVERSION}" = "7" ]; then
+    progress "Checking for libuv availability."
+    # shellcheck disable=SC2086
+    if ${pm_cmd} search ${interactive_opts} -v libuv | grep -q "No matches found"; then
+      progress "libv not found, checking for EPEL availability."
+      # shellcheck disable=SC2086
+      if ${pm_cmd} search ${interactive_opts} -v epel-release | grep -q "No matches found"; then
+        warning "Unable to find a suitable source for libuv, cannot install on this system."
+        return 1
+      else
+        progress "EPEL is available, attempting to install so that required dependencies are available."
+
+        # shellcheck disable=SC2086
+        if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} epel-release; then
+          warning "Failed to install EPEL."
+          return 1
+        fi
+      fi
+    else
+      return 0
+    fi
+  fi
 }
 
 try_package_install() {
@@ -645,13 +671,23 @@ try_package_install() {
     progress "Repository configuration is already present, attempting to install netdata."
   fi
 
+  if ! check_special_native_deps; then
+    warning "Could not find secondary dependencies ${DISTRO} on ${SYSARCH}."
+    if [ -z "${NO_CLEANUP}" ]; then
+      progress "Attempting to uninstall repository configuration package."
+      # shellcheck disable=SC2086
+      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+    fi
+    return 2
+  fi
+
   progress "Checking for usable Netdata package."
-  if ! pkg_avail_check "${DISTRO_COMPAT_NAME}"; then
+  if ! netdata_avail_check "${DISTRO_COMPAT_NAME}"; then
     warning "Could not find a usable native package for ${DISTRO} on ${SYSARCH}."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} ${pm_cmd} env ${env} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
