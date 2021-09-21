@@ -1628,7 +1628,7 @@ netdataDashboard.context = {
     },
     'net.packets': {
         info: 'Number of packets that the interface has received and sent. '+
-        'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> statistic is '+
+        'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is '+
         'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
     },
     'net.errors': {
@@ -1653,7 +1653,7 @@ netdataDashboard.context = {
     },
     'net.compressed': {
         info: 'Number of correctly received and transmitted compressed packets. '+
-        'This counters is only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
+        'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
     },
     'net.events': {
         info: '<b>Frames</b> is an aggregated counter for dropped packets due to '+
@@ -1664,7 +1664,7 @@ netdataDashboard.context = {
         'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.'
     },
     'net.duplex': {
-        info: '<p>The interface latest or current '+
+        info: '<p>The interface\'s latest or current '+
         '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter '+
         '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
         '<b>Unknown</b> - the duplex mode can not be determined. '+
@@ -1688,12 +1688,12 @@ netdataDashboard.context = {
         '<p><b>State map</b>: 0 - down, 1 - up.</p>'
     },
     'net.speed': {
-        info: 'The interface latest or current speed that the network adapter '+
+        info: 'The interface\'s latest or current speed that the network adapter '+
         '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
         'This does not give the max supported speed of the NIC.'
     },
     'net.mtu': {
-        info: 'The interface currently configured '+
+        info: 'The interface\'s currently configured '+
         '<a href="https://en.wikipedia.org/wiki/Maximum_transmission_unit" target="_blank">Maximum transmission unit</a> (MTU) value. '+
         'MTU is the size of the largest protocol data unit that can be communicated in a single network layer transaction.'
     },
