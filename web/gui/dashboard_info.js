@@ -47,7 +47,8 @@ netdataDashboard.menu = {
     'net': {
         title: 'Network Interfaces',
         icon: '<i class="fas fa-sitemap"></i>',
-        info: 'Performance metrics for network interfaces.'
+        info: '<p>Performance <a href="https://www.kernel.org/doc/html/latest/networking/statistics.html" target="_blank">metrics for network interfaces</a>.</p>'+
+        '<p>Netdata retrieves this data reading the <code>/proc/net/dev</code> file and <code>/sys/class/net/</code> directory.</p>'
     },
 
     'wireless': {
@@ -1286,25 +1287,6 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // network interfaces
-
-    'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. These are the same counters reported by <code>ifconfig</code> as <code>RX dropped</code> (inbound) and <code>TX dropped</code> (outbound). <b>inbound</b> packets can be dropped at the network interface level due to <a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. Check <a href="https://www.novell.com/support/kb/doc.php?id=7007165" target="_blank">this document</a> for more information.'
-    },
-
-    'net.duplex': {
-        info: 'State map: 0 - unknown, 1 - half duplex, 2 - full duplex'
-    },
-
-    'net.operstate': {
-        info: 'State map: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up'
-    },
-
-    'net.carrier': {
-        info: 'State map: 0 - down, 1 - up'
-    },
-
-    // ------------------------------------------------------------------------
     // IP
 
     'ip.inerrors': {
@@ -1651,7 +1633,79 @@ netdataDashboard.context = {
                 else
                     return '';
             }
-        ]
+        ],
+        info: 'Amount of traffic that the interface has received and sent.'
+    },
+    'net.packets': {
+        info: 'Number of packets that the interface has received and sent. '+
+        'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is '+
+        'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
+    },
+    'net.errors': {
+        info: '<b>Inbound</b> is the number of bad packets received on this interface. '+
+        'It includes dropped packets due to invalid length, CRC, frame alignment, and other errors. '+
+        '<b>Outbound</b> is the number of transmit problems. '+
+        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, late collisions, and other problems.'
+    },
+    'net.fifo': {
+        info: '<b>Inbound</b> is the number of packets dropped because they did not fit into buffers provided by the host, '+
+        'e.g. packets larger than MTU or next buffer in the ring was not available for a scatter transfer. '+
+        '<b>Outbound</b> is the number of frame transmission errors due to device FIFO underrun/underflow. '+
+        'This condition occurs when the device begins transmission of a frame '+
+        'but is unable to deliver the entire frame to the transmitter in time for transmission.'
+    },
+    'net.drops': {
+        info: 'Packets that have been dropped at the network interface level. '+
+        '<b>Inbound</b> is the number of packets received but not processed, e.g. due to '+
+        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, '+
+        'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. '+
+        '<b>Outbound</b> is the number of packets dropped on their way to transmission, e.g. due to lack of resources.'
+    },
+    'net.compressed': {
+        info: 'Number of correctly received and transmitted compressed packets. '+
+        'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
+    },
+    'net.events': {
+        info: '<b>Frames</b> is an aggregated counter for dropped packets due to '+
+        'invalid length, FIFO overflow, CRC, and frame alignment errors. '+
+        '<b>Collisions</b> is the number of '+
+        '<a href="https://en.wikipedia.org/wiki/Collision_(telecommunications)" target="blank">collisions</a> during packet transmissions. '+
+        '<b>Carrier</b> is an aggregated counter for frame transmission errors due to '+
+        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.'
+    },
+    'net.duplex': {
+        info: '<p>The interface\'s latest or current '+
+        '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter '+
+        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
+        '<b>Unknown</b> - the duplex mode can not be determined. '+
+        '<b>Half duplex</b> - the communication is one direction at a time. '+
+        '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'+
+        '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
+    },
+    'net.operstate': {
+        info: '</p>The current <a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface. '+
+        '<b>Unknown</b> - the state can not be determined. '+
+        '<b>NotPresent</b> - the interface has missing (typically, hardware) components. '+
+        '<b>Down</b> - the interface is unable to transfer data on L1, e.g. ethernet is not plugged or interface is administratively down. '+
+        '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). '+
+        '<b>Testing</b> - the interface is in testing mode, e.g. cable test. It can’t be used for normal traffic until tests complete. '+
+        '<b>Dormant</b> - the interface is L1 up, but waiting for an external event, e.g. for a protocol to establish. '+
+        '<b>Up</b> - the interface is ready to pass packets and can be used.</p>'+
+        '<p><b>State map</b>: 0 - unknown, 1 - notpresent, 2 - down, 3 - lowerlayerdown, 4 - testing, 5 - dormant, 6 - up.</p>'
+    },
+    'net.carrier': {
+        info: '<p>The current physical link state of the interface.</p>'+
+        '<p><b>State map</b>: 0 - down, 1 - up.</p>'
+    },
+    'net.speed': {
+        info: 'The interface\'s latest or current speed that the network adapter '+
+        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
+        'This does not give the max supported speed of the NIC.'
+    },
+    'net.mtu': {
+        info: 'The interface\'s currently configured '+
+        '<a href="https://en.wikipedia.org/wiki/Maximum_transmission_unit" target="_blank">Maximum transmission unit</a> (MTU) value. '+
+        'MTU is the size of the largest protocol data unit that can be communicated in a single network layer transaction.'
     },
 
     // ------------------------------------------------------------------------
