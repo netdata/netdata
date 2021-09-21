@@ -734,7 +734,7 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             char *os_match = value;
-            alert_cfg->os = strdupz(value);
+            if (alert_cfg) alert_cfg->os = strdupz(value);
             SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT);
 
             if(!simple_pattern_matches(os_pattern, host->os)) {
@@ -751,7 +751,7 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
             char *host_match = value;
-            alert_cfg->host = strdupz(value);
+            if (alert_cfg) alert_cfg->host = strdupz(value);
             SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT);
 
             if(!simple_pattern_matches(host_pattern, host->hostname)) {
@@ -1226,16 +1226,17 @@ static int health_readfile(const char *filename, void *data) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
         if(ignore_this || !alert_hash_and_store_config(rc->config_hash_id, alert_cfg) || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
-            alert_config_free(alert_cfg);
         }
     }
 
     if(rt) {
         if(ignore_this || !alert_hash_and_store_config(rt->config_hash_id, alert_cfg) || !rrdcalctemplate_add_template_from_config(host, rt)) {
             rrdcalctemplate_free(rt);
-            alert_config_free(alert_cfg);
         }
     }
+
+    if (alert_cfg)
+        alert_config_free(alert_cfg);
 
     fclose(fp);
     return 1;
