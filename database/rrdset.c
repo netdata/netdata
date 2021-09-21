@@ -1861,7 +1861,8 @@ after_second_database_work:
             rrdset_wrlock(st);
 
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
+                if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) &&  !rrddim_flag_check(rd, RRDDIM_FLAG_ACLK)
+                             && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))) {
                     info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
                     if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
