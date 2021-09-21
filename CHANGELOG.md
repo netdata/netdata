@@ -6,12 +6,19 @@
 
 **Merged pull requests:**
 
+- fix\(docs\): broken links [\#11540](https://github.com/netdata/netdata/pull/11540) ([ilyam8](https://github.com/ilyam8))
+- update london demo to point at london3 [\#11533](https://github.com/netdata/netdata/pull/11533) ([andrewm4894](https://github.com/andrewm4894))
+- add/update proc\_interrupts charts info [\#11532](https://github.com/netdata/netdata/pull/11532) ([ilyam8](https://github.com/ilyam8))
+- add diskstats charts info  [\#11528](https://github.com/netdata/netdata/pull/11528) ([ilyam8](https://github.com/ilyam8))
 - docs\(health\): add a note about handling backslashes in configuration files [\#11527](https://github.com/netdata/netdata/pull/11527) ([ilyam8](https://github.com/ilyam8))
+- Re-added EPEL on CentOS 7. [\#11525](https://github.com/netdata/netdata/pull/11525) ([Ferroin](https://github.com/Ferroin))
+- Fix issue with log messages appearing in the terminal instead of the error.log on startup [\#11524](https://github.com/netdata/netdata/pull/11524) ([stelfrag](https://github.com/stelfrag))
 - add ipc semaphores charts info [\#11523](https://github.com/netdata/netdata/pull/11523) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.0. [\#11521](https://github.com/netdata/netdata/pull/11521) ([netdatabot](https://github.com/netdatabot))
 - remove `reset\_netdata\_trace.sh` from netdata.service [\#11517](https://github.com/netdata/netdata/pull/11517) ([ilyam8](https://github.com/ilyam8))
 - Remove unused script [\#11516](https://github.com/netdata/netdata/pull/11516) ([thiagoftsm](https://github.com/thiagoftsm))
 - Clean up dependency handling for CentOS/RHEL [\#11515](https://github.com/netdata/netdata/pull/11515) ([Ferroin](https://github.com/Ferroin))
+- Add node message support for ACLK new architecture [\#11514](https://github.com/netdata/netdata/pull/11514) ([stelfrag](https://github.com/stelfrag))
 - Convert uppercase to lowercase for eBPF submenus [\#11511](https://github.com/netdata/netdata/pull/11511) ([thiagoftsm](https://github.com/thiagoftsm))
 - Improved some wordings of the file README.md, only a lifecycle test! [\#11510](https://github.com/netdata/netdata/pull/11510) ([siamaktavakoli](https://github.com/siamaktavakoli))
 - Install basic netdata deps by default. [\#11508](https://github.com/netdata/netdata/pull/11508) ([Ferroin](https://github.com/Ferroin))
@@ -23,6 +30,7 @@
 - Revert "add Travis ctrl file for checking if changes happened" [\#11486](https://github.com/netdata/netdata/pull/11486) ([Ferroin](https://github.com/Ferroin))
 - Clean netdata naming [\#11484](https://github.com/netdata/netdata/pull/11484) ([andrewm4894](https://github.com/andrewm4894))
 - remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
+- Update libbpf [\#11480](https://github.com/netdata/netdata/pull/11480) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allow arbitrary options to be passed to make from netdata-installer.sh. [\#11479](https://github.com/netdata/netdata/pull/11479) ([Ferroin](https://github.com/Ferroin))
 - eBPF vsn bump to v0.7.9.1 [\#11471](https://github.com/netdata/netdata/pull/11471) ([UmanShahzad](https://github.com/UmanShahzad))
 - eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
@@ -156,16 +164,10 @@
 - Use memory mode RAM if memory mode dbengine is specified but not available [\#11207](https://github.com/netdata/netdata/pull/11207) ([stelfrag](https://github.com/stelfrag))
 - Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
 - health: fix alarm-line-charts matching [\#11204](https://github.com/netdata/netdata/pull/11204) ([ilyam8](https://github.com/ilyam8))
-- fix ebpf.plugin segfault when ebpf\_load\_program return null pointer [\#11203](https://github.com/netdata/netdata/pull/11203) ([wangpei-nice](https://github.com/wangpei-nice))
-- fix `install\_type` detection during update [\#11199](https://github.com/netdata/netdata/pull/11199) ([ilyam8](https://github.com/ilyam8))
 - claiming: exit 0 when daemon not running and the claim was successful [\#11195](https://github.com/netdata/netdata/pull/11195) ([ilyam8](https://github.com/ilyam8))
 - Load class, component and type from health log when sufficient fields are detected. [\#11193](https://github.com/netdata/netdata/pull/11193) ([MrZammler](https://github.com/MrZammler))
 - Check return status of execution of anonymous statistics script [\#11188](https://github.com/netdata/netdata/pull/11188) ([MrZammler](https://github.com/MrZammler))
 - VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
-- add link to example conf [\#11182](https://github.com/netdata/netdata/pull/11182) ([gotjoshua](https://github.com/gotjoshua))
-- rename default from job 'local' to 'anomalies' [\#11178](https://github.com/netdata/netdata/pull/11178) ([andrewm4894](https://github.com/andrewm4894))
-- Move parser from children to main thread [\#11152](https://github.com/netdata/netdata/pull/11152) ([thiagoftsm](https://github.com/thiagoftsm))
-- Removed Fedora 32 from CI. [\#11143](https://github.com/netdata/netdata/pull/11143) ([Ferroin](https://github.com/Ferroin))
 - Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
 - Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
 
@@ -271,9 +273,6 @@
 - spelling: backend [\#10911](https://github.com/netdata/netdata/pull/10911) ([jsoref](https://github.com/jsoref))
 - Spelling aclk [\#10910](https://github.com/netdata/netdata/pull/10910) ([jsoref](https://github.com/jsoref))
 - Spelling build [\#10909](https://github.com/netdata/netdata/pull/10909) ([jsoref](https://github.com/jsoref))
-- health: add synchronization.conf to the Makefile [\#10907](https://github.com/netdata/netdata/pull/10907) ([ilyam8](https://github.com/ilyam8))
-- health: add systemdunits alarms [\#10906](https://github.com/netdata/netdata/pull/10906) ([ilyam8](https://github.com/ilyam8))
-- web/gui: add systemdunits info to the dashboard\_info.js [\#10904](https://github.com/netdata/netdata/pull/10904) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -284,8 +283,6 @@
 - Don’t use glob expansion in argument to `cd` in updater. [\#10936](https://github.com/netdata/netdata/pull/10936) ([Ferroin](https://github.com/Ferroin))
 - Fix memory corruption issue when executing context queries in RAM/SAVE memory mode [\#10933](https://github.com/netdata/netdata/pull/10933) ([stelfrag](https://github.com/stelfrag))
 - Update CODEOWNERS [\#10928](https://github.com/netdata/netdata/pull/10928) ([knatsakis](https://github.com/knatsakis))
-- Update news and GIF in README, fix typo [\#10900](https://github.com/netdata/netdata/pull/10900) ([joelhans](https://github.com/joelhans))
-- Update README.md [\#10898](https://github.com/netdata/netdata/pull/10898) ([slimanio](https://github.com/slimanio))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
