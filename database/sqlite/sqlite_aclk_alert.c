@@ -163,7 +163,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
 
-        alarm_log.node_id = get_str_from_uuid(wc->host->node_id);
+        alarm_log.node_id = strdupz(wc->node_id);
         alarm_log.claim_id = claim_id;
 
         alarm_log.chart = strdupz((char *)sqlite3_column_text(res, 12));
@@ -318,7 +318,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     struct alarm_log_health alarm_log;
     alarm_log.claim_id = claim_id;
-    alarm_log.node_id = get_str_from_uuid(wc->host->node_id);
+    alarm_log.node_id = strdupz(wc->node_id);
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
 
@@ -330,6 +330,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to get health log statistics from the database, rc = %d", rc);
 
+    freez((char *)alarm_log.node_id);
     freez(claim_id);
     buffer_free(sql);
 #endif
