@@ -122,7 +122,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (wc->alerts_start_seq_id != 0) {
         buffer_sprintf(
             sql,
-            "UPDATE aclk_alert_%s SET date_submitted = NULL WHERE sequence_id >= %" PRIu64
+            "UPDATE aclk_alert_%s SET date_submitted = NULL, date_cloud_ack = NULL WHERE sequence_id >= %" PRIu64
             "; UPDATE aclk_alert_%s SET date_cloud_ack = strftime('%%s','now') WHERE sequence_id < %" PRIu64
             " and date_cloud_ack is null",
             wc->uuid_str,
