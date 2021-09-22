@@ -3,8 +3,6 @@
 #ifndef NETDATA_SQLITE_ACLK_ALERT_H
 #define NETDATA_SQLITE_ACLK_ALERT_H
 
-#include "sqlite_functions.h"
-
 extern sqlite3 *db_meta;
 
 int aclk_add_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
