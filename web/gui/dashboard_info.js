@@ -839,11 +839,12 @@ netdataDashboard.submenu = {
     },
 
     'filesystem.file_access': {
-        title: 'file access',
+        title: 'file access (eBPF)',
         info: 'When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows file access per <a href="#menu_apps_submenu_file_access">application</a>.'
     },
 
     'apps.file_access': {
+        title: 'file access (eBPF)',
         info: 'Netdata also gives a summary for this chart on <a href="#menu_filesystem_submenu_file_access">Filesystem submenu</a> (more details on <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#file" target="_blank">eBPF plugin file chart section</a>).'
     },
 
