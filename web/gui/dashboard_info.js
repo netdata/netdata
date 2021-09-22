@@ -1334,31 +1334,38 @@ netdataDashboard.context = {
             '<b>truncated</b> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
             '<b>checksum</b> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
     },
+
     'ip.mcast': {
         info: 'Total multicast traffic in the system.'
     },
+
     'ip.mcastpkts': {
         info: 'Total transferred multicast packets in the system.'
     },
+
     'ip.bcast': {
         info: 'Total broadcast traffic in the system.'
     },
+
     'ip.bcastpkts': {
         info: 'Total transferred broadcast packets in the system.'
     },
+
     'ip.ecnpkts': {
         info: 'Total number of received IP packets with ECN bits set in the system. '+
         '<b>CEP</b> - congestion encountered. '+
         '<b>NoECTP</b> - non ECN-capable transport. '+
         '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.'
     },
+
     'ip.tcpreorders': {
         info: 'TCP prevents out-of-order packets by either sequencing them in the correct order or by requesting the retransmission of out-of-order packets. '+
         '<b>Timestamp</b> - detected re-ordering using the timestamp option. '+
         '<b>SACK</b> - detected re-ordering using Selective Acknowledgment algorithm. '+
         '<b>FACK</b> - detected re-ordering using Forward Acknowledgment algorithm. '+
-        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.</b>'
+        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.'
     },
+
     'ip.tcpofo': {
         info: 'TCP maintains an out-of-order (OOO) queue to keep the OOO packets in the TCP communication. '+
         '<b>InQueue</b> - the TCP layer receives an OOO packet and has enough memory to queue it. '+
@@ -1366,6 +1373,7 @@ netdataDashboard.context = {
         '<b>Merged</b> - the received OOO packet has an overlay with the previous packet. '+
         'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>.'
     },
+
     'ip.tcpsyncookies': {
         info: '<a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> are used to mitigate SYN flood. '+
         '<b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
@@ -1374,6 +1382,7 @@ netdataDashboard.context = {
         '<b>Failed</b> - the MSS decoded from the SYN cookie is invalid. When this counter is incremented, '+
         'the received packet won’t be treated as a SYN cookie.'
     },
+
     'ip.tcpmemorypressures': {
         info: 'Number of times a socket was put in <b>memory pressure</b> due to a non fatal memory allocation failure (the kernel attempts to work around this situation by reducing the send buffers, etc).'
     },
