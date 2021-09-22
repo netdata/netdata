@@ -727,6 +727,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                     return;
                 } else {
                     struct aclk_database_cmd cmd;
+                    memset(&cmd, 0, sizeof(cmd));
                     // TODO: handle timestamp
 //                    if (!wc->chart_reset_count)
 //                        wc->chart_delay = now_realtime_sec() + 60;
