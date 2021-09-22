@@ -95,7 +95,15 @@ netdataDashboard.menu = {
     'ipvs': {
         title: 'IP Virtual Server',
         icon: '<i class="fas fa-eye"></i>',
-        info: '<a href="http://www.linuxvirtualserver.org/software/ipvs.html" target="_blank">IPVS (IP Virtual Server)</a> implements transport-layer load balancing inside the Linux kernel, so called Layer-4 switching. IPVS running on a host acts as a load balancer at the front of a cluster of real servers, it can direct requests for TCP/UDP based services to the real servers, and makes services of the real servers to appear as a virtual service on a single IP address.'
+        info: '<p><a href="http://www.linuxvirtualserver.org/software/ipvs.html" target="_blank">IPVS (IP Virtual Server)</a> '+
+        'implements transport-layer load balancing inside the Linux kernel, so called Layer-4 switching. '+
+        'IPVS running on a host acts as a load balancer at the front of a cluster of real servers, '+
+        'it can direct requests for TCP/UDP based services to the real servers, '+
+        'and makes services of the real servers to appear as a virtual service on a single IP address.</p>'+
+        '<p>Netdata collects summary statistics, reading <code>/proc/net/ip_vs_stats</code>. '+
+        'To display the statistics information of services and their servers, run <code>ipvsadm -Ln --stats</code> '+
+        'or <code>ipvsadm -Ln --rate</code> for the rate statistics. '+
+        'For details, see <a href="https://linux.die.net/man/8/ipvsadm" target="_blank">ipvsadm(8)</a>.</p>'
     },
 
     'netfilter': {
@@ -1722,6 +1730,19 @@ netdataDashboard.context = {
         heads: [
             netdataDashboard.gaugeChart('New Connections', '12%', 'new', '#5555AA')
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // IPVS
+    'ipvs.sockets': {
+        info: 'Total created connections for all services and their servers. '+
+        'To see the IPVS connection table, run <code>ipvsadm -Lnc</code>.'
+    },
+    'ipvs.packets': {
+        info: 'Total transferred packets for all services and their servers.'
+    },
+    'ipvs.net': {
+        info: 'Total network traffic for all services and their servers.'
     },
 
     // ------------------------------------------------------------------------
