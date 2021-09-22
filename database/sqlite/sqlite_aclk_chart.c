@@ -94,7 +94,8 @@ static int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, 
     uuid_generate(unique_uuid);
 
     uuid_t claim_uuid;
-    uuid_parse(claim_id, claim_uuid);
+    if (uuid_parse(claim_id, claim_uuid))
+        return 1;
 
     rc = sqlite3_bind_blob(res_chart, 1, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
