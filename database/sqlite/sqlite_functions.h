@@ -39,6 +39,16 @@ struct node_instance_list {
 
 #define SQL_STORE_ACTIVE_DIMENSION \
     "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
+
+#define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
+    if (unlikely(!db_meta)) {                                                                                          \
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
+            return 1;                                                                                                  \
+        }                                                                                                              \
+        error_report("Database has not been initialized");                                                             \
+        return 1;                                                                                                      \
+    }
+
 extern int sql_init_database(void);
 extern void sql_close_database(void);
 
