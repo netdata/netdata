@@ -4076,6 +4076,20 @@ static void cgroup_main_cleanup(void *ptr) {
         sleep_usec(step);
     }
 
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        sem_close(shm_mutex_cgroup_ebpf);
+        sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
+    }
+
+    if (shm_cgroup_ebpf.header) {
+        munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
+    }
+
+    if (shm_fd_cgroup_ebpf > 0) {
+        close(shm_fd_cgroup_ebpf);
+        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
