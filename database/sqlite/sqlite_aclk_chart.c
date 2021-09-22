@@ -690,7 +690,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     debug(D_ACLK_SYNC,"START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
           sequence_id, created_at, batch_id);
     uuid_t node_uuid;
-    uuid_parse(node_id, node_uuid);
+    if (uuid_parse(node_id, node_uuid))
+        return;
 
     struct aclk_database_worker_config *wc  = NULL;
     rrd_wrlock();
