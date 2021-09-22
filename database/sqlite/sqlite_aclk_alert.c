@@ -113,11 +113,11 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    BUFFER *sql = buffer_create(1024);
-
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;
+
+    BUFFER *sql = buffer_create(1024);
 
     if (wc->alerts_start_seq_id != 0) {
         buffer_sprintf(
