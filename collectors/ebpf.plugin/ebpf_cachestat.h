@@ -12,7 +12,7 @@
 #define NETDATA_CACHESTAT_HIT_CHART "cachestat_hits"
 #define NETDATA_CACHESTAT_MISSES_CHART "cachestat_misses"
 
-#define NETDATA_CACHESTAT_SUBMENU "page cache (eBPF)"
+#define NETDATA_CACHESTAT_SUBMENU "page_cache"
 
 #define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
