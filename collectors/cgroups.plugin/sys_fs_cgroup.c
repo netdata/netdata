@@ -94,6 +94,11 @@ static struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
     { .name = NULL,      .setting = SYSTEMD_CGROUP_ERR     },
 };
 
+// Shared memory with information from detected cgroups
+netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf = {NULL, NULL};
+static int shm_fd_cgroup_ebpf = -1;
+sem_t *shm_mutex_cgroup_ebpf = SEM_FAILED;
+
 /* on Fed systemd is not in PATH for some reason */
 #define SYSTEMD_CMD_RHEL "/usr/lib/systemd/systemd --version"
 #define SYSTEMD_HIERARCHY_STRING "default-hierarchy="
@@ -459,6 +464,47 @@ void read_cgroup_plugin_configuration() {
     }
 
     mountinfo_free_all(root);
+}
+
+void netdata_cgroup_ebpf_initialize_shm()
+{
+    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0666);
+    if (shm_fd_cgroup_ebpf < 0) {
+        error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
+        return;
+    }
+
+    size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
+    if (ftruncate(shm_fd_cgroup_ebpf, length)) {
+        error("Cannot set size for shared memory.");
+        goto end_init_shm;
+    }
+
+    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *) mmap(NULL, length,
+                                                                       PROT_READ | PROT_WRITE, MAP_SHARED,
+                                                                       shm_fd_cgroup_ebpf, 0);
+
+    if (!shm_cgroup_ebpf.header) {
+        error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        goto end_init_shm;
+    }
+    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) (shm_cgroup_ebpf.header +
+                                                              sizeof(netdata_ebpf_cgroup_shm_header_t));
+
+    shm_mutex_cgroup_ebpf = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT,
+                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
+
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        return;
+    }
+
+    error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
+    munmap(shm_cgroup_ebpf.header, length);
+
+end_init_shm:
+    close(shm_fd_cgroup_ebpf);
+    shm_fd_cgroup_ebpf = -1;
+    shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
 }
 
 // ----------------------------------------------------------------------------
@@ -4028,6 +4074,7 @@ void *cgroups_main(void *ptr) {
     int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
 
     read_cgroup_plugin_configuration();
+    netdata_cgroup_ebpf_initialize_shm();
 
     RRDSET *stcpu_thread = NULL;
 

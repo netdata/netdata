@@ -46,6 +46,9 @@ typedef struct netdata_ebpf_cgroup_shm {
     netdata_ebpf_cgroup_shm_body_t *body;
 } netdata_ebpf_cgroup_shm_t;
 
+#define NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME "netdata_shm_cgroup_ebpf"
+#define NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME "/netdata_sem_cgroup_ebpf"
+
 #include "../proc.plugin/plugin_proc.h"
 
 #else // (TARGET_OS == OS_LINUX)
