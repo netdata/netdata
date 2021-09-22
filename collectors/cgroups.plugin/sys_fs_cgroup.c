@@ -595,10 +595,6 @@ struct cgroup_network_interface {
     struct cgroup_network_interface *next;
 };
 
-#define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
-#define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
-#define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
-
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
 struct cgroup {
     uint32_t options;
