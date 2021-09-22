@@ -24,6 +24,28 @@ extern void *cgroups_main(void *ptr);
 #define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
 #define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
 
+typedef struct netdata_ebpf_cgroup_shm_header {
+    int cgroup_root_count;
+    int cgroup_max;
+    int systemd_enabled;
+    size_t body_length;
+} netdata_ebpf_cgroup_shm_header_t;
+
+typedef struct netdata_ebpf_cgroup_shm_body {
+    // Considering what is exposed in this link https://en.wikipedia.org/wiki/Comparison_of_file_systems#Limits
+    // this length is enough to store what we want.
+    char name[256];
+    uint32_t hash;
+    uint32_t options;
+    int enabled;
+    char path[FILENAME_MAX + 1];
+} netdata_ebpf_cgroup_shm_body_t;
+
+typedef struct netdata_ebpf_cgroup_shm {
+    netdata_ebpf_cgroup_shm_header_t *header;
+    netdata_ebpf_cgroup_shm_body_t *body;
+} netdata_ebpf_cgroup_shm_t;
+
 #include "../proc.plugin/plugin_proc.h"
 
 #else // (TARGET_OS == OS_LINUX)
