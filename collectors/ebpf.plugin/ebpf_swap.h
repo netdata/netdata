@@ -12,7 +12,7 @@
 #define NETDATA_MEM_SWAP_CHART "swapcalls"
 #define NETDATA_MEM_SWAP_READ_CHART "swap_read_call"
 #define NETDATA_MEM_SWAP_WRITE_CHART "swap_write_call"
-#define NETDATA_SWAP_SUBMENU "swap (eBPF)"
+#define NETDATA_SWAP_SUBMENU "swap"
 
 // configuration file
 #define NETDATA_DIRECTORY_SWAP_CONFIG_FILE "swap.conf"

@@ -1062,6 +1062,10 @@ netdataDashboard.context = {
         info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
     },
 
+    'system.swapcalls': {
+        info: 'Monitor calls for functions <code>swap_readpage</code>code> and <code>swap_writepage</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows swap access per <a href="#menu_apps_submenu_swap">application</a>.'
+    },
+
     'system.ipc_semaphores': {
         info: 'Number of allocated System V IPC semaphores. '+
         'The system-wide limit on the number of semaphores in all semaphore sets is specified in <code>/proc/sys/kernel/sem</code> file (2nd field).'
@@ -3955,7 +3959,7 @@ netdataDashboard.context = {
     },
 
     'apps.swap_read_call': {
-        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory.'
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_swap">System overview</a>.'
     },
 
     'apps.swap_write_call': {
