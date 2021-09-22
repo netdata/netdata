@@ -78,8 +78,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - name: Run eslint
+      - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
+        with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
 
