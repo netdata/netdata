@@ -466,6 +466,19 @@ void read_cgroup_plugin_configuration() {
     mountinfo_free_all(root);
 }
 
+void netdata_cgroup_ebpf_set_values(size_t length)
+{
+    sem_wait(shm_mutex_cgroup_ebpf);
+
+    shm_cgroup_ebpf.header->cgroup_max = cgroup_root_max;
+    shm_cgroup_ebpf.header->systemd_enabled = cgroup_enable_systemd_services |
+                                              cgroup_enable_systemd_services_detailed_memory |
+                                              cgroup_used_memory;
+    shm_cgroup_ebpf.header->body_length = length;
+
+    sem_post(shm_mutex_cgroup_ebpf);
+}
+
 void netdata_cgroup_ebpf_initialize_shm()
 {
     shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0666);
@@ -495,6 +508,7 @@ void netdata_cgroup_ebpf_initialize_shm()
                                      S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
 
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        netdata_cgroup_ebpf_set_values(length);
         return;
     }
 
