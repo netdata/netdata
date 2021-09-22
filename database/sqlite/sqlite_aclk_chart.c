@@ -94,7 +94,8 @@ static int aclk_add_chart_payload(char *uuid_str, uuid_t *uuid, char *claim_id, 
     uuid_generate(unique_uuid);
 
     uuid_t claim_uuid;
-    uuid_parse(claim_id, claim_uuid);
+    if (uuid_parse(claim_id, claim_uuid))
+        return 1;
 
     rc = sqlite3_bind_blob(res_chart, 1, &unique_uuid , sizeof(unique_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
@@ -336,6 +337,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     freez(payload_list);
     freez(payload_list_size);
+    freez(payload_list_max_size);
     freez(position_list);
     freez(is_dim);
 
@@ -688,7 +690,8 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     debug(D_ACLK_SYNC,"START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
           sequence_id, created_at, batch_id);
     uuid_t node_uuid;
-    uuid_parse(node_id, node_uuid);
+    if (uuid_parse(node_id, node_uuid))
+        return;
 
     struct aclk_database_worker_config *wc  = NULL;
     rrd_wrlock();
@@ -724,6 +727,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                     return;
                 } else {
                     struct aclk_database_cmd cmd;
+                    memset(&cmd, 0, sizeof(cmd));
                     // TODO: handle timestamp
 //                    if (!wc->chart_reset_count)
 //                        wc->chart_delay = now_realtime_sec() + 60;
