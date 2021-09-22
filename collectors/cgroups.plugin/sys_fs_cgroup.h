@@ -31,10 +31,12 @@ typedef struct netdata_ebpf_cgroup_shm_header {
     size_t body_length;
 } netdata_ebpf_cgroup_shm_header_t;
 
+#define CGROUP_EBPF_NAME_SHARED_LENGTH 256
+
 typedef struct netdata_ebpf_cgroup_shm_body {
     // Considering what is exposed in this link https://en.wikipedia.org/wiki/Comparison_of_file_systems#Limits
     // this length is enough to store what we want.
-    char name[256];
+    char name[CGROUP_EBPF_NAME_SHARED_LENGTH];
     uint32_t hash;
     uint32_t options;
     int enabled;

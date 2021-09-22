@@ -2110,6 +2110,74 @@ static inline void copy_discovered_cgroups()
     cgroup_root = discovered_cgroup_root;
 }
 
+static void is_there_cgroup_procs(netdata_ebpf_cgroup_shm_body_t *out, char *id)
+{
+    struct stat buf;
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_cpuset_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_blkio_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_memory_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_devices_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, id);
+    if (likely(stat(out->path, &buf) == 0)) {
+        return;
+    }
+
+    out->path[0] = '\0';
+    out->enabled = 0;
+}
+
+static inline void share_cgroups()
+{
+    struct cgroup *cg;
+    int count;
+    struct stat buf;
+
+    if (shm_mutex_cgroup_ebpf == SEM_FAILED) {
+        return;
+    }
+    sem_wait(shm_mutex_cgroup_ebpf);
+
+    for (cg = cgroup_root, count = 0; cg ; cg = cg->next, count++) {
+        netdata_ebpf_cgroup_shm_body_t *ptr = &shm_cgroup_ebpf.body[count];
+        char *prefix = (cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE) ? "" : "cgroup_";
+        snprintfz(ptr->name, CGROUP_EBPF_NAME_SHARED_LENGTH - 1, "%s%s", prefix, cg->chart_title);
+        ptr->hash = simple_hash(ptr->name);
+        ptr->options = cg->options;
+        ptr->enabled = cg->enabled;
+        if (cgroup_use_unified_cgroups) {
+            snprintfz(ptr->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
+            if (likely(stat(ptr->path, &buf) == -1)) {
+                ptr->path[0] = '\0';
+                ptr->enabled = 0;
+            }
+        } else {
+            is_there_cgroup_procs(ptr, cg->id);
+        }
+
+        debug(D_CGROUP, "cgroup shared: NAME=%s, ENABLED=%d", ptr->name, ptr->enabled);
+    }
+
+    shm_cgroup_ebpf.header->cgroup_root_count = count;
+    sem_post(shm_mutex_cgroup_ebpf);
+}
+
 static inline void find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
 
@@ -2165,6 +2233,8 @@ static inline void find_all_cgroups() {
     cleanup_all_cgroups();
     copy_discovered_cgroups();
     uv_mutex_unlock(&cgroup_root_mutex);
+
+    share_cgroups();
 
     debug(D_CGROUP, "done searching for cgroups");
 }
