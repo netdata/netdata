@@ -336,6 +336,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     freez(payload_list);
     freez(payload_list_size);
+    freez(payload_list_max_size);
     freez(position_list);
     freez(is_dim);
 
