@@ -32,8 +32,6 @@ jobs:
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/i386, arch: i386}
           - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/amd64, arch: amd64, alias: bullseye}
           - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/i386, arch: i386, alias: bullseye}
-          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
-          - {distro: ubuntu, version: "16.04", pkgclouddistro: ubuntu/xenial, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}

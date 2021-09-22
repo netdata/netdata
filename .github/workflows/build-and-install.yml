@@ -49,7 +49,6 @@ jobs:
           - 'ubuntu:21.04'
           - 'ubuntu:20.04'
           - 'ubuntu:18.04'
-          - 'ubuntu:16.04'
         include:
           - distro: 'alpine:edge'
             pre: 'apk add -U bash'
@@ -102,9 +101,6 @@ jobs:
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'ubuntu:18.04'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'ubuntu:16.04'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
     runs-on: ubuntu-latest
