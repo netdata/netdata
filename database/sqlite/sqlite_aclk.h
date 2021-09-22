@@ -198,7 +198,8 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
     if (unlikely(!node_id))
         return NULL;
 
-    uuid_parse(node_id, node_uuid);
+    if (uuid_parse(node_id, node_uuid))
+        return NULL;
 
     RRDHOST *host = localhost;
     while(host) {
