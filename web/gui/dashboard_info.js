@@ -734,7 +734,23 @@ netdataDashboard.submenu = {
     },
 
     'ip.ecn': {
-        info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> is a TCP extension that allows end-to-end notification of network congestion without dropping packets. ECN is an optional feature that may be used between two ECN-enabled endpoints when the underlying network infrastructure also supports it.'
+        info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
+        'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
+        'ECN is an optional feature that may be used between two ECN-enabled endpoints when '+
+        'the underlying network infrastructure also supports it.'
+    },
+
+    'ip.multicast': {
+        info: '<a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">IP multicast</a> is a technique for '+
+        'one-to-many communication over an IP network. '+
+        'Multicast uses network infrastructure efficiently by requiring the source to send a packet only once, '+
+        'even if it needs to be delivered to a large number of receivers. '+
+        'The nodes in the network take care of replicating the packet to reach multiple receivers only when necessary.'
+    },
+    'ip.broadcast': {
+        info: 'In computer networking, '+
+        '<a href="https://en.wikipedia.org/wiki/Broadcasting_(networking)" target="_blank">broadcasting</a> refers to transmitting a packet that will be received by every device on the network. '+
+        'In practice, the scope of the broadcast is limited to a broadcast domain.'
     },
 
     'netfilter.conntrack': {
@@ -1314,9 +1330,58 @@ netdataDashboard.context = {
 
     'ip.inerrors': {
         info: 'Errors encountered during the reception of IP packets. ' +
-            '<code>noroutes</code> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
-            '<code>truncated</code> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
-            '<code>checksum</code> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+            '<b>noroutes</b> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
+            '<b>truncated</b> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
+            '<b>checksum</b> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+    },
+
+    'ip.mcast': {
+        info: 'Total multicast traffic in the system.'
+    },
+
+    'ip.mcastpkts': {
+        info: 'Total transferred multicast packets in the system.'
+    },
+
+    'ip.bcast': {
+        info: 'Total broadcast traffic in the system.'
+    },
+
+    'ip.bcastpkts': {
+        info: 'Total transferred broadcast packets in the system.'
+    },
+
+    'ip.ecnpkts': {
+        info: 'Total number of received IP packets with ECN bits set in the system. '+
+        '<b>CEP</b> - congestion encountered. '+
+        '<b>NoECTP</b> - non ECN-capable transport. '+
+        '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.'
+    },
+
+    'ip.tcpreorders': {
+        info: 'TCP prevents out-of-order packets by either sequencing them in the correct order or by requesting the retransmission of out-of-order packets. '+
+        '<b>Timestamp</b> - detected re-ordering using the timestamp option. '+
+        '<b>SACK</b> - detected re-ordering using Selective Acknowledgment algorithm. '+
+        '<b>FACK</b> - detected re-ordering using Forward Acknowledgment algorithm. '+
+        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.'
+    },
+
+    'ip.tcpofo': {
+        info: 'TCP maintains an out-of-order (OOO) queue to keep the OOO packets in the TCP communication. '+
+        '<b>InQueue</b> - the TCP layer receives an OOO packet and has enough memory to queue it. '+
+        '<b>Dropped</b> - the TCP layer receives an OOO packet but does not have enough memory, so drops it. '+
+        '<b>Merged</b> - the received OOO packet has an overlay with the previous packet. '+
+        'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>. '+
+        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.'
+    },
+
+    'ip.tcpsyncookies': {
+        info: '<a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> are used to mitigate SYN flood. '+
+        '<b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
+        '<b>Sent</b> - an application was not able to accept a connection fast enough, so the kernel could not store '+
+        'an entry in the queue for this connection. Instead of dropping it, it sent a SYN cookie to the client. '+
+        '<b>Failed</b> - the MSS decoded from the SYN cookie is invalid. When this counter is incremented, '+
+        'the received packet won’t be treated as a SYN cookie.'
     },
 
     'ip.tcpmemorypressures': {
