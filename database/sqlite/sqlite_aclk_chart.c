@@ -5,15 +5,6 @@
 
 #include "../../aclk/aclk_charts_api.h"
 
-#define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
-    if (unlikely(!db_meta)) {                                                                                          \
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
-            return 1;                                                                                                  \
-        }                                                                                                              \
-        error_report("Database has not been initialized");                                                             \
-        return 1;                                                                                                      \
-    }
-
 static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc,
                                           void *data, enum aclk_database_opcode opcode)
 {
