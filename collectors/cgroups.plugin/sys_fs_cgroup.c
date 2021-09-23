@@ -2134,11 +2134,6 @@ static void is_there_cgroup_procs(netdata_ebpf_cgroup_shm_body_t *out, char *id)
         return;
     }
 
-    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
-        return;
-    }
-
     out->path[0] = '\0';
     out->enabled = 0;
 }
