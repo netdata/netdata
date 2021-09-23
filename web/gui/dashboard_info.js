@@ -1392,13 +1392,13 @@ netdataDashboard.context = {
         '<p><b>Received</b> - packets received by the IP layer. '+
         'This counter will be increased even if the packet is dropped later. '+
         '<b>Sent</b> - packets sent via IP layer, for both single cast and multicast packets. '+
-        'That counter does not include any packets counted in <b>Forwarded</b>. '+
+        'This counter does not include any packets counted in <b>Forwarded</b>. '+
         '<b>Forwarded</b> - input packets for which this host was not their final IP destination, '+
         'as a result of which an attempt was made to find a route to forward them to that final destination. '+
         'In hosts which do not act as IP Gateways, this counter will include only those packets which were '+
         '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a>, '+
         'and the Source-Route option processing was successful. '+
-        '<b>Delivered</b> - packets delivered to the upper layer protocols, e.g. TCP, UDP, ICMP and so on.</p>'
+        '<b>Delivered</b> - packets delivered to the upper layer protocols, e.g. TCP, UDP, ICMP, and so on.</p>'
     },
 
     'ipv4.fragsout': {
@@ -1448,7 +1448,7 @@ netdataDashboard.context = {
         'e.g. bad ICMP checksums, bad length, etc. '+
         '<b>OutErrors</b> - ICMP messages which this host did not send due to '+
         'problems discovered within ICMP such as a lack of buffers. '+
-        'This counter does no include errors discovered outside the ICMP layer '+
+        'This counter does not include errors discovered outside the ICMP layer '+
         'such as the inability of IP to route the resultant datagram. '+
         '<b>InCsumErrors</b> - received ICMP messages with bad checksum.</p>'
     },
@@ -1491,9 +1491,9 @@ netdataDashboard.context = {
     'ipv4.tcppackets': {
         info: '<p>The number of packets transferred by the TCP layer.</p>'+
         '</p><b>Received</b> - received packets, including those received in error, '+
-        'such as checksum error, invalid TCP header and so on. '+
+        'such as checksum error, invalid TCP header, and so on. '+
         '<b>Sent</b> - sent packets, excluding the retransmitted packets. '+
-        'But it includes the SYN, ACK and RST packets.</p>'
+        'But it includes the SYN, ACK, and RST packets.</p>'
     },
 
     'ipv4.tcpsock': {
