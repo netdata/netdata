@@ -1371,7 +1371,8 @@ netdataDashboard.context = {
         '<b>InQueue</b> - the TCP layer receives an OOO packet and has enough memory to queue it. '+
         '<b>Dropped</b> - the TCP layer receives an OOO packet but does not have enough memory, so drops it. '+
         '<b>Merged</b> - the received OOO packet has an overlay with the previous packet. '+
-        'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>.'
+        'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>. '+
+        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.'
     },
 
     'ip.tcpsyncookies': {
