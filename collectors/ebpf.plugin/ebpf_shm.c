@@ -444,7 +444,7 @@ static void ebpf_create_shm_charts()
         NETDATA_SYSTEM_IPC_SHM_SUBMENU,
         NULL,
         NETDATA_EBPF_CHART_TYPE_LINE,
-        202,
+        NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS,
         ebpf_create_global_dimension,
         shm_publish_aggregated,
         NETDATA_SHM_END,
