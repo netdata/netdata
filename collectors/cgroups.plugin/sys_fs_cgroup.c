@@ -481,7 +481,7 @@ void netdata_cgroup_ebpf_set_values(size_t length)
 
 void netdata_cgroup_ebpf_initialize_shm()
 {
-    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0666);
+    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
     if (shm_fd_cgroup_ebpf < 0) {
         error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
         return;
