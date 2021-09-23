@@ -1452,8 +1452,119 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // IPv4
 
+    'ipv4.packets': {
+        info: '<p>IPv4 packets statistics for this host.</p>'+
+        '<p><b>Received</b> - packets received by the IP layer. '+
+        'This counter will be increased even if the packet is dropped later. '+
+        '<b>Sent</b> - packets sent via IP layer, for both single cast and multicast packets. '+
+        'This counter does not include any packets counted in <b>Forwarded</b>. '+
+        '<b>Forwarded</b> - input packets for which this host was not their final IP destination, '+
+        'as a result of which an attempt was made to find a route to forward them to that final destination. '+
+        'In hosts which do not act as IP Gateways, this counter will include only those packets which were '+
+        '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a>, '+
+        'and the Source-Route option processing was successful. '+
+        '<b>Delivered</b> - packets delivered to the upper layer protocols, e.g. TCP, UDP, ICMP, and so on.</p>'
+    },
+
+    'ipv4.fragsout': {
+        info: '<p><a href="https://en.wikipedia.org/wiki/IPv4#Fragmentation" target="_blank">IPv4 fragmentation</a> '+
+        'statistics for this system.</p>'+
+        '<p><b>OK</b> - packets that have been successfully fragmented. '+
+        '<b>Failed</b> - packets that have been discarded because they needed to be fragmented '+
+        'but could not be, e.g. due to <i>Don\'t Fragment</i> (DF) flag was set. '+
+        '<b>Created</b> - fragments that have been generated as a result of fragmentation.</p>'
+    },
+
+    'ipv4.fragsin': {
+        info: '<p><a href="https://en.wikipedia.org/wiki/IPv4#Reassembly" target="_blank">IPv4 reassembly</a> '+
+        'statistics for this system.</p>'+
+        '<p><b>OK</b> - packets that have been successfully reassembled. '+
+        '<b>Failed</b> - failures detected by the IP reassembly algorithm. '+
+        'This is not necessarily a count of discarded IP fragments since some algorithms '+
+        'can lose track of the number of fragments by combining them as they are received. '+
+        '<b>All</b> - received IP fragments which needed to be reassembled.</p>'
+    },
+
+    'ipv4.errors': {
+        info: '<p>The number of discarded IPv4 packets.</p>'+
+        '<p><b>InDiscards</b>, <b>OutDiscards</b> - inbound and outbound packets which were chosen '+
+        'to be discarded even though no errors had been '+
+        'detected to prevent their being deliverable to a higher-layer protocol. '+
+        '<b>InHdrErrors</b> - input packets that have been discarded due to errors in their IP headers, including '+
+        'bad checksums, version number mismatch, other format errors, time-to-live exceeded, '+
+        'errors discovered in processing their IP options, etc. '+
+        '<b>OutNoRoutes</b> - packets that have been discarded because no route could be found '+
+        'to transmit them to their destination. This includes any packets which a host cannot route '+
+        'because all of its default gateways are down. '+
+        '<b>InAddrErrors</b> - input packets that have been discarded due to invalid IP address or '+
+        'the destination IP address is not a local address and IP forwarding is not enabled. '+
+        '<b>InUnknownProtos</b> - input packets which were discarded because of an unknown or unsupported protocol.</p>'
+    },
+
+    'ipv4.icmp': {
+        info: '<p>The number of transferred IPv4 ICMP messages.</p>'+
+        '<p><b>Received</b>, <b>Sent</b> - ICMP messages which the host received and attempted to send. '+
+        'Both these counters include errors.</p>'
+    },
+
+    'ipv4.icmp_errors': {
+        info: '<p>The number of IPv4 ICMP errors.</p>'+
+        '<p><b>InErrors</b> - received ICMP messages but determined as having ICMP-specific errors, '+
+        'e.g. bad ICMP checksums, bad length, etc. '+
+        '<b>OutErrors</b> - ICMP messages which this host did not send due to '+
+        'problems discovered within ICMP such as a lack of buffers. '+
+        'This counter does not include errors discovered outside the ICMP layer '+
+        'such as the inability of IP to route the resultant datagram. '+
+        '<b>InCsumErrors</b> - received ICMP messages with bad checksum.</p>'
+    },
+
+    'ipv4.icmpmsg': {
+        info: 'The number of transferred '+
+        '<a href="https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml" target="_blank">IPv4 ICMP control messages</a>.'
+    },
+
+    'ipv4.udppackets': {
+        info: 'The number of transferred UDP packets.'
+    },
+
+    'ipv4.udperrors': {
+        info: '<p>The number of errors encountered during transferring UDP packets.</p>'+
+        '<b>RcvbufErrors</b> - receive buffer is full. '+
+        '<b>SndbufErrors</b> - send buffer is full, no kernel memory available, or '+
+        'the IP layer reported an error when trying to send the packet and no error queue has been setup. '+
+        '<b>InErrors</b> - that is an aggregated counter for all errors, excluding <b>NoPorts</b>. '+
+        '<b>NoPorts</b> - no application is listening at the destination port. '+
+        '<b>InCsumErrors</b> - a UDP checksum failure is detected. '+
+        '<b>IgnoredMulti</b> - ignored multicast packets.'
+    },
+
+    'ipv4.udplite': {
+        info: 'The number of transferred UDP-Lite packets.'
+    },
+
+    'ipv4.udplite_errors': {
+        info: '<p>The number of errors encountered during transferring UDP-Lite packets.</p>'+
+        '<b>RcvbufErrors</b> - receive buffer is full. '+
+        '<b>SndbufErrors</b> - send buffer is full, no kernel memory available, or '+
+        'the IP layer reported an error when trying to send the packet and no error queue has been setup. '+
+        '<b>InErrors</b> - that is an aggregated counter for all errors, excluding <b>NoPorts</b>. '+
+        '<b>NoPorts</b> - no application is listening at the destination port. '+
+        '<b>InCsumErrors</b> - a UDP checksum failure is detected. '+
+        '<b>IgnoredMulti</b> - ignored multicast packets.'
+    },
+
+    'ipv4.tcppackets': {
+        info: '<p>The number of packets transferred by the TCP layer.</p>'+
+        '</p><b>Received</b> - received packets, including those received in error, '+
+        'such as checksum error, invalid TCP header, and so on. '+
+        '<b>Sent</b> - sent packets, excluding the retransmitted packets. '+
+        'But it includes the SYN, ACK, and RST packets.</p>'
+    },
+
     'ipv4.tcpsock': {
-        info: 'The number of established TCP connections (known as <code>CurrEstab</code>). This is a snapshot of the established connections at the time of measurement (i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
+        info: 'The number of TCP connections for which the current state is either ESTABLISHED or CLOSE-WAIT. '+
+        'This is a snapshot of the established connections at the time of measurement '+
+        '(i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
     },
 
     'ipv4.tcpopens': {
