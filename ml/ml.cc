@@ -17,6 +17,9 @@ void ml_init(void) {
 }
 
 void ml_new_host(RRDHOST *RH) {
+    if (!Cfg.EnableAnomalyDetection)
+        return;
+
     if (simple_pattern_matches(Cfg.SP_HostsToSkip, RH->hostname))
         return;
 

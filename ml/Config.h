@@ -9,6 +9,8 @@ namespace ml {
 
 class Config {
 public:
+    bool EnableAnomalyDetection;
+
     Seconds TrainSecs;
     Seconds MinTrainSecs;
     Seconds TrainEvery;

@@ -17,6 +17,8 @@ Config ml::Cfg;
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = "ml";
 
+    Cfg.EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+
     Cfg.TrainSecs = Seconds{config_get_number(ConfigSectionML, "num secs to train", 4 * 60)};
     Cfg.MinTrainSecs = Seconds{config_get_number(ConfigSectionML, "minimum num secs to train", 1 * 60)};
     Cfg.TrainEvery = Seconds{config_get_number(ConfigSectionML, "train every secs", 1 * 60 )};
