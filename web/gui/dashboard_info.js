@@ -89,7 +89,12 @@ netdataDashboard.menu = {
     'sctp': {
         title: 'SCTP Networking',
         icon: '<i class="fas fa-cloud"></i>',
-        info: '<a href="https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol" target="_blank">Stream Control Transmission Protocol (SCTP)</a> is a computer network protocol which operates at the transport layer and serves a role similar to the popular protocols TCP and UDP. SCTP provides some of the features of both UDP and TCP: it is message-oriented like UDP and ensures reliable, in-sequence transport of messages with congestion control like TCP. It differs from those protocols by providing multi-homing and redundant paths to increase resilience and reliability.'
+        info: '<p><a href="https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol" target="_blank">Stream Control Transmission Protocol (SCTP)</a> '+
+        'is a computer network protocol which operates at the transport layer and serves a role similar to the popular '+
+        'protocols TCP and UDP. SCTP provides some of the features of both UDP and TCP: it is message-oriented like UDP '+
+        'and ensures reliable, in-sequence transport of messages with congestion control like TCP. '+
+        'It differs from those protocols by providing multi-homing and redundant paths to increase resilience and reliability.</p>'+
+        '<p>Netdata collects SCTP metrics reading the <code>/proc/net/sctp/snmp</code> file.</p>'
     },
 
     'ipvs': {
@@ -1583,6 +1588,45 @@ netdataDashboard.context = {
             + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
             + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
+    },
+
+    // ------------------------------------------------------------------------
+    // SCTP
+
+    'sctp.established': {
+        info: 'The number of associations for which the current state is either '+
+        'ESTABLISHED, SHUTDOWN-RECEIVED or SHUTDOWN-PENDING.'
+    },
+
+    'sctp.transitions': {
+        info: '<p>The number of times that associations have made a direct transition between states.</p>'+
+        '<p><b>Active</b> - from COOKIE-ECHOED to ESTABLISHED. The upper layer initiated the association attempt. '+
+        '<b>Passive</b> - from CLOSED to ESTABLISHED. The remote endpoint initiated the association attempt. '+
+        '<b>Aborted</b> - from any state to CLOSED using the primitive ABORT. Ungraceful termination of the association. '+
+        '<b>Shutdown</b> - from SHUTDOWN-SENT or SHUTDOWN-ACK-SENT to CLOSED. Graceful termination of the association.</p>'
+    },
+
+    'sctp.packets': {
+        info: '<p>The number of transferred SCTP packets.</p>'+
+        '<p><b>Received</b> - includes duplicate packets. '+
+        '<b>Sent</b> - includes retransmitted DATA chunks.</p>'
+    },
+
+    'sctp.packet_errors': {
+        info: '<p>The number of errors encountered during receiving SCTP packets.</p>'+
+        '<p><b>Invalid</b> - packets for which the receiver was unable to identify an appropriate association. '+
+        '<b>Checksum</b> - packets with an invalid checksum.</p>'
+    },
+
+    'sctp.fragmentation': {
+        info: '<p>The number of fragmented and reassembled SCTP messages.</p>'+
+        '<p><b>Reassembled</b> - reassembled user messages, after conversion into DATA chunks. '+
+        '<b>Fragmented</b> - user messages that have to be fragmented because of the MTU.</p>'
+    },
+
+    'sctp.chunks': {
+        info: 'The number of transferred control, ordered, and unordered DATA chunks. '+
+        'Retransmissions and duplicates are not included.'
     },
 
     // ------------------------------------------------------------------------
