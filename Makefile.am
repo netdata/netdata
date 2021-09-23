@@ -39,6 +39,7 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    ml/kmeans/dlib \
     README.md \
     LICENSE \
     REDISTRIBUTED.md \
@@ -117,6 +118,7 @@ SUBDIRS += \
     claim \
     parser \
     spawn \
+    ml \
     $(NULL)
 
 if ENABLE_ACLK
