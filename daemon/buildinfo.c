@@ -37,6 +37,12 @@
 #define FEAT_NATIVE_HTTPS 0
 #endif
 
+#ifdef ENABLE_ML
+#define FEAT_ML 1
+#else
+#define FEAT_ML 0
+#endif
+
 // Optional libraries
 
 #ifdef ENABLE_JSONC
@@ -224,6 +230,7 @@ void print_build_info(void) {
     printf("    ACLK-NG New Cloud Protocol: %s\n", FEAT_YES_NO(NEW_CLOUD_PROTO));
     printf("    ACLK Legacy:                %s\n", FEAT_YES_NO(FEAT_ACLK_LEGACY));
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
+    printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
 
     printf("Libraries:\n");
     printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
@@ -282,7 +289,8 @@ void print_build_info_json(void) {
     printf("    \"aclk-ng-new-cloud-proto\": %s,\n", FEAT_JSON_BOOL(NEW_CLOUD_PROTO));
     printf("    \"aclk-legacy\": %s,\n", FEAT_JSON_BOOL(FEAT_ACLK_LEGACY));
 
-    printf("    \"tls-host-verify\": %s\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
+    printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
+    printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
     printf("  },\n");
 
     printf("  \"libs\": {\n");
