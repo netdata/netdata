@@ -1657,11 +1657,11 @@ netdataDashboard.context = {
         '<b>IgnoredMulti</b> - ignored multicast packets.'
     },
 
-    'ipv6.udplite': {
+    'ipv6.udplitepackets': {
         info: 'The number of transferred UDP-Lite packets.'
     },
 
-    'ipv6.udplite_errors': {
+    'ipv6.udpliteerrors': {
         info: '<p>The number of errors encountered during transferring UDP-Lite packets.</p>'+
         '<p><b>RcvbufErrors</b> - receive buffer is full. '+
         '<b>SndbufErrors</b> - send buffer is full, no kernel memory available, or '+
