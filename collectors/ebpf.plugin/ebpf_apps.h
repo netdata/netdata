@@ -14,6 +14,7 @@
 #define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net"
+#define NETDATA_APPS_IPC_SHM_GROUP "ipc shared memory"
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
@@ -24,6 +25,7 @@
 #include "ebpf_cachestat.h"
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
+#include "ebpf_shm.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
@@ -122,6 +124,7 @@ struct target {
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
+    netdata_publish_shm_t shm;
 
     /* These variables are not necessary for eBPF collector
     kernel_uint_t minflt;

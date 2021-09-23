@@ -1105,6 +1105,10 @@ netdataDashboard.context = {
         'The run-time limit on the maximum  shared memory segment size that can be created is specified in <code>/proc/sys/kernel/shmmax</code> file.'
     },
 
+    'system.shared_memory_calls': {
+        info: 'Monitor calls to functions <code>shmget</code>, <code>shmat</code>, <code>shmdt</code> and <code>shmctl</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows shared memory system call usage <a href="#menu_apps_submenu_ipc_shared_memory">per application</a>.'
+    },
+
     'system.message_queue_messages': {
         info: 'Number of messages that are currently present in System V IPC message queues.'
     },
