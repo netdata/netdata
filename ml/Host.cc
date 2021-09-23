@@ -161,9 +161,7 @@ void DetectableHost::detectOnce() {
     BitRateWindow::Edge Edge = P.first;
     size_t WindowLength = P.second;
 
-    // TODO: check if we should reset on idle's loop as well.
-    bool ResetBitCounter = (Edge.first == BitRateWindow::State::BelowThreshold) &&
-                           (Edge.second == BitRateWindow::State::BelowThreshold);
+    bool ResetBitCounter = (Edge.first != BitRateWindow::State::AboveThreshold);
     bool NewAnomalyEvent = (Edge.first == BitRateWindow::State::AboveThreshold) &&
                            (Edge.second == BitRateWindow::State::Idle);
 
