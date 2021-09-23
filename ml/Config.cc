@@ -19,9 +19,9 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
 
-    Cfg.TrainSecs = Seconds{config_get_number(ConfigSectionML, "num secs to train", 4 * 60)};
-    Cfg.MinTrainSecs = Seconds{config_get_number(ConfigSectionML, "minimum num secs to train", 1 * 60)};
-    Cfg.TrainEvery = Seconds{config_get_number(ConfigSectionML, "train every secs", 1 * 60 )};
+    Cfg.TrainSecs = Seconds{config_get_number(ConfigSectionML, "num secs to train", 4 * 60 * 60)};
+    Cfg.MinTrainSecs = Seconds{config_get_number(ConfigSectionML, "minimum num secs to train", 1 * 60 * 60)};
+    Cfg.TrainEvery = Seconds{config_get_number(ConfigSectionML, "train every secs", 1 * 60 * 60 )};
 
     Cfg.DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     Cfg.SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -37,7 +37,10 @@ void Config::readMLConfig(void) {
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
-    std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training", "!system.cpu *");
+    std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
+            "!system.* !cpu.* !mem.* !disk.* !disk_* "
+            "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
+            "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
     std::stringstream SS;
