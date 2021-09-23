@@ -168,11 +168,12 @@ void DetectableHost::detectOnce() {
     bool NewAnomalyEvent = (Edge.first == BitRateWindow::State::AboveThreshold) &&
                            (Edge.second == BitRateWindow::State::Idle);
 
-    size_t NumAnomalousDimensions = 0;
     std::vector<std::pair<double, std::string>> DimsOverThreshold;
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
+
+        size_t NumAnomalousDimensions = 0;
 
         DimsOverThreshold.reserve(DimensionsMap.size());
 

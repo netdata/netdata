@@ -1237,7 +1237,7 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
-                ml_is_anomalous(rd, 0, false);
+                (void) ml_is_anomalous(rd, 0, false);
 
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
 //                rd->values[current_entry] = SN_EMPTY_SLOT;
@@ -1264,7 +1264,7 @@ static inline size_t rrdset_done_interpolate(
                 #endif
             }
             else {
-                ml_is_anomalous(rd, 0, false);
+                (void) ml_is_anomalous(rd, 0, false);
 
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING "

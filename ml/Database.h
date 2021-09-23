@@ -88,7 +88,7 @@ private:
     static const char *SQL_SELECT_ANOMALY_EVENTS;
 
 public:
-    Database(const std::string Path);
+    Database(const std::string &Path);
 
     ~Database();
 

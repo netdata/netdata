@@ -91,7 +91,7 @@ bool Statement::resetAndClear(bool Ret) {
     return Ret;
 }
 
-Database::Database(const std::string Path) {
+Database::Database(const std::string &Path) {
     // Get sqlite3 connection handle.
     int RC = sqlite3_open(Path.c_str(), &Conn);
     if (RC != SQLITE_OK) {
