@@ -436,14 +436,22 @@ static void ebpf_shm_allocate_global_vectors()
  */
 static void ebpf_create_shm_charts()
 {
-    ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_SHM_GLOBAL_CHART,
-                      "Calls to shared memory system calls.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_IPC_SHM_SUBMENU,
-                      NULL,
-                      NETDATA_EBPF_CHART_TYPE_LINE,
-                      202,
-                      ebpf_create_global_dimension,
-                      shm_publish_aggregated, NETDATA_SHM_END, NETDATA_EBPF_MODULE_NAME_SHM);
+    ebpf_create_chart(
+        NETDATA_EBPF_SYSTEM_GROUP,
+        NETDATA_SHM_GLOBAL_CHART,
+        "Calls to shared memory system calls.",
+        EBPF_COMMON_DIMENSION_CALL,
+        NETDATA_SYSTEM_IPC_SHM_SUBMENU,
+        NULL,
+        NETDATA_EBPF_CHART_TYPE_LINE,
+        202,
+        ebpf_create_global_dimension,
+        shm_publish_aggregated,
+        NETDATA_SHM_END,
+        NETDATA_EBPF_MODULE_NAME_SHM
+    );
+
+    fflush(stdout);
 }
 
 /**
