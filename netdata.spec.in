@@ -228,6 +228,9 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 # Conf step
 autoreconf -ivf
 %configure \
+	%ifnarch x86_64 i386
+	--disable-ebpf
+	%endif
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
 	--with-bundled-libJudy \
 	%endif
@@ -274,7 +277,9 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
+%ifarch x86_64 i386
 install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
+%endif
 
 # ###########################################################
 # Install cups.plugin
@@ -401,7 +406,9 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
+%ifarch x86_64 i386
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
+%endif
 
 %pre
 
