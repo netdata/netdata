@@ -6,7 +6,16 @@
 
 **Merged pull requests:**
 
+- Update ebpf dashboard [\#11547](https://github.com/netdata/netdata/pull/11547) ([thiagoftsm](https://github.com/thiagoftsm))
+- add proc\_net\_ip\_vs\_stats charts info [\#11546](https://github.com/netdata/netdata/pull/11546) ([ilyam8](https://github.com/ilyam8))
+- fix proc collector: Undefined state DEGRADED for zpool [\#11545](https://github.com/netdata/netdata/pull/11545) ([elelayan](https://github.com/elelayan))
+- add proc\_net\_dev charts info [\#11543](https://github.com/netdata/netdata/pull/11543) ([ilyam8](https://github.com/ilyam8))
+- add proc\_meminfo charts info [\#11541](https://github.com/netdata/netdata/pull/11541) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): broken links [\#11540](https://github.com/netdata/netdata/pull/11540) ([ilyam8](https://github.com/ilyam8))
+- Fix installer flag --use-system-protobuf [\#11539](https://github.com/netdata/netdata/pull/11539) ([underhood](https://github.com/underhood))
+- add proc\_mdstat charts info [\#11537](https://github.com/netdata/netdata/pull/11537) ([ilyam8](https://github.com/ilyam8))
+- Add New Cloud Protocol files to CMake [\#11536](https://github.com/netdata/netdata/pull/11536) ([underhood](https://github.com/underhood))
+- Fix coverity issues for health config [\#11535](https://github.com/netdata/netdata/pull/11535) ([MrZammler](https://github.com/MrZammler))
 - update london demo to point at london3 [\#11533](https://github.com/netdata/netdata/pull/11533) ([andrewm4894](https://github.com/andrewm4894))
 - add/update proc\_interrupts charts info [\#11532](https://github.com/netdata/netdata/pull/11532) ([ilyam8](https://github.com/ilyam8))
 - add diskstats charts info  [\#11528](https://github.com/netdata/netdata/pull/11528) ([ilyam8](https://github.com/ilyam8))
@@ -15,6 +24,7 @@
 - Fix issue with log messages appearing in the terminal instead of the error.log on startup [\#11524](https://github.com/netdata/netdata/pull/11524) ([stelfrag](https://github.com/stelfrag))
 - add ipc semaphores charts info [\#11523](https://github.com/netdata/netdata/pull/11523) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.0. [\#11521](https://github.com/netdata/netdata/pull/11521) ([netdatabot](https://github.com/netdatabot))
+- Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
 - remove `reset\_netdata\_trace.sh` from netdata.service [\#11517](https://github.com/netdata/netdata/pull/11517) ([ilyam8](https://github.com/ilyam8))
 - Remove unused script [\#11516](https://github.com/netdata/netdata/pull/11516) ([thiagoftsm](https://github.com/thiagoftsm))
 - Clean up dependency handling for CentOS/RHEL [\#11515](https://github.com/netdata/netdata/pull/11515) ([Ferroin](https://github.com/Ferroin))
@@ -44,6 +54,7 @@
 - Fix ram level alarms [\#11452](https://github.com/netdata/netdata/pull/11452) ([ilyam8](https://github.com/ilyam8))
 - Check for failed protobuf configure or make [\#11450](https://github.com/netdata/netdata/pull/11450) ([MrZammler](https://github.com/MrZammler))
 - update "Install Netdata on Synology" guide [\#11449](https://github.com/netdata/netdata/pull/11449) ([ilyam8](https://github.com/ilyam8))
+- Add chart message support for ACLK new architecture [\#11447](https://github.com/netdata/netdata/pull/11447) ([stelfrag](https://github.com/stelfrag))
 - Don’t bail early if we fail to build cloud deps with required cloud. [\#11446](https://github.com/netdata/netdata/pull/11446) ([Ferroin](https://github.com/Ferroin))
 - eBPF Soft IRQ latency [\#11445](https://github.com/netdata/netdata/pull/11445) ([UmanShahzad](https://github.com/UmanShahzad))
 - Installation review [\#11442](https://github.com/netdata/netdata/pull/11442) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -158,18 +169,7 @@
 - Decentralized [\#11220](https://github.com/netdata/netdata/pull/11220) ([OdysLam](https://github.com/OdysLam))
 - New email notification template [\#11219](https://github.com/netdata/netdata/pull/11219) ([MrZammler](https://github.com/MrZammler))
 - python.d: merge user/stock plugin configuration files [\#11217](https://github.com/netdata/netdata/pull/11217) ([ilyam8](https://github.com/ilyam8))
-- Only report the exit code when anonymous statistics script fails [\#11215](https://github.com/netdata/netdata/pull/11215) ([MrZammler](https://github.com/MrZammler))
-- Reduce memory needed per dimension [\#11212](https://github.com/netdata/netdata/pull/11212) ([stelfrag](https://github.com/stelfrag))
-- Ignore dbengine journal files that can not be read [\#11210](https://github.com/netdata/netdata/pull/11210) ([stelfrag](https://github.com/stelfrag))
-- Use memory mode RAM if memory mode dbengine is specified but not available [\#11207](https://github.com/netdata/netdata/pull/11207) ([stelfrag](https://github.com/stelfrag))
-- Add Microsoft Teams to supported notification endpoints [\#11205](https://github.com/netdata/netdata/pull/11205) ([zanechua](https://github.com/zanechua))
-- health: fix alarm-line-charts matching [\#11204](https://github.com/netdata/netdata/pull/11204) ([ilyam8](https://github.com/ilyam8))
-- claiming: exit 0 when daemon not running and the claim was successful [\#11195](https://github.com/netdata/netdata/pull/11195) ([ilyam8](https://github.com/ilyam8))
 - Load class, component and type from health log when sufficient fields are detected. [\#11193](https://github.com/netdata/netdata/pull/11193) ([MrZammler](https://github.com/MrZammler))
-- Check return status of execution of anonymous statistics script [\#11188](https://github.com/netdata/netdata/pull/11188) ([MrZammler](https://github.com/MrZammler))
-- VFS new thread [\#11187](https://github.com/netdata/netdata/pull/11187) ([thiagoftsm](https://github.com/thiagoftsm))
-- Compile/Link with absolute paths for bundled/vendored deps. [\#11129](https://github.com/netdata/netdata/pull/11129) ([vkalintiris](https://github.com/vkalintiris))
-- Provide UTC offset in seconds and edit health config command [\#11051](https://github.com/netdata/netdata/pull/11051) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
@@ -258,21 +258,6 @@
 - ACLK new cloud architecture new TBEB [\#10941](https://github.com/netdata/netdata/pull/10941) ([underhood](https://github.com/underhood))
 - Add new charts for extended disk metrics [\#10939](https://github.com/netdata/netdata/pull/10939) ([vlvkobal](https://github.com/vlvkobal))
 - Adds --recursive to docu git clones [\#10932](https://github.com/netdata/netdata/pull/10932) ([underhood](https://github.com/underhood))
-- Add lists of monitored metrics to the cgroups plugin documentation [\#10924](https://github.com/netdata/netdata/pull/10924) ([vlvkobal](https://github.com/vlvkobal))
-- Spelling web gui [\#10922](https://github.com/netdata/netdata/pull/10922) ([jsoref](https://github.com/jsoref))
-- Spelling web api server [\#10921](https://github.com/netdata/netdata/pull/10921) ([jsoref](https://github.com/jsoref))
-- Spelling tests [\#10920](https://github.com/netdata/netdata/pull/10920) ([jsoref](https://github.com/jsoref))
-- Spelling streaming [\#10919](https://github.com/netdata/netdata/pull/10919) ([jsoref](https://github.com/jsoref))
-- spelling: bidirectional [\#10918](https://github.com/netdata/netdata/pull/10918) ([jsoref](https://github.com/jsoref))
-- Spelling libnetdata [\#10917](https://github.com/netdata/netdata/pull/10917) ([jsoref](https://github.com/jsoref))
-- Spelling health [\#10916](https://github.com/netdata/netdata/pull/10916) ([jsoref](https://github.com/jsoref))
-- Spelling exporting [\#10915](https://github.com/netdata/netdata/pull/10915) ([jsoref](https://github.com/jsoref))
-- Spelling database [\#10914](https://github.com/netdata/netdata/pull/10914) ([jsoref](https://github.com/jsoref))
-- Spelling daemon [\#10913](https://github.com/netdata/netdata/pull/10913) ([jsoref](https://github.com/jsoref))
-- Spelling collectors [\#10912](https://github.com/netdata/netdata/pull/10912) ([jsoref](https://github.com/jsoref))
-- spelling: backend [\#10911](https://github.com/netdata/netdata/pull/10911) ([jsoref](https://github.com/jsoref))
-- Spelling aclk [\#10910](https://github.com/netdata/netdata/pull/10910) ([jsoref](https://github.com/jsoref))
-- Spelling build [\#10909](https://github.com/netdata/netdata/pull/10909) ([jsoref](https://github.com/jsoref))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
@@ -282,7 +267,6 @@
 
 - Don’t use glob expansion in argument to `cd` in updater. [\#10936](https://github.com/netdata/netdata/pull/10936) ([Ferroin](https://github.com/Ferroin))
 - Fix memory corruption issue when executing context queries in RAM/SAVE memory mode [\#10933](https://github.com/netdata/netdata/pull/10933) ([stelfrag](https://github.com/stelfrag))
-- Update CODEOWNERS [\#10928](https://github.com/netdata/netdata/pull/10928) ([knatsakis](https://github.com/knatsakis))
 
 ## [v1.30.0](https://github.com/netdata/netdata/tree/v1.30.0) (2021-03-31)
 
