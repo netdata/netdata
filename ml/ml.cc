@@ -74,7 +74,6 @@ bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
 
     D->addValue(Value, Exists);
     bool Result = D->predict().second;
-    error("Dimension %s anomaly bit %d", RD->name, Result);
     return Result;
 }
 

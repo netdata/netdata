@@ -122,7 +122,6 @@ void TrainableHost::trainOne(TimePoint &Now) {
 
         switch (Result) {
         case MLResult::Success:
-            error("Trained dimension: %s\n", D->getRD()->id);
             return;
         case MLResult::TryLockFailed:
         case MLResult::ShouldNotTrainNow:
