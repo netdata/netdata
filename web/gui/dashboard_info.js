@@ -1621,7 +1621,7 @@ netdataDashboard.context = {
     'sctp.fragmentation': {
         info: '<p>The number of fragmented and reassembled SCTP messages.</p>'+
         '<p><b>Reassembled</b> - reassembled user messages, after conversion into DATA chunks. '+
-        '<b>Checksum</b> - user messages that have to be fragmented because of the MTU.</p>'
+        '<b>Fragmented</b> - user messages that have to be fragmented because of the MTU.</p>'
     },
 
     'sctp.chunks': {
