@@ -84,8 +84,8 @@ override_dh_install:
 		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
-	if [ $(HAVE_EBPF) -eq 1 ]; then
-		packaging/bundle-ebpf.sh . ${TOP}/usr/libexec/netdata/plugins.d
+	if [ $(HAVE_EBPF) -eq 1 ]; then \
+		packaging/bundle-ebpf.sh . ${TOP}/usr/libexec/netdata/plugins.d \
 	fi
 
 	# Install go
