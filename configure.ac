@@ -1217,13 +1217,19 @@ else
     have_gtest="no"
 fi
 
-AC_MSG_RESULT([${have_gtest}])
-
 # -----------------------------------------------------------------------------
 # ml - anomaly detection
 
 AM_CONDITIONAL([ENABLE_ML], [test "${enable_ml}" = "yes"])
 if test "${enable_ml}" = "yes"; then
+    AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
+    if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+        AC_MSG_ERROR([You have requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
+    fi
+
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
     OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
     OPTIONAL_ML_LIBS=""
