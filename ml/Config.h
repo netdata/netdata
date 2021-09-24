@@ -19,6 +19,8 @@ public:
     unsigned SmoothN;
     unsigned LagN;
 
+    unsigned MaxKMeansIters;
+
     double DimensionAnomalyScoreThreshold;
     double HostAnomalyRateThreshold;
 

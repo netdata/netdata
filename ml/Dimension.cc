@@ -134,7 +134,7 @@ MLResult TrainableDimension::trainModel(TimePoint &Now) {
         return MLResult::MissingData;
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN);
-    KM.train(SB);
+    KM.train(SB, Cfg.MaxKMeansIters);
 
     delete[] CNs;
     return MLResult::Success;

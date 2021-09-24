@@ -3,7 +3,7 @@
 #include "KMeans.h"
 #include <dlib/clustering.h>
 
-void KMeans::train(SamplesBuffer &SB) {
+void KMeans::train(SamplesBuffer &SB, size_t MaxIterations) {
     std::vector<DSample> Samples = SB.preprocess();
 
     MinDist = std::numeric_limits<CalculatedNumber>::max();
@@ -15,7 +15,7 @@ void KMeans::train(SamplesBuffer &SB) {
         ClusterCenters.clear();
 
         dlib::pick_initial_centers(NumClusters, ClusterCenters, Samples);
-        dlib::find_clusters_using_kmeans(Samples, ClusterCenters);
+        dlib::find_clusters_using_kmeans(Samples, ClusterCenters, MaxIterations);
 
         for (const auto &S : Samples) {
             CalculatedNumber MeanDist = 0.0;

@@ -27,6 +27,8 @@ void Config::readMLConfig(void) {
     Cfg.SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
     Cfg.LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
 
+    Cfg.MaxKMeansIters = config_get_number(ConfigSectionML, "max k-means iterations", 1000);
+
     Cfg.DimensionAnomalyScoreThreshold = config_get_float(ConfigSectionML, "dimension anomaly score threshold", 0.99);
     Cfg.HostAnomalyRateThreshold = config_get_float(ConfigSectionML, "host anomaly rate threshold", 0.2);
 
