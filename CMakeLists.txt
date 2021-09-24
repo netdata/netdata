@@ -947,7 +947,7 @@ set(DAEMON_FILES
 
 set(ML_FILES
         ml/ml.h
-        ml/ml-dummy.cc
+        ml/ml-dummy.c
 )
 
 set(NETDATA_FILES

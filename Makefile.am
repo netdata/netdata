@@ -237,7 +237,7 @@ HEALTH_PLUGIN_FILES = \
 
 ML_FILES = \
     ml/ml.h \
-    ml/ml-dummy.cc \
+    ml/ml-dummy.c \
     $(NULL)
 
 if ENABLE_ML
@@ -260,6 +260,7 @@ ML_FILES += \
     ml/kmeans/SamplesBuffer.h \
     ml/kmeans/SamplesBuffer.cc \
     ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/json/single_include/nlohmann/json.hpp \
     ml/ml.cc \
     ml/ml-private.h \
     $(NULL)

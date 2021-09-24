@@ -1604,7 +1604,8 @@ AC_MSG_RESULT([${enable_lto}])
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
                                      -o "${enable_exporting_pubsub}" = "yes" \
                                      -o "${enable_backend_prometheus_remote_write}" = "yes" \
-                                     -o "${new_cloud_protocol}" = "yes"])
+                                     -o "${new_cloud_protocol}" = "yes" \
+                                     -o "${enable_ml}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
