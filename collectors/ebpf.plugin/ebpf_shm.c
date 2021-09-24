@@ -381,6 +381,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20191,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, NETDATA_EBPF_MODULE_NAME_SHM);
+
     ebpf_create_charts_on_apps(NETDATA_SHMAT_CHART,
                                "Calls to syscall <code>shmat(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -389,6 +390,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, NETDATA_EBPF_MODULE_NAME_SHM);
+
     ebpf_create_charts_on_apps(NETDATA_SHMDT_CHART,
                                "Calls to syscall <code>shmdt(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -397,6 +399,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                20193,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, NETDATA_EBPF_MODULE_NAME_SHM);
+
     ebpf_create_charts_on_apps(NETDATA_SHMCTL_CHART,
                                "Calls to syscall <code>shmctl(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,

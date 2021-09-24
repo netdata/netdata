@@ -4001,6 +4001,22 @@ netdataDashboard.context = {
         info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
     },
 
+    'apps.shmget_call': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_shared_memory_calls">System overview</a>.'
+    },
+
+    'apps.shmat_call': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'apps.shmdt_call': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'apps.shmctl_call': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
+    },
+
     // ------------------------------------------------------------------------
     // ACLK Internal Stats
     'netdata.aclk_status': {
