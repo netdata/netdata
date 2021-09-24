@@ -1792,6 +1792,27 @@ netdataDashboard.context = {
         '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.</p>'
     },
 
+    'ipv6.sockstat6_tcp_sockets': {
+        info: 'The number of TCP sockets in any state, excluding TIME-WAIT and CLOSED.'
+    },
+
+    'ipv6.sockstat6_udp_sockets': {
+        info: 'The number of used UDP sockets.'
+    },
+
+    'ipv4.sockstat6_udplite_sockets': {
+        info: 'The number of used UDP-Lite sockets.'
+    },
+
+    'ipv4.sockstat6_raw_sockets': {
+        info: 'The number of used <a href="https://en.wikipedia.org/wiki/Network_socket#Types" target="_blank"> raw sockets</a>.'
+    },
+
+    'ipv4.sockstat6_frag_sockets': {
+        info: 'The number of entries in hash tables that are used for packet reassembly.'
+    },
+
+
     // ------------------------------------------------------------------------
     // SCTP
 
