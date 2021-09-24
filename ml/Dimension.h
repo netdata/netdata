@@ -97,7 +97,7 @@ public:
     }
 
 private:
-    BitBufferCounter BBC{static_cast<size_t>(Cfg.ADWindowSize)};
+    BitBufferCounter BBC{static_cast<size_t>(Cfg.ADMinWindowSize)};
     size_t NumSetBits{0};
 };
 

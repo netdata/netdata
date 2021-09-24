@@ -70,10 +70,10 @@ private:
     std::thread DetectionThread;
 
     BitRateWindow BRW{
-        static_cast<size_t>(Cfg.ADWindowSize),
-        2 * static_cast<size_t>(Cfg.ADWindowSize),
-        10,
-        static_cast<size_t>(Cfg.ADWindowSize * Cfg.ADWindowRateThreshold)
+        static_cast<size_t>(Cfg.ADMinWindowSize),
+        static_cast<size_t>(Cfg.ADMaxWindowSize),
+        static_cast<size_t>(Cfg.ADIdleWindowSize),
+        static_cast<size_t>(Cfg.ADMinWindowSize * Cfg.ADWindowRateThreshold)
     };
 
     CalculatedNumber AnomalyRate{0.0};

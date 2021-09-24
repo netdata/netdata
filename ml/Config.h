@@ -11,7 +11,7 @@ class Config {
 public:
     bool EnableAnomalyDetection;
 
-    Seconds TrainSecs;
+    Seconds MaxTrainSecs;
     Seconds MinTrainSecs;
     Seconds TrainEvery;
 
@@ -24,7 +24,9 @@ public:
     double DimensionAnomalyScoreThreshold;
     double HostAnomalyRateThreshold;
 
-    double ADWindowSize;
+    double ADMinWindowSize;
+    double ADMaxWindowSize;
+    double ADIdleWindowSize;
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
 
