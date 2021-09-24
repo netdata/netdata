@@ -6,10 +6,11 @@ yaml-files:
   - 'collectors/python.d.plugin/*.conf'
   - 'collectors/python.d.plugin/*/*.conf'
 
+ignore: |
+  mqtt_websockets/
+  packaging/makeself/tmp/
+
 rules:
-  line-length:
-    max: 120
-    level: warning
   braces: enable
   brackets: enable
   colons: enable
@@ -19,9 +20,14 @@ rules:
   document-end: disable
   document-start: disable
   empty-lines: enable
-  empty-values: disable
+  empty-values: enable
   hyphens: enable
   indentation: enable
+  line-length:
+    max: 150
+    level: warning
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
   key-duplicates: enable
   key-ordering: disable
   new-line-at-end-of-file: enable
