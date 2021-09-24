@@ -407,19 +407,19 @@ void aclk_database_worker(void *arg)
 // ALERTS
                 case ACLK_DATABASE_ADD_ALERT:
                     debug(D_ACLK_SYNC,"Adding alert event for %s", wc->host_guid);
-//                    aclk_add_alert_event(wc, cmd);
+                    aclk_add_alert_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
                     debug(D_ACLK_SYNC,"Pushing chart config info to the cloud for %s", wc->host_guid);
-//                    aclk_push_alert_config_event(wc, cmd);
+                    aclk_push_alert_config_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_PUSH_ALERT:
                     debug(D_ACLK_SYNC, "Pushing alert info to the cloud for %s", wc->host_guid);
-//                    aclk_push_alert_event(wc, cmd);
+                    aclk_push_alert_event(wc, cmd);
                     break;
                 case ACLK_DATABASE_ALARM_HEALTH_LOG:
                     debug(D_ACLK_SYNC, "Pushing alarm health log to the cloud for %s", wc->host_guid);
-//                    aclk_push_alarm_health_log(wc, cmd);
+                    aclk_push_alarm_health_log(wc, cmd);
                     break;
 
 // NODE OPERATIONS
