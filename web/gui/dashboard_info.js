@@ -1106,7 +1106,7 @@ netdataDashboard.context = {
     },
 
     'system.shared_memory_calls': {
-        info: 'Monitor calls to functions <code>shmget</code>, <code>shmat</code>, <code>shmdt</code> and <code>shmctl</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows shared memory system call usage <a href="#menu_apps_submenu_ipc_shared_memory">per application</a>.'
+        info: 'Monitor calls to functions <code>shmget</code>, <code>shmat</code>, <code>shmdt</code>, and <code>shmctl</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows shared memory system call usage <a href="#menu_apps_submenu_ipc_shared_memory">per application</a>.'
     },
 
     'system.message_queue_messages': {
@@ -4002,7 +4002,7 @@ netdataDashboard.context = {
     },
 
     'apps.shmget_call': {
-        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_shared_memory_calls">System overview</a>.'
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
     },
 
     'apps.shmat_call': {
