@@ -4,6 +4,7 @@
 #include "sqlite_aclk_chart.h"
 
 #include "../../aclk/aclk_charts_api.h"
+#include "../../aclk/aclk.h"
 
 static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc,
                                           void *data, enum aclk_database_opcode opcode)
@@ -404,7 +405,7 @@ int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_d
         destroy_chart_config_updated(&chart_config);
     }
     else
-        info("DEBUG: Chart config for %s not found", hash_id);
+        info("Chart config for %s not found", hash_id);
 
     bind_fail:
         rc = sqlite3_finalize(res);
@@ -455,6 +456,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
 
 void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     BUFFER *sql = buffer_create(1024);
     buffer_sprintf(sql, "UPDATE aclk_chart_%s SET status = NULL, date_submitted = NULL WHERE sequence_id >= %"PRIu64";",
                    wc->uuid_str, cmd.param1);
@@ -462,7 +464,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
     if (cmd.param1 == 1) {
         db_lock();
         buffer_flush(sql);
-        info("DEBUG: Deleting all data for %s", wc->uuid_str);
+        error_report("Received full resync for %s", wc->uuid_str);
         buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; DELETE FROM aclk_chart_latest_%s;",
                        wc->uuid_str, wc->uuid_str, wc->uuid_str);
         db_execute(buffer_tostring(sql));
@@ -470,7 +472,6 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         wc->chart_sequence_id = 0;
         wc->chart_timestamp = 0;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         RRDHOST *host = wc->host;
         rrdhost_rdlock(host);
         RRDSET *st;
@@ -484,7 +485,6 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
             rrdset_unlock(st);
         }
         rrdhost_unlock(host);
-#endif
     }
     else {
         //sql_chart_deduplicate(wc, cmd);
@@ -492,6 +492,11 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
     }
     buffer_free(sql);
     wc->chart_updates = 1;
+#else
+    UNUSED(wc);
+    UNUSED(cmd);
+#endif
+
     return;
 }
 
@@ -568,12 +573,26 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
+    info("DEBUG: CHART new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
+    if (!aclk_use_new_cloud_arch && aclk_connected) {
+        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+        aclk_update_chart(st->rrdhost, st->id, 1);
+        info("DEBUG: CHART Sending LEGACY chart update for %s", st->name);
+        return 0;
+    }
+    info("DEBUG: CHART Sending NEW ARCH new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                    st, ACLK_DATABASE_ADD_CHART);
 }
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
+    //info("DEBUG: DIMENSION  new_arch=%d   connected=%d", aclk_use_new_cloud_arch, aclk_connected);
+    if (!aclk_use_new_cloud_arch && aclk_connected) {
+        info("DEBUG: DIMENSION skipping");
+        return 0;
+    }
+
     int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
                                      rd, ACLK_DATABASE_ADD_DIMENSION);
     if (likely(!rc))
