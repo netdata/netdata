@@ -390,6 +390,8 @@ fi
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
+NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-ml/} --enable-ml"
+
 if [ "${UID}" -ne 0 ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
     netdata_banner "wrong command line options!"
