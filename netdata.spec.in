@@ -15,6 +15,13 @@ AutoReqProv: yes
 # error.
 %global __os_install_post %{nil}
 
+# Disable eBPF for architectures other than x86
+%ifarch x86_64 i386
+%global _have_ebpf 1
+%else
+%global _have_ebpf 0
+%endif
+
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
@@ -228,7 +235,7 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 # Conf step
 autoreconf -ivf
 %configure \
-	%ifnarch x86_64 i386
+	%if 0%{!?_have_ebpf}
 	--disable-ebpf
 	%endif
 	%if 0%{!?fedora:1} && 0%{!?suse_version:1}
@@ -277,7 +284,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install ebpf.plugin
-%ifarch x86_64 i386
+%if 0%{?_have_ebpf}
 install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
 %endif
 
@@ -406,7 +413,7 @@ install_go() {
 install_go
 install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
-%ifarch x86_64 i386
+%if 0%{?_have_ebpf}
 ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} ${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
 %endif
 
