@@ -1466,7 +1466,7 @@ netdataDashboard.context = {
         '<b>Forwarded</b> - input packets for which this host was not their final IP destination, '+
         'as a result of which an attempt was made to find a route to forward them to that final destination. '+
         'In hosts which do not act as IP Gateways, this counter will include only those packets which were '+
-        '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a>, '+
+        '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a> '+
         'and the Source-Route option processing was successful. '+
         '<b>Delivered</b> - packets delivered to the upper layer protocols, e.g. TCP, UDP, ICMP, and so on.</p>'
     },
@@ -1602,7 +1602,7 @@ netdataDashboard.context = {
         '<b>Forwarded</b> - input packets for which this host was not their final IP destination, '+
         'as a result of which an attempt was made to find a route to forward them to that final destination. '+
         'In hosts which do not act as IP Gateways, this counter will include only those packets which were '+
-        '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a>, '+
+        '<a href="https://en.wikipedia.org/wiki/Source_routing" target="_blank">Source-Routed</a> '+
         'and the Source-Route option processing was successful. '+
         '<b>Delivers</b> - packets delivered to the upper layer protocols, e.g. TCP, UDP, ICMP, and so on.</p>'
     },
