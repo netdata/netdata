@@ -1590,6 +1590,50 @@ netdataDashboard.context = {
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
     },
 
+    'ipv4.sockstat_sockets': {
+        info: 'The total number of used sockets for all '+
+        '<a href="https://man7.org/linux/man-pages/man7/address_families.7.html" target="_blank">address families</a> '+
+        'in this system.'
+    },
+
+    'ipv4.sockstat_tcp_sockets': {
+        info: '<p>The number of TCP sockets in the system in certain '+
+        '<a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation" target="_blank">states</a>.</p>'+
+        '<p><b>Alloc</b> - in any TCP state. '+
+        '<b>Orphan</b> - no longer attached to a socket descriptor in any user processes, '+
+        'but for which the kernel is still required to maintain state in order to complete the transport protocol. '+
+        '<b>InUse</b> - in any TCP state, excluding TIME-WAIT and CLOSED. '+
+        '<b>TimeWait</b> - in the TIME-WAIT state.</p>'
+    },
+
+    'ipv4.sockstat_tcp_mem': {
+        info: 'The amount of memory used by allocated TCP sockets.'
+    },
+
+    'ipv4.sockstat_udp_sockets': {
+        info: 'The number of used UDP sockets.'
+    },
+
+    'ipv4.sockstat_udp_mem': {
+        info: 'The amount of memory used by allocated UDP sockets.'
+    },
+
+    'ipv4.sockstat_udplite_sockets': {
+        info: 'The number of used UDP-Lite sockets.'
+    },
+
+    'ipv4.sockstat_raw_sockets': {
+        info: 'The number of used <a href="https://en.wikipedia.org/wiki/Network_socket#Types" target="_blank"> raw sockets</a>.'
+    },
+
+    'ipv4.sockstat_frag_sockets': {
+        info: 'The number of entries in hash tables that are used for packet reassembly.'
+    },
+
+    'ipv4.sockstat_frag_mem': {
+        info: 'The amount of memory used for packet reassembly.'
+    },
+
     // ------------------------------------------------------------------------
     // IPv6
 
