@@ -918,6 +918,9 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 
+if LINUX
+    NETDATA_COMMON_LIBS += -lrt
+endif
 
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
