@@ -649,7 +649,7 @@ RRDSET *rrdset_create_custom(
                         aclk_add_collector(host, st->plugin_name, st->module_name);
                     }
                 }
-                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+                rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
             }
 #endif
             freez(old_plugin);
@@ -940,7 +940,7 @@ RRDSET *rrdset_create_custom(
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting)
         aclk_add_collector(host, plugin, module);
-    rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+    rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
 #endif
     return(st);
 }
@@ -1377,10 +1377,19 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+    #ifdef ACLK_NG
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+        if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
+            if (likely(!sql_queue_chart_to_aclk(st)))
+                rrdset_flag_set(st, RRDSET_FLAG_ACLK);
+        }
+    }
+    #else
+    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
     }
+    #endif
 #endif
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
@@ -1783,9 +1792,24 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
+    time_t mark = now_realtime_sec();
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
+
+#ifdef ENABLE_ACLK
+        #ifdef ACLK_NG
+        int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+        if (unlikely(live != rd->state->aclk_live_status)) {
+            if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+                if (likely(!sql_queue_dimension_to_aclk(rd))) {
+                    rd->state->aclk_live_status = live;
+                    //info("DEBUG: Dimension %s on chart %s live status = %d", rd->name, rd->rrdset->name, live);
+                }
+            }
+        }
+    #endif
+#endif
         if(unlikely(!rd->updated))
             continue;
 
