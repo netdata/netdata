@@ -1134,6 +1134,10 @@ netdataDashboard.context = {
         info: 'Amount of memory currently used by messages in System V IPC message queues.'
     },
 
+    'system.uptime': {
+        info: 'The amount of time the system has been running, including time spent in suspend.'
+    },
+
     // ------------------------------------------------------------------------
     // CPU charts
 
