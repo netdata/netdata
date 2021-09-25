@@ -135,8 +135,8 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
         chart_payload.config_hash = get_str_from_uuid(&st->state->hash_id);
         chart_payload.update_every = st->update_every;
         chart_payload.memory_mode = st->rrd_memory_mode;
-        chart_payload.name = strdupz((char *)st->name);
-        chart_payload.node_id = strdupz(wc->node_id);
+        chart_payload.name = (char *)st->name;
+        chart_payload.node_id = wc->node_id;
         chart_payload.claim_id = claim_id;
         chart_payload.id = strdupz(st->id);
 
@@ -187,12 +187,12 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         size_t size;
 
         memset(&dim_payload, 0, sizeof(dim_payload));
-        dim_payload.node_id = strdupz(wc->node_id);
+        dim_payload.node_id = wc->node_id;
         dim_payload.claim_id = claim_id;
-        dim_payload.name = strdupz(rd->name);
-        dim_payload.id = strdupz(rd->id);
+        dim_payload.name = rd->name;
+        dim_payload.id = rd->id;
 
-        dim_payload.chart_id = strdupz(rd->rrdset->name);
+        dim_payload.chart_id = rd->rrdset->name;
         dim_payload.created_at.tv_sec = first_t;
         if (unlikely(!live))
             dim_payload.last_timestamp.tv_sec = last_t;
@@ -200,10 +200,6 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
         char *payload = generate_chart_dimension_updated(&size, &dim_payload);
         if (likely(payload))
             rc = aclk_add_chart_payload(wc->uuid_str, &rd->state->metric_uuid, claim_id, ACLK_PAYLOAD_DIMENSION, (void *)payload, size);
-        freez((char *)dim_payload.node_id);
-        freez((char *)dim_payload.chart_id);
-        freez((char *)dim_payload.name);
-        freez((char *)dim_payload.id);
         freez(payload);
         freez(claim_id);
     }
@@ -736,10 +732,11 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 if (sequence_id > wc->chart_sequence_id || wc->chart_reset_count > 10) {
                     info("DEBUG: Full resync requested -- reset_count=%d", wc->chart_reset_count);
                     chart_reset_t chart_reset;
-                    chart_reset.node_id = strdupz(node_id);
+                    chart_reset.node_id = node_id;
                     chart_reset.claim_id = is_agent_claimed();
                     chart_reset.reason = SEQ_ID_NOT_EXISTS;
                     aclk_chart_reset(chart_reset);
+                    freez(chart_reset.claim_id);
 //                    wc->chart_updates = 0;
                     wc->chart_reset_count = -1;
                     return;
