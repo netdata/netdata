@@ -230,6 +230,10 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (unlikely(!claim_id))
         return;
 
+    uuid_t claim_uuid;
+    if (uuid_parse(claim_id, claim_uuid))
+        return;
+
     int limit = cmd.count > 0 ? cmd.count : 1;
 
     uint64_t first_sequence;
@@ -253,7 +257,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    rc = sqlite3_bind_text(res, 1, claim_id , -1, SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, claim_uuid , sizeof(claim_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -343,6 +347,7 @@ bind_fail:
 #else
     UNUSED(wc);
     UNUSED(cmd);
+    info("ACLK_NG not defined");
 #endif
     return;
 }
@@ -573,14 +578,14 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
-    info("DEBUG: CHART new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
+//    info("DEBUG: CHART new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     if (!aclk_use_new_cloud_arch && aclk_connected) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
-        info("DEBUG: CHART Sending LEGACY chart update for %s", st->name);
+//        info("DEBUG: CHART Sending LEGACY chart update for %s", st->name);
         return 0;
     }
-    info("DEBUG: CHART Sending NEW ARCH new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
+//    info("DEBUG: CHART Sending NEW ARCH new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                    st, ACLK_DATABASE_ADD_CHART);
 }
@@ -589,7 +594,7 @@ int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
     //info("DEBUG: DIMENSION  new_arch=%d   connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     if (!aclk_use_new_cloud_arch && aclk_connected) {
-        info("DEBUG: DIMENSION skipping");
+//        info("DEBUG: DIMENSION skipping");
         return 0;
     }
 
@@ -697,6 +702,9 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     if (unlikely(!node_id))
         return;
 
+    info("DEBUG: START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
+          sequence_id, created_at, batch_id);
+
     debug(D_ACLK_SYNC,"START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
           sequence_id, created_at, batch_id);
     uuid_t node_uuid;
@@ -755,8 +763,11 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     }
-                    else
+                    else {
                         wc->chart_updates = 1;
+                        info("DEBUG: Enabling chart stream for node %s from sequence %"PRIu64" batch=%"PRIu64, node_id,
+                             sequence_id, batch_id);
+                    }
                 }
             }
             else
