@@ -1230,6 +1230,14 @@ if test "${enable_ml}" = "yes"; then
         AC_MSG_ERROR([You have requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
     fi
 
+    AC_LANG_PUSH([C++])
+    AX_CHECK_COMPILE_FLAG(
+        [-std=c++11],
+        [CXX11FLAG="$CXX11FLAG -std=c++11"],
+        [AC_MSG_ERROR([You have requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])]
+    )
+    AC_LANG_POP([C++])
+
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
     OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
     OPTIONAL_ML_LIBS=""
