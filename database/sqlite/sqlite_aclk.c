@@ -266,7 +266,7 @@ static void timer_cb(uv_timer_t* handle)
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
 
-    if (wc->chart_updates && !wc->chart_pending) {
+    if (wc->chart_updates && !wc->chart_pending && aclk_connected) {
         cmd.opcode = ACLK_DATABASE_PUSH_CHART;
         cmd.count = ACLK_MAX_CHART_BATCH;
         cmd.completion = NULL;
@@ -275,7 +275,7 @@ static void timer_cb(uv_timer_t* handle)
             wc->chart_pending = 1;
     }
 
-    if (wc->alert_updates) {
+    if (wc->alert_updates && aclk_connected) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
         cmd.count = ACLK_MAX_ALERT_UPDATES;
         aclk_database_enq_cmd_noblock(wc, &cmd);
@@ -446,7 +446,7 @@ void aclk_database_worker(void *arg)
                             }
                         }
                     }
-                    if (wc->node_info_send && wc->host && localhost && claimed()) {
+                    if (wc->node_info_send && wc->host && localhost && claimed() && aclk_connected) {
                         cmd.opcode = ACLK_DATABASE_NODE_INFO;
                         cmd.completion = NULL;
                         wc->node_info_send = aclk_database_enq_cmd_noblock(wc, &cmd);
