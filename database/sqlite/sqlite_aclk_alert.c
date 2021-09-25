@@ -163,7 +163,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         char old_value_string[100 + 1];
         char new_value_string[100 + 1];
 
-        alarm_log.node_id = strdupz(wc->node_id);
+        alarm_log.node_id = wc->node_id;
         alarm_log.claim_id = claim_id;
 
         alarm_log.chart = strdupz((char *)sqlite3_column_text(res, 12));
@@ -379,7 +379,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to fetch a chart hash configuration");
+        error_report("Failed to prepare statement when trying to fetch an alarm hash configuration");
         goto fail;
     }
 
