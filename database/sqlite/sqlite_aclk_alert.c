@@ -179,10 +179,13 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz((char *)wc->host->abbrev_timezone);
-        alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : strdupz((char *)wc->host->health_default_exec);
+        alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
+                                                                  strdupz((char *)wc->host->health_default_exec);
         alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
 
-        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) : strdupz("UNKNOWN=0");
+        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
+                                 health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
+                                 strdupz("UNKNOWN=0");
         alarm_log.command = strdupz(edit_command);
 
         alarm_log.duration = (time_t) sqlite3_column_int64(res, 6);
@@ -193,10 +196,23 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.delay_up_to_timestamp = (time_t) sqlite3_column_int64(res, 10);
         alarm_log.last_repeat = (time_t) sqlite3_column_int64(res, 25);
 
-        alarm_log.silenced = ( (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_SILENCED)  || ( sqlite3_column_type(res, 15) != SQLITE_NULL && !strncmp((char *)sqlite3_column_text(res,15), "silent", 6)) ) ? 1 : 0;
+        alarm_log.silenced = ((sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_SILENCED) ||
+                              (sqlite3_column_type(res, 15) != SQLITE_NULL &&
+                               !strncmp((char *)sqlite3_column_text(res, 15), "silent", 6))) ?
+                                 1 :
+                                 0;
 
-        alarm_log.value_string = sqlite3_column_type(res, 23) == SQLITE_NULL ? strdupz((char *)"-") : strdupz((char *)format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 23), (char *) sqlite3_column_text(res, 17), -1));
-        alarm_log.old_value_string = sqlite3_column_type(res, 24) == SQLITE_NULL ? strdupz((char *)"-") : strdupz((char *)format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 17), -1));
+        alarm_log.value_string =
+            sqlite3_column_type(res, 23) == SQLITE_NULL ?
+                strdupz((char *)"-") :
+                strdupz((char *)format_value_and_unit(
+                    new_value_string, 100, sqlite3_column_double(res, 23), (char *)sqlite3_column_text(res, 17), -1));
+
+        alarm_log.old_value_string =
+            sqlite3_column_type(res, 24) == SQLITE_NULL ?
+                strdupz((char *)"-") :
+                strdupz((char *)format_value_and_unit(
+                    old_value_string, 100, sqlite3_column_double(res, 24), (char *)sqlite3_column_text(res, 17), -1));
 
         alarm_log.value = (calculated_number) sqlite3_column_double(res, 23);
         alarm_log.old_value = (calculated_number) sqlite3_column_double(res, 24);
@@ -204,7 +220,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
         alarm_log.rendered_info = strdupz((char *)sqlite3_column_text(res, 18));
 
-        info("DEBUG: %s pushing alert seq %" PRIu64 " - %" PRIu64"", wc->uuid_str, (uint64_t) sqlite3_column_int64(res, 0), (uint64_t) sqlite3_column_int64(res, 1));
         aclk_send_alarm_log_entry(&alarm_log);
 
         if (first_sequence_id == 0)
@@ -278,12 +293,8 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     sqlite3_stmt *res = NULL;
 
     //TODO: make this better: include info from health log too
-    buffer_sprintf(sql, "select aa.sequence_id, aa.date_created, \
-                         (select laa.sequence_id from aclk_alert_%s laa \
-                         order by laa.sequence_id desc limit 1), \
-                         (select laa.date_created from aclk_alert_%s laa \
-                         order by laa.sequence_id desc limit 1) \
-                         from aclk_alert_%s aa order by aa.sequence_id asc limit 1;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    buffer_sprintf(sql, "SELECT MIN(sequence_id), MIN(date_created), MAX(sequence_id), MAX(date_created) " \
+         "FROM aclk_alert_%s;", wc->uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -463,7 +474,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
         destroy_aclk_alarm_configuration(&alarm_config);
     }
     else
-        info("DEBUG: Alert config for %s not found", config_hash);
+        info("Alert config for %s not found", config_hash);
 
     bind_fail:
     rc = sqlite3_finalize(res);
