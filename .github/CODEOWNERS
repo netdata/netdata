@@ -29,7 +29,7 @@ collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
 daemon/ @thiagoftsm
 database/ @thiagoftsm @vkalintiris
-docs/ @joelhans
+docs/ @DShreve2
 health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
@@ -44,7 +44,7 @@ web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @vkalintiris
-*.md @joelhans
+*.md @DShreve2
 Dockerfile* @Ferroin @vkalintiris
 
 # Ownership of specific files
@@ -62,5 +62,5 @@ netdata-installer.sh @Ferroin @vkalintiris
 package.json @jacekkolasa @Ferroin @vkalintiris
 packaging/version @netdatabot @Ferroin @vkalintiris
 
-LICENSE.md @joelhans @Ferroin @vkalintiris
+LICENSE.md @DShreve2 @Ferroin @vkalintiris
 CHANGELOG.md @netdatabot @Ferroin @vkalintiris
