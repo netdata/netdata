@@ -26,6 +26,25 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
+
+    "CREATE TABLE IF NOT EXISTS chart_hash_map(chart_id blob , hash_id blob, UNIQUE (chart_id, hash_id));",
+
+    "CREATE TABLE IF NOT EXISTS chart_hash(hash_id blob PRIMARY KEY,type text, id text, name text, "
+    "family text, context text, title text, unit text, plugin text, "
+    "module text, priority integer, chart_type, last_used);",
+
+    "CREATE VIEW IF NOT EXISTS v_chart_hash as SELECT ch.*, chm.chart_id FROM chart_hash ch, chart_hash_map chm "
+    "WHERE ch.hash_id = chm.hash_id;",
+
+    "CREATE TRIGGER IF NOT EXISTS tr_v_chart_hash INSTEAD OF INSERT on v_chart_hash BEGIN "
+    "INSERT INTO chart_hash (hash_id, type, id, name, family, context, title, unit, plugin, "
+    "module, priority, chart_type, last_used) "
+    "values (new.hash_id, new.type, new.id, new.name, new.family, new.context, new.title, new.unit, new.plugin, "
+    "new.module, new.priority, new.chart_type, strftime('%s')) "
+    "ON CONFLICT (hash_id) DO UPDATE SET last_used = strftime('%s'); "
+    "INSERT INTO chart_hash_map (chart_id, hash_id) values (new.chart_id, new.hash_id) "
+    "on conflict (chart_id, hash_id) do nothing; END; ",
+
     "delete from chart_active;",
     "delete from dimension_active;",
     "delete from chart where chart_id not in (select chart_id from dimension);",
@@ -1389,9 +1408,16 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
+    struct aclk_database_worker_config *wc = host->dbsync_worker;
+
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
     uuid_copy(*(host->node_id), *node_id);
+
+    if (unlikely(!wc))
+        sql_create_aclk_table(host, &host->host_uuid, node_id);
+    else
+        uuid_unparse_lower(*node_id, wc->node_id);
     return;
 }
 
