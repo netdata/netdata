@@ -97,8 +97,8 @@ static alarmstream::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_s
 
 void destroy_alarm_log_entry(struct alarm_log_entry *entry)
 {
-    freez(entry->node_id);
-    freez(entry->claim_id);
+    //freez(entry->node_id);
+    //freez(entry->claim_id);
 
     freez(entry->chart);
     freez(entry->name);
