@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- add proc\_uptime charts info [\#11569](https://github.com/netdata/netdata/pull/11569) ([ilyam8](https://github.com/ilyam8))
+- add proc\_net\_sockstat and sockstat6 charts info [\#11567](https://github.com/netdata/netdata/pull/11567) ([ilyam8](https://github.com/ilyam8))
 - Disable eBPF compilation in different platforms [\#11566](https://github.com/netdata/netdata/pull/11566) ([thiagoftsm](https://github.com/thiagoftsm))
+- add proc\_net\_snmp6 charts info [\#11565](https://github.com/netdata/netdata/pull/11565) ([ilyam8](https://github.com/ilyam8))
 - add proc\_net\_sctp\_snmp charts info [\#11564](https://github.com/netdata/netdata/pull/11564) ([ilyam8](https://github.com/ilyam8))
+- Add shared memory to cgroup [\#11559](https://github.com/netdata/netdata/pull/11559) ([thiagoftsm](https://github.com/thiagoftsm))
 - add proc\_net\_snmp charts info [\#11557](https://github.com/netdata/netdata/pull/11557) ([ilyam8](https://github.com/ilyam8))
 - End of support for Ubuntu 16.04 [\#11556](https://github.com/netdata/netdata/pull/11556) ([Ferroin](https://github.com/Ferroin))
 - add proc\_net\_netstat charts info [\#11554](https://github.com/netdata/netdata/pull/11554) ([ilyam8](https://github.com/ilyam8))
@@ -161,16 +165,12 @@
 - Send correct aclk implementation used by agent to posthog. [\#11247](https://github.com/netdata/netdata/pull/11247) ([MrZammler](https://github.com/MrZammler))
 - Fixes error on --disable-cloud [\#11244](https://github.com/netdata/netdata/pull/11244) ([underhood](https://github.com/underhood))
 - Swap class and type attributes in stock alarm configurations [\#11240](https://github.com/netdata/netdata/pull/11240) ([MrZammler](https://github.com/MrZammler))
-- packaging: update go.d.plugin version to v0.29.0 [\#11239](https://github.com/netdata/netdata/pull/11239) ([ilyam8](https://github.com/ilyam8))
 - Adds xfs filesystem monitoring to eBPF [\#11238](https://github.com/netdata/netdata/pull/11238) ([thiagoftsm](https://github.com/thiagoftsm))
 - Extra posthog attributes [\#11237](https://github.com/netdata/netdata/pull/11237) ([MrZammler](https://github.com/MrZammler))
-- health: update cockroachdb alarms [\#11235](https://github.com/netdata/netdata/pull/11235) ([ilyam8](https://github.com/ilyam8))
 - ACLK-NG New Cloud NodeInstance related msgs [\#11234](https://github.com/netdata/netdata/pull/11234) ([underhood](https://github.com/underhood))
-- Ebpf arrays [\#11230](https://github.com/netdata/netdata/pull/11230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allows ACLK NG and Legacy to coexist [\#11225](https://github.com/netdata/netdata/pull/11225) ([underhood](https://github.com/underhood))
 - Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
 - Add vkalintiris as a code owner for more components [\#11221](https://github.com/netdata/netdata/pull/11221) ([vkalintiris](https://github.com/vkalintiris))
-- Decentralized [\#11220](https://github.com/netdata/netdata/pull/11220) ([OdysLam](https://github.com/OdysLam))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
@@ -257,7 +257,6 @@
 - health: add Inconsistent state to the mysql\_galera\_cluster\_state alarm [\#10945](https://github.com/netdata/netdata/pull/10945) ([ilyam8](https://github.com/ilyam8))
 - Update cloud-providers.md [\#10942](https://github.com/netdata/netdata/pull/10942) ([Avre](https://github.com/Avre))
 - ACLK new cloud architecture new TBEB [\#10941](https://github.com/netdata/netdata/pull/10941) ([underhood](https://github.com/underhood))
-- Add new charts for extended disk metrics [\#10939](https://github.com/netdata/netdata/pull/10939) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
