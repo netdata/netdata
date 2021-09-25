@@ -465,10 +465,14 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
     if (cmd.param1 == 1) {
         db_lock();
         buffer_flush(sql);
-        error_report("Received full resync for %s", wc->uuid_str);
-        buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; DELETE FROM aclk_chart_latest_%s;",
-                       wc->uuid_str, wc->uuid_str, wc->uuid_str);
+        info("Received full resync for %s", wc->uuid_str);
+        buffer_sprintf(sql, "DELETE FROM aclk_chart_payload_%s; DELETE FROM aclk_chart_%s; " \
+                            "DELETE FROM aclk_chart_latest_%s;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+
+        db_execute("BEGIN TRANSACTION;");
         db_execute(buffer_tostring(sql));
+        db_execute("COMMIT TRANSACTION;");
+
         db_unlock();
         wc->chart_sequence_id = 0;
         wc->chart_timestamp = 0;
