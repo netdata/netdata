@@ -207,7 +207,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#ifdef ACLK_NEWARCH_DEVMODE
+//#ifdef ACLK_NEWARCH_DEVMODE
     char *err_msg = NULL;
     int rc;
 
@@ -236,7 +236,7 @@ void sql_aclk_sync_init(void)
 
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
         "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);
-#endif
+//#endif
     return;
 }
 
@@ -334,8 +334,8 @@ void aclk_database_worker(void *arg)
     wc->node_info_send = (wc->host && !localhost);
     aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
-// TODO: To be added
-//  sql_get_last_chart_sequence(wc, cmd);
+
+    sql_get_last_chart_sequence(wc, cmd);
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
