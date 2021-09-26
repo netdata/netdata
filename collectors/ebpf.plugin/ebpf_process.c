@@ -48,6 +48,8 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+static struct netdata_static_thread cgroup_thread = {"EBPF CGROUP", NULL, NULL,
+                                                    1, NULL, NULL,  NULL};
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -468,6 +470,36 @@ static void ebpf_create_apps_charts(struct target *root)
  *****************************************************************/
 
 /**
+ * Cgroup update shm
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data from shared memory.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_cgroup_update_shm(void *ptr)
+{
+    UNUSED(ptr);
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    usec_t step = 30 * USEC_PER_SEC;
+    while (!close_ebpf_plugin) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
+
+        if (!shm_ebpf_cgroup.header)
+            ebpf_map_cgroup_shared_memory();
+
+        ebpf_parse_cgroup_shm_data();
+    }
+
+    return NULL;
+}
+
+/**
  * Main loop for this collector.
  *
  * @param step the number of microseconds used with heart beat
@@ -475,6 +507,12 @@ static void ebpf_create_apps_charts(struct target *root)
  */
 static void process_collector(usec_t step, ebpf_module_t *em)
 {
+    cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
+    cgroup_thread.start_routine = ebpf_cgroup_update_shm;
+
+    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
+                          ebpf_cgroup_update_shm, em);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
@@ -568,6 +606,8 @@ static void ebpf_process_cleanup(void *ptr)
         }
         bpf_object__close(objects);
     }
+
+    freez(cgroup_thread.thread);
 }
 
 /*****************************************************************

@@ -71,8 +71,6 @@ void ebpf_map_cgroup_shared_memory()
         return;
     }
 
-    //error("KILLME_TOTAL_EBPF: (%d, %d,%d, %d, %lu)", shm_ebpf_cgroup.header->cgroup_root_count, shm_ebpf_cgroup.header->cgroup_max,
-    //      shm_ebpf_cgroup.header->systemd_enabled, shm_ebpf_cgroup.header->updated, shm_ebpf_cgroup.header->body_length);
     size_t length =  shm_ebpf_cgroup.header->body_length;
 
     munmap(shm_ebpf_cgroup.header, sizeof(netdata_ebpf_cgroup_shm_header_t));
@@ -90,6 +88,7 @@ void ebpf_map_cgroup_shared_memory()
     if (shm_sem_ebpf_cgroup == SEM_FAILED) {
         error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
         munmap(shm_ebpf_cgroup.header, length);
+        shm_ebpf_cgroup.header = NULL;
         close(shm_fd_ebpf_cgroup);
         shm_fd_ebpf_cgroup = -1;
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
