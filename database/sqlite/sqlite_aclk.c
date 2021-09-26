@@ -262,6 +262,11 @@ static void timer_cb(uv_timer_t* handle)
 
     if (wc->cleanup_after && wc->cleanup_after < now_realtime_sec()) {
         cmd.opcode = ACLK_DATABASE_CLEANUP;
+        cmd.completion = NULL;
+        aclk_database_enq_cmd_noblock(wc, &cmd);
+
+        cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
+        cmd.completion = NULL;
         if (!aclk_database_enq_cmd_noblock(wc, &cmd))
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
@@ -424,8 +429,8 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
                     break;
-                case ACLK_DATABASE_UPD_STATS:
-//                    sql_update_metric_statistics(wc, cmd);
+                case ACLK_DATABASE_UPD_RETENTION:
+                    aclk_update_retention(wc, cmd);
                     break;
 
 // NODE_INSTANCE DETECTION
@@ -726,7 +731,7 @@ void aclk_data_rotated(RRDHOST *host)
     debug(D_ACLK_SYNC,"Processing data base rotation event");
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = ACLK_DATABASE_UPD_STATS;
+    cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
 
     rrd_wrlock();
     RRDHOST *this_host = localhost;
