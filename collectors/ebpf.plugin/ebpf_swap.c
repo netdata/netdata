@@ -138,6 +138,42 @@ static void swap_fill_pid(uint32_t current_pid, netdata_publish_swap_t *publish)
 }
 
 /**
+ * Update cgroup
+ *
+ * Update cgroup data based in
+ */
+static void ebpf_update_swap_cgroup()
+{
+    ebpf_cgroup_target_t *ect ;
+    netdata_publish_swap_t *cv = swap_vector;
+    int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
+    size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_publish_swap_t *out = &pids->swap;
+            if (swap_pid[pid]) {
+                netdata_publish_swap_t *in = swap_pid[pid];
+
+                out->read = in->read;
+                out->write = in->write;
+                memcpy(out, in, sizeof(netdata_publish_swap_t));
+            } else {
+                memset(cv, 0, length);
+                if (!bpf_map_lookup_elem(fd, &pid, cv)) {
+                    swap_apps_accumulator(cv);
+
+                    memcpy(out, cv, sizeof(netdata_publish_swap_t));
+                }
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -208,10 +244,9 @@ static void read_global_table()
 }
 
 /**
- * Socket read hash
+ * Swap read hash
  *
  * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
  *
  * @param ptr It is a NULL value for this thread.
  *
@@ -308,12 +343,16 @@ static void swap_collector(ebpf_module_t *em)
                           ebpf_swap_read_hash, em);
 
     int apps = em->apps_charts;
+    int cgroup = em->cgroup_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         if (apps)
             read_apps_table();
+
+        if (cgroup)
+            ebpf_update_swap_cgroup();
 
         pthread_mutex_lock(&lock);
 
