@@ -4,6 +4,7 @@
 #include "sqlite_aclk_alert.h"
 
 #include "../../aclk/aclk_alarm_api.h"
+#include "../../aclk/aclk.h"
 
 // will replace call to aclk_update_alarm in health/health_log.c
 // and handle both cases
@@ -11,8 +12,13 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
 {
     //check aclk architecture and handle old json alarm update to cloud
     //include also the valid statuses for this case
-    /* if (!aclk_architecture)
-         aclk_update_alarm(host, ae); */
+    if (!aclk_use_new_cloud_arch) {
+        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
+            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
+            aclk_update_alarm(host, ae);
+        }
+        return;
+    }
 
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
         return;
@@ -176,6 +182,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
         alarm_log.config_hash = strdupz((char *)uuid_str);
+        if (uuid_is_null(*((uuid_t *) sqlite3_column_blob(res, 3))))
+            info("DEBUG: alert hash id is null on %s --> %"PRIu64, wc->uuid_str, (uint64_t) sqlite3_column_int64(res, 0));
 
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz((char *)wc->host->abbrev_timezone);
@@ -369,6 +377,11 @@ void aclk_send_alarm_configuration(char *config_hash)
     return;
 }
 
+#define SQL_SELECT_ALERT_CONFIG "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin," \
+    "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
+    "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
+    "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
+
 int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(wc);
@@ -382,20 +395,16 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
     sqlite3_stmt *res = NULL;
 
     char *config_hash = (char *) cmd.data_param;
-    BUFFER *sql = buffer_create(1024);
-    buffer_sprintf(
-        sql,
-        "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin, module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info, options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;");
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to fetch an alarm hash configuration");
-        goto fail;
+        return 1;
     }
 
     uuid_t hash_uuid;
     if (uuid_parse(config_hash, hash_uuid))
-        goto fail;
+        return 1;
 
     rc = sqlite3_bind_blob(res, 1, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
@@ -475,13 +484,10 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
     else
         info("Alert config for %s not found", config_hash);
 
-    bind_fail:
+bind_fail:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement when pushing alarm config hash, rc = %d", rc);
-
-    fail:
-    buffer_free(sql);
 
     return rc;
 #endif
@@ -538,7 +544,10 @@ int sql_queue_removed_alerts_to_aclk(RRDHOST *host)
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
-                   "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s where new_status = -2 and updated_by_id = 0 and unique_id not in (select alert_unique_id from aclk_alert_%s) order by unique_id asc on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+        "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s " \
+        "where new_status = -2 and updated_by_id = 0 and unique_id not in " \
+        "(select alert_unique_id from aclk_alert_%s) order by unique_id asc " \
+        "on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
     db_execute(buffer_tostring(sql));
 
