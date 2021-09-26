@@ -332,6 +332,172 @@ void ebpf_swap_send_apps_data(struct target *root)
 }
 
 /**
+ * Sum PIDs
+ *
+ * Sum values for all targets.
+ *
+ * @param swap
+ * @param root
+ */
+static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_on_target2 *pids)
+{
+    uint64_t local_read = 0;
+    uint64_t local_write = 0;
+
+    while (pids) {
+        netdata_publish_swap_t *w = &pids->swap;
+        local_write += w->write;
+        local_read += w->read;
+
+        pids = pids->next;
+    }
+
+    // These conditions were added, because we are using incremental algorithm
+    swap->write = (local_write >= swap->write) ? local_write : swap->write;
+    swap->read = (local_read >= swap->read) ? local_read : swap->read;
+}
+
+/**
+ * Send Systemd charts
+ *
+ * Send collected data to Netdata.
+ */
+static void ebpf_send_systemd_swap_charts()
+{
+    ebpf_cgroup_target_t *ect;
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART);
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (unlikely(ect->systemd)) {
+            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART);
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (unlikely(ect->systemd)) {
+            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.write);
+        }
+    }
+    write_end_chart();
+}
+
+/**
+ * Create specific swap charts
+ *
+ * Create charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_create_specific_swap_charts(char *type)
+{
+    ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
+                      "Calls for function <code>swap_readpage</code>.",
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
+                      ebpf_create_global_dimension,
+                      swap_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+
+    ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
+                      "Calls for function <code>swap_writepage</code>.",
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      NULL,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
+                      ebpf_create_global_dimension,
+                      &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+}
+
+/*
+ * Send Specific Swap data
+ *
+ * Send data for specific cgroup/apps.
+ *
+ * @param type   chart type
+ * @param values structure with values that will be sent to netdata
+ */
+static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *values)
+{
+    write_begin_chart(type, NETDATA_MEM_SWAP_READ_CHART);
+    write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].name, (long long) values->read);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_MEM_SWAP_WRITE_CHART);
+    write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name, (long long) values->write);
+    write_end_chart();
+}
+
+/**
+ *  Create Systemd Swap Charts
+ *
+ *  Create charts when systemd is enabled
+ **/
+static void ebpf_create_systemd_swap_charts()
+{
+    ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_READ_CHART,
+                                  "Calls for function <code>swap_readpage</code>. This chart is provided by eBPF plugin.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_SWAP_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20191,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_EBPF_MODULE_NAME_SWAP);
+
+    ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_WRITE_CHART,
+                                  "Calls for function <code>swap_writepage</code>. This chart is provided by eBPF plugin.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_SWAP_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20192,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_EBPF_MODULE_NAME_SWAP);
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+*/
+void ebpf_swap_send_cgroup_data()
+{
+    static int systemd_charts = 0;
+
+    if (!ebpf_cgroup_pids)
+        return;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        ebpf_swap_sum_cgroup_pids(&ect->publish_systemd_swap, ect->pids);
+        if (!ect->systemd && !(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART)) {
+            ebpf_create_specific_swap_charts(ect->name);
+            ect->flags |= NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+        }
+    }
+
+    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
+
+    if (!systemd_charts) {
+        if (has_systemd) {
+            ebpf_create_systemd_swap_charts();
+        }
+        systemd_charts = 1;
+    }
+
+    if (has_systemd) {
+        ebpf_send_systemd_swap_charts();
+    }
+
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) {
+            ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap);
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
 * Main loop for this collector.
 */
 static void swap_collector(ebpf_module_t *em)
@@ -360,6 +526,9 @@ static void swap_collector(ebpf_module_t *em)
 
         if (apps)
             ebpf_swap_send_apps_data(apps_groups_root_target);
+
+        if (cgroup)
+            ebpf_swap_send_cgroup_data();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
