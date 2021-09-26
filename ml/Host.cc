@@ -7,101 +7,150 @@
 
 using namespace ml;
 
-static void updateMLChart(RRDHOST *RH,
-                          collected_number NumTotalDimensions,
-                          collected_number NumAnomalousDimensions,
-                          collected_number AnomalyRate) {
-    static thread_local RRDSET *MLRS = nullptr;
-    static thread_local RRDDIM *NumTotalDimensionsRD = nullptr;
+static void updateDimensionsChart(RRDHOST *RH,
+                                  collected_number NumNormalDimensions,
+                                  collected_number NumAnomalousDimensions,
+                                  collected_number AnomalyRate) {
+    static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *NumNormalDimensionsRD = nullptr;
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
-    static thread_local RRDDIM *AnomalyRateRD = nullptr;
+    // static thread_local RRDDIM *AnomalyRateRD = nullptr;
+    (void) AnomalyRate;
 
-    if (!MLRS) {
-        MLRS = rrdset_create(
-            RH,
-            "ml_prediction_info",
-            "host_anomaly_status",
-            NULL,
-            "ml_prediction_info",
-            NULL,
-            "Number of anomalous units",
-            "number of units",
-            "ml_units",
-            NULL,
-            39183,
-            Cfg.UpdateEvery,
-            RRDSET_TYPE_LINE
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "dimensions", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Anomaly detection dimensions", // title
+            "dimensions", // units
+            "netdata", // plugin
+            "ml", // module
+            39183, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
         );
 
-        NumTotalDimensionsRD = rrddim_add(MLRS, "num_total_dimensions", NULL,
+        NumNormalDimensionsRD = rrddim_add(RS, "normal", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumAnomalousDimensionsRD = rrddim_add(MLRS, "num_anomalous_dimensions", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        AnomalyRateRD = rrddim_add(MLRS, "anomaly_rate", NULL,
+        NumAnomalousDimensionsRD = rrddim_add(RS, "anomalous", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else
-        rrdset_next(MLRS);
+        rrdset_next(RS);
 
-    rrddim_set_by_pointer(MLRS, NumTotalDimensionsRD, NumTotalDimensions);
-    rrddim_set_by_pointer(MLRS, NumAnomalousDimensionsRD, NumAnomalousDimensions);
-    rrddim_set_by_pointer(MLRS, AnomalyRateRD, AnomalyRate);
+    rrddim_set_by_pointer(RS, NumNormalDimensionsRD, NumNormalDimensions);
+    rrddim_set_by_pointer(RS, NumAnomalousDimensionsRD, NumAnomalousDimensions);
 
-    rrdset_done(MLRS);
+    rrdset_done(RS);
 }
 
-static void updateADChart(RRDHOST *RH,
-                          std::pair<BitRateWindow::Edge, size_t> P,
-                          bool ResetBitCounter,
-                          bool NewAnomalyEvent,
-                          collected_number AnomalyRate) {
-    static thread_local RRDSET *ADRS = nullptr;
+static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
+    static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *AnomalyRateRD = nullptr;
+
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "anomaly_rate", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Percentage of anomalous dimensions", // title
+            "percentage", // units
+            "netdata", // plugin
+            "ml", // module
+            39184, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+
+        AnomalyRateRD = rrddim_add(RS, "anomaly_rate", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(RS);
+
+    rrddim_set_by_pointer(RS, AnomalyRateRD, AnomalyRate);
+
+    rrdset_done(RS);
+}
+
+static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) {
+    static thread_local RRDSET *RS = nullptr;
     static thread_local RRDDIM *WindowLengthRD = nullptr;
+
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "detector_window", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Anomaly detector window length", // title
+            "seconds", // units
+            "netdata", // plugin
+            "ml", // module
+            39185, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+
+        WindowLengthRD = rrddim_add(RS, "duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(RS);
+
+    rrddim_set_by_pointer(RS, WindowLengthRD, WindowLength * Cfg.UpdateEvery);
+    rrdset_done(RS);
+}
+
+static void updateEventsChart(RRDHOST *RH,
+                              std::pair<BitRateWindow::Edge, size_t> P,
+                              bool ResetBitCounter,
+                              bool NewAnomalyEvent) {
+    static thread_local RRDSET *RS = nullptr;
     static thread_local RRDDIM *AboveThresholdRD = nullptr;
     static thread_local RRDDIM *ResetBitCounterRD = nullptr;
     static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
-    static thread_local RRDDIM *AnomalyRateRD = nullptr;
 
-    if (!ADRS) {
-        ADRS = rrdset_create(
-            RH,
-            "ml_detector_info",
-            "host_anomaly_status",
-            NULL,
-            "ml_detector_info",
-            NULL,
-            "Anomaly detection info",
-            "info",
-            "info",
-            NULL,
-            39184,
-            Cfg.UpdateEvery,
-            RRDSET_TYPE_LINE
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "detector_events", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Anomaly events triggerred", // title
+            "boolean", // units
+            "netdata", // plugin
+            "ml", // module
+            39186, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
         );
 
-        WindowLengthRD = rrddim_add(ADRS, "window_length", NULL,
+        AboveThresholdRD = rrddim_add(RS, "above_threshold", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        AnomalyRateRD = rrddim_add(ADRS, "anomaly_rate", NULL,
+        ResetBitCounterRD = rrddim_add(RS, "reset_bit_counter", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        AboveThresholdRD = rrddim_add(ADRS, "above_threshold", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        ResetBitCounterRD = rrddim_add(ADRS, "reset_bit_counter", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NewAnomalyEventRD = rrddim_add(ADRS, "new_anomaly_event", NULL,
+        NewAnomalyEventRD = rrddim_add(RS, "new_anomaly_event", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else
-        rrdset_next(ADRS);
+        rrdset_next(RS);
 
     BitRateWindow::Edge E = P.first;
     bool AboveThreshold = E.second == BitRateWindow::State::AboveThreshold;
-    size_t WindowLength = P.second;
 
-    rrddim_set_by_pointer(ADRS, WindowLengthRD, WindowLength);
-    rrddim_set_by_pointer(ADRS, AnomalyRateRD, AnomalyRate);
-    rrddim_set_by_pointer(ADRS, AboveThresholdRD, AboveThreshold);
-    rrddim_set_by_pointer(ADRS, ResetBitCounterRD, ResetBitCounter);
-    rrddim_set_by_pointer(ADRS, NewAnomalyEventRD, NewAnomalyEvent);
+    rrddim_set_by_pointer(RS, AboveThresholdRD, AboveThreshold);
+    rrddim_set_by_pointer(RS, ResetBitCounterRD, ResetBitCounter);
+    rrddim_set_by_pointer(RS, NewAnomalyEventRD, NewAnomalyEvent);
 
-    rrdset_done(ADRS);
+    rrdset_done(RS);
 }
 
 void RrdHost::addDimension(Dimension *D) {
@@ -199,8 +248,10 @@ void DetectableHost::detectOnce() {
                 AnomalyRate, WindowLength,
                 NumAnomalousDimensions, DimensionsMap.size());
 
-        updateMLChart(getRH(), DimensionsMap.size(), NumAnomalousDimensions, 100 * AnomalyRate);
-        updateADChart(getRH(), P, ResetBitCounter, NewAnomalyEvent, 100 * AnomalyRate);
+        updateDimensionsChart(getRH(), DimensionsMap.size() - NumAnomalousDimensions, NumAnomalousDimensions, 100 * AnomalyRate);
+        updateRateChart(getRH(), AnomalyRate * 100.0);
+        updateWindowLengthChart(getRH(), WindowLength);
+        updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     }
 
     if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
