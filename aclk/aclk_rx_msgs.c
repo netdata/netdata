@@ -339,7 +339,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             return;
         }
         chart_batch_id = res.batch_id;
-        info("DEBUG: Received batch id %d", chart_batch_id);
         aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
         freez(res.claim_id);
         freez(res.node_id);
@@ -376,7 +375,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             freez(res.node_id);
             return;
         }
-        //TODO stelfrag/MrZammler call your handler here
         aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
         freez(res.node_id);
         return;
@@ -387,7 +385,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             error("Error parsing SendAlarmLogHealth");
             return;
         }
-        //TODO stelfrag/MrZammler call your handler here
         aclk_send_alarm_health_log(node_id);
         freez(node_id);
         return;
@@ -398,7 +395,6 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             error("Error parsing SendAlarmConfiguration");
             return;
         }
-        //TODO stelfrag/MrZammler call your handler here
         aclk_send_alarm_configuration(config_hash);
         freez(config_hash);
         return;

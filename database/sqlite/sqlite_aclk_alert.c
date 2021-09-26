@@ -182,8 +182,6 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), uuid_str);
         alarm_log.config_hash = strdupz((char *)uuid_str);
-        if (uuid_is_null(*((uuid_t *) sqlite3_column_blob(res, 3))))
-            info("DEBUG: alert hash id is null on %s --> %"PRIu64, wc->uuid_str, (uint64_t) sqlite3_column_int64(res, 0));
 
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz((char *)wc->host->abbrev_timezone);

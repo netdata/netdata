@@ -1804,7 +1804,6 @@ after_second_database_work:
             if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
                 if (likely(!sql_queue_dimension_to_aclk(rd))) {
                     rd->state->aclk_live_status = live;
-                    //info("DEBUG: Dimension %s on chart %s live status = %d", rd->name, rd->rrdset->name, live);
                 }
             }
         }

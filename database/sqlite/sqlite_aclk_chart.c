@@ -578,25 +578,19 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
-//    info("DEBUG: CHART new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     if (!aclk_use_new_cloud_arch && aclk_connected) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
-//        info("DEBUG: CHART Sending LEGACY chart update for %s", st->name);
         return 0;
     }
-//    info("DEBUG: CHART Sending NEW ARCH new_arch=%d connected=%d", aclk_use_new_cloud_arch, aclk_connected);
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                    st, ACLK_DATABASE_ADD_CHART);
 }
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
-    //info("DEBUG: DIMENSION  new_arch=%d   connected=%d", aclk_use_new_cloud_arch, aclk_connected);
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
-//        info("DEBUG: DIMENSION skipping");
+    if (!aclk_use_new_cloud_arch && aclk_connected)
         return 0;
-    }
 
     int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
                                      rd, ACLK_DATABASE_ADD_DIMENSION);
@@ -702,9 +696,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
     if (unlikely(!node_id))
         return;
 
-    info("DEBUG: START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
-          sequence_id, created_at, batch_id);
-
     debug(D_ACLK_SYNC,"START streaming charts for node %s from sequence %"PRIu64" t=%ld, batch=%"PRIu64, node_id,
           sequence_id, created_at, batch_id);
     uuid_t node_uuid;
@@ -741,34 +732,25 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                     chart_reset.reason = SEQ_ID_NOT_EXISTS;
                     aclk_chart_reset(chart_reset);
                     freez(chart_reset.claim_id);
-//                    wc->chart_updates = 0;
                     wc->chart_reset_count = -1;
                     return;
                 } else {
                     struct aclk_database_cmd cmd;
                     memset(&cmd, 0, sizeof(cmd));
-                    // TODO: handle timestamp
-//                    if (!wc->chart_reset_count)
-//                        wc->chart_delay = now_realtime_sec() + 60;
-//                    else
-//                        wc->chart_delay = 0;
 
+                    // TODO: handle timestamp
                     if (sequence_id < wc->chart_sequence_id) { // || created_at != wc->chart_timestamp) {
-//                        wc->chart_updates = 0;
                         if (sequence_id)
-                            info("DEBUG: Synchonization mismatch detected");
+                            info("Synchonization mismatch detected");
                         else
-                            info("DEBUG: Synchonization mismatch detected; full resync ACKed from the cloud");
+                            info("Synchonization mismatch detected; full resync ACKed from the cloud");
                         cmd.opcode = ACLK_DATABASE_RESET_CHART;
                         cmd.param1 = sequence_id + 1;
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     }
-                    else {
+                    else
                         wc->chart_updates = 1;
-                        info("DEBUG: Enabling chart stream for node %s from sequence %"PRIu64" batch=%"PRIu64, node_id,
-                             sequence_id, batch_id);
-                    }
                 }
             }
             else
