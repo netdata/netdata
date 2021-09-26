@@ -159,6 +159,12 @@ ebpf_module_t ebpf_modules[] = {
 // Link with apps.plugin
 ebpf_process_stat_t *global_process_stat = NULL;
 
+// Link with cgroup.plugin
+netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup = {NULL, NULL};
+int shm_fd_ebpf_cgroup = -1;
+sem_t *shm_sem_ebpf_cgroup = SEM_FAILED;
+pthread_mutex_t mutex_cgroup_shm;
+
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt;
 
