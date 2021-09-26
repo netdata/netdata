@@ -11,6 +11,8 @@ class Config {
 public:
     bool EnableAnomalyDetection;
 
+    unsigned UpdateEvery;
+
     Seconds MaxTrainSecs;
     Seconds MinTrainSecs;
     Seconds TrainEvery;

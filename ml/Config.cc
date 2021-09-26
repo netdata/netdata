@@ -22,9 +22,16 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = "ml";
 
-    Cfg.EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+    Cfg.EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
     if (!Cfg.EnableAnomalyDetection)
         return;
+
+    Cfg.UpdateEvery = config_get_number(ConfigSectionML, "update every", 1);
+    if (Cfg.UpdateEvery > 30) {
+        error("Disabling anomaly detection because ml.update_every > 30 seconds");
+        Cfg.EnableAnomalyDetection = false;
+        return;
+    }
 
     /*
      * Read values

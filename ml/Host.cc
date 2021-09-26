@@ -29,7 +29,7 @@ static void updateMLChart(RRDHOST *RH,
             "ml_units",
             NULL,
             39183,
-            1,
+            Cfg.UpdateEvery,
             RRDSET_TYPE_LINE
         );
 
@@ -74,7 +74,7 @@ static void updateADChart(RRDHOST *RH,
             "info",
             NULL,
             39184,
-            1,
+            Cfg.UpdateEvery,
             RRDSET_TYPE_LINE
         );
 
@@ -212,8 +212,9 @@ void DetectableHost::detectOnce() {
     nlohmann::json JsonResult = DimsOverThreshold;
     error("--->>> JSON <<<---\n%s", JsonResult.dump(4).c_str());
 
-    time_t Now = now_realtime_sec();
-    DB.insertAnomaly("AD1", 1, getUUID(), Now - WindowLength, Now, JsonResult.dump(4));
+    time_t Before = now_realtime_sec();
+    time_t After = Before - (WindowLength * Cfg.UpdateEvery);
+    DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
 }
 
 void DetectableHost::detect() {
@@ -227,7 +228,7 @@ void DetectableHost::detect() {
         Duration<double> Dur = EndTP - StartTP;
         error("Detection took %lf seconds", Dur.count());
 
-        std::this_thread::sleep_for(Seconds{1});
+        std::this_thread::sleep_for(Seconds{Cfg.UpdateEvery});
     }
 }
 

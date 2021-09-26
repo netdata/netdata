@@ -64,7 +64,7 @@ TrainableDimension::getCalculatedNumbers() {
     time_t BeforeT = now_realtime_sec() - 1;
     time_t AfterT = BeforeT - (MaxN * updateEvery().count());
 
-    BeforeT -=  (BeforeT % updateEvery().count());
+    BeforeT -= (BeforeT % updateEvery().count());
     AfterT -= (AfterT % updateEvery().count());
 
     time_t LastT = latestTime();
