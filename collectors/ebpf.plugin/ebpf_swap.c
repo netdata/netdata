@@ -410,6 +410,24 @@ static void ebpf_create_specific_swap_charts(char *type)
                       &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
+/**
+ * Create specific swap charts
+ *
+ * Create charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_obsolete_specific_swap_charts(char *type)
+{
+    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART,"Calls for function <code>swap_readpage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100);
+
+    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "Calls for function <code>swap_writepage</code>.",
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE,NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101);
+}
+
 /*
  * Send Specific Swap data
  *
@@ -489,8 +507,11 @@ void ebpf_swap_send_cgroup_data()
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) {
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART && ect->updated) {
             ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap);
+        } else {
+            ebpf_obsolete_specific_swap_charts(ect->name);
+            ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
         }
     }
 
