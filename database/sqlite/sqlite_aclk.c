@@ -207,7 +207,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-//#ifdef ACLK_NEWARCH_DEVMODE
+#ifdef ACLK_NEWARCH_DEVMODE
     char *err_msg = NULL;
     int rc;
 
@@ -236,7 +236,7 @@ void sql_aclk_sync_init(void)
 
     rc = sqlite3_exec(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni WHERE "
         "h.host_id = ni.host_id AND ni.node_id IS NOT NULL;", aclk_start_sync_thread, NULL, NULL);
-//#endif
+#endif
     return;
 }
 
