@@ -108,10 +108,6 @@ void ebpf_close_cgroup_shm()
         sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
     }
 
-    if (shm_ebpf_cgroup.header) {
-        munmap(shm_ebpf_cgroup.header, shm_ebpf_cgroup.header->body_length);
-    }
-
     if (shm_fd_ebpf_cgroup > 0) {
         close(shm_fd_ebpf_cgroup);
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
