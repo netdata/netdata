@@ -341,7 +341,7 @@ void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *fam
     ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, title, units, family, charttype, NULL, order, module);
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely(w->systemd))
+        if (unlikely(w->systemd) && unlikely(w->updated))
             fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }

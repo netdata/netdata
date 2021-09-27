@@ -361,25 +361,32 @@ static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_o
  * Send Systemd charts
  *
  * Send collected data to Netdata.
+ *
+ * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
+ *         otherwise function returns 1 to avoid chart recreation
  */
-static void ebpf_send_systemd_swap_charts()
+static int ebpf_send_systemd_swap_charts()
 {
+    int ret = 1;
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd)) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
-        }
+        } else
+            ret = 0;
     }
     write_end_chart();
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd)) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.write);
         }
     }
     write_end_chart();
+
+    return ret;
 }
 
 /**
@@ -503,7 +510,7 @@ void ebpf_swap_send_cgroup_data()
     }
 
     if (has_systemd) {
-        ebpf_send_systemd_swap_charts();
+        systemd_charts = ebpf_send_systemd_swap_charts();
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
