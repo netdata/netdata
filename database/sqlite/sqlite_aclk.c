@@ -185,7 +185,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#ifdef ACLK_NEWARCH_DEVMODE
+#if defined(ENABLE_CLOUD) && defined(ACLK_NG)
     char *err_msg = NULL;
     int rc;
 
@@ -491,6 +491,7 @@ error_after_loop_init:
 
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 {
+#ifdef ENABLE_CLOUD
     char uuid_str[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
 
@@ -552,6 +553,12 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, wc->node_id);
     fatal_assert(0 == uv_thread_create(&(wc->thread), aclk_database_worker, wc));
+#else
+    UNUSED(host);
+    UNUSED(host_uuid);
+    UNUSED(node_id);
+#endif
+    return;
 }
 
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
