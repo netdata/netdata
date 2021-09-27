@@ -589,6 +589,7 @@ void analytics_main_cleanup(void *ptr)
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     debug(D_ANALYTICS, "Cleaning up...");
+    analytics_free_data();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
