@@ -261,7 +261,6 @@ void DetectableHost::detectOnce() {
     std::reverse(DimsOverThreshold.begin(), DimsOverThreshold.end());
 
     nlohmann::json JsonResult = DimsOverThreshold;
-    error("--->>> JSON <<<---\n%s", JsonResult.dump(4).c_str());
 
     time_t Before = now_realtime_sec();
     time_t After = Before - (WindowLength * Cfg.UpdateEvery);
