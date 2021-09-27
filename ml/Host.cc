@@ -196,10 +196,17 @@ void TrainableHost::train() {
         Duration<double> RealDuration = SteadyClock::now() - StartTP;
         Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery} / (NumDimensions + 1);
 
-        if (RealDuration >= AllottedDuration)
-            continue;
+        Duration<double> SleepFor;
+        if ((2 * RealDuration) >= AllottedDuration) {
+            error("\"train every secs\" configuration option is too low"
+                  " (training dration: %lf seconds, allotted duration: %lf seconds)",
+                  RealDuration.count(), AllottedDuration.count());
 
-        Duration<double> SleepFor = AllottedDuration - RealDuration;
+            SleepFor = AllottedDuration;
+        } else {
+            SleepFor = AllottedDuration - RealDuration;
+        }
+
         Duration<double> MaxSleepFor = Seconds{1};
         std::this_thread::sleep_for(std::min(SleepFor, MaxSleepFor));
     }
