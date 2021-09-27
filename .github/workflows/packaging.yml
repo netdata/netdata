@@ -131,7 +131,7 @@ jobs:
       - name: Save Packages
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.distro }}-${{ matrix.version }}-packages
+          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
       - name: Upload to PackageCloud
         if: github.event_name == 'workflow_dispatch'
