@@ -186,9 +186,9 @@ AC_ARG_WITH(
 )
 AC_ARG_ENABLE(
     [ml],
-    [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@no@:>@])],
-    [enable_ml="yes"],
-    [enable_ml="no"]
+    [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@default autodetect@:>@])],
+    ,
+    [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
     [ml_tests],
@@ -1220,31 +1220,54 @@ fi
 # -----------------------------------------------------------------------------
 # ml - anomaly detection
 
-AM_CONDITIONAL([ENABLE_ML], [test "${enable_ml}" = "yes"])
-if test "${enable_ml}" = "yes"; then
-    AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
-    if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
-        AC_MSG_RESULT([yes])
-    else
-        AC_MSG_RESULT([no])
-        AC_MSG_ERROR([You have requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
-    fi
+# Check if submodules have not been fetched. Fail if ML was explicitly requested.
+AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
+if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+    AC_MSG_RESULT([yes])
+    have_ml_submodules="yes"
+else
+    AC_MSG_RESULT([no])
+    have_ml_submodules="no"
+fi
 
-    AC_LANG_PUSH([C++])
-    AX_CHECK_COMPILE_FLAG(
-        [-std=c++11],
-        [CXX11FLAG="$CXX11FLAG -std=c++11"],
-        [AC_MSG_ERROR([You have requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])]
-    )
-    AC_LANG_POP([C++])
+if test "${enable_ml}" = "yes" -a "${have_ml_submodules}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
+fi
 
+# Check if C++ toolchain does not support C++11. Fail if ML was explicitly requested.
+AC_LANG_PUSH([C++])
+AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
+AC_LANG_POP([C++])
+
+if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
+else
+    CXX11FLAG="$CXX11FLAG -std=c++11"
+fi
+
+# Decide if we should build ML
+if test "${enable_ml}" != "no" -a "${have_ml_submodules}" = "yes" -a "${have_cxx11}" = "yes"; then
+    build_ml="yes"
+else
+    build_ml="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
+if test "${build_ml}" = "yes"; then
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
     OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
     OPTIONAL_ML_LIBS=""
 fi
 
-AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${enable_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"])
-if test "${enable_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+# Decide if we should build ML tests.
+if test "${build_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+    build_ml_tests="yes"
+else
+    build_ml_tests="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${build_ml_tests}" = "yes"])
+if test "${build_ml_tests}" = "yes"; then
     AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
     OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
     OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
