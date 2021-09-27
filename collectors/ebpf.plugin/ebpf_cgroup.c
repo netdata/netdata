@@ -103,7 +103,7 @@ void ebpf_map_cgroup_shared_memory()
  */
 void ebpf_close_cgroup_shm()
 {
-    if (shm_sem_ebpf_cgroup == SEM_FAILED) {
+    if (shm_sem_ebpf_cgroup != SEM_FAILED) {
         sem_close(shm_sem_ebpf_cgroup);
         sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
     }
