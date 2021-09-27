@@ -3,8 +3,9 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"
-#include "../../aclk/aclk.h"
+#endif
 
 static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc,
                                           void *data, enum aclk_database_opcode opcode)
@@ -20,6 +21,7 @@ static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc
     return 0;
 }
 
+#ifdef ENABLE_ACLK
 static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -118,6 +120,7 @@ bind_fail:
         error_report("Failed to reset statement in store chart payload, rc = %d", rc);
     return (rc != SQLITE_DONE);
 }
+#endif
 
 int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
@@ -578,6 +581,7 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
+#ifdef ENABLE_CLOUD
     if (!aclk_use_new_cloud_arch) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
@@ -585,10 +589,15 @@ int sql_queue_chart_to_aclk(RRDSET *st)
     }
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                    st, ACLK_DATABASE_ADD_CHART);
+#else
+    UNUSED(st);
+    return 0;
+#endif
 }
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
+#ifdef ENABLE_CLOUD
     if (!aclk_use_new_cloud_arch)
         return 0;
 
@@ -597,6 +606,10 @@ int sql_queue_dimension_to_aclk(RRDDIM *rd)
     if (likely(!rc))
         rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
     return rc;
+#else
+    UNUSED(rd);
+    return 0;
+#endif
 }
 
 void sql_chart_deduplicate(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)

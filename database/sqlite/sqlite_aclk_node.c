@@ -5,6 +5,7 @@
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 #include "../../aclk/aclk_charts_api.h"
+#include "../../aclk/aclk.h"
 #endif
 
 void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
@@ -69,8 +70,11 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
-
+#ifdef ACLK_NG
     int rc;
+
+    if (!aclk_use_new_cloud_arch || !aclk_connected)
+        return;
 
     if (unlikely(!wc->host))
         return;
@@ -143,10 +147,8 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         {
             RRDSET *st = NULL;
             rc = (st = rrdset_find(wc->host, (const char *)sqlite3_column_text(res, 2))) ? 0 : 1;
-            if (!rc) {
+            if (!rc)
                 first_entry_t = rrdset_first_entry_t(st);
-                //                info("DEBUG: Scanning SET = %s --> %ld", st->name, first_entry_t);
-            }
         }
 
         if (likely(!rc && first_entry_t))
@@ -172,5 +174,8 @@ failed:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host dimensions");
+#else
+    UNUSED(wc);
+#endif
     return;
 }

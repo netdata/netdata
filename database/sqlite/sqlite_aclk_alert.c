@@ -3,8 +3,10 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
 
+#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_alarm_api.h"
 #include "../../aclk/aclk.h"
+#endif
 
 // will replace call to aclk_update_alarm in health/health_log.c
 // and handle both cases
@@ -12,6 +14,7 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
 {
     //check aclk architecture and handle old json alarm update to cloud
     //include also the valid statuses for this case
+#ifdef ENABLE_ACLK
     if (!aclk_use_new_cloud_arch) {
         if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
@@ -39,6 +42,10 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
+#else
+    UNUSED(host);
+    UNUSED(ae);
+#endif
     return;
 }
 
@@ -85,6 +92,7 @@ bind_fail:
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 {
+#ifdef ENABLE_ACLK
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return ALARM_STATUS_REMOVED;
@@ -104,6 +112,9 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
         default:
             return ALARM_STATUS_UNKNOWN;
     }
+#else
+    return 1;
+#endif
 }
 
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
