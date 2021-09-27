@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request: null
   workflow_dispatch:
     inputs:
       version:
@@ -99,7 +99,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
-          SLACK_FOOTER:
+          SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker Build failed:'
           SLACK_USERNAME: 'GitHub Actions'

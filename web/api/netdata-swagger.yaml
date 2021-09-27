@@ -456,7 +456,7 @@ paths:
           required: false
           allowEmptyValue: true
           schema:
-           oneOf:
+            oneOf:
               - type: string
                 enum:
                   - green
@@ -478,7 +478,7 @@ paths:
           required: false
           allowEmptyValue: true
           schema:
-           oneOf:
+            oneOf:
               - type: string
                 enum:
                   - green
