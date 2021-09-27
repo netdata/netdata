@@ -22,16 +22,8 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = "ml";
 
-    Cfg.EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
-    if (!Cfg.EnableAnomalyDetection)
-        return;
-
-    Cfg.UpdateEvery = config_get_number(ConfigSectionML, "update every", 1);
-    if (Cfg.UpdateEvery > 30) {
-        error("Disabling anomaly detection because ml.update_every > 30 seconds");
-        Cfg.EnableAnomalyDetection = false;
-        return;
-    }
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+    unsigned UpdateEvery = config_get_number(ConfigSectionML, "update every", 1);
 
     /*
      * Read values
@@ -100,8 +92,6 @@ void Config::readMLConfig(void) {
         MaxTrainSecs = 4 * 3600;
     }
 
-    ADMinWindowSize = clamp(ADMinWindowSize, 30.0, 300.0);
-    ADMaxWindowSize = clamp(ADMaxWindowSize, 60.0, 900.0);
     if (ADMinWindowSize >= ADMaxWindowSize) {
         error("invalid min/max anomaly window size found (%lf >= %lf)", ADMinWindowSize, ADMaxWindowSize);
 
@@ -113,24 +103,27 @@ void Config::readMLConfig(void) {
      * Assign to config instance
      */
 
-    Cfg.MaxTrainSecs = Seconds{clamp(MaxTrainSecs, 1 * 3600, 6 * 3600)};
-    Cfg.MinTrainSecs = Seconds{clamp(MinTrainSecs, 1 * 3600, 6 * 3600)};
-    Cfg.TrainEvery = Seconds{clamp(TrainEvery, 1 * 3600, 6 * 3600)};
+    Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
+    Cfg.UpdateEvery = UpdateEvery;
 
-    Cfg.DiffN = clamp(DiffN, 0u, 1u);
-    Cfg.SmoothN = clamp(SmoothN, 0u, 5u);
-    Cfg.LagN = clamp(LagN, 0u, 5u);
+    Cfg.MaxTrainSecs = Seconds{MaxTrainSecs};
+    Cfg.MinTrainSecs = Seconds{MinTrainSecs};
+    Cfg.TrainEvery = Seconds{TrainEvery};
 
-    Cfg.MaxKMeansIters = clamp(MaxKMeansIters, 500u, 1000u);
+    Cfg.DiffN = DiffN;
+    Cfg.SmoothN = SmoothN;
+    Cfg.LagN = LagN;
 
-    Cfg.DimensionAnomalyScoreThreshold = clamp(DimensionAnomalyScoreThreshold, 0.01, 5.00);
-    Cfg.HostAnomalyRateThreshold = clamp(HostAnomalyRateThreshold, 0.01, 1.0);
+    Cfg.MaxKMeansIters = MaxKMeansIters;
 
-    Cfg.ADMinWindowSize = clamp(ADMinWindowSize, 30.0, 300.0);
-    Cfg.ADMaxWindowSize = clamp(ADMaxWindowSize, 60.0, 900.0);
-    Cfg.ADIdleWindowSize = clamp(ADIdleWindowSize, 30.0, 900.0);
-    Cfg.ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
-    Cfg.ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
+    Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;
+    Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
+
+    Cfg.ADMinWindowSize = ADMinWindowSize;
+    Cfg.ADMaxWindowSize = ADMaxWindowSize;
+    Cfg.ADIdleWindowSize = ADIdleWindowSize;
+    Cfg.ADWindowRateThreshold = ADWindowRateThreshold;
+    Cfg.ADDimensionRateThreshold = ADDimensionRateThreshold;
 
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
