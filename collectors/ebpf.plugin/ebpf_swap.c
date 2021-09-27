@@ -427,12 +427,14 @@ static void ebpf_create_specific_swap_charts(char *type)
 static void ebpf_obsolete_specific_swap_charts(char *type)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART,"Calls to function <code>swap_readpage</code>.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU, NULL,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100);
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "Calls to function <code>swap_writepage</code>.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,NULL,
-                              NETDATA_EBPF_CHART_TYPE_LINE,NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101);
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,NULL,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101);
 }
 
 /*
