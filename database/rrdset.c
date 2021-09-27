@@ -1792,7 +1792,9 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
+#ifdef ACLK_NG
     time_t mark = now_realtime_sec();
+#endif
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
