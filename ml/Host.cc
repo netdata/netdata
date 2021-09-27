@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <dlib/statistics.h>
+
 #include "Config.h"
 #include "Host.h"
 
@@ -181,6 +183,54 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
     rrdset_done(RS);
 }
 
+static void updateTrainingChart(RRDHOST *RH,
+                                collected_number MaxTrainingDuration,
+                                collected_number AvgTrainingDuration,
+                                collected_number StdDevTrainingDuration,
+                                collected_number AvgSleepForDuration)
+{
+    static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *MaxTrainingDurationRD = nullptr;
+    static thread_local RRDDIM *AvgTrainingDurationRD = nullptr;
+    static thread_local RRDDIM *StdDevTrainingDurationRD = nullptr;
+    static thread_local RRDDIM *AvgSleepForDurationRD = nullptr;
+
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "training_stats", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Training step statistics", // title
+            "milliseconds", // units
+            "netdata", // plugin
+            "ml", // module
+            39188, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+
+        MaxTrainingDurationRD = rrddim_add(RS, "max_training_duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+        AvgTrainingDurationRD = rrddim_add(RS, "avg_training_duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+        StdDevTrainingDurationRD = rrddim_add(RS, "stddev_training_duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+        AvgSleepForDurationRD = rrddim_add(RS, "avg_sleep_duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(RS);
+
+    rrddim_set_by_pointer(RS, MaxTrainingDurationRD, MaxTrainingDuration);
+    rrddim_set_by_pointer(RS, AvgTrainingDurationRD, AvgTrainingDuration);
+    rrddim_set_by_pointer(RS, StdDevTrainingDurationRD, StdDevTrainingDuration);
+    rrddim_set_by_pointer(RS, AvgSleepForDurationRD, AvgSleepForDuration);
+
+    rrdset_done(RS);
+}
+
 void RrdHost::addDimension(Dimension *D) {
     std::lock_guard<std::mutex> Lock(Mutex);
     DimensionsMap[D->getRD()] = D;
@@ -211,6 +261,12 @@ void TrainableHost::trainOne(TimePoint &Now) {
 }
 
 void TrainableHost::train() {
+    dlib::running_stats<double> TrainingRS;
+    dlib::running_stats<double> AllottedRS;
+    dlib::running_stats<double> SleepForRS;
+
+    Duration<double> MaxSleepFor = Seconds{1};
+
     while (!netdata_exit) {
         size_t NumDimensions;
 
@@ -234,9 +290,17 @@ void TrainableHost::train() {
         } else {
             SleepFor = AllottedDuration - RealDuration;
         }
+        SleepFor = std::min(SleepFor, MaxSleepFor);
 
-        Duration<double> MaxSleepFor = Seconds{1};
-        std::this_thread::sleep_for(std::min(SleepFor, MaxSleepFor));
+        TrainingRS.add(RealDuration.count());
+        TrainingDurationMax = TrainingRS.max();
+        TrainingDurationAvg = TrainingRS.mean();
+        TrainingDurationStdDev = TrainingRS.stddev();
+
+        SleepForRS.add(SleepFor.count());
+        SleepForDurationAvg = SleepForRS.mean();
+
+        std::this_thread::sleep_for(SleepFor);
     }
 }
 
@@ -288,6 +352,10 @@ void DetectableHost::detectOnce() {
     updateRateChart(getRH(), AnomalyRate * 100.0);
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
+    updateTrainingChart(getRH(), TrainingDurationMax * 1000.0,
+                                 TrainingDurationAvg * 1000.0,
+                                 TrainingDurationStdDev * 1000.0,
+                                 SleepForDurationAvg * 1000.0);
 
     if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
         return;

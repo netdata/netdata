@@ -42,6 +42,13 @@ public:
 
     void train();
     void trainOne(TimePoint &Now);
+
+protected:
+    std::atomic<double> TrainingDurationMax;
+    std::atomic<double> TrainingDurationAvg;
+    std::atomic<double> TrainingDurationStdDev;
+
+    std::atomic<double> SleepForDurationAvg;
 };
 
 class DetectableHost : public TrainableHost {
