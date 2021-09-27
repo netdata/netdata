@@ -105,12 +105,10 @@ void ebpf_close_cgroup_shm()
 {
     if (shm_sem_ebpf_cgroup != SEM_FAILED) {
         sem_close(shm_sem_ebpf_cgroup);
-        sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
     }
 
     if (shm_fd_ebpf_cgroup > 0) {
         close(shm_fd_ebpf_cgroup);
-        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
 }
 
@@ -164,6 +162,7 @@ static void ebpf_remove_cgroup_target_update_list()
         if (!ect->updated) {
             if (ect == ebpf_cgroup_pids) {
                 ebpf_cgroup_pids = next;
+                prev = next;
             } else {
                 prev->next = next;
             }
@@ -176,7 +175,6 @@ static void ebpf_remove_cgroup_target_update_list()
 
         ect = next;
     }
-
 }
 
 // --------------------------------------------------------------------------------------------------------------------
