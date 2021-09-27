@@ -110,7 +110,12 @@ jobs:
         shell: bash
         run: |
           docker run -e DO_NOT_TRACK=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
-      - name: Upload
+      - name: Save Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.distro }}-${{ matrix.version }}-packages
+          path: ${{ github.workspace }}/artifacts/*
+      - name: Upload to PackageCloud
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:

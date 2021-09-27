@@ -23,6 +23,11 @@ jobs:
           submodules: recursive
       - name: Build
         run: .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Save Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.arch }}-static-builds
+          path: ${{ github.workspace }}/artifacts/*
   source-build:
     name: Build & Install
     strategy:

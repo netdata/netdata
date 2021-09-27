@@ -77,6 +77,11 @@ jobs:
         run: |
           ls -lah netdata-*.tar.gz
           echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
+      - name: Save Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-archive
+          path: ${{ github.workspace }}/${{ env.DISTFILE }}
       - name: Run run_install_with_dist_file.sh
         run: |
           ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
