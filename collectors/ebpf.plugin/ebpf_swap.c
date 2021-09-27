@@ -221,7 +221,7 @@ static void swap_send_global()
 /**
  * Read global counter
  *
- * Read the table with number of calls for all functions
+ * Read the table with number of calls to all functions
  */
 static void read_global_table()
 {
@@ -462,7 +462,7 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
 static void ebpf_create_systemd_swap_charts()
 {
     ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_READ_CHART,
-                                  "Calls for function <code>swap_readpage</code>. This chart is provided by eBPF plugin.",
+                                  "Calls to <code>swap_readpage</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -471,7 +471,7 @@ static void ebpf_create_systemd_swap_charts()
                                   NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_WRITE_CHART,
-                                  "Calls for function <code>swap_writepage</code>. This chart is provided by eBPF plugin.",
+                                  "Calls to function <code>swap_writepage</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
