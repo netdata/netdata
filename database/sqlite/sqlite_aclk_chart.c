@@ -578,7 +578,7 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
-    if (!aclk_use_new_cloud_arch && aclk_connected) {
+    if (!aclk_use_new_cloud_arch) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
         return 0;
@@ -589,7 +589,7 @@ int sql_queue_chart_to_aclk(RRDSET *st)
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
-    if (!aclk_use_new_cloud_arch && aclk_connected)
+    if (!aclk_use_new_cloud_arch)
         return 0;
 
     int rc = sql_queue_chart_payload((struct aclk_database_worker_config *) rd->rrdset->rrdhost->dbsync_worker,
@@ -710,47 +710,41 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
             rrd_unlock();
             wc = (struct aclk_database_worker_config *)host->dbsync_worker;
             if (likely(wc)) {
-                //                if (unlikely(!wc->chart_updates)) {
-                //                    struct aclk_database_cmd cmd;
-                //                    cmd.opcode = ACLK_DATABASE_NODE_INFO;
-                //                    cmd.completion = NULL;
-                //                    aclk_database_enq_cmd(wc, &cmd);
-                //                }
-
                 wc->chart_reset_count++;
+                __sync_synchronize();
                 wc->chart_updates = 0;
                 wc->batch_id = batch_id;
+                __sync_synchronize();
                 wc->batch_created = now_realtime_sec();
-                info("DEBUG: START streaming charts for %s (%s) enabled -- last streamed sequence %"PRIu64" t=%ld  (reset count=%d)", node_id, wc->uuid_str,
-                     wc->chart_sequence_id, wc->chart_timestamp, wc->chart_reset_count);
-                // If mismatch detected
                 if (sequence_id > wc->chart_sequence_id || wc->chart_reset_count > 10) {
-                    info("DEBUG: Full resync requested -- reset_count=%d", wc->chart_reset_count);
+                    debug(D_ACLK_SYNC,"Requesting full resync from the cloud -- reset_count=%d", wc->chart_reset_count);
                     chart_reset_t chart_reset;
-                    chart_reset.node_id = node_id;
                     chart_reset.claim_id = is_agent_claimed();
-                    chart_reset.reason = SEQ_ID_NOT_EXISTS;
-                    aclk_chart_reset(chart_reset);
-                    freez(chart_reset.claim_id);
-                    wc->chart_reset_count = -1;
+                    if (chart_reset.claim_id) {
+                        chart_reset.node_id = node_id;
+                        chart_reset.reason = SEQ_ID_NOT_EXISTS;
+                        aclk_chart_reset(chart_reset);
+                        freez(chart_reset.claim_id);
+                        wc->chart_reset_count = -1;
+                    }
                     return;
                 } else {
                     struct aclk_database_cmd cmd;
                     memset(&cmd, 0, sizeof(cmd));
-
                     // TODO: handle timestamp
                     if (sequence_id < wc->chart_sequence_id) { // || created_at != wc->chart_timestamp) {
-                        if (sequence_id)
-                            info("Synchonization mismatch detected");
-                        else
-                            info("Synchonization mismatch detected; full resync ACKed from the cloud");
                         cmd.opcode = ACLK_DATABASE_RESET_CHART;
                         cmd.param1 = sequence_id + 1;
                         cmd.completion = NULL;
                         aclk_database_enq_cmd(wc, &cmd);
                     }
-                    else
+                    else {
+                        debug(D_ACLK_SYNC,"START streaming charts for %s enabled -- last streamed sequence %"PRIu64 \
+                              " t=%ld (reset count=%d)", wc->host_guid, wc->chart_sequence_id,
+                              wc->chart_timestamp, wc->chart_reset_count);
+                        wc->chart_reset_count = 0;
                         wc->chart_updates = 1;
+                    }
                 }
             }
             else
