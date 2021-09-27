@@ -20,7 +20,7 @@
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
-#define EBPF_CFG_CGROUP "cgroup"
+#define EBPF_CFG_CGROUP "cgroups"
 
 /**
  * The next magic number is got doing the following math:
