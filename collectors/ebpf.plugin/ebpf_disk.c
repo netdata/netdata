@@ -608,7 +608,7 @@ void *ebpf_disk_read_hash(void *ptr)
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
 {
     ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, "disk.latency_io",
                               w->histogram.order);
 
     w->flags = 0;
