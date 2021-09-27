@@ -568,6 +568,7 @@ void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
     return;
 }
 
+#ifdef ACLK_NG
 void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 {
     if (unlikely(!node_id))
@@ -577,6 +578,7 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
     aclk_submit_param_command(node_id, ACLK_DATABASE_RESET_CHART, last_sequence_id);
     return;
 }
+#endif
 
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)

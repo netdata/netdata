@@ -3,16 +3,12 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk.h"
 
-// TODO: To be added
 #include "sqlite_aclk_chart.h"
-//#include "sqlite_aclk_alert.h"
 #include "sqlite_aclk_node.h"
 
 const char *aclk_sync_config[] = {
     NULL,
 };
-
-int aclk_architecture = 0;
 
 uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
@@ -76,24 +72,6 @@ void aclk_database_init_cmd_queue(struct aclk_database_worker_config *wc)
     wc->queue_size = 0;
     fatal_assert(0 == uv_cond_init(&wc->cmd_cond));
     fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
-}
-
-void aclk_database_enq_cmd_nowake(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd)
-{
-    unsigned queue_size;
-
-    /* wait for free space in queue */
-    uv_mutex_lock(&wc->cmd_mutex);
-    while ((queue_size = wc->queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
-        uv_cond_wait(&wc->cmd_cond, &wc->cmd_mutex);
-    }
-    fatal_assert(queue_size < ACLK_DATABASE_CMD_Q_MAX_SIZE);
-    /* enqueue command */
-    wc->cmd_queue.cmd_array[wc->cmd_queue.tail] = *cmd;
-    wc->cmd_queue.tail = wc->cmd_queue.tail != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
-                         wc->cmd_queue.tail + 1 : 0;
-    wc->queue_size = queue_size + 1;
-    uv_mutex_unlock(&wc->cmd_mutex);
 }
 
 int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd)
@@ -473,7 +451,7 @@ void aclk_database_worker(void *arg)
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
-     * it is however undocumented behaviour and we need to be aware if this becomes
+     * it is however undocumented behaviour we need to be aware if this becomes
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
@@ -510,11 +488,6 @@ error_after_loop_init:
 }
 
 // -------------------------------------------------------------
-
-void aclk_set_architecture(int mode)
-{
-    aclk_architecture = mode;
-}
 
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 {
