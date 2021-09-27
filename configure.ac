@@ -1220,6 +1220,11 @@ fi
 # -----------------------------------------------------------------------------
 # ml - anomaly detection
 
+# Check if uuid is availabe. Fail if ML was explicitly requested.
+if test "${enable_ml}" = "yes" -a "${have_uuid}" != "yes"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found."])
+fi
+
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
 AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
 if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
@@ -1246,7 +1251,7 @@ else
 fi
 
 # Decide if we should build ML
-if test "${enable_ml}" != "no" -a "${have_ml_submodules}" = "yes" -a "${have_cxx11}" = "yes"; then
+if test "${enable_ml}" != "no" -a "${have_ml_submodules}" = "yes" -a "${have_cxx11}" = "yes" -a "${have_uuid}" = "yes"; then
     build_ml="yes"
 else
     build_ml="no"
