@@ -185,7 +185,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#if defined(ENABLE_CLOUD) && defined(ACLK_NG)
+#if defined(ENABLE_ACLK) && defined(ACLK_NG)
     char *err_msg = NULL;
     int rc;
 
@@ -345,14 +345,6 @@ void aclk_database_worker(void *arg)
                     if (wc->host == localhost)
                         sql_check_aclk_table_list(wc);
                     break;
-                case ACLK_DATABASE_CHECK:
-                    debug(D_ACLK_SYNC, "Checking database dimensions for %s", wc->host_guid);
-//                    sql_check_dimension_state(wc, cmd);
-                    break;
-                case ACLK_DATABASE_CHECK_ROTATION:
-                    debug(D_ACLK_SYNC, "Checking database for rotation %s", wc->host_guid);
-//                    sql_check_rotation_state(wc, cmd);
-                    break;
                 case ACLK_DATABASE_DELETE_HOST:
                     debug(D_ACLK_SYNC,"Cleaning ACLK tables for %s", (char *) cmd.data);
                     sql_delete_aclk_table_list(wc, cmd);
@@ -491,7 +483,7 @@ error_after_loop_init:
 
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 {
-#ifdef ENABLE_CLOUD
+#ifdef ENABLE_ACLK
     char uuid_str[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
 
@@ -704,9 +696,9 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
     return;
 }
 
-void aclk_data_rotated(RRDHOST *host)
+void aclk_data_rotated(void)
 {
-    UNUSED(host);
+#if defined(ENABLE_ACLK) && defined(ACLK_NG)
 
     debug(D_ACLK_SYNC,"Processing data base rotation event");
     struct aclk_database_cmd cmd;
@@ -729,5 +721,6 @@ void aclk_data_rotated(RRDHOST *host)
         tmp = tmp->next;
     }
     uv_mutex_unlock(&aclk_async_lock);
+#endif
     return;
 }

@@ -5,6 +5,7 @@
 
 #ifdef ENABLE_ACLK
 #include "../../aclk/aclk_charts_api.h"
+#include "../../aclk/aclk.h"
 #endif
 
 static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc,
@@ -583,7 +584,7 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 // ST is read locked
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
-#ifdef ENABLE_CLOUD
+#ifdef ENABLE_ACLK
     if (!aclk_use_new_cloud_arch) {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
@@ -599,7 +600,7 @@ int sql_queue_chart_to_aclk(RRDSET *st)
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
-#ifdef ENABLE_CLOUD
+#ifdef ENABLE_ACLK
     if (!aclk_use_new_cloud_arch)
         return 0;
 

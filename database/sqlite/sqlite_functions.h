@@ -92,4 +92,6 @@ extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
 extern int execute_insert(sqlite3_stmt *res);
 extern int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement);
+extern void compute_chart_hash(RRDSET *st);
+extern void sql_chart_from_hash_id(char *hash_str, BUFFER *wb);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

@@ -117,8 +117,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CHART_ACK,
-    ACLK_DATABASE_CHECK,
-    ACLK_DATABASE_CHECK_ROTATION,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_INFO,
@@ -212,7 +210,7 @@ extern int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc,
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
-void aclk_data_rotated(RRDHOST *host);
+void aclk_data_rotated(void);
 void sql_aclk_sync_init(void);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);

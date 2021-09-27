@@ -139,8 +139,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     if (wc->alerts_start_seq_id != 0) {
         buffer_sprintf(
             sql,
-            "UPDATE aclk_alert_%s SET date_submitted = NULL, date_cloud_ack = NULL WHERE sequence_id >= %" PRIu64
-            "; UPDATE aclk_alert_%s SET date_cloud_ack = strftime('%%s','now') WHERE sequence_id < %" PRIu64
+            "UPDATE aclk_alert_%s SET date_submitted = NULL, date_cloud_ack = NULL WHERE sequence_id >= %"PRIu64
+            "; UPDATE aclk_alert_%s SET date_cloud_ack = strftime('%%s','now') WHERE sequence_id < %"PRIu64
             " and date_cloud_ack is null",
             wc->uuid_str,
             wc->alerts_start_seq_id,
@@ -521,6 +521,11 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     if (likely(host))
         wc = (struct aclk_database_worker_config *)host->dbsync_worker;
     rrd_unlock();
+
+    if (unlikely(!host->health_enabled)) {
+        info("Ignoring request to stream alert state changes, health is disabled for %s", host->machine_guid);
+        return;
+    }
 
     if (likely(wc)) {
         info("START streaming alerts for %s enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64, node_id, batch_id, start_seq_id);
