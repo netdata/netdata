@@ -632,7 +632,7 @@ static void ebpf_swap_allocate_global_vectors()
 static void ebpf_create_swap_charts()
 {
     ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_MEM_SWAP_CHART,
-                      "Calls for internal functions used to access swap.",
+                      "Calls to internal functions used to access swap.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
