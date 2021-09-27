@@ -150,6 +150,37 @@ static void updateEventsChart(RRDHOST *RH,
     rrdset_done(RS);
 }
 
+static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuration) {
+    static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *PredictiobDurationRD = nullptr;
+
+    if (!RS) {
+        RS = rrdset_create(
+            RH, // host
+            "anomaly_detection", // type
+            "prediction_stats", // id
+            NULL, // name
+            "anomaly_detection", // family
+            NULL, // ctx
+            "Time it took to run prediction", // title
+            "milliseconds", // units
+            "netdata", // plugin
+            "ml", // module
+            39187, // priority
+            Cfg.UpdateEvery, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+
+        PredictiobDurationRD  = rrddim_add(RS, "duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+    } else
+        rrdset_next(RS);
+
+    rrddim_set_by_pointer(RS, PredictiobDurationRD, PredictionDuration);
+
+    rrdset_done(RS);
+}
+
 void RrdHost::addDimension(Dimension *D) {
     std::lock_guard<std::mutex> Lock(Mutex);
     DimensionsMap[D->getRD()] = D;
@@ -280,10 +311,11 @@ void DetectableHost::detect() {
         TimePoint EndTP = SteadyClock::now();
 
         Duration<double> Dur = EndTP - StartTP;
-        error("Detection took %lf seconds", Dur.count());
+        updateDetectionChart(getRH(), Dur.count() * 1000);
 
         std::this_thread::sleep_for(Seconds{Cfg.UpdateEvery});
     }
+
 }
 
 void DetectableHost::startAnomalyDetectionThreads() {
