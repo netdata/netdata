@@ -56,9 +56,6 @@ void ml_new_dimension(RRDDIM *RD) {
     if (simple_pattern_matches(Cfg.SP_ChartsToSkip, RS->name))
         return;
 
-    if (strstr(RS->name, "ml_prediction_info") || strstr(RS->name, "ml_detector_info"))
-        return;
-
     Dimension *D = new Dimension(RD);
     RD->state->ml_dimension = static_cast<ml_dimension_t>(D);
     H->addDimension(D);

@@ -9,13 +9,10 @@ using namespace ml;
 
 static void updateDimensionsChart(RRDHOST *RH,
                                   collected_number NumNormalDimensions,
-                                  collected_number NumAnomalousDimensions,
-                                  collected_number AnomalyRate) {
+                                  collected_number NumAnomalousDimensions) {
     static thread_local RRDSET *RS = nullptr;
     static thread_local RRDDIM *NumNormalDimensionsRD = nullptr;
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
-    // static thread_local RRDDIM *AnomalyRateRD = nullptr;
-    (void) AnomalyRate;
 
     if (!RS) {
         RS = rrdset_create(
@@ -223,10 +220,11 @@ void DetectableHost::detectOnce() {
 
     std::vector<std::pair<double, std::string>> DimsOverThreshold;
 
+    size_t NumAnomalousDimensions = 0;
+    size_t NumNormalDimensions = 0;
+
     {
         std::lock_guard<std::mutex> Lock(Mutex);
-
-        size_t NumAnomalousDimensions = 0;
 
         DimsOverThreshold.reserve(DimensionsMap.size());
 
@@ -249,17 +247,16 @@ void DetectableHost::detectOnce() {
         else
             AnomalyRate = 0.0;
 
-        error("Host anomaly: "
-                "rate=%lf, length=%zu,"
-                "anomalous-dimensions=%zu, total-dimensions= %zu",
-                AnomalyRate, WindowLength,
-                NumAnomalousDimensions, DimensionsMap.size());
+        NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
 
-        updateDimensionsChart(getRH(), DimensionsMap.size() - NumAnomalousDimensions, NumAnomalousDimensions, 100 * AnomalyRate);
-        updateRateChart(getRH(), AnomalyRate * 100.0);
-        updateWindowLengthChart(getRH(), WindowLength);
-        updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
+        error("Host anomaly: rate=%lf, length=%zu, anomalous-dimensions=%zu, normal-dimensions= %zu",
+              AnomalyRate, WindowLength, NumAnomalousDimensions, NumNormalDimensions);
     }
+
+    updateDimensionsChart(getRH(), NumNormalDimensions, NumAnomalousDimensions);
+    updateRateChart(getRH(), AnomalyRate * 100.0);
+    updateWindowLengthChart(getRH(), WindowLength);
+    updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
 
     if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
         return;
