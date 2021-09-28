@@ -28,6 +28,7 @@ typedef struct netdata_ebpf_cgroup_shm_header {
     int cgroup_root_count;
     int cgroup_max;
     int systemd_enabled;
+    int __pad;
     size_t body_length;
 } netdata_ebpf_cgroup_shm_header_t;
 
