@@ -1885,6 +1885,51 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Netfilter Connection Tracker
+
+    'netfilter.conntrack_sockets': {
+        info: 'The number of entries in the conntrack table.'
+    },
+
+    'netfilter.conntrack_new': {
+        info: '<p>Packet tracking statistics.</p>'+
+        '<p><b>New</b> - conntrack entries added which were not expected before. '+
+        '<b>Ignore</b> - packets seen which are already connected to a conntrack entry. '+
+        '<b>Invalid</b> - packets seen which can not be tracked.</p>'
+    },
+
+    'netfilter.conntrack_changes': {
+        info: '<p>The number of changes in conntrack tables.</p>'+
+        '<p><b>Inserted</b>, <b>Deleted</b> - conntrack entries which were inserted or removed. '+
+        '<b>Delete-list</b> - conntrack entries which were put to dying list.</p>'
+    },
+
+    'netfilter.conntrack_expect': {
+        info: '<p>The number of events in the "expect" table. '+
+        'Connection tracking expectations are the mechanism used to "expect" RELATED connections to existing ones. '+
+        'An expectation is a connection that is expected to happen in a period of time.</p>'+
+        '<p><b>Created</b>, <b>Deleted</b> - conntrack entries which were inserted or removed. '+
+        '<b>New</b> - conntrack entries added after an expectation for them was already present.</p>'
+    },
+
+    'netfilter.conntrack_search': {
+        info: '<p>Conntrack table lookup statistics.</p>'+
+        '<p><b>Searched</b> - conntrack table lookups performed. '+
+        '<b>Restarted</b> - conntrack table lookups which had to be restarted due to hashtable resizes. '+
+        '<b>Found</b> - conntrack table lookups which were successful.</p>'
+    },
+
+    'netfilter.conntrack_errors': {
+        info: '<p>Conntrack errors.</p>'+
+        '<p><b>IcmpError</b> - packets which could not be tracked due to error situation. '+
+        '<b>InsertFailed</b> - entries for which list insertion was attempted but failed '+
+        '(happens if the same entry is already present). '+
+        '<b>Drop</b> - packets dropped due to conntrack failure. '+
+        'Either new conntrack entry allocation failed, or protocol helper dropped the packet. '+
+        '<b>EarlyDrop</b> - dropped conntrack entries to make room for new ones, if maximum table size was reached.</p>'
+    },
+
+    // ------------------------------------------------------------------------
     // APPS
 
     'apps.cpu': {
