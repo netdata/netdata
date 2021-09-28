@@ -363,6 +363,17 @@ void DetectableHost::detectOnce() {
     std::sort(DimsOverThreshold.begin(), DimsOverThreshold.end());
     std::reverse(DimsOverThreshold.begin(), DimsOverThreshold.end());
 
+    // Make sure the JSON response won't grow beyond a specific number
+    // of dimensions. Log an error message if this happens, because it
+    // most likely means that the user specified a very-low anomaly rate
+    // threshold.
+    size_t NumMaxDimsOverThreshold = 2000;
+    if (DimsOverThreshold.size() > NumMaxDimsOverThreshold) {
+        error("Found %zu dimensions over threshold. Reducing JSON result to %zu dimensions.",
+              DimsOverThreshold.size(), NumMaxDimsOverThreshold);
+        DimsOverThreshold.resize(NumMaxDimsOverThreshold);
+    }
+
     nlohmann::json JsonResult = DimsOverThreshold;
 
     time_t Before = now_realtime_sec();
