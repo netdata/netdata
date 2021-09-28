@@ -216,6 +216,14 @@ AC_ARG_WITH(
     [aclk_ng="detect"]
 )
 
+AC_ARG_WITH(
+    [new-cloud-protocol],
+    [AS_HELP_STRING([--with-new-cloud-protocol],
+                    [Requires New Cloud Protocol support to be built])],
+    [new_cloud_protocol="$withval"],
+    [new_cloud_protocol="detect"]
+)
+
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
