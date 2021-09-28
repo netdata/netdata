@@ -50,7 +50,6 @@ jobs:
           - 'fedora:33'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.3'
-          - 'opensuse/tumbleweed:latest'
           - 'ubuntu:21.04'
           - 'ubuntu:20.04'
           - 'ubuntu:18.04'
@@ -95,8 +94,6 @@ jobs:
           - distro: 'opensuse/leap:15.2'
             rmjsonc: 'zypper rm -y libjson-c-devel'
           - distro: 'opensuse/leap:15.3'
-            rmjsonc: 'zypper rm -y libjson-c-devel'
-          - distro: 'opensuse/tumbleweed:latest'
             rmjsonc: 'zypper rm -y libjson-c-devel'
 
           - distro: 'ubuntu:21.04'
