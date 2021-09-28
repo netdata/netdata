@@ -80,7 +80,7 @@ void ebpf_map_cgroup_shared_memory()
         limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
         return;
     }
-    shm_ebpf_cgroup.body = (netdata_ebpf_cgroup_shm_body_t *) (shm_ebpf_cgroup.header +
+    shm_ebpf_cgroup.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_ebpf_cgroup.header +
                                                               sizeof(netdata_ebpf_cgroup_shm_header_t));
 
     shm_sem_ebpf_cgroup = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT, 0660, 1);
