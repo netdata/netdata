@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- add missing privilege to fix MySQL slave reporting [\#11574](https://github.com/netdata/netdata/pull/11574) ([steffenweber](https://github.com/steffenweber))
 - add proc\_uptime charts info [\#11569](https://github.com/netdata/netdata/pull/11569) ([ilyam8](https://github.com/ilyam8))
 - add proc\_net\_sockstat and sockstat6 charts info [\#11567](https://github.com/netdata/netdata/pull/11567) ([ilyam8](https://github.com/ilyam8))
 - Disable eBPF compilation in different platforms [\#11566](https://github.com/netdata/netdata/pull/11566) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -42,6 +43,7 @@
 - Convert uppercase to lowercase for eBPF submenus [\#11511](https://github.com/netdata/netdata/pull/11511) ([thiagoftsm](https://github.com/thiagoftsm))
 - Improved some wordings of the file README.md, only a lifecycle test! [\#11510](https://github.com/netdata/netdata/pull/11510) ([siamaktavakoli](https://github.com/siamaktavakoli))
 - Install basic netdata deps by default. [\#11508](https://github.com/netdata/netdata/pull/11508) ([Ferroin](https://github.com/Ferroin))
+- Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 - Better check for supported -F parameter in sendmail [\#11506](https://github.com/netdata/netdata/pull/11506) ([MrZammler](https://github.com/MrZammler))
 - v2.19.9 [\#11505](https://github.com/netdata/netdata/pull/11505) ([allelos](https://github.com/allelos))
 - Fix elasticsearch null values returned by \_cat/indices API [\#11501](https://github.com/netdata/netdata/pull/11501) ([vpiserchia](https://github.com/vpiserchia))
@@ -50,6 +52,7 @@
 - Revert "add Travis ctrl file for checking if changes happened" [\#11486](https://github.com/netdata/netdata/pull/11486) ([Ferroin](https://github.com/Ferroin))
 - Clean netdata naming [\#11484](https://github.com/netdata/netdata/pull/11484) ([andrewm4894](https://github.com/andrewm4894))
 - remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
+- Update alarms info [\#11481](https://github.com/netdata/netdata/pull/11481) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf [\#11480](https://github.com/netdata/netdata/pull/11480) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allow arbitrary options to be passed to make from netdata-installer.sh. [\#11479](https://github.com/netdata/netdata/pull/11479) ([Ferroin](https://github.com/Ferroin))
 - eBPF vsn bump to v0.7.9.1 [\#11471](https://github.com/netdata/netdata/pull/11471) ([UmanShahzad](https://github.com/UmanShahzad))
@@ -162,10 +165,6 @@
 - eBPF keep values from `ebpf.d.conf` [\#11253](https://github.com/netdata/netdata/pull/11253) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add more nics to FreeBSD plugin [\#11251](https://github.com/netdata/netdata/pull/11251) ([diizzyy](https://github.com/diizzyy))
 - Fix libjudy installation on CentOS 8. [\#11248](https://github.com/netdata/netdata/pull/11248) ([Ferroin](https://github.com/Ferroin))
-- Send correct aclk implementation used by agent to posthog. [\#11247](https://github.com/netdata/netdata/pull/11247) ([MrZammler](https://github.com/MrZammler))
-- Fixes error on --disable-cloud [\#11244](https://github.com/netdata/netdata/pull/11244) ([underhood](https://github.com/underhood))
-- Swap class and type attributes in stock alarm configurations [\#11240](https://github.com/netdata/netdata/pull/11240) ([MrZammler](https://github.com/MrZammler))
-- Adds xfs filesystem monitoring to eBPF [\#11238](https://github.com/netdata/netdata/pull/11238) ([thiagoftsm](https://github.com/thiagoftsm))
 - Extra posthog attributes [\#11237](https://github.com/netdata/netdata/pull/11237) ([MrZammler](https://github.com/MrZammler))
 - ACLK-NG New Cloud NodeInstance related msgs [\#11234](https://github.com/netdata/netdata/pull/11234) ([underhood](https://github.com/underhood))
 - Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
@@ -251,10 +250,6 @@
 - Add a metric for percpu memory [\#10964](https://github.com/netdata/netdata/pull/10964) ([vlvkobal](https://github.com/vlvkobal))
 - Bring flexible adjust for eBPF hash tables [\#10962](https://github.com/netdata/netdata/pull/10962) ([thiagoftsm](https://github.com/thiagoftsm))
 - Provide new attributes in health conf files [\#10961](https://github.com/netdata/netdata/pull/10961) ([MrZammler](https://github.com/MrZammler))
-- Fix epbf crash when process exit [\#10957](https://github.com/netdata/netdata/pull/10957) ([thiagoftsm](https://github.com/thiagoftsm))
-- Contributing revamp, take 2 [\#10956](https://github.com/netdata/netdata/pull/10956) ([OdysLam](https://github.com/OdysLam))
-- health: add Inconsistent state to the mysql\_galera\_cluster\_state alarm [\#10945](https://github.com/netdata/netdata/pull/10945) ([ilyam8](https://github.com/ilyam8))
-- Update cloud-providers.md [\#10942](https://github.com/netdata/netdata/pull/10942) ([itsavaren](https://github.com/itsavaren))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
