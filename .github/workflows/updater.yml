@@ -37,6 +37,7 @@ jobs:
           - 'ubuntu:18.04'
           - 'ubuntu:20.04'
           - 'ubuntu:21.04'
+          - 'ubuntu:21.10'
         include:
           - distro: 'alpine:3.14'
             pre: 'apk add -U bash'
@@ -55,6 +56,8 @@ jobs:
           - distro: 'ubuntu:20.04'
             pre: 'apt-get update'
           - distro: 'ubuntu:21.04'
+            pre: 'apt-get update'
+          - distro: 'ubuntu:21.10'
             pre: 'apt-get update'
     runs-on: ubuntu-latest
     steps:
