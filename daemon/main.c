@@ -28,7 +28,6 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
-    analytics_free_data();
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
