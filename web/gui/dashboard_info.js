@@ -958,8 +958,17 @@ netdataDashboard.submenu = {
         'To see the total number for the system check the <a href="#menu_system_submenu_interrupts">interrupts</a> section. '+
         'The last column in <code>/proc/interrupts</code> provides an interrupt description or the device name that registered the handler for that interrupt.'
     },
-};
 
+    'cpu.throttling': {
+        info: ' CPU throttling is commonly used to automatically slow down the computer '+
+        'when possible to use less energy and conserve battery.'
+    },
+
+    'cpu.cpuidle': {
+        info: '<a href="https://en.wikipedia.org/wiki/Advanced_Configuration_and_Power_Interface#Processor_states" target="_blank">Idle States (C-states)</a> '+
+        'are used to save power when the processor is idle.'
+    },
+};
 
 // ----------------------------------------------------------------------------
 // chart
@@ -1194,6 +1203,22 @@ netdataDashboard.context = {
     'cpu.softnet_stat': {
         commonMin: true,
         commonMax: true
+    },
+
+    'cpu.core_throttling': {
+        info: 'The number of adjustments made to the clock speed of the CPU based on it\'s core temperature.'
+    },
+
+    'cpu.package_throttling': {
+        info: 'The number of adjustments made to the clock speed of the CPU based on it\'s package (chip) temperature.'
+    },
+
+    'cpufreq.cpufreq': {
+        info: 'The frequency measures the number of cycles your CPU executes per second.'
+    },
+
+    'cpuidle.cpuidle': {
+        info: 'The percentage of time spent in C-states.'
     },
 
     // ------------------------------------------------------------------------
