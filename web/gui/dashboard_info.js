@@ -698,6 +698,11 @@ netdataDashboard.menu = {
         info: 'Z scores scores relating to key system metrics.'
     },
 
+    'anomalydetection': {
+        title: 'Anomaly Detection',
+        icon: '<i class="fas fa-brain"></i>',
+        info: 'Charts relating to anomaly detection, increased `anomalous` dimensions or a higher than usual `anomaly_rate` could be signs of some abnormal behaviour. Read our <a href="https://learn.netdata.cloud/guides/monitor/anomaly-detection" target="_blank">anomaly detection guide</a> for more details.'
+    },
 };
 
 
@@ -6337,6 +6342,22 @@ netdataDashboard.context = {
     'systemd.slice_unit_state': {
         info: 'Scope units are similar to service units, but manage foreign processes instead of starting them as well. ' +
         'See <a href="https://www.freedesktop.org/software/systemd/man/systemd.slice.html#" target="_blank"> systemd.slice(5)</a>.'
+    },
+
+    'anomalydetection.dimensions': {
+        info: 'Total count of dimensions considered anomalous or normal. '
+    },
+
+    'anomalydetection.anomaly_rate': {
+        info: 'Percentage of anomalous dimensions. '
+    },
+
+    'anomalydetection.detector_window': {
+        info: 'The length of the active window used by the detector. '
+    },
+
+    'anomalydetection.detector_events': {
+        info: 'Flags (0 or 1) to show when an anomaly event has been triggered by the detector. '
     },
 
 };

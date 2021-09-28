@@ -19,10 +19,10 @@ static void updateDimensionsChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "dimensions", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Anomaly detection dimensions", // title
             "dimensions", // units
@@ -53,10 +53,10 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "anomaly_rate", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Percentage of anomalous dimensions", // title
             "percentage", // units
@@ -84,10 +84,10 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "detector_window", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Anomaly detector window length", // title
             "seconds", // units
@@ -119,10 +119,10 @@ static void updateEventsChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "detector_events", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Anomaly events triggerred", // title
             "boolean", // units
@@ -159,10 +159,10 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "prediction_stats", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Time it took to run prediction", // title
             "milliseconds", // units
@@ -198,10 +198,10 @@ static void updateTrainingChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomaly_detection", // type
+            "anomalydetection", // type
             "training_stats", // id
             NULL, // name
-            "anomaly_detection", // family
+            "anomalydetection", // family
             NULL, // ctx
             "Training step statistics", // title
             "milliseconds", // units
