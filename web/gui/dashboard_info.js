@@ -770,7 +770,15 @@ netdataDashboard.submenu = {
 
     'netfilter.synproxy': {
         title: 'DDoS protection',
-        info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
+        info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> '+
+        'is a TCP SYN packets proxy. '+
+        'It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. '+
+        'SYNPROXY intercepts new TCP connections and handles the initial 3-way handshake using syncookies '+
+        'instead of conntrack to establish the connection. '+
+        'It is optimized to handle millions of packets per second utilizing all CPUs available without '+
+        'any concurrency locking between the connections. '+
+        'It can be used for any kind of TCP traffic (even encrypted), '+
+        'since it does not interfere with the content itself.'
     },
 
     'ipfw.dynamic_rules': {
@@ -1927,6 +1935,21 @@ netdataDashboard.context = {
         '<b>Drop</b> - packets dropped due to conntrack failure. '+
         'Either new conntrack entry allocation failed, or protocol helper dropped the packet. '+
         '<b>EarlyDrop</b> - dropped conntrack entries to make room for new ones, if maximum table size was reached.</p>'
+    },
+
+    'netfilter.synproxy_syn_received': {
+        info: 'The number of initial TCP SYN packets received from clients.'
+    },
+
+    'netfilter.synproxy_conn_reopened': {
+        info: 'The number of reopened connections by new TCP SYN packets directly from the TIME-WAIT state.'
+    },
+
+    'netfilter.synproxy_cookies': {
+        info: '<p>SYNPROXY cookie statistics.</p>'+
+        '<p><b>Valid</b>, <b>Invalid</b> - result of cookie validation in TCP ACK packets received from clients. '+
+        '<b>Retransmits</b> - TCP SYN packets retransmitted to the server. '+
+        'It happens when the client repeats TCP ACK and the connection to the server is not yet established.</p>'
     },
 
     // ------------------------------------------------------------------------
