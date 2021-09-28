@@ -160,8 +160,9 @@ static void read_apps_table()
 
         shm_fill_pid(key, cv);
 
-        // We are cleaning to avoid passing data read from one process to other.
+        // now that we've consumed the value, zero it out in the map.
         memset(cv, 0, length);
+        bpf_map_update_elem(fd, &key, cv, BPF_EXIST)
 
         pids = pids->next;
     }
@@ -248,28 +249,23 @@ void *ebpf_shm_read_hash(void *ptr)
  */
 static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *root)
 {
-    uint64_t local_get = 0;
-    uint64_t local_at = 0;
-    uint64_t local_dt = 0;
-    uint64_t local_ctl = 0;
-
     while (root) {
         int32_t pid = root->pid;
         netdata_publish_shm_t *w = shm_pid[pid];
         if (w) {
-            local_get += w->get;
-            local_at += w->at;
-            local_dt += w->dt;
-            local_ctl += w->ctl;
+            shm->get += w->get;
+            shm->at += w->at;
+            shm->dt += w->dt;
+            shm->ctl += w->ctl;
+
+            // reset for next collection.
+            w->get = 0;
+            w->at = 0;
+            w->dt = 0;
+            w->ctl = 0;
         }
         root = root->next;
     }
-
-    // These conditions were added, because we are using incremental algorithm
-    shm->get = (local_get >= shm->get) ? local_get : shm->get;
-    shm->at = (local_at >= shm->at) ? local_at : shm->at;
-    shm->dt = (local_dt >= shm->dt) ? local_dt : shm->dt;
-    shm->ctl = (local_ctl >= shm->ctl) ? local_ctl : shm->ctl;
 }
 
 /**
