@@ -1883,7 +1883,7 @@ netdataDashboard.context = {
         'Connection tracking expectations are the mechanism used to "expect" RELATED connections to existing ones. '+
         'An expectation is a connection that is expected to happen in a period of time.</p>'+
         '<p><b>Created</b>, <b>Deleted</b> - conntrack entries which were inserted or removed. '+
-        '<b>New</b> -  conntrack entries added after an expectation for them was already present.</p>'
+        '<b>New</b> - conntrack entries added after an expectation for them was already present.</p>'
     },
 
     'netfilter.conntrack_search': {
