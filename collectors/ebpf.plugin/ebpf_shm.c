@@ -162,7 +162,7 @@ static void read_apps_table()
 
         // now that we've consumed the value, zero it out in the map.
         memset(cv, 0, length);
-        bpf_map_update_elem(fd, &key, cv, BPF_EXIST)
+        bpf_map_update_elem(fd, &key, cv, BPF_EXIST);
 
         pids = pids->next;
     }
