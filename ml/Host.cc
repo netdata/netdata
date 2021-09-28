@@ -22,7 +22,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             "anomalydetection", // type
             "dimensions", // id
             NULL, // name
-            "anomalydetection", // family
+            "dimensions", // family
             NULL, // ctx
             "Anomaly detection dimensions", // title
             "dimensions", // units
@@ -56,7 +56,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             "anomalydetection", // type
             "anomaly_rate", // id
             NULL, // name
-            "anomalydetection", // family
+            "anomaly_rate", // family
             NULL, // ctx
             "Percentage of anomalous dimensions", // title
             "percentage", // units
@@ -87,7 +87,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             "anomalydetection", // type
             "detector_window", // id
             NULL, // name
-            "anomalydetection", // family
+            "detector_window", // family
             NULL, // ctx
             "Anomaly detector window length", // title
             "seconds", // units
@@ -122,7 +122,7 @@ static void updateEventsChart(RRDHOST *RH,
             "anomalydetection", // type
             "detector_events", // id
             NULL, // name
-            "anomalydetection", // family
+            "detector_events", // family
             NULL, // ctx
             "Anomaly events triggerred", // title
             "boolean", // units
@@ -162,7 +162,7 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
             "anomalydetection", // type
             "prediction_stats", // id
             NULL, // name
-            "anomalydetection", // family
+            "prediction_stats", // family
             NULL, // ctx
             "Time it took to run prediction", // title
             "milliseconds", // units
@@ -201,7 +201,7 @@ static void updateTrainingChart(RRDHOST *RH,
             "anomalydetection", // type
             "training_stats", // id
             NULL, // name
-            "anomalydetection", // family
+            "training_stats", // family
             NULL, // ctx
             "Training step statistics", // title
             "milliseconds", // units
