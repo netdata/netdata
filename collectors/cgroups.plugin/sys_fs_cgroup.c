@@ -501,7 +501,7 @@ void netdata_cgroup_ebpf_initialize_shm()
         error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
         goto end_init_shm;
     }
-    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) (shm_cgroup_ebpf.header +
+    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_cgroup_ebpf.header +
                                                               sizeof(netdata_ebpf_cgroup_shm_header_t));
 
     shm_mutex_cgroup_ebpf = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT,
