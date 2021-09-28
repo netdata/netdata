@@ -123,7 +123,7 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
     int rc = 0;
     CHECK_SQLITE_CONNECTION(db_meta);
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     char *claim_id = is_agent_claimed();
 
     RRDSET *st = cmd.data;
@@ -169,7 +169,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
     int rc = 0;
     CHECK_SQLITE_CONNECTION(db_meta);
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     char *claim_id = is_agent_claimed();
 
     RRDDIM *rd = cmd.data;
@@ -216,7 +216,7 @@ int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk
 
 void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     int rc;
 
     wc->chart_pending = 0;
@@ -351,7 +351,7 @@ bind_fail:
 int aclk_send_chart_config(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(wc);
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 
     CHECK_SQLITE_CONNECTION(db_meta);
 
@@ -470,7 +470,7 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         wc->chart_sequence_id = 0;
         wc->chart_timestamp = 0;
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         RRDHOST *host = wc->host;
         rrdhost_rdlock(host);
         RRDSET *st;
@@ -674,7 +674,7 @@ fail:
 // Start streaming charts / dimensions for node_id
 void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at, uint64_t batch_id)
 {
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!node_id))
         return;
 

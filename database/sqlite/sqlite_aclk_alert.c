@@ -102,7 +102,7 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 
 void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-#ifndef ACLK_NG
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
     UNUSED(wc);
     UNUSED(cmd);
 #else
@@ -259,7 +259,7 @@ void aclk_send_alarm_health_log(char *node_id)
 void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
-#ifndef ACLK_NG
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
     UNUSED(wc);
 #else
     int rc;
@@ -362,7 +362,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(wc);
-#ifndef ACLK_NG
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
     UNUSED(cmd);
 #else
     int rc = 0;
@@ -482,7 +482,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start_seq_id)
 {
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!node_id))
         return;
 

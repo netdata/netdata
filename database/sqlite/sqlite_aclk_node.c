@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_node.h"
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 #include "../../aclk/aclk_charts_api.h"
 #endif
 
@@ -11,7 +11,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 {
     UNUSED(cmd);
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     struct update_node_info node_info;
 
     rrd_wrlock();
