@@ -809,6 +809,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
             AC_MSG_ERROR([Requested new cloud protocol support but it cant be build])
         fi
         if test "$can_build_new_cloud_protocol" = "yes"; then
+            new_cloud_protocol="yes"
             AC_DEFINE([ENABLE_NEW_CLOUD_PROTOCOL], [1], [New protobuf based Netdata Cloud Protocol Support])
             OPTIONAL_ACLK_NG_CFLAGS="${OPTIONAL_ACLK_NG_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
             OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
@@ -1556,7 +1557,7 @@ AC_MSG_RESULT([${enable_lto}])
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
                                      -o "${enable_exporting_pubsub}" = "yes" \
                                      -o "${enable_backend_prometheus_remote_write}" = "yes" \
-                                     -o "${aclk_ng}" = "yes"])
+                                     -o "${new_cloud_protocol}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
