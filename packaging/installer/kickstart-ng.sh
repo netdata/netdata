@@ -17,6 +17,7 @@ INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_DISABLE_CLOUD=0
+NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
@@ -378,18 +379,36 @@ handle_existing_install() {
   fi
 
   case "${INSTALL_TYPE}" in
-    kickstart-*|legacy-*|manual-static)
+    kickstart-*|legacy-*|manual-static|unknown)
+      if [ "${INSTALL_TYPE}" = "unknown" ]; then
+        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
+      else
+        progress "Found an existing netdata install at ${ndprefix}, with type '${INSTALL_TYPE}'."
+      fi
+
       if [ -n "${NETDATA_REINSTALL}" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
+
+        case "${INSTALL_TYPE}" in
+          binpkg-*) NETDATA_ONLY_NATIVE=1 ;;
+          *-build) NETDATA_ONLY_BUILD=1 ;;
+          *-static) NETDATA_ONLY_STATIC=1 ;;
+          unknown)
+            fatal "User requested reinstall, but we do not support reinstalling over an unknown install type, exiting."
+            ;;
+        esac
+
         return 0
       fi
 
       ret=0
 
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ] && echo "${INSTALL_TYPE}" | grep -vq "binpkg-*"; then
         if ! update; then
           warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
         fi
+      else
+        warning "Not updating existing install at ${ndprefix}."
       fi
 
       if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
@@ -398,49 +417,14 @@ handle_existing_install() {
         ret=$?
       elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
         fatal "User asked to claim, but did not proide a claiming token."
-      fi
-
-      exit $ret
-      ;;
-    binpkg-*)
-      ret=0
-
-      if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-        progress "Attempting to claim existing install at ${ndprefix}."
-        claim
-        ret=$?
+      else
+        progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
       exit $ret
       ;;
     oci)
       fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
-      ;;
-    unknown)
-      warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
-
-      if [ -n "${NETDATA_REINSTALL}" ]; then
-        progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
-        return 0
-      fi
-
-      ret=0
-
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-        if ! update; then
-          warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
-        fi
-      fi
-
-      if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-        progress "Attempting to claim existing install at ${ndprefix}."
-        claim
-        ret=$?
-      elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
-        fatal "User asked to claim, but did not proide a claiming token."
-      fi
-
-      exit $ret
       ;;
     *)
       fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
