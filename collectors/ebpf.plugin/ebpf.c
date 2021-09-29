@@ -653,7 +653,7 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
  *
  * @param em             the structure that will be changed
  * @param disable_apps   the status about the apps charts.
- * @param disable_cgroup the status about the apps charts.
+ * @param disable_cgroup the status about the cgroups charts.
  */
 static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_apps, int disable_cgroup)
 {
@@ -1049,7 +1049,7 @@ static void ebpf_update_table_size()
  * Read collector values
  *
  * @param disable_apps    variable to store information related to apps.
- * @param disable_cgroups variable to store information related to apps.
+ * @param disable_cgroups variable to store information related to cgroups.
  */
 static void read_collector_values(int *disable_apps, int *disable_cgroups)
 {
@@ -1225,7 +1225,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
  *
  * @param path             the path where the file ebpf.conf is stored.
  * @param disable_apps     variable to store the information about apps plugin status.
- * @param disable_cgroups  variable to store the information about apps plugin status.
+ * @param disable_cgroups  variable to store the information about cgroups plugin status.
  *
  * @return 0 on success and -1 otherwise.
  */
