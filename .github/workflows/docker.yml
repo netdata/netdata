@@ -44,6 +44,7 @@ jobs:
           - linux/i386
           - linux/arm/v7
           - linux/arm64
+          - linux/ppc64le
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -92,7 +93,7 @@ jobs:
       - name: Docker Build
         uses: docker/build-push-action@v2
         with:
-          platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: true
           tags: ${{ env.tags }}
       - name: Failure Notification
