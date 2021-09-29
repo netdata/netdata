@@ -334,6 +334,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
     if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
     if(FEAT_ACLK_NG)         buffer_strcat (b, "|ACLK Next Generation");
+    if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
 
