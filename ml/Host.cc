@@ -19,7 +19,7 @@ static void updateDimensionsChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "dimensions", // id
             NULL, // name
             "dimensions", // family
@@ -53,7 +53,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "anomaly_rate", // id
             NULL, // name
             "anomaly_rate", // family
@@ -84,7 +84,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "detector_window", // id
             NULL, // name
             "detector_window", // family
@@ -119,7 +119,7 @@ static void updateEventsChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "detector_events", // id
             NULL, // name
             "detector_events", // family
@@ -159,7 +159,7 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "prediction_stats", // id
             NULL, // name
             "prediction_stats", // family
@@ -198,7 +198,7 @@ static void updateTrainingChart(RRDHOST *RH,
     if (!RS) {
         RS = rrdset_create(
             RH, // host
-            "anomalydetection", // type
+            "anomaly_detection", // type
             "training_stats", // id
             NULL, // name
             "training_stats", // family
