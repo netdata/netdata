@@ -157,8 +157,6 @@ static void ebpf_update_swap_cgroup()
             if (swap_pid[pid]) {
                 netdata_publish_swap_t *in = swap_pid[pid];
 
-                out->read = in->read;
-                out->write = in->write;
                 memcpy(out, in, sizeof(netdata_publish_swap_t));
             } else {
                 memset(cv, 0, length);
