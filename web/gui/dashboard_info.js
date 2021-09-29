@@ -1169,6 +1169,10 @@ netdataDashboard.context = {
         'The run-time limit on the maximum  shared memory segment size that can be created is specified in <code>/proc/sys/kernel/shmmax</code> file.'
     },
 
+    'system.shared_memory_calls': {
+        info: 'Monitor calls to functions <code>shmget</code>, <code>shmat</code>, <code>shmdt</code>, and <code>shmctl</code>. When integration with apps is <a href="https://learn.netdata.cloud/guides/troubleshoot/monitor-debug-applications-ebpf" target="_blank">enabled</a>, Netdata also shows shared memory system call usage <a href="#menu_apps_submenu_ipc_shared_memory">per application</a>.'
+    },
+
     'system.message_queue_messages': {
         info: 'Number of messages that are currently present in System V IPC message queues.'
     },
@@ -4563,6 +4567,22 @@ netdataDashboard.context = {
 
     'apps.swap_write_call': {
         info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory.'
+    },
+
+    'apps.shmget_call': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+    },
+
+    'apps.shmat_call': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'apps.shmdt_call': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'apps.shmctl_call': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
     },
 
     // ------------------------------------------------------------------------

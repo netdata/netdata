@@ -978,6 +978,12 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         freez(fd_pid[pid]);
         fd_pid[pid] = NULL;
     }
+
+    // Clean shm structure
+    if (shm_pid) {
+        freez(shm_pid[pid]);
+        shm_pid[pid] = NULL;
+    }
 }
 
 /**

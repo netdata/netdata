@@ -504,6 +504,8 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_oomkill.h
         collectors/ebpf.plugin/ebpf_process.c
         collectors/ebpf.plugin/ebpf_process.h
+        collectors/ebpf.plugin/ebpf_shm.c
+        collectors/ebpf.plugin/ebpf_shm.h
         collectors/ebpf.plugin/ebpf_socket.c
         collectors/ebpf.plugin/ebpf_socket.h
         collectors/ebpf.plugin/ebpf_softirq.c

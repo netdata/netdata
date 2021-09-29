@@ -87,7 +87,8 @@ enum ebpf_module_indexes {
     EBPF_MODULE_FD_IDX,
     EBPF_MODULE_HARDIRQ_IDX,
     EBPF_MODULE_SOFTIRQ_IDX,
-    EBPF_MODULE_OOMKILL_IDX
+    EBPF_MODULE_OOMKILL_IDX,
+    EBPF_MODULE_SHM_IDX
 };
 
 typedef struct ebpf_tracepoint {
@@ -115,6 +116,7 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
+#define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"

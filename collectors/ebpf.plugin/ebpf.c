@@ -145,6 +145,11 @@ ebpf_module_t ebpf_modules[] = {
       .optional = 0, .apps_routine = ebpf_oomkill_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &oomkill_config,
       .config_file = NETDATA_OOMKILL_CONFIG_FILE},
+    { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
+      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
+      .optional = 0, .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &shm_config,
+      .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY,
       .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -223,6 +228,12 @@ static void ebpf_exit(int sig)
         ebpf_modules[EBPF_MODULE_FD_IDX].enabled = 0;
         clean_fd_pid_structures();
         freez(fd_pid);
+    }
+
+    if (ebpf_modules[EBPF_MODULE_SHM_IDX].enabled) {
+        ebpf_modules[EBPF_MODULE_SHM_IDX].enabled = 0;
+        clean_shm_pid_structures();
+        freez(shm_pid);
     }
 
     /*
@@ -740,7 +751,9 @@ void ebpf_print_help()
             " --process or -p     Enable charts related to process run time.\n"
             "\n"
             " --return or -r      Run the collector in return mode.\n"
-            "\n",
+            "\n"
+            " --shm or -b         Enable chart related to shared memory tracking.\n"
+            "\n"
             " --softirq or -t     Enable chart related to soft IRQ latency.\n"
             "\n"
             " --sync or -s        Enable chart related to sync run time.\n"
@@ -748,7 +761,7 @@ void ebpf_print_help()
             " --swap or -w        Enable chart related to swap run time.\n"
             "\n"
             " --vfs or -f         Enable chart related to vfs run time.\n"
-            "\n"
+            "\n",
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
 }
@@ -1168,6 +1181,13 @@ static void read_collector_values(int *disable_apps)
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
+                                    CONFIG_BOOLEAN_YES);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps);
         // Read network viewer section
@@ -1263,6 +1283,7 @@ static void parse_args(int argc, char **argv)
         {"oomkill",        no_argument,    0,  'o' },
         {"process",        no_argument,    0,  'p' },
         {"return",         no_argument,    0,  'r' },
+        {"shm",            no_argument,    0,  'b' },
         {"softirq",        no_argument,    0,  't' },
         {"sync",           no_argument,    0,  's' },
         {"swap",           no_argument,    0,  'w' },
@@ -1281,7 +1302,7 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvgacdkieqmnoprtswf", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvgacdkieqmnoprbtswf", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1397,6 +1418,14 @@ static void parse_args(int argc, char **argv)
                 ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
+#endif
+                break;
+            }
+            case 'b': {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_SHM_IDX, disable_apps);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"shm\" chart, because it was started with the option \"--shm\" or \"-b\".");
 #endif
                 break;
             }
@@ -1717,6 +1746,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_SOFTIRQ_IDX].start_routine},
         {"EBPF OOMKILL" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_OOMKILL_IDX].start_routine},
+        {"EBPF SHM" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_SHM_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };
