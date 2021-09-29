@@ -4,12 +4,6 @@
 
 #include "daemon/common.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 

@@ -21,10 +21,6 @@
 #include <fcntl.h>
 #endif
 
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.

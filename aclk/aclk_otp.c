@@ -9,12 +9,6 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 struct dictionary_singleton {
     char *key;
     char *result;
