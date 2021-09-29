@@ -50,6 +50,7 @@ jobs:
           - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
           - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/arm64/v8, arch: arm64}
           - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/arm/v7, arch: armhf}
           - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/arm64/v8, arch: arm64}
