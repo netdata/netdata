@@ -738,6 +738,21 @@ netdataDashboard.submenu = {
         info: 'Non-Uniform Memory Access (NUMA) is a hierarchical memory design the memory access time is dependent on locality. Under NUMA, a processor can access its own local memory faster than non-local memory (memory local to another processor or memory shared between processors). The individual metrics are described in the <a href="https://www.kernel.org/doc/Documentation/numastat.txt" target="_blank">Linux kernel documentation</a>.'
     },
 
+    'mem.ecc': {
+        info: '<p><a href="https://en.wikipedia.org/wiki/ECC_memory" target="_blank">ECC memory</a> '+
+        'is a type of computer data storage that uses an error correction code (ECC) to detect '+
+        'and correct n-bit data corruption which occurs in memory. '+
+        'Typically, ECC memory maintains a memory system immune to single-bit errors: '+
+        'the data that is read from each word is always the same as the data that had been written to it, '+
+        'even if one of the bits actually stored has been flipped to the wrong state.</p>'+
+        '<p>Memory errors can be classified into two types: '+
+        '<b>Soft errors</b>, which randomly corrupt bits but do not leave physical damage. '+
+        'Soft errors are transient in nature and are not repeatable, can be because of electrical or '+
+        'magnetic interference. '+
+        '<b>Hard errors</b>, which corrupt bits in a repeatable manner because '+
+        'of a physical/hardware defect or an environmental problem.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
@@ -1320,6 +1335,18 @@ netdataDashboard.context = {
 
     'mem.hwcorrupt': {
         info: 'The amount of memory with physical corruption problems, identified by <a href="https://en.wikipedia.org/wiki/ECC_memory" target="_blank">ECC</a> and set aside by the kernel so it does not get used.'
+    },
+
+    'mem.ecc_ce': {
+        info: 'The number of correctable (single-bit) ECC errors. '+
+        'These errors do not affect the normal operation of the system '+
+        'because they are still being corrected. '+
+        'Periodic correctable errors may indicate that one of the memory modules is slowly failing.'
+    },
+
+    'mem.ecc_ue': {
+        info: 'The number of uncorrectable (multi-bit) ECC errors. '+
+        'An uncorrectable error is a fatal issue that will typically lead to an OS crash.'
     },
 
     'mem.cachestat_ratio': {
