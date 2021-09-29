@@ -130,18 +130,19 @@ jobs:
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
         run: |
-          docker run -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         run: |
-          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         run: |
-          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, require ACLK-NG
         run: |
-          docker run -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' test \
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         if: matrix.rmjsonc != ''
         run: |
-          docker run -w /netdata test \
+          docker run --security-opt seccomp=unconfined -w /netdata test \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
