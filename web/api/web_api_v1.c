@@ -1102,6 +1102,22 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     return HTTP_RESP_OK;
 }
 
+static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
+    UNUSED(url);
+    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+
+    char *str = aclk_state_json();
+    buffer_strcat(wb, str);
+    freez(str);
+
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
+    return HTTP_RESP_OK;
+}
+
 static struct api_command {
     const char *command;
     uint32_t hash;
@@ -1127,6 +1143,7 @@ static struct api_command {
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
+        { "aclk",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state      },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
