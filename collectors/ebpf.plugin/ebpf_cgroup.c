@@ -106,11 +106,13 @@ void ebpf_close_cgroup_shm()
     if (shm_sem_ebpf_cgroup != SEM_FAILED) {
         sem_close(shm_sem_ebpf_cgroup);
         sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
+        shm_sem_ebpf_cgroup = SEM_FAILED;
     }
 
     if (shm_fd_ebpf_cgroup > 0) {
         close(shm_fd_ebpf_cgroup);
         shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+        shm_fd_ebpf_cgroup = -1;
     }
 }
 
@@ -148,6 +150,7 @@ void ebpf_clean_cgroup_pids()
 
         ect = next_cgroup;
     }
+    ebpf_cgroup_pids = NULL;
 }
 
 /**
@@ -220,7 +223,6 @@ static ebpf_cgroup_target_t * ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm
     ebpf_cgroup_target_t *new_ect = callocz(1, sizeof(ebpf_cgroup_target_t));
 
     ebpf_cgroup_set_target_data(new_ect, ptr);
-
     if (!ebpf_cgroup_pids) {
         ebpf_cgroup_pids = new_ect;
     } else {
@@ -252,7 +254,6 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
     for (l = 0; l < lines ;l++) {
         int pid = (int)str2l(procfile_lineword(ff, l, 0));
         if (pid) {
-            /*
             struct pid_on_target2 *pt, *prev;
             for (pt = ect->pids, prev = ect->pids; pt; prev = pt, pt = pt->next) {
                 if (pt->pid == pid)
@@ -267,7 +268,6 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
                 else
                     prev->next = w;
             }
-             */
         }
     }
 
