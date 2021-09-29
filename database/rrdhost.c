@@ -746,7 +746,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         fatal("Failed to initialize dbengine");
     }
 #endif
+#ifdef ACLK_NEWARCH_DEVMODE
     sql_aclk_sync_init();
+#endif
     rrd_unlock();
 
     web_client_api_v1_management_init();
