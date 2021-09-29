@@ -105,10 +105,12 @@ void ebpf_close_cgroup_shm()
 {
     if (shm_sem_ebpf_cgroup != SEM_FAILED) {
         sem_close(shm_sem_ebpf_cgroup);
+        sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
     }
 
     if (shm_fd_ebpf_cgroup > 0) {
         close(shm_fd_ebpf_cgroup);
+        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
     }
 }
 
@@ -250,6 +252,7 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
     for (l = 0; l < lines ;l++) {
         int pid = (int)str2l(procfile_lineword(ff, l, 0));
         if (pid) {
+            /*
             struct pid_on_target2 *pt, *prev;
             for (pt = ect->pids, prev = ect->pids; pt; prev = pt, pt = pt->next) {
                 if (pt->pid == pid)
@@ -264,6 +267,7 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
                 else
                     prev->next = w;
             }
+             */
         }
     }
 
