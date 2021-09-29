@@ -1207,7 +1207,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps);
+        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps, *disable_cgroups);
         started++;
     }
 
@@ -1448,7 +1448,7 @@ static void parse_args(int argc, char **argv)
             }
             case 'b': {
                 enabled = 1;
-                ebpf_enable_chart(EBPF_MODULE_SHM_IDX, disable_apps);
+                ebpf_enable_chart(EBPF_MODULE_SHM_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"shm\" chart, because it was started with the option \"--shm\" or \"-b\".");
 #endif
