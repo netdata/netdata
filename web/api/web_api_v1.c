@@ -984,6 +984,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #else
     buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
 #endif
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
+#else
+    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
+#endif
 #ifdef ACLK_LEGACY
     buffer_strcat(wb, "\t\"aclk-legacy-available\": true,\n");
 #else

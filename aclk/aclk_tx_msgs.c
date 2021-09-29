@@ -403,6 +403,7 @@ int aclk_send_app_layer_disconnect(mqtt_wss_client client, const char *message)
     return pid;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 // new protobuf msgs
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
@@ -481,6 +482,7 @@ void aclk_generate_node_state_update(mqtt_wss_client client, node_instance_conne
     aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_NODE_CONN, "UpdateNodeInstanceConnection");
     freez(msg);
 }
+#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 #ifndef __GNUC__
 #pragma endregion

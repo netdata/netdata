@@ -260,6 +260,7 @@ err_cleanup_nojson:
     return 1;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
 {
     // TODO do the look up table with hashes to optimize when there are more
@@ -331,3 +332,4 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
 
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
+#endif

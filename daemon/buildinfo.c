@@ -199,6 +199,12 @@
 #define FEAT_ACLK_NG 0
 #endif
 
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#define NEW_CLOUD_PROTO 1
+#else
+#define NEW_CLOUD_PROTO 0
+#endif
+
 #ifdef ACLK_LEGACY
 #define FEAT_ACLK_LEGACY 1
 #else
@@ -211,12 +217,13 @@ void print_build_info(void) {
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
     printf("Features:\n");
-    printf("    dbengine:                %s\n", FEAT_YES_NO(FEAT_DBENGINE));
-    printf("    Native HTTPS:            %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
-    printf("    Netdata Cloud:           %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
-    printf("    ACLK Next Generation:    %s\n", FEAT_YES_NO(FEAT_ACLK_NG));
-    printf("    ACLK Legacy:             %s\n", FEAT_YES_NO(FEAT_ACLK_LEGACY));
-    printf("    TLS Host Verification:   %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
+    printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
+    printf("    Native HTTPS:               %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
+    printf("    Netdata Cloud:              %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
+    printf("    ACLK Next Generation:       %s\n", FEAT_YES_NO(FEAT_ACLK_NG));
+    printf("    ACLK-NG New Cloud Protocol: %s\n", FEAT_YES_NO(NEW_CLOUD_PROTO));
+    printf("    ACLK Legacy:                %s\n", FEAT_YES_NO(FEAT_ACLK_LEGACY));
+    printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
 
     printf("Libraries:\n");
     printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
@@ -271,8 +278,9 @@ void print_build_info_json(void) {
 #else
     printf("    \"cloud-disabled\": false,\n");
 #endif
-    printf("    \"aclk-ng\": \"%s\",\n", FEAT_JSON_BOOL(FEAT_ACLK_NG));
-    printf("    \"aclk-legacy\": \"%s\",\n", FEAT_JSON_BOOL(FEAT_ACLK_LEGACY));
+    printf("    \"aclk-ng\": %s,\n", FEAT_JSON_BOOL(FEAT_ACLK_NG));
+    printf("    \"aclk-ng-new-cloud-proto\": %s,\n", FEAT_JSON_BOOL(NEW_CLOUD_PROTO));
+    printf("    \"aclk-legacy\": %s,\n", FEAT_JSON_BOOL(FEAT_ACLK_LEGACY));
 
     printf("    \"tls-host-verify\": %s\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
     printf("  },\n");
@@ -326,6 +334,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_NATIVE_HTTPS)    buffer_strcat (b, "|Native HTTPS");
     if(FEAT_CLOUD)           buffer_strcat (b, "|Netdata Cloud");
     if(FEAT_ACLK_NG)         buffer_strcat (b, "|ACLK Next Generation");
+    if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
 
