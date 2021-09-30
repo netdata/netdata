@@ -1273,11 +1273,10 @@ static inline size_t rrdset_done_interpolate(
                 calculated_number t2 = unpack_storage_number(rd->values[current_entry]);
 
                 calculated_number accuracy = accuracy_loss(t1, t2);
-                debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " FLAGS=0x%08x (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
+                debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
                       , st->id, rd->name
                       , current_entry
                       , t2
-                      , get_storage_number_flags(rd->values[current_entry])
                       , t1
                       , accuracy
                       , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
