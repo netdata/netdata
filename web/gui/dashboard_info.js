@@ -2124,7 +2124,24 @@ netdataDashboard.context = {
     },
 
     'apps.vmem': {
-        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated by applications. Check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+    },
+
+    'apps.minor_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Minor" target="_blank">minor faults</a> '+
+        'which have not required loading a memory page from the disk. '+
+        'Minor page faults occur when the page is present in the memory but is not mapped properly either because of '+
+        'invalid mapping or data is not cleared from the page.'
+    },
+
+    'apps.major_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major faults</a> '+
+        'which have required loading a memory page from the disk. '+
+        'Major page faults occur because of the absence of the required page from the RAM. '+
+        'They are expected when a process starts or needs to read in additional data and '+
+        'in these cases do not indicate a problem condition. '+
+        'However, a major page fault can also be the result of reading memory pages that have been written out '+
+        'to the swap file, which could indicate a memory shortage.'
     },
 
     'apps.uptime': {
