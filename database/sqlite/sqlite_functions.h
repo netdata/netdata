@@ -91,5 +91,4 @@ extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
 extern void compute_chart_hash(RRDSET *st);
-extern void sql_chart_from_hash_id(char *hash_str, BUFFER *wb);
 #endif //NETDATA_SQLITE_FUNCTIONS_H
