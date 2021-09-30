@@ -71,7 +71,7 @@ typedef uint32_t storage_number;
 #define SN_EMPTY_SLOT 0x00000000
 
 // checks
-#define does_storage_number_exist(value) ((get_storage_number_flags(value) != 0)?1:0)
+#define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
 #define did_storage_number_reset(value)  ((get_storage_number_flags(value) == SN_EXISTS_RESET)?1:0)
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags);
