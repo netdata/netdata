@@ -973,7 +973,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
         rrdhost_aclk_state_lock(localhost);
         create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
         rrdhost_aclk_state_unlock(localhost);
-        create_query->data.node_creation.hops = 1; //TODO - real hop count instead of hardcoded
+        create_query->data.node_creation.hops = (uint32_t) host->system_info->hops;
         create_query->data.node_creation.hostname = strdupz(host->hostname);
         create_query->data.node_creation.machine_guid = strdupz(host->machine_guid);
         aclk_queue_query(create_query);
@@ -981,7 +981,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
     }
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    query->data.node_update.hops = 1; //TODO - real hop count instead of hardcoded
+    query->data.node_update.hops = (uint32_t) host->system_info->hops;
     rrdhost_aclk_state_lock(localhost);
     query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
     rrdhost_aclk_state_unlock(localhost);
@@ -1020,7 +1020,7 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_lock(localhost);
             create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
             rrdhost_aclk_state_unlock(localhost);
-            create_query->data.node_creation.hops = uuid_compare(list->host_id, localhost->host_uuid) ? 1 : 0; // TODO - when streaming supports hops
+            create_query->data.node_creation.hops = list->hops;
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
