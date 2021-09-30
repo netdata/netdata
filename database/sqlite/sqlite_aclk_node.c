@@ -70,7 +70,7 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     int rc;
 
     if (!aclk_use_new_cloud_arch || !aclk_connected)

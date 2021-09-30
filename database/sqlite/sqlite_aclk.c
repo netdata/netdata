@@ -185,7 +185,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#if defined(ENABLE_ACLK) && defined(ACLK_NG)
+#if ENABLE_NEW_CLOUD_PROTOCOL
     char *err_msg = NULL;
     int rc;
 

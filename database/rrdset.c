@@ -1378,7 +1378,7 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    #ifdef ACLK_NG
+    #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
             if (likely(!sql_queue_chart_to_aclk(st)))
@@ -1793,15 +1793,14 @@ after_first_database_work:
 after_second_database_work:
     st->last_collected_total  = st->collected_total;
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     time_t mark = now_realtime_sec();
 #endif
     rrddim_foreach_read(rd, st) {
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
 
-#ifdef ENABLE_ACLK
-        #ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
         if (unlikely(live != rd->state->aclk_live_status)) {
             if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
@@ -1810,7 +1809,6 @@ after_second_database_work:
                 }
             }
         }
-    #endif
 #endif
         if(unlikely(!rd->updated))
             continue;

@@ -3,11 +3,12 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_chart.h"
 
-#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 #include "../../aclk/aclk_charts_api.h"
 #include "../../aclk/aclk.h"
 #endif
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc,
                                           void *data, enum aclk_database_opcode opcode)
 {
@@ -22,7 +23,6 @@ static inline int sql_queue_chart_payload(struct aclk_database_worker_config *wc
     return 0;
 }
 
-#ifdef ENABLE_ACLK
 static int payload_sent(char *uuid_str, uuid_t *uuid, void *payload, size_t payload_size)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -569,7 +569,7 @@ void aclk_ack_chart_sequence_id(char *node_id, uint64_t last_sequence_id)
     return;
 }
 
-#ifdef ACLK_NG
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 {
     if (unlikely(!node_id))
@@ -585,13 +585,20 @@ void aclk_reset_chart_event(char *node_id, uint64_t last_sequence_id)
 int sql_queue_chart_to_aclk(RRDSET *st)
 {
 #ifdef ENABLE_ACLK
-    if (!aclk_use_new_cloud_arch) {
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    if (!aclk_use_new_cloud_arch)
+#endif
+    {
         rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
         aclk_update_chart(st->rrdhost, st->id, 1);
         return 0;
     }
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     return sql_queue_chart_payload((struct aclk_database_worker_config *) st->rrdhost->dbsync_worker,
                                    st, ACLK_DATABASE_ADD_CHART);
+#else
+    return 0;
+#endif
 #else
     UNUSED(st);
     return 0;
@@ -600,7 +607,7 @@ int sql_queue_chart_to_aclk(RRDSET *st)
 
 int sql_queue_dimension_to_aclk(RRDDIM *rd)
 {
-#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!aclk_use_new_cloud_arch)
         return 0;
 
