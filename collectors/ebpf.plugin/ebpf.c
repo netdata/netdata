@@ -1081,7 +1081,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
 
     // Cgroup is a positive sentence, so we need to invert the values to disable apps.
     // We are using the same pattern for cgroup and apps
-    enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP, CONFIG_BOOLEAN_YES);
+    enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_CGROUP, CONFIG_BOOLEAN_NO);
     *disable_cgroups =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
 
     // Read ebpf programs section
