@@ -1327,7 +1327,7 @@ netdataDashboard.context = {
         '<a href="https://en.wikipedia.org/wiki/Out_of_memory" target="_blank">Out of Memory</a> Killer. '+
         'The kernel\'s OOM killer is summoned when the system runs short of free memory and '+
         'is unable to proceed without killing one or more processes. '+
-        'it tries to pick the process whose demise will free the most memory while '+
+        'It tries to pick the process whose demise will free the most memory while '+
         'causing the least misery for users of the system. '+
         'This counter also includes processes within containers that have exceeded the memory limit.'
     },
