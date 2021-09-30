@@ -1322,6 +1322,33 @@ netdataDashboard.context = {
         info: 'Committed Memory, is the sum of all memory which has been allocated by processes.'
     },
 
+    'mem.oom_kill': {
+        info: 'The number of processes killed by '+
+        '<a href="https://en.wikipedia.org/wiki/Out_of_memory" target="_blank">Out of Memory</a> Killer. '+
+        'The kernel\'s OOM killer is summoned when the system runs short of free memory and '+
+        'is unable to proceed without killing one or more processes. '+
+        'It tries to pick the process whose demise will free the most memory while '+
+        'causing the least misery for users of the system. '+
+        'This counter also includes processes within containers that have exceeded the memory limit.'
+    },
+
+    'mem.numa': {
+        info: '<p>NUMA balancing statistics.</p>'+
+        '<p><b>Local</b> - pages successfully allocated on this node, by a process on this node. '+
+        '<b>Foreign</b> - pages initially intended for this node that were allocated to another node instead. '+
+        '<b>Interleave</b> - interleave policy pages successfully allocated to this node. '+
+        '<b>Other</b> - pages allocated on this node, by a process on another node. '+
+        '<b>PteUpdates</b> - base pages that were marked for NUMA hinting faults. '+
+        '<b>HugePteUpdates</b> - transparent huge pages that were marked for NUMA hinting faults. '+
+        'In Combination with <b>pte_updates</b> the total address space that was marked can be calculated. '+
+        '<b>HintFaults</b> - NUMA hinting faults that were trapped. '+
+        '<b>HintFaultsLocal</b> - hinting faults that were to local nodes. '+
+        'In combination with <b>HintFaults</b>, the percentage of local versus remote faults can be calculated. '+
+        'A high percentage of local hinting faults indicates that the workload is closer to being converged. '+
+        '<b>PagesMigrated</b> - pages were migrated because they were misplaced. '+
+        'As migration is a copying operation, it contributes the largest part of the overhead created by NUMA balancing.</p>'
+    },
+
     'mem.available': {
         info: 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.'
     },
