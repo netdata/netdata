@@ -715,6 +715,7 @@ fail:
 // Start streaming charts / dimensions for node_id
 void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at, uint64_t batch_id)
 {
+    UNUSED(created_at);
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!node_id))
         return;
@@ -780,7 +781,6 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
 #else
     UNUSED(node_id);
     UNUSED(sequence_id);
-    UNUSED(created_at);
     UNUSED(batch_id);
 #endif
     return;
