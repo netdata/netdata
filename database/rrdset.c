@@ -1231,8 +1231,8 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
-//                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
+//                rd->values[current_entry] = SN_EMPTY_SLOT;
                 continue;
             }
 
@@ -1260,8 +1260,8 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-//                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
-                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
+//                rd->values[current_entry] = SN_EMPTY_SLOT;
+                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 
