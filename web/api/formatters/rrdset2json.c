@@ -2,7 +2,15 @@
 
 #include "rrdset2json.h"
 
-//TODO <timo> remove this ifndef ENABLE_JSONC when charts call is removed
+#ifdef ENABLE_JSONC
+#ifdef ACLK_LEGACY
+void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
+    json_object *j = rrdset_json(st, dimensions_count, memory_used, skip_volatile);
+    buffer_strcat(wb, json_object_to_json_string_ext(j, JSON_C_TO_STRING_PLAIN));
+    json_object_put(j);
+}
+#endif
+#else /* !defined(ENABLE_JSONC) */
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
     if(unlikely(!st->rrdlabels))
@@ -154,6 +162,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             "\n\t\t}"
     );
 }
+#endif /* ENABLE_JSONC */
 
 
 #ifdef ENABLE_JSONC
