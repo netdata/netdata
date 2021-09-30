@@ -29,7 +29,7 @@ extern int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 extern int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
-extern int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
+extern int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb, int pretty_fmt);
 #ifdef ENABLE_JSONC
 extern json_object *generate_info_json(RRDHOST *host);
 #endif

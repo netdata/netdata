@@ -1326,17 +1326,18 @@ json_object *generate_info_json(RRDHOST *host)
     return j;
 }
 
-inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb, int pretty_fmt)
 {
     json_object *j = generate_info_json(host);
-    buffer_strcat(wb, json_object_to_json_string(j));
+    buffer_strcat(wb, json_object_to_json_string_ext(j, pretty_fmt ? JSON_C_TO_STRING_PRETTY : JSON_C_TO_STRING_PLAIN));
     json_object_put(j);
     return 0;
 }
 
 #else /* !ENABLE_JSONC */
-inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb, int pretty_fmt)
 {
+    UNUSED(pretty_fmt);
     buffer_strcat(wb, "{\n");
     buffer_sprintf(wb, "\t\"version\": \"%s\",\n", rrdhost_program_version(host));
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
@@ -1574,7 +1575,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
 
-    web_client_api_request_v1_info_fill_buffer(host, wb);
+    web_client_api_request_v1_info_fill_buffer(host, wb, 1);
 
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
