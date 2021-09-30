@@ -319,6 +319,10 @@ void aclk_database_worker(void *arg)
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
     sql_get_last_chart_sequence(wc, cmd);
+    wc->chart_updates = 0;
+    wc->alert_updates = 0;
+    wc->startup_time = now_realtime_sec();
+    wc->cleanup_after = wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -536,10 +540,6 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     if (likely(host))
         host->dbsync_worker = (void *) wc;
     wc->host = host;
-    wc->chart_updates = 0;
-    wc->alert_updates = 0;
-    wc->startup_time = now_realtime_sec();
-    wc->cleanup_after = wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
     strcpy(wc->uuid_str, uuid_str);
     strcpy(wc->host_guid, host_guid);
     if (node_id && !uuid_is_null(*node_id))
