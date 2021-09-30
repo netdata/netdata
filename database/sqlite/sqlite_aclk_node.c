@@ -93,15 +93,11 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    if (wc->host)
-        rc = sqlite3_bind_blob(res, 1, &wc->host->host_uuid , sizeof(wc->host->host_uuid), SQLITE_STATIC);
-    else {
-        uuid_t host_uuid;
-        rc = uuid_parse(wc->host_guid, host_uuid);
-        if (unlikely(rc))
-            goto failed;
-        rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
-    }
+    uuid_t host_uuid;
+    rc = uuid_parse(wc->host_guid, host_uuid);
+    if (unlikely(rc))
+        goto failed;
+    rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch host dimensions");
         goto failed;
