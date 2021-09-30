@@ -6,6 +6,9 @@
 #include "rrd2json.h"
 
 extern void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived);
+#ifdef ENABLE_JSONC
+json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived);
+#endif
 extern void chartcollectors2json(RRDHOST *host, BUFFER *wb);
 extern const char* get_release_channel();
 

@@ -36,6 +36,7 @@ const char* get_release_channel() {
     return (use_stable)?"stable":"nightly";
 }
 
+#ifndef ENABLE_JSONC
 void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
@@ -137,6 +138,97 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 
     buffer_sprintf(wb, "\n\t]\n}\n");
 }
+#else /* defined ENABLE_JSONC */
+void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived) {
+    json_object *j = charts_json(host, skip_volatile, show_archived);
+    buffer_strcat(wb, json_object_to_json_string_ext(j, JSON_C_TO_STRING_PLAIN));
+    json_object_put(j);
+}
+#endif
+
+#ifdef ENABLE_JSONC
+#define JSON_ADD_STRING(name, str, obj)                                                                                \
+    {                                                                                                                  \
+        tmp = json_object_new_string(str);                                                                             \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+#define JSON_ADD_INT(name, val, obj)                                                                                   \
+    {                                                                                                                  \
+        tmp = json_object_new_int(val);                                                                                \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
+{
+    static char *custom_dashboard_info_js_filename = NULL;
+    RRDSET *st;
+    json_object *j = json_object_new_object();
+    json_object *tmp;
+    size_t dimensions = 0, memory = 0, alarms = 0, charts = 0;
+
+    time_t now = now_realtime_sec();
+
+    if(unlikely(!custom_dashboard_info_js_filename))
+        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
+
+    JSON_ADD_STRING("hostname", host->hostname, j)
+    JSON_ADD_STRING("version", host->program_version, j)
+    JSON_ADD_STRING("release_channel", get_release_channel(), j)
+    JSON_ADD_STRING("os", host->os, j)
+    JSON_ADD_STRING("timezone", host->timezone, j)
+    tmp = json_object_new_int(host->rrd_update_every);
+    json_object_object_add(j, "update_every", tmp);
+    tmp = json_object_new_int(host->rrd_history_entries);
+    json_object_object_add(j, "history", tmp);
+    JSON_ADD_STRING("memory_mode", rrd_memory_mode_name(host->rrd_memory_mode), j)
+    JSON_ADD_STRING("custom_info", custom_dashboard_info_js_filename, j)
+
+    rrdhost_rdlock(host);
+    rrdset_foreach_read(st, host) {
+        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
+            tmp = rrdset_json(st, &dimensions, &memory, skip_volatile);
+            json_object_object_add(j, st->id, tmp);
+            charts++;
+        }
+    }
+
+    RRDCALC *rc;
+    for(rc = host->alarms; rc ; rc = rc->next) {
+        if(rc->rrdset)
+            alarms++;
+    }
+    rrdhost_unlock(host);
+
+    JSON_ADD_INT("charts_count", charts, j)
+    JSON_ADD_INT("dimensions_count", dimensions, j)
+    JSON_ADD_INT("alarms_count", alarms, j)
+    JSON_ADD_INT("rrd_memory_bytes", memory, j)
+    JSON_ADD_INT("hosts_count", rrd_hosts_available, j)
+
+    json_object *host_array = json_object_new_array();
+    if (rrd_hosts_available > 1) {
+        rrd_rdlock();
+        RRDHOST *h;
+        rrdhost_foreach_read(h) {
+            if(!rrdhost_should_be_removed(h, host, now) && !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED)) {
+                // another json object with single item :/
+                // we must keep it like this to keep API same
+                json_object *tmp_obj = json_object_new_object();
+                JSON_ADD_STRING("hostname", h->hostname, tmp_obj);
+                json_object_array_add(host_array, tmp_obj);
+            }
+        }
+        rrd_unlock();
+    } else {
+        json_object *tmp_obj = json_object_new_object();
+        JSON_ADD_STRING("hostname", host->hostname, tmp_obj)
+        json_object_array_add(host_array, tmp_obj);
+    }
+
+    return j;
+}
+#endif
+
 
 // generate collectors list for the api/v1/info call
 

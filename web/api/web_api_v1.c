@@ -557,7 +557,13 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
+#ifdef ENABLE_JSONC
+    json_object *j = charts_json(host, 0, 0);
+    buffer_strcat(w->response.data, json_object_to_json_string_ext(j, JSON_C_TO_STRING_PRETTY));
+    json_object_put(j);
+#else
     charts2json(host, w->response.data, 0, 0);
+#endif
     return HTTP_RESP_OK;
 }
 
