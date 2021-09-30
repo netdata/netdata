@@ -1261,7 +1261,9 @@ netdataDashboard.context = {
         heads: [
             netdataDashboard.gaugeChart('Saved', '12%', 'savings', '#0099CC')
         ],
-        info: 'The amount of memory saved by KSM.'
+        info: '<p>The amount of memory saved by KSM.</p>'+
+        '<p><b>Savings</b> - saved memory. '+
+        '<b>Offered</b> - memory marked as mergeable.</p>'
     },
 
     'mem.ksm_ratios': {
