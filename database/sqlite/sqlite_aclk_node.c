@@ -76,9 +76,6 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     if (!aclk_use_new_cloud_arch || !aclk_connected)
         return;
 
-    if (unlikely(!wc->host))
-        return;
-
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;
@@ -92,6 +89,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch host dimensions");
+        freez(claim_id);
         return;
     }
 
@@ -166,10 +164,10 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     };
     aclk_retention_updated(&rotate_data);
     freez(rotate_data.node_id);
-    freez(rotate_data.claim_id);
     freez(rotate_data.interval_durations);
 
 failed:
+    freez(claim_id);
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when reading host dimensions");
