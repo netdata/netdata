@@ -2,6 +2,7 @@
 
 #include "rrdset2json.h"
 
+//TODO <timo> remove this ifndef ENABLE_JSONC when charts call is removed
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
     if(unlikely(!st->rrdlabels))
@@ -173,6 +174,18 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         json_object_object_add(obj, name, tmp);                                                                        \
     }
 
+json_object *chart_labels_json(RRDSET *st)
+{
+    struct label_index *labels = &st->state->labels;
+    json_object *tmp, *j = json_object_new_object();
+
+    netdata_rwlock_rdlock(&labels->labels_rwlock);
+    for (struct label *label = labels->head; label; label = label->next)
+        JSON_ADD_STRING(label->key, label->value, j)
+    netdata_rwlock_unlock(&labels->labels_rwlock);
+    return j;
+}
+
 extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *memory_used, int skip_volatile)
 {
     json_object *j = json_object_new_object();
@@ -272,9 +285,7 @@ extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *me
         json_object_object_add(j, "alarms", obj);
     }
 
-    buffer_flush(buf);
-    chart_labels2json(st, buf, 0);
-    tmp = json_tokener_parse(buffer_tostring(buf));
+    tmp = chart_labels_json(st);
     json_object_object_add(j, "chart_labels", tmp);
 
     rrdset_unlock(st);

@@ -3,9 +3,17 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
+#ifdef ENABLE_JSONC
+void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
+    json_object *j = rrdset_json(st, NULL, NULL, 0);
+    buffer_strcat(wb, json_object_to_json_string_ext(j, JSON_C_TO_STRING_PRETTY));
+    json_object_put(j);
+}
+#else
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
+#endif
 
 void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
     switch(format) {
