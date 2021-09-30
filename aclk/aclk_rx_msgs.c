@@ -360,11 +360,9 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     if (!strcmp(message_type, "UpdateChartConfigs")) {
         struct update_chart_config res = parse_update_chart_config(msg, msg_len);
         if (!res.claim_id || !res.node_id || !res.hashes)
-        {
             error("Error parsing UpdateChartConfigs msg");
-            destroy_update_chart_config(&res);
-        }
-        aclk_get_chart_config(res.hashes);
+        else
+            aclk_get_chart_config(res.hashes);
         destroy_update_chart_config(&res);
         return;
     }
