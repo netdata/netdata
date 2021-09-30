@@ -145,6 +145,7 @@ struct collector {
     const char *module;
 };
 
+#ifndef ENABLE_JSONC
 struct array_printer {
     int c;
     BUFFER *wb;
@@ -189,3 +190,48 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
     dictionary_walkthrough_read(dict, print_collector_callback, &ap);
     dictionary_destroy(dict);
 }
+
+#else /* !ENABLE_JSONC */
+static int collector_dict_walker(void *dict_entry, void *ctx)
+{
+    json_object *array = ctx;
+    json_object *obj = json_object_new_object();
+    json_object *tmp;
+    struct collector *col=(struct collector *) dict_entry;
+
+    tmp = json_object_new_string(col->plugin);
+    json_object_object_add(obj, "plugin", tmp);
+
+    tmp = json_object_new_string(col->module);
+    json_object_object_add(obj, "module", tmp);
+
+    json_object_array_add(array, obj);
+    return 0;
+}
+
+json_object *chartcollectors_json(RRDHOST *host) {
+    json_object *array = json_object_new_array();
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    RRDSET *st;
+    char name[500];
+
+    time_t now = now_realtime_sec();
+    rrdhost_rdlock(host);
+    rrdset_foreach_read(st, host) {
+        if (rrdset_is_available_for_viewers(st)) {
+            struct collector col = {
+                    .plugin = st->plugin_name ? st->plugin_name : "",
+                    .module = st->module_name ? st->module_name : ""
+            };
+            sprintf(name, "%s:%s", col.plugin, col.module);
+            dictionary_set(dict, name, &col, sizeof(struct collector));
+            st->last_accessed_time = now;
+        }
+    }
+    rrdhost_unlock(host);
+
+    dictionary_get_all(dict, collector_dict_walker, array);
+    dictionary_destroy(dict);
+    return array;
+}
+#endif
