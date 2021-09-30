@@ -2058,7 +2058,65 @@ netdataDashboard.context = {
     // APPS
 
     'apps.cpu': {
-        height: 2.0
+        height: 2.0,
+        info: 'Total CPU utilization (all cores). It includes user, system and guest time.'
+    },
+
+    'apps.cpu_user': {
+        height: 2.0,
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">user space</a> (all cores).'
+    },
+
+    'apps.cpu_system': {
+        height: 2.0,
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">kernel space</a> (all cores).'
+    },
+
+    'apps.cpu_guest': {
+        height: 2.0,
+        info: 'The amount of time spent running a virtual CPU for a guest operating system (all cores).'
+    },
+
+    'apps.preads': {
+        height: 2.0,
+        info: 'The amount of data that has been really read from the storage layer.'
+    },
+
+    'apps.pwrites': {
+        height: 2.0,
+        info: 'The amount of data that has been really written to the storage layer.'
+    },
+
+    'apps.lreads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required '+
+        '(the read might have been satisfied from pagecache).'
+    },
+
+    'apps.lwrites': {
+        info: 'The amount of data that has been written or shall be written to the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required '+
+        '(the read might have been satisfied from pagecache).'
+    },
+
+    'apps.files': {
+        info: 'The number of open files and directories.'
+    },
+
+    'apps.pipes': {
+        info: 'The number of open '+
+        '<a href="https://en.wikipedia.org/wiki/Anonymous_pipe#Unix" target="_blank">pipes</a>. '+
+        'A pipe, a unidirectional data channel that can be used for interprocess communication.'
+    },
+
+    'apps.sockets': {
+        info: 'The number of open sockets. '+
+        'Sockets are a way to enable inter-process communication between programs running on a server, '+
+        'or between programs running on separate servers. This includes both network and UNIX sockets.'
     },
 
     'apps.mem': {
@@ -2067,14 +2125,6 @@ netdataDashboard.context = {
 
     'apps.vmem': {
         info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
-    },
-
-    'apps.preads': {
-        height: 2.0
-    },
-
-    'apps.pwrites': {
-        height: 2.0
     },
 
     'apps.uptime': {
