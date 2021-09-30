@@ -1299,7 +1299,7 @@ static inline size_t rrdset_done_interpolate(
             #endif
         }
         // reset the storage flags for the next point, if any;
-        storage_flags = SN_EXISTS;
+        storage_flags = SN_DEFAULT_FLAGS;
 
         st->counter = ++counter;
         st->current_entry = current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
@@ -1530,7 +1530,7 @@ after_first_database_work:
             st->collected_total += rd->collected_value;
     }
 
-    uint32_t storage_flags = SN_EXISTS;
+    uint32_t storage_flags = SN_DEFAULT_FLAGS;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
