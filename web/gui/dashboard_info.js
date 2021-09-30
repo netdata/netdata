@@ -1284,7 +1284,7 @@ netdataDashboard.context = {
             }
         ],
         info: 'The effectiveness of KSM. '+
-        'This is the percentage of currently merged pages of the total that have been marked as mergeable.'
+        'This is the percentage of the mergeable pages that are currently merged.'
     },
 
     'mem.zram_usage': {
