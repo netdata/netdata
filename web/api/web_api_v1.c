@@ -1013,6 +1013,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
+#ifndef ENABLE_JSONC
 static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
@@ -1102,8 +1103,232 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     rrdlabels_to_buffer(host->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
     buffer_strcat(wb, "\n");
 }
+#endif /* ENABLE_JSONC */
 
 extern int aclk_connected;
+#ifdef ENABLE_JSONC
+#define JSON_ADD_STRING(name, str, obj)                                                                                \
+    {                                                                                                                  \
+        tmp = json_object_new_string(str);                                                                             \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+#define JSON_ADD_INT(name, val, obj)                                                                                   \
+    {                                                                                                                  \
+        tmp = json_object_new_int(val);                                                                                \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+#define JSON_ADD_BOOL(name, val, obj)                                                                                  \
+    {                                                                                                                  \
+        tmp = json_object_new_boolean(val);                                                                            \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+static inline json_object *generate_info_summary_alarm_statuses(RRDHOST *host)
+{
+    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
+    RRDCALC *rc;
+    rrdhost_rdlock(host);
+    for(rc = host->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        switch(rc->status) {
+            case RRDCALC_STATUS_WARNING:
+                alarm_warn++;
+                break;
+            case RRDCALC_STATUS_CRITICAL:
+                alarm_crit++;
+                break;
+            default:
+                alarm_normal++;
+        }
+    }
+    rrdhost_unlock(host);
+
+    json_object *tmp;
+    json_object *obj = json_object_new_object();
+    JSON_ADD_INT("normal", alarm_normal, obj)
+    JSON_ADD_INT("warning", alarm_warn, obj)
+    JSON_ADD_INT("critical", alarm_crit, obj)
+
+    return obj;
+}
+
+static inline void generate_info_mirrored_hosts(json_object *j)
+{
+    json_object *hosts = json_object_new_array();
+    json_object *host_statuses = json_object_new_array();
+    json_object *tmp, *host_status;
+
+    RRDHOST *host;
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
+            continue;
+
+        tmp = json_object_new_string(host->hostname);
+        json_object_array_add(hosts, tmp);
+
+        host_status = json_object_new_object();
+        netdata_mutex_lock(&host->receiver_lock);
+        JSON_ADD_STRING("guid", host->machine_guid, host_status)
+        JSON_ADD_STRING("reachable", ((host->receiver || host == localhost) ? "true" : "false"), host_status)
+        tmp = json_object_new_int(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+        json_object_object_add(host_status, "hops", tmp);
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        rrdhost_aclk_state_lock(host);
+        if (host->aclk_state.claimed_id)
+            JSON_ADD_STRING("claim_id", host->aclk_state.claimed_id, host_status)
+        else
+            json_object_object_add(host_status, "claim_id", NULL);
+        rrdhost_aclk_state_unlock(host);
+
+        json_object_array_add(host_statuses, host_status);
+    }
+    rrd_unlock();
+
+    json_object_object_add(j, "mirrored_hosts", hosts);
+    json_object_object_add(j, "mirrored_hosts_status", host_statuses);
+}
+
+inline json_object *host_labels_json(RRDHOST *host)
+{
+    json_object *tmp, *obj = json_object_new_object();
+
+    rrdhost_rdlock(host);
+    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+    for (struct label *label = host->labels.head; label; label = label->next)
+        JSON_ADD_STRING(label->key, label->value, obj);
+    netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    rrdhost_unlock(host);
+
+    return obj;
+}
+
+json_object *generate_info_json(RRDHOST *host)
+{
+    json_object *j = json_object_new_object();
+    json_object *tmp;
+
+    JSON_ADD_STRING("version", host->program_version, j)
+    JSON_ADD_STRING("uid", host->machine_guid, j)
+
+    generate_info_mirrored_hosts(j);
+
+    json_object_object_add(j, "alarms", generate_info_summary_alarm_statuses(host));
+
+    JSON_ADD_STRING("os_name", (host->system_info->host_os_name) ? host->system_info->host_os_name : "", j)
+    JSON_ADD_STRING("os_id", (host->system_info->host_os_id) ? host->system_info->host_os_id : "", j)
+    JSON_ADD_STRING("os_id_like", (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : "", j)
+    JSON_ADD_STRING("os_version", (host->system_info->host_os_version) ? host->system_info->host_os_version : "", j)
+    JSON_ADD_STRING("os_version_id", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "", j)
+    JSON_ADD_STRING("os_detection", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "", j)
+    JSON_ADD_STRING("cores_total", (host->system_info->host_cores) ? host->system_info->host_cores : "", j)
+    JSON_ADD_STRING("total_disk_space", (host->system_info->host_disk_space) ? host->system_info->host_disk_space : "", j)
+    JSON_ADD_STRING("cpu_freq", (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : "", j)
+    JSON_ADD_STRING("ram_total", (host->system_info->host_ram_total) ? host->system_info->host_ram_total : "", j)
+
+    if (host->system_info->container_os_name)
+        JSON_ADD_STRING("container_os_name", host->system_info->container_os_name, j)
+    if (host->system_info->container_os_id)
+        JSON_ADD_STRING("container_os_id", host->system_info->container_os_id, j)
+    if (host->system_info->container_os_id_like)
+        JSON_ADD_STRING("container_os_id_like", host->system_info->container_os_id_like, j)
+    if (host->system_info->container_os_version)
+        JSON_ADD_STRING("container_os_version", host->system_info->container_os_version, j)
+    if (host->system_info->container_os_version_id)
+        JSON_ADD_STRING("container_os_version_id", host->system_info->container_os_version_id, j)
+    if (host->system_info->container_os_detection)
+        JSON_ADD_STRING("container_os_detection", host->system_info->container_os_detection, j)
+    if (host->system_info->is_k8s_node)
+        JSON_ADD_STRING("is_k8s_node", host->system_info->is_k8s_node, j)
+
+    JSON_ADD_STRING("kernel_name", (host->system_info->kernel_name) ? host->system_info->kernel_name : "", j)
+    JSON_ADD_STRING("kernel_version", (host->system_info->kernel_version) ? host->system_info->kernel_version : "", j)
+    JSON_ADD_STRING("architecture", (host->system_info->architecture) ? host->system_info->architecture : "", j)
+    JSON_ADD_STRING("virtualization", (host->system_info->virtualization) ? host->system_info->virtualization : "", j)
+    JSON_ADD_STRING("virt_detection", (host->system_info->virt_detection) ? host->system_info->virt_detection : "", j)
+    JSON_ADD_STRING("container", (host->system_info->container) ? host->system_info->container : "", j)
+    JSON_ADD_STRING("container_detection", (host->system_info->container_detection) ? host->system_info->container_detection : "", j)
+
+    json_object_object_add(j, "host_labels", host_labels_json(host));
+
+    json_object_object_add(j, "collectors", chartcollectors_json(host));
+
+#ifdef DISABLE_CLOUD
+    JSON_ADD_BOOL("cloud-enabled", 0, j)
+#else
+    JSON_ADD_BOOL("cloud-enabled", appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1), j)
+#endif
+
+#ifdef ENABLE_ACLK
+    JSON_ADD_BOOL("cloud-available", 1, j)
+#ifdef ACLK_NG
+    JSON_ADD_BOOL("aclk-ng-available", 1, j)
+#else
+    JSON_ADD_BOOL("aclk-ng-available", 0, j)
+#endif
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    JSON_ADD_BOOL("aclk-ng-new-cloud-protocol", 1, j)
+#else
+    JSON_ADD_BOOL("aclk-ng-new-cloud-protocol", 0, j)
+#endif
+#ifdef ACLK_LEGACY
+    JSON_ADD_BOOL("aclk-legacy-available", 1, j)
+#else
+    JSON_ADD_BOOL("aclk-legacy-available", 0, j)
+#endif
+    JSON_ADD_STRING("aclk-implementation", aclk_ng ? "Next Generation" : "Legacy", j)
+#else /* !ENABLE_ACLK */
+    JSON_ADD_BOOL("cloud-available", 0, j)
+#endif /* ENABLE_ALCK */
+
+    char *agent_id = is_agent_claimed();
+    JSON_ADD_BOOL("agent-claimed", (agent_id != NULL), j)
+    freez(agent_id);
+
+#ifdef ENABLE_ACLK
+    if (aclk_connected)
+        JSON_ADD_BOOL("aclk-available", 1, j)
+    else
+#endif
+        JSON_ADD_BOOL("aclk-available", 0, j)
+
+    JSON_ADD_STRING("memory-mode", analytics_data.netdata_config_memory_mode, j)
+    JSON_ADD_STRING("multidb-disk-quota", analytics_data.netdata_config_multidb_disk_quota, j)
+    JSON_ADD_STRING("page-cache-size", analytics_data.netdata_config_page_cache_size, j)
+    JSON_ADD_STRING("stream-enabled", analytics_data.netdata_config_stream_enabled, j)
+    JSON_ADD_STRING("hosts-available", analytics_data.netdata_config_hosts_available, j)
+    JSON_ADD_STRING("https-enabled", analytics_data.netdata_config_https_enabled, j)
+    JSON_ADD_STRING("buildinfo", analytics_data.netdata_buildinfo, j)
+    JSON_ADD_STRING("release-channel", analytics_data.netdata_config_release_channel, j)
+    JSON_ADD_STRING("web-enabled", analytics_data.netdata_config_web_enabled, j)
+    JSON_ADD_STRING("notification-methods", analytics_data.netdata_notification_methods, j)
+    JSON_ADD_STRING("exporting-enabled", analytics_data.netdata_config_exporting_enabled, j)
+    JSON_ADD_STRING("exporting-connectors", analytics_data.netdata_exporting_connectors, j)
+    JSON_ADD_STRING("allmetrics-prometheus-used", analytics_data.netdata_allmetrics_prometheus_used, j)
+    JSON_ADD_STRING("allmetrics-shell-used", analytics_data.netdata_allmetrics_shell_used, j)
+    JSON_ADD_STRING("allmetrics-json-used", analytics_data.netdata_allmetrics_json_used, j)
+    JSON_ADD_STRING("dashboard-used", analytics_data.netdata_dashboard_used, j)
+    JSON_ADD_STRING("charts-count", analytics_data.netdata_charts_count, j)
+    JSON_ADD_STRING("metrics-count", analytics_data.netdata_metrics_count, j)
+
+    return j;
+}
+
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
+{
+    json_object *j = generate_info_json(host);
+    buffer_strcat(wb, json_object_to_json_string(j));
+    json_object_put(j);
+    return 0;
+}
+
+#else /* !ENABLE_JSONC */
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 {
     buffer_strcat(wb, "{\n");
@@ -1292,6 +1517,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_strcat(wb, "\n}");
     return 0;
 }
+#endif /* ENABLE_JSONC */
 
 #if defined(ENABLE_ML)
 int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
