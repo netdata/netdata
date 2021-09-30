@@ -153,3 +153,132 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             "\n\t\t}"
     );
 }
+
+
+#ifdef ENABLE_JSONC
+#define JSON_ADD_STRING(name, str, obj)                                                                                \
+    {                                                                                                                  \
+        tmp = json_object_new_string(str);                                                                             \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+#define JSON_ADD_INT64(name, val, obj)                                                                                 \
+    {                                                                                                                  \
+        tmp = json_object_new_int64(val);                                                                              \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+#define JSON_ADD_INT(name, val, obj)                                                                                   \
+    {                                                                                                                  \
+        tmp = json_object_new_int(val);                                                                                \
+        json_object_object_add(obj, name, tmp);                                                                        \
+    }
+
+extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *memory_used, int skip_volatile)
+{
+    json_object *j = json_object_new_object();
+    json_object *tmp;
+
+    rrdset_rdlock(st);
+
+    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
+    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
+
+    JSON_ADD_STRING("id", st->id, j)
+    JSON_ADD_STRING("name", st->name, j)
+    JSON_ADD_STRING("type", st->type, j)
+    JSON_ADD_STRING("family", st->family, j)
+    JSON_ADD_STRING("context", st->context, j)
+
+    BUFFER *buf = buffer_create(1024);
+    buffer_sprintf(buf, "%s (%s)", st->title, st->name);
+    JSON_ADD_STRING("title", buffer_tostring(buf), j)
+
+    JSON_ADD_INT64("priority", st->priority, j)
+
+    JSON_ADD_STRING("plugin", st->plugin_name ? st->plugin_name : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
+    JSON_ADD_STRING("module", st->module_name ? st->module_name : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
+
+    tmp = json_object_new_boolean(rrdset_flag_check(st, RRDSET_FLAG_ENABLED));
+    json_object_object_add(j, "enabled", tmp);
+
+    JSON_ADD_STRING("units", st->units, j)
+
+    buffer_flush(buf);
+    buffer_sprintf(buf, "/api/v1/data?chart=%s", st->name);
+    tmp = json_object_new_string(buffer_tostring(buf));
+    json_object_object_add(j, "data_url", tmp);
+
+    JSON_ADD_STRING("chart_type", rrdset_type_name(st->chart_type), j)
+
+    if (likely(!skip_volatile))
+        JSON_ADD_INT64("duration", last_entry_t - first_entry_t + st->update_every, j); //st->entries * st->update_every
+    
+    JSON_ADD_INT64("first_entry", first_entry_t, j)
+
+    if (likely(!skip_volatile))
+        JSON_ADD_INT64("last_entry", last_entry_t, j)
+
+    JSON_ADD_INT("update_every", st->update_every, j)
+
+    json_object *obj = json_object_new_object();
+    RRDDIM *rd;
+    if (memory_used) *memory_used += st->memsize;
+    rrddim_foreach_read(rd, st) {
+        if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+
+        if (memory_used) *memory_used += rd->memsize;
+        if (dimensions_count) (*dimensions_count)++;
+
+        // to keep API same with legacy implementation
+        // which also creates dictionary with fixed one item
+        // funny but... (maybe /api/v2 in future :) )
+        json_object *tmp_obj = json_object_new_object();
+        JSON_ADD_STRING("name", rd->name, tmp_obj);
+        json_object_object_add(obj, rd->id, tmp_obj);
+    }
+    json_object_object_add(j, "dimensions", obj);
+
+    buffer_flush(buf);
+    health_api_v1_chart_custom_variables2json(st, buf); // TODO jsonc-ify this
+    tmp = json_tokener_parse(buffer_tostring(buf));
+    json_object_object_add(j, "chart_variables", tmp);
+
+    if (isnan(st->green) || isinf(st->green)) {
+        json_object_object_add(j, "green", NULL);
+    } else {
+        buffer_flush(buf);
+        buffer_rrd_value(buf, st->green);
+        JSON_ADD_STRING("green", buffer_tostring(buf), j)
+    }
+
+    if (isnan(st->green) || isinf(st->green)) {
+        json_object_object_add(j, "red", NULL);
+    } else {
+        buffer_flush(buf);
+        buffer_rrd_value(buf, st->red);
+        JSON_ADD_STRING("red", buffer_tostring(buf), j)
+    }
+
+    if (likely(!skip_volatile)) {
+        obj = json_object_new_object();
+        RRDCALC *rc;
+        for (rc = st->alarms; rc; rc = rc->rrdset_next) {
+            json_object *tmp_obj = json_object_new_object();
+            JSON_ADD_INT("id", rc->id, tmp_obj)
+            JSON_ADD_STRING("status", rrdcalc_status2string(rc->status), tmp_obj);
+            JSON_ADD_STRING("units", rc->units, tmp_obj)
+            JSON_ADD_INT("update_every", rc->update_every, tmp_obj)
+        }
+        json_object_object_add(j, "alarms", obj);
+    }
+
+    buffer_flush(buf);
+    chart_labels2json(st, buf, 0);
+    tmp = json_tokener_parse(buffer_tostring(buf));
+    json_object_object_add(j, "chart_labels", tmp);
+
+    rrdset_unlock(st);
+    buffer_free(buf);
+    return j;
+}
+#endif
