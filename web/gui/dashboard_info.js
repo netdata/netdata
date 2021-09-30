@@ -727,7 +727,11 @@ netdataDashboard.submenu = {
 
     'mem.ksm': {
         title: 'deduper (ksm)',
-        info: 'Kernel Same-page Merging (KSM) performance monitoring, read from several files in <code>/sys/kernel/mm/ksm/</code>. KSM is a memory-saving de-duplication feature in the Linux kernel (since version 2.6.32). The KSM daemon ksmd periodically scans those areas of user memory which have been registered with it, looking for pages of identical content which can be replaced by a single write-protected page (which is automatically copied if a process later wants to update its content). KSM was originally developed for use with KVM (where it was known as Kernel Shared Memory), to fit more virtual machines into physical memory, by sharing the data common between them.  But it can be useful to any application which generates many instances of the same data.'
+        info: '<a href="https://en.wikipedia.org/wiki/Kernel_same-page_merging" target="_blank">Kernel Same-page Merging</a> '+
+        '(KSM) performance monitoring, read from several files in <code>/sys/kernel/mm/ksm/</code>. '+
+        'KSM is a memory-saving de-duplication feature in the Linux kernel. '+
+        'The KSM daemon ksmd periodically scans those areas of user memory which have been registered with it, '+
+        'looking for pages of identical content which can be replaced by a single write-protected page.'
     },
 
     'mem.hugepages': {
@@ -1243,10 +1247,23 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // MEMORY
 
+    'mem.ksm': {
+        info: '<p>Memory pages merging statistics. '+
+        'A high ratio of <b>Sharing</b> to <b>Shared</b> indicates good sharing, '+
+        'but a high ratio of <b>Unshared</b> to <b>Sharing</b> indicates wasted effort.</p>'+
+        '<p><b>Shared</b> - used shared pages. '+
+        '<b>Unshared</b> - memory no longer shared (pages are unique but repeatedly checked for merging). '+
+        '<b>Sharing</b> - memory currently shared (how many more sites are sharing the pages, i.e. how much saved). '+
+        '<b>Volatile</b> - volatile pages (changing too fast to be placed in a tree).</p>'
+    },
+
     'mem.ksm_savings': {
         heads: [
             netdataDashboard.gaugeChart('Saved', '12%', 'savings', '#0099CC')
-        ]
+        ],
+        info: '<p>The amount of memory saved by KSM.</p>'+
+        '<p><b>Savings</b> - saved memory. '+
+        '<b>Offered</b> - memory marked as mergeable.</p>'
     },
 
     'mem.ksm_ratios': {
@@ -1265,7 +1282,9 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'The effectiveness of KSM. '+
+        'This is the percentage of the mergeable pages that are currently merged.'
     },
 
     'mem.zram_usage': {
