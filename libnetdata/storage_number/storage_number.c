@@ -2,6 +2,11 @@
 
 #include "../libnetdata.h"
 
+#define get_storage_number_flags(value) \
+    ((((storage_number)(value)) & (1 << 24)) | \
+     (((storage_number)(value)) & (1 << 25)) | \
+     (((storage_number)(value)) & (1 << 26)))
+
 storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
