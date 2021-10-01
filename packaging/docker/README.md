@@ -32,7 +32,7 @@ directive, not a COMMAND directive. Please adapt your execution scripts accordin
 ENTRYPOINT vs COMMAND in the [Docker
 documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-Our POWER8+ Docker images do not support our FreeIPMI collector. THis is a technical limitation in FreeIPMI itself,
+Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
 and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
