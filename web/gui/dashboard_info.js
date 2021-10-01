@@ -210,9 +210,9 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-heartbeat"></i>',
         info: 'Per application statistics are collected using '+
         '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
-        'This plugin walks through all processes and aggregates statistics for applications, defined in '+
-        '<a href="https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/apps_groups.conf" target="_blank">apps_groups.conf</a>. '+
-        'The plugin counts also the resources of exited children. '+
+        'This plugin walks through all processes and aggregates statistics for '+
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin#configuration" target="_blank">application groups</a>. '+
+        'The plugin also counts the resources of exited children. '+
         'So for processes like shell scripts, the reported values include the resources used by the commands '+
         'these scripts run within each timeframe.',
         height: 1.5
@@ -224,7 +224,7 @@ netdataDashboard.menu = {
         info: 'Per user group statistics are collected using '+
         '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
         'This plugin walks through all processes and aggregates statistics per user group. '+
-        'The plugin counts also the resources of exited children. '+
+        'The plugin also counts the resources of exited children. '+
         'So for processes like shell scripts, the reported values include the resources used by the commands '+
         'these scripts run within each timeframe.',
         height: 1.5
@@ -236,7 +236,7 @@ netdataDashboard.menu = {
         info: 'Per user statistics are collected using '+
         '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
         'This plugin walks through all processes and aggregates statistics per user. '+
-        'The plugin counts also the resources of exited children. '+
+        'The plugin also counts the resources of exited children. '+
         'So for processes like shell scripts, the reported values include the resources used by the commands '+
         'these scripts run within each timeframe.',
         height: 1.5
