@@ -2960,7 +2960,10 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[4] + '"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'Total CPU utilization within the configured or system-wide (if not set) limits. '+
+        'When the CPU utilization of a cgroup exceeds the limit (for that period), '+
+        'the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period.'
     },
 
     'cgroup.cpu': {
@@ -2988,6 +2991,16 @@ netdataDashboard.context = {
         '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
     },
 
+    'cgroup.cpu_per_core': {
+        info: 'Total CPU utilization per core within system-wide CPU resources.'
+    },
+
+    'cgroup.mem_utilization': {
+        info: 'RAM utilization within the configured or system-wide (if not set) limits. '+
+        'When the RAM utilization of a cgroup exceeds the limit, '+
+        'OOM killer will start killing the tasks belonging to the cgroup.'
+    },
+
     'cgroup.mem_usage_limit': {
         mainheads: [
             function (os, id) {
@@ -3008,7 +3021,10 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'RAM usage within the configured or system-wide (if not set) limits. '+
+        'When the RAM usage of a cgroup exceeds the limit, '+
+        'OOM killer will start killing the tasks belonging to the cgroup.'
     },
 
     'cgroup.mem_usage': {
@@ -3030,7 +3046,8 @@ netdataDashboard.context = {
                 } else
                     return '';
             }
-        ]
+        ],
+        info: 'The amount of used RAM and swap memory.'
     },
 
     'cgroup.throttle_io': {
@@ -3066,6 +3083,34 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+
+    'cgroup.mem': {
+        info: 'Memory usage statistics. '+
+        'The individual metrics are described in the memory.stat section for '+
+        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html#per-memory-cgroup-local-status" target="_blank">cgroup-v1 </a>'+
+        'and '+
+        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#memory-interface-files" target="_blank">cgroup-v2</a>.'
+    },
+
+    'cgroup.mem_failcnt': {
+        info: 'The number of memory usage hits limits.'
+    },
+
+    'cgroup.writeback': {
+        info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+    },
+
+    'cgroup.mem_activity': {
+        info: '<p>Memory accounting statistics.</p>'+
+        '<p><b>In</b> - a page is accounted as either mapped anon page (RSS) or cache page (Page Cache) to the cgroup. '+
+        '<b>Out</b> - a page is unaccounted from the cgroup.</p>'
+    },
+
+    'cgroup.pgfaults': {
+        info: '<p>Memory <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> statistics.</p>'+
+        '<p><b>Pgfault</b> - all page faults. '+
+        '<b>Swap</b> - major page faults.</p>'
     },
 
     // ------------------------------------------------------------------------
