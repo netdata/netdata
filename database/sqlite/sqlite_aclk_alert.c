@@ -113,6 +113,7 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
             return ALARM_STATUS_UNKNOWN;
     }
 #else
+    UNUSED(status);
     return 1;
 #endif
 }

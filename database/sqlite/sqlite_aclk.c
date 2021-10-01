@@ -6,6 +6,10 @@
 #include "sqlite_aclk_chart.h"
 #include "sqlite_aclk_node.h"
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#include "../../aclk/aclk.h"
+#endif
+
 const char *aclk_sync_config[] = {
     NULL,
 };
@@ -229,40 +233,49 @@ static void async_cb(uv_async_t *handle)
 
 static void timer_cb(uv_timer_t* handle)
 {
-    struct aclk_database_worker_config *wc = handle->data;
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    struct aclk_database_worker_config *wc = handle->data;
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_TIMER;
     aclk_database_enq_cmd_noblock(wc, &cmd);
 
-    if (wc->cleanup_after && wc->cleanup_after < now_realtime_sec()) {
-        cmd.opcode = ACLK_DATABASE_CLEANUP;
-        cmd.completion = NULL;
-        aclk_database_enq_cmd_noblock(wc, &cmd);
+    time_t now =  now_realtime_sec();
 
-        cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
-        cmd.completion = NULL;
+    if (wc->cleanup_after && wc->cleanup_after < now) {
+        cmd.opcode = ACLK_DATABASE_CLEANUP;
         if (!aclk_database_enq_cmd_noblock(wc, &cmd))
             wc->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
 
-    if (wc->chart_updates && !wc->chart_pending && aclk_connected) {
-        cmd.opcode = ACLK_DATABASE_PUSH_CHART;
-        cmd.count = ACLK_MAX_CHART_BATCH;
-        cmd.completion = NULL;
-        cmd.param1 = ACLK_MAX_CHART_BATCH_COUNT;
-        if (!aclk_database_enq_cmd_noblock(wc, &cmd))
-            wc->chart_pending = 1;
-    }
+    if (aclk_use_new_cloud_arch && aclk_connected) {
+        if (wc->rotation_after && wc->rotation_after < now) {
+            cmd.opcode = ACLK_DATABASE_NODE_INFO;
+            aclk_database_enq_cmd_noblock(wc, &cmd);
 
-    if (wc->alert_updates && aclk_connected) {
-        cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
-        cmd.count = ACLK_MAX_ALERT_UPDATES;
-        aclk_database_enq_cmd_noblock(wc, &cmd);
+            cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
+            if (!aclk_database_enq_cmd_noblock(wc, &cmd))
+                wc->rotation_after += ACLK_DATABASE_ROTATION_INTERVAL;
+        }
+
+        if (wc->chart_updates && !wc->chart_pending) {
+            cmd.opcode = ACLK_DATABASE_PUSH_CHART;
+            cmd.count = ACLK_MAX_CHART_BATCH;
+            cmd.param1 = ACLK_MAX_CHART_BATCH_COUNT;
+            if (!aclk_database_enq_cmd_noblock(wc, &cmd))
+                wc->chart_pending = 1;
+        }
+
+        if (wc->alert_updates) {
+            cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
+            cmd.count = ACLK_MAX_ALERT_UPDATES;
+            aclk_database_enq_cmd_noblock(wc, &cmd);
+        }
     }
+#endif
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
@@ -323,6 +336,7 @@ void aclk_database_worker(void *arg)
     wc->alert_updates = 0;
     wc->startup_time = now_realtime_sec();
     wc->cleanup_after = wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
+    wc->rotation_after = wc->startup_time + ACLK_DATABASE_ROTATION_DELAY;
     while (likely(shutdown == 0)) {
         uv_run(loop, UV_RUN_DEFAULT);
 
@@ -404,6 +418,7 @@ void aclk_database_worker(void *arg)
                     sql_build_node_info(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_RETENTION:
+                    debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
                     aclk_update_retention(wc, cmd);
                     break;
 
@@ -700,15 +715,16 @@ void aclk_data_rotated(void)
 {
 #if ENABLE_NEW_CLOUD_PROTOCOL
 
-    debug(D_ACLK_SYNC,"Processing database rotation event");
-    struct aclk_database_cmd cmd;
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
+    if (!aclk_use_new_cloud_arch || !aclk_connected)
+        return;
 
+    time_t next_rotation_time = now_realtime_sec()+ACLK_DATABASE_ROTATION_DELAY;
     rrd_wrlock();
     RRDHOST *this_host = localhost;
     while (this_host) {
-        aclk_database_enq_cmd((struct aclk_database_worker_config *)this_host->dbsync_worker, &cmd);
+        struct aclk_database_worker_config *wc = this_host->dbsync_worker;
+        if (wc)
+            wc->rotation_after = next_rotation_time;
         this_host = this_host->next;
     }
     rrd_unlock();
@@ -717,7 +733,7 @@ void aclk_data_rotated(void)
 
     uv_mutex_lock(&aclk_async_lock);
     while (tmp) {
-        aclk_database_enq_cmd(tmp, &cmd);
+        tmp->rotation_after = next_rotation_time;
         tmp = tmp->next;
     }
     uv_mutex_unlock(&aclk_async_lock);

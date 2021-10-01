@@ -16,7 +16,9 @@
 #endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
 #define ACLK_DATABASE_CLEANUP_FIRST  (60)
+#define ACLK_DATABASE_ROTATION_DELAY  (60)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
+#define ACLK_DATABASE_ROTATION_INTERVAL (3600)
 #define ACLK_DELETE_ACK_INTERNAL (600)
 #define ACLK_SYNC_QUERY_SIZE 512
 
@@ -163,6 +165,7 @@ struct aclk_database_worker_config {
     time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
     time_t startup_time;           // When the sync thread started
+    time_t rotation_after;
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from

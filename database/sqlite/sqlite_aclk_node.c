@@ -82,7 +82,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
     sqlite3_stmt *res = NULL;
 
-    if (wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+    if (!wc->host || (wc->host && wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_DIMENSION_LIST, -1, &res, 0);
     else
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_CHART_LIST, -1, &res, 0);
@@ -117,7 +117,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     rotate_data.interval_durations = callocz(max_intervals, sizeof(*rotate_data.interval_durations));
 
     now_realtime_timeval(&rotate_data.rotation_timestamp);
-    rotate_data.memory_mode = wc->host->rrd_memory_mode;
+    rotate_data.memory_mode = wc->host ? wc->host->rrd_memory_mode : localhost->rrd_memory_mode;
     rotate_data.claim_id = claim_id;
     rotate_data.node_id = strdupz(wc->node_id);
 
@@ -134,15 +134,21 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         }
 #ifdef ENABLE_DBENGINE
         time_t  last_entry_t;
-        if (wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (wc->host && wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             rc = rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
         else
 #endif
         {
-            RRDSET *st = NULL;
-            rc = (st = rrdset_find(wc->host, (const char *)sqlite3_column_text(res, 2))) ? 0 : 1;
-            if (!rc)
-                first_entry_t = rrdset_first_entry_t(st);
+            if (wc->host) {
+                RRDSET *st = NULL;
+                rc = (st = rrdset_find(wc->host, (const char *)sqlite3_column_text(res, 2))) ? 0 : 1;
+                if (!rc)
+                    first_entry_t = rrdset_first_entry_t(st);
+            }
+            else {
+                 rc = 0;
+                 first_entry_t = rotate_data.rotation_timestamp.tv_sec;
+            }
         }
 
         if (likely(!rc && first_entry_t))
