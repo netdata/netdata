@@ -8,12 +8,14 @@
 
 #include "schema_wrapper_utils.h"
 
+using namespace alarms::v1;
+
 struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_t len)
 {
     struct start_alarm_streaming ret;
     memset(&ret, 0, sizeof(ret));
 
-    alarmstream::v1::StartAlarmStreaming msg;
+    StartAlarmStreaming msg;
 
     if (!msg.ParseFromArray(data, len))
         return ret;
@@ -27,7 +29,7 @@ struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_
 
 char *parse_send_alarm_log_health(const char *data, size_t len)
 {
-    alarmstream::v1::SendAlarmLogHealth msg;
+    SendAlarmLogHealth msg;
     if (!msg.ParseFromArray(data, len))
         return NULL;
     return strdupz(msg.node_id().c_str());
@@ -35,22 +37,22 @@ char *parse_send_alarm_log_health(const char *data, size_t len)
 
 char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data)
 {
-    alarmstream::v1::AlarmLogHealth msg;
-    alarmstream::v1::LogEntries *entries;
+    AlarmLogHealth msg;
+    LogEntries *entries;
 
     msg.set_claim_id(data->claim_id);
     msg.set_node_id(data->node_id);
     msg.set_enabled(data->enabled);
 
     switch (data->status) {
-        case ALARM_LOG_STATUS_IDLE:
-            msg.set_status(alarmstream::v1::ALARM_LOG_STATUS_IDLE);
+        case alarm_log_status_aclk::ALARM_LOG_STATUS_IDLE:
+            msg.set_status(alarms::v1::ALARM_LOG_STATUS_IDLE);
             break;
-        case ALARM_LOG_STATUS_RUNNING:
-            msg.set_status(alarmstream::v1::ALARM_LOG_STATUS_RUNNING);
+        case alarm_log_status_aclk::ALARM_LOG_STATUS_RUNNING:
+            msg.set_status(alarms::v1::ALARM_LOG_STATUS_RUNNING);
             break;
-        case ALARM_LOG_STATUS_UNSPECIFIED:
-            msg.set_status(alarmstream::v1::ALARM_LOG_STATUS_UNSPECIFIED);
+        case alarm_log_status_aclk::ALARM_LOG_STATUS_UNSPECIFIED:
+            msg.set_status(alarms::v1::ALARM_LOG_STATUS_UNSPECIFIED);
             break;
         default:
             error("Unknown status of AlarmLogHealth LogEntry");
@@ -72,26 +74,26 @@ char *generate_alarm_log_health(size_t *len, struct alarm_log_health *data)
     return bin;
 }
 
-static alarmstream::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status status)
+static alarms::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status status)
 {
     switch (status) {
-        case ALARM_STATUS_NULL:
-            return alarmstream::v1::ALARM_STATUS_NULL;
-        case ALARM_STATUS_UNKNOWN:
-            return alarmstream::v1::ALARM_STATUS_UNKNOWN;
-        case ALARM_STATUS_REMOVED:
-            return alarmstream::v1::ALARM_STATUS_REMOVED;
-        case ALARM_STATUS_NOT_A_NUMBER:
-            return alarmstream::v1::ALARM_STATUS_NOT_A_NUMBER;
-        case ALARM_STATUS_CLEAR:
-            return alarmstream::v1::ALARM_STATUS_CLEAR;
-        case ALARM_STATUS_WARNING:
-            return alarmstream::v1::ALARM_STATUS_WARNING;
-        case ALARM_STATUS_CRITICAL:
-            return alarmstream::v1::ALARM_STATUS_CRITICAL;
+        case aclk_alarm_status::ALARM_STATUS_NULL:
+            return alarms::v1::ALARM_STATUS_NULL;
+        case aclk_alarm_status::ALARM_STATUS_UNKNOWN:
+            return alarms::v1::ALARM_STATUS_UNKNOWN;
+        case aclk_alarm_status::ALARM_STATUS_REMOVED:
+            return alarms::v1::ALARM_STATUS_REMOVED;
+        case aclk_alarm_status::ALARM_STATUS_NOT_A_NUMBER:
+            return alarms::v1::ALARM_STATUS_NOT_A_NUMBER;
+        case aclk_alarm_status::ALARM_STATUS_CLEAR:
+            return alarms::v1::ALARM_STATUS_CLEAR;
+        case aclk_alarm_status::ALARM_STATUS_WARNING:
+            return alarms::v1::ALARM_STATUS_WARNING;
+        case aclk_alarm_status::ALARM_STATUS_CRITICAL:
+            return alarms::v1::ALARM_STATUS_CRITICAL;
         default:
             error("Unknown alarm status");
-            return alarmstream::v1::ALARM_STATUS_UNKNOWN;
+            return alarms::v1::ALARM_STATUS_UNKNOWN;
     }
 }
 
@@ -120,7 +122,7 @@ void destroy_alarm_log_entry(struct alarm_log_entry *entry)
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 {
-    alarmstream::v1::AlarmLogEntry le;
+    AlarmLogEntry le;
 
     le.set_node_id(data->node_id);
     le.set_claim_id(data->claim_id);
