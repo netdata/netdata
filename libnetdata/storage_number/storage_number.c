@@ -17,7 +17,8 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 24 to bit 1 = the value
 
     storage_number r = get_storage_number_flags(flags);
-    if(!value) return r;
+    if(!value)
+        goto RET_SN;
 
     int m = 0;
     calculated_number n = value, factor = 10;
@@ -52,7 +53,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
             error("Number " CALCULATED_NUMBER_FORMAT " is too big.", value);
             #endif
             r += 0x00ffffff;
-            return r;
+            goto RET_SN;
         }
     }
     else {
@@ -83,6 +84,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     r += (storage_number)n;
 #endif
 
+RET_SN:
     return r;
 }
 
