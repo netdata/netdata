@@ -13,7 +13,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     // bit 27 SN_EXISTS_100
     // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_EXISTS
+    // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
     storage_number r = get_storage_number_flags(flags);
@@ -105,7 +105,7 @@ calculated_number unpack_storage_number(storage_number value) {
         factor = 100;
 
     // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_EXISTS
+    // bit 25 SN_ANOMALY_BIT
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;

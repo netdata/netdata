@@ -60,11 +60,11 @@ typedef long double collected_number;
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
-#define SN_EXISTS           (1 << 24) // the value exists
+#define SN_ANOMALY_BIT      (1 << 24) // the anomaly bit of the value
 #define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
 #define SN_EXISTS_100       (1 << 26) // very large value (multiplier is 100 instead of 10)
 
-#define SN_DEFAULT_FLAGS    SN_EXISTS
+#define SN_DEFAULT_FLAGS    SN_ANOMALY_BIT
 
 #define SN_EMPTY_SLOT 0x00000000
 
