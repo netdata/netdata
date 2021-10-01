@@ -656,6 +656,8 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 
         if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
             ebpf_obsolete_hd_charts(ned);
+            avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)ned);
+            UNUSED(ret);
             if (move == plot_disks) {
                 freez(move);
                 plot_disks = NULL;

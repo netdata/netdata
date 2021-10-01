@@ -20,6 +20,7 @@
 #define EBPF_CFG_UPDATE_EVERY "update every"
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
+#define EBPF_CFG_CGROUP "cgroups"
 
 /**
  * The next magic number is got doing the following math:
@@ -155,6 +156,7 @@ typedef struct ebpf_module {
     int update_time;
     int global_charts;
     int apps_charts;
+    int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;

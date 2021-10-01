@@ -4659,6 +4659,17 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Services units
+
+    'services.swap_read_call': {
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
+    },
+
+    'services.swap_write_call': {
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
+    },
+
+    // ------------------------------------------------------------------------
     // ACLK Internal Stats
     'netdata.aclk_status': {
         valueRange: "[0, 1]",

@@ -30,6 +30,7 @@
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
+#include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
@@ -232,10 +233,14 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 // Common variables
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
+extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;
+extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
+extern int shm_fd_ebpf_cgroup;
+extern sem_t *shm_sem_ebpf_cgroup;
+extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern int update_every;
 extern uint32_t finalized_threads;
