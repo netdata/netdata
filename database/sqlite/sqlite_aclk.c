@@ -698,9 +698,9 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
 
 void aclk_data_rotated(void)
 {
-#if defined(ENABLE_ACLK) && defined(ACLK_NG)
+#if ENABLE_NEW_CLOUD_PROTOCOL
 
-    debug(D_ACLK_SYNC,"Processing data base rotation event");
+    debug(D_ACLK_SYNC,"Processing database rotation event");
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_UPD_RETENTION;
