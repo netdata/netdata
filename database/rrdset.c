@@ -1134,7 +1134,10 @@ static inline size_t rrdset_done_interpolate(
     size_t counter = st->counter;
     long current_entry = st->current_entry;
 
-    uint32_t storage_flags = has_reset_value ? SN_EXISTS_RESET : SN_DEFAULT_FLAGS;
+    uint32_t storage_flags = SN_DEFAULT_FLAGS;
+
+    if (has_reset_value)
+        storage_flags |= SN_EXISTS_RESET;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 
