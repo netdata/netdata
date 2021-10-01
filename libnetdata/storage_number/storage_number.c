@@ -85,6 +85,9 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
 #endif
 
 RET_SN:
+    if (r == SN_EMPTY_SLOT)
+        r = SN_ANOMALOUS_ZERO;
+
     return r;
 }
 

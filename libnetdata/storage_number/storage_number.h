@@ -68,6 +68,13 @@ typedef uint32_t storage_number;
 
 #define SN_EMPTY_SLOT 0x00000000
 
+// When the calculated number is zero and the value is anomalous (ie. it's bit
+// is zero) we want to return a storage_number representation that is
+// different from the empty slot. We achieve this by mapping zero to
+// SN_EXISTS_100. Unpacking the SN_EXISTS_100 value will return zero because
+// its fraction field (as well as its exponent factor field) will be zero.
+#define SN_ANOMALOUS_ZERO SN_EXISTS_100
+
 // checks
 #define does_storage_number_exist(value) (((storage_number) (value)) != SN_EMPTY_SLOT)
 #define did_storage_number_reset(value)  ((((storage_number) (value)) & SN_EXISTS_RESET) != 0)
