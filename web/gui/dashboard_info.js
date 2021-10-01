@@ -2982,7 +2982,10 @@ netdataDashboard.context = {
                 } else
                     return '';
             }
-        ]
+        ],
+        info: 'Total CPU utilization within system-wide CPU resources (all cores). '+
+        'The amount of time spent by tasks of the cgroup in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
     },
 
     'cgroup.mem_usage_limit': {
