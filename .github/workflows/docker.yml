@@ -98,8 +98,7 @@ jobs:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64
           push: true
           tags: ${{ env.tags }}
-          build-args:
-            - OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
