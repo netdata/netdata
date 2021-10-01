@@ -1119,7 +1119,7 @@ static inline size_t rrdset_done_interpolate(
         , usec_t last_collect_ut
         , usec_t now_collect_ut
         , char store_this_entry
-        , uint32_t storage_flags
+        , uint32_t has_reset_value
 ) {
     RRDDIM *rd;
 
@@ -1133,6 +1133,8 @@ static inline size_t rrdset_done_interpolate(
 
     size_t counter = st->counter;
     long current_entry = st->current_entry;
+
+    uint32_t storage_flags = has_reset_value ? SN_EXISTS_RESET : SN_DEFAULT_FLAGS;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 
@@ -1529,7 +1531,7 @@ after_first_database_work:
             st->collected_total += rd->collected_value;
     }
 
-    uint32_t storage_flags = SN_DEFAULT_FLAGS;
+    uint32_t has_reset_value = 0;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
@@ -1626,7 +1628,7 @@ after_first_database_work:
                           , rd->collected_value);
 
                     if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        storage_flags = SN_EXISTS_RESET;
+                        has_reset_value = 1;
 
                     uint64_t last = (uint64_t)rd->last_collected_value;
                     uint64_t new = (uint64_t)rd->collected_value;
@@ -1697,7 +1699,7 @@ after_first_database_work:
                     );
 
                     if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        storage_flags = SN_EXISTS_RESET;
+                        has_reset_value = 1;
 
                     rd->last_collected_value = rd->collected_value;
                 }
@@ -1776,7 +1778,7 @@ after_first_database_work:
             , last_collect_ut
             , now_collect_ut
             , store_this_entry
-            , storage_flags
+            , has_reset_value
     );
 
 after_second_database_work:
