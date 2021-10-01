@@ -128,6 +128,7 @@ static int
         enable_file_charts = 1,
         max_fds_cache_seconds = 60,
 #endif
+        enable_detailed_uptime = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
@@ -3519,26 +3520,28 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
-    send_BEGIN(type, "uptime_min", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_min);
-    }
-    send_END();
+    if (enable_detailed_uptime) {
+      send_BEGIN(type, "uptime_min", dt);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed && w->processes))
+              send_SET(w->name, w->uptime_min);
+      }
+      send_END();
 
-    send_BEGIN(type, "uptime_avg", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_sum / w->processes);
-    }
-    send_END();
+      send_BEGIN(type, "uptime_avg", dt);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed && w->processes))
+              send_SET(w->name, w->uptime_sum / w->processes);
+      }
+      send_END();
 
-    send_BEGIN(type, "uptime_max", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->uptime_max);
+      send_BEGIN(type, "uptime_max", dt);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed && w->processes))
+              send_SET(w->name, w->uptime_max);
+      }
+      send_END();
     }
-    send_END();
 #endif
 
     send_BEGIN(type, "mem", dt);
@@ -3710,22 +3713,24 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+    if (enable_detailed_uptime) {
+      fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed))
+              fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+      }
 
-    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
+      fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed))
+              fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+      }
 
-    fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+      fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
+      for (w = root; w ; w = w->next) {
+          if(unlikely(w->exposed))
+              fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+      }
     }
 #endif
 
@@ -3936,6 +3941,11 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
             enable_groups_charts = 0;
+            continue;
+        }
+
+        if(strcmp("with-detailed-uptime", argv[i]) == 0) {
+            enable_detailed_uptime = 1;
             continue;
         }
 
