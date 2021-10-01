@@ -208,21 +208,37 @@ netdataDashboard.menu = {
     'apps': {
         title: 'Applications',
         icon: '<i class="fas fa-heartbeat"></i>',
-        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code>, which can be edited by running <code>$ /etc/netdata/edit-config apps_groups.conf</code> (the default is <a href="https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
-        height: 1.5
-    },
-
-    'users': {
-        title: 'Users',
-        icon: '<i class="fas fa-user"></i>',
-        info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per application statistics are collected using '+
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
+        'This plugin walks through all processes and aggregates statistics for '+
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin#configuration" target="_blank">application groups</a>. '+
+        'The plugin also counts the resources of exited children. '+
+        'So for processes like shell scripts, the reported values include the resources used by the commands '+
+        'these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
         title: 'User Groups',
+        icon: '<i class="fas fa-user"></i>',
+        info: 'Per user group statistics are collected using '+
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
+        'This plugin walks through all processes and aggregates statistics per user group. '+
+        'The plugin also counts the resources of exited children. '+
+        'So for processes like shell scripts, the reported values include the resources used by the commands '+
+        'these scripts run within each timeframe.',
+        height: 1.5
+    },
+
+    'users': {
+        title: 'Users',
         icon: '<i class="fas fa-users"></i>',
-        info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per user statistics are collected using '+
+        '<a href="https://learn.netdata.cloud/docs/agent/collectors/apps.plugin" target="_blank">apps.plugin</a>. '+
+        'This plugin walks through all processes and aggregates statistics per user. '+
+        'The plugin also counts the resources of exited children. '+
+        'So for processes like shell scripts, the reported values include the resources used by the commands '+
+        'these scripts run within each timeframe.',
         height: 1.5
     },
 
@@ -2055,31 +2071,308 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // APPS
+    // APPS (Applications, Groups, Users)
 
+    // APPS cpu
     'apps.cpu': {
-        height: 2.0
+        info: 'Total CPU utilization (all cores). It includes user, system and guest time.'
+    },
+    'groups.cpu': {
+        info: 'Total CPU utilization (all cores). It includes user, system and guest time.'
+    },
+    'users.cpu': {
+        info: 'Total CPU utilization (all cores). It includes user, system and guest time.'
     },
 
-    'apps.mem': {
-        info: 'Real memory (RAM) used by applications. This does not include shared memory.'
+    'apps.cpu_user': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
+    },
+    'groups.cpu_user': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
+    },
+    'users.cpu_user': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
     },
 
-    'apps.vmem': {
-        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+    'apps.cpu_system': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
+    },
+    'groups.cpu_system': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
+    },
+    'users.cpu_system': {
+        info: 'The amount of time the CPU was busy executing code in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
     },
 
+    'apps.cpu_guest': {
+        info: 'The amount of time spent running a virtual CPU for a guest operating system (all cores).'
+    },
+    'groups.cpu_guest': {
+        info: 'The amount of time spent running a virtual CPU for a guest operating system (all cores).'
+    },
+    'users.cpu_guest': {
+        info: 'The amount of time spent running a virtual CPU for a guest operating system (all cores).'
+    },
+
+    // APPS disk
     'apps.preads': {
-        height: 2.0
+        info: 'The amount of data that has been read from the storage layer. '+
+        'Actual physical disk I/O was required.'
+    },
+    'groups.preads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'Actual physical disk I/O was required.'
+    },
+    'users.preads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'Actual physical disk I/O was required.'
     },
 
     'apps.pwrites': {
-        height: 2.0
+        info: 'The amount of data that has been written to the storage layer. '+
+        'Actual physical disk I/O was required.'
+    },
+    'groups.pwrites': {
+        info: 'The amount of data that has been written to the storage layer. '+
+        'Actual physical disk I/O was required.'
+    },
+    'users.pwrites': {
+        info: 'The amount of data that has been written to the storage layer. '+
+        'Actual physical disk I/O was required.'
+    },
+
+    'apps.lreads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required '+
+        '(the read might have been satisfied from pagecache).'
+    },
+    'groups.lreads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required '+
+        '(the read might have been satisfied from pagecache).'
+    },
+    'users.lreads': {
+        info: 'The amount of data that has been read from the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required '+
+        '(the read might have been satisfied from pagecache).'
+    },
+
+    'apps.lwrites': {
+        info: 'The amount of data that has been written or shall be written to the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required.'
+    },
+    'groups.lwrites': {
+        info: 'The amount of data that has been written or shall be written to the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required.'
+    },
+    'users.lwrites': {
+        info: 'The amount of data that has been written or shall be written to the storage layer. '+
+        'It includes things such as terminal I/O and is unaffected by whether or '+
+        'not actual physical disk I/O was required.'
+    },
+
+    'apps.files': {
+        info: 'The number of open files and directories.'
+    },
+    'groups.files': {
+        info: 'The number of open files and directories.'
+    },
+    'users.files': {
+        info: 'The number of open files and directories.'
+    },
+
+    // APPS mem
+    'apps.mem': {
+        info: 'Real memory (RAM) used by applications. This does not include shared memory.'
+    },
+    'groups.mem': {
+        info: 'Real memory (RAM) used per user group. This does not include shared memory.'
+    },
+    'users.mem': {
+        info: 'Real memory (RAM) used per user group. This does not include shared memory.'
+    },
+
+    'apps.vmem': {
+        info: 'Virtual memory allocated by applications. '+
+        'Check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+    },
+    'groups.vmem': {
+        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+    },
+    'users.vmem': {
+        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+    },
+
+    'apps.minor_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Minor" target="_blank">minor faults</a> '+
+        'which have not required loading a memory page from the disk. '+
+        'Minor page faults occur when a process needs data that is in memory and is assigned to another process. '+
+        'They share memory pages between multiple processes – '+
+        'no additional data needs to be read from disk to memory.'
+    },
+    'groups.minor_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Minor" target="_blank">minor faults</a> '+
+        'which have not required loading a memory page from the disk. '+
+        'Minor page faults occur when a process needs data that is in memory and is assigned to another process. '+
+        'They share memory pages between multiple processes – '+
+        'no additional data needs to be read from disk to memory.'
+    },
+    'users.minor_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Minor" target="_blank">minor faults</a> '+
+        'which have not required loading a memory page from the disk. '+
+        'Minor page faults occur when a process needs data that is in memory and is assigned to another process. '+
+        'They share memory pages between multiple processes – '+
+        'no additional data needs to be read from disk to memory.'
+    },
+
+    // APPS processes
+    'apps.threads': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Thread_(computing)" target="_blank">threads</a>.'
+    },
+    'groups.threads': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Thread_(computing)" target="_blank">threads</a>.'
+    },
+    'users.threads': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Thread_(computing)" target="_blank">threads</a>.'
+    },
+
+    'apps.processes': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Process_(computing)" target="_blank">processes</a>.'
+    },
+    'groups.processes': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Process_(computing)" target="_blank">processes</a>.'
+    },
+    'users.processes': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Process_(computing)" target="_blank">processes</a>.'
     },
 
     'apps.uptime': {
-        info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
+        info: 'The period of time within which at least one process in the group has been running.'
     },
+    'groups.uptime': {
+        info: 'The period of time within which at least one process in the group has been running.'
+    },
+    'users.uptime': {
+        info: 'The period of time within which at least one process in the group has been running.'
+    },
+
+    'apps.uptime_min': {
+        info: 'The shortest uptime among processes in the group.'
+    },
+    'groups.uptime_min': {
+        info: 'The shortest uptime among processes in the group.'
+    },
+    'users.uptime_min': {
+        info: 'The shortest uptime among processes in the group.'
+    },
+
+    'apps.uptime_avg': {
+        info: 'The average uptime of processes in the group.'
+    },
+    'groups.uptime_avg': {
+        info: 'The average uptime of processes in the group.'
+    },
+    'users.uptime_avg': {
+        info: 'The average uptime of processes in the group.'
+    },
+
+    'apps.uptime_max': {
+        info: 'The longest uptime among processes in the group.'
+    },
+    'groups.uptime_max': {
+        info: 'The longest uptime among processes in the group.'
+    },
+    'users.uptime_max': {
+        info: 'The longest uptime among processes in the group.'
+    },
+
+    'apps.pipes': {
+        info: 'The number of open '+
+        '<a href="https://en.wikipedia.org/wiki/Anonymous_pipe#Unix" target="_blank">pipes</a>. '+
+        'A pipe is a unidirectional data channel that can be used for interprocess communication.'
+    },
+    'groups.pipes': {
+        info: 'The number of open '+
+        '<a href="https://en.wikipedia.org/wiki/Anonymous_pipe#Unix" target="_blank">pipes</a>. '+
+        'A pipe is a unidirectional data channel that can be used for interprocess communication.'
+    },
+    'users.pipes': {
+        info: 'The number of open '+
+        '<a href="https://en.wikipedia.org/wiki/Anonymous_pipe#Unix" target="_blank">pipes</a>. '+
+        'A pipe is a unidirectional data channel that can be used for interprocess communication.'
+    },
+
+    // APPS swap
+    'apps.swap': {
+        info: 'The amount of swapped-out virtual memory by anonymous private pages. '+
+        'This does not include shared swap memory.'
+    },
+    'groups.swap': {
+        info: 'The amount of swapped-out virtual memory by anonymous private pages. '+
+        'This does not include shared swap memory.'
+    },
+    'users.swap': {
+        info: 'The amount of swapped-out virtual memory by anonymous private pages. '+
+        'This does not include shared swap memory.'
+    },
+
+    'apps.major_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major faults</a> '+
+        'which have required loading a memory page from the disk. '+
+        'Major page faults occur because of the absence of the required page from the RAM. '+
+        'They are expected when a process starts or needs to read in additional data and '+
+        'in these cases do not indicate a problem condition. '+
+        'However, a major page fault can also be the result of reading memory pages that have been written out '+
+        'to the swap file, which could indicate a memory shortage.'
+    },
+    'groups.major_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major faults</a> '+
+        'which have required loading a memory page from the disk. '+
+        'Major page faults occur because of the absence of the required page from the RAM. '+
+        'They are expected when a process starts or needs to read in additional data and '+
+        'in these cases do not indicate a problem condition. '+
+        'However, a major page fault can also be the result of reading memory pages that have been written out '+
+        'to the swap file, which could indicate a memory shortage.'
+    },
+    'users.major_faults': {
+        info: 'The number of <a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major faults</a> '+
+        'which have required loading a memory page from the disk. '+
+        'Major page faults occur because of the absence of the required page from the RAM. '+
+        'They are expected when a process starts or needs to read in additional data and '+
+        'in these cases do not indicate a problem condition. '+
+        'However, a major page fault can also be the result of reading memory pages that have been written out '+
+        'to the swap file, which could indicate a memory shortage.'
+    },
+
+    // APPS net
+    'apps.sockets': {
+        info: 'The number of open sockets. '+
+        'Sockets are a way to enable inter-process communication between programs running on a server, '+
+        'or between programs running on separate servers. This includes both network and UNIX sockets.'
+    },
+    'groups.sockets': {
+        info: 'The number of open sockets. '+
+        'Sockets are a way to enable inter-process communication between programs running on a server, '+
+        'or between programs running on separate servers. This includes both network and UNIX sockets.'
+    },
+    'users.sockets': {
+        info: 'The number of open sockets. '+
+        'Sockets are a way to enable inter-process communication between programs running on a server, '+
+        'or between programs running on separate servers. This includes both network and UNIX sockets.'
+    },
+
+   // Apps eBPF stuff
 
     'apps.file_open': {
         info: 'Calls to the internal function <code>do_sys_open</code> ( For kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
@@ -2182,60 +2475,6 @@ netdataDashboard.context = {
 
     'apps.dc_not_found': {
         info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
-    // ------------------------------------------------------------------------
-    // USERS
-
-    'users.cpu': {
-        height: 2.0
-    },
-
-    'users.mem': {
-        info: 'Real memory (RAM) used per user. This does not include shared memory.'
-    },
-
-    'users.vmem': {
-        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
-    },
-
-    'users.preads': {
-        height: 2.0
-    },
-
-    'users.pwrites': {
-        height: 2.0
-    },
-
-    'users.uptime': {
-        info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
-    },
-
-    // ------------------------------------------------------------------------
-    // GROUPS
-
-    'groups.cpu': {
-        height: 2.0
-    },
-
-    'groups.mem': {
-        info: 'Real memory (RAM) used per user group. This does not include shared memory.'
-    },
-
-    'groups.vmem': {
-        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
-    },
-
-    'groups.preads': {
-        height: 2.0
-    },
-
-    'groups.pwrites': {
-        height: 2.0
-    },
-
-    'groups.uptime': {
-        info: 'Carried over process group uptime. The period of time within which at least one process in the group was running.'
     },
 
     // ------------------------------------------------------------------------
