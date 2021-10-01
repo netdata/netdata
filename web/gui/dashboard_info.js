@@ -2086,28 +2086,28 @@ netdataDashboard.context = {
 
     'apps.cpu_user': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">user space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
     },
     'groups.cpu_user': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">user space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
     },
     'users.cpu_user': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">user space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user mode</a> (all cores).'
     },
 
     'apps.cpu_system': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">kernel space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
     },
     'groups.cpu_system': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">kernel space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
     },
     'users.cpu_system': {
         info: 'The amount of time the CPU was busy executing code in '+
-        '<a href="https://en.wikipedia.org/wiki/User_space" target="_blank">kernel space</a> (all cores).'
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">kernel mode</a> (all cores).'
     },
 
     'apps.cpu_guest': {
