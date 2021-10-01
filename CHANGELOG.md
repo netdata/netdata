@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- add proc\_vmstat charts info [\#11597](https://github.com/netdata/netdata/pull/11597) ([ilyam8](https://github.com/ilyam8))
+- add sys\_kernel\_mm\_ksm charts info [\#11595](https://github.com/netdata/netdata/pull/11595) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.2. [\#11593](https://github.com/netdata/netdata/pull/11593) ([netdatabot](https://github.com/netdatabot))
 - add sys\_devices\_system\_edac\_mc charts info [\#11589](https://github.com/netdata/netdata/pull/11589) ([ilyam8](https://github.com/ilyam8))
 - Adds local webserver API/v1 call "aclk" [\#11588](https://github.com/netdata/netdata/pull/11588) ([underhood](https://github.com/underhood))
@@ -167,9 +169,6 @@
 - Ebpf disk latency [\#11276](https://github.com/netdata/netdata/pull/11276) ([thiagoftsm](https://github.com/thiagoftsm))
 - Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([OdysLam](https://github.com/OdysLam))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
-- makes ACLK-NG the default if available [\#11272](https://github.com/netdata/netdata/pull/11272) ([underhood](https://github.com/underhood))
-- update old log to new one [\#11263](https://github.com/netdata/netdata/pull/11263) ([OdysLam](https://github.com/OdysLam))
-- Add openSUSE 15.3 package builds. [\#11259](https://github.com/netdata/netdata/pull/11259) ([Ferroin](https://github.com/Ferroin))
 - Extra posthog attributes [\#11237](https://github.com/netdata/netdata/pull/11237) ([MrZammler](https://github.com/MrZammler))
 - ACLK-NG New Cloud NodeInstance related msgs [\#11234](https://github.com/netdata/netdata/pull/11234) ([underhood](https://github.com/underhood))
 - Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
@@ -240,11 +239,6 @@
 - ci: fix aws-kinesis builds [\#10992](https://github.com/netdata/netdata/pull/10992) ([ilyam8](https://github.com/ilyam8))
 - Move global stats to a separate thread [\#10991](https://github.com/netdata/netdata/pull/10991) ([vlvkobal](https://github.com/vlvkobal))
 - adds missing SPDX license info into ACLK-NG [\#10990](https://github.com/netdata/netdata/pull/10990) ([underhood](https://github.com/underhood))
-- K6 quality of life updates [\#10985](https://github.com/netdata/netdata/pull/10985) ([OdysLam](https://github.com/OdysLam))
-- Add sections for class, component and type. [\#10984](https://github.com/netdata/netdata/pull/10984) ([MrZammler](https://github.com/MrZammler))
-- Update eBPF documentation [\#10982](https://github.com/netdata/netdata/pull/10982) ([thiagoftsm](https://github.com/thiagoftsm))
-- remove vneg from ACLK-NG [\#10980](https://github.com/netdata/netdata/pull/10980) ([underhood](https://github.com/underhood))
-- Remove outdated privacy policy and terms of use [\#10979](https://github.com/netdata/netdata/pull/10979) ([joelhans](https://github.com/joelhans))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
