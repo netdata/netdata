@@ -1201,7 +1201,7 @@ static inline void generate_info_mirrored_hosts(json_object *j)
     json_object_object_add(j, "mirrored_hosts_status", host_statuses);
 }
 
-inline json_object *host_labels_json(RRDHOST *host)
+static inline json_object *host_labels_json(RRDHOST *host)
 {
     json_object *tmp, *obj = json_object_new_object();
 
