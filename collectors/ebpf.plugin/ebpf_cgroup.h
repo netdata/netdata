@@ -16,6 +16,7 @@ struct pid_on_target2 {
     int updated;
 
     netdata_publish_swap_t swap;
+    netdata_fd_stat_t fd;
 
     struct pid_on_target2 *next;
 };
@@ -40,6 +41,7 @@ typedef struct ebpf_cgroup_target {
     uint32_t updated;
 
     netdata_publish_swap_t publish_systemd_swap;
+    netdata_fd_stat_t publish_systemd_fd;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;

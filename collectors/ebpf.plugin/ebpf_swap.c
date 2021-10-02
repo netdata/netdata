@@ -512,7 +512,7 @@ void ebpf_swap_send_cgroup_data()
         if (ect->systemd)
             continue;
 
-        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART)) {
+        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) && ect->updated) {
             ebpf_create_specific_swap_charts(ect->name);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
         }
