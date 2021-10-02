@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- add apps.plugin charts descriptions [\#11601](https://github.com/netdata/netdata/pull/11601) ([ilyam8](https://github.com/ilyam8))
 - add proc\_vmstat charts info [\#11597](https://github.com/netdata/netdata/pull/11597) ([ilyam8](https://github.com/ilyam8))
+- fix varnish VBE parsing [\#11596](https://github.com/netdata/netdata/pull/11596) ([ilyam8](https://github.com/ilyam8))
 - add sys\_kernel\_mm\_ksm charts info [\#11595](https://github.com/netdata/netdata/pull/11595) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.2. [\#11593](https://github.com/netdata/netdata/pull/11593) ([netdatabot](https://github.com/netdatabot))
 - add sys\_devices\_system\_edac\_mc charts info [\#11589](https://github.com/netdata/netdata/pull/11589) ([ilyam8](https://github.com/ilyam8))
@@ -21,6 +23,7 @@
 - add proc\_net\_stat\_conntrack charts info [\#11576](https://github.com/netdata/netdata/pull/11576) ([ilyam8](https://github.com/ilyam8))
 - Free analytics data when analytics thread stops [\#11575](https://github.com/netdata/netdata/pull/11575) ([MrZammler](https://github.com/MrZammler))
 - add missing privilege to fix MySQL slave reporting [\#11574](https://github.com/netdata/netdata/pull/11574) ([steffenweber](https://github.com/steffenweber))
+- Integrate eBPF and cgroup \(consumer side\) [\#11573](https://github.com/netdata/netdata/pull/11573) ([thiagoftsm](https://github.com/thiagoftsm))
 - add proc\_uptime charts info [\#11569](https://github.com/netdata/netdata/pull/11569) ([ilyam8](https://github.com/ilyam8))
 - add proc\_net\_sockstat and sockstat6 charts info [\#11567](https://github.com/netdata/netdata/pull/11567) ([ilyam8](https://github.com/ilyam8))
 - Disable eBPF compilation in different platforms [\#11566](https://github.com/netdata/netdata/pull/11566) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -165,7 +168,6 @@
 - suport TLS SNI in ACLK-NG [\#11285](https://github.com/netdata/netdata/pull/11285) ([underhood](https://github.com/underhood))
 - Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
 - Properly handle the file list for updating the dashboard. [\#11282](https://github.com/netdata/netdata/pull/11282) ([Ferroin](https://github.com/Ferroin))
-- fixes confusing error in ACLK Legacy [\#11278](https://github.com/netdata/netdata/pull/11278) ([underhood](https://github.com/underhood))
 - Ebpf disk latency [\#11276](https://github.com/netdata/netdata/pull/11276) ([thiagoftsm](https://github.com/thiagoftsm))
 - Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([OdysLam](https://github.com/OdysLam))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
@@ -234,11 +236,6 @@
 - improvements to anomalies collector following dogfooding [\#11003](https://github.com/netdata/netdata/pull/11003) ([andrewm4894](https://github.com/andrewm4894))
 - Backend chart filtering backward compatibility fix [\#11002](https://github.com/netdata/netdata/pull/11002) ([vlvkobal](https://github.com/vlvkobal))
 - Add a chart with netdata uptime [\#10997](https://github.com/netdata/netdata/pull/10997) ([vlvkobal](https://github.com/vlvkobal))
-- Improve get started/installation docs [\#10995](https://github.com/netdata/netdata/pull/10995) ([joelhans](https://github.com/joelhans))
-- Persist claim ids in local database for parent and children [\#10993](https://github.com/netdata/netdata/pull/10993) ([stelfrag](https://github.com/stelfrag))
-- ci: fix aws-kinesis builds [\#10992](https://github.com/netdata/netdata/pull/10992) ([ilyam8](https://github.com/ilyam8))
-- Move global stats to a separate thread [\#10991](https://github.com/netdata/netdata/pull/10991) ([vlvkobal](https://github.com/vlvkobal))
-- adds missing SPDX license info into ACLK-NG [\#10990](https://github.com/netdata/netdata/pull/10990) ([underhood](https://github.com/underhood))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
