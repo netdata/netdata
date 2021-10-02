@@ -398,7 +398,7 @@ static void ebpf_create_specific_swap_charts(char *type)
 {
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function <code>swap_readpage</code>.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU_CGROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
@@ -407,7 +407,7 @@ static void ebpf_create_specific_swap_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function <code>swap_writepage</code>.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU_CGROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
@@ -425,12 +425,12 @@ static void ebpf_create_specific_swap_charts(char *type)
 static void ebpf_obsolete_specific_swap_charts(char *type)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART,"Calls to function <code>swap_readpage</code>.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU_CGROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NULL,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "Calls to function <code>swap_writepage</code>.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU_CGROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,NULL,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101);
 }
@@ -494,31 +494,36 @@ void ebpf_swap_send_cgroup_data()
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_swap_sum_cgroup_pids(&ect->publish_systemd_swap, ect->pids);
-        if (!ect->systemd && !(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART)) {
-            ebpf_create_specific_swap_charts(ect->name);
-            ect->flags |= NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
-        }
     }
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
 
-    if (!systemd_charts) {
-        if (has_systemd) {
-            ebpf_create_systemd_swap_charts();
-        }
-        systemd_charts = 1;
-    }
-
     if (has_systemd) {
+        if (!systemd_charts) {
+            ebpf_create_systemd_swap_charts();
+            systemd_charts = 1;
+            fflush(stdout);
+        }
+
         systemd_charts = ebpf_send_systemd_swap_charts();
     }
 
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART && ect->updated) {
-            ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap);
-        } else {
-            ebpf_obsolete_specific_swap_charts(ect->name);
-            ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+        if (ect->systemd)
+            continue;
+
+        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART)) {
+            ebpf_create_specific_swap_charts(ect->name);
+            ect->flags |= NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+        }
+
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) {
+            if (ect->updated) {
+                ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap);
+            } else {
+                ebpf_obsolete_specific_swap_charts(ect->name);
+                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+            }
         }
     }
 
