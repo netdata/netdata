@@ -755,6 +755,16 @@ static void ebpf_process_send_cgroup_data()
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
+void ebpf_process_update_cgroup_algorithm()
+{
+    int i;
+    for (i = 0; i < NETDATA_KEY_PUBLISH_PROCESS_END; i++)  {
+        netdata_publish_syscall_t *ptr = &process_publish_aggregated[i];
+        freez(ptr->algorithm);
+        ptr->algorithm = strdupz(ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+    }
+}
+
 /**
  * Main loop for this collector.
  *
@@ -774,6 +784,9 @@ static void process_collector(usec_t step, ebpf_module_t *em)
     int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
     int cgroups = em->cgroup_charts;
+    if (cgroups)
+        ebpf_process_update_cgroup_algorithm();
+
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
