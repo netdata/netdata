@@ -40,7 +40,7 @@
 
 // Group used on Dashboard
 #define NETDATA_VFS_GROUP "vfs"
-#define NETDATA_VFS_GROUP_CGROUP "vfs (eBPF)"
+#define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
