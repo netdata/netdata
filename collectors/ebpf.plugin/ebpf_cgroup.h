@@ -19,6 +19,7 @@ struct pid_on_target2 {
     netdata_fd_stat_t fd;
     netdata_publish_vfs_t vfs;
     ebpf_process_stat_t ps;
+    netdata_dcstat_pid_t dc;
 
     struct pid_on_target2 *next;
 };
@@ -46,6 +47,7 @@ typedef struct ebpf_cgroup_target {
     netdata_fd_stat_t publish_systemd_fd;
     netdata_publish_vfs_t publish_systemd_vfs;
     ebpf_process_stat_t publish_systemd_ps;
+    netdata_publish_dcstat_t publish_dc;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;
