@@ -526,28 +526,28 @@ static void ebpf_send_specific_fd_data(char *type, netdata_fd_stat_t *values, eb
 static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
 {
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_OPEN, "Number of open files",
-                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
+                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP_CGROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20061,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
-                                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
+                                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP_CGROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20062,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                       NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSED, "Files closed",
-                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
+                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP_CGROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20063,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
-                                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
+                                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP_CGROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20064,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                       NETDATA_EBPF_MODULE_NAME_PROCESS);
