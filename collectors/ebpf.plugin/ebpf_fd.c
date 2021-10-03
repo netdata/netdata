@@ -626,7 +626,6 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
     }
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-
     if (has_systemd) {
         if (!systemd_charts) {
             ebpf_create_systemd_fd_charts(em);
@@ -640,7 +639,7 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
         if (ect->systemd)
             continue;
 
-        if (!ect->systemd && !(ect->flags & NETDATA_EBPF_CGROUP_HAS_FD_CHART) && ect->updated) {
+        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_FD_CHART) && ect->updated) {
             ebpf_create_specific_fd_charts(ect->name, em);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_FD_CHART;
         }
