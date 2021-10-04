@@ -17,6 +17,10 @@
 // configuration file
 #define NETDATA_DIRECTORY_SWAP_CONFIG_FILE "swap.conf"
 
+// Contexts
+#define NETDATA_CGROUP_SWAP_READ_CONTEXT "cgroup_swap_read_calls"
+#define NETDATA_CGROUP_SWAP_WRITE_CONTEXT "cgroup_swap_write_calls"
+
 typedef struct netdata_publish_swap {
     uint64_t read;
     uint64_t write;

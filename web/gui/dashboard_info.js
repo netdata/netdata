@@ -5282,11 +5282,11 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Services units
 
-    'services.swap_read_call': {
+    'cgroup_swap_read_calls': {
         info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
     },
 
-    'services.swap_write_call': {
+    'cgroup_swap_write_calls': {
         info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
     },
 
