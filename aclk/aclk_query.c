@@ -299,6 +299,7 @@ aclk_query_handler aclk_query_handlers[] = {
     { .type = UPDATE_NODE_INFO,     .name = "update node info",         .fnc = send_bin_msg             },
     { .type = ALARM_LOG_HEALTH,     .name = "alarm log health",         .fnc = send_bin_msg             },
     { .type = ALARM_PROVIDE_CFG,    .name = "provide alarm config",     .fnc = send_bin_msg             },
+    { .type = ALARM_SNAPSHOT,       .name = "alarm snapshot",           .fnc = send_bin_msg             },
 #endif
     { .type = UNKNOWN,              .name = NULL,                       .fnc = NULL                     }
 };
