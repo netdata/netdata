@@ -5,16 +5,16 @@
 * @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin @kaskavel @vkalintiris
-.github/ @Ferroin @kaskavel @vkalintiris
+.travis/ @Ferroin @iigorkarpov @kaskavel @vkalintiris
+.github/ @Ferroin @iigorkarpov @kaskavel @vkalintiris
 aclk/ @stelfrag @underhood
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @Ferroin
-contrib/debian @Ferroin @vkalintiris
+build/ @Ferroin @iigorkarpov
+contrib/debian @Ferroin @iigorkarpov @vkalintiris
 collectors/ @vlvkobal
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
@@ -34,33 +34,33 @@ health/ @thiagoftsm @vlvkobal @vkalintiris
 health/health.d/ @thiagoftsm @vlvkobal
 health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm
-packaging/ @Ferroin @vkalintiris
+packaging/ @Ferroin @iigorkarpov @vkalintiris
 registry/ @jacekkolasa
 streaming/ @thiagoftsm @vlvkobal
-system/ @Ferroin @vkalintiris
-tests/ @Ferroin @kaskavel @vkalintiris
+system/ @Ferroin @iigorkarpov @vkalintiris
+tests/ @Ferroin @iigorkarpov @kaskavel @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @vkalintiris
+*.am @Ferroin @iigorkarpov @vkalintiris
 *.md @DShreve2
-Dockerfile* @Ferroin @vkalintiris
+Dockerfile* @Ferroin @iigorkarpov @vkalintiris
 
 # Ownership of specific files
-.gitignore @Ferroin @vkalintiris
-.travis.yml @Ferroin @kaskavel @vkalintiris
-.lgtm.yml @Ferroin @vkalintiris
-.eslintrc @Ferroin @vkalintiris
-.eslintignore @Ferroin @vkalintiris
-.csslintrc @Ferroin @vkalintiris
-.codeclimate.yml @Ferroin @vkalintiris
-.codacy.yml @Ferroin @vkalintiris
-.yamllint.yml @Ferroin @vkalintiris
-netdata.spec.in @Ferroin @vkalintiris
-netdata-installer.sh @Ferroin @vkalintiris
-package.json @jacekkolasa @Ferroin @vkalintiris
-packaging/version @netdatabot @Ferroin @vkalintiris
+.gitignore @Ferroin @iigorkarpov @vkalintiris
+.travis.yml @Ferroin @iigorkarpov @kaskavel @vkalintiris
+.lgtm.yml @Ferroin @iigorkarpov @vkalintiris
+.eslintrc @Ferroin @iigorkarpov @vkalintiris
+.eslintignore @Ferroin @iigorkarpov @vkalintiris
+.csslintrc @Ferroin @iigorkarpov @vkalintiris
+.codeclimate.yml @Ferroin @iigorkarpov @vkalintiris
+.codacy.yml @Ferroin @iigorkarpov @vkalintiris
+.yamllint.yml @Ferroin @iigorkarpov @vkalintiris
+netdata.spec.in @Ferroin @iigorkarpov @vkalintiris
+netdata-installer.sh @Ferroin @iigorkarpov @vkalintiris
+package.json @jacekkolasa @Ferroin @iigorkarpov @vkalintiris
+packaging/version @netdatabot @Ferroin @iigorkarpov @vkalintiris
 
 LICENSE.md @DShreve2 @Ferroin @vkalintiris
-CHANGELOG.md @netdatabot @Ferroin @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @iigorkarpov @vkalintiris
