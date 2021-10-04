@@ -42,6 +42,15 @@
 #define NETDATA_VFS_GROUP "vfs"
 #define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
 
+// Contexts
+#define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup_vfs_unlink_calls"
+#define NETDATA_CGROUP_VFS_WRITE_CONTEXT "cgroup_vfs_write_calls"
+#define NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT "cgroup_vfs_write_error_calls"
+#define NETDATA_CGROUP_VFS_READ_CONTEXT "cgroup_vfs_read_calls"
+#define NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT "cgroup_vfs_read_error_calls"
+#define NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT "cgroup_vfs_write_bytes"
+#define NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT "cgroup_vfs_read_bytes"
+
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
     uint32_t pid;
