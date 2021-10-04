@@ -28,20 +28,39 @@ jobs:
         include:
           - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
           - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/i386, arch: i386}
+          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/arm/v7, arch: armhf}
+          - {distro: debian, version: "9", pkgclouddistro: debian/stretch, format: deb, base_image: debian, platform: linux/arm64/v8, arch: arm64}
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/amd64, arch: amd64}
           - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/i386, arch: i386}
+          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/arm/v7, arch: armhf}
+          - {distro: debian, version: "10", pkgclouddistro: debian/buster, format: deb, base_image: debian, platform: linux/arm64/v8, arch: arm64}
           - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/amd64, arch: amd64, alias: bullseye}
           - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/i386, arch: i386, alias: bullseye}
+          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/arm/v7, arch: armhf, alias: bullseye}
+          - {distro: debian, version: "11", pkgclouddistro: debian/bullseye, format: deb, base_image: debian, platform: linux/arm64/v8, arch: arm64, alias: bullseye}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/i386, arch: i386}
+          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
+          - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
+          - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
           - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/arm/v7, arch: armhf}
+          - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/arm64/v8, arch: arm64}
           - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
+          - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/arm64/v8, arch: arm64}
           - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/arm/v7, arch: armhf}
+          - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/arm64/v8, arch: arm64}
           - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
+          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/arm/v7, arch: armhf}
+          - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/arm64/v8, arch: arm64}
           - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/arm64/v8, arch: arm64}
           - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
+          - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/arm64/v8, arch: arm64}
       # We intentiaonally disable the fail-fast behavior so that a
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
@@ -87,7 +106,7 @@ jobs:
             echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> $GITHUB_ENV
           fi
       - name: Setup QEMU
-        if: matrix.platform != 'linux/amd64'
+        if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
         uses: docker/setup-qemu-action@v1
       - name: Prepare Docker Environment
         shell: bash
@@ -113,7 +132,7 @@ jobs:
       - name: Save Packages
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.distro }}-${{ matrix.version }}-packages
+          name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
       - name: Upload to PackageCloud
         if: github.event_name == 'workflow_dispatch'
