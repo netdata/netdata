@@ -222,3 +222,13 @@ alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *
 
     return msg;
 }
+
+void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data)
+{
+    AlarmSnapshot *alarm_snapshot = (AlarmSnapshot *)snapshot;
+    AlarmLogEntry *alarm_log_entry = alarm_snapshot->add_alarms();
+
+    fill_alarm_log_entry(data, alarm_log_entry);
+
+    alarm_snapshot->set_chunk_size(alarm_snapshot->chunk_size() + 1);
+}

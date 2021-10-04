@@ -124,6 +124,7 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr);
 
 alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);
+void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data);
 
 #ifdef __cplusplus
 }
