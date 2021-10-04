@@ -17,6 +17,12 @@
 // configuration file
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
 
+// Contexts
+#define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup_dc_ratio"
+#define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup_dc_reference"
+#define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup_dc_not_cache"
+#define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup_dc_not_found"
+
 #define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
 
 enum directory_cache_indexes {

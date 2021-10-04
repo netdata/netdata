@@ -522,14 +522,14 @@ static void ebpf_create_specific_dc_charts(char *type)
 {
     ebpf_create_chart(type, NETDATA_DC_HIT_CHART, "Percentage of files listed inside directory cache.",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL, NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700,
                       ebpf_create_global_dimension,
                       dcstat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(type, NETDATA_DC_REFERENCE_CHART, "Count file access.",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL, NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CGROUP_DC_REFERENCE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5701,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 1,
@@ -538,7 +538,7 @@ static void ebpf_create_specific_dc_charts(char *type)
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                       "Access to files that were not present inside directory cache.",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL, NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5702,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW], 1,
@@ -547,7 +547,7 @@ static void ebpf_create_specific_dc_charts(char *type)
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                       "Number of requests for files that were not found on filesystem.",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL, NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5703,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS], 1,
@@ -566,25 +566,25 @@ static void ebpf_obsolete_specific_dc_charts(char *type)
     ebpf_write_chart_obsolete(type, NETDATA_DC_HIT_CHART,
                               "Percentage of files listed inside directory cache.",
                               EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REFERENCE_CHART,
                               "Count file access.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_REFERENCE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5701);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                               "Access to files that were not present inside directory cache.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5702);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                               "Number of requests for files that were not found on filesystem.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NULL,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5703);
 }
 
@@ -652,8 +652,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21200,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REFERENCE_CHART,
                                   "Count file access.",
@@ -661,8 +661,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21201,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_CGROUP_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                   "Access to files that were not present inside directory cache.",
@@ -670,8 +670,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                   "Number of requests for files that were not found on filesystem.",
@@ -679,8 +679,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /**
