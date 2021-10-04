@@ -78,7 +78,8 @@ enum aclk_topics {
     ACLK_TOPICID_NODE_INFO             = 13,
     ACLK_TOPICID_ALARM_LOG             = 14,
     ACLK_TOPICID_ALARM_HEALTH          = 15,
-    ACLK_TOPICID_ALARM_CONFIG          = 16
+    ACLK_TOPICID_ALARM_CONFIG          = 16,
+    ACLK_TOPICID_ALARM_SNAPSHOT        = 17
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);
