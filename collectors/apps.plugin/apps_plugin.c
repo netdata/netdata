@@ -3521,26 +3521,26 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
     if (enable_detailed_uptime_charts) {
-      send_BEGIN(type, "uptime_min", dt);
-      for (w = root; w ; w = w->next) {
-          if(unlikely(w->exposed && w->processes))
-              send_SET(w->name, w->uptime_min);
-      }
-      send_END();
+        send_BEGIN(type, "uptime_min", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_min);
+        }
+        send_END();
 
-      send_BEGIN(type, "uptime_avg", dt);
-      for (w = root; w ; w = w->next) {
-          if(unlikely(w->exposed && w->processes))
-              send_SET(w->name, w->uptime_sum / w->processes);
-      }
-      send_END();
+        send_BEGIN(type, "uptime_avg", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_sum / w->processes);
+        }
+        send_END();
 
-      send_BEGIN(type, "uptime_max", dt);
-      for (w = root; w ; w = w->next) {
-          if(unlikely(w->exposed && w->processes))
-              send_SET(w->name, w->uptime_max);
-      }
-      send_END();
+        send_BEGIN(type, "uptime_max", dt);
+        for (w = root; w ; w = w->next) {
+            if(unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->uptime_max);
+        }
+        send_END();
     }
 #endif
 
