@@ -48,6 +48,7 @@ typedef struct ebpf_cgroup_target {
     netdata_publish_vfs_t publish_systemd_vfs;
     ebpf_process_stat_t publish_systemd_ps;
     netdata_publish_dcstat_t publish_dc;
+    int oomkill;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;
