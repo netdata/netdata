@@ -3199,7 +3199,10 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[4] + '"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'Total CPU utilization within the configured or system-wide (if not set) limits. '+
+        'When the CPU utilization of a cgroup exceeds the limit for the configured period, '+
+        'the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period.'
     },
 
     'cgroup.cpu': {
@@ -3221,7 +3224,26 @@ netdataDashboard.context = {
                 } else
                     return '';
             }
-        ]
+        ],
+        info: 'Total CPU utilization within the system-wide CPU resources (all cores). '+
+        'The amount of time spent by tasks of the cgroup in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
+    },
+
+    'cgroup.cpu_per_core': {
+        info: 'Total CPU utilization per core within the system-wide CPU resources.'
+    },
+
+    'cgroup.cpu_pressure': {
+        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on CPU. '+
+        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'cgroup.mem_utilization': {
+        info: 'RAM utilization within the configured or system-wide (if not set) limits. '+
+        'When the RAM utilization of a cgroup exceeds the limit, '+
+        'OOM killer will start killing the tasks belonging to the cgroup.'
     },
 
     'cgroup.mem_usage_limit': {
@@ -3244,7 +3266,10 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'RAM usage within the configured or system-wide (if not set) limits. '+
+        'When the RAM usage of a cgroup exceeds the limit, '+
+        'OOM killer will start killing the tasks belonging to the cgroup.'
     },
 
     'cgroup.mem_usage': {
@@ -3266,7 +3291,67 @@ netdataDashboard.context = {
                 } else
                     return '';
             }
-        ]
+        ],
+        info: 'The amount of used RAM and swap memory.'
+    },
+
+    'cgroup.mem': {
+        info: 'Memory usage statistics. '+
+        'The individual metrics are described in the memory.stat section for '+
+        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html#per-memory-cgroup-local-status" target="_blank">cgroup-v1 </a>'+
+        'and '+
+        '<a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#memory-interface-files" target="_blank">cgroup-v2</a>.'
+    },
+
+    'cgroup.mem_failcnt': {
+        info: 'The number of memory usage hits limits.'
+    },
+
+    'cgroup.writeback': {
+        info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+    },
+
+    'cgroup.mem_activity': {
+        info: '<p>Memory accounting statistics.</p>'+
+        '<p><b>In</b> - a page is accounted as either mapped anon page (RSS) or cache page (Page Cache) to the cgroup. '+
+        '<b>Out</b> - a page is unaccounted from the cgroup.</p>'
+    },
+
+    'cgroup.pgfaults': {
+        info: '<p>Memory <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> statistics.</p>'+
+        '<p><b>Pgfault</b> - all page faults. '+
+        '<b>Swap</b> - major page faults.</p>'
+    },
+
+    'cgroup.memory_pressure': {
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on memory. '+
+        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'cgroup.memory_full_pressure': {
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+        '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on memory simultaneously. '+
+        'In this state actual CPU cycles are going to waste, '+
+        'and a workload that spends extended time in this state is considered to be thrashing. '+
+        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'cgroup.io': {
+        info: 'The amount of data transferred to and from specific devices as seen by the CFQ scheduler. '+
+        'It is not updated when the CFQ scheduler is operating on a request queue.'
+    },
+
+    'cgroup.serviced_ops': {
+        info: 'The number of I/O operations performed on specific devices as seen by the CFQ scheduler.'
+    },
+
+    'cgroup.queued_ops': {
+        info: 'The number of requests queued for I/O operations.'
+    },
+
+    'cgroup.merged_ops': {
+        info: 'The number of BIOS requests merged into requests for I/O operations.'
     },
 
     'cgroup.throttle_io': {
@@ -3301,7 +3386,26 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[3] + '"'
                     + ' role="application"></div>';
             }
-        ]
+        ],
+        info: 'The amount of data transferred to and from specific devices as seen by the throttling policy.'
+    },
+
+    'cgroup.throttle_serviced_ops': {
+        info: 'The number of I/O operations performed on specific devices as seen by the throttling policy.'
+    },
+
+    'cgroup.io_pressure': {
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+        '<b>Some</b> indicates the share of time in which at least some tasks are stalled on I/O. '+
+        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'cgroup.io_full_pressure': {
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
+        '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on I/O simultaneously. '+
+        'In this state actual CPU cycles are going to waste, '+
+        'and a workload that spends extended time in this state is considered to be thrashing. '+
+        'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     // ------------------------------------------------------------------------
