@@ -120,54 +120,59 @@ void destroy_alarm_log_entry(struct alarm_log_entry *entry)
     freez(entry->rendered_info);
 }
 
+static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *proto)
+{
+    proto->set_node_id(data->node_id);
+    proto->set_claim_id(data->claim_id);
+
+    proto->set_chart(data->chart);
+    proto->set_name(data->name);
+    if (data->family)
+        proto->set_family(data->family);
+
+    proto->set_batch_id(data->batch_id);
+    proto->set_sequence_id(data->sequence_id);
+    proto->set_when(data->when);
+
+    proto->set_config_hash(data->config_hash);
+
+    proto->set_utc_offset(data->utc_offset);
+    proto->set_timezone(data->timezone);
+
+    proto->set_exec_path(data->exec_path);
+    proto->set_conf_source(data->conf_source);
+    proto->set_command(data->command);
+
+    proto->set_duration(data->duration);
+    proto->set_non_clear_duration(data->non_clear_duration);
+
+
+    proto->set_status(aclk_alarm_status_to_proto(data->status));
+    proto->set_old_status(aclk_alarm_status_to_proto(data->old_status));
+    proto->set_delay(data->delay);
+    proto->set_delay_up_to_timestamp(data->delay_up_to_timestamp);
+
+    proto->set_last_repeat(data->last_repeat);
+    proto->set_silenced(data->silenced);
+
+    if (data->value_string)
+        proto->set_value_string(data->value_string);
+    if (data->old_value_string)
+        proto->set_old_value_string(data->old_value_string);
+
+    proto->set_value(data->value);
+    proto->set_old_value(data->old_value);
+
+    proto->set_updated(data->updated);
+
+    proto->set_rendered_info(data->rendered_info);
+}
+
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 {
     AlarmLogEntry le;
 
-    le.set_node_id(data->node_id);
-    le.set_claim_id(data->claim_id);
-
-    le.set_chart(data->chart);
-    le.set_name(data->name);
-    if (data->family)
-        le.set_family(data->family);
-
-    le.set_batch_id(data->batch_id);
-    le.set_sequence_id(data->sequence_id);
-    le.set_when(data->when);
-
-    le.set_config_hash(data->config_hash);
-
-    le.set_utc_offset(data->utc_offset);
-    le.set_timezone(data->timezone);
-
-    le.set_exec_path(data->exec_path);
-    le.set_conf_source(data->conf_source);
-    le.set_command(data->command);
-
-    le.set_duration(data->duration);
-    le.set_non_clear_duration(data->non_clear_duration);
-
-
-    le.set_status(aclk_alarm_status_to_proto(data->status));
-    le.set_old_status(aclk_alarm_status_to_proto(data->old_status));
-    le.set_delay(data->delay);
-    le.set_delay_up_to_timestamp(data->delay_up_to_timestamp);
-
-    le.set_last_repeat(data->last_repeat);
-    le.set_silenced(data->silenced);
-
-    if (data->value_string)
-        le.set_value_string(data->value_string);
-    if (data->old_value_string)
-        le.set_old_value_string(data->old_value_string);
-
-    le.set_value(data->value);
-    le.set_old_value(data->old_value);
-
-    le.set_updated(data->updated);
-
-    le.set_rendered_info(data->rendered_info);
+    fill_alarm_log_entry(data, &le);
 
     *len = PROTO_COMPAT_MSG_SIZE(le);
     char *bin = (char*)mallocz(*len);
