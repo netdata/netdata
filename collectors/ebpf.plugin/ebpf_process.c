@@ -310,7 +310,9 @@ static void ebpf_update_process_cgroup()
 
                 memcpy(out, in, sizeof(ebpf_process_stat_t));
             } else {
-                bpf_map_lookup_elem(pid_fd, &pid, out);
+                if (bpf_map_lookup_elem(pid_fd, &pid, out)) {
+                    memset(out, 0, sizeof(ebpf_process_stat_t));
+                }
             }
         }
     }
@@ -755,6 +757,11 @@ static void ebpf_process_send_cgroup_data()
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
+/**
+ * Update Cgroup algorithm
+ *
+ * Change algorithm from absolute to incremental
+ */
 void ebpf_process_update_cgroup_algorithm()
 {
     int i;
