@@ -176,3 +176,27 @@ char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
 
     return bin;
 }
+
+struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t len)
+{
+    SendAlarmSnapshot msg;
+    if (!msg.ParseFromArray(data, len))
+        return NULL;
+
+    struct send_alarm_snapshot *ret = (struct send_alarm_snapshot*)callocz(1, sizeof(struct send_alarm_snapshot));
+    if (msg.claim_id().c_str())
+        ret->claim_id = strdupz(msg.claim_id().c_str());
+    if (msg.node_id().c_str())
+        ret->node_id = strdupz(msg.node_id().c_str());
+    ret->snapshot_id = msg.snapshot_id();
+    ret->sequence_id = msg.sequence_id();
+    
+    return ret;
+}
+
+void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
+{
+    freez(ptr->claim_id);
+    freez(ptr->node_id);
+    freez(ptr);
+}
