@@ -3453,7 +3453,7 @@ netdataDashboard.context = {
 
     'services.mem_pgmajfault': {
         info: 'The number of '+
-        '<a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="">major</a> '+
+        '<a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major</a> '+
         'page faults.'
     },
 
