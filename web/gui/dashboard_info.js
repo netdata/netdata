@@ -2962,7 +2962,7 @@ netdataDashboard.context = {
             }
         ],
         info: 'Total CPU utilization within the configured or system-wide (if not set) limits. '+
-        'When the CPU utilization of a cgroup exceeds the limit (for that period), '+
+        'When the CPU utilization of a cgroup exceeds the limit for the configured period, '+
         'the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period.'
     },
 
@@ -2986,17 +2986,17 @@ netdataDashboard.context = {
                     return '';
             }
         ],
-        info: 'Total CPU utilization within system-wide CPU resources (all cores). '+
+        info: 'Total CPU utilization within the system-wide CPU resources (all cores). '+
         'The amount of time spent by tasks of the cgroup in '+
         '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
     },
 
     'cgroup.cpu_per_core': {
-        info: 'Total CPU utilization per core within system-wide CPU resources.'
+        info: 'Total CPU utilization per core within the system-wide CPU resources.'
     },
 
     'cgroup.cpu_pressure': {
-        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a>. '+
+        info: 'CPU <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
         '<b>Some</b> indicates the share of time in which at least some tasks are stalled on CPU. '+
         'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
@@ -3085,13 +3085,13 @@ netdataDashboard.context = {
     },
 
     'cgroup.memory_pressure': {
-        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a>. '+
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
         '<b>Some</b> indicates the share of time in which at least some tasks are stalled on memory. '+
         'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'cgroup.memory_full_pressure': {
-        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a>. '+
+        info: 'Memory <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
         '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on memory simultaneously. '+
         'In this state actual CPU cycles are going to waste, '+
         'and a workload that spends extended time in this state is considered to be thrashing. '+
@@ -3156,13 +3156,13 @@ netdataDashboard.context = {
     },
 
     'cgroup.io_pressure': {
-        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a>. '+
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
         '<b>Some</b> indicates the share of time in which at least some tasks are stalled on I/O. '+
         'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'cgroup.io_full_pressure': {
-        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a>. '+
+        info: 'I/O <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a>. '+
         '<b>Full</b> indicates the share of time in which all non-idle tasks are stalled on I/O simultaneously. '+
         'In this state actual CPU cycles are going to waste, '+
         'and a workload that spends extended time in this state is considered to be thrashing. '+
