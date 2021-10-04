@@ -205,3 +205,20 @@ void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
     freez(ptr->node_id);
     freez(ptr);
 }
+
+alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data)
+{
+    AlarmSnapshot *msg = new AlarmSnapshot;
+    if (unlikely(!msg)) fatal("Cannot allocate memory for AlarmSnapshot");
+
+    msg->set_node_id(data->node_id);
+    msg->set_claim_id(data->claim_id);
+    msg->set_snapshot_id(data->snapshot_id);
+    msg->set_chunks(data->chunks);
+    msg->set_chunk(data->chunk);
+
+    // this is handled automatically by add_alarm_log_entry2snapshot function
+    msg->set_chunk_size(0);
+
+    return msg;
+}
