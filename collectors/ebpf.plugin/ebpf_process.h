@@ -24,6 +24,11 @@
 // Process configuration name
 #define NETDATA_PROCESS_CONFIG_FILE "process.conf"
 
+// Contexts
+#define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup_process_create"
+#define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup_thread_create"
+#define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup_task_close"
+
 // Index from kernel
 typedef enum ebpf_process_index {
     NETDATA_KEY_CALLS_DO_EXIT,
