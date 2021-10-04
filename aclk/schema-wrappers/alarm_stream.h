@@ -125,6 +125,7 @@ void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr);
 
 alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);
 void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data);
+char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapshot);
 
 #ifdef __cplusplus
 }

@@ -232,3 +232,17 @@ void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct al
 
     alarm_snapshot->set_chunk_size(alarm_snapshot->chunk_size() + 1);
 }
+
+char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapshot)
+{
+    AlarmSnapshot *alarm_snapshot = (AlarmSnapshot *)snapshot;
+    *len = PROTO_COMPAT_MSG_SIZE_PTR(alarm_snapshot);
+    char *bin = (char*)mallocz(*len);
+    if (!alarm_snapshot->SerializeToArray(bin, *len)) {
+        delete alarm_snapshot;
+        return NULL;
+    }
+
+    delete alarm_snapshot;
+    return bin;
+}
