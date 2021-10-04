@@ -653,19 +653,19 @@ static void ebpf_create_systemd_process_charts()
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_TASK_PROCESS, "Process started",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20065,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20066,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_TASK_CLOSE, "Tasks closed",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20067,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
 }
 

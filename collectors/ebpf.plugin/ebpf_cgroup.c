@@ -330,13 +330,14 @@ void ebpf_parse_cgroup_shm_data()
  * @param charttype chart type
  * @param order  the chart order
  * @param algorithm the algorithm used by dimension
+ * @param context   add context for chart
  * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                   char *algorithm, char *module)
+                                   char *algorithm, char *context, char *module)
 {
     ebpf_cgroup_target_t *w;
-    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, title, units, family, charttype, NULL, order, module);
+    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, title, units, family, charttype, context, order, module);
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
         if (unlikely(w->systemd) && unlikely(w->updated))

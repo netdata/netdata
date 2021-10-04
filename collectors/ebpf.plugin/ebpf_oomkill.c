@@ -135,7 +135,7 @@ static void ebpf_create_systemd_oomkill_charts()
     ebpf_create_charts_on_systemd(NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
                                   EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 20191,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_OOMKILL);
 }
 

@@ -652,7 +652,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21200,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REFERENCE_CHART,
@@ -661,7 +661,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21201,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
@@ -670,7 +670,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
@@ -679,7 +679,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX], NULL,
                                   NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
