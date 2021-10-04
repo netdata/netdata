@@ -345,6 +345,7 @@ void analytics_build_info(BUFFER *b) {
     if(NEW_CLOUD_PROTO)      buffer_strcat (b, "|New Cloud Protocol Support");
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
+    if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
 
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
     if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
