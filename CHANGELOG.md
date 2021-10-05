@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- apps: disable reporting min/avg/max group uptime by default [\#11609](https://github.com/netdata/netdata/pull/11609) ([ilyam8](https://github.com/ilyam8))
+- fix https client  [\#11608](https://github.com/netdata/netdata/pull/11608) ([underhood](https://github.com/underhood))
+- add cgroups.plugin charts descriptions [\#11607](https://github.com/netdata/netdata/pull/11607) ([ilyam8](https://github.com/ilyam8))
 - add apps.plugin charts descriptions [\#11601](https://github.com/netdata/netdata/pull/11601) ([ilyam8](https://github.com/ilyam8))
 - add proc\_vmstat charts info [\#11597](https://github.com/netdata/netdata/pull/11597) ([ilyam8](https://github.com/ilyam8))
 - fix varnish VBE parsing [\#11596](https://github.com/netdata/netdata/pull/11596) ([ilyam8](https://github.com/ilyam8))
@@ -140,7 +143,7 @@
 - packaging: update go.d.plugin version to v0.30.0 [\#11349](https://github.com/netdata/netdata/pull/11349) ([ilyam8](https://github.com/ilyam8))
 - eBPF btrfs [\#11348](https://github.com/netdata/netdata/pull/11348) ([thiagoftsm](https://github.com/thiagoftsm))
 - Assorted kickstart install fixes. [\#11342](https://github.com/netdata/netdata/pull/11342) ([Ferroin](https://github.com/Ferroin))
-- add geth default config [\#11341](https://github.com/netdata/netdata/pull/11341) ([OdysLam](https://github.com/OdysLam))
+- add geth default config [\#11341](https://github.com/netdata/netdata/pull/11341) ([odyslam](https://github.com/odyslam))
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Adds aclk-schemas to dist\_noinst\_DATA [\#11338](https://github.com/netdata/netdata/pull/11338) ([underhood](https://github.com/underhood))
 - Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
@@ -163,15 +166,12 @@
 - health: remove pythond modules specific last\_collected alarms [\#11307](https://github.com/netdata/netdata/pull/11307) ([ilyam8](https://github.com/ilyam8))
 - Update get-started.mdx [\#11303](https://github.com/netdata/netdata/pull/11303) ([jlbriston](https://github.com/jlbriston))
 - fix `mdstat` current operation charts context/title [\#11289](https://github.com/netdata/netdata/pull/11289) ([ilyam8](https://github.com/ilyam8))
-- Remove access check for install-type file [\#11288](https://github.com/netdata/netdata/pull/11288) ([MrZammler](https://github.com/MrZammler))
 - eBPF plugin remove parallel plugins [\#11287](https://github.com/netdata/netdata/pull/11287) ([thiagoftsm](https://github.com/thiagoftsm))
-- suport TLS SNI in ACLK-NG [\#11285](https://github.com/netdata/netdata/pull/11285) ([underhood](https://github.com/underhood))
 - Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
 - Properly handle the file list for updating the dashboard. [\#11282](https://github.com/netdata/netdata/pull/11282) ([Ferroin](https://github.com/Ferroin))
 - Ebpf disk latency [\#11276](https://github.com/netdata/netdata/pull/11276) ([thiagoftsm](https://github.com/thiagoftsm))
-- Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([OdysLam](https://github.com/OdysLam))
+- Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([odyslam](https://github.com/odyslam))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
-- Extra posthog attributes [\#11237](https://github.com/netdata/netdata/pull/11237) ([MrZammler](https://github.com/MrZammler))
 - ACLK-NG New Cloud NodeInstance related msgs [\#11234](https://github.com/netdata/netdata/pull/11234) ([underhood](https://github.com/underhood))
 - Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
 
@@ -186,7 +186,7 @@
 - Use size\_t instead of int for vfs\_bufspace\_count in FreeBSD plugin [\#11142](https://github.com/netdata/netdata/pull/11142) ([diizzyy](https://github.com/diizzyy))
 - Bundle the react dashboard code into the agent repo directly. [\#11139](https://github.com/netdata/netdata/pull/11139) ([Ferroin](https://github.com/Ferroin))
 - Reduce the number of ACLK chart updates during chart obsoletion [\#11133](https://github.com/netdata/netdata/pull/11133) ([stelfrag](https://github.com/stelfrag))
-- Update k6.md [\#11127](https://github.com/netdata/netdata/pull/11127) ([OdysLam](https://github.com/OdysLam))
+- Update k6.md [\#11127](https://github.com/netdata/netdata/pull/11127) ([odyslam](https://github.com/odyslam))
 - Fix broken link in doc [\#11122](https://github.com/netdata/netdata/pull/11122) ([forest0](https://github.com/forest0))
 - analytics: reduce alarms notifications dump logging [\#11116](https://github.com/netdata/netdata/pull/11116) ([ilyam8](https://github.com/ilyam8))
 - Check configuration for CUSTOM and MSTEAM [\#11113](https://github.com/netdata/netdata/pull/11113) ([MrZammler](https://github.com/MrZammler))
@@ -235,7 +235,6 @@
 - Allow the remote write configuration have multiple destinations [\#11005](https://github.com/netdata/netdata/pull/11005) ([vlvkobal](https://github.com/vlvkobal))
 - improvements to anomalies collector following dogfooding [\#11003](https://github.com/netdata/netdata/pull/11003) ([andrewm4894](https://github.com/andrewm4894))
 - Backend chart filtering backward compatibility fix [\#11002](https://github.com/netdata/netdata/pull/11002) ([vlvkobal](https://github.com/vlvkobal))
-- Add a chart with netdata uptime [\#10997](https://github.com/netdata/netdata/pull/10997) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
