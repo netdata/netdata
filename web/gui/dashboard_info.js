@@ -1950,7 +1950,7 @@ netdataDashboard.context = {
 
     'ipv6.sockstat6_tcp_sockets': {
         info: 'The number of TCP sockets in any '+
-        '<a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation" target="">state</a>, '+
+        '<a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation" target="_blank">state</a>, '+
         'excluding TIME-WAIT and CLOSED.'
     },
 
@@ -2805,17 +2805,17 @@ netdataDashboard.context = {
 
     'nfs.proc2': {
         info: 'NFSv2 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="">RFC1094</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="_blank">RFC1094</a>.'
     },
 
     'nfs.proc3': {
         info: 'NFSv3 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="">RFC1813</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
     },
 
     'nfs.proc4': {
         info: 'NFSv4 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="">RFC1813</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
     },
 
     // ------------------------------------------------------------------------
@@ -2869,22 +2869,22 @@ netdataDashboard.context = {
 
     'nfsd.proc2': {
         info: 'NFSv2 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="">RFC1094</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="_blank">RFC1094</a>.'
     },
 
     'nfsd.proc3': {
         info: 'NFSv3 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="">RFC1813</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
     },
 
     'nfsd.proc4': {
         info: 'NFSv4 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="">RFC1813</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
     },
 
     'nfsd.proc4ops': {
         info: 'NFSv4 RPC operations. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc5661#section-18" target="">RFC5661</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc5661#section-18" target="_blank">RFC5661</a>.'
     },
 
     // ------------------------------------------------------------------------
