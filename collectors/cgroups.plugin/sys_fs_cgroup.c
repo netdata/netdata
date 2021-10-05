@@ -2911,7 +2911,15 @@ void update_systemd_services_charts(
             if(unlikely(!cg->rd_swap_usage))
                 cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
+            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                rrddim_set_by_pointer(
+                    st_swap_usage,
+                    cg->rd_swap_usage,
+                    (cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) > 0 ?
+                        cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
+            } else {
+                rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
+            }
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -3601,8 +3609,8 @@ void update_cgroup_charts(int update_every) {
                 rrddim_set(
                     cg->st_mem_usage,
                     "swap",
-                    (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes) ?
-                        cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes : 0);
+                    (cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) > 0 ?
+                        cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
             } else {
                 rrddim_set(cg->st_mem_usage, "swap", cg->memory.msw_usage_in_bytes);
             }
