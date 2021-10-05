@@ -978,7 +978,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     "nfsd"
                     , "proc4ops"
                     , NULL
-                    , "nfsv2ops"
+                    , "nfsv4ops"
                     , NULL
                     , "NFS v4 Server Operations"
                     , "operations/s"
