@@ -4329,19 +4329,34 @@ netdataDashboard.context = {
     // Power Supplies
 
     'powersupply.capacity': {
-        info: undefined
+        info: 'The current battery charge.'
     },
 
     'powersupply.charge': {
-        info: undefined
+        info: '<p>The battery charge in Amp-hours.</p>'+
+        '<p><b>now</b> - actual charge value. '+
+        '<b>full</b>, <b>empty</b> - last remembered value of charge when battery became full/empty. '+
+        'It also could mean "value of charge when battery considered full/empty at given conditions (temperature, age)". '+
+        'I.e. these attributes represents real thresholds, not design values. ' +
+        '<b>full_design</b>, <b>empty_design</b> - design charge values, when battery considered full/empty.</p>'
     },
 
     'powersupply.energy': {
-        info: undefined
+        info: '<p>The battery charge in Watt-hours.</p>'+
+        '<p><b>now</b> - actual charge value. '+
+        '<b>full</b>, <b>empty</b> - last remembered value of charge when battery became full/empty. '+
+        'It also could mean "value of charge when battery considered full/empty at given conditions (temperature, age)". '+
+        'I.e. these attributes represents real thresholds, not design values. ' +
+        '<b>full_design</b>, <b>empty_design</b> - design charge values, when battery considered full/empty.</p>'
     },
 
     'powersupply.voltage': {
-        info: undefined
+        info: '<p>The power supply voltage.</p>'+
+        '<p><b>now</b> - current voltage. '+
+        '<b>max</b>, <b>min</b> - voltage values that hardware could only guess (measure and retain) the thresholds '+
+        'of a given power supply. '+
+        '<b>max_design</b>, <b>min_design</b> - design values for maximal and minimal power supply voltages. '+
+        'Maximal/minimal means values of voltages when battery considered "full"/"empty" at normal conditions.</p>'
     },
 
     // ------------------------------------------------------------------------
