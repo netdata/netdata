@@ -20,8 +20,10 @@ netdataDashboard.menu = {
     'services': {
         title: 'systemd Services',
         icon: '<i class="fas fa-cogs"></i>',
-        info: 'Resources utilization of systemd services. netdata monitors all systemd services via CGROUPS ' +
-            '(the resources accounting used by containers). '
+        info: 'Resources utilization of systemd services. '+
+        'Netdata monitors all systemd services via '+
+        '<a href="https://en.wikipedia.org/wiki/Cgroups" target="_blank">cgroups</a> ' +
+        '(the resources accounting used by containers).'
     },
 
     'ap': {
@@ -3406,6 +3408,124 @@ netdataDashboard.context = {
         'In this state actual CPU cycles are going to waste, '+
         'and a workload that spends extended time in this state is considered to be thrashing. '+
         'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    // ------------------------------------------------------------------------
+    // containers (systemd)
+
+    'services.cpu': {
+        info: 'Total CPU utilization within the system-wide CPU resources (all cores). '+
+        'The amount of time spent by tasks of the cgroup in '+
+        '<a href="https://en.wikipedia.org/wiki/CPU_modes#Mode_types" target="_blank">user and kernel</a> modes.'
+    },
+
+    'services.mem_usage': {
+        info: 'The amount of used RAM.'
+    },
+
+    'services.mem_rss': {
+        info: 'The amount of used '+
+        '<a href="https://en.wikipedia.org/wiki/Resident_set_size" target="_blank">RSS</a> memory. '+
+        'It includes transparent hugepages.'
+    },
+
+    'services.mem_mapped': {
+        info: 'The size of '+
+        '<a href="https://en.wikipedia.org/wiki/Memory-mapped_file" target="_blank">memory-mapped</a> files.'
+    },
+
+    'services.mem_cache': {
+        info: 'The amount of used '+
+        '<a href="https://en.wikipedia.org/wiki/Page_cache" target="_blank">page cache</a> memory.'
+    },
+
+    'services.mem_writeback': {
+        info: 'The amount of file/anon cache that is '+
+        '<a href="https://en.wikipedia.org/wiki/Cache_(computing)#Writing_policies" target="_blank">queued for syncing</a> '+
+        'to disk.'
+    },
+
+    'services.mem_pgfault': {
+        info: 'The number of '+
+        '<a href="https://en.wikipedia.org/wiki/Page_fault#Types" target="_blank">page faults</a>. '+
+        'It includes both minor and major page faults.'
+    },
+
+    'services.mem_pgmajfault': {
+        info: 'The number of '+
+        '<a href="https://en.wikipedia.org/wiki/Page_fault#Major" target="_blank">major</a> '+
+        'page faults.'
+    },
+
+    'services.mem_pgpgin': {
+        info: 'The amount of memory charged to the cgroup. '+
+        'The charging event happens each time a page is accounted as either '+
+        'mapped anon page(RSS) or cache page(Page Cache) to the cgroup.'
+    },
+
+    'services.mem_pgpgout': {
+        info: 'The amount of memory uncharged from the cgroup. '+
+        'The uncharging event happens each time a page is unaccounted from the cgroup.'
+    },
+
+    'services.mem_failcnt': {
+        info: 'The number of memory usage hits limits.'
+    },
+
+    'services.swap_usage': {
+        info: 'The number of used '+
+        '<a href="https://en.wikipedia.org/wiki/Memory_paging#Unix_and_Unix-like_systems" target="_blank">swap</a> '+
+        'memory.'
+    },
+
+    'services.io_read': {
+        info: 'The amount of data transferred from specific devices as seen by the CFQ scheduler. '+
+        'It is not updated when the CFQ scheduler is operating on a request queue.'
+    },
+
+    'services.io_write': {
+        info: 'The amount of data transferred to specific devices as seen by the CFQ scheduler. '+
+        'It is not updated when the CFQ scheduler is operating on a request queue.'
+    },
+
+    'services.io_ops_read': {
+        info: 'The number of read operations performed on specific devices as seen by the CFQ scheduler.'
+    },
+
+    'services.io_ops_write': {
+        info: 'The number write operations performed on specific devices as seen by the CFQ scheduler.'
+    },
+
+    'services.throttle_io_read': {
+        info: 'The amount of data transferred from specific devices as seen by the throttling policy.'
+    },
+
+    'services.throttle_io_write': {
+        info: 'The amount of data transferred to specific devices as seen by the throttling policy.'
+    },
+
+    'services.throttle_io_ops_read': {
+        info: 'The number of read operations performed on specific devices as seen by the throttling policy.'
+    },
+
+    'services.throttle_io_ops_write': {
+        info: 'The number of write operations performed on specific devices as seen by the throttling policy.'
+    },
+
+    'services.queued_io_ops_read': {
+        info: 'The number of queued read requests.'
+    },
+
+    'services.queued_io_ops_write': {
+        info: 'The number of queued write requests.'
+    },
+
+    'services.merged_io_ops_read': {
+        info: 'The number of read requests merged.'
+    },
+
+    'services.merged_io_ops_write': {
+        info: 'The number of write requests merged.'
     },
 
     // ------------------------------------------------------------------------
