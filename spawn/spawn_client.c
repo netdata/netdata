@@ -139,7 +139,7 @@ static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
     uv_buf_t writebuf[3];
     struct write_context *write_ctx;
 
-    write_ctx = mallocz(sizeof(*write_ctx));
+    write_ctx = callocz(1, sizeof(*write_ctx));
     write_ctx->write_req.data = write_ctx;
 
     uv_mutex_lock(&cmdinfo->mutex);
