@@ -43,13 +43,21 @@
 #define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
 
 // Contexts
-#define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup_vfs_unlink_calls"
-#define NETDATA_CGROUP_VFS_WRITE_CONTEXT "cgroup_vfs_write_calls"
-#define NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT "cgroup_vfs_write_error_calls"
-#define NETDATA_CGROUP_VFS_READ_CONTEXT "cgroup_vfs_read_calls"
-#define NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT "cgroup_vfs_read_error_calls"
-#define NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT "cgroup_vfs_write_bytes"
-#define NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT "cgroup_vfs_read_bytes"
+#define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup.vfs_unlink"
+#define NETDATA_CGROUP_VFS_WRITE_CONTEXT "cgroup.vfs_write"
+#define NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT "cgroup.vfs_write_error"
+#define NETDATA_CGROUP_VFS_READ_CONTEXT "cgroup.vfs_read"
+#define NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT "cgroup.vfs_read_error"
+#define NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT "cgroup.vfs_write_bytes"
+#define NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT "cgroup.vfs_read_bytes"
+
+#define NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT "services.vfs_unlink"
+#define NETDATA_SYSTEMD_VFS_WRITE_CONTEXT "services.vfs_write"
+#define NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT "services.vfs_write_error"
+#define NETDATA_SYSTEMD_VFS_READ_CONTEXT "services.vfs_read"
+#define NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT "services.vfs_read_error"
+#define NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT "services.vfs_write_bytes"
+#define NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT "services.vfs_read_bytes"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
