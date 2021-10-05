@@ -25,9 +25,13 @@
 #define NETDATA_PROCESS_CONFIG_FILE "process.conf"
 
 // Contexts
-#define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup_process_create"
-#define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup_thread_create"
-#define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup_task_close"
+#define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup.process_create"
+#define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup.thread_create"
+#define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup.task_close"
+
+#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "services.process_create"
+#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "services.thread_create"
+#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "services.task_close"
 
 // Index from kernel
 typedef enum ebpf_process_index {
