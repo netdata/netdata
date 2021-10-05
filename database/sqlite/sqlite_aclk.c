@@ -189,7 +189,7 @@ int aclk_start_sync_thread(void *data, int argc, char **argv, char **column)
 
 void sql_aclk_sync_init(void)
 {
-#if ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     char *err_msg = NULL;
     int rc;
 
@@ -713,7 +713,7 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
 
 void aclk_data_rotated(void)
 {
-#if ENABLE_NEW_CLOUD_PROTOCOL
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 
     if (!aclk_use_new_cloud_arch || !aclk_connected)
         return;

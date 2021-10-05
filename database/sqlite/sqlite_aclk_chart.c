@@ -347,7 +347,6 @@ bind_fail:
 #else
     UNUSED(wc);
     UNUSED(cmd);
-    info("ACLK_NG not defined");
 #endif
     return;
 }
