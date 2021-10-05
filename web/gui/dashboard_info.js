@@ -22,7 +22,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-cogs"></i>',
         info: 'Resources utilization of systemd services. '+
         'Netdata monitors all systemd services via '+
-        '<a href="https://en.wikipedia.org/wiki/Cgroups" target="_blank">CGROUPS</a> ' +
+        '<a href="https://en.wikipedia.org/wiki/Cgroups" target="_blank">cgroups</a> ' +
         '(the resources accounting used by containers).'
     },
 
@@ -3440,7 +3440,7 @@ netdataDashboard.context = {
     },
 
     'services.mem_writeback': {
-        info: 'The amount of file/anon cache that are '+
+        info: 'The amount of file/anon cache that is '+
         '<a href="https://en.wikipedia.org/wiki/Cache_(computing)#Writing_policies" target="_blank">queued for syncing</a> '+
         'to disk.'
     },
@@ -3484,7 +3484,7 @@ netdataDashboard.context = {
     },
 
     'services.io_write': {
-        info: 'The amount of data to to specific devices as seen by the CFQ scheduler. '+
+        info: 'The amount of data transferred to specific devices as seen by the CFQ scheduler. '+
         'It is not updated when the CFQ scheduler is operating on a request queue.'
     },
 
@@ -3521,11 +3521,11 @@ netdataDashboard.context = {
     },
 
     'services.merged_io_ops_read': {
-        info: 'The number of read requests merged into requests.'
+        info: 'The number of read requests merged.'
     },
 
     'services.merged_io_ops_write': {
-        info: 'The number of write requests merged into requests.'
+        info: 'The number of write requests merged.'
     },
 
     // ------------------------------------------------------------------------
