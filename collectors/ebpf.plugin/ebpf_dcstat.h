@@ -18,10 +18,15 @@
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
 
 // Contexts
-#define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup_dc_ratio"
-#define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup_dc_reference"
-#define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup_dc_not_cache"
-#define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup_dc_not_found"
+#define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup.dc_ratio"
+#define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup.dc_reference"
+#define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup.dc_not_cache"
+#define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup.dc_not_found"
+
+#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "services.dc_ratio"
+#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "services.dc_reference"
+#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
+#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
 #define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
 

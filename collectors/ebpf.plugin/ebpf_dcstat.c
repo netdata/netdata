@@ -653,7 +653,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21200,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REFERENCE_CHART,
                                   "Count file access.",
@@ -662,7 +662,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21201,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_CGROUP_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                   "Access to files that were not present inside directory cache.",
@@ -671,7 +671,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                   "Number of requests for files that were not found on filesystem.",
@@ -680,7 +680,7 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /**
