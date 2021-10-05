@@ -479,8 +479,6 @@ static void ebpf_create_systemd_swap_charts()
 */
 void ebpf_swap_send_cgroup_data()
 {
-    static int systemd_charts = 0;
-
     if (!ebpf_cgroup_pids)
         return;
 
@@ -493,6 +491,7 @@ void ebpf_swap_send_cgroup_data()
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
 
     if (has_systemd) {
+        static int systemd_charts = 0;
         if (!systemd_charts) {
             ebpf_create_systemd_swap_charts();
             systemd_charts = 1;

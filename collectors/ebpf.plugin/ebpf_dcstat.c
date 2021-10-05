@@ -782,8 +782,6 @@ static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc
 */
 void ebpf_dc_send_cgroup_data()
 {
-    static int systemd_charts = 0;
-
     if (!ebpf_cgroup_pids)
         return;
 
@@ -793,6 +791,7 @@ void ebpf_dc_send_cgroup_data()
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
     if (has_systemd) {
+        static int systemd_charts = 0;
         if (!systemd_charts) {
             ebpf_create_systemd_dc_charts();
             systemd_charts = 1;

@@ -717,7 +717,6 @@ static int ebpf_send_systemd_process_charts()
 */
 static void ebpf_process_send_cgroup_data()
 {
-    static int systemd_chart = 0;
     if (!ebpf_cgroup_pids)
         return;
 
@@ -730,6 +729,7 @@ static void ebpf_process_send_cgroup_data()
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
 
     if (has_systemd) {
+        static int systemd_chart = 0;
         if (!systemd_chart) {
             ebpf_create_systemd_process_charts();
             systemd_chart = 1;

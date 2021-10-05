@@ -1126,7 +1126,6 @@ static int ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 */
 static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 {
-    static int systemd_charts = 0;
     if (!ebpf_cgroup_pids)
         return;
 
@@ -1138,6 +1137,7 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
     if (has_systemd) {
+        static int systemd_charts = 0;
         if (!systemd_charts) {
             ebpf_create_systemd_vfs_charts(em);
             systemd_charts = 1;
