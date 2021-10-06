@@ -2937,8 +2937,11 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // ZFS pools
     'zfspool.state': {
-        info: 'ZFS pool state. The overall health of a pool, as reported by <code>zpool status</code>, is determined by the aggregate state of all devices within the pool. ' +
-            'For details, see <a href="https://openzfs.github.io/openzfs-docs/man/8/zpoolconcepts.8.html?#Device_Failure_and_Recovery" target="_blank"> ZFS documentation</a>.'
+        info: 'ZFS pool state. '+
+        'The overall health of a pool, as reported by <code>zpool status</code>, '+
+        'is determined by the aggregate state of all devices within the pool. ' +
+        'For states description, '+
+        'see <a href="https://openzfs.github.io/openzfs-docs/man/7/zpoolconcepts.7.html#Device_Failure_and_Recovery" target="_blank"> ZFS documentation</a>.'
     },
 
     // ------------------------------------------------------------------------
