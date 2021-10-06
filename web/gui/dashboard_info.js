@@ -178,13 +178,19 @@ netdataDashboard.menu = {
     'nfsd': {
         title: 'NFS Server',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the Network File Server. NFS is a distributed file system protocol, allowing a user on a client computer to access files over a network, much like local storage is accessed. NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system. The NFS is an open standard defined in Request for Comments (RFC).'
+        info: 'Performance metrics of the Network File Server. '+
+        '<a href="https://en.wikipedia.org/wiki/Network_File_System" target="_blank">NFS</a> '+
+        'is a distributed file system protocol, allowing a user on a client computer to access files over a network, '+
+        'much like local storage is accessed. '+
+        'NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system.'
     },
 
     'nfs': {
         title: 'NFS Client',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
+        info: 'Performance metrics of the '+
+        '<a href="https://en.wikipedia.org/wiki/Network_File_System" target="_blank">NFS</a> '+
+        'operations of this system, acting as an NFS client.'
     },
 
     'zfs': {
