@@ -2890,7 +2890,7 @@ netdataDashboard.context = {
 
     'nfsd.proc4ops': {
         info: 'NFSv4 RPC operations. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc5661#section-18" target="_blank">RFC5661</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
     },
 
     // ------------------------------------------------------------------------
