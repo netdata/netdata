@@ -63,6 +63,37 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
 
     return;
 }
+#define SQL_SELECT_HOST_MEMORY_MODE "select memory_mode from chart where host_id = @host_id limit 1;"
+static RRD_MEMORY_MODE sql_get_host_memory_mode(uuid_t *host_id)
+{
+    int rc;
+
+    RRD_MEMORY_MODE memory_mode = RRD_MEMORY_MODE_RAM;
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_MEMORY_MODE, -1, &res, 0);
+
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to read host memory mode");
+        return memory_mode;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host parameter to fetch host memory mode");
+        goto failed;
+    }
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        memory_mode = (RRD_MEMORY_MODE) sqlite3_column_int(res, 0);
+    }
+
+failed:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when reading host memory mode");
+    return memory_mode;
+}
 
 #define SELECT_HOST_DIMENSION_LIST  "SELECT d.dim_id, c.update_every, c.type||'.'||c.id FROM chart c, dimension d, host h " \
         "WHERE d.chart_id = c.chart_id AND c.host_id = h.host_id AND c.host_id = @host_id ORDER BY c.update_every ASC;"
@@ -84,8 +115,19 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         return;
 
     sqlite3_stmt *res = NULL;
+    RRD_MEMORY_MODE memory_mode;
 
-    if (!wc->host || wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+    uuid_t host_uuid;
+    rc = uuid_parse(wc->host_guid, host_uuid);
+    if (unlikely(rc))
+        return;
+
+    if (wc->host)
+        memory_mode = wc->host->rrd_memory_mode;
+    else
+        memory_mode = sql_get_host_memory_mode(&host_uuid);
+
+    if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_DIMENSION_LIST, -1, &res, 0);
     else
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_CHART_LIST, -1, &res, 0);
@@ -96,10 +138,6 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    uuid_t host_uuid;
-    rc = uuid_parse(wc->host_guid, host_uuid);
-    if (unlikely(rc))
-        goto failed;
     rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host parameter to fetch host dimensions");
@@ -120,7 +158,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     rotate_data.interval_durations = callocz(max_intervals, sizeof(*rotate_data.interval_durations));
 
     now_realtime_timeval(&rotate_data.rotation_timestamp);
-    rotate_data.memory_mode = wc->host ? wc->host->rrd_memory_mode : localhost->rrd_memory_mode;
+    rotate_data.memory_mode = memory_mode;
     rotate_data.claim_id = claim_id;
     rotate_data.node_id = strdupz(wc->node_id);
 
@@ -137,7 +175,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         }
 #ifdef ENABLE_DBENGINE
         time_t  last_entry_t;
-        if (wc->host && wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
             rc = rrdeng_metric_latest_time_by_uuid((uuid_t *)sqlite3_column_blob(res, 0), &first_entry_t, &last_entry_t);
         else
 #endif
