@@ -331,6 +331,7 @@ void aclk_database_worker(void *arg)
     aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
+    memset(&cmd, 0, sizeof(cmd));
     sql_get_last_chart_sequence(wc, cmd);
     wc->chart_updates = 0;
     wc->alert_updates = 0;

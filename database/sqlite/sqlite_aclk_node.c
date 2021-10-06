@@ -85,7 +85,7 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
     sqlite3_stmt *res = NULL;
 
-    if (!wc->host || (wc->host && wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE))
+    if (!wc->host || wc->host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_DIMENSION_LIST, -1, &res, 0);
     else
         rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_CHART_LIST, -1, &res, 0);
