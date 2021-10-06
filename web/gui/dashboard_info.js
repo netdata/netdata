@@ -2821,7 +2821,7 @@ netdataDashboard.context = {
 
     'nfs.proc4': {
         info: 'NFSv4 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc3010#section-14" target="_blank">RFC3010</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
     },
 
     // ------------------------------------------------------------------------
@@ -2885,7 +2885,7 @@ netdataDashboard.context = {
 
     'nfsd.proc4': {
         info: 'NFSv4 RPC calls. The individual metrics are described in '+
-        '<a href="https://datatracker.ietf.org/doc/html/rfc3010#section-14" target="_blank">RFC3010</a>.'
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
     },
 
     'nfsd.proc4ops': {
