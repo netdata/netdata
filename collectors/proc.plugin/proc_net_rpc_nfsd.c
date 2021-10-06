@@ -408,9 +408,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
 
             rpc_calls = str2ull(procfile_lineword(ff, l, 1));
-            rpc_bad_format = str2ull(procfile_lineword(ff, l, 2));
-            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 3));
-            rpc_bad_client = str2ull(procfile_lineword(ff, l, 4));
+            rpc_bad_format = str2ull(procfile_lineword(ff, l, 3));
+            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 4));
+            rpc_bad_client = str2ull(procfile_lineword(ff, l, 5));
 
             unsigned long long sum = rpc_calls + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
             if(sum == 0ULL) do_rpc = -1;
