@@ -15,9 +15,10 @@
 #define ACLK_MAX_CHART_BATCH_COUNT (10)
 #endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
-#define ACLK_SYNC_RETRY_COUNT   "10"
 #define ACLK_DATABASE_CLEANUP_FIRST  (60)
+#define ACLK_DATABASE_ROTATION_DELAY  (60)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
+#define ACLK_DATABASE_ROTATION_INTERVAL (3600)
 #define ACLK_DELETE_ACK_INTERNAL (600)
 #define ACLK_SYNC_QUERY_SIZE 512
 
@@ -59,8 +60,6 @@ static inline void aclk_complete(struct aclk_completion *p)
 }
 
 extern uv_mutex_t aclk_async_lock;
-
-extern int aclk_architecture;
 
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
@@ -120,8 +119,6 @@ enum aclk_database_opcode {
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CHART_ACK,
-    ACLK_DATABASE_CHECK,
-    ACLK_DATABASE_CHECK_ROTATION,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_INFO,
@@ -130,11 +127,9 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_RESET_CHART,
-    ACLK_DATABASE_RESET_NODE,
     ACLK_DATABASE_SHUTDOWN,
     ACLK_DATABASE_TIMER,
-    ACLK_DATABASE_UPD_STATS,
-    ACLK_DATABASE_MAX_OPCODE
+    ACLK_DATABASE_UPD_RETENTION
 };
 
 struct aclk_chart_payload_t {
@@ -170,6 +165,7 @@ struct aclk_database_worker_config {
     time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
     time_t startup_time;           // When the sync thread started
+    time_t rotation_after;
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
@@ -215,13 +211,11 @@ extern sqlite3 *db_meta;
 
 extern int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
-extern void aclk_set_architecture(int mode);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
-void aclk_data_rotated(RRDHOST *host);
+void aclk_data_rotated(void);
 void sql_aclk_sync_init(void);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 #endif //NETDATA_SQLITE_ACLK_H

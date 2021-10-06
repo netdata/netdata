@@ -162,10 +162,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 #ifdef ENABLE_ACLK
     if (netdata_cloud_setting) {
-        if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
-            ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
-            aclk_update_alarm(host, ae);
-        }
+        sql_queue_alarm_to_aclk(host, ae);
     }
 #endif
 }

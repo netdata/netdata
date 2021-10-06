@@ -109,7 +109,12 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 /* Health related SQL queries
    Inserts an entry in the table
 */
-#define SQL_INSERT_HEALTH_LOG(guid) "INSERT INTO health_log_%s(hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+#define SQL_INSERT_HEALTH_LOG(guid) "INSERT INTO health_log_%s(hostname, unique_id, alarm_id, alarm_event_id, " \
+    "config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, " \
+    "exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, " \
+    "units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, " \
+    "class, component, type) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", guid
+
 void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -639,7 +644,13 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 /*
  * Store an alert config hash in the database
  */
-#define SQL_STORE_ALERT_CONFIG_HASH "insert or replace into alert_hash (hash_id, date_updated, alarm, template, on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every) values (?1,strftime('%s'),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
+#define SQL_STORE_ALERT_CONFIG_HASH "insert or replace into alert_hash (hash_id, date_updated, alarm, template, " \
+    "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
+    "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
+    "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
+    "p_db_lookup_before, p_update_every) values (?1,strftime('%s'),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34);"
+
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
     static __thread sqlite3_stmt *res = NULL;

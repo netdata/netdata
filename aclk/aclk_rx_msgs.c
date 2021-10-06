@@ -330,6 +330,73 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         return;
     }
 
+    if (!strcmp(message_type, "StreamChartsAndDimensions")) {
+        stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        chart_batch_id = res.batch_id;
+        aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "ChartsAndDimensionsAck")) {
+        chart_and_dim_ack_t res = parse_chart_and_dimensions_ack(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        aclk_ack_chart_sequence_id(res.node_id, res.last_seq_id);
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "UpdateChartConfigs")) {
+        struct update_chart_config res = parse_update_chart_config(msg, msg_len);
+        if (!res.claim_id || !res.node_id || !res.hashes)
+            error("Error parsing UpdateChartConfigs msg");
+        else
+            aclk_get_chart_config(res.hashes);
+        destroy_update_chart_config(&res);
+        return;
+    }
+    if (!strcmp(message_type, "StartAlarmStreaming")) {
+        struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
+        if (!res.node_id || !res.batch_id) {
+            error("Error parsing StartAlarmStreaming");
+            freez(res.node_id);
+            return;
+        }
+        aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "SendAlarmLogHealth")) {
+        char *node_id = parse_send_alarm_log_health(msg, msg_len);
+        if (!node_id) {
+            error("Error parsing SendAlarmLogHealth");
+            return;
+        }
+        aclk_send_alarm_health_log(node_id);
+        freez(node_id);
+        return;
+    }
+    if (!strcmp(message_type, "SendAlarmConfiguration")) {
+        char *config_hash = parse_send_alarm_configuration(msg, msg_len);
+        if (!config_hash || !*config_hash) {
+            error("Error parsing SendAlarmConfiguration");
+            return;
+        }
+        aclk_send_alarm_configuration(config_hash);
+        freez(config_hash);
+        return;
+    }
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
 #endif
