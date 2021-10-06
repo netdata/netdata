@@ -180,13 +180,19 @@ netdataDashboard.menu = {
     'nfsd': {
         title: 'NFS Server',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the Network File Server. NFS is a distributed file system protocol, allowing a user on a client computer to access files over a network, much like local storage is accessed. NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system. The NFS is an open standard defined in Request for Comments (RFC).'
+        info: 'Performance metrics of the Network File Server. '+
+        '<a href="https://en.wikipedia.org/wiki/Network_File_System" target="_blank">NFS</a> '+
+        'is a distributed file system protocol, allowing a user on a client computer to access files over a network, '+
+        'much like local storage is accessed. '+
+        'NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system.'
     },
 
     'nfs': {
         title: 'NFS Client',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
+        info: 'Performance metrics of the '+
+        '<a href="https://en.wikipedia.org/wiki/Network_File_System" target="_blank">NFS</a> '+
+        'operations of this system, acting as an NFS client.'
     },
 
     'zfs': {
@@ -1952,7 +1958,7 @@ netdataDashboard.context = {
 
     'ipv6.sockstat6_tcp_sockets': {
         info: 'The number of TCP sockets in any '+
-        '<a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation" target="">state</a>, '+
+        '<a href="https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation" target="_blank">state</a>, '+
         'excluding TIME-WAIT and CLOSED.'
     },
 
@@ -2828,6 +2834,104 @@ netdataDashboard.context = {
         '<b>Dirty</b> is the data that is modified in the cache but not yet written to the permanent storage. '+
         '<b>Clean</b> data matches the data stored on the permanent storage. '+
         '<b>Metadata</b> is bcache\'s metadata overhead. '
+    },
+
+    // ------------------------------------------------------------------------
+    // NFS client
+
+    'nfs.net': {
+        info: 'The number of received UDP and TCP packets.'
+    },
+
+    'nfs.rpc': {
+        info: '<p>Remote Procedure Call (RPC) statistics.</p>'+
+        '</p><b>Calls</b> - all RPC calls. '+
+        '<b>Retransmits</b> - retransmitted calls. '+
+        '<b>AuthRefresh</b> - authentication refresh calls (validating credentials with the server).</p>'
+    },
+
+    'nfs.proc2': {
+        info: 'NFSv2 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="_blank">RFC1094</a>.'
+    },
+
+    'nfs.proc3': {
+        info: 'NFSv3 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
+    },
+
+    'nfs.proc4': {
+        info: 'NFSv4 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
+    },
+
+    // ------------------------------------------------------------------------
+    // NFS server
+
+    'nfsd.readcache': {
+        info: '<p>Reply cache statistics. '+
+        'The reply cache keeps track of responses to recently performed non-idempotent transactions, and '+
+        'in case of a replay, the cached response is sent instead of attempting to perform the operation again.</p>'+
+        '<b>Hits</b> - client did not receive a reply and re-transmitted its request. This event is undesirable. '+
+        '<b>Misses</b> - an operation that requires caching (idempotent). '+
+        '<b>Nocache</b> - an operation that does not require caching (non-idempotent).'
+    },
+
+    'nfsd.filehandles': {
+        info: '<p>File handle statistics. '+
+        'File handles are small pieces of memory that keep track of what file is opened.</p>'+
+        '<p><b>Stale</b> - happen when a file handle references a location that has been recycled. '+
+        'This also occurs when the server loses connection and '+
+        'applications are still using files that are no longer accessible.'
+    },
+
+    'nfsd.io': {
+        info: 'The amount of data transferred to and from disk.'
+    },
+
+    'nfsd.threads': {
+        info: 'The number of threads used by the NFS daemon.'
+    },
+
+    'nfsd.readahead': {
+        info: '<p>Read-ahead cache statistics. '+
+        'NFS read-ahead predictively requests blocks from a file in advance of I/O requests by the application. '+
+        'It is designed to improve client sequential read throughput.</p>'+
+        '<p><b>10%</b>-<b>100%</b> - histogram of depth the block was found. '+
+        'This means how far the cached block is from the original block that was first requested. '+
+        '<b>Misses</b> - not found in the read-ahead cache.</p>'
+    },
+
+    'nfsd.net': {
+        info: 'The number of received UDP and TCP packets.'
+    },
+
+    'nfsd.rpc': {
+        info: '<p>Remote Procedure Call (RPC) statistics.</p>'+
+        '</p><b>Calls</b> - all RPC calls. '+
+        '<b>BadAuth</b> - bad authentication. '+
+        'It does not count if you try to mount from a machine that it\'s not in your exports file. '+
+        '<b>BadFormat</b> - other errors.</p>'
+    },
+
+    'nfsd.proc2': {
+        info: 'NFSv2 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1094#section-2.2" target="_blank">RFC1094</a>.'
+    },
+
+    'nfsd.proc3': {
+        info: 'NFSv3 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc1813#section-3" target="_blank">RFC1813</a>.'
+    },
+
+    'nfsd.proc4': {
+        info: 'NFSv4 RPC calls. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
+    },
+
+    'nfsd.proc4ops': {
+        info: 'NFSv4 RPC operations. The individual metrics are described in '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
     },
 
     // ------------------------------------------------------------------------
