@@ -198,7 +198,10 @@ netdataDashboard.menu = {
     'zfs': {
         title: 'ZFS filesystem',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
+        info: 'Performance metrics of the ZFS filesystem. '+
+        'The following charts visualize all metrics reported by '+
+        '<a href="https://github.com/openzfs/zfs/blob/master/cmd/arcstat/arcstat.in" target="_blank">arcstat.py</a> and '+
+        '<a href="https://github.com/openzfs/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
     },
 
     'zfspool': {
@@ -2932,6 +2935,87 @@ netdataDashboard.context = {
     'nfsd.proc4ops': {
         info: 'NFSv4 RPC operations. The individual metrics are described in '+
         '<a href="https://datatracker.ietf.org/doc/html/rfc8881#section-18" target="_blank">RFC8881</a>.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ZFS
+
+    'zfs.arc_size': {
+        info: '<p>The size of the ARC.</p>'+
+        '<p><b>Arcsz</b> - actual size. '+
+        '<b>Target</b> - target size that the ARC is attempting to maintain (adaptive). '+
+        '<b>Min</b> - minimum size limit. When the ARC is asked to shrink, it will stop shrinking at this value. '+
+        '<b>Min</b> - maximum size limit.</p>'
+    },
+
+    'zfs.l2_size': {
+        info: '<p>The size of the L2ARC.</p>'+
+        '<p><b>Actual</b> - size of compressed data. '+
+        '<b>Size</b> - size of uncompressed data.</p>'
+    },
+
+    'zfs.reads': {
+        info: '<p>The number of read requests.</p>'+
+        '<p><b>ARC</b> - all prefetch and demand requests. '+
+        '<b>Demand</b> - triggered by an application request. '+
+        '<b>Prefetch</b> - triggered by the prefetch mechanism, not directly from an application request. '+
+        '<b>Metadata</b> - metadata read requests. '+
+        '<b>L2</b> - L2ARC read requests.</p>'
+    },
+
+    'zfs.bytes': {
+        info: 'The amount of data transferred to and from the L2ARC cache devices.'
+    },
+
+    'zfs.hits': {
+        info: '<p>Hit ratio of the ARC read requests.</p>'+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.dhits': {
+        info: '<p>Hit ratio of the ARC data and metadata demand read requests. '+
+        'Demand requests are triggered by an application request.</p>'+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.phits': {
+        info: '<p>Hit ratio of the ARC data and metadata prefetch read requests. '+
+        'Prefetch requests are triggered by the prefetch mechanism, not directly from an application request.</p>'+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.mhits': {
+        info: '<p>Hit ratio of the ARC metadata read requests. '+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.l2its': {
+        info: '<p>Hit ratio of the L2ARC lookups. '+
+        '<b>Hits</b> - a data block was in the L2ARC cache and returned. '+
+        '<b>Misses</b> - a data block was not in the L2ARC cache. '+
+        'It will be read from the pool disks.</p>'
+    },
+
+    'zfs.demand_data_hits': {
+        info: '<p>Hit ratio of the ARC data demand read requests. '+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.prefetch_data_hits': {
+        info: '<p>Hit ratio of the ARC data prefetch read requests. '+
+        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
     },
 
     // ------------------------------------------------------------------------
