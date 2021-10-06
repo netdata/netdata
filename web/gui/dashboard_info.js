@@ -781,6 +781,18 @@ netdataDashboard.submenu = {
         'of a physical/hardware defect or an environmental problem.'
     },
 
+    'mem.pagetype': {
+        info: 'Statistics of free memory available from '+
+        '<a href="https://en.wikipedia.org/wiki/Buddy_memory_allocation" target="_blank">memory buddy allocator</a>. '+
+        'The buddy allocator is the system memory allocator. '+
+        'The whole memory space is split in physical pages, which are grouped by '+
+        'NUMA node, zone, '+
+        '<a href="https://lwn.net/Articles/224254/" target="_blank">migrate type</a>, and size of the block. '+
+        'By keeping pages grouped based on their ability to move, '+
+        'the kernel can reclaim pages within a page block to satisfy a high-order allocation. '+
+        'When the kernel or an application requests some memory, the buddy allocator provides a page that matches closest the request.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
@@ -1417,6 +1429,10 @@ netdataDashboard.context = {
     'mem.ecc_ue': {
         info: 'The number of uncorrectable (multi-bit) ECC errors. '+
         'An uncorrectable error is a fatal issue that will typically lead to an OS crash.'
+    },
+
+    'mem.pagetype_global': {
+        info: 'The amount of memory available in blocks of certain size.'
     },
 
     'mem.cachestat_ratio': {
