@@ -722,13 +722,19 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         can_enable_ng="no"
     fi
     AC_MSG_CHECKING([if SSL available for ACLK Next Generation])
-    if test "$enable_https" != "no" -a -n "${SSL_LIBS}"; then
+    if test -n "${SSL_LIBS}"; then
         AC_MSG_RESULT([yes])
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
         AC_MSG_RESULT([no])
+    fi
+    AC_MSG_CHECKING([if SSL has been disabled with --disable-https for ACLK Next Generation])
+    if test "$enable_https" = "no"; then
+        AC_MSG_RESULT([yes])
         can_enable_ng="no"
+    else
+        AC_MSG_RESULT([no])
     fi
     AC_MSG_CHECKING([if JSON-C available for ACLK Next Generation])
     if test "$enable_jsonc" != "yes"; then
