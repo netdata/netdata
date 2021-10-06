@@ -2618,6 +2618,45 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WIRELESS NETWORK INTERFACES
+
+    'wireless.link_quality': {
+        info: 'Overall quality of the link. '+
+        'May be based on the level of contention or interference, the bit or frame error rate, '+
+        'how good the received signal is, some timing synchronisation, or other hardware metric.'
+    },
+
+    'wireless.signal_level': {
+        info: 'Received signal strength '+
+        '(<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" target="">RSSI</a>).'
+    },
+
+    'wireless.noise_level': {
+        info: 'Background noise level (when no packet is transmitted).'
+    },
+
+    'wireless.discarded_packets': {
+        info: '<p>The number of discarded packets.</p>'+
+        '</p><b>NWID</b> - received packets with a different NWID or ESSID. '+
+        'Used to detect configuration problems or adjacent network existence (on the same frequency). '+
+        '<b>Crypt</b> - received packets that the hardware was unable to code/encode. '+
+        'This can be used to detect invalid encryption settings. '+
+        '<b>Frag</b> - received packets for which the hardware was not able to properly re-assemble '+
+        'the link layer fragments (most likely one was missing). '+
+        '<b>Retry</b> - packets that the hardware failed to deliver. '+
+        'Most MAC protocols will retry the packet a number of times before giving up. '+
+        '<b>Misc</b> - other packets lost in relation with specific wireless operations.</p>'
+    },
+
+    'wireless.missed_beacons': {
+        info: 'The number of periodic '+
+        '<a href="https://en.wikipedia.org/wiki/Beacon_frame" target="_blank">beacons</a> '+
+        'from the Cell or the Access Point have been missed. '+
+        'Beacons are sent at regular intervals to maintain the cell coordination, '+
+        'failure to receive them usually indicates that the card is out of range.'
+    },
+
+    // ------------------------------------------------------------------------
     // NETFILTER
 
     'netfilter.sockets': {
