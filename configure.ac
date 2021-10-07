@@ -702,6 +702,10 @@ AS_IF(
     [have_CXX_compiler=yes]
 )
 
+if test "${have_libprotobuf}" == "yes" && test "${have_CXX_compiler}" == "yes"; then
+    AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available ])
+fi
+
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
 if test "$aclk_ng" = "no"; then

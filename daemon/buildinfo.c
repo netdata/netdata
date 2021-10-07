@@ -57,6 +57,16 @@
 
 // Optional libraries
 
+#ifdef HAVE_PROTOBUF
+#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
+#define FEAT_PROTOBUF 1
+#else
+#define FEAT_PROTOBUF 0
+#endif
+#else
+#define FEAT_PROTOBUF 0
+#endif
+
 #ifdef ENABLE_JSONC
 #define FEAT_JSONC 1
 #else
@@ -226,6 +236,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
 
     printf("Libraries:\n");
+    printf("    protobuf:                %s\n", FEAT_YES_NO(FEAT_PROTOBUF));
     printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
     printf("    JSON-C:                  %s\n", FEAT_YES_NO(FEAT_JSONC));
     printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
@@ -286,6 +297,7 @@ void print_build_info_json(void) {
     printf("  },\n");
 
     printf("  \"libs\": {\n");
+    printf("    \"protobuf\": %s,\n",         FEAT_JSON_BOOL(FEAT_PROTOBUF));
     printf("    \"jemalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_JEMALLOC));
     printf("    \"jsonc\": %s,\n",            FEAT_JSON_BOOL(FEAT_JSONC));
     printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));
@@ -338,6 +350,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_ACLK_LEGACY)     buffer_strcat (b, "|ACLK Legacy");
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
 
+    if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
     if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
     if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");
