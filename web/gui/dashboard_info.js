@@ -196,9 +196,10 @@ netdataDashboard.menu = {
     },
 
     'zfs': {
-        title: 'ZFS filesystem',
+        title: 'ZFS Cache',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the ZFS filesystem. '+
+        info: 'Performance metrics of the '+
+        '<a href="https://en.wikipedia.org/wiki/ZFS#Caching_mechanisms" target="_blank">ZFS ARC and L2ARC</a>. '+
         'The following charts visualize all metrics reported by '+
         '<a href="https://github.com/openzfs/zfs/blob/master/cmd/arcstat/arcstat.in" target="_blank">arcstat.py</a> and '+
         '<a href="https://github.com/openzfs/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
@@ -2968,54 +2969,103 @@ netdataDashboard.context = {
     },
 
     'zfs.hits': {
-        info: '<p>Hit ratio of the ARC read requests.</p>'+
-        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        info: '<p>Hit rate of the ARC read requests.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
         '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
         'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
     },
 
     'zfs.dhits': {
-        info: '<p>Hit ratio of the ARC data and metadata demand read requests. '+
+        info: '<p>Hit rate of the ARC data and metadata demand read requests. '+
+        'Demand requests are triggered by an application request.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.phits': {
+        info: '<p>Hit rate of the ARC data and metadata prefetch read requests. '+
+        'Prefetch requests are triggered by the prefetch mechanism, not directly from an application request.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.mhits': {
+        info: '<p>Hit rate of the ARC metadata read requests.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.l2its': {
+        info: '<p>Hit rate of the L2ARC lookups.</p>'+
+        '</p><b>Hits</b> - a data block was in the L2ARC cache and returned. '+
+        '<b>Misses</b> - a data block was not in the L2ARC cache. '+
+        'It will be read from the pool disks.</p>'
+    },
+
+    'zfs.demand_data_hits': {
+        info: '<p>Hit rate of the ARC data demand read requests. '+
         'Demand requests are triggered by an application request.</p>'+
         '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
         '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
         'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
     },
 
-    'zfs.phits': {
-        info: '<p>Hit ratio of the ARC data and metadata prefetch read requests. '+
-        'Prefetch requests are triggered by the prefetch mechanism, not directly from an application request.</p>'+
-        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
-        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
-        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
-    },
-
-    'zfs.mhits': {
-        info: '<p>Hit ratio of the ARC metadata read requests. '+
-        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
-        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
-        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
-    },
-
-    'zfs.l2its': {
-        info: '<p>Hit ratio of the L2ARC lookups. '+
-        '<b>Hits</b> - a data block was in the L2ARC cache and returned. '+
-        '<b>Misses</b> - a data block was not in the L2ARC cache. '+
-        'It will be read from the pool disks.</p>'
-    },
-
-    'zfs.demand_data_hits': {
-        info: '<p>Hit ratio of the ARC data demand read requests. '+
-        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
-        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
-        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
-    },
-
     'zfs.prefetch_data_hits': {
-        info: '<p>Hit ratio of the ARC data prefetch read requests. '+
-        '<b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        info: '<p>Hit rate of the ARC data prefetch read requests. '+
+        'Prefetch requests are triggered by the prefetch mechanism, not directly from an application request.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
         '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
         'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.list_hits': {
+        info: 'MRU (most recently used) and MFU (most frequently used) cache list hits. '+
+        'MRU and MFU lists contain metadata for requested blocks which are cached. '+
+        'Ghost lists contain metadata of the evicted pages on disk.'
+    },
+
+    'zfs.arc_size_breakdown': {
+        info: 'The size of MRU (most recently used) and MFU (most frequently used) cache.'
+    },
+
+    'zfs.memory_ops': {
+        info: '<p>Memory operation statistics.</p>'+
+        '<p><b>Direct</b> - synchronous memory reclaim. Data is evicted from the ARC and free slabs reaped. '+
+        '<b>Throttled</b> - number of times that ZFS had to limit the ARC growth. '+
+        'A constant increasing of the this value can indicate excessive pressure to evict data from the ARC. '+
+        '<b>Indirect</b> - asynchronous memory reclaim. It reaps free slabs from the ARC cache.</p>'
+    },
+
+    'zfs.important_ops': {
+        info: '<p>Eviction and insertion operation statistics.</p>'+
+        '<p><b>EvictSkip</b> - skipped data eviction operations. '+
+        '<b>Deleted</b> - old data is evicted (deleted) from the cache. '+
+        '<b>MutexMiss</b> - an attempt to get hash or data block mutex when it is locked during eviction. '+
+        '<b>HashCollisions</b> - occurs when two distinct data block numbers have the same hash value.</p>'
+    },
+
+    'zfs.actual_hits': {
+        info: '<p>MRU and MFU cache hit rate.</p>'+
+        '<p><b>Hits</b> - a data block was in the ARC DRAM cache and returned. '+
+        '<b>Misses</b> - a data block was not in the ARC DRAM cache. '+
+        'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
+    },
+
+    'zfs.hash_elements': {
+        info: '<p>Data Virtual Address (DVA) hash table element statistics.</p>'+
+        '<p><b>Current</b> - current number of elements. '+
+        '<b>Max</b> - maximum number of elements seen.</p>'
+    },
+
+    'zfs.hash_chains': {
+        info: '<p>Data Virtual Address (DVA) hash table chain statistics. '+
+        'A chain is formed when two or more distinct data block numbers have the same hash value.</p>'+
+        '<p><b>Current</b> - current number of chains. '+
+        '<b>Max</b> - longest length seen for a chain. '+
+        'If the value is high, performance may degrade as the hash locks are held longer while the chains are walked.</p>'
     },
 
     // ------------------------------------------------------------------------
