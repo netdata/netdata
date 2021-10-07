@@ -391,6 +391,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         char *config_hash = parse_send_alarm_configuration(msg, msg_len);
         if (!config_hash || !*config_hash) {
             error("Error parsing SendAlarmConfiguration");
+            freez(config_hash);
             return;
         }
         aclk_send_alarm_configuration(config_hash);
