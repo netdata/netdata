@@ -29,7 +29,7 @@ jobs:
         with:
           title: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
           body: 'See https://github.com/netdata/dashboard/releases/tag/${{ github.event.inputs.dashboard_version }} for changes.'
-          branch: dashboard-${{ github.events.inputs.dashboard_version }}
+          branch: dashboard-${{ github.event.inputs.dashboard_version }}
           branch-suffix: timestamp
           delete-branch: true
           commit-message: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
