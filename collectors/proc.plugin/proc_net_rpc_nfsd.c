@@ -342,6 +342,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                 continue;
             }
 
+            // readahead cache has been disabled since 2019 (kernel 5.4)
+            // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/fs/nfsd/vfs.c?id=501cb1849f865960501d19d54e6a5af306f9b6fd
+
             ra_size = str2ull(procfile_lineword(ff, l, 1));
             ra_hist10 = str2ull(procfile_lineword(ff, l, 2));
             ra_hist20 = str2ull(procfile_lineword(ff, l, 3));
