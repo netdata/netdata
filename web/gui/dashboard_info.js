@@ -860,6 +860,12 @@ netdataDashboard.submenu = {
         }
     },
 
+    'system.clock synchronization': {
+        info: '<a href="https://en.wikipedia.org/wiki/Network_Time_Protocol" target="_blank">NTP</a> '+
+        'lets you automatically sync your system time with a remote server. '+
+        'This keeps your machine’s time accurate by syncing with servers that are known to have accurate times.'
+    },
+
     'cpu.softnet_stat': {
         title: 'softnet',
         info: function (os) {
@@ -1120,7 +1126,19 @@ netdataDashboard.context = {
     },
 
     'system.clock_sync_state': {
-        info: 'State map: 0 - not synchronized, 1 - synchronized'
+        info:'<p>The system clock synchronization state. '+
+        'It is strongly recommended having the clock in sync with reliable NTP servers. Otherwise, '+
+        'it leads to unpredictable problems. '+
+        'It can take several minutes (usually up to 17) before NTP daemon selects a server to synchronize with. '+
+        '<p><b>State map</b>: 0 - not synchronized, 1 - synchronized.</p>'
+    },
+
+    'system.clock_sync_offset': {
+        info: 'A typical NTP client regularly polls one or more NTP servers. '+
+        'The client must compute its '+
+        '<a href="https://en.wikipedia.org/wiki/Network_Time_Protocol#Clock_synchronization_algorithm" target="_blank">time offset</a> '+
+        'and round-trip delay. '+
+        'Time offset is the difference in absolute time between the two clocks.'
     },
 
     'system.forks': {
