@@ -8,7 +8,7 @@ on:
       dashboard_version:
         # This must be specified, and must _exactly_ match the version
         # tag for the release to be used for the update.
-        name: Dashboard Version
+        description: Dashboard Version
         required: true
 
 env:
