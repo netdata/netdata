@@ -53,6 +53,15 @@ netdataDashboard.menu = {
         '<p>Netdata retrieves this data reading the <code>/proc/net/dev</code> file and <code>/sys/class/net/</code> directory.</p>'
     },
 
+    'Infiniband': {
+        title: 'Infiniband ports',
+        icon: '<i class="fas fa-sitemap"></i>',
+        info: '<p>Performance and exception statistics for '+
+        '<a href="https://en.wikipedia.org/wiki/InfiniBand" target="_blank">Infiniband</a> ports. '+
+        'The individual port and hardware counters can be found in the '+
+        '<a href="https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters" target="_blank">Mellanox knowledge base</a>.'
+    },
+
     'wireless': {
         title: 'Wireless Interfaces',
         icon: '<i class="fas fa-wifi"></i>',
@@ -2676,6 +2685,29 @@ netdataDashboard.context = {
         'from the Cell or the Access Point have been missed. '+
         'Beacons are sent at regular intervals to maintain the cell coordination, '+
         'failure to receive them usually indicates that the card is out of range.'
+    },
+
+    // ------------------------------------------------------------------------
+    // INFINIBAND
+
+    'ib.bytes': {
+        info: 'The amount of traffic transferred by the port.'
+    },
+
+    'ib.packets': {
+        info: 'The number of packets transferred by the port.'
+    },
+
+    'ib.errors': {
+        info: 'The number of errors encountered by the port.'
+    },
+
+    'ib.hwerrors': {
+        info: 'The number of hardware errors encountered by the port.'
+    },
+
+    'ib.hwpackets': {
+        info: 'The number of hardware packets transferred by the port.'
     },
 
     // ------------------------------------------------------------------------
