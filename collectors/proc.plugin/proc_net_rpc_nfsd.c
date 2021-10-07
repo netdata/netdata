@@ -305,7 +305,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             fh_stale = str2ull(procfile_lineword(ff, l, 1));
             
-            // other file handler metrics was never used and are always zero
+            // other file handler metrics were never used and are always zero
 
             if(fh_stale == 0ULL) do_fh = -1;
             else do_fh = 2;
@@ -331,7 +331,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             th_threads = str2ull(procfile_lineword(ff, l, 1));
 
-            // threads histogram has been disabled since 2009 (kernel 2.6.30)
+            // thread histogram has been disabled since 2009 (kernel 2.6.30)
             // https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=8bbfa9f3889b643fc7de82c0c761ef17097f8faf
             
             do_th = 2;
