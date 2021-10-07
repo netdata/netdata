@@ -193,3 +193,10 @@ void aclk_queue_lock(void)
     aclk_query_queue.block_push = 1;
     ACLK_QUEUE_UNLOCK;
 }
+
+void aclk_queue_unlock(void)
+{
+    ACLK_QUEUE_LOCK;
+    aclk_query_queue.block_push = 0;
+    ACLK_QUEUE_UNLOCK;
+}

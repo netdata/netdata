@@ -294,6 +294,8 @@ static int read_query_thread_count()
     return threads;
 }
 
+void aclk_graceful_disconnect(mqtt_wss_client client);
+
 /* Keeps connection alive and handles all network comms.
  * Returns on error or when netdata is shutting down.
  * @param client instance of mqtt_wss_client
@@ -312,7 +314,11 @@ static int handle_connection(mqtt_wss_client client)
         }
 
         if (disconnect_req) {
+            disconnect_req = 0;
             aclk_graceful_disconnect(client);
+            aclk_queue_unlock();
+            aclk_shared_state.mqtt_shutdown_msg_id = -1;
+            aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
             return 1;
         }
 
