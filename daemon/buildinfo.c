@@ -19,6 +19,24 @@
 #endif
 #endif
 
+#ifdef ACLK_NG
+#define FEAT_ACLK_NG 1
+#else
+#define FEAT_ACLK_NG 0
+#endif
+
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#define NEW_CLOUD_PROTO 1
+#else
+#define NEW_CLOUD_PROTO 0
+#endif
+
+#ifdef ACLK_LEGACY
+#define FEAT_ACLK_LEGACY 1
+#else
+#define FEAT_ACLK_LEGACY 0
+#endif
+
 #ifdef ENABLE_DBENGINE
 #define FEAT_DBENGINE 1
 #else
@@ -191,24 +209,6 @@
 #define FEAT_REMOTE_WRITE 1
 #else
 #define FEAT_REMOTE_WRITE 0
-#endif
-
-#ifdef ACLK_NG
-#define FEAT_ACLK_NG 1
-#else
-#define FEAT_ACLK_NG 0
-#endif
-
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-#define NEW_CLOUD_PROTO 1
-#else
-#define NEW_CLOUD_PROTO 0
-#endif
-
-#ifdef ACLK_LEGACY
-#define FEAT_ACLK_LEGACY 1
-#else
-#define FEAT_ACLK_LEGACY 0
 #endif
 
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
