@@ -270,7 +270,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     char *type;
     unsigned long long rc_hits = 0, rc_misses = 0, rc_nocache = 0;
-    unsigned long long fh_stale = 0, fh_total_lookups = 0, fh_anonymous_lookups = 0, fh_dir_not_in_dcache = 0, fh_non_dir_not_in_dcache = 0;
+    unsigned long long fh_stale = 0;
     unsigned long long io_read = 0, io_write = 0;
     unsigned long long th_threads = 0, th_fullcnt = 0, th_hist10 = 0, th_hist20 = 0, th_hist30 = 0, th_hist40 = 0, th_hist50 = 0, th_hist60 = 0, th_hist70 = 0, th_hist80 = 0, th_hist90 = 0, th_hist100 = 0;
     unsigned long long ra_size = 0, ra_hist10 = 0, ra_hist20 = 0, ra_hist30 = 0, ra_hist40 = 0, ra_hist50 = 0, ra_hist60 = 0, ra_hist70 = 0, ra_hist80 = 0, ra_hist90 = 0, ra_hist100 = 0, ra_none = 0;
@@ -304,13 +304,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
 
             fh_stale = str2ull(procfile_lineword(ff, l, 1));
-            fh_total_lookups = str2ull(procfile_lineword(ff, l, 2));
-            fh_anonymous_lookups = str2ull(procfile_lineword(ff, l, 3));
-            fh_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 4));
-            fh_non_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 5));
+            
+            // other file handler metrics was never used and are always zero
 
-            unsigned long long sum = fh_stale + fh_total_lookups + fh_anonymous_lookups + fh_dir_not_in_dcache + fh_non_dir_not_in_dcache;
-            if(sum == 0ULL) do_fh = -1;
+            if(fh_stale == 0ULL) do_fh = -1;
             else do_fh = 2;
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
@@ -542,11 +539,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_fh == 2) {
         static RRDSET *st = NULL;
-        static RRDDIM *rd_stale                 = NULL,
-                      *rd_total_lookups         = NULL,
-                      *rd_anonymous_lookups     = NULL,
-                      *rd_dir_not_in_dcache     = NULL,
-                      *rd_non_dir_not_in_dcache = NULL;
+        static RRDDIM *rd_stale                 = NULL;
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -566,18 +559,10 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_stale                 = rrddim_add(st, "stale",                 NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_total_lookups         = rrddim_add(st, "total_lookups",         NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_anonymous_lookups     = rrddim_add(st, "anonymous_lookups",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_dir_not_in_dcache     = rrddim_add(st, "dir_not_in_dcache",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_non_dir_not_in_dcache = rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_stale,                 fh_stale);
-        rrddim_set_by_pointer(st, rd_total_lookups,         fh_total_lookups);
-        rrddim_set_by_pointer(st, rd_anonymous_lookups,     fh_anonymous_lookups);
-        rrddim_set_by_pointer(st, rd_dir_not_in_dcache,     fh_dir_not_in_dcache);
-        rrddim_set_by_pointer(st, rd_non_dir_not_in_dcache, fh_non_dir_not_in_dcache);
         rrdset_done(st);
     }
 
