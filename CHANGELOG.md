@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- add proc\_pagetypeinfo charts info [\#11627](https://github.com/netdata/netdata/pull/11627) ([ilyam8](https://github.com/ilyam8))
+- add proc\_net\_wireless charts info [\#11626](https://github.com/netdata/netdata/pull/11626) ([ilyam8](https://github.com/ilyam8))
+- add proc\_net\_rpc\_nfs and nfsd charts info [\#11625](https://github.com/netdata/netdata/pull/11625) ([ilyam8](https://github.com/ilyam8))
 - fix proc nfsd "proc4ops" chart family [\#11623](https://github.com/netdata/netdata/pull/11623) ([ilyam8](https://github.com/ilyam8))
+- Initialize struct with zeroes [\#11621](https://github.com/netdata/netdata/pull/11621) ([MrZammler](https://github.com/MrZammler))
 - add sys\_class\_power\_supply charts info [\#11619](https://github.com/netdata/netdata/pull/11619) ([ilyam8](https://github.com/ilyam8))
 - add cgroups.plugin systemd units charts info [\#11618](https://github.com/netdata/netdata/pull/11618) ([ilyam8](https://github.com/ilyam8))
 - Fix swap size calculation for cgroups [\#11617](https://github.com/netdata/netdata/pull/11617) ([vlvkobal](https://github.com/vlvkobal))
@@ -27,6 +31,7 @@
 - Remove unused synproxy chart [\#11582](https://github.com/netdata/netdata/pull/11582) ([vlvkobal](https://github.com/vlvkobal))
 - add proc\_net\_stat\_synproxy charts info [\#11581](https://github.com/netdata/netdata/pull/11581) ([ilyam8](https://github.com/ilyam8))
 - Sorting the Postgres cluster databases in the postgres collector [\#11580](https://github.com/netdata/netdata/pull/11580) ([unhandled-exception](https://github.com/unhandled-exception))
+- Enable additional functionality for the new cloud architecture [\#11579](https://github.com/netdata/netdata/pull/11579) ([stelfrag](https://github.com/stelfrag))
 - Fix CID 339027 and reverse arguments [\#11578](https://github.com/netdata/netdata/pull/11578) ([thiagoftsm](https://github.com/thiagoftsm))
 - add proc\_softirqs charts info [\#11577](https://github.com/netdata/netdata/pull/11577) ([ilyam8](https://github.com/ilyam8))
 - add proc\_net\_stat\_conntrack charts info [\#11576](https://github.com/netdata/netdata/pull/11576) ([ilyam8](https://github.com/ilyam8))
@@ -163,18 +168,13 @@
 - Fix tiny issues in docs [\#11320](https://github.com/netdata/netdata/pull/11320) ([UmanShahzad](https://github.com/UmanShahzad))
 - Add some more entries to gitignore [\#11319](https://github.com/netdata/netdata/pull/11319) ([UmanShahzad](https://github.com/UmanShahzad))
 - Add HTTP access log messages for ACLK-NG [\#11318](https://github.com/netdata/netdata/pull/11318) ([UmanShahzad](https://github.com/UmanShahzad))
-- Updated dashboard version. [\#11316](https://github.com/netdata/netdata/pull/11316) ([allelos](https://github.com/allelos))
 - Log message when the page cache manager sleeps for more than 1 second. [\#11314](https://github.com/netdata/netdata/pull/11314) ([vkalintiris](https://github.com/vkalintiris))
 - eBPF NFS monitoring [\#11313](https://github.com/netdata/netdata/pull/11313) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add hop count for children [\#11311](https://github.com/netdata/netdata/pull/11311) ([stelfrag](https://github.com/stelfrag))
-- fix various python modules charts contexts [\#11310](https://github.com/netdata/netdata/pull/11310) ([ilyam8](https://github.com/ilyam8))
 - Update get-started.mdx [\#11303](https://github.com/netdata/netdata/pull/11303) ([jlbriston](https://github.com/jlbriston))
 - Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
 - Properly handle the file list for updating the dashboard. [\#11282](https://github.com/netdata/netdata/pull/11282) ([Ferroin](https://github.com/Ferroin))
-- Ebpf disk latency [\#11276](https://github.com/netdata/netdata/pull/11276) ([thiagoftsm](https://github.com/thiagoftsm))
 - Auto-detect PGID in Dockerfile's ENTRYPOINT script [\#11274](https://github.com/netdata/netdata/pull/11274) ([odyslam](https://github.com/odyslam))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
-- ACLK-NG New Cloud NodeInstance related msgs [\#11234](https://github.com/netdata/netdata/pull/11234) ([underhood](https://github.com/underhood))
 - Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
@@ -228,10 +228,6 @@
 - bump to netdata-pandas==0.0.38 [\#11022](https://github.com/netdata/netdata/pull/11022) ([andrewm4894](https://github.com/andrewm4894))
 - Provide more agent analytics to posthog [\#11020](https://github.com/netdata/netdata/pull/11020) ([MrZammler](https://github.com/MrZammler))
 - Rename struct fields from class to classification. [\#11019](https://github.com/netdata/netdata/pull/11019) ([vkalintiris](https://github.com/vkalintiris))
-- Improve dashboard documentation \(part 1\) [\#11015](https://github.com/netdata/netdata/pull/11015) ([joelhans](https://github.com/joelhans))
-- Remove links to old install doc [\#11014](https://github.com/netdata/netdata/pull/11014) ([joelhans](https://github.com/joelhans))
-- Revert "Provide more agent analytics to posthog" [\#11011](https://github.com/netdata/netdata/pull/11011) ([MrZammler](https://github.com/MrZammler))
-- anonymous-statistics: add a timeout when using `curl` [\#11010](https://github.com/netdata/netdata/pull/11010) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
