@@ -119,8 +119,10 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
     uuid_t host_uuid;
     rc = uuid_parse(wc->host_guid, host_uuid);
-    if (unlikely(rc))
+    if (unlikely(rc)) {
+        freez(claim_id);
         return;
+    }
 
     if (wc->host)
         memory_mode = wc->host->rrd_memory_mode;
