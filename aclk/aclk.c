@@ -24,6 +24,7 @@
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
+int disconnect_req = 0;
 
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
@@ -307,6 +308,11 @@ static int handle_connection(mqtt_wss_client client)
         // for netdata_exit
         if (mqtt_wss_service(client, 1000) < 0){
             error("Connection Error or Dropped");
+            return 1;
+        }
+
+        if (disconnect_req) {
+            aclk_graceful_disconnect(client);
             return 1;
         }
 
