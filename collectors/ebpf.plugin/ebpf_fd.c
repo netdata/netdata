@@ -389,7 +389,7 @@ static void ebpf_fd_sum_cgroup_pids(netdata_fd_stat_t *fd, struct pid_on_target2
 
         accumulator.open_err += w->open_err;
         accumulator.open_call += w->open_call;
-        accumulator.close_err += w->close_err;
+        accumulator.close_call += w->close_call;
         accumulator.close_err += w->close_err;
 
         pids = pids->next;
