@@ -34,6 +34,7 @@ jobs:
           - 'debian:bullseye' # 11
           - 'fedora:33'
           - 'fedora:34'
+          - 'fedora:35'
           - 'ubuntu:18.04'
           - 'ubuntu:20.04'
           - 'ubuntu:21.04'
