@@ -73,6 +73,19 @@ void ml_delete_dimension(RRDDIM *RD) {
     RD->state->ml_dimension = nullptr;
 }
 
+char *ml_get_host_config(RRDHOST *RH) {
+    nlohmann::json ConfigJson;
+
+    if (RH && RH->ml_host) {
+        Host *H = static_cast<Host *>(RH->ml_host);
+        H->getConfigAsJson(ConfigJson);
+    } else {
+        ConfigJson["enabled"] = false;
+    }
+
+    return strdup(ConfigJson.dump(2, '\t').c_str());
+}
+
 bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
     Dimension *D = static_cast<Dimension *>(RD->state->ml_dimension);
     if (!D)
@@ -125,7 +138,7 @@ char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
         return nullptr;
     }
 
-    return strdup(Json.dump(4).c_str());
+    return strdup(Json.dump(4, '\t').c_str());
 }
 
 #if defined(ENABLE_ML_TESTS)

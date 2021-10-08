@@ -1089,7 +1089,17 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"metrics-count\": ");
     analytics_get_data(analytics_data.netdata_metrics_count, wb);
+    buffer_strcat(wb, ",\n");
+
+#if defined(ENABLE_ML)
+    char *ml_info = ml_get_host_config(host);
+
+    buffer_strcat(wb, "\t\"ml-info\": ");
+    buffer_strcat(wb, ml_info);
     buffer_strcat(wb, "\n");
+
+    free(ml_info);
+#endif
 
     buffer_strcat(wb, "}");
     return 0;

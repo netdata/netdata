@@ -241,6 +241,31 @@ void RrdHost::removeDimension(Dimension *D) {
     DimensionsMap.erase(D->getRD());
 }
 
+void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
+    Json["version"] = 1;
+
+    Json["enabled"] = Cfg.EnableAnomalyDetection;
+
+    Json["min-train-samples"] = Cfg.MinTrainSecs.count();
+    Json["max-train-samples"] = Cfg.MaxTrainSecs.count();
+    Json["train-every"] = Cfg.MaxTrainSecs.count();
+
+    Json["diff-n"] = Cfg.DiffN;
+    Json["smooth-n"] = Cfg.SmoothN;
+    Json["lag-n"] = Cfg.LagN;
+
+    Json["max-kmeans-iters"] = Cfg.MaxKMeansIters;
+
+    Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;
+    Json["host-anomaly-rate-threshold"] = Cfg.HostAnomalyRateThreshold;
+
+    Json["min-window-size"] = Cfg.ADMinWindowSize;
+    Json["max-window-size"] = Cfg.ADMaxWindowSize;
+    Json["idle-window-size"] = Cfg.ADIdleWindowSize;
+    Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
+    Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
+}
+
 void TrainableHost::trainOne(TimePoint &Now) {
     for (auto &DP : DimensionsMap) {
         Dimension *D = DP.second;

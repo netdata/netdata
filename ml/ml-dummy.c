@@ -10,6 +10,8 @@ void ml_new_host(RRDHOST *RH) { (void) RH; }
 
 void ml_delete_host(RRDHOST *RH) { (void) RH; }
 
+char *ml_get_host_config(RRDHOST *RH) { (void) RH; }
+
 void ml_new_dimension(RRDDIM *RD) { (void) RD; }
 
 void ml_delete_dimension(RRDDIM *RD) { (void) RD; }

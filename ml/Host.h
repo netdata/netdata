@@ -27,6 +27,8 @@ public:
     void addDimension(Dimension *D);
     void removeDimension(Dimension *D);
 
+    void getConfigAsJson(nlohmann::json &Json) const;
+
     virtual ~RrdHost() {};
 
 protected:
