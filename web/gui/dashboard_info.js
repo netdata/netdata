@@ -1702,12 +1702,13 @@ netdataDashboard.context = {
     },
 
     'ip.tcp_accept_queue': {
-        info: 'The <b>accept queue</b> of the kernel holds the fully established TCP connections, waiting to be handled ' +
-            'by the listening application. <b>overflows</b> (or <code>ListenOverflows</code>) is the number of ' +
-            'established connections that could not be handled because the receive queue of the listening application ' +
-            'was full. <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming ' +
-            'connections that could not be handled, including SYN floods, overflows, out of memory, security issues, ' +
-            'no route to destination, reception of related ICMP messages, socket is broadcast or multicast.'
+        info: '<p>The accept queue of the kernel holds the fully established TCP connections, waiting to be handled ' +
+            'by the listening application.</p>'+
+            '<b>Overflows</b> - the number of established connections that could not be handled because '+
+            'the receive queue of the listening application was full. '+
+            '<b>Drops</b> - number of incoming connections that could not be handled, including SYN floods, '+
+            'overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, '+
+            'socket is broadcast or multicast.</p>'
     },
 
 
