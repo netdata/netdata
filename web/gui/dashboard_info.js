@@ -1641,7 +1641,8 @@ netdataDashboard.context = {
     },
 
     'ip.tcpmemorypressures': {
-        info: 'Number of times a socket was put in <b>memory pressure</b> due to a non fatal memory allocation failure (the kernel attempts to work around this situation by reducing the send buffers, etc).'
+        info: 'The number of times a socket was put in memory pressure due to a non fatal memory allocation failure '+
+        '(the kernel attempts to work around this situation by reducing the send buffers, etc).'
     },
 
     'ip.tcpconnaborts': {
