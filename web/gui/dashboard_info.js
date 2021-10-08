@@ -1066,7 +1066,14 @@ netdataDashboard.context = {
             void (os);
             return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
-                + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
+                + netdataDashboard.sparkline(
+                '<br/>An important metric worth monitoring, is <b>softirq</b> ',
+                'system.cpu',
+                'softirq',
+                '%',
+                '. A constantly high percentage of softirq may indicate network driver issues. '+
+                'The individual metrics can be found in the '+
+                '<a href="https://www.kernel.org/doc/html/latest/filesystems/proc.html#miscellaneous-kernel-statistics-in-proc-stat" target="_blank">kernel documentation</a>.');
         },
         valueRange: "[0, 100]"
     },
