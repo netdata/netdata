@@ -1193,7 +1193,9 @@ netdataDashboard.context = {
     },
 
     'system.processes': {
-        info: 'System processes. <b>Running</b> are the processes in the CPU. <b>Blocked</b> are processes that are willing to enter the CPU, but they cannot, e.g. because they wait for disk activity.'
+        info: '<p>System processes.</p>'+
+        '<p><b>Running</b> - running or ready to run (runnable). '+
+        '<b>Blocked</b> - currently blocked, waiting for I/O to complete.</p>'
     },
 
     'system.active_processes': {
