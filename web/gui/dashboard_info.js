@@ -1834,14 +1834,17 @@ netdataDashboard.context = {
     },
 
     'ipv4.tcpopens': {
-        info: '<b>active</b> or <code>ActiveOpens</code> is the number of outgoing TCP <b>connections attempted</b> by this host.'
-            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of incoming TCP <b>connections accepted</b> by this host.'
+        info: '<p>TCP connections statistics.</p>'+
+        '<p><b>Active</b> - number of outgoing TCP connections attempted by this host. '+
+         '<b>Passive</b> - number of incoming TCP connections accepted by this host.</p>'
     },
 
     'ipv4.tcperrors': {
-        info: '<code>InErrs</code> is the number of TCP segments received in error (including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6).'
-            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors (for both IPv4 and IPv6).'
-            + ' <code>RetransSegs</code> is the number of TCP segments retransmitted.'
+        info: '<p>TCP errors.</p>'+
+        '<p><b>InErrs</b> - TCP segments received in error '+
+        '(including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6). '+
+        '<b>InCsumErrors</b> - TCP segments received with checksum errors (for both IPv4 and IPv6). '+
+        '<b>RetransSegs</b> - TCP segments retransmitted.</p>'
     },
 
     'ipv4.tcphandshake': {
