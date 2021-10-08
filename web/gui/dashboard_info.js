@@ -491,37 +491,37 @@ netdataDashboard.menu = {
 
     'couchdb': {
         icon: '<i class="fas fa-database"></i>',
-        info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
+        info: 'Performance metrics for <b><a href="https://couchdb.apache.org/" target="_blank">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
 
     'beanstalk': {
         title: 'Beanstalkd',
         icon: '<i class="fas fa-tasks"></i>',
-        info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
+        info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/" target="_blank">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
     },
 
     'rabbitmq': {
         title: 'RabbitMQ',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/">RabbitMQ</a></b> open-source message broker.'
+        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/" target="_blank">RabbitMQ</a></b> open-source message broker.'
     },
 
     'ceph': {
         title: 'Ceph',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> cluster server, the open-source distributed storage system.'
+        info: 'Provides statistics on the <b><a href="http://ceph.com/" target="_blank">ceph</a></b> cluster server, the open-source distributed storage system.'
     },
 
     'ntpd': {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
-        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/" target="_blank">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
     },
 
     'spigotmc': {
         title: 'Spigot MC',
         icon: '<i class="fas fa-eye"></i>',
-        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/" target="_blank">Spigot Minecraft</a></b> server.'
     },
 
     'unbound': {
@@ -533,13 +533,13 @@ netdataDashboard.menu = {
     'boinc': {
         title: 'BOINC',
         icon: '<i class="fas fa-microchip"></i>',
-        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
+        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/" target="_blank">BOINC</a></b> distributed computing clients.'
     },
 
     'w1sensor': {
         title: '1-Wire Sensors',
         icon: '<i class="fas fa-thermometer-half"></i>',
-        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
+        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire" target="_blank">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
     },
 
     'logind': {
@@ -551,7 +551,7 @@ netdataDashboard.menu = {
     'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
+        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt" target="_blank">Linux power supply class</a>.'
     },
 
     'xenstat': {
@@ -581,25 +581,25 @@ netdataDashboard.menu = {
     'vsphere': {
         title: 'vSphere',
         icon: '<i class="fas fa-server"></i>',
-        info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
+        info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html" target="_blank">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
     },
 
     'vcsa': {
         title: 'VCSA',
         icon: '<i class="fas fa-server"></i>',
-        info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health">Health API</a>.'
+        info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health" target="_blank">Health API</a>.'
     },
 
     'zookeeper': {
         title: 'Zookeeper',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
+        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/" target="_blank">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
     },
 
     'hdfs': {
         title: 'HDFS',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
+        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" target="_blank">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
     },
 
     'am2320': {
@@ -640,13 +640,13 @@ netdataDashboard.menu = {
     'vernemq': {
         title: 'VerneMQ',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Performance data for the <b><a href="https://vernemq.com/">VerneMQ</a></b> open-source MQTT broker.'
+        info: 'Performance data for the <b><a href="https://vernemq.com/" target="_blank">VerneMQ</a></b> open-source MQTT broker.'
     },
 
     'pulsar': {
         title: 'Pulsar',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
+        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/" target="_blank">Apache Pulsar</a></b> pub-sub messaging system.'
     },
 
     'anomalies': {
@@ -664,13 +664,13 @@ netdataDashboard.menu = {
     'statsd': { 
         title: 'StatsD',
         icon: '<i class="fas fa-chart-line"></i>',
-        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
+        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin" target="_blank">Netdata Learn</a>.'
     },
 
     'supervisord': {
         title: 'Supervisord',
         icon: '<i class="fas fa-tasks"></i>',
-        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
+        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/" target="_blank">Supervisor</a></b>. ' +
         'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
     },
 
@@ -901,7 +901,7 @@ netdataDashboard.submenu = {
 
     'couchdb.perdbstats': {
         title: 'per db statistics',
-        info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
+        info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db" target="_blank">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
     },
 
     'couchdb.erlang': {
@@ -911,7 +911,7 @@ netdataDashboard.submenu = {
 
     'ntpd.system': {
         title: 'system',
-        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
+        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html" target="_blank">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
     },
 
     'ntpd.peers': {
@@ -1084,14 +1084,14 @@ netdataDashboard.context = {
     },
 
     'system.cpu_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
             'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'system.memory_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
             'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
@@ -1100,7 +1100,7 @@ netdataDashboard.context = {
     },
 
     'system.io_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
             'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
@@ -2688,7 +2688,7 @@ netdataDashboard.context = {
 
     'wireless.signal_level': {
         info: 'Received signal strength '+
-        '(<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" target="">RSSI</a>).'
+        '(<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" target="_blank">RSSI</a>).'
     },
 
     'wireless.noise_level': {
@@ -4271,7 +4271,7 @@ netdataDashboard.context = {
 
     'web_log.squid_code': {
         info: 'These are combined squid result status codes. A break down per component is given in the following charts. ' +
-            'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs">squid documentation about them</a>.'
+            'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs" target="_blank">squid documentation about them</a>.'
     },
 
     'web_log.squid_handling_opts': {
@@ -4512,11 +4512,11 @@ netdataDashboard.context = {
     },
 
     'couchdb.replicator_jobs': {
-        info: 'Detailed breakdown of any replication jobs in progress on this node. For more information, see the <a href="http://docs.couchdb.org/en/latest/replication/replicator.html">replicator documentation</a>.'
+        info: 'Detailed breakdown of any replication jobs in progress on this node. For more information, see the <a href="http://docs.couchdb.org/en/latest/replication/replicator.html" target="_blank">replicator documentation</a>.'
     },
 
     'couchdb.open_files': {
-        info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit">needs to be increased.</a>'
+        info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit" target="_blank">needs to be increased.</a>'
     },
 
     'btrfs.disk': {
@@ -4633,7 +4633,7 @@ netdataDashboard.context = {
     },
 
     'ntpd.sys_tc': {
-        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
+        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html" target="_blank">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
         height: 0.5
     },
 
@@ -4659,7 +4659,7 @@ netdataDashboard.context = {
     },
 
     'ntpd.peer_xleave': {
-        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html">NTP Interleaved Modes</a>.'
+        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html" target="_blank">NTP Interleaved Modes</a>.'
     },
 
     'ntpd.peer_rootdelay': {
@@ -4850,8 +4850,8 @@ netdataDashboard.context = {
             '<code>shared</code> is sum of all shared metrics for all powered-on virtual machines, plus amount for vSphere services on the host. ' +
             '<code>sharedcommon</code> is amount of machine memory that is shared by all powered-on virtual machines and vSphere services on the host. ' +
             '<code>shared</code> - <code>sharedcommon</code> = machine memory (host memory) savings (KB). ' +
-            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html">Measuring and Differentiating Types of Memory Usage</a> and ' +
-            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html">Memory Counters</a> articles.'
+            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html" target="_blank">Measuring and Differentiating Types of Memory Usage</a> and ' +
+            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html" target="_blank">Memory Counters</a> articles.'
     },
 
     'vsphere.host_mem_swap_rate': {
@@ -4875,8 +4875,8 @@ netdataDashboard.context = {
             '<code>consumed</code> = <code>granted</code> - <code>memory saved due to memory sharing</code>. ' +
             '<code>active</code> is amount of memory that is actively used, as estimated by VMkernel based on recently touched memory pages. ' +
             '<code>shared</code> is amount of guest “physical” memory shared with other virtual machines (through the VMkernel’s transparent page-sharing mechanism, a RAM de-duplication technique). ' +
-            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html">Measuring and Differentiating Types of Memory Usage</a> and ' +
-            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html">Memory Counters</a> articles.'
+            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html" target="_blank">Measuring and Differentiating Types of Memory Usage</a> and ' +
+            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html" target="_blank">Memory Counters</a> articles.'
 
     },
 
@@ -5027,7 +5027,7 @@ netdataDashboard.context = {
 
     'squidlog.cache_result_code_requests': {
         info: 'The Squid result code is composed of several tags (separated by underscore characters) which describe the response sent to the client. ' +
-            'Check the <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes">squid documentation</a> about them.'
+            'Check the <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes" target="_blank">squid documentation</a> about them.'
     },
 
     'squidlog.cache_result_code_transport_tag_requests': {
@@ -5089,7 +5089,7 @@ netdataDashboard.context = {
     },
 
     'squidlog.http_method_requests': {
-        info: 'The request method to obtain an object. Please refer to section <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Request_methods">request-methods</a> for available methods and their description.'
+        info: 'The request method to obtain an object. Please refer to section <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Request_methods" target="_blank">request-methods</a> for available methods and their description.'
     },
 
     'squidlog.hier_code_requests': {
