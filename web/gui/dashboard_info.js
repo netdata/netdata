@@ -1848,10 +1848,15 @@ netdataDashboard.context = {
     },
 
     'ipv4.tcphandshake': {
-        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code> to <code>CLOSED</code>).'
-            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
-            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
-            + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
+        info: '<p>TCP handshake statistics.</p>'+
+        '<p><b>EstabResets</b> - established connections resets '+
+        '(i.e. connections that made a direct transition from ESTABLISHED or CLOSE_WAIT to CLOSED). '+
+        '<b>OutRsts</b> - TCP segments sent, with the RST flag set (for both IPv4 and IPv6). '+
+        '<b>AttemptFails</b> - number of times TCP connections made a direct transition from either '+
+        'SYN_SENT or SYN_RECV to CLOSED, plus the number of times TCP connections made a direct transition '+
+        'from the SYN_RECV to LISTEN. '+
+        '<b>SynRetrans</b> - shows retries for new outbound TCP connections, '+
+        'which can indicate general connectivity issues or backlog on the remote host.</p>'
     },
 
     'ipv4.sockstat_sockets': {
