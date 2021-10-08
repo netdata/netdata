@@ -2654,57 +2654,62 @@ netdataDashboard.context = {
                     return '';
             }
         ],
-        info: 'Amount of traffic that the interface has received and sent.'
+        info: 'The amount of traffic transferred by the network interface.'
     },
     'net.packets': {
-        info: 'Number of packets that the interface has received and sent. '+
+        info: 'The number of packets transferred by the network interface. '+
         'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is '+
         'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
     },
     'net.errors': {
-        info: '<b>Inbound</b> is the number of bad packets received on this interface. '+
+        info: '<p>The number of errors encountered by the network interface.</p>'+
+        '<p><b>Inbound</b> - bad packets received on this interface. '+
         'It includes dropped packets due to invalid length, CRC, frame alignment, and other errors. '+
-        '<b>Outbound</b> is the number of transmit problems. '+
-        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, late collisions, and other problems.'
+        '<b>Outbound</b> - transmit problems. '+
+        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, '+
+        'late collisions, and other problems.</p>'
     },
     'net.fifo': {
-        info: '<b>Inbound</b> is the number of packets dropped because they did not fit into buffers provided by the host, '+
+        info: '<p>The number of FIFO errors encountered by the network interface.</p>'+
+        '<p><b>Inbound</b> - packets dropped because they did not fit into buffers provided by the host, '+
         'e.g. packets larger than MTU or next buffer in the ring was not available for a scatter transfer. '+
-        '<b>Outbound</b> is the number of frame transmission errors due to device FIFO underrun/underflow. '+
+        '<b>Outbound</b> - frame transmission errors due to device FIFO underrun/underflow. '+
         'This condition occurs when the device begins transmission of a frame '+
-        'but is unable to deliver the entire frame to the transmitter in time for transmission.'
+        'but is unable to deliver the entire frame to the transmitter in time for transmission.</p>'
     },
     'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. '+
-        '<b>Inbound</b> is the number of packets received but not processed, e.g. due to '+
+        info: '<p>The number of packets that have been dropped at the network interface level.</p>'+
+        '<p><b>Inbound</b> - packets received but not processed, e.g. due to '+
         '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, '+
         'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. '+
-        '<b>Outbound</b> is the number of packets dropped on their way to transmission, e.g. due to lack of resources.'
+        '<b>Outbound</b> - packets dropped on their way to transmission, e.g. due to lack of resources.</p>'
     },
     'net.compressed': {
-        info: 'Number of correctly received and transmitted compressed packets. '+
+        info: 'The number of correctly transferred compressed packets by the network interface. '+
         'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
     },
     'net.events': {
-        info: '<b>Frames</b> is an aggregated counter for dropped packets due to '+
+        info: '<p>The number of errors encountered by the network interface.</p>'+
+        '<p><b>Frames</b> - aggregated counter for dropped packets due to '+
         'invalid length, FIFO overflow, CRC, and frame alignment errors. '+
-        '<b>Collisions</b> is the number of '+
+        '<b>Collisions</b> - '+
         '<a href="https://en.wikipedia.org/wiki/Collision_(telecommunications)" target="blank">collisions</a> during packet transmissions. '+
-        '<b>Carrier</b> is an aggregated counter for frame transmission errors due to '+
-        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.'
+        '<b>Carrier</b> - aggregated counter for frame transmission errors due to '+
+        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.</p>'
     },
     'net.duplex': {
         info: '<p>The interface\'s latest or current '+
         '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter '+
-        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
-        '<b>Unknown</b> - the duplex mode can not be determined. '+
+        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>'+
+        '<p><b>Unknown</b> - the duplex mode can not be determined. '+
         '<b>Half duplex</b> - the communication is one direction at a time. '+
         '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'+
         '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
     },
     'net.operstate': {
-        info: '</p>The current <a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface. '+
-        '<b>Unknown</b> - the state can not be determined. '+
+        info: '<p>The current '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>'+
+        '<p><b>Unknown</b> - the state can not be determined. '+
         '<b>NotPresent</b> - the interface has missing (typically, hardware) components. '+
         '<b>Down</b> - the interface is unable to transfer data on L1, e.g. ethernet is not plugged or interface is administratively down. '+
         '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). '+
