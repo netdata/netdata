@@ -3064,7 +3064,7 @@ netdataDashboard.context = {
         'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
     },
 
-    'zfs.l2its': {
+    'zfs.l2hits': {
         info: '<p>Hit rate of the L2ARC lookups.</p>'+
         '</p><b>Hits</b> - a data block was in the L2ARC cache and returned. '+
         '<b>Misses</b> - a data block was not in the L2ARC cache. '+
