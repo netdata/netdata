@@ -1622,12 +1622,12 @@ netdataDashboard.context = {
     },
 
     'ip.tcpofo': {
-        info: 'TCP maintains an out-of-order (OOO) queue to keep the OOO packets in the TCP communication. '+
-        '<b>InQueue</b> - the TCP layer receives an OOO packet and has enough memory to queue it. '+
-        '<b>Dropped</b> - the TCP layer receives an OOO packet but does not have enough memory, so drops it. '+
-        '<b>Merged</b> - the received OOO packet has an overlay with the previous packet. '+
+        info: '<p>TCP maintains an out-of-order queue to keep the out-of-order packets in the TCP communication.</p>'+
+        '<p><b>InQueue</b> - the TCP layer receives an out-of-order packet and has enough memory to queue it. '+
+        '<b>Dropped</b> - the TCP layer receives an out-of-order packet but does not have enough memory, so drops it. '+
+        '<b>Merged</b> - the received out-of-order packet has an overlay with the previous packet. '+
         'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>. '+
-        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.'
+        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.</p>'
     },
 
     'ip.tcpsyncookies': {
