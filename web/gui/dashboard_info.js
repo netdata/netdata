@@ -1156,7 +1156,7 @@ netdataDashboard.context = {
 
     'system.forks': {
         colors: '#5555DD',
-        info: 'Number of new processes created.'
+        info: 'The number of new processes created.'
     },
 
     'system.intr': {
