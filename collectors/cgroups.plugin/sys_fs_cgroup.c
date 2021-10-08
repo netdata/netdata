@@ -2915,7 +2915,7 @@ void update_systemd_services_charts(
                 rrddim_set_by_pointer(
                     st_swap_usage,
                     cg->rd_swap_usage,
-                    (cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) > 0 ?
+                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
                         cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
             } else {
                 rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
@@ -3609,7 +3609,7 @@ void update_cgroup_charts(int update_every) {
                 rrddim_set(
                     cg->st_mem_usage,
                     "swap",
-                    (cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) > 0 ?
+                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
                         cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
             } else {
                 rrddim_set(cg->st_mem_usage, "swap", cg->memory.msw_usage_in_bytes);
