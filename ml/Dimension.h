@@ -12,7 +12,11 @@ namespace ml {
 
 class RrdDimension {
 public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) {}
+    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->state->query_ops) {
+        std::stringstream SS;
+        SS << RD->rrdset->id << "|" << RD->name;
+        ID = SS.str();
+    }
 
     RRDDIM *getRD() const { return RD; }
 
@@ -22,44 +26,45 @@ public:
 
     Seconds updateEvery() const { return Seconds{RD->update_every}; }
 
-    std::string getID() const {
-        std::stringstream SS;
-        SS << RD->rrdset->id << "|" << RD->name;
-        return SS.str();
-    }
+    const std::string getID() const { return ID; }
 
     virtual ~RrdDimension() {}
 
 private:
     RRDDIM *RD;
     struct rrddim_volatile::rrddim_query_ops *Ops;
+
+    std::string ID;
 };
 
 enum class MLResult {
     Success = 0,
-    TryLockFailed,
     MissingData,
-    ShouldNotTrainNow,
     NaN,
-    NoModel,
 };
 
 class TrainableDimension : public RrdDimension {
 public:
     TrainableDimension(RRDDIM *RD) : RrdDimension(RD) {}
 
-    MLResult trainModel(TimePoint &Now);
+    MLResult trainModel();
 
     CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
         return KM.anomalyScore(SB);
     }
 
+    bool shouldTrain(const TimePoint &TP) const {
+        return (LastTrainedAt + (Cfg.TrainEvery * Cfg.UpdateEvery)) < TP;
+    }
+
 private:
     std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
 
+public:
+    TimePoint LastTrainedAt{Seconds{0}};
+
 private:
     KMeans KM;
-    TimePoint LastTrainedAt{SteadyClock::now()};
 };
 
 class PredictableDimension : public TrainableDimension {

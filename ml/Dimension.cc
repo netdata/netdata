@@ -120,12 +120,7 @@ TrainableDimension::getCalculatedNumbers() {
     return { CNs, TotalValues };
 }
 
-MLResult TrainableDimension::trainModel(TimePoint &Now) {
-    if ((LastTrainedAt + Cfg.TrainEvery) >= Now)
-        return MLResult::ShouldNotTrainNow;
-
-    LastTrainedAt = Now;
-
+MLResult TrainableDimension::trainModel() {
     auto P = getCalculatedNumbers();
     CalculatedNumber *CNs = P.first;
     unsigned N = P.second;

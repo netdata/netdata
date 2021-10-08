@@ -34,8 +34,11 @@ public:
 protected:
     RRDHOST *RH;
 
+    // Protect dimension and lock maps
     std::mutex Mutex;
+
     std::map<RRDDIM *, Dimension *> DimensionsMap;
+    std::map<Dimension *, std::mutex> LocksMap;
 };
 
 class TrainableHost : public RrdHost {
@@ -43,7 +46,10 @@ public:
     TrainableHost(RRDHOST *RH) : RrdHost(RH) {}
 
     void train();
-    void trainOne(TimePoint &Now);
+
+private:
+    std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
+    void trainDimension(Dimension *D, const TimePoint &NowTP);
 
 protected:
     std::atomic<double> TrainingDurationMax;

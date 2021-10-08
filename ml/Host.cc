@@ -233,12 +233,31 @@ static void updateTrainingChart(RRDHOST *RH,
 
 void RrdHost::addDimension(Dimension *D) {
     std::lock_guard<std::mutex> Lock(Mutex);
+
     DimensionsMap[D->getRD()] = D;
+
+    // Default construct mutex for dimension
+    LocksMap[D];
 }
 
 void RrdHost::removeDimension(Dimension *D) {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    DimensionsMap.erase(D->getRD());
+    // Remove the dimension from the hosts map.
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        DimensionsMap.erase(D->getRD());
+    }
+
+    // Delete the dimension by locking the mutex that protects it.
+    {
+        std::lock_guard<std::mutex> Lock(LocksMap[D]);
+        delete D;
+    }
+
+    // Remove the lock entry for the deleted dimension.
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        LocksMap.erase(D);
+    }
 }
 
 void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
@@ -266,22 +285,34 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
 }
 
-void TrainableHost::trainOne(TimePoint &Now) {
+std::pair<Dimension *, Duration<double>>
+TrainableHost::findDimensionToTrain(const TimePoint &NowTP) {
+    std::lock_guard<std::mutex> Lock(Mutex);
+
+    Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery} / (DimensionsMap.size()  + 1);
+
     for (auto &DP : DimensionsMap) {
         Dimension *D = DP.second;
 
-        MLResult Result = D->trainModel(Now);
-
-        switch (Result) {
-        case MLResult::Success:
-            return;
-        case MLResult::TryLockFailed:
-        case MLResult::ShouldNotTrainNow:
-        case MLResult::MissingData:
-            continue;
-        default:
-            error("Unhandled MLError enumeration value");
+        if (D->shouldTrain(NowTP)) {
+            LocksMap[D].lock();
+            return { D, AllottedDuration };
         }
+    }
+
+    return { nullptr, AllottedDuration };
+}
+
+void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
+    if (D == nullptr)
+        return;
+
+    D->LastTrainedAt = NowTP + Seconds{Cfg.UpdateEvery};
+    D->trainModel();
+
+    {
+        std::lock_guard<std::mutex> Lock(Mutex);
+        LocksMap[D].unlock();
     }
 }
 
@@ -293,17 +324,13 @@ void TrainableHost::train() {
     Duration<double> MaxSleepFor = Seconds{1};
 
     while (!netdata_exit) {
-        size_t NumDimensions;
+        TimePoint NowTP = SteadyClock::now();
 
-        TimePoint StartTP = SteadyClock::now();
-        {
-            std::lock_guard<std::mutex> Lock(Mutex);
+        auto P = findDimensionToTrain(NowTP);
+        trainDimension(P.first, NowTP);
 
-            NumDimensions = DimensionsMap.size();
-            trainOne(StartTP);
-        }
-        Duration<double> RealDuration = SteadyClock::now() - StartTP;
-        Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery} / (NumDimensions + 1);
+        Duration<double> AllottedDuration = P.second;
+        Duration<double> RealDuration = SteadyClock::now() - NowTP;
 
         Duration<double> SleepFor;
         if ((2 * RealDuration) >= AllottedDuration) {
