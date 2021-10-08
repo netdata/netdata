@@ -1583,10 +1583,10 @@ netdataDashboard.context = {
     // IP
 
     'ip.inerrors': {
-        info: 'Errors encountered during the reception of IP packets. ' +
-            '<b>noroutes</b> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
-            '<b>truncated</b> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
-            '<b>checksum</b> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+        info: '<p>The number of errors encountered during the reception of IP packets.</p>' +
+            '</p><b>NoRoutes</b> - packets that were dropped because there was no route to send them. ' +
+            '<b>Truncated</b> - packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
+            '<b>Checksum</b> - packets that were dropped because they had wrong checksum.</p>'
     },
 
     'ip.mcast': {
