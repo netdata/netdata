@@ -1694,14 +1694,11 @@ netdataDashboard.context = {
 
 
     'ip.tcp_syn_queue': {
-        info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
+        info: '<p>The SYN queue of the kernel tracks TCP handshakes until connections get fully established. ' +
             'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
-            'is not configured to fall back to SYN cookies*. Overflows are usually caused by SYN flood DoS attacks ' +
-            '(i.e. someone sends lots of SYN packets and never completes the handshakes). ' +
-            '<b>drops</b> (or <code>TcpExtTCPReqQFullDrop</code>) is the number of connections dropped because the ' +
-            'SYN queue was full and SYN cookies were disabled. ' +
-            '<b>cookies</b> (or <code>TcpExtTCPReqQFullDoCookies</code>) is the number of SYN cookies sent because the ' +
-            'SYN queue was full.'
+            'is not configured to fall back to SYN cookies. Overflows are usually caused by SYN flood DoS attacks.</p>' +
+            '<p><b>Drops</b> - number of connections dropped because the SYN queue was full and SYN cookies were disabled. ' +
+            '<b>Cookies</b> - number of SYN cookies sent because the SYN queue was full.</p>'
     },
 
     'ip.tcp_accept_queue': {
