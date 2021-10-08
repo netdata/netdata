@@ -58,7 +58,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-sitemap"></i>',
         info: '<p>Performance and exception statistics for '+
         '<a href="https://en.wikipedia.org/wiki/InfiniBand" target="_blank">Infiniband</a> ports. '+
-        'The individual port and hardware counters can be found in the '+
+        'The individual port and hardware counters descriptions can be found in the '+
         '<a href="https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters" target="_blank">Mellanox knowledge base</a>.'
     },
 
