@@ -3882,7 +3882,7 @@ netdataDashboard.context = {
     },
 
     'services.swap_usage': {
-        info: 'The number of used '+
+        info: 'The amount of used '+
         '<a href="https://en.wikipedia.org/wiki/Memory_paging#Unix_and_Unix-like_systems" target="_blank">swap</a> '+
         'memory.'
     },
