@@ -2825,11 +2825,11 @@ netdataDashboard.context = {
             netdataDashboard.gaugeChart('Read', '12%', 'reads'),
             netdataDashboard.gaugeChart('Write', '12%', 'writes')
         ],
-        info: 'Amount of data transferred to and from disk.'
+        info: 'The amount of data transferred to and from disk.'
     },
 
     'disk_ext.io': {
-        info: 'Amount of discarded data that are no longer in use by a mounted file system.'
+        info: 'The amount of discarded data that are no longer in use by a mounted file system.'
     },
 
     'disk.ops': {
@@ -2837,7 +2837,7 @@ netdataDashboard.context = {
     },
 
     'disk_ext.ops': {
-        info: '<p>Number (after merges) of completed discard/flush requests.</p>'+
+        info: '<p>The number (after merges) of completed discard/flush requests.</p>'+
         '<p><b>Discard</b> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
         'They are useful for solid-state drivers (SSDs) and thinly-provisioned storage. '+
         'Discarding/trimming enables the SSD to handle garbage collection more efficiently, '+
@@ -2897,7 +2897,7 @@ netdataDashboard.context = {
         info: 'Disk space utilization. reserved for root is automatically reserved by the system to prevent the root user from getting out of space.'
     },
     'disk.inodes': {
-        info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
+        info: 'Inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
     'disk.bcache_hit_ratio': {
@@ -2916,10 +2916,10 @@ netdataDashboard.context = {
         'throttling background writeback and using a PD controller to smoothly adjust the rate.'
     },
     'disk.bcache_size': {
-        info: 'Amount of dirty data for this backing device in the cache.'
+        info: 'The amount of dirty data for this backing device in the cache.'
     },
     'disk.bcache_usage': {
-        info: 'Percentage of cache device which does not contain dirty data, and could potentially be used for writeback.'
+        info: 'The percentage of cache device which does not contain dirty data, and could potentially be used for writeback.'
     },
     'disk.bcache_cache_read_races': {
         info: '<b>Read races</b> happen when a bucket was reused and invalidated while data was being read from the cache. '+
@@ -2937,11 +2937,11 @@ netdataDashboard.context = {
         info: 'Hits and misses for IO that is intended to skip the cache.'
     },
     'disk.bcache_cache_alloc': {
-        info: 'Working set size. '+
-        '<b>Unused</b> is the percentage of the cache that does not contain any data. '+
+        info: '<p>Working set size.</p>'+
+        '<p><b>Unused</b> is the percentage of the cache that does not contain any data. '+
         '<b>Dirty</b> is the data that is modified in the cache but not yet written to the permanent storage. '+
         '<b>Clean</b> data matches the data stored on the permanent storage. '+
-        '<b>Metadata</b> is bcache\'s metadata overhead. '
+        '<b>Metadata</b> is bcache\'s metadata overhead.</p>'
     },
 
     // ------------------------------------------------------------------------
