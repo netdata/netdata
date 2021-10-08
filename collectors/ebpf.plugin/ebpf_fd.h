@@ -24,6 +24,17 @@
 // Process configuration name
 #define NETDATA_FD_CONFIG_FILE "fd.conf"
 
+// Contexts
+#define NETDATA_CGROUP_FD_OPEN_CONTEXT "cgroup.fd_open"
+#define NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT "cgroup.fd_open_error"
+#define NETDATA_CGROUP_FD_CLOSE_CONTEXT "cgroup.fd_close"
+#define NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT "cgroup.fd_close_error"
+
+#define NETDATA_SYSTEMD_FD_OPEN_CONTEXT "services.fd_open"
+#define NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT "services.fd_open_error"
+#define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "services.fd_close"
+#define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "services.fd_close_error"
+
 typedef struct netdata_fd_stat {
     uint64_t pid_tgid;                     // Unique identifier
     uint32_t pid;                          // Process ID

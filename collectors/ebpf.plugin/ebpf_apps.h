@@ -12,6 +12,7 @@
 
 #define NETDATA_APPS_FAMILY "apps"
 #define NETDATA_APPS_FILE_GROUP "file_access"
+#define NETDATA_APPS_FILE_CGROUP_GROUP "file_access (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net"
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shared memory"
@@ -353,18 +354,14 @@ typedef struct ebpf_process_stat {
     uint32_t pid;
 
     //Counter
-    uint32_t open_call;
     uint32_t exit_call;
     uint32_t release_call;
     uint32_t fork_call;
     uint32_t clone_call;
-    uint32_t close_call;
 
     //Counter
-    uint32_t open_err;
     uint32_t fork_err;
     uint32_t clone_err;
-    uint32_t close_err;
 
     uint8_t removeme;
 } ebpf_process_stat_t;

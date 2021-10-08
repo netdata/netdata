@@ -16,6 +16,10 @@ struct pid_on_target2 {
     int updated;
 
     netdata_publish_swap_t swap;
+    netdata_fd_stat_t fd;
+    netdata_publish_vfs_t vfs;
+    ebpf_process_stat_t ps;
+    netdata_dcstat_pid_t dc;
 
     struct pid_on_target2 *next;
 };
@@ -40,6 +44,11 @@ typedef struct ebpf_cgroup_target {
     uint32_t updated;
 
     netdata_publish_swap_t publish_systemd_swap;
+    netdata_fd_stat_t publish_systemd_fd;
+    netdata_publish_vfs_t publish_systemd_vfs;
+    ebpf_process_stat_t publish_systemd_ps;
+    netdata_publish_dcstat_t publish_dc;
+    int oomkill;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;
@@ -50,6 +59,6 @@ extern void ebpf_parse_cgroup_shm_data();
 extern void ebpf_close_cgroup_shm();
 extern void ebpf_clean_cgroup_pids();
 extern void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                          char *algorithm, char *module);
+                                          char *algorithm, char *context, char *module);
 
 #endif /* NETDATA_EBPF_CGROUP_H */
