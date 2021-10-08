@@ -864,7 +864,11 @@ netdataDashboard.submenu = {
                 '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
                 '<p><b>Processed</b> - packets processed. '+
                 '<b>Dropped</b> - packets dropped because the network device backlog was full. '+
-                '<b>Squeezed</b> - number of times the network device budget or time limit were consumed, but more work was available.</p>';
+                '<b>Squeezed</b> - number of times the network device budget was consumed or the time limit was reached, '+
+                'but more work was available. '+
+                '<b>ReceivedRPS</b> - number of times this CPU has been woken up to process packets via an Inter-processor Interrupt. '+
+                '<b>FlowLimitCount</b> - number of times the flow limit has been reached (flow limiting is an optional '+
+                'Receive Packet Steering feature).</p>';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
         }
@@ -880,7 +884,17 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function (os) {
             if (os === 'linux')
-                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
+                'Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
+                'More information about identifying and troubleshooting network driver related issues can be found at '+
+                '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
+                '<p><b>Processed</b> - packets processed. '+
+                '<b>Dropped</b> - packets dropped because the network device backlog was full. '+
+                '<b>Squeezed</b> - number of times the network device budget was consumed or the time limit was reached, '+
+                'but more work was available. '+
+                '<b>ReceivedRPS</b> - number of times this CPU has been woken up to process packets via an Inter-processor Interrupt. '+
+                '<b>FlowLimitCount</b> - number of times the flow limit has been reached (flow limiting is an optional '+
+                'Receive Packet Steering feature).</p>';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
