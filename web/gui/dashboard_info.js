@@ -1606,10 +1606,10 @@ netdataDashboard.context = {
     },
 
     'ip.ecnpkts': {
-        info: 'Total number of received IP packets with ECN bits set in the system. '+
-        '<b>CEP</b> - congestion encountered. '+
+        info: '<p>Total number of received IP packets with ECN bits set in the system.</p>'+
+        '<p><b>CEP</b> - congestion encountered. '+
         '<b>NoECTP</b> - non ECN-capable transport. '+
-        '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.'
+        '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.</p>'
     },
 
     'ip.tcpreorders': {
