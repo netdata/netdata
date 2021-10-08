@@ -1613,11 +1613,12 @@ netdataDashboard.context = {
     },
 
     'ip.tcpreorders': {
-        info: 'TCP prevents out-of-order packets by either sequencing them in the correct order or by requesting the retransmission of out-of-order packets. '+
-        '<b>Timestamp</b> - detected re-ordering using the timestamp option. '+
+        info: '<p>TCP prevents out-of-order packets by either sequencing them in the correct order or '+
+        'by requesting the retransmission of out-of-order packets.</p>'+
+        '<p><b>Timestamp</b> - detected re-ordering using the timestamp option. '+
         '<b>SACK</b> - detected re-ordering using Selective Acknowledgment algorithm. '+
         '<b>FACK</b> - detected re-ordering using Forward Acknowledgment algorithm. '+
-        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.'
+        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.</p>'
     },
 
     'ip.tcpofo': {
