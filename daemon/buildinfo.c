@@ -60,11 +60,18 @@
 #ifdef HAVE_PROTOBUF
 #if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
 #define FEAT_PROTOBUF 1
+#ifdef BUNDLED_PROTOBUF
+#define FEAT_PROTOBUF_BUNDLED " (bundled)"
 #else
-#define FEAT_PROTOBUF 0
+#define FEAT_PROTOBUF_BUNDLED " (system)"
 #endif
 #else
 #define FEAT_PROTOBUF 0
+#define FEAT_PROTOBUF_BUNDLED ""
+#endif
+#else
+#define FEAT_PROTOBUF 0
+#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 
 #ifdef ENABLE_JSONC
@@ -236,7 +243,7 @@ void print_build_info(void) {
     printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
 
     printf("Libraries:\n");
-    printf("    protobuf:                %s\n", FEAT_YES_NO(FEAT_PROTOBUF));
+    printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
     printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
     printf("    JSON-C:                  %s\n", FEAT_YES_NO(FEAT_JSONC));
     printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
@@ -298,6 +305,7 @@ void print_build_info_json(void) {
 
     printf("  \"libs\": {\n");
     printf("    \"protobuf\": %s,\n",         FEAT_JSON_BOOL(FEAT_PROTOBUF));
+    printf("    \"protobuf-source\": \"%s\",\n", FEAT_PROTOBUF_BUNDLED);
     printf("    \"jemalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_JEMALLOC));
     printf("    \"jsonc\": %s,\n",            FEAT_JSON_BOOL(FEAT_JSONC));
     printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));

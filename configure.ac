@@ -703,7 +703,11 @@ AS_IF(
 )
 
 if test "${have_libprotobuf}" == "yes" && test "${have_CXX_compiler}" == "yes"; then
-    AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available ])
+    AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available])
+fi
+
+if test "${have_libprotobuf}" == "yes" && test "${with_bundled_protobuf}" == "yes"; then
+    AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
 fi
 
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
