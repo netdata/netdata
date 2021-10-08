@@ -1471,7 +1471,9 @@ netdataDashboard.context = {
     },
 
     'mem.slab': {
-        info: '<b>Reclaimable</b> is the amount of memory which the kernel can reuse. <b>Unreclaimable</b> can not be reused even when the kernel is lacking memory.'
+        info: '<p><a href="https://en.wikipedia.org/wiki/Slab_allocation" target="">Slab memory</a> statistics.<p>'+
+        '<p><b>Reclaimable</b> - amount of memory which the kernel can reuse. '+
+        '<b>Unreclaimable</b> - can not be reused even when the kernel is lacking memory.</p>'
     },
 
     'mem.hugepages': {
