@@ -1643,7 +1643,18 @@ netdataDashboard.context = {
     },
 
     'ip.tcpconnaborts': {
-        info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
+        info: '<p>TCP connection aborts.</p>'+
+        '<p><b>BadData</b> - happens while the connection is on FIN_WAIT1 and the kernel receives a packet '+
+        'with a sequence number beyond the last one for this connection - '+
+        'the kernel responds with RST (closes the connection). '+
+        '<b>UserClosed</b> - happens when the kernel receives data on an already closed connection and '+
+        'responds with RST. '+
+        '<b>NoMemory</b> - happens when there are too many orphaned sockets (not attached to an fd) and '+
+        'the kernel has to drop a connection - sometimes it will send an RST, sometimes it won\'t. '+
+        '<b>Timeout</b> - happens when a connection times out. '+
+        '<b>Linger</b> - happens when the kernel killed a socket that was already closed by the application and '+
+        'lingered around for long enough. '+
+        '<b>Failed</b> - happens when the kernel attempted to send an RST but failed because there was no memory available.</p>'
     },
 
     'ip.tcp_functions': {
