@@ -1199,7 +1199,7 @@ netdataDashboard.context = {
     },
 
     'system.active_processes': {
-        info: 'All system processes.'
+        info: 'The total number of processes in the system.'
     },
 
     'system.ctxt': {
