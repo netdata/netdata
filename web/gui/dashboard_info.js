@@ -1631,12 +1631,13 @@ netdataDashboard.context = {
     },
 
     'ip.tcpsyncookies': {
-        info: '<a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> are used to mitigate SYN flood. '+
-        '<b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
+        info: '<p><a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> '+
+        'are used to mitigate SYN flood.</p>'+
+        '<p><b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
         '<b>Sent</b> - an application was not able to accept a connection fast enough, so the kernel could not store '+
         'an entry in the queue for this connection. Instead of dropping it, it sent a SYN cookie to the client. '+
         '<b>Failed</b> - the MSS decoded from the SYN cookie is invalid. When this counter is incremented, '+
-        'the received packet won’t be treated as a SYN cookie.'
+        'the received packet won’t be treated as a SYN cookie.</p>'
     },
 
     'ip.tcpmemorypressures': {
