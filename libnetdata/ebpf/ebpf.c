@@ -333,7 +333,7 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
                         info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
 #endif
                         bpf_map__resize(map, w->user_input);
-                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts)) {
+                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
                         w->user_input = ND_EBPF_DEFAULT_MIN_PID;
                         bpf_map__resize(map, w->user_input);
                     }
@@ -439,7 +439,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
                 w->type |= NETDATA_EBPF_MAP_CONTROLLER_UPDATED;
 
                 uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-                int value = em->apps_charts;
+                int value = em->apps_charts | em->cgroup_charts;
                 int ret = bpf_map_update_elem(w->map_fd, &key, &value, 0);
                 if (ret)
                     error("Add key(%u) for controller table failed.", key);
