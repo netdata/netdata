@@ -1042,6 +1042,10 @@ netdataDashboard.submenu = {
         info: '<a href="https://en.wikipedia.org/wiki/Advanced_Configuration_and_Power_Interface#Processor_states" target="_blank">Idle States (C-states)</a> '+
         'are used to save power when the processor is idle.'
     },
+
+    'services.net': {
+        title: 'network (eBPF)',
+    },
 };
 
 // ----------------------------------------------------------------------------
@@ -3973,6 +3977,34 @@ netdataDashboard.context = {
         info: 'Number of times the syscall <code>shmctl</code> is called.'
     },
 
+    'services.net_bytes_send': {
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+    },
+
+    'services.net_bytes_recv': {
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'services.net_tcp_send': {
+        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+    },
+
+    'services.net_tcp_recv': {
+        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+    },
+
+    'services.net_retransmit': {
+        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+    },
+
+    'services.net_udp_send': {
+        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+    },
+
+    'services.net_udp_recv': {
+        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+    },
+
     // ------------------------------------------------------------------------
     // beanstalkd
     // system charts
@@ -5681,6 +5713,34 @@ netdataDashboard.context = {
 
     'cgroup.shmctl': {
         info: 'Number of times the syscall <code>shmctl</code> is called.'
+    },
+
+    'cgroup.net_bytes_send': {
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+    },
+
+    'cgroup.net_bytes_recv': {
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'cgroup.net_tcp_send': {
+        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+    },
+
+    'cgroup.net_tcp_recv': {
+        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+    },
+
+    'cgroup.net_retransmit': {
+        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+    },
+
+    'cgroup.net_udp_send': {
+        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+    },
+
+    'cgroup.net_udp_recv': {
+        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
     },
 
     // ------------------------------------------------------------------------
