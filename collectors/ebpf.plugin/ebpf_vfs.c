@@ -506,7 +506,7 @@ static void read_update_vfs_cgroup()
                 if (!bpf_map_lookup_elem(fd, &pid, vv)) {
                     vfs_apps_accumulator(vv);
 
-                    memcpy(out, vv, sizeof(netdata_publish_swap_t));
+                    memcpy(out, vv, sizeof(netdata_publish_vfs_t));
                 }
             }
         }

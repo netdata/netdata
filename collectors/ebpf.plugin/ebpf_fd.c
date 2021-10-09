@@ -276,7 +276,7 @@ static void ebpf_update_fd_cgroup()
                 if (!bpf_map_lookup_elem(fd, &pid, fv)) {
                     fd_apps_accumulator(fv);
 
-                    memcpy(out, fv, sizeof(netdata_publish_swap_t));
+                    memcpy(out, fv, sizeof(netdata_fd_stat_t));
                 }
             }
         }
