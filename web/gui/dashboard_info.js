@@ -3957,6 +3957,22 @@ netdataDashboard.context = {
         info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
     },
 
+    'services.shmget': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+    },
+
+    'services.shmat': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'services.shmdt': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'services.shmctl': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
+    },
+
     // ------------------------------------------------------------------------
     // beanstalkd
     // system charts
@@ -5649,6 +5665,22 @@ netdataDashboard.context = {
 
     'cgroup.dc_not_found': {
         info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'cgroup.shmget': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+    },
+
+    'cgroup.shmat': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'cgroup.shmdt': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'cgroup.shmctl': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
     },
 
     // ------------------------------------------------------------------------

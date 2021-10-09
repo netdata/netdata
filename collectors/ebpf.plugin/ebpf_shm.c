@@ -137,6 +137,46 @@ static void shm_fill_pid(uint32_t current_pid, netdata_publish_shm_t *publish)
 }
 
 /**
+ * Update cgroup
+ *
+ * Update cgroup data based in
+ */
+static void ebpf_update_shm_cgroup()
+{
+    netdata_publish_shm_t *cv = shm_vector;
+    int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
+    size_t length = sizeof(netdata_publish_shm_t) * ebpf_nprocs;
+    ebpf_cgroup_target_t *ect;
+
+    memset(cv, 0, length);
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_publish_shm_t *out = &pids->shm;
+            if (likely(shm_pid) && shm_pid[pid]) {
+                netdata_publish_shm_t *in = shm_pid[pid];
+
+                memcpy(out, in, sizeof(netdata_publish_shm_t));
+            } else {
+                if (!bpf_map_lookup_elem(fd, &pid, cv)) {
+                    shm_apps_accumulator(cv);
+
+                    memcpy(out, cv, sizeof(netdata_publish_shm_t));
+
+                    // now that we've consumed the value, zero it out in the map.
+                    memset(cv, 0, length);
+                    bpf_map_update_elem(fd, &pid, cv, BPF_EXIST);
+                }
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -316,6 +356,288 @@ void ebpf_shm_send_apps_data(struct target *root)
 }
 
 /**
+ * Sum values for all targets.
+ */
+static void ebpf_shm_sum_cgroup_pids(netdata_publish_shm_t *shm, struct pid_on_target2 *root)
+{
+    netdata_publish_shm_t shmv;
+    memset(&shmv, 0, sizeof(shmv));
+    while (root) {
+        netdata_publish_shm_t *w = &root->shm;
+        shmv.get += w->get;
+        shmv.at += w->at;
+        shmv.dt += w->dt;
+        shmv.ctl += w->ctl;
+
+        root = root->next;
+    }
+
+    memcpy(shm, &shmv, sizeof(shmv));
+}
+
+/**
+ * Create specific shared memory charts
+ *
+ * Create charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_create_specific_shm_charts(char *type)
+{
+    ebpf_create_chart(type, NETDATA_SHMGET_CHART,
+                      "Calls to syscall <code>shmget(2)</code>.",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_APPS_IPC_SHM_GROUP,
+                      NETDATA_CGROUP_SHM_GET_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5800,
+                      ebpf_create_global_dimension,
+                      &shm_publish_aggregated[NETDATA_KEY_SHMGET_CALL],
+                      1,
+                      NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_chart(type, NETDATA_SHMAT_CHART,
+                      "Calls to syscall <code>shmat(2)</code>.",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_APPS_IPC_SHM_GROUP,
+                      NETDATA_CGROUP_SHM_AT_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5801,
+                      ebpf_create_global_dimension,
+                      &shm_publish_aggregated[NETDATA_KEY_SHMAT_CALL],
+                      1,
+                      NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_chart(type, NETDATA_SHMDT_CHART,
+                      "Calls to syscall <code>shmdt(2)</code>.",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_APPS_IPC_SHM_GROUP,
+                      NETDATA_CGROUP_SHM_DT_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5802,
+                      ebpf_create_global_dimension,
+                      &shm_publish_aggregated[NETDATA_KEY_SHMDT_CALL],
+                      1,
+                      NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_chart(type, NETDATA_SHMCTL_CHART,
+                      "Calls to syscall <code>shmctl(2)</code>.",
+                      EBPF_COMMON_DIMENSION_CALL,
+                      NETDATA_APPS_IPC_SHM_GROUP,
+                      NETDATA_CGROUP_SHM_CTL_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5803,
+                      ebpf_create_global_dimension,
+                      &shm_publish_aggregated[NETDATA_KEY_SHMCTL_CALL],
+                      1,
+                      NETDATA_EBPF_MODULE_NAME_SHM);
+}
+
+/**
+ * Obsolete specific shared memory charts
+ *
+ * Obsolete charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_obsolete_specific_shm_charts(char *type)
+{
+    ebpf_write_chart_obsolete(type, NETDATA_SHMGET_CHART,
+                              "Calls to syscall <code>shmget(2)</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_APPS_IPC_SHM_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_GET_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5800);
+
+    ebpf_write_chart_obsolete(type, NETDATA_SHMAT_CHART,
+                              "Calls to syscall <code>shmat(2)</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_APPS_IPC_SHM_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_AT_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5801);
+
+    ebpf_write_chart_obsolete(type, NETDATA_SHMDT_CHART,
+                              "Calls to syscall <code>shmdt(2)</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_APPS_IPC_SHM_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_DT_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5802);
+
+    ebpf_write_chart_obsolete(type, NETDATA_SHMCTL_CHART,
+                              "Calls to syscall <code>shmctl(2)</code>.",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_APPS_IPC_SHM_GROUP,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_CTL_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5803);
+}
+
+/**
+ *  Create Systemd Swap Charts
+ *
+ *  Create charts when systemd is enabled
+ **/
+static void ebpf_create_systemd_shm_charts()
+{
+    ebpf_create_charts_on_systemd(NETDATA_SHMGET_CHART,
+                                  "Calls to syscall <code>shmget(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_IPC_SHM_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20191,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SYSTEMD_SHM_GET_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_charts_on_systemd(NETDATA_SHMAT_CHART,
+                                  "Calls to syscall <code>shmat(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_IPC_SHM_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20192,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SYSTEMD_SHM_AT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_charts_on_systemd(NETDATA_SHMDT_CHART,
+                                  "Calls to syscall <code>shmdt(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_IPC_SHM_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20193,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SYSTEMD_SHM_DT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+
+    ebpf_create_charts_on_systemd(NETDATA_SHMCTL_CHART,
+                                  "Calls to syscall <code>shmctl(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_IPC_SHM_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  20193,
+                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+                                  NETDATA_SYSTEMD_SHM_CTL_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+}
+
+/**
+ * Send Systemd charts
+ *
+ * Send collected data to Netdata.
+ *
+ * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
+ *         otherwise function returns 1 to avoid chart recreation
+ */
+static int ebpf_send_systemd_shm_charts()
+{
+    int ret = 1;
+    ebpf_cgroup_target_t *ect;
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMGET_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_shm.get);
+        } else
+            ret = 0;
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMAT_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_shm.at);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMDT_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_shm.dt);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMCTL_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_shm.ctl);
+        }
+    }
+    write_end_chart();
+
+    return ret;
+}
+
+/*
+ * Send Specific Shared memory data
+ *
+ * Send data for specific cgroup/apps.
+ *
+ * @param type   chart type
+ * @param values structure with values that will be sent to netdata
+ */
+static void ebpf_send_specific_shm_data(char *type, netdata_publish_shm_t *values)
+{
+    write_begin_chart(type, NETDATA_SHMGET_CHART);
+    write_chart_dimension(shm_publish_aggregated[NETDATA_KEY_SHMGET_CALL].name, (long long)values->get);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_SHMAT_CHART);
+    write_chart_dimension(shm_publish_aggregated[NETDATA_KEY_SHMAT_CALL].name, (long long)values->at);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_SHMDT_CHART);
+    write_chart_dimension(shm_publish_aggregated[NETDATA_KEY_SHMDT_CALL].name, (long long)values->dt);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_SHMCTL_CHART);
+    write_chart_dimension(shm_publish_aggregated[NETDATA_KEY_SHMCTL_CALL].name, (long long)values->ctl);
+    write_end_chart();
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+*/
+void ebpf_shm_send_cgroup_data()
+{
+    if (!ebpf_cgroup_pids)
+        return;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        ebpf_shm_sum_cgroup_pids(&ect->publish_shm, ect->pids);
+    }
+
+    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
+    if (has_systemd) {
+        static int systemd_charts = 0;
+        if (!systemd_charts) {
+            ebpf_create_systemd_shm_charts();
+            systemd_charts = 1;
+        }
+
+        systemd_charts = ebpf_send_systemd_shm_charts();
+    }
+
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SHM_CHART) && ect->updated) {
+            ebpf_create_specific_shm_charts(ect->name);
+            ect->flags |= NETDATA_EBPF_CGROUP_HAS_SHM_CHART;
+        }
+
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SHM_CHART) {
+            if (ect->updated) {
+                ebpf_send_specific_shm_data(ect->name, &ect->publish_shm);
+            } else {
+                ebpf_obsolete_specific_shm_charts(ect->name);
+                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+            }
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
 * Main loop for this collector.
 */
 static void shm_collector(ebpf_module_t *em)
@@ -332,6 +654,7 @@ static void shm_collector(ebpf_module_t *em)
     );
 
     int apps = em->apps_charts;
+    int cgroups = em->cgroup_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -340,12 +663,20 @@ static void shm_collector(ebpf_module_t *em)
             read_apps_table();
         }
 
+        if (cgroups) {
+            ebpf_update_shm_cgroup();
+        }
+
         pthread_mutex_lock(&lock);
 
         shm_send_global();
 
         if (apps) {
             ebpf_shm_send_apps_data(apps_groups_root_target);
+        }
+
+        if (cgroups) {
+            ebpf_shm_send_cgroup_data();
         }
 
         pthread_mutex_unlock(&lock);
@@ -412,11 +743,13 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param length is the length for the vectors used inside the collector.
+ * @param apps is apps enabled?
  */
-static void ebpf_shm_allocate_global_vectors()
+static void ebpf_shm_allocate_global_vectors(int apps)
 {
-    shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
+    if (apps)
+        shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
+
     shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
 
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -477,7 +810,7 @@ void *ebpf_shm_thread(void *ptr)
         goto endshm;
     }
 
-    ebpf_shm_allocate_global_vectors();
+    ebpf_shm_allocate_global_vectors(em->apps_charts);
 
     int algorithms[NETDATA_SHM_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX,
