@@ -39,7 +39,7 @@ static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
 netdata_fd_stat_t *fd_vector = NULL;
-netdata_fd_stat_t **fd_pid;
+netdata_fd_stat_t **fd_pid = NULL;
 
 /*****************************************************************
  *

@@ -601,14 +601,11 @@ void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_ta
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
-        int32_t pid = root->pid;
-        netdata_publish_dcstat_t *w = dcstat_pid[pid];
-        if (w) {
-            netdata_dcstat_pid_t *src = &w->curr;
-            dst->cache_access += src->cache_access;
-            dst->file_system += src->file_system;
-            dst->not_found += src->not_found;
-        }
+        netdata_dcstat_pid_t *src = &root->dc;
+
+        dst->cache_access += src->cache_access;
+        dst->file_system += src->file_system;
+        dst->not_found += src->not_found;
 
         root = root->next;
     }
