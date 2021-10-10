@@ -32,7 +32,11 @@ static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_i
 
 char *tracepoint_sched_type = { "sched" } ;
 char *tracepoint_sched_process_exit = { "sched_process_exit" };
+char *tracepoint_sched_process_exec = { "sched_process_exec" };
+char *tracepoint_sched_process_fork = { "sched_process_fork" };
 static int was_sched_process_exit_enabled = 0;
+static int was_sched_process_exec_enabled = 0;
+static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
@@ -879,6 +883,16 @@ static void ebpf_process_disable_tracepoints()
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
             error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
     }
+
+    if (!was_sched_process_exec_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
+    }
+
+    if (!was_sched_process_fork_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
+    }
 }
 
 /**
@@ -1011,16 +1025,23 @@ static int ebpf_process_enable_tracepoints()
     }
     was_sched_process_exit_enabled = test;
 
-    /*
-    test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_rq_complete);
+    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exec);
     if (test == -1)
         return -1;
     else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
+        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
             return -1;
     }
-    was_block_rq_complete_enabled = test;
-     */
+    was_sched_process_exec_enabled = test;
+
+    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_fork);
+    if (test == -1)
+        return -1;
+    else if (!test) {
+        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
+            return -1;
+    }
+    was_sched_process_fork_enabled = test;
 
     return 0;
 }
