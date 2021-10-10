@@ -30,6 +30,10 @@ static ebpf_local_maps_t process_maps[] = {{.name = "tbl_pid_stats", .internal_i
                                             .type = NETDATA_EBPF_MAP_CONTROLLER,
                                             .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
+char *tracepoint_sched_type = { "sched" } ;
+char *tracepoint_sched_process_exit = { "sched_process_exit" };
+static int was_sched_process_exit_enabled = 0;
+
 static netdata_idx_t *process_hash_values = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
@@ -864,6 +868,20 @@ void clean_global_memory() {
 }
 
 /**
+ * Process disable tracepoints
+ *
+ * Disable tracepoints when the plugin was responsible to enable it.
+ */
+static void ebpf_process_disable_tracepoints()
+{
+    char *default_message = { "Cannot disable the tracepoint" };
+    if (!was_sched_process_exit_enabled) {
+        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
+            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
+    }
+}
+
+/**
  * Clean up the main thread.
  *
  * @param ptr thread data.
@@ -886,6 +904,8 @@ static void ebpf_process_cleanup(void *ptr)
     clean_global_memory();
     freez(global_process_stats);
     freez(current_apps_data);
+
+    ebpf_process_disable_tracepoints();
 
     if (probe_links) {
         struct bpf_program *prog;
@@ -974,6 +994,38 @@ static void wait_for_all_threads_die()
 }
 
 /**
+ * Enable tracepoints
+ *
+ * Enable necessary tracepoints for thread.
+ *
+ * @return  It returns 0 on success and -1 otherwise
+ */
+static int ebpf_process_enable_tracepoints()
+{
+    int test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exit);
+    if (test == -1)
+        return -1;
+    else if (!test) {
+        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
+            return -1;
+    }
+    was_sched_process_exit_enabled = test;
+
+    /*
+    test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_rq_complete);
+    if (test == -1)
+        return -1;
+    else if (!test) {
+        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
+            return -1;
+    }
+    was_block_rq_complete_enabled = test;
+     */
+
+    return 0;
+}
+
+/**
  * Process thread
  *
  * Thread used to generate process charts.
@@ -989,6 +1041,10 @@ void *ebpf_process_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
     process_enabled = em->enabled;
+
+    if (ebpf_process_enable_tracepoints()) {
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts =  CONFIG_BOOLEAN_NO;
+    }
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
