@@ -32,14 +32,9 @@ void KMeans::train(SamplesBuffer &SB, size_t MaxIterations) {
                 MaxDist = MeanDist;
         }
     }
-
-    HasClusterCenters = true;
 }
 
 CalculatedNumber KMeans::anomalyScore(SamplesBuffer &SB) {
-    if (!HasClusterCenters)
-        return std::numeric_limits<CalculatedNumber>::quiet_NaN();
-
     std::vector<DSample> DSamples = SB.preprocess();
 
     std::unique_lock<std::mutex> Lock(Mutex, std::defer_lock);

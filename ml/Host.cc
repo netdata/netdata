@@ -10,9 +10,12 @@
 using namespace ml;
 
 static void updateDimensionsChart(RRDHOST *RH,
+                                  collected_number NumTrainedDimensions,
                                   collected_number NumNormalDimensions,
                                   collected_number NumAnomalousDimensions) {
     static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *NumTotalDimensionsRD = nullptr;
+    static thread_local RRDDIM *NumTrainedDimensionsRD = nullptr;
     static thread_local RRDDIM *NumNormalDimensionsRD = nullptr;
     static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
 
@@ -33,6 +36,10 @@ static void updateDimensionsChart(RRDHOST *RH,
             RRDSET_TYPE_LINE // chart_type
         );
 
+        NumTotalDimensionsRD = rrddim_add(RS, "total", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
+        NumTrainedDimensionsRD = rrddim_add(RS, "trained", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
         NumNormalDimensionsRD = rrddim_add(RS, "normal", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
         NumAnomalousDimensionsRD = rrddim_add(RS, "anomalous", NULL,
@@ -40,6 +47,8 @@ static void updateDimensionsChart(RRDHOST *RH,
     } else
         rrdset_next(RS);
 
+    rrddim_set_by_pointer(RS, NumTotalDimensionsRD, NumNormalDimensions + NumAnomalousDimensions);
+    rrddim_set_by_pointer(RS, NumTrainedDimensionsRD, NumTrainedDimensions);
     rrddim_set_by_pointer(RS, NumNormalDimensionsRD, NumNormalDimensions);
     rrddim_set_by_pointer(RS, NumAnomalousDimensionsRD, NumAnomalousDimensions);
 
@@ -184,16 +193,12 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
 }
 
 static void updateTrainingChart(RRDHOST *RH,
-                                collected_number MaxTrainingDuration,
-                                collected_number AvgTrainingDuration,
-                                collected_number StdDevTrainingDuration,
-                                collected_number AvgSleepForDuration)
+                                collected_number TotalTrainingDuration,
+                                collected_number MaxTrainingDuration)
 {
     static thread_local RRDSET *RS = nullptr;
+    static thread_local RRDDIM *TotalTrainingDurationRD = nullptr;
     static thread_local RRDDIM *MaxTrainingDurationRD = nullptr;
-    static thread_local RRDDIM *AvgTrainingDurationRD = nullptr;
-    static thread_local RRDDIM *StdDevTrainingDurationRD = nullptr;
-    static thread_local RRDDIM *AvgSleepForDurationRD = nullptr;
 
     if (!RS) {
         RS = rrdset_create(
@@ -212,21 +217,15 @@ static void updateTrainingChart(RRDHOST *RH,
             RRDSET_TYPE_LINE // chart_type
         );
 
+        TotalTrainingDurationRD = rrddim_add(RS, "total_training_duration", NULL,
+                1, 1, RRD_ALGORITHM_ABSOLUTE);
         MaxTrainingDurationRD = rrddim_add(RS, "max_training_duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        AvgTrainingDurationRD = rrddim_add(RS, "avg_training_duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        StdDevTrainingDurationRD = rrddim_add(RS, "stddev_training_duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        AvgSleepForDurationRD = rrddim_add(RS, "avg_sleep_duration", NULL,
                 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else
         rrdset_next(RS);
 
+    rrddim_set_by_pointer(RS, TotalTrainingDurationRD, MaxTrainingDuration);
     rrddim_set_by_pointer(RS, MaxTrainingDurationRD, MaxTrainingDuration);
-    rrddim_set_by_pointer(RS, AvgTrainingDurationRD, AvgTrainingDuration);
-    rrddim_set_by_pointer(RS, StdDevTrainingDurationRD, StdDevTrainingDuration);
-    rrddim_set_by_pointer(RS, AvgSleepForDurationRD, AvgSleepForDuration);
 
     rrdset_done(RS);
 }
@@ -308,7 +307,11 @@ void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
         return;
 
     D->LastTrainedAt = NowTP + Seconds{Cfg.UpdateEvery};
+
+    TimePoint StartTP = SteadyClock::now();
     D->trainModel();
+    Duration<double> Duration = SteadyClock::now() - StartTP;
+    D->updateTrainingDuration(Duration.count());
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
@@ -317,10 +320,6 @@ void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
 }
 
 void TrainableHost::train() {
-    dlib::running_stats<double> TrainingRS;
-    dlib::running_stats<double> AllottedRS;
-    dlib::running_stats<double> SleepForRS;
-
     Duration<double> MaxSleepFor = Seconds{1};
 
     while (!netdata_exit) {
@@ -333,25 +332,10 @@ void TrainableHost::train() {
         Duration<double> RealDuration = SteadyClock::now() - NowTP;
 
         Duration<double> SleepFor;
-        if ((2 * RealDuration) >= AllottedDuration) {
-            error("\"train every secs\" configuration option is too low"
-                  " (training dration: %lf seconds, allotted duration: %lf seconds)",
-                  RealDuration.count(), AllottedDuration.count());
+        if (RealDuration >= AllottedDuration)
+            continue;
 
-            SleepFor = AllottedDuration;
-        } else {
-            SleepFor = AllottedDuration - RealDuration;
-        }
-        SleepFor = std::min(SleepFor, MaxSleepFor);
-
-        TrainingRS.add(RealDuration.count());
-        TrainingDurationMax = TrainingRS.max();
-        TrainingDurationAvg = TrainingRS.mean();
-        TrainingDurationStdDev = TrainingRS.stddev();
-
-        SleepForRS.add(SleepFor.count());
-        SleepForDurationAvg = SleepForRS.mean();
-
+        SleepFor = std::min(AllottedDuration - RealDuration, MaxSleepFor);
         std::this_thread::sleep_for(SleepFor);
     }
 }
@@ -369,6 +353,10 @@ void DetectableHost::detectOnce() {
 
     size_t NumAnomalousDimensions = 0;
     size_t NumNormalDimensions = 0;
+    size_t NumTrainedDimensions = 0;
+
+    double TotalTrainingDuration = 0.0;
+    double MaxTrainingDuration = 0.0;
 
     {
         std::lock_guard<std::mutex> Lock(Mutex);
@@ -381,6 +369,12 @@ void DetectableHost::detectOnce() {
             auto P = D->detect(WindowLength, ResetBitCounter);
             bool IsAnomalous = P.first;
             double AnomalyRate = P.second;
+
+            NumTrainedDimensions += D->isTrained();
+
+            double DimTrainingDuration = D->updateTrainingDuration(0.0);
+            MaxTrainingDuration = std::max(MaxTrainingDuration, DimTrainingDuration);
+            TotalTrainingDuration += DimTrainingDuration;
 
             if (IsAnomalous)
                 NumAnomalousDimensions += 1;
@@ -400,14 +394,15 @@ void DetectableHost::detectOnce() {
               AnomalyRate, WindowLength, NumAnomalousDimensions, NumNormalDimensions);
     }
 
-    updateDimensionsChart(getRH(), NumNormalDimensions, NumAnomalousDimensions);
+    this->NumAnomalousDimensions = NumAnomalousDimensions;
+    this->NumNormalDimensions = NumNormalDimensions;
+    this->NumTrainedDimensions = NumTrainedDimensions;
+
+    updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
     updateRateChart(getRH(), AnomalyRate * 100.0);
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
-    updateTrainingChart(getRH(), TrainingDurationMax * 1000.0,
-                                 TrainingDurationAvg * 1000.0,
-                                 TrainingDurationStdDev * 1000.0,
-                                 SleepForDurationAvg * 1000.0);
+    updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
 
     if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
         return;
@@ -446,7 +441,13 @@ void DetectableHost::detect() {
 
         std::this_thread::sleep_for(Seconds{Cfg.UpdateEvery});
     }
+}
 
+void DetectableHost::getDetectionInfoAsJson(nlohmann::json &Json) const {
+    Json["anomalous-dimensions"] = NumAnomalousDimensions;
+    Json["normal-dimensions"] = NumNormalDimensions;
+    Json["total-dimensions"] = NumAnomalousDimensions + NumNormalDimensions;
+    Json["trained-dimensions"] = NumTrainedDimensions;
 }
 
 void DetectableHost::startAnomalyDetectionThreads() {

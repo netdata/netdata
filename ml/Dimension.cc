@@ -130,6 +130,7 @@ MLResult TrainableDimension::trainModel() {
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN);
     KM.train(SB, Cfg.MaxKMeansIters);
+    Trained = true;
 
     delete[] CNs;
     return MLResult::Success;

@@ -24,7 +24,6 @@ private:
     size_t NumClusters;
 
     std::vector<DSample> ClusterCenters;
-    std::atomic<bool> HasClusterCenters{false};
 
     CalculatedNumber MinDist;
     CalculatedNumber MaxDist;

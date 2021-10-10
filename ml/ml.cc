@@ -72,12 +72,13 @@ void ml_delete_dimension(RRDDIM *RD) {
     RD->state->ml_dimension = nullptr;
 }
 
-char *ml_get_host_config(RRDHOST *RH) {
+char *ml_get_host_info(RRDHOST *RH) {
     nlohmann::json ConfigJson;
 
     if (RH && RH->ml_host) {
         Host *H = static_cast<Host *>(RH->ml_host);
         H->getConfigAsJson(ConfigJson);
+        H->getDetectionInfoAsJson(ConfigJson);
     } else {
         ConfigJson["enabled"] = false;
     }

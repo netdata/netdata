@@ -50,13 +50,6 @@ public:
 private:
     std::pair<Dimension *, Duration<double>> findDimensionToTrain(const TimePoint &NowTP);
     void trainDimension(Dimension *D, const TimePoint &NowTP);
-
-protected:
-    std::atomic<double> TrainingDurationMax;
-    std::atomic<double> TrainingDurationAvg;
-    std::atomic<double> TrainingDurationStdDev;
-
-    std::atomic<double> SleepForDurationAvg;
 };
 
 class DetectableHost : public TrainableHost {
@@ -76,6 +69,8 @@ public:
         return DB.getAnomaliesInRange(Args...);
     }
 
+    void getDetectionInfoAsJson(nlohmann::json &Json) const;
+
 private:
     void detect();
     void detectOnce();
@@ -92,6 +87,10 @@ private:
     };
 
     CalculatedNumber AnomalyRate{0.0};
+
+    size_t NumAnomalousDimensions{0};
+    size_t NumNormalDimensions{0};
+    size_t NumTrainedDimensions{0};
 
     Database DB{Cfg.AnomalyDBPath};
 };

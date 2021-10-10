@@ -50,11 +50,17 @@ public:
     MLResult trainModel();
 
     CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
-        return KM.anomalyScore(SB);
+        return Trained ? KM.anomalyScore(SB) : 0.0;
     }
 
     bool shouldTrain(const TimePoint &TP) const {
         return (LastTrainedAt + (Cfg.TrainEvery * Cfg.UpdateEvery)) < TP;
+    }
+
+    bool isTrained() const { return Trained; }
+
+    double updateTrainingDuration(double Duration) {
+        return TrainingDuration.exchange(Duration);
     }
 
 private:
@@ -65,6 +71,8 @@ public:
 
 private:
     KMeans KM;
+    std::atomic<bool> Trained{false};
+    std::atomic<double> TrainingDuration{0.0};
 };
 
 class PredictableDimension : public TrainableDimension {
