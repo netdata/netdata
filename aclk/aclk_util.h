@@ -5,12 +5,6 @@
 #include "libnetdata/libnetdata.h"
 #include "mqtt_wss_client.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 // Helper stuff which should not have any further inside ACLK dependency
 // and are supposed not to be needed outside of ACLK
 
