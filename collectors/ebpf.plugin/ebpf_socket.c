@@ -1713,7 +1713,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 {
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV,
                       "Bytes received",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300,
@@ -1722,7 +1722,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT,
                       "Bytes sent",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301,
@@ -1731,7 +1731,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                       "Calls to tcp_cleanup_rbuf.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302,
@@ -1740,7 +1740,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                       "Calls to tcp_sendmsg.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303,
@@ -1749,7 +1749,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                       "Calls to tcp_retransmit.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304,
@@ -1758,7 +1758,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                       "Calls to udp_sendmsg",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305,
@@ -1767,7 +1767,7 @@ static void ebpf_create_specific_socket_charts(char *type)
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                       "Calls to udp_recvmsg",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_CGROUP_NET_GROUP,
                       NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306,
