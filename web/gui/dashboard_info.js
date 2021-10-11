@@ -859,7 +859,7 @@ netdataDashboard.submenu = {
         info: function (os) {
             if (os === 'linux')
                 return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
-                'Total for all CPU cores can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
+                'Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
                 'More information about identifying and troubleshooting network driver related issues can be found at '+
                 '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
                 '<p><b>Processed</b> - packets processed. '+
@@ -885,7 +885,7 @@ netdataDashboard.submenu = {
         info: function (os) {
             if (os === 'linux')
                 return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
-                'Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
+                'Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. '+
                 'More information about identifying and troubleshooting network driver related issues can be found at '+
                 '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
                 '<p><b>Processed</b> - packets processed. '+
