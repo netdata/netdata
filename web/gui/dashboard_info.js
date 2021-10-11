@@ -58,7 +58,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-sitemap"></i>',
         info: '<p>Performance and exception statistics for '+
         '<a href="https://en.wikipedia.org/wiki/InfiniBand" target="_blank">Infiniband</a> ports. '+
-        'The individual port and hardware counters can be found in the '+
+        'The individual port and hardware counter descriptions can be found in the '+
         '<a href="https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters" target="_blank">Mellanox knowledge base</a>.'
     },
 
@@ -491,37 +491,37 @@ netdataDashboard.menu = {
 
     'couchdb': {
         icon: '<i class="fas fa-database"></i>',
-        info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
+        info: 'Performance metrics for <b><a href="https://couchdb.apache.org/" target="_blank">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
 
     'beanstalk': {
         title: 'Beanstalkd',
         icon: '<i class="fas fa-tasks"></i>',
-        info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
+        info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/" target="_blank">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
     },
 
     'rabbitmq': {
         title: 'RabbitMQ',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/">RabbitMQ</a></b> open-source message broker.'
+        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/" target="_blank">RabbitMQ</a></b> open-source message broker.'
     },
 
     'ceph': {
         title: 'Ceph',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> cluster server, the open-source distributed storage system.'
+        info: 'Provides statistics on the <b><a href="http://ceph.com/" target="_blank">ceph</a></b> cluster server, the open-source distributed storage system.'
     },
 
     'ntpd': {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
-        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/" target="_blank">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
     },
 
     'spigotmc': {
         title: 'Spigot MC',
         icon: '<i class="fas fa-eye"></i>',
-        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/" target="_blank">Spigot Minecraft</a></b> server.'
     },
 
     'unbound': {
@@ -533,13 +533,13 @@ netdataDashboard.menu = {
     'boinc': {
         title: 'BOINC',
         icon: '<i class="fas fa-microchip"></i>',
-        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
+        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/" target="_blank">BOINC</a></b> distributed computing clients.'
     },
 
     'w1sensor': {
         title: '1-Wire Sensors',
         icon: '<i class="fas fa-thermometer-half"></i>',
-        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
+        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire" target="_blank">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
     },
 
     'logind': {
@@ -551,7 +551,7 @@ netdataDashboard.menu = {
     'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
+        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt" target="_blank">Linux power supply class</a>.'
     },
 
     'xenstat': {
@@ -581,25 +581,25 @@ netdataDashboard.menu = {
     'vsphere': {
         title: 'vSphere',
         icon: '<i class="fas fa-server"></i>',
-        info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
+        info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html" target="_blank">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
     },
 
     'vcsa': {
         title: 'VCSA',
         icon: '<i class="fas fa-server"></i>',
-        info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health">Health API</a>.'
+        info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health" target="_blank">Health API</a>.'
     },
 
     'zookeeper': {
         title: 'Zookeeper',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
+        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/" target="_blank">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
     },
 
     'hdfs': {
         title: 'HDFS',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
+        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" target="_blank">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
     },
 
     'am2320': {
@@ -640,13 +640,13 @@ netdataDashboard.menu = {
     'vernemq': {
         title: 'VerneMQ',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Performance data for the <b><a href="https://vernemq.com/">VerneMQ</a></b> open-source MQTT broker.'
+        info: 'Performance data for the <b><a href="https://vernemq.com/" target="_blank">VerneMQ</a></b> open-source MQTT broker.'
     },
 
     'pulsar': {
         title: 'Pulsar',
         icon: '<i class="fas fa-comments"></i>',
-        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/">Apache Pulsar</a></b> pub-sub messaging system.'
+        info: 'Summary, namespaces and topics performance data for the <b><a href="http://pulsar.apache.org/" target="_blank">Apache Pulsar</a></b> pub-sub messaging system.'
     },
 
     'anomalies': {
@@ -664,13 +664,13 @@ netdataDashboard.menu = {
     'statsd': { 
         title: 'StatsD',
         icon: '<i class="fas fa-chart-line"></i>',
-        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin">Netdata Learn</a>.'
+        info:'StatsD is an industry-standard technology stack for monitoring applications and instrumenting any piece of software to deliver custom metrics. Netdata allows the user to organize the metrics in different charts and visualize any application metric easily. Read more on <a href="https://learn.netdata.cloud/docs/agent/collectors/statsd.plugin" target="_blank">Netdata Learn</a>.'
     },
 
     'supervisord': {
         title: 'Supervisord',
         icon: '<i class="fas fa-tasks"></i>',
-        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/">Supervisor</a></b>. ' +
+        info: 'Detailed statistics for each group of processes controlled by <b><a href="http://supervisord.org/" target="_blank">Supervisor</a></b>. ' +
         'Netdata collects these metrics using <a href="http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo" target="_blank"><code>getAllProcessInfo</code></a> method.'
     },
 
@@ -858,7 +858,17 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function (os) {
             if (os === 'linux')
-                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
+                'Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
+                'More information about identifying and troubleshooting network driver related issues can be found at '+
+                '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
+                '<p><b>Processed</b> - packets processed. '+
+                '<b>Dropped</b> - packets dropped because the network device backlog was full. '+
+                '<b>Squeezed</b> - number of times the network device budget was consumed or the time limit was reached, '+
+                'but more work was available. '+
+                '<b>ReceivedRPS</b> - number of times this CPU has been woken up to process packets via an Inter-processor Interrupt. '+
+                '<b>FlowLimitCount</b> - number of times the flow limit has been reached (flow limiting is an optional '+
+                'Receive Packet Steering feature).</p>';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
         }
@@ -874,7 +884,17 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function (os) {
             if (os === 'linux')
-                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
+                'Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. '+
+                'More information about identifying and troubleshooting network driver related issues can be found at '+
+                '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
+                '<p><b>Processed</b> - packets processed. '+
+                '<b>Dropped</b> - packets dropped because the network device backlog was full. '+
+                '<b>Squeezed</b> - number of times the network device budget was consumed or the time limit was reached, '+
+                'but more work was available. '+
+                '<b>ReceivedRPS</b> - number of times this CPU has been woken up to process packets via an Inter-processor Interrupt. '+
+                '<b>FlowLimitCount</b> - number of times the flow limit has been reached (flow limiting is an optional '+
+                'Receive Packet Steering feature).</p>';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
@@ -901,7 +921,7 @@ netdataDashboard.submenu = {
 
     'couchdb.perdbstats': {
         title: 'per db statistics',
-        info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
+        info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db" target="_blank">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
     },
 
     'couchdb.erlang': {
@@ -911,7 +931,7 @@ netdataDashboard.submenu = {
 
     'ntpd.system': {
         title: 'system',
-        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
+        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html" target="_blank">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
     },
 
     'ntpd.peers': {
@@ -1066,7 +1086,14 @@ netdataDashboard.context = {
             void (os);
             return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
-                + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
+                + netdataDashboard.sparkline(
+                '<br/>An important metric worth monitoring, is <b>softirq</b> ',
+                'system.cpu',
+                'softirq',
+                '%',
+                '. A constantly high percentage of softirq may indicate network driver issues. '+
+                'The individual metrics can be found in the '+
+                '<a href="https://www.kernel.org/doc/html/latest/filesystems/proc.html#miscellaneous-kernel-statistics-in-proc-stat" target="_blank">kernel documentation</a>.');
         },
         valueRange: "[0, 100]"
     },
@@ -1077,14 +1104,14 @@ netdataDashboard.context = {
     },
 
     'system.cpu_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
             'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'system.memory_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
             'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
@@ -1093,7 +1120,7 @@ netdataDashboard.context = {
     },
 
     'system.io_some_pressure': {
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html" target="_blank">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
             'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
@@ -1117,7 +1144,9 @@ netdataDashboard.context = {
     },
 
     'system.swapio': {
-        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of the metrics <code>in</code> or <code>out</code> is not shown in the chart, the reason is that the metric is zero. - you can change the page settings to always render all the available dimensions on all charts).'
+        info: '<p>System swap I/O.</p>'+
+        '<b>In</b> - pages the system has swapped in from disk to RAM. '+
+        '<b>Out</b> - pages the system has swapped out from RAM to disk.'
     },
 
     'system.pgfaults': {
@@ -1147,7 +1176,7 @@ netdataDashboard.context = {
 
     'system.forks': {
         colors: '#5555DD',
-        info: 'Number of new processes created.'
+        info: 'The number of new processes created.'
     },
 
     'system.intr': {
@@ -1184,11 +1213,13 @@ netdataDashboard.context = {
     },
 
     'system.processes': {
-        info: 'System processes. <b>Running</b> are the processes in the CPU. <b>Blocked</b> are processes that are willing to enter the CPU, but they cannot, e.g. because they wait for disk activity.'
+        info: '<p>System processes.</p>'+
+        '<p><b>Running</b> - running or ready to run (runnable). '+
+        '<b>Blocked</b> - currently blocked, waiting for I/O to complete.</p>'
     },
 
     'system.active_processes': {
-        info: 'All system processes.'
+        info: 'The total number of processes in the system.'
     },
 
     'system.ctxt': {
@@ -1381,7 +1412,12 @@ netdataDashboard.context = {
 
 
     'mem.pgfaults': {
-        info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory.'
+        info: '<p>A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, '+
+        'called trap, raised by computer hardware when a running program accesses a memory page '+
+        'that is mapped into the virtual address space, but not actually loaded into main memory.</p>'+
+        '</p><b>Minor</b> - the page is loaded in memory at the time the fault is generated, '+
+        'but is not marked in the memory management unit as being loaded in memory. '+
+        '<b>Major</b> - generated when the system needs to load the memory page from disk or swap memory.</p>'
     },
 
     'mem.committed': {
@@ -1425,17 +1461,19 @@ netdataDashboard.context = {
     },
 
     'mem.kernel': {
-        info: 'The total amount of memory being used by the kernel. '+
-        '<b>Slab</b> is the memory used by the kernel to cache data structures for its own use. '+
-        '<b>KernelStack</b> is the memory allocated for each task done by the kernel. '+
-        '<b>PageTables</b> is the memory dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). '+
-        '<b>VmallocUsed</b> is the memory being used as virtual address space. '+
-        '<b>Percpu</b> is the memory allocated to the per-CPU allocator used to back per-CPU allocations (excludes the cost of metadata). '+
-        'When you create a per-CPU variable, each processor on the system gets its own copy of that variable.'
+        info: '<p>The total amount of memory being used by the kernel.</p>'+
+        '<p><b>Slab</b> - used by the kernel to cache data structures for its own use. '+
+        '<b>KernelStack</b> - allocated for each task done by the kernel. '+
+        '<b>PageTables</b> - dedicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). '+
+        '<b>VmallocUsed</b> - being used as virtual address space. '+
+        '<b>Percpu</b> - allocated to the per-CPU allocator used to back per-CPU allocations (excludes the cost of metadata). '+
+        'When you create a per-CPU variable, each processor on the system gets its own copy of that variable.</p>'
     },
 
     'mem.slab': {
-        info: '<b>Reclaimable</b> is the amount of memory which the kernel can reuse. <b>Unreclaimable</b> can not be reused even when the kernel is lacking memory.'
+        info: '<p><a href="https://en.wikipedia.org/wiki/Slab_allocation" target="_blank">Slab memory</a> statistics.<p>'+
+        '<p><b>Reclaimable</b> - amount of memory which the kernel can reuse. '+
+        '<b>Unreclaimable</b> - can not be reused even when the kernel is lacking memory.</p>'
     },
 
     'mem.hugepages': {
@@ -1545,10 +1583,10 @@ netdataDashboard.context = {
     // IP
 
     'ip.inerrors': {
-        info: 'Errors encountered during the reception of IP packets. ' +
-            '<b>noroutes</b> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
-            '<b>truncated</b> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
-            '<b>checksum</b> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+        info: '<p>The number of errors encountered during the reception of IP packets.</p>' +
+            '</p><b>NoRoutes</b> - packets that were dropped because there was no route to send them. ' +
+            '<b>Truncated</b> - packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
+            '<b>Checksum</b> - packets that were dropped because they had wrong checksum.</p>'
     },
 
     'ip.mcast': {
@@ -1568,44 +1606,58 @@ netdataDashboard.context = {
     },
 
     'ip.ecnpkts': {
-        info: 'Total number of received IP packets with ECN bits set in the system. '+
-        '<b>CEP</b> - congestion encountered. '+
+        info: '<p>Total number of received IP packets with ECN bits set in the system.</p>'+
+        '<p><b>CEP</b> - congestion encountered. '+
         '<b>NoECTP</b> - non ECN-capable transport. '+
-        '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.'
+        '<b>ECTP0</b> and <b>ECTP1</b> - ECN capable transport.</p>'
     },
 
     'ip.tcpreorders': {
-        info: 'TCP prevents out-of-order packets by either sequencing them in the correct order or by requesting the retransmission of out-of-order packets. '+
-        '<b>Timestamp</b> - detected re-ordering using the timestamp option. '+
+        info: '<p>TCP prevents out-of-order packets by either sequencing them in the correct order or '+
+        'by requesting the retransmission of out-of-order packets.</p>'+
+        '<p><b>Timestamp</b> - detected re-ordering using the timestamp option. '+
         '<b>SACK</b> - detected re-ordering using Selective Acknowledgment algorithm. '+
         '<b>FACK</b> - detected re-ordering using Forward Acknowledgment algorithm. '+
-        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.'
+        '<b>Reno</b> - detected re-ordering using Fast Retransmit algorithm.</p>'
     },
 
     'ip.tcpofo': {
-        info: 'TCP maintains an out-of-order (OOO) queue to keep the OOO packets in the TCP communication. '+
-        '<b>InQueue</b> - the TCP layer receives an OOO packet and has enough memory to queue it. '+
-        '<b>Dropped</b> - the TCP layer receives an OOO packet but does not have enough memory, so drops it. '+
-        '<b>Merged</b> - the received OOO packet has an overlay with the previous packet. '+
+        info: '<p>TCP maintains an out-of-order queue to keep the out-of-order packets in the TCP communication.</p>'+
+        '<p><b>InQueue</b> - the TCP layer receives an out-of-order packet and has enough memory to queue it. '+
+        '<b>Dropped</b> - the TCP layer receives an out-of-order packet but does not have enough memory, so drops it. '+
+        '<b>Merged</b> - the received out-of-order packet has an overlay with the previous packet. '+
         'The overlay part will be dropped. All these packets will also be counted into <b>InQueue</b>. '+
-        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.'
+        '<b>Pruned</b> - packets dropped from out-of-order queue because of socket buffer overrun.</p>'
     },
 
     'ip.tcpsyncookies': {
-        info: '<a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> are used to mitigate SYN flood. '+
-        '<b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
+        info: '<p><a href="https://en.wikipedia.org/wiki/SYN_cookies" target="_blank">SYN cookies</a> '+
+        'are used to mitigate SYN flood.</p>'+
+        '<p><b>Received</b> - after sending a SYN cookie, it came back to us and passed the check. '+
         '<b>Sent</b> - an application was not able to accept a connection fast enough, so the kernel could not store '+
         'an entry in the queue for this connection. Instead of dropping it, it sent a SYN cookie to the client. '+
         '<b>Failed</b> - the MSS decoded from the SYN cookie is invalid. When this counter is incremented, '+
-        'the received packet won’t be treated as a SYN cookie.'
+        'the received packet won’t be treated as a SYN cookie.</p>'
     },
 
     'ip.tcpmemorypressures': {
-        info: 'Number of times a socket was put in <b>memory pressure</b> due to a non fatal memory allocation failure (the kernel attempts to work around this situation by reducing the send buffers, etc).'
+        info: 'The number of times a socket was put in memory pressure due to a non fatal memory allocation failure '+
+        '(the kernel attempts to work around this situation by reducing the send buffers, etc).'
     },
 
     'ip.tcpconnaborts': {
-        info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
+        info: '<p>TCP connection aborts.</p>'+
+        '<p><b>BadData</b> - happens while the connection is on FIN_WAIT1 and the kernel receives a packet '+
+        'with a sequence number beyond the last one for this connection - '+
+        'the kernel responds with RST (closes the connection). '+
+        '<b>UserClosed</b> - happens when the kernel receives data on an already closed connection and '+
+        'responds with RST. '+
+        '<b>NoMemory</b> - happens when there are too many orphaned sockets (not attached to an fd) and '+
+        'the kernel has to drop a connection - sometimes it will send an RST, sometimes it won\'t. '+
+        '<b>Timeout</b> - happens when a connection times out. '+
+        '<b>Linger</b> - happens when the kernel killed a socket that was already closed by the application and '+
+        'lingered around for long enough. '+
+        '<b>Failed</b> - happens when the kernel attempted to send an RST but failed because there was no memory available.</p>'
     },
 
     'ip.tcp_functions': {
@@ -1645,23 +1697,21 @@ netdataDashboard.context = {
 
 
     'ip.tcp_syn_queue': {
-        info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
+        info: '<p>The SYN queue of the kernel tracks TCP handshakes until connections get fully established. ' +
             'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
-            'is not configured to fall back to SYN cookies*. Overflows are usually caused by SYN flood DoS attacks ' +
-            '(i.e. someone sends lots of SYN packets and never completes the handshakes). ' +
-            '<b>drops</b> (or <code>TcpExtTCPReqQFullDrop</code>) is the number of connections dropped because the ' +
-            'SYN queue was full and SYN cookies were disabled. ' +
-            '<b>cookies</b> (or <code>TcpExtTCPReqQFullDoCookies</code>) is the number of SYN cookies sent because the ' +
-            'SYN queue was full.'
+            'is not configured to fall back to SYN cookies. Overflows are usually caused by SYN flood DoS attacks.</p>' +
+            '<p><b>Drops</b> - number of connections dropped because the SYN queue was full and SYN cookies were disabled. ' +
+            '<b>Cookies</b> - number of SYN cookies sent because the SYN queue was full.</p>'
     },
 
     'ip.tcp_accept_queue': {
-        info: 'The <b>accept queue</b> of the kernel holds the fully established TCP connections, waiting to be handled ' +
-            'by the listening application. <b>overflows</b> (or <code>ListenOverflows</code>) is the number of ' +
-            'established connections that could not be handled because the receive queue of the listening application ' +
-            'was full. <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming ' +
-            'connections that could not be handled, including SYN floods, overflows, out of memory, security issues, ' +
-            'no route to destination, reception of related ICMP messages, socket is broadcast or multicast.'
+        info: '<p>The accept queue of the kernel holds the fully established TCP connections, waiting to be handled ' +
+            'by the listening application.</p>'+
+            '<b>Overflows</b> - the number of established connections that could not be handled because '+
+            'the receive queue of the listening application was full. '+
+            '<b>Drops</b> - number of incoming connections that could not be handled, including SYN floods, '+
+            'overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, '+
+            'socket is broadcast or multicast.</p>'
     },
 
 
@@ -1784,21 +1834,29 @@ netdataDashboard.context = {
     },
 
     'ipv4.tcpopens': {
-        info: '<b>active</b> or <code>ActiveOpens</code> is the number of outgoing TCP <b>connections attempted</b> by this host.'
-            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of incoming TCP <b>connections accepted</b> by this host.'
+        info: '<p>TCP connection statistics.</p>'+
+        '<p><b>Active</b> - number of outgoing TCP connections attempted by this host. '+
+         '<b>Passive</b> - number of incoming TCP connections accepted by this host.</p>'
     },
 
     'ipv4.tcperrors': {
-        info: '<code>InErrs</code> is the number of TCP segments received in error (including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6).'
-            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors (for both IPv4 and IPv6).'
-            + ' <code>RetransSegs</code> is the number of TCP segments retransmitted.'
+        info: '<p>TCP errors.</p>'+
+        '<p><b>InErrs</b> - TCP segments received in error '+
+        '(including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6). '+
+        '<b>InCsumErrors</b> - TCP segments received with checksum errors (for both IPv4 and IPv6). '+
+        '<b>RetransSegs</b> - TCP segments retransmitted.</p>'
     },
 
     'ipv4.tcphandshake': {
-        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code> to <code>CLOSED</code>).'
-            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
-            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
-            + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
+        info: '<p>TCP handshake statistics.</p>'+
+        '<p><b>EstabResets</b> - established connections resets '+
+        '(i.e. connections that made a direct transition from ESTABLISHED or CLOSE_WAIT to CLOSED). '+
+        '<b>OutRsts</b> - TCP segments sent, with the RST flag set (for both IPv4 and IPv6). '+
+        '<b>AttemptFails</b> - number of times TCP connections made a direct transition from either '+
+        'SYN_SENT or SYN_RECV to CLOSED, plus the number of times TCP connections made a direct transition '+
+        'from the SYN_RECV to LISTEN. '+
+        '<b>SynRetrans</b> - shows retries for new outbound TCP connections, '+
+        'which can indicate general connectivity issues or backlog on the remote host.</p>'
     },
 
     'ipv4.sockstat_sockets': {
@@ -2596,57 +2654,62 @@ netdataDashboard.context = {
                     return '';
             }
         ],
-        info: 'Amount of traffic that the interface has received and sent.'
+        info: 'The amount of traffic transferred by the network interface.'
     },
     'net.packets': {
-        info: 'Number of packets that the interface has received and sent. '+
+        info: 'The number of packets transferred by the network interface. '+
         'Received <a href="https://en.wikipedia.org/wiki/Multicast" target="_blank">multicast</a> counter is '+
         'commonly calculated at the device level (unlike <b>received</b>) and therefore may include packets which did not reach the host.'
     },
     'net.errors': {
-        info: '<b>Inbound</b> is the number of bad packets received on this interface. '+
+        info: '<p>The number of errors encountered by the network interface.</p>'+
+        '<p><b>Inbound</b> - bad packets received on this interface. '+
         'It includes dropped packets due to invalid length, CRC, frame alignment, and other errors. '+
-        '<b>Outbound</b> is the number of transmit problems. '+
-        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, late collisions, and other problems.'
+        '<b>Outbound</b> - transmit problems. '+
+        'It includes frames transmission errors due to loss of carrier, FIFO underrun/underflow, heartbeat, '+
+        'late collisions, and other problems.</p>'
     },
     'net.fifo': {
-        info: '<b>Inbound</b> is the number of packets dropped because they did not fit into buffers provided by the host, '+
+        info: '<p>The number of FIFO errors encountered by the network interface.</p>'+
+        '<p><b>Inbound</b> - packets dropped because they did not fit into buffers provided by the host, '+
         'e.g. packets larger than MTU or next buffer in the ring was not available for a scatter transfer. '+
-        '<b>Outbound</b> is the number of frame transmission errors due to device FIFO underrun/underflow. '+
+        '<b>Outbound</b> - frame transmission errors due to device FIFO underrun/underflow. '+
         'This condition occurs when the device begins transmission of a frame '+
-        'but is unable to deliver the entire frame to the transmitter in time for transmission.'
+        'but is unable to deliver the entire frame to the transmitter in time for transmission.</p>'
     },
     'net.drops': {
-        info: 'Packets that have been dropped at the network interface level. '+
-        '<b>Inbound</b> is the number of packets received but not processed, e.g. due to '+
-        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, '+
+        info: '<p>The number of packets that have been dropped at the network interface level.</p>'+
+        '<p><b>Inbound</b> - packets received but not processed, e.g. due to '+
+        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad/unintended VLAN tags, '+
         'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. '+
-        '<b>Outbound</b> is the number of packets dropped on their way to transmission, e.g. due to lack of resources.'
+        '<b>Outbound</b> - packets dropped on their way to transmission, e.g. due to lack of resources.</p>'
     },
     'net.compressed': {
-        info: 'Number of correctly received and transmitted compressed packets. '+
+        info: 'The number of correctly transferred compressed packets by the network interface. '+
         'These counters are only meaningful for interfaces which support packet compression (e.g. CSLIP, PPP).'
     },
     'net.events': {
-        info: '<b>Frames</b> is an aggregated counter for dropped packets due to '+
+        info: '<p>The number of errors encountered by the network interface.</p>'+
+        '<p><b>Frames</b> - aggregated counter for dropped packets due to '+
         'invalid length, FIFO overflow, CRC, and frame alignment errors. '+
-        '<b>Collisions</b> is the number of '+
+        '<b>Collisions</b> - '+
         '<a href="https://en.wikipedia.org/wiki/Collision_(telecommunications)" target="blank">collisions</a> during packet transmissions. '+
-        '<b>Carrier</b> is an aggregated counter for frame transmission errors due to '+
-        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.'
+        '<b>Carrier</b> - aggregated counter for frame transmission errors due to '+
+        'excessive collisions, loss of carrier, device FIFO underrun/underflow, Heartbeat/SQE Test errors, and  late collisions.</p>'
     },
     'net.duplex': {
         info: '<p>The interface\'s latest or current '+
         '<a href="https://en.wikipedia.org/wiki/Duplex_(telecommunications)" target="_blank">duplex</a> that the network adapter '+
-        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to. '+
-        '<b>Unknown</b> - the duplex mode can not be determined. '+
+        '<a href="https://en.wikipedia.org/wiki/Autonegotiation" target="_blank">negotiated</a> with the device it is connected to.</p>'+
+        '<p><b>Unknown</b> - the duplex mode can not be determined. '+
         '<b>Half duplex</b> - the communication is one direction at a time. '+
         '<b>Full duplex</b> - the interface is able to send and receive data simultaneously.</p>'+
         '<p><b>State map</b>: 0 - unknown, 1 - half, 2 - full.</p>'
     },
     'net.operstate': {
-        info: '</p>The current <a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface. '+
-        '<b>Unknown</b> - the state can not be determined. '+
+        info: '<p>The current '+
+        '<a href="https://datatracker.ietf.org/doc/html/rfc2863" target="_blank">operational state</a> of the interface.</p>'+
+        '<p><b>Unknown</b> - the state can not be determined. '+
         '<b>NotPresent</b> - the interface has missing (typically, hardware) components. '+
         '<b>Down</b> - the interface is unable to transfer data on L1, e.g. ethernet is not plugged or interface is administratively down. '+
         '<b>LowerLayerDown</b> - the interface is down due to state of lower-layer interface(s). '+
@@ -2681,7 +2744,7 @@ netdataDashboard.context = {
 
     'wireless.signal_level': {
         info: 'Received signal strength '+
-        '(<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" target="">RSSI</a>).'
+        '(<a href="https://en.wikipedia.org/wiki/Received_signal_strength_indication" target="_blank">RSSI</a>).'
     },
 
     'wireless.noise_level': {
@@ -2787,11 +2850,11 @@ netdataDashboard.context = {
             netdataDashboard.gaugeChart('Read', '12%', 'reads'),
             netdataDashboard.gaugeChart('Write', '12%', 'writes')
         ],
-        info: 'Amount of data transferred to and from disk.'
+        info: 'The amount of data transferred to and from disk.'
     },
 
     'disk_ext.io': {
-        info: 'Amount of discarded data that are no longer in use by a mounted file system.'
+        info: 'The amount of discarded data that are no longer in use by a mounted file system.'
     },
 
     'disk.ops': {
@@ -2799,7 +2862,7 @@ netdataDashboard.context = {
     },
 
     'disk_ext.ops': {
-        info: '<p>Number (after merges) of completed discard/flush requests.</p>'+
+        info: '<p>The number (after merges) of completed discard/flush requests.</p>'+
         '<p><b>Discard</b> commands inform disks which blocks of data are no longer considered to be in use and therefore can be erased internally. '+
         'They are useful for solid-state drivers (SSDs) and thinly-provisioned storage. '+
         'Discarding/trimming enables the SSD to handle garbage collection more efficiently, '+
@@ -2859,7 +2922,7 @@ netdataDashboard.context = {
         info: 'Disk space utilization. reserved for root is automatically reserved by the system to prevent the root user from getting out of space.'
     },
     'disk.inodes': {
-        info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
+        info: 'Inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
     'disk.bcache_hit_ratio': {
@@ -2878,10 +2941,10 @@ netdataDashboard.context = {
         'throttling background writeback and using a PD controller to smoothly adjust the rate.'
     },
     'disk.bcache_size': {
-        info: 'Amount of dirty data for this backing device in the cache.'
+        info: 'The amount of dirty data for this backing device in the cache.'
     },
     'disk.bcache_usage': {
-        info: 'Percentage of cache device which does not contain dirty data, and could potentially be used for writeback.'
+        info: 'The percentage of cache device which does not contain dirty data, and could potentially be used for writeback.'
     },
     'disk.bcache_cache_read_races': {
         info: '<b>Read races</b> happen when a bucket was reused and invalidated while data was being read from the cache. '+
@@ -2899,11 +2962,11 @@ netdataDashboard.context = {
         info: 'Hits and misses for IO that is intended to skip the cache.'
     },
     'disk.bcache_cache_alloc': {
-        info: 'Working set size. '+
-        '<b>Unused</b> is the percentage of the cache that does not contain any data. '+
+        info: '<p>Working set size.</p>'+
+        '<p><b>Unused</b> is the percentage of the cache that does not contain any data. '+
         '<b>Dirty</b> is the data that is modified in the cache but not yet written to the permanent storage. '+
         '<b>Clean</b> data matches the data stored on the permanent storage. '+
-        '<b>Metadata</b> is bcache\'s metadata overhead. '
+        '<b>Metadata</b> is bcache\'s metadata overhead.</p>'
     },
 
     // ------------------------------------------------------------------------
@@ -3064,7 +3127,7 @@ netdataDashboard.context = {
         'It will be read from the L2ARC cache devices (if available and the data is cached on them) or the pool disks.</p>'
     },
 
-    'zfs.l2its': {
+    'zfs.l2hits': {
         info: '<p>Hit rate of the L2ARC lookups.</p>'+
         '</p><b>Hits</b> - a data block was in the L2ARC cache and returned. '+
         '<b>Misses</b> - a data block was not in the L2ARC cache. '+
@@ -3819,7 +3882,7 @@ netdataDashboard.context = {
     },
 
     'services.swap_usage': {
-        info: 'The number of used '+
+        info: 'The amount of used '+
         '<a href="https://en.wikipedia.org/wiki/Memory_paging#Unix_and_Unix-like_systems" target="_blank">swap</a> '+
         'memory.'
     },
@@ -4347,7 +4410,7 @@ netdataDashboard.context = {
 
     'web_log.squid_code': {
         info: 'These are combined squid result status codes. A break down per component is given in the following charts. ' +
-            'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs">squid documentation about them</a>.'
+            'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs" target="_blank">squid documentation about them</a>.'
     },
 
     'web_log.squid_handling_opts': {
@@ -4588,11 +4651,11 @@ netdataDashboard.context = {
     },
 
     'couchdb.replicator_jobs': {
-        info: 'Detailed breakdown of any replication jobs in progress on this node. For more information, see the <a href="http://docs.couchdb.org/en/latest/replication/replicator.html">replicator documentation</a>.'
+        info: 'Detailed breakdown of any replication jobs in progress on this node. For more information, see the <a href="http://docs.couchdb.org/en/latest/replication/replicator.html" target="_blank">replicator documentation</a>.'
     },
 
     'couchdb.open_files': {
-        info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit">needs to be increased.</a>'
+        info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit" target="_blank">needs to be increased.</a>'
     },
 
     'btrfs.disk': {
@@ -4709,7 +4772,7 @@ netdataDashboard.context = {
     },
 
     'ntpd.sys_tc': {
-        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
+        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html" target="_blank">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
         height: 0.5
     },
 
@@ -4735,7 +4798,7 @@ netdataDashboard.context = {
     },
 
     'ntpd.peer_xleave': {
-        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html">NTP Interleaved Modes</a>.'
+        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html" target="_blank">NTP Interleaved Modes</a>.'
     },
 
     'ntpd.peer_rootdelay': {
@@ -4926,8 +4989,8 @@ netdataDashboard.context = {
             '<code>shared</code> is sum of all shared metrics for all powered-on virtual machines, plus amount for vSphere services on the host. ' +
             '<code>sharedcommon</code> is amount of machine memory that is shared by all powered-on virtual machines and vSphere services on the host. ' +
             '<code>shared</code> - <code>sharedcommon</code> = machine memory (host memory) savings (KB). ' +
-            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html">Measuring and Differentiating Types of Memory Usage</a> and ' +
-            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html">Memory Counters</a> articles.'
+            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html" target="_blank">Measuring and Differentiating Types of Memory Usage</a> and ' +
+            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html" target="_blank">Memory Counters</a> articles.'
     },
 
     'vsphere.host_mem_swap_rate': {
@@ -4951,8 +5014,8 @@ netdataDashboard.context = {
             '<code>consumed</code> = <code>granted</code> - <code>memory saved due to memory sharing</code>. ' +
             '<code>active</code> is amount of memory that is actively used, as estimated by VMkernel based on recently touched memory pages. ' +
             '<code>shared</code> is amount of guest “physical” memory shared with other virtual machines (through the VMkernel’s transparent page-sharing mechanism, a RAM de-duplication technique). ' +
-            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html">Measuring and Differentiating Types of Memory Usage</a> and ' +
-            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html">Memory Counters</a> articles.'
+            'For details see <a href="https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.resmgmt.doc/GUID-BFDC988B-F53D-4E97-9793-A002445AFAE1.html" target="_blank">Measuring and Differentiating Types of Memory Usage</a> and ' +
+            '<a href="https://www.vmware.com/support/developer/converter-sdk/conv51_apireference/memory_counters.html" target="_blank">Memory Counters</a> articles.'
 
     },
 
@@ -5103,7 +5166,7 @@ netdataDashboard.context = {
 
     'squidlog.cache_result_code_requests': {
         info: 'The Squid result code is composed of several tags (separated by underscore characters) which describe the response sent to the client. ' +
-            'Check the <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes">squid documentation</a> about them.'
+            'Check the <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes" target="_blank">squid documentation</a> about them.'
     },
 
     'squidlog.cache_result_code_transport_tag_requests': {
@@ -5165,7 +5228,7 @@ netdataDashboard.context = {
     },
 
     'squidlog.http_method_requests': {
-        info: 'The request method to obtain an object. Please refer to section <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Request_methods">request-methods</a> for available methods and their description.'
+        info: 'The request method to obtain an object. Please refer to section <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Request_methods" target="_blank">request-methods</a> for available methods and their description.'
     },
 
     'squidlog.hier_code_requests': {
