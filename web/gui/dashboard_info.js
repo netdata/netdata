@@ -58,7 +58,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-sitemap"></i>',
         info: '<p>Performance and exception statistics for '+
         '<a href="https://en.wikipedia.org/wiki/InfiniBand" target="_blank">Infiniband</a> ports. '+
-        'The individual port and hardware counters descriptions can be found in the '+
+        'The individual port and hardware counter descriptions can be found in the '+
         '<a href="https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters" target="_blank">Mellanox knowledge base</a>.'
     },
 
@@ -859,7 +859,7 @@ netdataDashboard.submenu = {
         info: function (os) {
             if (os === 'linux')
                 return '<p>Statistics for CPUs SoftIRQs related to network receive work. '+
-                'Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
+                'Total for all CPU cores can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. '+
                 'More information about identifying and troubleshooting network driver related issues can be found at '+
                 '<a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.</p>'+
                 '<p><b>Processed</b> - packets processed. '+
@@ -1471,7 +1471,7 @@ netdataDashboard.context = {
     },
 
     'mem.slab': {
-        info: '<p><a href="https://en.wikipedia.org/wiki/Slab_allocation" target="">Slab memory</a> statistics.<p>'+
+        info: '<p><a href="https://en.wikipedia.org/wiki/Slab_allocation" target="_blank">Slab memory</a> statistics.<p>'+
         '<p><b>Reclaimable</b> - amount of memory which the kernel can reuse. '+
         '<b>Unreclaimable</b> - can not be reused even when the kernel is lacking memory.</p>'
     },
@@ -1834,7 +1834,7 @@ netdataDashboard.context = {
     },
 
     'ipv4.tcpopens': {
-        info: '<p>TCP connections statistics.</p>'+
+        info: '<p>TCP connection statistics.</p>'+
         '<p><b>Active</b> - number of outgoing TCP connections attempted by this host. '+
          '<b>Passive</b> - number of incoming TCP connections accepted by this host.</p>'
     },
@@ -2680,7 +2680,7 @@ netdataDashboard.context = {
     'net.drops': {
         info: '<p>The number of packets that have been dropped at the network interface level.</p>'+
         '<p><b>Inbound</b> - packets received but not processed, e.g. due to '+
-        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad / unintended VLAN tags, '+
+        '<a href="#menu_system_submenu_softnet_stat">softnet backlog</a> overflow, bad/unintended VLAN tags, '+
         'unknown or unregistered protocols, IPv6 frames when the server is not configured for IPv6. '+
         '<b>Outbound</b> - packets dropped on their way to transmission, e.g. due to lack of resources.</p>'
     },
