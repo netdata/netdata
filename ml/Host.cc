@@ -389,9 +389,6 @@ void DetectableHost::detectOnce() {
             AnomalyRate = 0.0;
 
         NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
-
-        error("Host anomaly: rate=%lf, length=%zu, anomalous-dimensions=%zu, normal-dimensions= %zu",
-              AnomalyRate, WindowLength, NumAnomalousDimensions, NumNormalDimensions);
     }
 
     this->NumAnomalousDimensions = NumAnomalousDimensions;
