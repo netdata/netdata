@@ -7,8 +7,8 @@
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
 
 // Groups used on Dashboard
-#define NETDATA_PROCESS_GROUP "process"
-#define NETDATA_PROCESS_CGROUP_GROUP "process (eBPF)"
+#define NETDATA_PROCESS_GROUP "processes"
+#define NETDATA_PROCESS_CGROUP_GROUP "processes (eBPF)"
 
 // Global chart name
 #define NETDATA_EXIT_SYSCALL "exit"

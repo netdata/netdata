@@ -123,14 +123,14 @@ static void ebpf_process_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t pvc;
     ebpf_update_global_publish(process_publish_aggregated, &pvc, process_aggregated_data);
 
-    write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY,
+    write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_SYSTEM_GROUP,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT], 2);
-    write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY,
+    write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_SYSTEM_GROUP,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK], 2);
 
-    write_status_chart(NETDATA_EBPF_FAMILY, &pvc);
+    write_status_chart(NETDATA_EBPF_SYSTEM_GROUP, &pvc);
     if (em->mode < MODE_ENTRY) {
-        write_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY,
+        write_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_SYSTEM_GROUP,
                         &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK], 2);
     }
 }
@@ -366,7 +366,7 @@ static void ebpf_process_status_chart(char *family, char *name, char *axis,
  */
 static void ebpf_create_global_charts(ebpf_module_t *em)
 {
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                       NETDATA_PROCESS_SYSCALL,
                       "Start process",
                       EBPF_COMMON_DIMENSION_CALL,
@@ -378,7 +378,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                       2, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
-    ebpf_create_chart(NETDATA_EBPF_FAMILY,
+    ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                       NETDATA_EXIT_SYSCALL,
                       "Exit process",
                       EBPF_COMMON_DIMENSION_CALL,
@@ -390,7 +390,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                       2, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
-    ebpf_process_status_chart(NETDATA_EBPF_FAMILY,
+    ebpf_process_status_chart(NETDATA_EBPF_SYSTEM_GROUP,
                               NETDATA_PROCESS_STATUS_NAME,
                               EBPF_COMMON_DIMENSION_DIFFERENCE,
                               NETDATA_PROCESS_GROUP,
@@ -398,7 +398,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                               21004);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_create_chart(NETDATA_EBPF_FAMILY,
+        ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                           NETDATA_PROCESS_ERROR_NAME,
                           "Fails to create process",
                           EBPF_COMMON_DIMENSION_CALL,
@@ -1061,11 +1061,11 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = process_maps;
-    process_enabled = em->enabled;
 
     if (ebpf_process_enable_tracepoints()) {
         em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts =  CONFIG_BOOLEAN_NO;
     }
+    process_enabled = em->enabled;
 
     pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
