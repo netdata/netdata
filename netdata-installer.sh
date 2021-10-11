@@ -216,7 +216,6 @@ USAGE: ${PROGRAM} [options]
   --disable-ebpf             Disable eBPF Kernel plugin (Default: enabled)
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
-  --aclk-legacy              Forces build of ACLK Legacy which is fallback by default.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
   --disable-https            Explicitly disable TLS support
@@ -238,7 +237,6 @@ USAGE: ${PROGRAM} [options]
   --enable-ml                Enable anomaly detection with machine learning. (Default: autodetect)
   --disable-ml
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
-  --use-system-lws           Use a system copy of libwebsockets instead of bundling our own (default is to use the bundled copy).
   --use-system-protobuf      Use a system copy of libprotobuf instead of bundling our own (default is to use the bundled copy).
   --zlib-is-really-here or
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
@@ -283,7 +281,6 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
-    "--use-system-lws") USE_SYSTEM_LWS=1 ;;
     "--use-system-protobuf")
       USE_SYSTEM_PROTOBUF=1
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--without-bundled-protobuf/} --without-bundled-protobuf"
@@ -346,7 +343,7 @@ while [ -n "${1}" ]; do
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--aclk-ng") ;;
     "--aclk-legacy")
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-legacy/} --with-aclk-legacy"
+      fatal "ACLK legacy is no longer supported."
       ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
@@ -607,187 +604,6 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 fi
 
 trap build_error EXIT
-
-# -----------------------------------------------------------------------------
-
-build_libmosquitto() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
-  fi
-
-  if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} ${make} ${MAKEOPTS} -C "${1}/lib"
-  else
-    pushd ${1} > /dev/null || return 1
-    if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run ${env_cmd} cmake \
-        -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-        -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-        -D WITH_STATIC_LIBRARIES:boolean=YES \
-        .
-    else
-      run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
-    fi
-    run ${env_cmd} ${make} ${MAKEOPTS} -C lib
-    run mv lib/libmosquitto_static.a lib/libmosquitto.a
-    popd || return 1
-  fi
-}
-
-copy_libmosquitto() {
-  target_dir="${PWD}/externaldeps/mosquitto"
-
-  run mkdir -p "${target_dir}"
-
-  run cp "${1}/lib/libmosquitto.a" "${target_dir}"
-  run cp "${1}/lib/mosquitto.h" "${target_dir}"
-}
-
-bundle_libmosquitto() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-    echo "Skipping libmosquitto"
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libmosquitto."
-
-  progress "Prepare custom libmosquitto version"
-
-  MOSQUITTO_PACKAGE_VERSION="$(cat packaging/mosquitto.version)"
-
-  tmp="$(mktemp -d -t netdata-mosquitto-XXXXXX)"
-  MOSQUITTO_PACKAGE_BASENAME="${MOSQUITTO_PACKAGE_VERSION}.tar.gz"
-
-  if fetch_and_verify "mosquitto" \
-    "https://github.com/netdata/mosquitto/archive/${MOSQUITTO_PACKAGE_BASENAME}" \
-    "${MOSQUITTO_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_MOSQUITTO}"; then
-    if run tar -xf "${tmp}/${MOSQUITTO_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
-      copy_libmosquitto "${tmp}/mosquitto-${MOSQUITTO_PACKAGE_VERSION}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libmosquitto built and prepared."
-    else
-      run_failed "Failed to build libmosquitto."
-      defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-    fi
-  else
-    run_failed "Unable to fetch sources for libmosquitto."
-    defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_libmosquitto
-
-# -----------------------------------------------------------------------------
-
-build_libwebsockets() {
-  local env_cmd=''
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS=-fPIC CXXFLAGS= LDFLAGS="
-  fi
-
-  pushd "${1}" > /dev/null || exit 1
-
-  if [ "$(uname)" = "Darwin" ]; then
-    run patch -p1 << "EOF"
---- a/lib/plat/unix/private.h
-+++ b/lib/plat/unix/private.h
-@@ -164,6 +164,8 @@ delete_from_fd(const struct lws_context *context, int fd);
-  * but happily have something equivalent in the SO_NOSIGPIPE flag.
-  */
- #ifdef __APPLE__
-+/* iOS SDK 12+ seems to define it, undef it for compatibility both ways */
-+#undef MSG_NOSIGNAL
- #define MSG_NOSIGNAL SO_NOSIGPIPE
- #endif
-EOF
-
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-      return 1
-    fi
-  fi
-
-  if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run ${env_cmd} cmake \
-      -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-      -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-      -D LWS_WITH_SOCKS5:bool=ON \
-      -D LWS_IPV6:bool=ON \
-      $CMAKE_FLAGS \
-      .
-  else
-    run ${env_cmd} cmake \
-      -D LWS_WITH_SOCKS5:bool=ON \
-      -D LWS_IPV6:bool=ON \
-      $CMAKE_FLAGS \
-      .
-  fi
-  run ${env_cmd} ${make} ${MAKEOPTS}
-  popd > /dev/null || exit 1
-}
-
-copy_libwebsockets() {
-  target_dir="${PWD}/externaldeps/libwebsockets"
-
-  run mkdir -p "${target_dir}" || return 1
-
-  run cp "${1}/lib/libwebsockets.a" "${target_dir}/libwebsockets.a" || return 1
-  run cp -r "${1}/include" "${target_dir}" || return 1
-}
-
-bundle_libwebsockets() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] || [ -n "${USE_SYSTEM_LWS}" ]; then
-    echo "Skipping libwebsockets"
-    return 0
-  fi
-
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    defer_error_highlighted "Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud."
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libwebsockets."
-
-  progress "Prepare libwebsockets"
-
-  LIBWEBSOCKETS_PACKAGE_VERSION="$(cat packaging/libwebsockets.version)"
-
-  tmp="$(mktemp -d -t netdata-libwebsockets-XXXXXX)"
-  LIBWEBSOCKETS_PACKAGE_BASENAME="v${LIBWEBSOCKETS_PACKAGE_VERSION}.tar.gz"
-
-  if fetch_and_verify "libwebsockets" \
-    "https://github.com/warmcat/libwebsockets/archive/${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
-    "${LIBWEBSOCKETS_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBWEBSOCKETS}"; then
-    if run tar -xf "${tmp}/${LIBWEBSOCKETS_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
-      copy_libwebsockets "${tmp}/libwebsockets-${LIBWEBSOCKETS_PACKAGE_VERSION}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libwebsockets built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-lws"
-    else
-      run_failed "Failed to build libwebsockets."
-      defer_error_highlighted "Failed to build libwebsockets. You may not be able to connect this node to Netdata Cloud."
-    fi
-  else
-    run_failed "Unable to fetch sources for libwebsockets."
-    defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_libwebsockets
 
 # -----------------------------------------------------------------------------
 
