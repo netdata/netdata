@@ -45,6 +45,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Build
         run: |
           docker build -f .github/dockerfiles/Dockerfile.clang .
