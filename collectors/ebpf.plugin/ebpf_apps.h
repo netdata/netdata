@@ -357,12 +357,11 @@ typedef struct ebpf_process_stat {
     //Counter
     uint32_t exit_call;
     uint32_t release_call;
-    uint32_t fork_call;
-    uint32_t clone_call;
+    uint32_t create_process;
+    uint32_t create_thread;
 
     //Counter
-    uint32_t fork_err;
-    uint32_t clone_err;
+    uint32_t task_err;
 
     uint8_t removeme;
 } ebpf_process_stat_t;

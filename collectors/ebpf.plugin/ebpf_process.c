@@ -197,7 +197,7 @@ void ebpf_process_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_do_fork));
+            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, create_process));
             write_chart_dimension(w->name, value);
         }
     }
@@ -206,7 +206,7 @@ void ebpf_process_send_apps_data(struct target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, call_sys_clone));
+            value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_publish_apps_t, create_thread));
             write_chart_dimension(w->name, value);
         }
     }
@@ -287,11 +287,10 @@ static void ebpf_process_update_apps_data()
         //Read data
         cad->call_do_exit = ps->exit_call;
         cad->call_release_task = ps->release_call;
-        cad->call_do_fork = ps->fork_call;
-        cad->call_sys_clone = ps->clone_call;
+        cad->create_process = ps->create_process;
+        cad->create_thread = ps->create_thread;
 
-        cad->ecall_do_fork = ps->fork_err;
-        cad->ecall_sys_clone = ps->clone_err;
+        cad->ecall_do_fork = ps->task_err;
 
         pids = pids->next;
     }
@@ -555,22 +554,20 @@ static void ebpf_process_sum_cgroup_pids(ebpf_process_stat_t *ps, struct pid_on_
 
         accumulator.exit_call += ps->exit_call;
         accumulator.release_call += ps->release_call;
-        accumulator.fork_call += ps->fork_call;
-        accumulator.clone_call += ps->clone_call;
+        accumulator.create_process += ps->create_process;
+        accumulator.create_thread += ps->create_thread;
 
-        accumulator.fork_err += ps->fork_err;
-        accumulator.clone_err += ps->clone_err;
+        accumulator.task_err += ps->task_err;
 
         pids = pids->next;
     }
 
     ps->exit_call = (accumulator.exit_call >= ps->exit_call) ? accumulator.exit_call : ps->exit_call;
     ps->release_call = (accumulator.release_call >= ps->release_call) ? accumulator.release_call : ps->release_call;
-    ps->fork_call = (accumulator.fork_call >= ps->fork_call) ? accumulator.fork_call : ps->fork_call;
-    ps->clone_call = (accumulator.clone_call >= ps->clone_call) ? accumulator.clone_call : ps->clone_call;
+    ps->create_process = (accumulator.create_process >= ps->create_process) ? accumulator.create_process : ps->create_process;
+    ps->create_thread = (accumulator.create_thread >= ps->create_thread) ? accumulator.create_thread : ps->create_thread;
 
-    ps->fork_err = (accumulator.fork_err >= ps->fork_err) ? accumulator.fork_err : ps->fork_err;
-    ps->clone_err = (accumulator.clone_err >= ps->clone_err) ? accumulator.clone_err : ps->clone_err;
+    ps->task_err = (accumulator.task_err >= ps->task_err) ? accumulator.task_err : ps->task_err;
 }
 
 /*
@@ -585,12 +582,12 @@ static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *val
 {
     write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK].name,
-                          (long long) values->fork_call);
+                          (long long) values->create_process);
     write_end_chart();
 
     write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD);
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_CLONE].name,
-                          (long long) values->clone_call);
+                          (long long) values->create_thread);
     write_end_chart();
 
     write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE);
@@ -695,7 +692,7 @@ static int ebpf_send_systemd_process_charts()
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, ect->publish_systemd_ps.fork_call);
+            write_chart_dimension(ect->name, ect->publish_systemd_ps.create_process);
         } else
             ret = 0;
     }
@@ -704,7 +701,7 @@ static int ebpf_send_systemd_process_charts()
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, ect->publish_systemd_ps.clone_call);
+            write_chart_dimension(ect->name, ect->publish_systemd_ps.create_thread);
         }
     }
     write_end_chart();
