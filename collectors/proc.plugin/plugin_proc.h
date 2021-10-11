@@ -5,24 +5,8 @@
 
 #include "daemon/common.h"
 
-#if (TARGET_OS == OS_LINUX)
-
-#define NETDATA_PLUGIN_HOOK_LINUX_PROC \
-    { \
-        .name = "PLUGIN[proc]", \
-        .config_section = CONFIG_SECTION_PLUGINS, \
-        .config_name = "proc", \
-        .enabled = 1, \
-        .thread = NULL, \
-        .init_routine = NULL, \
-        .start_routine = proc_main \
-    },
-
-
 #define PLUGIN_PROC_CONFIG_NAME "proc"
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
-
-extern void *proc_main(void *ptr);
 
 extern int do_proc_net_dev(int update_every, usec_t dt);
 extern int do_proc_net_wireless(int update_every, usec_t dt);
@@ -73,12 +57,5 @@ extern void netdev_rename_device_del(const char *host_device);
 #include "proc_self_mountinfo.h"
 #include "proc_pressure.h"
 #include "zfs_common.h"
-
-#else // (TARGET_OS == OS_LINUX)
-
-#define NETDATA_PLUGIN_HOOK_LINUX_PROC
-
-#endif // (TARGET_OS == OS_LINUX)
-
 
 #endif /* NETDATA_PLUGIN_PROC_H */

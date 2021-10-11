@@ -17,17 +17,6 @@
 #define ANALYTICS_MAX_JSON_HITS 255
 #define ANALYTICS_MAX_DASHBOARD_HITS 255
 
-#define NETDATA_PLUGIN_HOOK_ANALYTICS \
-    { \
-        .name = "ANALYTICS", \
-        .config_section = NULL, \
-        .config_name = NULL, \
-        .enabled = 0, \
-        .thread = NULL, \
-        .init_routine = NULL, \
-        .start_routine = analytics_main \
-    },
-
 /* Needed to calculate the space needed for parameters */
 #define ANALYTICS_NO_OF_ITEMS 38
 
@@ -79,7 +68,6 @@ struct analytics_data {
     uint8_t dashboard_hits;
 };
 
-extern void *analytics_main(void *ptr);
 extern void analytics_get_data(char *name, BUFFER *wb);
 extern void set_late_global_environment(void);
 extern void analytics_free_data(void);

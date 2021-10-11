@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_idlejitter.h"
+#include "daemon/common.h"
 
 #define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 

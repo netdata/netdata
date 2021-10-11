@@ -199,7 +199,6 @@ APPS_PLUGIN_FILES = \
 
 CHECKS_PLUGIN_FILES = \
     collectors/checks.plugin/plugin_checks.c \
-    collectors/checks.plugin/plugin_checks.h \
     $(NULL)
 
 FREEBSD_PLUGIN_FILES = \
@@ -269,7 +268,6 @@ endif
 
 IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
-    collectors/idlejitter.plugin/plugin_idlejitter.h \
     $(NULL)
 
 CGROUPS_PLUGIN_FILES = \
@@ -283,12 +281,10 @@ CGROUP_NETWORK_FILES = \
     $(NULL)
 
 DISKSPACE_PLUGIN_FILES = \
-    collectors/diskspace.plugin/plugin_diskspace.h \
     collectors/diskspace.plugin/plugin_diskspace.c \
     $(NULL)
 
 TIMEX_PLUGIN_FILES = \
-    collectors/timex.plugin/plugin_timex.h \
     collectors/timex.plugin/plugin_timex.c \
     $(NULL)
 
@@ -411,7 +407,6 @@ PROC_PLUGIN_FILES = \
 
 TC_PLUGIN_FILES = \
     collectors/tc.plugin/plugin_tc.c \
-    collectors/tc.plugin/plugin_tc.h \
     $(NULL)
 
 MACOS_PLUGIN_FILES = \
@@ -569,7 +564,6 @@ REGISTRY_PLUGIN_FILES = \
 
 STATSD_PLUGIN_FILES = \
     collectors/statsd.plugin/statsd.c \
-    collectors/statsd.plugin/statsd.h \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
@@ -867,7 +861,8 @@ DAEMON_FILES = \
     daemon/signals.c \
     daemon/signals.h \
     daemon/service.c \
-    daemon/service.h \
+    daemon/static_threads.h \
+    daemon/static_threads.c \
     daemon/commands.c \
     daemon/commands.h \
     daemon/unit_test.c \
@@ -902,25 +897,27 @@ NETDATA_FILES = \
 
 if FREEBSD
     NETDATA_FILES += \
+        daemon/static_threads_freebsd.c \
         $(FREEBSD_PLUGIN_FILES) \
         $(NULL)
 endif
 
 if MACOS
     NETDATA_FILES += \
+        daemon/static_threads_macos.c \
         $(MACOS_PLUGIN_FILES) \
         $(NULL)
 endif
 
 if LINUX
     NETDATA_FILES += \
+        daemon/static_threads_linux.c \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
         $(TIMEX_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
-
 endif
 
 NETDATA_COMMON_LIBS = \

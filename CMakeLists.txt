@@ -428,7 +428,6 @@ set(APPS_PLUGIN_FILES
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
-        collectors/checks.plugin/plugin_checks.h
         )
 
 set(FREEBSD_PLUGIN_FILES
@@ -453,7 +452,6 @@ set(HEALTH_PLUGIN_FILES
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c
-        collectors/idlejitter.plugin/plugin_idlejitter.h
         )
 
 set(CGROUPS_PLUGIN_FILES
@@ -466,12 +464,10 @@ set(CGROUP_NETWORK_FILES
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        collectors/diskspace.plugin/plugin_diskspace.h
         collectors/diskspace.plugin/plugin_diskspace.c
         )
 
 set(TIMEX_PLUGIN_FILES
-        collectors/timex.plugin/plugin_timex.h
         collectors/timex.plugin/plugin_timex.c
         )
 
@@ -583,7 +579,6 @@ set(PROC_PLUGIN_FILES
 
 set(TC_PLUGIN_FILES
         collectors/tc.plugin/plugin_tc.c
-        collectors/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
@@ -624,7 +619,6 @@ set(REGISTRY_PLUGIN_FILES
 
 set(STATSD_PLUGIN_FILES
         collectors/statsd.plugin/statsd.c
-        collectors/statsd.plugin/statsd.h
         )
 
 set(RRD_PLUGIN_FILES
@@ -926,7 +920,8 @@ set(DAEMON_FILES
         daemon/signals.c
         daemon/signals.h
         daemon/service.c
-        daemon/service.h
+        daemon/static_threads.c
+        daemon/static_threads.h
         daemon/commands.c
         daemon/commands.h
         daemon/unit_test.c
@@ -1184,7 +1179,9 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 # netdata
 
 IF(LINUX)
+    list(APPEND NETDATA_FILES daemon/static_threads_linux.c)
     list(APPEND NETDATA_COMMON_LIBRARIES rt)
+
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
@@ -1202,6 +1199,8 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_SLABINFO True)
 
 ELSEIF(FREEBSD)
+    list(APPEND NETDATA_FILES daemon/static_threads_freebsd.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
@@ -1213,6 +1212,8 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_EBPF False)
 
 ELSEIF(MACOS)
+    list(APPEND NETDATA_FILES daemon/static_threads_macos.c)
+
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
