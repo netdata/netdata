@@ -32,7 +32,7 @@ static void updateDimensionsChart(RRDHOST *RH,
             "netdata", // plugin
             "ml", // module
             39183, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -72,7 +72,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
             "netdata", // plugin
             "ml", // module
             39184, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -103,7 +103,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
             "netdata", // plugin
             "ml", // module
             39185, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -112,7 +112,7 @@ static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) 
     } else
         rrdset_next(RS);
 
-    rrddim_set_by_pointer(RS, WindowLengthRD, WindowLength * Cfg.UpdateEvery);
+    rrddim_set_by_pointer(RS, WindowLengthRD, WindowLength * RH->rrd_update_every);
     rrdset_done(RS);
 }
 
@@ -138,7 +138,7 @@ static void updateEventsChart(RRDHOST *RH,
             "netdata", // plugin
             "ml", // module
             39186, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -178,7 +178,7 @@ static void updateDetectionChart(RRDHOST *RH, collected_number PredictionDuratio
             "netdata", // plugin
             "ml", // module
             39187, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -213,7 +213,7 @@ static void updateTrainingChart(RRDHOST *RH,
             "netdata", // plugin
             "ml", // module
             39188, // priority
-            Cfg.UpdateEvery, // update_every
+            RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
 
@@ -224,7 +224,7 @@ static void updateTrainingChart(RRDHOST *RH,
     } else
         rrdset_next(RS);
 
-    rrddim_set_by_pointer(RS, TotalTrainingDurationRD, MaxTrainingDuration);
+    rrddim_set_by_pointer(RS, TotalTrainingDurationRD, TotalTrainingDuration);
     rrddim_set_by_pointer(RS, MaxTrainingDurationRD, MaxTrainingDuration);
 
     rrdset_done(RS);
@@ -264,9 +264,9 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
 
     Json["enabled"] = Cfg.EnableAnomalyDetection;
 
-    Json["min-train-samples"] = Cfg.MinTrainSecs.count();
-    Json["max-train-samples"] = Cfg.MaxTrainSecs.count();
-    Json["train-every"] = Cfg.MaxTrainSecs.count();
+    Json["min-train-samples"] = Cfg.MinTrainSamples;
+    Json["max-train-samples"] = Cfg.MaxTrainSamples;
+    Json["train-every"] = Cfg.TrainEvery;
 
     Json["diff-n"] = Cfg.DiffN;
     Json["smooth-n"] = Cfg.SmoothN;
@@ -288,7 +288,7 @@ std::pair<Dimension *, Duration<double>>
 TrainableHost::findDimensionToTrain(const TimePoint &NowTP) {
     std::lock_guard<std::mutex> Lock(Mutex);
 
-    Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery} / (DimensionsMap.size()  + 1);
+    Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery * updateEvery()} / (DimensionsMap.size()  + 1);
 
     for (auto &DP : DimensionsMap) {
         Dimension *D = DP.second;
@@ -306,7 +306,7 @@ void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
     if (D == nullptr)
         return;
 
-    D->LastTrainedAt = NowTP + Seconds{Cfg.UpdateEvery};
+    D->LastTrainedAt = NowTP + Seconds{D->updateEvery()};
 
     TimePoint StartTP = SteadyClock::now();
     D->trainModel();
@@ -320,7 +320,7 @@ void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
 }
 
 void TrainableHost::train() {
-    Duration<double> MaxSleepFor = Seconds{1};
+    Duration<double> MaxSleepFor = Seconds{updateEvery()};
 
     while (!netdata_exit) {
         TimePoint NowTP = SteadyClock::now();
@@ -424,7 +424,7 @@ void DetectableHost::detectOnce() {
     nlohmann::json JsonResult = DimsOverThreshold;
 
     time_t Before = now_realtime_sec();
-    time_t After = Before - (WindowLength * Cfg.UpdateEvery);
+    time_t After = Before - (WindowLength * updateEvery());
     DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
 }
 
@@ -439,7 +439,7 @@ void DetectableHost::detect() {
         Duration<double> Dur = EndTP - StartTP;
         updateDetectionChart(getRH(), Dur.count() * 1000);
 
-        std::this_thread::sleep_for(Seconds{Cfg.UpdateEvery});
+        std::this_thread::sleep_for(Seconds{updateEvery()});
     }
 }
 

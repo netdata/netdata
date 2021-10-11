@@ -24,7 +24,7 @@ public:
 
     time_t oldestTime() { return Ops->oldest_time(RD); }
 
-    Seconds updateEvery() const { return Seconds{RD->update_every}; }
+    unsigned updateEvery() const { return RD->update_every; }
 
     const std::string getID() const { return ID; }
 
@@ -45,7 +45,8 @@ enum class MLResult {
 
 class TrainableDimension : public RrdDimension {
 public:
-    TrainableDimension(RRDDIM *RD) : RrdDimension(RD) {}
+    TrainableDimension(RRDDIM *RD) :
+        RrdDimension(RD), TrainEvery(Cfg.TrainEvery * updateEvery()) {}
 
     MLResult trainModel();
 
@@ -54,7 +55,7 @@ public:
     }
 
     bool shouldTrain(const TimePoint &TP) const {
-        return (LastTrainedAt + (Cfg.TrainEvery * Cfg.UpdateEvery)) < TP;
+        return (LastTrainedAt + TrainEvery) < TP;
     }
 
     bool isTrained() const { return Trained; }
@@ -70,7 +71,9 @@ public:
     TimePoint LastTrainedAt{Seconds{0}};
 
 private:
+    Seconds TrainEvery;
     KMeans KM;
+
     std::atomic<bool> Trained{false};
     std::atomic<double> TrainingDuration{0.0};
 };

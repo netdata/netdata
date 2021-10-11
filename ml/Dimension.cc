@@ -57,21 +57,18 @@ static CalculatedNumber unpack_storage_number_dbl(storage_number value) {
 
 std::pair<CalculatedNumber *, size_t>
 TrainableDimension::getCalculatedNumbers() {
-    size_t MinN = Cfg.MinTrainSecs / updateEvery();
-    size_t MaxN = Cfg.MaxTrainSecs / updateEvery();
+    size_t MinN = Cfg.MinTrainSamples;
+    size_t MaxN = Cfg.MaxTrainSamples;
 
     // Figure out what our time window should be.
     time_t BeforeT = now_realtime_sec() - 1;
-    time_t AfterT = BeforeT - (MaxN * updateEvery().count());
+    time_t AfterT = BeforeT - (MaxN * updateEvery());
 
-    BeforeT -= (BeforeT % updateEvery().count());
-    AfterT -= (AfterT % updateEvery().count());
+    BeforeT -= (BeforeT % updateEvery());
+    AfterT -= (AfterT % updateEvery());
 
-    time_t LastT = latestTime();
-    BeforeT = (BeforeT > LastT) ? LastT : BeforeT;
-
-    time_t FirstT = oldestTime();
-    AfterT = (AfterT < FirstT) ? FirstT : AfterT;
+    BeforeT = std::min(BeforeT, latestTime());
+    AfterT = std::max(AfterT, oldestTime());
 
     if (AfterT >= BeforeT)
         return { nullptr, 0 };

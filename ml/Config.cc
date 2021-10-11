@@ -23,15 +23,14 @@ void Config::readMLConfig(void) {
     const char *ConfigSectionML = "ml";
 
     bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
-    unsigned UpdateEvery = config_get_number(ConfigSectionML, "update every", 1);
 
     /*
      * Read values
      */
 
-    int MaxTrainSecs = config_get_number(ConfigSectionML, "maximum num secs to train", 4 * 3600);
-    int MinTrainSecs = config_get_number(ConfigSectionML, "minimum num secs to train", 1 * 3600);
-    int TrainEvery = config_get_number(ConfigSectionML, "train every secs", 1 * 3600);
+    unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
+    unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 3600);
+    unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
 
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -62,9 +61,9 @@ void Config::readMLConfig(void) {
      * Clamp
      */
 
-    MaxTrainSecs = clamp(MaxTrainSecs, 1 * 3600, 6 * 3600);
-    MinTrainSecs = clamp(MinTrainSecs, 1 * 3600, 6 * 3600);
-    TrainEvery = clamp(TrainEvery, 1 * 3600, 6 * 3600);
+    MaxTrainSamples = clamp(MaxTrainSamples, 1 * 3600u, 6 * 3600u);
+    MinTrainSamples = clamp(MinTrainSamples, 1 * 3600u, 6 * 3600u);
+    TrainEvery = clamp(TrainEvery, 1 * 3600u, 6 * 3600u);
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
@@ -85,11 +84,11 @@ void Config::readMLConfig(void) {
      * Validate
      */
 
-    if (MinTrainSecs >= MaxTrainSecs) {
-        error("invalid min/max train seconds found (%d >= %d)", MinTrainSecs, MaxTrainSecs);
+    if (MinTrainSamples >= MaxTrainSamples) {
+        error("invalid min/max train samples found (%d >= %d)", MinTrainSamples, MaxTrainSamples);
 
-        MinTrainSecs = 1 * 3600;
-        MaxTrainSecs = 4 * 3600;
+        MinTrainSamples = 1 * 3600;
+        MaxTrainSamples = 4 * 3600;
     }
 
     if (ADMinWindowSize >= ADMaxWindowSize) {
@@ -104,11 +103,10 @@ void Config::readMLConfig(void) {
      */
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
-    Cfg.UpdateEvery = UpdateEvery;
 
-    Cfg.MaxTrainSecs = Seconds{MaxTrainSecs};
-    Cfg.MinTrainSecs = Seconds{MinTrainSecs};
-    Cfg.TrainEvery = Seconds{TrainEvery};
+    Cfg.MaxTrainSamples = MaxTrainSamples;
+    Cfg.MinTrainSamples = MinTrainSamples;
+    Cfg.TrainEvery = TrainEvery;
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;

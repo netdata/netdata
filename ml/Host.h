@@ -18,6 +18,8 @@ public:
 
     RRDHOST *getRH() { return RH; }
 
+    unsigned updateEvery() { return RH->rrd_update_every; }
+
     std::string getUUID() {
         char S[UUID_STR_LEN];
         uuid_unparse_lower(RH->host_uuid, S);
