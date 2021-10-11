@@ -699,11 +699,11 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // compose the config_section for this chart
 
-    char config_section[RRD_ID_LENGTH_MAX + 1];
+    char config_section[RRD_ID_LENGTH_MAX + GUID_LEN + 2];
     if(host == localhost)
         strcpy(config_section, fullid);
     else
-        snprintfz(config_section, RRD_ID_LENGTH_MAX, "%s/%s", host->machine_guid, fullid);
+        snprintfz(config_section, RRD_ID_LENGTH_MAX + GUID_LEN + 1, "%s/%s", host->machine_guid, fullid);
 
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
