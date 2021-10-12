@@ -18,6 +18,17 @@
 // configuration file
 #define NETDATA_DIRECTORY_SHM_CONFIG_FILE "shm.conf"
 
+// Contexts
+#define NETDATA_CGROUP_SHM_GET_CONTEXT "cgroup.shmget"
+#define NETDATA_CGROUP_SHM_AT_CONTEXT "cgroup.shmat"
+#define NETDATA_CGROUP_SHM_DT_CONTEXT "cgroup.shmdt"
+#define NETDATA_CGROUP_SHM_CTL_CONTEXT "cgroup.shmctl"
+
+#define NETDATA_SYSTEMD_SHM_GET_CONTEXT "services.shmget"
+#define NETDATA_SYSTEMD_SHM_AT_CONTEXT "services.shmat"
+#define NETDATA_SYSTEMD_SHM_DT_CONTEXT "services.shmdt"
+#define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "services.shmctl"
+
 typedef struct netdata_publish_shm {
     uint64_t get;
     uint64_t at;

@@ -75,6 +75,7 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
 #define NETDATA_NETWORK_CONNECTIONS_GROUP "network connections"
+#define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
 
 // Global chart name
 #define NETDATA_TCP_FUNCTION_COUNT "tcp_functions"
@@ -111,6 +112,23 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_MINIMUM_IPV4_CIDR 0
 #define NETDATA_MAXIMUM_IPV4_CIDR 32
+
+// Contexts
+#define NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT "cgroup.net_bytes_recv"
+#define NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT "cgroup.net_bytes_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
+#define NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT "cgroup.net_tcp_send"
+#define NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT "cgroup.net_retransmit"
+#define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
+#define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
+
+#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "services.net_bytes_recv"
+#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "services.net_bytes_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "services.net_tcp_recv"
+#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "services.net_tcp_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "services.net_retransmit"
+#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
+#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
 
 typedef struct ebpf_socket_publish_apps {
     // Data read

@@ -1062,6 +1062,14 @@ netdataDashboard.submenu = {
         info: '<a href="https://en.wikipedia.org/wiki/Advanced_Configuration_and_Power_Interface#Processor_states" target="_blank">Idle States (C-states)</a> '+
         'are used to save power when the processor is idle.'
     },
+
+    'services.net': {
+        title: 'network (eBPF)',
+    },
+
+    'services.page_cache': {
+        title: 'pache cache (eBPF)',
+    },
 };
 
 // ----------------------------------------------------------------------------
@@ -3819,6 +3827,149 @@ netdataDashboard.context = {
         'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
+    'cgroup.swap_read': {
+        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
+    },
+
+    'cgroup.swap_write': {
+        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
+    },
+
+    'cgroup.fd_open': {
+        info: 'Calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
+            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
+    },
+
+    'cgroup.fd_open_error': {
+        info: 'Failed calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ).'
+    },
+
+    'cgroup.fd_close': {
+        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
+            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
+    },
+
+    'cgroup.fd_close_error': {
+        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
+    },
+
+    'cgroup.vfs_unlink': {
+        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
+    },
+
+    'cgroup.vfs_write': {
+        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+    },
+
+    'cgroup.vfs_write_error': {
+        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+    },
+
+    'cgroup.vfs_read': {
+        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+    },
+
+    'cgroup.vfs_read_error': {
+        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
+    },
+
+    'cgroup.vfs_write_bytes': {
+        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
+    },
+
+    'cgroup.vfs_read_bytes': {
+        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
+    },
+
+    'cgroup.process_create': {
+        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that do not have the flag <code>CLONE_THREAD</code> set.'
+    },
+
+    'cgroup.thread_create': {
+        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
+    },
+
+    'cgroup.task_close': {
+        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+    },
+
+    'cgroup.dc_ratio': {
+        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
+    },
+
+    'cgroup.dc_reference': {
+        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'cgroup.dc_not_cache': {
+        info: 'Counters of file accesses. <code>Slow</code> is when there is a file access and the file is not present in the directory cache, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'cgroup.dc_not_found': {
+        info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'cgroup.shmget': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+    },
+
+    'cgroup.shmat': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'cgroup.shmdt': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'cgroup.shmctl': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
+    },
+
+    'cgroup.net_bytes_send': {
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+    },
+
+    'cgroup.net_bytes_recv': {
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'cgroup.net_tcp_send': {
+        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+    },
+
+    'cgroup.net_tcp_recv': {
+        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+    },
+
+    'cgroup.net_retransmit': {
+        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+    },
+
+    'cgroup.net_udp_send': {
+        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+    },
+
+    'cgroup.net_udp_recv': {
+        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+    },
+
+    'cgroup.cachestat_ratio': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. If the entry is not there, a page cache miss has occurred and the kernel allocates a new entry and copies in data from the disk. Netdata calculates the percentage of accessed files that are cached on memory. <a href="https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138" target="_blank">The ratio</a> is calculated counting the accessed cached pages (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages.'
+    },
+
+    'cgroup.cachestat_dirties': {
+        info: 'Number of <a href="https://en.wikipedia.org/wiki/Page_cache#Memory_conservation" target="_blank">dirty(modified) pages</a> cache. Pages in the page cache modified after being brought in are called dirty pages. Since non-dirty pages in the page cache have identical copies in <a href="https://en.wikipedia.org/wiki/Secondary_storage" target="_blank">secondary storage</a> (e.g. hard disk drive or solid-state drive), discarding and reusing their space is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage and reusing their space.'
+    },
+
+    'cgroup.cachestat_hits': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. Hits show pages accessed that were not modified (we are excluding dirty pages), this counting also excludes the recent pages inserted for read.'
+    },
+
+    'cgroup.cachestat_misses': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
+    },
+
     // ------------------------------------------------------------------------
     // containers (systemd)
 
@@ -4018,6 +4169,66 @@ netdataDashboard.context = {
 
     'services.dc_not_found': {
         info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
+    },
+
+    'services.shmget': {
+        info: 'Number of times the syscall <code>shmget</code> is called. Netdata also gives a summary for these charts in <a href="#menu_system_submenu_ipc_shared_memory">System overview</a>.'
+    },
+
+    'services.shmat': {
+        info: 'Number of times the syscall <code>shmat</code> is called.'
+    },
+
+    'services.shmdt': {
+        info: 'Number of times the syscall <code>shmdt</code> is called.'
+    },
+
+    'services.shmctl': {
+        info: 'Number of times the syscall <code>shmctl</code> is called.'
+    },
+
+    'services.net_bytes_send': {
+        info: 'Bytes sent by functions <code>tcp_sendmsg</code>.'
+    },
+
+    'services.net_bytes_recv': {
+        info: 'Bytes received by functions <code>tcp_cleanup_rbuf</code> . We use <code>tcp_cleanup_rbuf</code> instead <code>tcp_recvmsg</code>, because this last misses <code>tcp_read_sock()</code> traffic and we would also need to have more probes to get the socket and package size.'
+    },
+
+    'services.net_tcp_send': {
+        info: 'The function <code>tcp_sendmsg</code> is used to collect number of bytes sent from TCP connections.'
+    },
+
+    'services.net_tcp_recv': {
+        info: 'The function <code>tcp_cleanup_rbuf</code> is used to collect number of bytes received from TCP connections.'
+    },
+
+    'services.net_retransmit': {
+        info: 'The function <code>tcp_retransmit_skb</code> is called when the host did not receive the expected return from a packet sent.'
+    },
+
+    'services.net_udp_send': {
+        info: 'The function <code>udp_sendmsg</code> is used to collect number of bytes sent from UDP connections.'
+    },
+
+    'services.net_udp_recv': {
+        info: 'The function <code>udp_recvmsg</code> is used to collect number of bytes received from UDP connections.'
+    },
+
+    'services.cachestat_ratio': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. If the entry is not there, a page cache miss has occurred and the kernel allocates a new entry and copies in data from the disk. Netdata calculates the percentage of accessed files that are cached on memory. <a href="https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138" target="_blank">The ratio</a> is calculated counting the accessed cached pages (without counting dirty pages and pages added because of read misses) divided by total access without dirty pages.'
+    },
+
+    'services.cachestat_dirties': {
+        info: 'Number of <a href="https://en.wikipedia.org/wiki/Page_cache#Memory_conservation" target="_blank">dirty(modified) pages</a> cache. Pages in the page cache modified after being brought in are called dirty pages. Since non-dirty pages in the page cache have identical copies in <a href="https://en.wikipedia.org/wiki/Secondary_storage" target="_blank">secondary storage</a> (e.g. hard disk drive or solid-state drive), discarding and reusing their space is much quicker than paging out application memory, and is often preferred over flushing the dirty pages into secondary storage and reusing their space.'
+    },
+
+    'services.cachestat_hits': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is there, a page cache hit has occurred and the read is from the cache. Hits show pages accessed that were not modified (we are excluding dirty pages), this counting also excludes the recent pages inserted for read.'
+    },
+
+    'services.cachestat_misses': {
+        info: 'When the processor needs to read or write a location in main memory, it checks for a corresponding entry in the page cache. If the entry is not there, a page cache miss has occurred and the cache allocates a new entry and copies in data for the main memory. Misses count page insertions to the memory not related to writing.'
     },
 
     // ------------------------------------------------------------------------
@@ -5626,92 +5837,6 @@ netdataDashboard.context = {
 
     'apps.shmctl_call': {
         info: 'Number of times the syscall <code>shmctl</code> is called.'
-    },
-
-    // ------------------------------------------------------------------------
-    // Cgroup units
-
-    'cgroup.swap_read': {
-        info: 'The function <code>swap_readpage</code> is called when the kernel reads a page from swap memory. This chart is provided by eBPF plugin.'
-    },
-
-    'cgroup.swap_write': {
-        info: 'The function <code>swap_writepage</code> is called when the kernel writes a page to swap memory. This chart is provided by eBPF plugin.'
-    },
-
-    'cgroup.fd_open': {
-        info: 'Calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ), which is the common function called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/open.2.html" target="_blank">open(2)</a> ' +
-            ' and <a href="https://www.man7.org/linux/man-pages/man2/openat.2.html" target="_blank">openat(2)</a>. '
-    },
-
-    'cgroup.fd_open_error': {
-        info: 'Failed calls to the internal function <code>do_sys_open</code> (for kernels newer than <code>5.5.19</code> we add a kprobe to <code>do_sys_openat2</code>. ).'
-    },
-
-    'cgroup.fd_close': {
-        info: 'Calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version, which is called from' +
-            ' <a href="https://www.man7.org/linux/man-pages/man2/close.2.html" target="_blank">close(2)</a>. '
-    },
-
-    'cgroup.fd_close_error': {
-        info: 'Failed calls to the internal function <a href="https://elixir.bootlin.com/linux/v5.10/source/fs/file.c#L665" target="_blank">__close_fd</a> or <a href="https://elixir.bootlin.com/linux/v5.11/source/fs/file.c#L617" target="_blank">close_fd</a> according to your kernel version.'
-    },
-
-    'cgroup.vfs_unlink': {
-        info: 'Calls to the function <a href="https://www.kernel.org/doc/htmldocs/filesystems/API-vfs-unlink.html" target="_blank">vfs_unlink</a>. This chart does not show all events that remove files from the filesystem, because filesystems can create their own functions to remove files.'
-    },
-
-    'cgroup.vfs_write': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
-    },
-
-    'cgroup.vfs_write_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
-    },
-
-    'cgroup.vfs_read': {
-        info: 'Successful calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
-    },
-
-    'cgroup.vfs_read_error': {
-        info: 'Failed calls to the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>. This chart may not show all filesystem events if it uses other functions to store data on disk.'
-    },
-
-    'cgroup.vfs_write_bytes': {
-        info: 'Total of bytes successfully written using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_write</a>.'
-    },
-
-    'cgroup.vfs_read_bytes': {
-        info: 'Total of bytes successfully read using the function <a href="https://topic.alibabacloud.com/a/kernel-state-file-operation-__-work-information-kernel_8_8_20287135.html" target="_blank">vfs_read</a>.'
-    },
-
-    'cgroup.process_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the process by counting the number of calls to <a href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that do not have the flag <code>CLONE_THREAD</code> set.'
-    },
-
-    'cgroup.thread_create': {
-        info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
-    },
-
-    'cgroup.task_close': {
-        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
-    },
-
-    'cgroup.dc_ratio': {
-        info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
-    },
-
-    'cgroup.dc_reference': {
-        info: 'Counters of file accesses. <code>Reference</code> is when there is a file access, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
-    'cgroup.dc_not_cache': {
-        info: 'Counters of file accesses. <code>Slow</code> is when there is a file access and the file is not present in the directory cache, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
-    },
-
-    'cgroup.dc_not_found': {
-        info: 'Counters of file accesses. <code>Miss</code> is when there is file access and the file is not found in the filesystem, see the <code>filesystem.dc_reference</code> chart for more context. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>.'
     },
 
     // ------------------------------------------------------------------------

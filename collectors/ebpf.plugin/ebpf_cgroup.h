@@ -20,6 +20,9 @@ struct pid_on_target2 {
     netdata_publish_vfs_t vfs;
     ebpf_process_stat_t ps;
     netdata_dcstat_pid_t dc;
+    netdata_publish_shm_t shm;
+    ebpf_bandwidth_t socket;
+    netdata_cachestat_pid_t cachestat;
 
     struct pid_on_target2 *next;
 };
@@ -49,6 +52,9 @@ typedef struct ebpf_cgroup_target {
     ebpf_process_stat_t publish_systemd_ps;
     netdata_publish_dcstat_t publish_dc;
     int oomkill;
+    netdata_publish_shm_t publish_shm;
+    ebpf_socket_publish_apps_t publish_socket;
+    netdata_publish_cachestat_t publish_cachestat;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;

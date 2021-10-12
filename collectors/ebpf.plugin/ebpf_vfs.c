@@ -497,7 +497,7 @@ static void read_update_vfs_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
-            if (vfs_pid[pid]) {
+            if (likely(vfs_pid) && vfs_pid[pid]) {
                 netdata_publish_vfs_t *in = vfs_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_publish_vfs_t));
@@ -506,7 +506,7 @@ static void read_update_vfs_cgroup()
                 if (!bpf_map_lookup_elem(fd, &pid, vv)) {
                     vfs_apps_accumulator(vv);
 
-                    memcpy(out, vv, sizeof(netdata_publish_swap_t));
+                    memcpy(out, vv, sizeof(netdata_publish_vfs_t));
                 }
             }
         }
@@ -1524,16 +1524,18 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- *  @param length is the length for the vectors used inside the collector.
+ *  @param apps is apps enabled?
  */
-static void ebpf_vfs_allocate_global_vectors()
+static void ebpf_vfs_allocate_global_vectors(int apps)
 {
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
 
     vfs_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-    vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
+
+    if (apps)
+        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
 }
 
 /*****************************************************************
@@ -1560,7 +1562,7 @@ void *ebpf_vfs_thread(void *ptr)
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
 
-    ebpf_vfs_allocate_global_vectors();
+    ebpf_vfs_allocate_global_vectors(em->apps_charts);
 
     if (!em->enabled)
         goto endvfs;

@@ -306,6 +306,25 @@ When the integration is enabled, eBPF collector allocates memory for each proces
  it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
  for each processor it runs.
 
+### Integration with `cgroups.plugin`
+
+The eBPF collector also creates charts for each cgroup through an integration with the
+[`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
+interacts with the Linux kernel.
+
+The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system.
+If you want to _enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
+`yes`.
+
+```conf
+[global]
+   cgroups = yes
+```
+
+If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
+`ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
+['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
+
 #### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:

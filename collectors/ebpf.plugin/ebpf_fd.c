@@ -39,7 +39,7 @@ static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
 netdata_fd_stat_t *fd_vector = NULL;
-netdata_fd_stat_t **fd_pid;
+netdata_fd_stat_t **fd_pid = NULL;
 
 /*****************************************************************
  *
@@ -267,7 +267,7 @@ static void ebpf_update_fd_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            if (fd_pid[pid]) {
+            if (likely(fd_pid) && fd_pid[pid]) {
                 netdata_fd_stat_t *in = fd_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
@@ -276,7 +276,7 @@ static void ebpf_update_fd_cgroup()
                 if (!bpf_map_lookup_elem(fd, &pid, fv)) {
                     fd_apps_accumulator(fv);
 
-                    memcpy(out, fv, sizeof(netdata_publish_swap_t));
+                    memcpy(out, fv, sizeof(netdata_fd_stat_t));
                 }
             }
         }
@@ -801,10 +801,14 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
+ *
+ * @param apps is apps enabled?
  */
-static void ebpf_fd_allocate_global_vectors()
+static void ebpf_fd_allocate_global_vectors(int apps)
 {
-    fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+    if (apps)
+        fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -829,7 +833,7 @@ void *ebpf_fd_thread(void *ptr)
     if (!em->enabled)
         goto endfd;
 
-    ebpf_fd_allocate_global_vectors();
+    ebpf_fd_allocate_global_vectors(em->apps_charts);
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {

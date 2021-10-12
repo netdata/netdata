@@ -303,7 +303,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            if (dcstat_pid[pid]) {
+            if (likely(dcstat_pid) && dcstat_pid[pid]) {
                 netdata_publish_dcstat_t *in = dcstat_pid[pid];
 
                 memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
@@ -601,14 +601,11 @@ void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_ta
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
-        int32_t pid = root->pid;
-        netdata_publish_dcstat_t *w = dcstat_pid[pid];
-        if (w) {
-            netdata_dcstat_pid_t *src = &w->curr;
-            dst->cache_access += src->cache_access;
-            dst->file_system += src->file_system;
-            dst->not_found += src->not_found;
-        }
+        netdata_dcstat_pid_t *src = &root->dc;
+
+        dst->cache_access += src->cache_access;
+        dst->file_system += src->file_system;
+        dst->not_found += src->not_found;
 
         root = root->next;
     }
@@ -903,16 +900,18 @@ static void ebpf_create_filesystem_charts()
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param length is the length for the vectors used inside the collector.
+ * @param apps is apps enabled?
  */
-static void ebpf_dcstat_allocate_global_vectors(size_t length)
+static void ebpf_dcstat_allocate_global_vectors(int apps)
 {
-    dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+    if (apps)
+        dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
+
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    memset(dcstat_counter_aggregated_data, 0, length*sizeof(netdata_syscall_stat_t));
-    memset(dcstat_counter_publish_aggregated, 0, length*sizeof(netdata_publish_syscall_t));
+    memset(dcstat_counter_aggregated_data, 0, NETDATA_DCSTAT_IDX_END * sizeof(netdata_syscall_stat_t));
+    memset(dcstat_counter_publish_aggregated, 0, NETDATA_DCSTAT_IDX_END * sizeof(netdata_publish_syscall_t));
 }
 
 /*****************************************************************
@@ -944,7 +943,7 @@ void *ebpf_dcstat_thread(void *ptr)
     if (!em->enabled)
         goto enddcstat;
 
-    ebpf_dcstat_allocate_global_vectors(NETDATA_DCSTAT_IDX_END);
+    ebpf_dcstat_allocate_global_vectors(em->apps_charts);
 
     pthread_mutex_lock(&lock);
 

@@ -15,7 +15,7 @@
 #define NETDATA_APPS_FILE_CGROUP_GROUP "file_access (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net"
-#define NETDATA_APPS_IPC_SHM_GROUP "ipc shared memory"
+#define NETDATA_APPS_IPC_SHM_GROUP "ipc shm (eBPF)"
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
@@ -27,6 +27,7 @@
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
 #include "ebpf_shm.h"
+#include "ebpf_socket.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"

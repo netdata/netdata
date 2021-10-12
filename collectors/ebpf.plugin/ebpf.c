@@ -659,7 +659,9 @@ static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disabl
 {
     em->enabled = CONFIG_BOOLEAN_YES;
 
-    if (!disable_apps) {
+    // oomkill stores data inside apps submenu, so it always need to have apps_enabled for plugin to create
+    // its chart, without this comparison eBPF.plugin will try to store invalid data when apps is disabled.
+    if (!disable_apps || !strcmp(em->thread_name, "oomkill")) {
         em->apps_charts = CONFIG_BOOLEAN_YES;
     }
 

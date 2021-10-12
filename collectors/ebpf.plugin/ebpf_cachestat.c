@@ -280,6 +280,43 @@ static void read_apps_table()
 }
 
 /**
+ * Update cgroup
+ *
+ * Update cgroup data based in
+ */
+static void ebpf_update_cachestat_cgroup()
+{
+    netdata_cachestat_pid_t *cv = cachestat_vector;
+    int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
+    size_t length = sizeof(netdata_cachestat_pid_t) * ebpf_nprocs;
+
+    ebpf_cgroup_target_t *ect;
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_cachestat_pid_t *out = &pids->cachestat;
+            if (likely(cachestat_pid) && cachestat_pid[pid]) {
+                netdata_publish_cachestat_t *in = cachestat_pid[pid];
+
+                memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
+            } else {
+                memset(cv, 0, length);
+                if (bpf_map_lookup_elem(fd, &pid, cv)) {
+                    continue;
+                }
+
+                cachestat_apps_accumulator(cv);
+
+                memcpy(out, cv, sizeof(netdata_cachestat_pid_t));
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
  * Create apps charts
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
@@ -463,7 +500,7 @@ void ebpf_cache_send_apps_data(struct target *root)
 
             uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
             uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
-            w->cachestat.dirty = current->mark_buffer_dirty;
+            w->cachestat.dirty = mbd;
             uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
             uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
 
@@ -504,6 +541,287 @@ void ebpf_cache_send_apps_data(struct target *root)
 }
 
 /**
+ * Cachestat sum PIDs
+ *
+ * Sum values for all PIDs associated to a group
+ *
+ * @param publish  output structure.
+ * @param root     structure with listed IPs
+ */
+void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct pid_on_target2 *root)
+{
+    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
+    memset(&publish->current, 0, sizeof(publish->current));
+
+    netdata_cachestat_pid_t *dst = &publish->current;
+    while (root) {
+        netdata_cachestat_pid_t *src = &root->cachestat;
+
+        dst->account_page_dirtied += src->account_page_dirtied;
+        dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
+        dst->mark_buffer_dirty += src->mark_buffer_dirty;
+        dst->mark_page_accessed += src->mark_page_accessed;
+
+        root = root->next;
+    }
+}
+
+/**
+ * Calc chart values
+ *
+ * Do necessary math to plot charts.
+ */
+void ebpf_cachestat_calc_chart_values()
+{
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        ebpf_cachestat_sum_cgroup_pids(&ect->publish_cachestat, ect->pids);
+
+        netdata_cachestat_pid_t *current = &ect->publish_cachestat.current;
+        netdata_cachestat_pid_t *prev = &ect->publish_cachestat.prev;
+
+        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
+        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+        ect->publish_cachestat.dirty = mbd;
+        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
+        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+        cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, apd);
+    }
+}
+
+/**
+ *  Create Systemd cachestat Charts
+ *
+ *  Create charts when systemd is enabled
+ **/
+static void ebpf_create_systemd_cachestat_charts()
+{
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                                  "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                                  EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, 21100,
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_DIRTY_CHART,
+                                  "Number of dirty pages added to the page cache.",
+                                  EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, 21101,
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Hits are function calls that Netdata counts.",
+                                  EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, 21102,
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Misses are function calls that Netdata counts.",
+                                  EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE, 21103,
+                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+                                  NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+}
+
+/**
+ * Send Cache Stat charts
+ *
+ * Send collected data to Netdata.
+ *
+ * @return It returns the status for chart creation, if it is necessary to remove a specific dimension, zero is returned
+ *         otherwise function returns 1 to avoid chart recreation
+ */
+static int ebpf_send_systemd_cachestat_charts()
+{
+    int ret = 1;
+    ebpf_cgroup_target_t *ect;
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.ratio);
+        } else
+            ret = 0;
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.dirty);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.hit);
+        }
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_MISSES_CHART);
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.miss);
+        }
+    }
+    write_end_chart();
+
+    return ret;
+}
+
+/**
+ * Send Directory Cache charts
+ *
+ * Send collected data to Netdata.
+ */
+static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_cachestat_t *npc)
+{
+    write_begin_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART);
+    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_RATIO].name, (long long)npc->ratio);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_CACHESTAT_DIRTY_CHART);
+    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY].name, (long long)npc->dirty);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_CACHESTAT_HIT_CHART);
+    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT].name, (long long)npc->hit);
+    write_end_chart();
+
+    write_begin_chart(type, NETDATA_CACHESTAT_MISSES_CHART);
+    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS].name, (long long)npc->miss);
+    write_end_chart();
+}
+
+/**
+ * Create specific cache Stat charts
+ *
+ * Create charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_create_specific_cachestat_charts(char *type)
+{
+    ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
+                      ebpf_create_global_dimension,
+                      cachestat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
+                      "Number of dirty pages added to the page cache.",
+                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
+                      ebpf_create_global_dimension,
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
+                      "Hits are function calls that Netdata counts.",
+                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
+                      ebpf_create_global_dimension,
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+
+    ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
+                      "Misses are function calls that Netdata counts.",
+                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
+                      ebpf_create_global_dimension,
+                      &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
+                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+}
+
+/**
+ * Obsolete specific cache stat charts
+ *
+ * Obsolete charts for cgroup/application.
+ *
+ * @param type the chart type.
+ */
+static void ebpf_obsolete_specific_cachestat_charts(char *type)
+{
+    ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                      "Hit is calculating using total cache added without dirties per total added because of red misses.",
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200);
+
+    ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
+                      "Number of dirty pages added to the page cache.",
+                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201);
+
+    ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
+                      "Hits are function calls that Netdata counts.",
+                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202);
+
+    ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
+                      "Misses are function calls that Netdata counts.",
+                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203);
+}
+
+/**
+ * Send data to Netdata calling auxiliar functions.
+*/
+void ebpf_cachestat_send_cgroup_data()
+{
+    if (!ebpf_cgroup_pids)
+        return;
+
+    pthread_mutex_lock(&mutex_cgroup_shm);
+    ebpf_cgroup_target_t *ect;
+    ebpf_cachestat_calc_chart_values();
+
+    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
+    if (has_systemd) {
+        static int systemd_charts = 0;
+        if (!systemd_charts) {
+            ebpf_create_systemd_cachestat_charts();
+            systemd_charts = 1;
+        }
+
+        systemd_charts = ebpf_send_systemd_cachestat_charts();
+    }
+
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART) && ect->updated) {
+            ebpf_create_specific_cachestat_charts(ect->name);
+            ect->flags |= NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART;
+        }
+
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART) {
+            if (ect->updated) {
+                ebpf_send_specific_cachestat_data(ect->name, &ect->publish_cachestat);
+            } else {
+                ebpf_obsolete_specific_cachestat_charts(ect->name);
+                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART;
+            }
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
 * Main loop for this collector.
 */
 static void cachestat_collector(ebpf_module_t *em)
@@ -517,6 +835,7 @@ static void cachestat_collector(ebpf_module_t *em)
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
     int apps = em->apps_charts;
+    int cgroups = em->cgroup_charts;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -524,12 +843,18 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps)
             read_apps_table();
 
+        if (cgroups)
+            ebpf_update_cachestat_cgroup();
+
         pthread_mutex_lock(&lock);
 
         cachestat_send_global(&publish);
 
         if (apps)
             ebpf_cache_send_apps_data(apps_groups_root_target);
+
+        if (cgroups)
+            ebpf_cachestat_send_cgroup_data();
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -597,18 +922,20 @@ static void ebpf_create_memory_charts()
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param length is the length for the vectors used inside the collector.
+ * @param apps is apps enabled?
  */
-static void ebpf_cachestat_allocate_global_vectors(size_t length)
+static void ebpf_cachestat_allocate_global_vectors(int apps)
 {
-    cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
+    if (apps)
+        cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
+
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    memset(cachestat_hash_values, 0, length * sizeof(netdata_idx_t));
-    memset(cachestat_counter_aggregated_data, 0, length * sizeof(netdata_syscall_stat_t));
-    memset(cachestat_counter_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
+    memset(cachestat_hash_values, 0, NETDATA_CACHESTAT_END * sizeof(netdata_idx_t));
+    memset(cachestat_counter_aggregated_data, 0, NETDATA_CACHESTAT_END * sizeof(netdata_syscall_stat_t));
+    memset(cachestat_counter_publish_aggregated, 0, NETDATA_CACHESTAT_END * sizeof(netdata_publish_syscall_t));
 }
 
 /*****************************************************************
@@ -639,7 +966,7 @@ void *ebpf_cachestat_thread(void *ptr)
         goto endcachestat;
 
     pthread_mutex_lock(&lock);
-    ebpf_cachestat_allocate_global_vectors(NETDATA_CACHESTAT_END);
+    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
 
     probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {

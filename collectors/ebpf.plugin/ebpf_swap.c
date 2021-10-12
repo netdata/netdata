@@ -154,7 +154,7 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            if (swap_pid[pid]) {
+            if (likely(swap_pid) && swap_pid[pid]) {
                 netdata_publish_swap_t *in = swap_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_publish_swap_t));
@@ -604,11 +604,13 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
- * @param length is the length for the vectors used inside the collector.
+ * @param apps is apps enabled?
  */
-static void ebpf_swap_allocate_global_vectors()
+static void ebpf_swap_allocate_global_vectors(int apps)
 {
-    swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
+    if (apps)
+        swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
+
     swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_swap_t));
 
     swap_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -665,7 +667,7 @@ void *ebpf_swap_thread(void *ptr)
         goto endswap;
     }
 
-    ebpf_swap_allocate_global_vectors();
+    ebpf_swap_allocate_global_vectors(em->apps_charts);
 
     int algorithms[NETDATA_SWAP_END] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
     ebpf_global_labels(swap_aggregated_data, swap_publish_aggregated, swap_dimension_name, swap_dimension_name,
