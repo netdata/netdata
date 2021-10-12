@@ -20,7 +20,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
  * Initialize global configuration variable.
  */
 void Config::readMLConfig(void) {
-    const char *ConfigSectionML = "ml";
+    const char *ConfigSectionML = CONFIG_SECTION_ML;
 
     bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
 
