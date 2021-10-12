@@ -171,6 +171,7 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *charttype,
                                  char *context,
                                  int order,
+                                 int update_time,
                                  char *module);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);

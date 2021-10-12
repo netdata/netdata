@@ -640,6 +640,7 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
                          NETDATA_EBPF_CHART_TYPE_STACKED,
                          NULL,
                          order,
+                         update_every,
                          NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     uint32_t i;
@@ -678,6 +679,7 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
                          NETDATA_EBPF_CHART_TYPE_STACKED,
                          NULL,
                          order,
+                         update_every,
                          NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     uint32_t i;

@@ -337,7 +337,8 @@ void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *fam
                                    char *algorithm, char *context, char *module)
 {
     ebpf_cgroup_target_t *w;
-    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, title, units, family, charttype, context, order, module);
+    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, title, units, family, charttype, context,
+                         order, update_every, module);
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
         if (unlikely(w->systemd) && unlikely(w->updated))
