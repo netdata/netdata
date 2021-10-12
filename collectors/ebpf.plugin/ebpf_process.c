@@ -451,7 +451,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20065,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_THREAD,
                                "Threads started",
@@ -460,7 +460,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20066,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_EXIT,
                                "Tasks starts exit process.",

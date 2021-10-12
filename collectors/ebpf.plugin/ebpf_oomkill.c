@@ -342,8 +342,6 @@ static void oomkill_collector(ebpf_module_t *em)
  */
 void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
-
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_OOMKILL_CHART,
                                "OOM kills",
@@ -352,7 +350,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20020,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_OOMKILL);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_OOMKILL);
 }
 
 /**

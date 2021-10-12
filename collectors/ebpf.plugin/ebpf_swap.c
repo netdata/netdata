@@ -576,8 +576,6 @@ static void swap_collector(ebpf_module_t *em)
  */
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
-
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_READ_CHART,
                                "Calls to function <code>swap_readpage</code>.",
@@ -586,7 +584,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20191,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SWAP);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_WRITE_CHART,
                                "Calls to function <code>swap_writepage</code>.",
@@ -595,7 +593,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SWAP);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
 /**

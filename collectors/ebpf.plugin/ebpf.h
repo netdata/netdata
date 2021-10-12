@@ -210,6 +210,7 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        int order,
                                        char *algorithm,
                                        struct target *root,
+                                       int update_every,
                                        char *module);
 
 extern void write_end_chart();

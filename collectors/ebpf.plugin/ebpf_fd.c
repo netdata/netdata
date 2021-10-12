@@ -718,7 +718,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20061,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
@@ -728,7 +728,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20062,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                   root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSED,
@@ -738,7 +738,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20063,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
@@ -748,7 +748,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                    NETDATA_EBPF_CHART_TYPE_STACKED,
                                    20064,
                                    ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                   root, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                   root, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 }
 

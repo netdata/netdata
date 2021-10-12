@@ -158,7 +158,6 @@ static void ebpf_dcstat_cleanup(void *ptr)
  */
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
                                "Percentage of files listed inside directory cache",
@@ -167,7 +166,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_LINE,
                                20100,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REFERENCE_CHART,
                                "Count file access.",
@@ -176,7 +175,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20101,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                "Access to files that were not present inside directory cache.",
@@ -185,7 +184,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20102,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                "Number of requests for files that were not found on filesystem.",
@@ -194,7 +193,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20103,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /*****************************************************************

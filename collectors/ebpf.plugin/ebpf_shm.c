@@ -697,8 +697,6 @@ static void shm_collector(ebpf_module_t *em)
  */
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
-
     struct target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SHMGET_CHART,
                                "Calls to syscall <code>shmget(2)</code>.",
@@ -707,7 +705,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20191,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SHM);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_charts_on_apps(NETDATA_SHMAT_CHART,
                                "Calls to syscall <code>shmat(2)</code>.",
@@ -716,7 +714,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SHM);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_charts_on_apps(NETDATA_SHMDT_CHART,
                                "Calls to syscall <code>shmdt(2)</code>.",
@@ -725,7 +723,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20193,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SHM);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_charts_on_apps(NETDATA_SHMCTL_CHART,
                                "Calls to syscall <code>shmctl(2)</code>.",
@@ -734,7 +732,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20194,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SHM);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SHM);
 }
 
 /**

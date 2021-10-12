@@ -551,7 +551,6 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    UNUSED(em);
     struct target *root = ptr;;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
@@ -559,7 +558,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20080,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_RECV,
                                "bytes received", EBPF_COMMON_DIMENSION_BITS,
@@ -567,7 +566,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20081,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                                "Calls for tcp_sendmsg",
@@ -576,7 +575,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20082,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                                "Calls for tcp_cleanup_rbuf",
@@ -585,7 +584,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20083,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                                "Calls for tcp_retransmit",
@@ -594,7 +593,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20084,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                                "Calls for udp_sendmsg",
@@ -603,7 +602,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20085,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                                "Calls for udp_recvmsg",
@@ -612,7 +611,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20086,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     socket_apps_created = 1;
 }
