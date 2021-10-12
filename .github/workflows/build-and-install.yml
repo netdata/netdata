@@ -14,7 +14,9 @@ jobs:
     strategy:
       matrix:
         arch:
-          - 'x86_64'
+          - x86_64
+          - armv7l
+          - aarch64
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
