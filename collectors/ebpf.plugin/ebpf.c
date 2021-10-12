@@ -514,18 +514,19 @@ void ebpf_create_global_dimension(void *ptr, int end)
 /**
  *  Call write_chart_cmd to create the charts
  *
- * @param type      chart type
- * @param id        chart id
- * @param title     chart title
- * @param units     axis label
- * @param family    group name used to attach the chart on dashboard
- * @param context   chart context
- * @param charttype chart type
- * @param order     order number of the specified chart
- * @param ncd       a pointer to a function called to create dimensions
- * @param move      a pointer for a structure that has the dimensions
- * @param end       number of dimensions for the chart created
- * @param module    chart module name, this is the eBPF thread.
+ * @param type        chart type
+ * @param id          chart id
+ * @param title       chart title
+ * @param units       axis label
+ * @param family      group name used to attach the chart on dashboard
+ * @param context     chart context
+ * @param charttype   chart type
+ * @param order       order number of the specified chart
+ * @param ncd         a pointer to a function called to create dimensions
+ * @param move        a pointer for a structure that has the dimensions
+ * @param end         number of dimensions for the chart created
+ * @param update_time update interval used with chart.
+ * @param module      chart module name, this is the eBPF thread.
  */
 void ebpf_create_chart(char *type,
                        char *id,
@@ -538,9 +539,10 @@ void ebpf_create_chart(char *type,
                        void (*ncd)(void *, int),
                        void *move,
                        int end,
+                       int update_time,
                        char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, update_every, module);
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, update_time, module);
 
     if (ncd) {
         ncd(move, end);

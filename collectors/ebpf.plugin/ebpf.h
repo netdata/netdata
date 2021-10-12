@@ -189,6 +189,7 @@ extern void ebpf_create_chart(char *type,
                               void (*ncd)(void *, int),
                               void *move,
                               int end,
+                              int update_time,
                               char *module);
 
 extern void write_begin_chart(char *family, char *name);
