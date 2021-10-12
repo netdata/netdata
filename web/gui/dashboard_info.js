@@ -701,7 +701,7 @@ netdataDashboard.menu = {
     'anomaly_detection': {
         title: 'Anomaly Detection',
         icon: '<i class="fas fa-brain"></i>',
-        info: 'Charts relating to anomaly detection, increased `anomalous` dimensions or a higher than usual `anomaly_rate` could be signs of some abnormal behaviour. Read our <a href="https://learn.netdata.cloud/guides/monitor/anomaly-detection" target="_blank">anomaly detection guide</a> for more details.'
+        info: 'Charts relating to anomaly detection, increased <code>anomalous</code> dimensions or a higher than usual <code>anomaly_rate</code> could be signs of some abnormal behaviour. Read our <a href="https://learn.netdata.cloud/guides/monitor/anomaly-detection" target="_blank">anomaly detection guide</a> for more details.'
     },
 };
 
