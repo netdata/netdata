@@ -1089,6 +1089,11 @@ if ENABLE_UNITTESTS
 
     TESTS = $(check_PROGRAMS)
 
+    XFAIL_TESTS = \
+        web/api/tests/web_api_testdriver \
+        web/api/tests/valid_urls_testdriver \
+        $(NULL)
+
     web_api_tests_valid_urls_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \
         -Wl,--wrap=finished_web_request_statistics \
