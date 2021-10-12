@@ -9,6 +9,9 @@ env:
   run_shellcheck: 0
   run_yamllint: 0
   DO_NOT_TRACK: 1
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   eslint:
     name: eslint

@@ -10,6 +10,9 @@ on:
       - coverity-scan.sh
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: coverity-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   coverity:
     if: github.repository == 'netdata/netdata'
