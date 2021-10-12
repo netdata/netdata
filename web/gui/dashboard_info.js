@@ -1312,22 +1312,22 @@ netdataDashboard.context = {
 
     'system.process_thread': {
         title : 'Task creation',
-        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads monitoring tracepoint <code>sched_process_fork</code>.'
+        info: 'Number of times that either <a href="https://www.ece.uic.edu/~yshi1/linux/lkse/node4.html#SECTION00421000000000000000" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, is called to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads monitoring tracepoint <code>sched_process_fork</code>. This chart is provided by eBPF plugin.'
     },
 
     'system.exit': {
         title : 'Exit monitoring',
-        info: 'Calls for the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+        info: 'Calls for the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
     },
 
     'system.task_error': {
         title : 'Task error',
-        info: 'Number of errors to create a new process or thread.'
+        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
     },
 
     'system.process_status': {
         title : 'Task status',
-        info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system.'
+        info: 'Difference between the number of process created and the number of threads created per period(<code>process</code> dimension), it also shows the number of possible zombie process running on system. This chart is provided by eBPF plugin.'
     },
 
     // ------------------------------------------------------------------------
