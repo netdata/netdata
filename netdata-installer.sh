@@ -118,12 +118,6 @@ download_go() {
 # make sure we save all commands we run
 run_logfile="netdata-installer.log"
 
-# set default make options
-if [ -z "${MAKEOPTS}" ]; then
-  MAKEOPTS="-j$(find_processors)"
-elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
-  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
-fi
 
 # -----------------------------------------------------------------------------
 # fix PKG_CHECK_MODULES error
@@ -393,6 +387,54 @@ fi
 
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
+
+NEED_PROTOBUF=true
+
+if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
+  NEED_PROTOBUF=false
+fi
+
+if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+  NEED_PROTOBUF=false
+fi
+
+if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
+  mega="$((1000 * 1000))"
+
+  if [ -n "${MAKEOPTS}" ]; then
+    proc_count="$(echo ${MAKEOPTS} | grep -oE '-j *[[:digit:]]+' | tr -d '-j ')"
+  else
+    proc_count="$(find_processors)"
+  fi
+
+  target_ram="$((1500 * mega + (250 * mega * proc_count)))"
+  total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
+
+  if [ -z "${MAKEOPTS}" ]; then
+    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 0 ]; do
+      proc_count="$((proc_count - 1))"
+      target_ram="$((1500 * mega + (250 * mega * proc_count)))"
+      MAKEOPTS="-j${proc_count}"
+    done
+
+    if [ "${proc_count}" -lt 1 ]; then
+      warning "Netdata needs at least ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
+      fatal "Insufficient RAM available for an install."
+    fi
+  else
+    if [ "${target_ram}" -gt "${total_ram}" ]; then
+      warning "Netdata needs ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
+      fatal "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
+    fi
+  fi
+fi
+
+# set default make options
+if [ -z "${MAKEOPTS}" ]; then
+  MAKEOPTS="-j$(find_processors)"
+elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
+  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
+fi
 
 if [ "${UID}" -ne 0 ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
