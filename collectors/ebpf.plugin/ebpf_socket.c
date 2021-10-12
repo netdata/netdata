@@ -1647,6 +1647,7 @@ static void ebpf_update_socket_cgroup()
                 publish->call_tcp_received = in->call_tcp_received;
                 publish->retransmit = in->retransmit;
                 publish->call_udp_sent = in->call_udp_sent;
+                publish->call_udp_received = in->call_udp_received;
             } else {
                 if (!bpf_map_lookup_elem(fd, &pid, eb)) {
                     ebpf_socket_bandwidth_accumulator(eb);
@@ -1659,6 +1660,7 @@ static void ebpf_update_socket_cgroup()
                     publish->call_tcp_received = out->call_tcp_received;
                     publish->retransmit = out->retransmit;
                     publish->call_udp_sent = out->call_udp_sent;
+                    publish->call_udp_received = out->call_udp_received;
                 }
             }
         }
