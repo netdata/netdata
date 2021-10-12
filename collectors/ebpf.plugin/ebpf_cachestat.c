@@ -609,19 +609,19 @@ static void ebpf_create_systemd_cachestat_charts()
                                   EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21101,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_CACHESTAT_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                                  NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_HIT_CHART, "Hits are function calls that Netdata counts.",
                                   EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21102,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_CACHESTAT_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                                  NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_charts_on_systemd(NETDATA_CACHESTAT_MISSES_CHART, "Misses are function calls that Netdata counts.",
                                   EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 21103,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_CACHESTAT_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                                  NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 }
 
 /**
@@ -717,7 +717,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
-                      NETDATA_CGROUP_CACHESTAT_REFERENCE_CONTEXT,
+                      NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
@@ -726,7 +726,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_CGROUP_SUBMENU,
-                      NETDATA_CGROUP_CACHESTAT_NOT_CACHE_CONTEXT,
+                      NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
@@ -735,7 +735,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_CGROUP_SUBMENU,
-                      NETDATA_CGROUP_CACHESTAT_NOT_FOUND_CONTEXT,
+                      NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
@@ -760,19 +760,19 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type)
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_REFERENCE_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_NOT_CACHE_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_NOT_FOUND_CONTEXT,
+                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203);
 }
 

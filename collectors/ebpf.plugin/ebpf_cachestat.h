@@ -26,14 +26,14 @@
 
 // Contexts
 #define NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT "cgroup.cachestat_ratio"
-#define NETDATA_CGROUP_CACHESTAT_REFERENCE_CONTEXT "cgroup.cachestat_dirties"
-#define NETDATA_CGROUP_CACHESTAT_NOT_CACHE_CONTEXT "cgroup.cachestat_hits"
-#define NETDATA_CGROUP_CACHESTAT_NOT_FOUND_CONTEXT "cgroup.cachestat_misses"
+#define NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT "cgroup.cachestat_dirties"
+#define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"
+#define NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT "cgroup.cachestat_misses"
 
 #define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "services.cachestat_ratio"
-#define NETDATA_SYSTEMD_CACHESTAT_REFERENCE_CONTEXT "services.cachestat_dirties"
-#define NETDATA_SYSTEMD_CACHESTAT_NOT_CACHE_CONTEXT "services.cachestat_hits"
-#define NETDATA_SYSTEMD_CACHESTAT_NOT_FOUND_CONTEXT "services.cachestat_misses"
+#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "services.cachestat_dirties"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
+#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
 
 // variables
 enum cachestat_counters {
