@@ -413,6 +413,7 @@ handle_existing_install() {
 
       if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
         progress "Attempting to claim existing install at ${ndprefix}."
+        INSTALL_PREFIX="${ndprefix}"
         claim
         ret=$?
       elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
@@ -474,12 +475,12 @@ check_claim_opts() {
 
 claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${NETDATA_PREFIX}" ]; then
+  if [ -z "${INSTALL_PREFIX}" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
-  elif [ "${NETDATA_PREFIX}" = "/opt/netdata" ]; then
+  elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
   else
-    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
   if ! pgrep netdata > /dev/null; then
