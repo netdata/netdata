@@ -14,6 +14,7 @@ run ./configure \
   --enable-static-link \
   --enable-net-redirections \
   --enable-array-variables \
+  --disable-progcomp \
   --disable-profiling \
   --disable-nls
 

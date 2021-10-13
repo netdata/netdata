@@ -6,6 +6,7 @@
 #  - PATH
 #  - CFLAGS
 #  - LDFLAGS
+#  - MAKEOPTS
 #  - IS_NETDATA_STATIC_BINARY
 #  - NETDATA_CONFIGURE_OPTIONS
 #  - REINSTALL_OPTIONS
@@ -402,7 +403,7 @@ if [ -t 2 ]; then
 else
   # we are headless
   # create a temporary file for the log
-  logfile="$(mktemp "${logfile}"/netdata-updater.log.XXXXXX)"
+  logfile="$(mktemp -t netdata-updater.log.XXXXXX)"
   # open fd 3 and send it to logfile
   exec 3> "${logfile}"
 fi
@@ -441,7 +442,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
   echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
 
   echo >&2 "Switching back to ${PREVDIR}"
-  cd "${PREVDIR}" || exit 1
+  cd "${PREVDIR}"
 else
   # the installer updates this script - so we run and exit in a single line
   update && exit 0

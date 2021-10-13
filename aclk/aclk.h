@@ -49,4 +49,7 @@ void aclk_send_node_instances(void);
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 
+char *ng_aclk_state(void);
+char *ng_aclk_state_json(void);
+
 #endif /* ACLK_H */

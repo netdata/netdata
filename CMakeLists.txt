@@ -500,8 +500,12 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_mount.h
         collectors/ebpf.plugin/ebpf_filesystem.c
         collectors/ebpf.plugin/ebpf_filesystem.h
+        collectors/ebpf.plugin/ebpf_oomkill.c
+        collectors/ebpf.plugin/ebpf_oomkill.h
         collectors/ebpf.plugin/ebpf_process.c
         collectors/ebpf.plugin/ebpf_process.h
+        collectors/ebpf.plugin/ebpf_shm.c
+        collectors/ebpf.plugin/ebpf_shm.h
         collectors/ebpf.plugin/ebpf_socket.c
         collectors/ebpf.plugin/ebpf_socket.h
         collectors/ebpf.plugin/ebpf_softirq.c
@@ -514,6 +518,8 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_vfs.h
         collectors/ebpf.plugin/ebpf_apps.c
         collectors/ebpf.plugin/ebpf_apps.h
+        collectors/ebpf.plugin/ebpf_cgroup.c
+        collectors/ebpf.plugin/ebpf_cgroup.h
         )
 
 set(PROC_PLUGIN_FILES
@@ -629,6 +635,14 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_functions.h
         database/sqlite/sqlite_aclk.c
         database/sqlite/sqlite_aclk.h
+        database/sqlite/sqlite_health.c
+        database/sqlite/sqlite_health.h
+        database/sqlite/sqlite_aclk_node.c
+        database/sqlite/sqlite_aclk_node.h
+        database/sqlite/sqlite_aclk_chart.c
+        database/sqlite/sqlite_aclk_chart.h
+        database/sqlite/sqlite_aclk_alert.c
+        database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
         database/sqlite/sqlite3.h
         database/engine/rrdengine.c
@@ -795,6 +809,10 @@ set(ACLK_NG_FILES
         aclk/aclk_rx_msgs.h
         aclk/https_client.c
         aclk/https_client.h
+        aclk/aclk_charts_api.c
+        aclk/aclk_charts_api.h
+        aclk/aclk_alarm_api.c
+        aclk/aclk_alarm_api.h
         mqtt_websockets/src/mqtt_wss_client.c
         mqtt_websockets/src/include/mqtt_wss_client.h
         mqtt_websockets/src/mqtt_wss_log.c
@@ -812,6 +830,16 @@ set(ACLK_NG_FILES
         aclk/schema-wrappers/node_connection.h
         aclk/schema-wrappers/node_creation.cc
         aclk/schema-wrappers/node_creation.h
+        aclk/schema-wrappers/chart_stream.cc
+        aclk/schema-wrappers/chart_stream.h
+        aclk/schema-wrappers/chart_config.cc
+        aclk/schema-wrappers/chart_config.h
+        aclk/schema-wrappers/alarm_stream.cc
+        aclk/schema-wrappers/alarm_stream.h
+        aclk/schema-wrappers/alarm_config.cc
+        aclk/schema-wrappers/alarm_config.h
+        aclk/schema-wrappers/node_info.cc
+        aclk/schema-wrappers/node_info.h
         aclk/schema-wrappers/schema_wrappers.h
         aclk/schema-wrappers/schema_wrapper_utils.cc
         aclk/schema-wrappers/schema_wrapper_utils.h
@@ -1098,9 +1126,17 @@ function(PROTOBUF_ACLK_GENERATE_CPP SRCS HDRS)
 endfunction()
 
 set(ACLK_NG_PROTO_DEFS
+        aclk/aclk-schemas/proto/aclk/v1/lib.proto
         aclk/aclk-schemas/proto/agent/v1/connection.proto
+        aclk/aclk-schemas/proto/alarm/v1/config.proto
+        aclk/aclk-schemas/proto/alarm/v1/stream.proto
+        aclk/aclk-schemas/proto/chart/v1/config.proto
+        aclk/aclk-schemas/proto/chart/v1/dimension.proto
+        aclk/aclk-schemas/proto/chart/v1/instance.proto
+        aclk/aclk-schemas/proto/chart/v1/stream.proto
         aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+        aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
         )
 PROTOBUF_ACLK_GENERATE_CPP(ACLK_NG_PROTO_BUILT_SRCS ACLK_NG_PROTO_BUILT_HDRS ${ACLK_NG_PROTO_DEFS})
 

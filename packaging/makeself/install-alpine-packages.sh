@@ -9,35 +9,37 @@
 
 # Add required APK packages
 apk add --no-cache -U \
-  bash \
-  wget \
-  curl \
-  ncurses \
-  git \
-  netcat-openbsd \
   alpine-sdk \
   autoconf \
   automake \
-  gcc \
-  make \
+  bash \
+  binutils \
   cmake \
-  libtool \
-  pkgconfig \
-  util-linux-dev \
+  curl \
+  gcc \
+  git \
   gnutls-dev \
-  zlib-dev \
-  zlib-static \
+  gzip \
   libmnl-dev \
   libnetfilter_acct-dev \
+  libtool \
   libuv-dev \
   libuv-static \
   lz4-dev \
   lz4-static \
-  snappy-dev \
+  make \
+  ncurses \
+  netcat-openbsd \
+  openssh \
+  pkgconfig \
   protobuf-dev \
-  binutils \
-  gzip \
-  xz || exit 1
+  snappy-dev \
+  util-linux-dev \
+  wget \
+  xz \
+  zlib-dev \
+  zlib-static ||
+  exit 1
 
 # snappy doesn't have static version in alpine, let's compile it
 export SNAPPY_VER="1.1.7"

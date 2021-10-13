@@ -11,6 +11,7 @@
 struct rrdcalctemplate {
     char *name;
     uint32_t hash_name;
+    uuid_t config_hash_id;
 
     char *exec;
     char *recipient;

@@ -10,7 +10,6 @@ static ebpf_local_maps_t mount_maps[] = {{.name = "tbl_mount", .internal_input =
                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-static ebpf_data_t mount_data;
 static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = { "mount", "umount" };
 static netdata_syscall_stat_t mount_aggregated_data[NETDATA_EBPF_MOUNT_SYSCALL];
 static netdata_publish_syscall_t mount_publish_aggregated[NETDATA_EBPF_MOUNT_SYSCALL];
@@ -227,15 +226,11 @@ void *ebpf_mount_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mount_maps;
-    fill_ebpf_data(&mount_data);
 
     if (!em->enabled)
         goto endmount;
 
-    if (ebpf_update_kernel(&mount_data))
-        goto endmount;
-
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, mount_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endmount;
     }

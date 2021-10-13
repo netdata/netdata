@@ -30,6 +30,7 @@
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
+#include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
@@ -86,7 +87,9 @@ enum ebpf_module_indexes {
     EBPF_MODULE_MOUNT_IDX,
     EBPF_MODULE_FD_IDX,
     EBPF_MODULE_HARDIRQ_IDX,
-    EBPF_MODULE_SOFTIRQ_IDX
+    EBPF_MODULE_SOFTIRQ_IDX,
+    EBPF_MODULE_OOMKILL_IDX,
+    EBPF_MODULE_SHM_IDX
 };
 
 typedef struct ebpf_tracepoint {
@@ -114,6 +117,8 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
+#define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
+#define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -143,6 +148,7 @@ extern pthread_mutex_t lock;
 extern int close_ebpf_plugin;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
+extern int isrh;
 extern char *ebpf_plugin_dir;
 extern char kernel_string[64];
 
@@ -195,8 +201,6 @@ extern void write_err_chart(char *name, char *family, netdata_publish_syscall_t 
 extern void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
                            char *dread, long long vread);
 
-extern void fill_ebpf_data(ebpf_data_t *ef);
-
 extern void ebpf_create_charts_on_apps(char *name,
                                        char *title,
                                        char *units,
@@ -225,14 +229,19 @@ extern uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
+#define EBPF_COMMON_DIMENSION_KILLS "kills"
 
 // Common variables
 extern int debug_enabled;
 extern struct pid_stat *root_of_pids;
+extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern struct pid_stat *root_of_pids;
 extern ebpf_process_stat_t *global_process_stat;
+extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
+extern int shm_fd_ebpf_cgroup;
+extern sem_t *shm_sem_ebpf_cgroup;
+extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
 extern int update_every;
 extern uint32_t finalized_threads;

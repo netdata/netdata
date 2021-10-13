@@ -16,6 +16,9 @@ on:
       - '**.h'
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   unit-tests-legacy:
     name: Unit Tests (legacy)

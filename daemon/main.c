@@ -28,7 +28,6 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
-    analytics_free_data();
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
@@ -1130,7 +1129,10 @@ int main(int argc, char **argv) {
         // get log filenames and settings
         log_init();
         error_log_limit_unlimited();
+        // initialize the log files
+        open_all_log_files();
 
+        get_system_timezone();
         // --------------------------------------------------------------------
         // get the certificate and start security
 #ifdef ENABLE_HTTPS
@@ -1179,9 +1181,6 @@ int main(int argc, char **argv) {
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
     }
-
-    // initialize the log files
-    open_all_log_files();
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {

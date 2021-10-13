@@ -306,13 +306,34 @@ When the integration is enabled, eBPF collector allocates memory for each proces
  it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
  for each processor it runs.
 
+### Integration with `cgroups.plugin`
+
+The eBPF collector also creates charts for each cgroup through an integration with the
+[`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
+interacts with the Linux kernel.
+
+The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system.
+If you want to _enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
+`yes`.
+
+```conf
+[global]
+   cgroups = yes
+```
+
+If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
+`ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
+['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
+
 #### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
 -   `fd` :  This eBPF program creates charts that show information about calls to open files.
--   `mount`: This eBPF program creates charts that show calls for syscalls mount(2) and umount(2).
--   `sync`: Montitor calls for syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
+-   `shm`: This eBPF program creates charts that show calls to syscalls
+    shmget(2), shmat(2), shmdt(2) and shmctl(2).
+-   `sync`: Montitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
 -   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
 -   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
@@ -322,6 +343,10 @@ The eBPF collector enables and runs the following eBPF programs by default:
     time spent servicing individual hardware interrupt requests (hard IRQs).
 -   `softirq`: This eBPF program creates charts that show information about
     time spent servicing individual software interrupt requests (soft IRQs).
+-   `oomkill`: This eBPF program creates a chart that shows OOM kills for all
+    applications recognized via the `apps.plugin` integration. Note that this
+    program will show application charts regardless of whether apps integration
+    is turned on or off.
 
 You can also enable the following eBPF programs:
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
@@ -596,10 +621,5 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
-
-## Cleaning `kprobe_events`
-The eBPF collector adds entries to the file `/sys/kernel/debug/tracing/kprobe_events`, and cleans them on exit, unless
-another process prevents it. If you need to clean the eBPF entries safely, you can manually run the script
-`/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh`.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Febpf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

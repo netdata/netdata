@@ -421,6 +421,35 @@ err_exit:
     return rc;
 }
 
+static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
+{
+    X509 *err_cert;
+    int err, depth;
+    char *err_str;
+
+    if (!preverify_ok) {
+        err = X509_STORE_CTX_get_error(ctx);
+        depth = X509_STORE_CTX_get_error_depth(ctx);
+        err_cert = X509_STORE_CTX_get_current_cert(ctx);
+        err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
+
+        error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
+                 X509_verify_cert_error_string(err), depth, err_str);
+
+        free(err_str);
+    }
+
+#ifdef ACLK_SSL_ALLOW_SELF_SIGNED
+    if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
+    {
+        preverify_ok = 1;
+        error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
+    }
+#endif
+
+    return preverify_ok;
+}
+
 int https_request(https_req_t *request, https_req_response_t *response) {
     int rc = 1, ret;
     char connect_port_str[PORT_STR_MAX_BYTES];
@@ -479,6 +508,12 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         error("Cannot allocate SSL context");
         goto exit_sock;
     }
+
+    if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
+        error("Error setting default verify paths");
+        goto exit_CTX;
+    }
+    SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
     if (ctx->ssl==NULL) {

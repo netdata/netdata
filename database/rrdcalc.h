@@ -38,6 +38,7 @@ struct rrdcalc {
 
     char *name;                     // the name of this alarm
     uint32_t hash;                  // the hash of the alarm name
+    uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
 
     char *exec;                     // the command to execute when this alarm switches state
     char *recipient;                // the recipient of the alarm (the first parameter to exec)
@@ -147,6 +148,43 @@ struct rrdcalc {
     struct rrdcalc *rrdset_prev;
 
     struct rrdcalc *next;
+};
+
+struct alert_config {
+    char *alarm;
+    char *template_key;
+    char *os;
+    char *host;
+    char *on;
+    char *families;
+    char *plugin;
+    char *module;
+    char *charts;
+    char *lookup;
+    char *calc;
+    char *warn;
+    char *crit;
+    char *every;
+    char *green;
+    char *red;
+    char *exec;
+    char *to;
+    char *units;
+    char *info;
+    char *classification;
+    char *component;
+    char *type;
+    char *delay;
+    char *options;
+    char *repeat;
+    char *host_labels;
+
+    char *p_db_lookup_dimensions;
+    char *p_db_lookup_method;
+    uint32_t p_db_lookup_options;
+    int32_t p_db_lookup_after;
+    int32_t p_db_lookup_before;
+    int32_t p_update_every;
 };
 
 extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);

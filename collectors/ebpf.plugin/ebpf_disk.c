@@ -18,8 +18,6 @@ static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_in
                                         {.name = NULL, .internal_input = 0, .user_input = 0,
                                          .type = NETDATA_EBPF_MAP_CONTROLLER,
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
-static ebpf_data_t disk_data;
-
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
@@ -610,7 +608,7 @@ void *ebpf_disk_read_hash(void *ptr)
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
 {
     ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED,
+                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, "disk.latency_io",
                               w->histogram.order);
 
     w->flags = 0;
@@ -658,6 +656,8 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 
         if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
             ebpf_obsolete_hd_charts(ned);
+            avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)ned);
+            UNUSED(ret);
             if (move == plot_disks) {
                 freez(move);
                 plot_disks = NULL;
@@ -792,14 +792,8 @@ void *ebpf_disk_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = disk_maps;
 
-    fill_ebpf_data(&disk_data);
-
     if (!em->enabled)
         goto enddisk;
-
-    if (ebpf_update_kernel(&disk_data)) {
-        goto enddisk;
-    }
 
     if (ebpf_disk_enable_tracepoints()) {
         em->enabled = CONFIG_BOOLEAN_NO;
@@ -817,7 +811,7 @@ void *ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, disk_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto enddisk;
     }

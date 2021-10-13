@@ -14,8 +14,7 @@ void aclk_send_alarm_log_health(struct alarm_log_health *log_health)
     query->data.bin_payload.payload = generate_alarm_log_health(&query->data.bin_payload.size, log_health);
     query->data.bin_payload.topic = ACLK_TOPICID_ALARM_HEALTH;
     query->data.bin_payload.msg_name = "AlarmLogHealth";
-    if (query->data.bin_payload.payload)
-        aclk_queue_query(query);
+    QUEUE_IF_PAYLOAD_PRESENT(query);
 }
 
 void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
@@ -32,6 +31,5 @@ void aclk_send_provide_alarm_cfg(struct provide_alarm_configuration *cfg)
     query->data.bin_payload.payload = generate_provide_alarm_configuration(&query->data.bin_payload.size, cfg);
     query->data.bin_payload.topic = ACLK_TOPICID_ALARM_CONFIG;
     query->data.bin_payload.msg_name = "ProvideAlarmConfiguration";
-    if (query->data.bin_payload.payload)
-        aclk_queue_query(query);
+    QUEUE_IF_PAYLOAD_PRESENT(query);
 }

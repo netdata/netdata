@@ -455,7 +455,8 @@ FROM pg_stat_database
 WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
-    AND NOT datname ~* '^template\d';
+    AND NOT datname ~* '^template\d'
+ORDER BY datname;
 """,
 }
 

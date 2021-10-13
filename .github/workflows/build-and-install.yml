@@ -4,23 +4,35 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request: null
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: builder-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   static-build:
-    name: Build (x86_64)
+    name: Static Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - x86_64
+          - armv7l
+          - aarch64
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
         with:
+          fetch-depth: 0
           submodules: recursive
-      - run: |
-          git fetch --prune --unshallow --tags
       - name: Build
-        run: |
-          .github/scripts/build-static-x86_64.sh
+        run: .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Save Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.arch }}-static-builds
+          path: ${{ github.workspace }}/artifacts/*
   source-build:
     name: Build & Install
     strategy:
@@ -43,11 +55,9 @@ jobs:
           - 'fedora:33'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.3'
-          - 'opensuse/tumbleweed:latest'
           - 'ubuntu:21.04'
           - 'ubuntu:20.04'
           - 'ubuntu:18.04'
-          - 'ubuntu:16.04'
         include:
           - distro: 'alpine:edge'
             pre: 'apk add -U bash'
@@ -90,8 +100,6 @@ jobs:
             rmjsonc: 'zypper rm -y libjson-c-devel'
           - distro: 'opensuse/leap:15.3'
             rmjsonc: 'zypper rm -y libjson-c-devel'
-          - distro: 'opensuse/tumbleweed:latest'
-            rmjsonc: 'zypper rm -y libjson-c-devel'
 
           - distro: 'ubuntu:21.04'
             pre: 'apt-get update'
@@ -100,9 +108,6 @@ jobs:
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'ubuntu:18.04'
-            pre: 'apt-get update'
-            rmjsonc: 'apt-get remove -y libjson-c-dev'
-          - distro: 'ubuntu:16.04'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
     runs-on: ubuntu-latest

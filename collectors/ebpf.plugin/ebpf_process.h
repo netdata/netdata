@@ -7,7 +7,8 @@
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
 
 // Groups used on Dashboard
-#define NETDATA_PROCESS_GROUP "Process"
+#define NETDATA_PROCESS_GROUP "process"
+#define NETDATA_PROCESS_CGROUP_GROUP "process (eBPF)"
 
 // Global chart name
 #define NETDATA_EXIT_SYSCALL "exit"
@@ -22,6 +23,15 @@
 
 // Process configuration name
 #define NETDATA_PROCESS_CONFIG_FILE "process.conf"
+
+// Contexts
+#define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup.process_create"
+#define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup.thread_create"
+#define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup.task_close"
+
+#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "services.process_create"
+#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "services.thread_create"
+#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "services.task_close"
 
 // Index from kernel
 typedef enum ebpf_process_index {

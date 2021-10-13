@@ -216,6 +216,14 @@ AC_ARG_WITH(
     [aclk_ng="detect"]
 )
 
+AC_ARG_WITH(
+    [new-cloud-protocol],
+    [AS_HELP_STRING([--with-new-cloud-protocol],
+                    [Requires New Cloud Protocol support to be built])],
+    [new_cloud_protocol="$withval"],
+    [new_cloud_protocol="detect"]
+)
+
 if test "${enable_cloud}" = "no"; then
     AC_DEFINE([DISABLE_CLOUD], [1], [disable netdata cloud functionality])
 fi
@@ -736,49 +744,6 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
     else
         AC_MSG_RESULT([yes])
     fi
-    AC_MSG_CHECKING([if protobuf available for ACLK Next Generation])
-    if test "${have_libprotobuf}" != "yes"; then
-        AC_MSG_RESULT([no])
-        can_enable_ng="no"
-    else
-        AC_MSG_RESULT([yes])
-    fi
-    AC_MSG_CHECKING([if protoc available for ACLK Next Generation])
-    if test "${have_protoc}" != "yes"; then
-        AC_MSG_RESULT([no])
-        can_enable_ng="no"
-    else
-        AC_MSG_RESULT([yes])
-    fi
-    AC_MSG_CHECKING([if C++ compiler available for ACLK Next Generation])
-    if test "${have_CXX_compiler}" != "yes"; then
-        AC_MSG_RESULT([no])
-        can_enable_ng="no"
-    else
-        AC_MSG_RESULT([yes])
-    fi
-
-    if test "${with_bundled_protobuf}" = "yes"; then
-        AC_LANG_PUSH([C++]) 
-        CXXFLAGS="${CXXFLAGS} -std=c++11"
-
-        # On some platforms, std::atomic needs a helper library
-        AC_MSG_CHECKING(whether -latomic is needed for static protobuf)
-        AC_LINK_IFELSE([AC_LANG_SOURCE([[
-          #include <atomic>
-          #include <cstdint>
-          std::atomic<std::int64_t> v;
-          int main() {
-            return v;
-          }
-        ]])], STD_ATOMIC_NEED_LIBATOMIC=no, STD_ATOMIC_NEED_LIBATOMIC=yes)
-        AC_MSG_RESULT($STD_ATOMIC_NEED_LIBATOMIC)
-        if test "x$STD_ATOMIC_NEED_LIBATOMIC" = xyes; then
-            OPTIONAL_ATOMIC_LIBS="-latomic"
-        fi
-        AC_SUBST([OPTIONAL_ATOMIC_LIBS])
-        AC_LANG_POP([C++])
-    fi
 
     AC_MSG_CHECKING([ACLK Next Generation can be built])
     AC_MSG_RESULT([${can_enable_ng}])
@@ -790,10 +755,67 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         enable_aclk="yes"
         AC_DEFINE([ACLK_NG], [1], [ACLK Next Generation Should be used])
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
-        OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
-        CXX11FLAG="-std=c++11"
-        OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
+        OPTIONAL_ACLK_NG_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include"
+    fi
+
+    if test "$aclk_ng" = "yes" -a "$new_cloud_protocol" != "no"; then
+        can_build_new_cloud_protocol="yes"
+        AC_MSG_CHECKING([if protobuf available for New Cloud Protocol])
+        if test "${have_libprotobuf}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+        AC_MSG_CHECKING([if protoc available for New Cloud Protocol])
+        if test "${have_protoc}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+        AC_MSG_CHECKING([if C++ compiler available for New Cloud Protocol])
+        if test "${have_CXX_compiler}" != "yes"; then
+            AC_MSG_RESULT([no])
+            can_build_new_cloud_protocol="no"
+        else
+            AC_MSG_RESULT([yes])
+        fi
+
+        if test "${with_bundled_protobuf}" = "yes"; then
+            AC_LANG_PUSH([C++]) 
+            CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+            # On some platforms, std::atomic needs a helper library
+            AC_MSG_CHECKING(whether -latomic is needed for static protobuf)
+            AC_LINK_IFELSE([AC_LANG_SOURCE([[
+              #include <atomic>
+              #include <cstdint>
+              std::atomic<std::int64_t> v;
+              int main() {
+                return v;
+              }
+            ]])], STD_ATOMIC_NEED_LIBATOMIC=no, STD_ATOMIC_NEED_LIBATOMIC=yes)
+            AC_MSG_RESULT($STD_ATOMIC_NEED_LIBATOMIC)
+            if test "x$STD_ATOMIC_NEED_LIBATOMIC" = xyes; then
+                OPTIONAL_ATOMIC_LIBS="-latomic"
+            fi
+            AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+            AC_LANG_POP([C++])
+        fi
+        AC_MSG_CHECKING([ACLK Next Generation can support New Cloud protocol])
+        AC_MSG_RESULT([${can_build_new_cloud_protocol}])
+        if test "$new_cloud_protocol" = "yes" -a "$can_build_new_cloud_protocol" != "yes"; then
+            AC_MSG_ERROR([Requested new cloud protocol support but it cant be build])
+        fi
+        if test "$can_build_new_cloud_protocol" = "yes"; then
+            new_cloud_protocol="yes"
+            AC_DEFINE([ENABLE_NEW_CLOUD_PROTOCOL], [1], [New protobuf based Netdata Cloud Protocol Support])
+            OPTIONAL_ACLK_NG_CFLAGS="${OPTIONAL_ACLK_NG_CFLAGS} -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+            OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
+            CXX11FLAG="-std=c++11"
+            OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
+        fi
     fi
 fi
 
@@ -888,6 +910,7 @@ AC_SUBST([enable_aclk])
 AM_CONDITIONAL([ACLK_NG], [test "${aclk_ng}" = "yes"])
 AM_CONDITIONAL([ACLK_LEGACY], [test "${aclk_legacy}" = "yes"])
 AM_CONDITIONAL([ENABLE_ACLK], [test "${enable_aclk}" = "yes"])
+AM_CONDITIONAL([ENABLE_NEW_CLOUD_PROTOCOL], [test "${can_build_new_cloud_protocol}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -1534,7 +1557,7 @@ AC_MSG_RESULT([${enable_lto}])
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
                                      -o "${enable_exporting_pubsub}" = "yes" \
                                      -o "${enable_backend_prometheus_remote_write}" = "yes" \
-                                     -o "${aclk_ng}" = "yes"])
+                                     -o "${new_cloud_protocol}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 

@@ -6,7 +6,7 @@
 #define ZFS_PROC_ARCSTATS "/proc/spl/kstat/zfs/arcstats"
 #define ZFS_PROC_POOLS "/proc/spl/kstat/zfs"
 
-#define STATE_SIZE 8
+#define STATE_SIZE 9
 #define MAX_CHART_ID 256
 
 extern struct arcstats arcstats;

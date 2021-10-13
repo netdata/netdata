@@ -118,6 +118,13 @@ download_go() {
 # make sure we save all commands we run
 run_logfile="netdata-installer.log"
 
+# set default make options
+if [ -z "${MAKEOPTS}" ]; then
+  MAKEOPTS="-j$(find_processors)"
+elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
+  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
+fi
+
 # -----------------------------------------------------------------------------
 # fix PKG_CHECK_MODULES error
 
@@ -279,7 +286,10 @@ while [ -n "${1}" ]; do
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
     "--use-system-lws") USE_SYSTEM_LWS=1 ;;
-    "--use-system-protobuf") USE_SYSTEM_PROTOBUF=1 ;;
+    "--use-system-protobuf")
+      USE_SYSTEM_PROTOBUF=1
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--without-bundled-protobuf/} --without-bundled-protobuf"
+    ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
@@ -549,7 +559,7 @@ build_libmosquitto() {
   fi
 
   if [ "$(uname -s)" = Linux ]; then
-    run ${env_cmd} ${make} -j$(find_processors) -C "${1}/lib"
+    run ${env_cmd} ${make} ${MAKEOPTS} -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
     if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
@@ -561,7 +571,7 @@ build_libmosquitto() {
     else
       run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
-    run ${env_cmd} ${make} -j$(find_processors) -C lib
+    run ${env_cmd} ${make} ${MAKEOPTS} -C lib
     run mv lib/libmosquitto_static.a lib/libmosquitto.a
     popd || return 1
   fi
@@ -657,7 +667,7 @@ EOF
       $CMAKE_FLAGS \
       .
   fi
-  run ${env_cmd} ${make} -j$(find_processors)
+  run ${env_cmd} ${make} ${MAKEOPTS}
   popd > /dev/null || exit 1
 }
 
@@ -727,7 +737,7 @@ build_protobuf() {
     return 1
   fi
 
-  if ! run ${env_cmd} $make -j$(find_processors); then
+  if ! run ${env_cmd} $make ${MAKEOPTS}; then
     popd > /dev/null || return 1
     return 1
   fi
@@ -803,7 +813,7 @@ build_judy() {
     run ${env_cmd} automake --add-missing --force --copy --include-deps &&
     run ${env_cmd} autoconf &&
     run ${env_cmd} ./configure &&
-    run ${env_cmd} ${make} -j$(find_processors) -C src &&
+    run ${env_cmd} ${make} ${MAKEOPTS} -C src &&
     run ${env_cmd} ar -r src/libJudy.a src/Judy*/*.o; then
     popd > /dev/null || return 1
   else
@@ -881,7 +891,7 @@ build_jsonc() {
 
   pushd "${1}" > /dev/null || exit 1
   run ${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF .
-  run ${env_cmd} ${make} -j$(find_processors)
+  run ${env_cmd} ${make} ${MAKEOPTS}
   popd > /dev/null || exit 1
 }
 
@@ -937,9 +947,29 @@ bundle_jsonc
 
 # -----------------------------------------------------------------------------
 
+get_kernel_version() {
+  r="$(uname -r | cut -f 1 -d '-')"
+
+  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
+
+  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
+}
+
+rename_libbpf_packaging() {
+  if [ "$(get_kernel_version)" -ge "005004014" ]; then
+    cp packaging/current_libbpf.checksums packaging/libbpf.checksums
+    cp packaging/current_libbpf.version packaging/libbpf.version
+  else
+    cp packaging/libbpf_0_0_9.checksums packaging/libbpf.checksums
+    cp packaging/libbpf_0_0_9.version packaging/libbpf.version
+  fi
+}
+
+
 build_libbpf() {
   pushd "${1}/src" > /dev/null || exit 1
-  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} -j$(find_processors) install
+  mkdir root build
+  run env CFLAGS=-fPIC CXXFLAGS= LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   popd > /dev/null || exit 1
 }
 
@@ -962,6 +992,8 @@ bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ ${NETDATA_DISABLE_EBPF} = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     return 0
   fi
+
+  rename_libbpf_packaging
 
   progress "Prepare libbpf"
 
@@ -1016,7 +1048,7 @@ fi
 if [ -d ./.git ] ; then
   echo >&2
   progress "Updating tags in git to ensure a consistent version number"
-  run git fetch <remote> 'refs/tags/*:refs/tags/*' || true
+  run git fetch -t || true
 fi
 
 # -----------------------------------------------------------------------------
@@ -1050,7 +1082,7 @@ run $make clean
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run $make -j$(find_processors) || exit 1
+run $make ${MAKEOPTS} || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
@@ -1562,27 +1594,6 @@ install_go() {
 
 install_go
 
-function get_kernel_version() {
-  r="$(uname -r | cut -f 1 -d '-')"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
-
-function get_rh_version() {
-  if [ ! -f /etc/redhat-release ]; then
-    printf "000000000"
-    return
-  fi
-
-  r="$(cut -f 4 -d ' ' < /etc/redhat-release)"
-
-  read -r -a p <<< "$(echo "${r}" | tr '.' ' ')"
-
-  printf "%03d%03d%03d" "${p[0]}" "${p[1]}" "${p[2]}"
-}
-
 detect_libc() {
   libc=
   if ldd --version 2>&1 | grep -q -i glibc; then
@@ -1609,9 +1620,9 @@ should_install_ebpf() {
     return 1
   fi
 
-  if [ "$(uname -s)" != "Linux" ]; then
-    run_failed "Currently eBPF is only supported on Linux."
-    defer_error "Currently eBPF is only supported on Linux."
+  if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+    run_failed "Currently eBPF is only supported on Linux on X86_64."
+    defer_error "Currently eBPF is only supported on Linux on X86_64."
     return 1
   fi
 
@@ -1657,6 +1668,12 @@ remove_old_ebpf() {
   if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
     echo >&2 "Removing old ebpf_kernel_reject_list.txt."
     rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
+  fi
+
+  # Remove old reset script
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh" ]; then
+    echo >&2 "Removing old reset_netdata_trace.sh."
+    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh"
   fi
 }
 
@@ -1925,6 +1942,7 @@ cat << EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 LDFLAGS="${LDFLAGS}"
+MAKEOPTS="${MAKEOPTS}"
 NETDATA_TMPDIR="${TMPDIR}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"

@@ -3,8 +3,6 @@
 #include "ebpf.h"
 #include "ebpf_sync.h"
 
-static ebpf_data_t sync_data;
-
 static char *sync_counter_dimension_name[NETDATA_SYNC_IDX_END] = { "sync", "syncfs",  "msync", "fsync", "fdatasync",
                                                                    "sync_file_range" };
 static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END];
@@ -16,6 +14,28 @@ static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 
 struct netdata_static_thread sync_threads = {"SYNC KERNEL", NULL, NULL, 1,
                                               NULL, NULL,  NULL};
+
+static ebpf_local_maps_t sync_maps[] = {{.name = "tbl_sync", .internal_input = NETDATA_SYNC_END,
+                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "tbl_syncfs", .internal_input = NETDATA_SYNC_END,
+                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "tbl_msync", .internal_input = NETDATA_SYNC_END,
+                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "tbl_fsync", .internal_input = NETDATA_SYNC_END,
+                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = "tbl_fdatasync", .internal_input = NETDATA_SYNC_END,
+                                         .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                         {.name = "tbl_syncfr", .internal_input = NETDATA_SYNC_END,
+                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                        {.name = NULL, .internal_input = 0, .user_input = 0,
+                                         .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                         .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
 struct config sync_config = { .first_section = NULL,
     .last_section = NULL,
@@ -53,15 +73,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (!w->probe_links && w->enabled) {
-            fill_ebpf_data(&w->kernel_info);
-            if (ebpf_update_kernel(&w->kernel_info)) {
-                em->thread_name = saved_name;
-                error("Cannot update the kernel for eBPF module %s", w->syscall);
-                return -1;
-            }
-
             em->thread_name = w->syscall;
-            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects, w->kernel_info.map_fd);
+            w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &w->objects);
             if (!w->probe_links) {
                 em->thread_name = saved_name;
                 return -1;
@@ -95,7 +108,7 @@ static void read_global_table()
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
         if (local_syscalls[i].enabled) {
-            int fd = local_syscalls[i].kernel_info.map_fd[NETDATA_SYNC_GLOBLAL_TABLE];
+            int fd = sync_maps[i].map_fd;
             if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
                 sync_hash_values[i] = stored;
             }
@@ -228,8 +241,6 @@ void ebpf_sync_cleanup_objects()
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->probe_links) {
-            freez(w->kernel_info.map_fd);
-
             struct bpf_program *prog;
             size_t j = 0 ;
             bpf_object__for_each_program(prog, w->objects) {
@@ -358,7 +369,7 @@ void *ebpf_sync_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_sync_cleanup, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    fill_ebpf_data(&sync_data);
+    em->maps = sync_maps;
 
     ebpf_sync_parse_syscalls();
 

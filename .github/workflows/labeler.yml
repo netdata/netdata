@@ -6,6 +6,9 @@ on:
     - cron: '*/5 * * * *'
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: labeller
+  cancel-in-progress: true
 jobs:
   labeler:
     runs-on: ubuntu-latest

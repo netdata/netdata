@@ -75,8 +75,6 @@ void chart_instance_updated_destroy(struct chart_instance_updated *instance)
 {
     freez((char*)instance->id);
     freez((char*)instance->claim_id);
-    freez((char*)instance->node_id);
-    freez((char*)instance->name);
 
     free_label_list(instance->label_head);
 

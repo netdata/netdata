@@ -26,21 +26,6 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
   exit 0
 fi
 
-# if nightlies.sh has not written this TRAVIS_BUILD_NUMBER, there's no 
-# changes from last nigthly
-if [ -f .travis/current_build_status ]; then
-  FILE_TRAVIS_BUILD_NUMBER=$(cut -d'#' -f2 < .travis/current_build_status)
-  FILE_TRAVIS_BUILD_STATUS=$(cut -d- -f1 < .travis/current_build_status)
-  if [[ ${FILE_TRAVIS_BUILD_NUMBER} -eq ${TRAVIS_BUILD_NUMBER} ]] && [[ ${FILE_TRAVIS_BUILD_STATUS} == "changes" ]]; then
-  	echo "Changes happen since last nightly release, let's continue"
-  else
-    echo "No changes since last nightly release, nothing else to do"
-	  exit 0
-  fi
-else
-  echo "File .travis/current_build_status doesn't exist, probably this is the very first build, let's continue"
-fi
-
 echo "--- Initialize git configuration ---"
 git checkout "${1-master}"
 git pull
@@ -67,8 +52,12 @@ make dist
 mv "${BASENAME}.tar.gz" artifacts/
 
 echo "--- Create self-extractor ---"
-command -v git > /dev/null && [ -d .git ] && git clean -d -f
-./packaging/makeself/build-x86_64-static.sh
+sxarches="x86_64 armv7l aarch64"
+for arch in ${sxarches}; do
+  git clean -d -f
+  rm -rf packating/makeself/tmp
+  ./packaging/makeself/build-static.sh ${arch}
+done
 
 # Needed for GCS
 echo "--- Copy artifacts to separate directory ---"
@@ -76,7 +65,13 @@ echo "--- Copy artifacts to separate directory ---"
 cp packaging/version artifacts/latest-version.txt
 cd artifacts
 ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
+
+for arch in ${sxarches}; do
+  ln -s "netdata-${arch}-$(git describe).gz.run" netdata-${arch}-latest.gz.run
+done
+
 ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+
 sha256sum -b ./* > "sha256sums.txt"
 echo "checksums:"
 cat sha256sums.txt
