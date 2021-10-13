@@ -459,22 +459,24 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
  *  Create Systemd Swap Charts
  *
  *  Create charts when systemd is enabled
+ *
+ *  @param update_every value to overwrite the update frequency set by the server.
  **/
-static void ebpf_create_systemd_swap_charts()
+static void ebpf_create_systemd_swap_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_READ_CHART,
                                   "Calls to <code>swap_readpage</code>.",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20191,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_SWAP);
+                                  NETDATA_EBPF_MODULE_NAME_SWAP, update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_WRITE_CHART,
                                   "Calls to function <code>swap_writepage</code>.",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20192,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_SWAP);
+                                  NETDATA_EBPF_MODULE_NAME_SWAP, update_every);
 }
 
 /**
@@ -498,7 +500,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
     if (has_systemd) {
         static int systemd_charts = 0;
         if (!systemd_charts) {
-            ebpf_create_systemd_swap_charts();
+            ebpf_create_systemd_swap_charts(update_every);
             systemd_charts = 1;
             fflush(stdout);
         }

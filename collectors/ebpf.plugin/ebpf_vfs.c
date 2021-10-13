@@ -896,87 +896,89 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20065,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "Write to disk",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20066,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_WRITE_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR, "Fails to write",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20067,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                      NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT, NETDATA_EBPF_MODULE_NAME_VFS);
+                                      NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT,
+                                      NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_READ_CALLS, "Read from disk",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20068,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_READ_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR, "Fails to read",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20069,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                      NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT, NETDATA_EBPF_MODULE_NAME_VFS);
+                                      NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT,
+                                      NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "Bytes written on disk",
                                   EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20070,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "Bytes read from disk",
                                   EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20071,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to <code>vfs_fsync</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20072,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20073,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                      NETDATA_EBPF_MODULE_NAME_VFS);
+                                      NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
     }
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls to <code>vfs_open</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20074,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20075,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                      NETDATA_EBPF_MODULE_NAME_VFS);
+                                      NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls to <code>vfs_create</code>",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20076,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_VFS);
+                                  NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20077,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                      NETDATA_EBPF_MODULE_NAME_VFS);
+                                      NETDATA_EBPF_MODULE_NAME_VFS, em->update_time);
     }
 }
 

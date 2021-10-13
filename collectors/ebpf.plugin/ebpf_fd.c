@@ -529,28 +529,28 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20061,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_OPEN_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                  NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20062,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT,
-                                      NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                      NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_time);
     }
 
     ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSED, "Files closed",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20063,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_CLOSE_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                  NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
                                       EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED, 20064,
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT,
-                                      NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                      NETDATA_EBPF_MODULE_NAME_PROCESS, em->update_time);
     }
 }
 

@@ -481,8 +481,10 @@ static void ebpf_obsolete_specific_shm_charts(char *type, int update_time)
  *  Create Systemd Swap Charts
  *
  *  Create charts when systemd is enabled
+ *
+ *  @param update_every value to overwrite the update frequency set by the server.
  **/
-static void ebpf_create_systemd_shm_charts()
+static void ebpf_create_systemd_shm_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_SHMGET_CHART,
                                   "Calls to syscall <code>shmget(2)</code>.",
@@ -491,7 +493,7 @@ static void ebpf_create_systemd_shm_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20191,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SYSTEMD_SHM_GET_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+                                  NETDATA_SYSTEMD_SHM_GET_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM, update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_SHMAT_CHART,
                                   "Calls to syscall <code>shmat(2)</code>.",
@@ -500,7 +502,7 @@ static void ebpf_create_systemd_shm_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20192,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SYSTEMD_SHM_AT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+                                  NETDATA_SYSTEMD_SHM_AT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM, update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_SHMDT_CHART,
                                   "Calls to syscall <code>shmdt(2)</code>.",
@@ -509,7 +511,7 @@ static void ebpf_create_systemd_shm_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20193,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SYSTEMD_SHM_DT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+                                  NETDATA_SYSTEMD_SHM_DT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM, update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_SHMCTL_CHART,
                                   "Calls to syscall <code>shmctl(2)</code>.",
@@ -518,7 +520,7 @@ static void ebpf_create_systemd_shm_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20193,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SYSTEMD_SHM_CTL_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM);
+                                  NETDATA_SYSTEMD_SHM_CTL_CONTEXT, NETDATA_EBPF_MODULE_NAME_SHM, update_every);
 }
 
 /**
@@ -616,7 +618,7 @@ void ebpf_shm_send_cgroup_data(int update_every)
     if (has_systemd) {
         static int systemd_charts = 0;
         if (!systemd_charts) {
-            ebpf_create_systemd_shm_charts();
+            ebpf_create_systemd_shm_charts(update_every);
             systemd_charts = 1;
         }
 

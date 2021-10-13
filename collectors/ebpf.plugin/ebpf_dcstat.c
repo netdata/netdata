@@ -641,8 +641,10 @@ void ebpf_dc_calc_chart_values()
  *  Create Systemd directory cache Charts
  *
  *  Create charts when systemd is enabled
+ *
+ *  @param update_every value to overwrite the update frequency set by the server.
  **/
-static void ebpf_create_systemd_dc_charts()
+static void ebpf_create_systemd_dc_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_DC_HIT_CHART,
                                   "Percentage of files listed inside directory cache.",
@@ -651,7 +653,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21200,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REFERENCE_CHART,
                                   "Count file access.",
@@ -660,7 +663,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21201,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                   "Access to files that were not present inside directory cache.",
@@ -669,7 +673,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                   "Number of requests for files that were not found on filesystem.",
@@ -678,7 +683,8 @@ static void ebpf_create_systemd_dc_charts()
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   21202,
                                   ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                                  NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
+                                  update_every);
 }
 
 /**
@@ -793,7 +799,7 @@ void ebpf_dc_send_cgroup_data(int update_every)
     if (has_systemd) {
         static int systemd_charts = 0;
         if (!systemd_charts) {
-            ebpf_create_systemd_dc_charts();
+            ebpf_create_systemd_dc_charts(update_every);
             systemd_charts = 1;
         }
 

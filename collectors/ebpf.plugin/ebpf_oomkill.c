@@ -130,14 +130,16 @@ static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
  *  Create Systemd OOMkill Charts
  *
  *  Create charts when systemd is enabled
+ *
+ *  @param update_every value to overwrite the update frequency set by the server.
  **/
-static void ebpf_create_systemd_oomkill_charts()
+static void ebpf_create_systemd_oomkill_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
                                   EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, 20191,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NULL,
-                                  NETDATA_EBPF_MODULE_NAME_OOMKILL);
+                                  NETDATA_EBPF_MODULE_NAME_OOMKILL, update_every);
 }
 
 /**
@@ -213,7 +215,7 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
     if (has_systemd) {
         static int systemd_charts = 0;
         if (!systemd_charts) {
-            ebpf_create_systemd_oomkill_charts();
+            ebpf_create_systemd_oomkill_charts(update_every);
             systemd_charts = 1;
         }
         systemd_charts = ebpf_send_systemd_oomkill_charts();

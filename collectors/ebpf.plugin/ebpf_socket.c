@@ -1885,8 +1885,10 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
  *  Create Systemd Socket Charts
  *
  *  Create charts when systemd is enabled
+ *
+ *  @param update_every value to overwrite the update frequency set by the server.
  **/
-static void ebpf_create_systemd_socket_charts()
+static void ebpf_create_systemd_socket_charts(int update_every)
 {
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_RECV,
                                   "Bytes received", EBPF_COMMON_DIMENSION_BITS,
@@ -1894,7 +1896,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20080,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_SENT,
                                   "Bytes sent", EBPF_COMMON_DIMENSION_BITS,
@@ -1902,7 +1905,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20081,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                                   "Calls to tcp_cleanup_rbuf.",
@@ -1911,7 +1915,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20082,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                                   "Calls to tcp_sendmsg.",
@@ -1920,7 +1925,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20083,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                                   "Calls to tcp_retransmit",
@@ -1929,7 +1935,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20084,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                                   "Calls to udp_sendmsg",
@@ -1938,7 +1945,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20085,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 
     ebpf_create_charts_on_systemd(NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                                   "Calls to udp_recvmsg",
@@ -1947,7 +1955,8 @@ static void ebpf_create_systemd_socket_charts()
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   20086,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                                  NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                                  NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
+                                  update_every);
 }
 
 /**
@@ -2057,7 +2066,7 @@ static void ebpf_socket_send_cgroup_data(int update_every)
     if (has_systemd) {
         static int systemd_charts = 0;
         if (!systemd_charts) {
-            ebpf_create_systemd_socket_charts();
+            ebpf_create_systemd_socket_charts(update_every);
             systemd_charts = 1;
         }
         systemd_charts = ebpf_send_systemd_socket_charts();
