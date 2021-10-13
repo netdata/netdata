@@ -2574,6 +2574,10 @@ netdataDashboard.context = {
         info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
     },
 
+    'apps.task_error': {
+        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+    },
+
     'apps.total_bandwidth_sent': {
         info: 'Bytes sent by functions <code>tcp_sendmsg</code> and <code>udp_sendmsg</code>.'
     },
@@ -3914,6 +3918,11 @@ netdataDashboard.context = {
         info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
+    'cgroup.task_error': {
+        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
+    },
+
+
     'cgroup.dc_ratio': {
         info: 'Percentage of file accesses that were present in the directory cache. 100% means that every file that was accessed was present in the directory cache. If files are not present in the directory cache 1) they are not present in the file system, 2) the files were not accessed before. Read more about <a href="https://www.kernel.org/doc/htmldocs/filesystems/the_directory_cache.html" target="_blank">directory cache</a>. Netdata also gives a summary for these charts in <a href="#menu_filesystem_submenu_directory_cache__eBPF_">Filesystem submenu</a>.'
     },
@@ -4173,6 +4182,10 @@ netdataDashboard.context = {
 
     'services.task_close': {
         info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+    },
+
+    'services.task_error': {
+        info: 'Number of errors to create a new process or thread. This chart is provided by eBPF plugin.'
     },
 
     'services.dc_ratio': {
