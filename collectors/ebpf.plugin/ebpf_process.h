@@ -20,6 +20,7 @@
 #define NETDATA_SYSCALL_APPS_TASK_PROCESS "process_create"
 #define NETDATA_SYSCALL_APPS_TASK_THREAD "thread_create"
 #define NETDATA_SYSCALL_APPS_TASK_CLOSE "task_close"
+#define NETDATA_SYSCALL_APPS_TASK_ERROR "task_error"
 
 // Process configuration name
 #define NETDATA_PROCESS_CONFIG_FILE "process.conf"
@@ -70,7 +71,7 @@ typedef struct ebpf_process_publish_apps {
     uint64_t create_thread;
 
     // Number of errors during the last read
-    uint64_t ecall_do_fork;
+    uint64_t task_err;
 } ebpf_process_publish_apps_t;
 
 enum ebpf_process_tables {
