@@ -2075,7 +2075,7 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SOCKET_CHART && ect->updated) {
             ebpf_send_specific_socket_data(ect->name, &ect->publish_socket);
         } else {
-            ebpf_obsolete_specific_socket_charts(ect->name);
+            ebpf_obsolete_specific_socket_charts(ect->name, update_every);
             ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SOCKET_CHART;
         }
     }
