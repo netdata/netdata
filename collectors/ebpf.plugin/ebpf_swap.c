@@ -393,8 +393,9 @@ static int ebpf_send_systemd_swap_charts()
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_specific_swap_charts(char *type)
+static void ebpf_create_specific_swap_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function <code>swap_readpage</code>.",
@@ -402,7 +403,7 @@ static void ebpf_create_specific_swap_charts(char *type)
                       NETDATA_CGROUP_SWAP_READ_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
-                      swap_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      swap_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function <code>swap_writepage</code>.",
@@ -410,7 +411,8 @@ static void ebpf_create_specific_swap_charts(char *type)
                       NETDATA_CGROUP_SWAP_WRITE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
                       ebpf_create_global_dimension,
-                      &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
 /**
@@ -476,8 +478,10 @@ static void ebpf_create_systemd_swap_charts()
 
 /**
  * Send data to Netdata calling auxiliar functions.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
 */
-void ebpf_swap_send_cgroup_data()
+void ebpf_swap_send_cgroup_data(int update_every)
 {
     if (!ebpf_cgroup_pids)
         return;
@@ -506,7 +510,7 @@ void ebpf_swap_send_cgroup_data()
             continue;
 
         if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) && ect->updated) {
-            ebpf_create_specific_swap_charts(ect->name);
+            ebpf_create_specific_swap_charts(ect->name, update_every);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
         }
 
@@ -536,6 +540,7 @@ static void swap_collector(ebpf_module_t *em)
 
     int apps = em->apps_charts;
     int cgroup = em->cgroup_charts;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -554,7 +559,7 @@ static void swap_collector(ebpf_module_t *em)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
         if (cgroup)
-            ebpf_swap_send_cgroup_data();
+            ebpf_swap_send_cgroup_data(update_time);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -626,8 +631,10 @@ static void ebpf_swap_allocate_global_vectors(int apps)
  * Create global charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_swap_charts()
+static void ebpf_create_swap_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_MEM_SWAP_CHART,
                       "Calls to internal functions used to access swap.",
@@ -636,7 +643,8 @@ static void ebpf_create_swap_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       202,
                       ebpf_create_global_dimension,
-                      swap_publish_aggregated, NETDATA_SWAP_END, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      swap_publish_aggregated, NETDATA_SWAP_END,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
 /**
@@ -672,7 +680,7 @@ void *ebpf_swap_thread(void *ptr)
                        algorithms, NETDATA_SWAP_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_swap_charts();
+    ebpf_create_swap_charts(em->update_time);
     pthread_mutex_unlock(&lock);
 
     swap_collector(em);

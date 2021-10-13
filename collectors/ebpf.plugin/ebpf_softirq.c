@@ -150,7 +150,7 @@ static void *softirq_reader(void *ptr)
     return NULL;
 }
 
-static void softirq_create_charts()
+static void softirq_create_charts(int update_every)
 {
     ebpf_create_chart(
         NETDATA_EBPF_SYSTEM_GROUP,
@@ -161,7 +161,7 @@ static void softirq_create_charts()
         NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
-        NULL, NULL, 0,
+        NULL, NULL, 0, update_every,
         NETDATA_EBPF_MODULE_NAME_SOFTIRQ
     );
 
@@ -207,7 +207,7 @@ static void softirq_collector(ebpf_module_t *em)
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    softirq_create_charts();
+    softirq_create_charts(em->update_time);
     softirq_create_dims();
     pthread_mutex_unlock(&lock);
 

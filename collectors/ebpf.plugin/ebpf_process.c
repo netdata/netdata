@@ -362,9 +362,10 @@ static void ebpf_update_process_cgroup()
  * @param axis   the axis label
  * @param web    the group name used to attach the chart on dashboard
  * @param order  the order number of the specified chart
+ * @param update_every value to overwrite the update frequency set by the server.
  */
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
-                                      char *web, char *algorithm, int order)
+                                      char *web, char *algorithm, int order, int update_every)
 {
     printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'process'\n",
            family,
@@ -397,7 +398,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21002,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                      2, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                      2, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                       NETDATA_EXIT_SYSCALL,
@@ -409,14 +410,14 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21003,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
-                      2, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                      2, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_process_status_chart(NETDATA_EBPF_SYSTEM_GROUP,
                               NETDATA_PROCESS_STATUS_NAME,
                               EBPF_COMMON_DIMENSION_DIFFERENCE,
                               NETDATA_PROCESS_GROUP,
                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                              21004);
+                              21004, em->update_time);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
@@ -429,7 +430,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21005,
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                          2, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                          2, em->update_time, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
 }
 
@@ -666,7 +667,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                       ebpf_create_global_dimension, &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
-                      1, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                      1, update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
@@ -674,7 +675,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001,
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_CLONE],
-                      1, NETDATA_EBPF_MODULE_NAME_PROCESS);
+                      1, update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "Tasks starts exit process.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
@@ -926,6 +927,7 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         ebpf_process_update_cgroup_algorithm();
 
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;

@@ -466,7 +466,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21070,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
-                      3, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      3, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_TCP_FUNCTION_BITS,
                       "TCP bandwidth", EBPF_COMMON_DIMENSION_BITS,
@@ -476,7 +476,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21071,
                       ebpf_create_global_dimension,
                       socket_publish_aggregated,
-                      2, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      2, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
@@ -489,7 +489,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21072,
                           ebpf_create_global_dimension,
                           socket_publish_aggregated,
-                          2, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                          2, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
 
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
@@ -502,7 +502,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21073,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT],
-                      1, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      1, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
                       NETDATA_UDP_FUNCTION_COUNT,
@@ -514,7 +514,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21074,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
-                      2, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      2, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_UDP_FUNCTION_BITS,
                       "UDP bandwidth", EBPF_COMMON_DIMENSION_BITS,
@@ -524,7 +524,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       21075,
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
-                      2, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                      2, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_EBPF_IP_FAMILY,
@@ -537,7 +537,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           21076,
                           ebpf_create_global_dimension,
                           &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
-                          2, NETDATA_EBPF_MODULE_NAME_SOCKET);
+                          2, em->update_time, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
 }
 
@@ -621,15 +621,16 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  *  Create common charts.
  *
- * @param id        the chart id
- * @param title     the chart title
- * @param units     the units label
- * @param family    the group name used to attach the chart on dashboard
- * @param order     the chart order
- * @param ptr       the plot structure with values.
+ * @param id            chart id
+ * @param title         chart title
+ * @param units         units label
+ * @param family        group name used to attach the chart on dashboard
+ * @param order         chart order
+ * @param update_every value to overwrite the update frequency set by the server.
+ * @param ptr          plot structure with values.
  */
 static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
-                                        char *family, int order, netdata_vector_plot_t *ptr)
+                                        char *family, int order, int update_every, netdata_vector_plot_t *ptr)
 {
     ebpf_write_chart_cmd(NETDATA_EBPF_FAMILY,
                          id,
@@ -665,10 +666,11 @@ static void ebpf_socket_create_nv_chart(char *id, char *title, char *units,
  * @param units     the units label
  * @param family    the group name used to attach the chart on dashboard
  * @param order     the chart order
+ * @param update_every value to overwrite the update frequency set by the server.
  * @param ptr       the plot structure with values.
  */
 static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
-                                             char *family, int order, netdata_vector_plot_t *ptr)
+                                             char *family, int order, int update_every, netdata_vector_plot_t *ptr)
 {
     ebpf_write_chart_cmd(NETDATA_EBPF_FAMILY,
                          id,
@@ -698,8 +700,9 @@ static void ebpf_socket_create_nv_retransmit(char *id, char *title, char *units,
  * Recreate the charts when new sockets are created.
  *
  * @param ptr a pointer for inbound or outbound vectors.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
+static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr, int update_every)
 {
     // We do not have new sockets, so we do not need move forward
     if (ptr->max_plot == ptr->last_plot)
@@ -712,34 +715,34 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr)
                                     "Outbound connections (bytes).", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21080,
-                                    ptr);
+                                    update_every, ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_OUTBOUND_PACKETS,
                                     "Outbound connections (packets)",
                                     EBPF_COMMON_DIMENSION_PACKETS,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21082,
-                                    ptr);
+                                    update_every, ptr);
 
         ebpf_socket_create_nv_retransmit(NETDATA_NV_OUTBOUND_RETRANSMIT,
                                          "Retransmitted packets",
                                          EBPF_COMMON_DIMENSION_CALL,
                                          NETDATA_NETWORK_CONNECTIONS_GROUP,
                                          21083,
-                                         ptr);
+                                         update_every, ptr);
     } else {
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_BYTES,
                                     "Inbound connections (bytes)", EBPF_COMMON_DIMENSION_BYTES,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21084,
-                                    ptr);
+                                    update_every, ptr);
 
         ebpf_socket_create_nv_chart(NETDATA_NV_INBOUND_PACKETS,
                                     "Inbound connections (packets)",
                                     EBPF_COMMON_DIMENSION_PACKETS,
                                     NETDATA_NETWORK_CONNECTIONS_GROUP,
                                     21085,
-                                    ptr);
+                                    update_every, ptr);
     }
 
     ptr->flags |= NETWORK_VIEWER_CHARTS_CREATED;
@@ -1711,8 +1714,9 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_specific_socket_charts(char *type)
+static void ebpf_create_specific_socket_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV,
                       "Bytes received",
@@ -1721,7 +1725,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT,
                       "Bytes sent",
@@ -1730,7 +1735,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301,
                       ebpf_create_global_dimension,
-                      socket_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      socket_publish_aggregated, 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                       "Calls to tcp_cleanup_rbuf.",
@@ -1739,7 +1745,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                       "Calls to tcp_sendmsg.",
@@ -1748,7 +1755,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303,
                       ebpf_create_global_dimension,
-                      socket_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      socket_publish_aggregated, 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                       "Calls to tcp_retransmit.",
@@ -1757,7 +1765,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                       "Calls to udp_sendmsg",
@@ -1766,7 +1775,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                       "Calls to udp_recvmsg",
@@ -1775,7 +1785,8 @@ static void ebpf_create_specific_socket_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306,
                       ebpf_create_global_dimension,
-                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF], 1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF], 1,
+                      update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
 /**
@@ -2027,8 +2038,10 @@ void ebpf_socket_update_cgroup_algorithm()
 
 /**
  * Send data to Netdata calling auxiliar functions.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
 */
-static void ebpf_socket_send_cgroup_data()
+static void ebpf_socket_send_cgroup_data(int update_every)
 {
     if (!ebpf_cgroup_pids)
         return;
@@ -2054,7 +2067,7 @@ static void ebpf_socket_send_cgroup_data()
             continue;
 
         if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SOCKET_CHART)) {
-            ebpf_create_specific_socket_charts(ect->name);
+            ebpf_create_specific_socket_charts(ect->name, update_every);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_SOCKET_CHART;
         }
 
@@ -2103,6 +2116,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
     int socket_apps_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].apps_charts;
     int socket_global_enabled = ebpf_modules[EBPF_MODULE_SOCKET_IDX].global_charts;
     int network_connection = em->optional;
+    int update_every = em->update_time;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -2126,7 +2140,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
-            ebpf_socket_send_cgroup_data();
+            ebpf_socket_send_cgroup_data(update_every);
 
         fflush(stdout);
 
@@ -2134,11 +2148,11 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
             // We are calling fflush many times, because when we have a lot of dimensions
             // we began to have not expected outputs and Netdata closed the plugin.
             pthread_mutex_lock(&nv_mutex);
-            ebpf_socket_create_nv_charts(&inbound_vectors);
+            ebpf_socket_create_nv_charts(&inbound_vectors, update_every);
             fflush(stdout);
             ebpf_socket_send_nv_data(&inbound_vectors);
 
-            ebpf_socket_create_nv_charts(&outbound_vectors);
+            ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
             fflush(stdout);
             ebpf_socket_send_nv_data(&outbound_vectors);
             wait_to_plot = 0;

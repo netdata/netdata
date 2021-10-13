@@ -381,8 +381,9 @@ static void ebpf_shm_sum_cgroup_pids(netdata_publish_shm_t *shm, struct pid_on_t
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_specific_shm_charts(char *type)
+static void ebpf_create_specific_shm_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_SHMGET_CHART,
                       "Calls to syscall <code>shmget(2)</code>.",
@@ -394,6 +395,7 @@ static void ebpf_create_specific_shm_charts(char *type)
                       ebpf_create_global_dimension,
                       &shm_publish_aggregated[NETDATA_KEY_SHMGET_CALL],
                       1,
+                      update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_chart(type, NETDATA_SHMAT_CHART,
@@ -406,6 +408,7 @@ static void ebpf_create_specific_shm_charts(char *type)
                       ebpf_create_global_dimension,
                       &shm_publish_aggregated[NETDATA_KEY_SHMAT_CALL],
                       1,
+                      update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_chart(type, NETDATA_SHMDT_CHART,
@@ -418,6 +421,7 @@ static void ebpf_create_specific_shm_charts(char *type)
                       ebpf_create_global_dimension,
                       &shm_publish_aggregated[NETDATA_KEY_SHMDT_CALL],
                       1,
+                      update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
 
     ebpf_create_chart(type, NETDATA_SHMCTL_CHART,
@@ -430,6 +434,7 @@ static void ebpf_create_specific_shm_charts(char *type)
                       ebpf_create_global_dimension,
                       &shm_publish_aggregated[NETDATA_KEY_SHMCTL_CALL],
                       1,
+                      update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
 }
 
@@ -592,8 +597,10 @@ static void ebpf_send_specific_shm_data(char *type, netdata_publish_shm_t *value
 
 /**
  * Send data to Netdata calling auxiliar functions.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
 */
-void ebpf_shm_send_cgroup_data()
+void ebpf_shm_send_cgroup_data(int update_every)
 {
     if (!ebpf_cgroup_pids)
         return;
@@ -620,7 +627,7 @@ void ebpf_shm_send_cgroup_data()
             continue;
 
         if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_SHM_CHART) && ect->updated) {
-            ebpf_create_specific_shm_charts(ect->name);
+            ebpf_create_specific_shm_charts(ect->name, update_every);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_SHM_CHART;
         }
 
@@ -655,6 +662,7 @@ static void shm_collector(ebpf_module_t *em)
 
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -676,7 +684,7 @@ static void shm_collector(ebpf_module_t *em)
         }
 
         if (cgroups) {
-            ebpf_shm_send_cgroup_data();
+            ebpf_shm_send_cgroup_data(update_time);
         }
 
         pthread_mutex_unlock(&lock);
@@ -763,8 +771,10 @@ static void ebpf_shm_allocate_global_vectors(int apps)
  * Create global charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_shm_charts()
+static void ebpf_create_shm_charts(int update_every)
 {
     ebpf_create_chart(
         NETDATA_EBPF_SYSTEM_GROUP,
@@ -778,7 +788,7 @@ static void ebpf_create_shm_charts()
         ebpf_create_global_dimension,
         shm_publish_aggregated,
         NETDATA_SHM_END,
-        NETDATA_EBPF_MODULE_NAME_SHM
+        update_every, NETDATA_EBPF_MODULE_NAME_SHM
     );
 
     fflush(stdout);
@@ -826,7 +836,7 @@ void *ebpf_shm_thread(void *ptr)
     );
 
     pthread_mutex_lock(&lock);
-    ebpf_create_shm_charts();
+    ebpf_create_shm_charts(em->update_time);
     pthread_mutex_unlock(&lock);
 
     shm_collector(em);
