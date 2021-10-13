@@ -1505,7 +1505,7 @@ static void parse_args(int argc, char **argv)
     }
 
     if (freq <= 0) {
-        freq = 10;
+        freq = 5;
     }
 
     if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
