@@ -1795,43 +1795,44 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
  * Obsolete charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_socket_charts(char *type)
+static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_RECV, "Bytes received",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5300, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_SENT,"Bytes sent",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5301, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "Calls to tcp_cleanup_rbuf.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5302, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "Calls to tcp_sendmsg.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5303, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "Calls to tcp_retransmit.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5304, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "Calls to udp_sendmsg",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5305, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "Calls to udp_recvmsg",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_NET_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5306, update_every);
 }
 
 /*

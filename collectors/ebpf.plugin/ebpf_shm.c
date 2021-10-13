@@ -444,36 +444,37 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
  * Obsolete charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_shm_charts(char *type)
+static void ebpf_obsolete_specific_shm_charts(char *type, int update_time)
 {
     ebpf_write_chart_obsolete(type, NETDATA_SHMGET_CHART,
                               "Calls to syscall <code>shmget(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_GET_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5800);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5800, update_time);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMAT_CHART,
                               "Calls to syscall <code>shmat(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_AT_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5801);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5801, update_time);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMDT_CHART,
                               "Calls to syscall <code>shmdt(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_DT_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5802);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5802, update_time);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMCTL_CHART,
                               "Calls to syscall <code>shmctl(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SHM_CTL_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5803);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5803, update_time);
 }
 
 /**
@@ -635,7 +636,7 @@ void ebpf_shm_send_cgroup_data(int update_every)
             if (ect->updated) {
                 ebpf_send_specific_shm_data(ect->name, &ect->publish_shm);
             } else {
-                ebpf_obsolete_specific_shm_charts(ect->name);
+                ebpf_obsolete_specific_shm_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
             }
         }

@@ -421,18 +421,19 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_swap_charts(char *type)
+static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART,"Calls to function <code>swap_readpage</code>.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_READ_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "Calls to function <code>swap_writepage</code>.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101, update_every);
 }
 
 /*
@@ -518,7 +519,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
             if (ect->updated) {
                 ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap);
             } else {
-                ebpf_obsolete_specific_swap_charts(ect->name);
+                ebpf_obsolete_specific_swap_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
             }
         }
