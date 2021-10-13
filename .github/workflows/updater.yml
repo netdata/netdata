@@ -11,6 +11,10 @@ on:
 env:
   DO_NOT_TRACK: 1
 
+concurrency:
+  group: updater-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   source-build:
     name: Install, Build & Update

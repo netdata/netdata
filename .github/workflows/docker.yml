@@ -13,6 +13,9 @@ on:
         required: true
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: docker-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 jobs:
   docker-test:
     name: Docker Runtime Test

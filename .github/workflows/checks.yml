@@ -7,6 +7,9 @@ on:
   pull_request: null
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   checksum-checks:
     name: Checksums

@@ -5,6 +5,9 @@ on:
   pull_request: null
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   prep-review:
     name: Prepare Review Jobs
