@@ -103,9 +103,12 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token TOKEN --claim-
 ```
 ### Connect an agent running in Docker
 
-To connect an instance of the Netdata Agent running inside of a Docker container, either set claiming environment
-variables in the container to have it automatically connected on startup or restart, or use `docker exec` to manually
-connect an already running container.
+To connect an instance of the Netdata Agent running inside of a Docker container, it is recommended that you follow
+the instructions and use the commands provided either in the `Nodes` tab of a new War Room on Netdata Cloud or in the 
+shelf that appears when you click `Connect Nodes` and select `Docker`. 
+
+However, users can also claim a new node by claiming environment variables in the container to have it automatically 
+connected on startup or restart.
 
 For the connection process to work, the contents of `/var/lib/netdata` _must_ be preserved across container
 restarts using a persistent volume.  See our [recommended `docker run` and Docker Compose
@@ -125,11 +128,11 @@ it will use these values to attempt to connect the container, automatically addi
 Rooms. If a proxy is specified, it will be used for the connection process and for connecting to Netdata Cloud.
 
 These variables can be specified using any mechanism supported by your container tooling for setting environment
-variables inside containers. For example, when creating a new Netdata container using `docker run`, the following
+variables inside containers. 
 
 When using the `docker run` command, if you have an agent container already running, it is important to know that there will be a short period of downtime. This is due to the process of recreating the new agent container.
 
-The command that Netdata Cloud will provide to you is:
+The command to connect a new node to Netdata Cloud is:
 
 ```bash 
 docker run -d --name=netdata \
@@ -151,6 +154,9 @@ docker run -d --name=netdata \
   -e NETDATA_CLAIM_PROXY=PROXY \
  netdata/netdata
 ```
+>Note: This command only works for connecting a new container. If you are claiming an existing container that can not be recreated, 
+you can add the container by going to Netdata Cloud, clicking the `Nodes` tab, clicking `Connect Nodes`, selecting `Docker, and following
+the instructions and commands provided. 
 
 The output that would be seen from the connection process when using other methods will be present in the container logs.
 
@@ -201,17 +207,6 @@ Then run the following command in the same directory as the `docker-compose.yml`
 docker-compose up -d
 ```
 
-#### Using docker exec
-
-Connect a _running Netdata Agent container_, where you don't want to recreate the existing container, append the script offered by Netdata Cloud to a `docker exec ...` command, replacing
-`netdata` with the name of your running container:
-
-```bash
-docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
-```
-
-The script should return `Agent was successfully claimed.`. If the connection process returns errors, or if
-you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
 ### Connect an agent running in macOS
 
