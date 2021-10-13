@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
+- Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
 - Fix chart config overflow [\#11645](https://github.com/netdata/netdata/pull/11645) ([stelfrag](https://github.com/stelfrag))
+- eBPF cgroup integration [\#11642](https://github.com/netdata/netdata/pull/11642) ([thiagoftsm](https://github.com/thiagoftsm))
 - various fixes and updates for dashboard info [\#11639](https://github.com/netdata/netdata/pull/11639) ([ilyam8](https://github.com/ilyam8))
 - Fix an overflow when unsigned integer subtracted [\#11638](https://github.com/netdata/netdata/pull/11638) ([vlvkobal](https://github.com/vlvkobal))
 - add note for the new release of charts on the cloud [\#11637](https://github.com/netdata/netdata/pull/11637) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -34,6 +37,7 @@
 - fix varnish VBE parsing [\#11596](https://github.com/netdata/netdata/pull/11596) ([ilyam8](https://github.com/ilyam8))
 - add sys\_kernel\_mm\_ksm charts info [\#11595](https://github.com/netdata/netdata/pull/11595) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.2. [\#11593](https://github.com/netdata/netdata/pull/11593) ([netdatabot](https://github.com/netdatabot))
+- Add POWER8+ support to our official Docker images. [\#11592](https://github.com/netdata/netdata/pull/11592) ([Ferroin](https://github.com/Ferroin))
 - add sys\_devices\_system\_edac\_mc charts info [\#11589](https://github.com/netdata/netdata/pull/11589) ([ilyam8](https://github.com/ilyam8))
 - Adds local webserver API/v1 call "aclk" [\#11588](https://github.com/netdata/netdata/pull/11588) ([underhood](https://github.com/underhood))
 - Makes New Cloud architecture optional for ACLK-NG [\#11587](https://github.com/netdata/netdata/pull/11587) ([underhood](https://github.com/underhood))
@@ -91,6 +95,7 @@
 - Fix elasticsearch null values returned by \_cat/indices API [\#11501](https://github.com/netdata/netdata/pull/11501) ([vpiserchia](https://github.com/vpiserchia))
 - Update claim README.md [\#11492](https://github.com/netdata/netdata/pull/11492) ([car12o](https://github.com/car12o))
 - Fix issues in Alarm API [\#11491](https://github.com/netdata/netdata/pull/11491) ([underhood](https://github.com/underhood))
+- Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
 - Revert "add Travis ctrl file for checking if changes happened" [\#11486](https://github.com/netdata/netdata/pull/11486) ([Ferroin](https://github.com/Ferroin))
 - Clean netdata naming [\#11484](https://github.com/netdata/netdata/pull/11484) ([andrewm4894](https://github.com/andrewm4894))
 - remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
@@ -168,14 +173,9 @@
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
-- eBPF ZFS monitoring [\#11330](https://github.com/netdata/netdata/pull/11330) ([thiagoftsm](https://github.com/thiagoftsm))
-- add postgresql version to requirements section [\#11328](https://github.com/netdata/netdata/pull/11328) ([charoleizer](https://github.com/charoleizer))
 - Add ACLK-NG cloud request type charts [\#11326](https://github.com/netdata/netdata/pull/11326) ([UmanShahzad](https://github.com/UmanShahzad))
-- Log message when the page cache manager sleeps for more than 1 second. [\#11314](https://github.com/netdata/netdata/pull/11314) ([vkalintiris](https://github.com/vkalintiris))
 - Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
-- Properly handle the file list for updating the dashboard. [\#11282](https://github.com/netdata/netdata/pull/11282) ([Ferroin](https://github.com/Ferroin))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
-- Move cleanup of obsolete charts to a separate thread [\#11222](https://github.com/netdata/netdata/pull/11222) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
@@ -220,10 +220,6 @@
 - Remove dots in cgroup ids [\#11050](https://github.com/netdata/netdata/pull/11050) ([vlvkobal](https://github.com/vlvkobal))
 - health/vernemq: use `average` instead of  `sum` [\#11037](https://github.com/netdata/netdata/pull/11037) ([ilyam8](https://github.com/ilyam8))
 - Fix storing an NULL claim id on a parent node [\#11036](https://github.com/netdata/netdata/pull/11036) ([stelfrag](https://github.com/stelfrag))
-- Improve installation method for Alpine [\#11035](https://github.com/netdata/netdata/pull/11035) ([tiramiseb](https://github.com/tiramiseb))
-- Load names [\#11034](https://github.com/netdata/netdata/pull/11034) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add Third-party collector: nextcloud plugin [\#11032](https://github.com/netdata/netdata/pull/11032) ([tknobi](https://github.com/tknobi))
-- Create ebpf.d directory in PLUGINDIR for debian and rpm package\(netdata\#11017\) [\#11031](https://github.com/netdata/netdata/pull/11031) ([wangpei-nice](https://github.com/wangpei-nice))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
