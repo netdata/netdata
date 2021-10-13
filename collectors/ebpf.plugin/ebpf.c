@@ -55,7 +55,6 @@ char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = {"absolute", "incremental"};
-int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
 struct config collector_config = { .first_section = NULL,
@@ -464,9 +463,10 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
+ * @param update_every value to overwrite the update frequency set by the server.
  */
 void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
-                               char *charttype, char *context, int order)
+                               char *charttype, char *context, int order, int update_every)
 {
     printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
            type,
@@ -1026,11 +1026,14 @@ static inline void how_to_load(char *ptr)
  * Update interval
  *
  * Update default interval with value from user
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_update_interval()
+static void ebpf_update_interval(int update_every)
 {
     int i;
-    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
+    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY,
+                                          update_every);
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].update_time = value;
     }
@@ -1057,8 +1060,9 @@ static void ebpf_update_table_size()
  *
  * @param disable_apps    variable to store information related to apps.
  * @param disable_cgroups variable to store information related to cgroups.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void read_collector_values(int *disable_apps, int *disable_cgroups)
+static void read_collector_values(int *disable_apps, int *disable_cgroups, int update_every)
 {
     // Read global section
     char *value;
@@ -1071,7 +1075,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
 
     how_to_load(value);
 
-    ebpf_update_interval();
+    ebpf_update_interval(update_every);
 
     ebpf_update_table_size();
 
@@ -1233,10 +1237,11 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
  * @param path             the path where the file ebpf.conf is stored.
  * @param disable_apps     variable to store the information about apps plugin status.
  * @param disable_cgroups  variable to store the information about cgroups plugin status.
+ * @param update_every value to overwrite the update frequency set by the server.
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups)
+static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups, int update_every)
 {
     char lpath[4096];
 
@@ -1248,7 +1253,7 @@ static int load_collector_config(char *path, int *disable_apps, int *disable_cgr
         }
     }
 
-    read_collector_values(disable_apps, disable_cgroups);
+    read_collector_values(disable_apps, disable_cgroups, update_every);
 
     return 0;
 }
@@ -1499,15 +1504,15 @@ static void parse_args(int argc, char **argv)
         }
     }
 
-    if (freq > 0) {
-        update_every = freq;
+    if (freq <= 0) {
+        freq = 10;
     }
 
-    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups)) {
+    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
         info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups)) {
+        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
             info("Does not have a stock file. It is starting with default options.");
         } else {
             enabled = 1;
