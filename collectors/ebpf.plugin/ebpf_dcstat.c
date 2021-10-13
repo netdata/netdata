@@ -560,32 +560,33 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
  * Obsolete charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_dc_charts(char *type)
+static void ebpf_obsolete_specific_dc_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_DC_HIT_CHART,
                               "Percentage of files listed inside directory cache.",
                               EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REFERENCE_CHART,
                               "Count file access.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_REFERENCE_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5701);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5701, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                               "Access to files that were not present inside directory cache.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5702);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5702, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                               "Number of requests for files that were not found on filesystem.",
                               EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5703);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5703, update_every);
 }
 
 /**
@@ -812,7 +813,7 @@ void ebpf_dc_send_cgroup_data(int update_every)
             if (ect->updated) {
                 ebpf_send_specific_dc_data(ect->name, &ect->publish_dc);
             } else {
-                ebpf_obsolete_specific_dc_charts(ect->name);
+                ebpf_obsolete_specific_dc_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_DC_CHART;
             }
         }

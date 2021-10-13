@@ -716,11 +716,13 @@ static void ebpf_obsolete_specific_process_charts(char *type, ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "Process started",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000);
+                              NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
+                              update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_CGROUP_THREAD_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001);
+                              NETDATA_CGROUP_THREAD_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001,
+                              update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_EXIT,"Tasks starts exit process.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
@@ -880,7 +882,7 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
             if (ect->updated) {
                 ebpf_send_specific_process_data(ect->name, &ect->publish_systemd_ps, em);
             } else {
-                ebpf_obsolete_specific_process_charts(ect->name, em);
+                ebpf_obsolete_specific_process_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_PROCESS_CHART;
             }
         }

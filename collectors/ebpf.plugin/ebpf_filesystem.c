@@ -101,8 +101,10 @@ static netdata_idx_t *filesystem_hash_values = NULL;
  * Create Filesystem chart
  *
  * Create latency charts
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_fs_charts()
+static void ebpf_obsolete_fs_charts(int update_every)
 {
     int i;
     uint32_t test = NETDATA_FILESYSTEM_FLAG_CHART_CREATED | NETDATA_FILESYSTEM_REMOVE_CHARTS;
@@ -115,20 +117,21 @@ static void ebpf_obsolete_fs_charts()
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                                       efp->hread.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hread.order);
+                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hread.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
                                       efp->hwrite.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hwrite.order);
+                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hwrite.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name, efp->hopen.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hopen.order);
+                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hopen.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, efp->hadditional.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
-                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order);
+                                      NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order,
+                                      update_every);
         }
         efp->flags = flags;
     }
@@ -508,12 +511,13 @@ void *ebpf_filesystem_read_hash(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_time;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         (void) ebpf_update_partitions(em);
-        ebpf_obsolete_fs_charts();
+        ebpf_obsolete_fs_charts(update_time);
 
         // No more partitions, it is not necessary to read tables
         if (em->optional)

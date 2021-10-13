@@ -601,15 +601,16 @@ void *ebpf_disk_read_hash(void *ptr)
 /**
  * Obsolete Hard Disk charts
  *
- * @param w the structure with necessary information to create the chart
- *
  * Make Hard disk charts and fill chart name
+ *
+ * @param w the structure with necessary information to create the chart
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
+static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 {
     ebpf_write_chart_obsolete(w->histogram.name, w->family, w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
                               w->family, NETDATA_EBPF_CHART_TYPE_STACKED, "disk.latency_io",
-                              w->histogram.order);
+                              w->histogram.order, update_every);
 
     w->flags = 0;
 }
@@ -651,12 +652,13 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
     time_t limit = 10 * em->update_time;
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
+    int update_time = em->update_time;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
 
         if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
-            ebpf_obsolete_hd_charts(ned);
+            ebpf_obsolete_hd_charts(ned, update_time);
             avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)ned);
             UNUSED(ret);
             if (move == plot_disks) {

@@ -748,32 +748,33 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
  * Obsolete charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_cachestat_charts(char *type)
+static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200);
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
                       EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201);
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202);
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
                       EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203);
+                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203, update_every);
 }
 
 /**
@@ -814,7 +815,7 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
             if (ect->updated) {
                 ebpf_send_specific_cachestat_data(ect->name, &ect->publish_cachestat);
             } else {
-                ebpf_obsolete_specific_cachestat_charts(ect->name);
+                ebpf_obsolete_specific_cachestat_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART;
             }
         }

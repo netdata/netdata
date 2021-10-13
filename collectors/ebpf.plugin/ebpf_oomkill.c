@@ -186,13 +186,14 @@ static void ebpf_send_specific_oomkill_data(char *type, int value)
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_obsolete_specific_oomkill_charts(char *type)
+static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
                               EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NULL,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600);
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600, update_every);
 }
 
 /**
@@ -230,7 +231,7 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
         if (ect->flags & NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART && ect->updated) {
             ebpf_send_specific_oomkill_data(ect->name, ect->oomkill);
         } else {
-            ebpf_obsolete_specific_oomkill_charts(ect->name);
+            ebpf_obsolete_specific_oomkill_charts(ect->name, update_every);
             ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART;
         }
     }
