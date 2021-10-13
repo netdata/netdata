@@ -516,15 +516,16 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_specific_dc_charts(char *type)
+static void ebpf_create_specific_dc_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_DC_HIT_CHART, "Percentage of files listed inside directory cache.",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                       NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700,
                       ebpf_create_global_dimension,
-                      dcstat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      dcstat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(type, NETDATA_DC_REFERENCE_CHART, "Count file access.",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -532,7 +533,7 @@ static void ebpf_create_specific_dc_charts(char *type)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5701,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 1,
-                      NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                       "Access to files that were not present inside directory cache.",
@@ -541,7 +542,7 @@ static void ebpf_create_specific_dc_charts(char *type)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5702,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW], 1,
-                      NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                       "Number of requests for files that were not found on filesystem.",
@@ -550,7 +551,7 @@ static void ebpf_create_specific_dc_charts(char *type)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5703,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS], 1,
-                      NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /**
@@ -775,8 +776,10 @@ static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc
 
 /**
  * Send data to Netdata calling auxiliar functions.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
 */
-void ebpf_dc_send_cgroup_data()
+void ebpf_dc_send_cgroup_data(int update_every)
 {
     if (!ebpf_cgroup_pids)
         return;
@@ -801,7 +804,7 @@ void ebpf_dc_send_cgroup_data()
             continue;
 
         if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_DC_CHART) && ect->updated) {
-            ebpf_create_specific_dc_charts(ect->name);
+            ebpf_create_specific_dc_charts(ect->name, update_every);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_DC_CHART;
         }
 
@@ -833,6 +836,7 @@ static void dcstat_collector(ebpf_module_t *em)
     memset(&publish, 0, sizeof(publish));
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -851,7 +855,7 @@ static void dcstat_collector(ebpf_module_t *em)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
-            ebpf_dc_send_cgroup_data();
+            ebpf_dc_send_cgroup_data(update_time);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -868,8 +872,10 @@ static void dcstat_collector(ebpf_module_t *em)
  * Create filesystem charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_filesystem_charts()
+static void ebpf_create_filesystem_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files listed inside directory cache",
@@ -878,7 +884,7 @@ static void ebpf_create_filesystem_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,
                       ebpf_create_global_dimension,
-                      dcstat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      dcstat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
@@ -888,7 +894,7 @@ static void ebpf_create_filesystem_charts()
                       21201,
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 3,
-                      NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     fflush(stdout);
 }
@@ -961,7 +967,7 @@ void *ebpf_dcstat_thread(void *ptr)
                        dcstat_counter_dimension_name, dcstat_counter_dimension_name,
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
-    ebpf_create_filesystem_charts();
+    ebpf_create_filesystem_charts(em->update_time);
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);

@@ -702,8 +702,9 @@ static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_caches
  * Create charts for cgroup/application.
  *
  * @param type the chart type.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_specific_cachestat_charts(char *type)
+static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
@@ -711,7 +712,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
                       ebpf_create_global_dimension,
-                      cachestat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      cachestat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
@@ -720,7 +721,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
@@ -729,7 +730,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
@@ -738,7 +739,7 @@ static void ebpf_create_specific_cachestat_charts(char *type)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 }
 
 /**
@@ -777,8 +778,10 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type)
 
 /**
  * Send data to Netdata calling auxiliar functions.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
 */
-void ebpf_cachestat_send_cgroup_data()
+void ebpf_cachestat_send_cgroup_data(int update_every)
 {
     if (!ebpf_cgroup_pids)
         return;
@@ -803,7 +806,7 @@ void ebpf_cachestat_send_cgroup_data()
             continue;
 
         if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART) && ect->updated) {
-            ebpf_create_specific_cachestat_charts(ect->name);
+            ebpf_create_specific_cachestat_charts(ect->name, update_every);
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_CACHESTAT_CHART;
         }
 
@@ -835,6 +838,7 @@ static void cachestat_collector(ebpf_module_t *em)
     memset(&publish, 0, sizeof(publish));
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
+    int update_time = em->update_time;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -853,7 +857,7 @@ static void cachestat_collector(ebpf_module_t *em)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
-            ebpf_cachestat_send_cgroup_data();
+            ebpf_cachestat_send_cgroup_data(update_time);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -870,8 +874,10 @@ static void cachestat_collector(ebpf_module_t *em)
  * Create global charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_create_memory_charts()
+static void ebpf_create_memory_charts(ebpf_module_t *em)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit is calculating using total cache added without dirties per total added because of red misses.",
@@ -880,7 +886,7 @@ static void ebpf_create_memory_charts()
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
-                      cachestat_counter_publish_aggregated, 1, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      cachestat_counter_publish_aggregated, 1, em->update_time, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages added to the page cache.",
@@ -890,7 +896,7 @@ static void ebpf_create_memory_charts()
                       21101,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      em->update_time, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
                       "Hits are function calls that Netdata counts.",
@@ -900,7 +906,7 @@ static void ebpf_create_memory_charts()
                       21102,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      em->update_time, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
                       "Misses are function calls that Netdata counts.",
@@ -910,7 +916,7 @@ static void ebpf_create_memory_charts()
                       21103,
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
-                      NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+                      em->update_time, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
     fflush(stdout);
 }
@@ -981,7 +987,7 @@ void *ebpf_cachestat_thread(void *ptr)
                        cachestat_counter_dimension_name, cachestat_counter_dimension_name,
                        algorithms, NETDATA_CACHESTAT_END);
 
-    ebpf_create_memory_charts();
+    ebpf_create_memory_charts(em);
 
     pthread_mutex_unlock(&lock);
 

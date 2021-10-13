@@ -179,8 +179,10 @@ static void mount_collector(ebpf_module_t *em)
  * Create mount charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_mount_charts()
+static void ebpf_create_mount_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
                       "Calls to mount and umount syscalls.",
@@ -190,7 +192,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                       ebpf_create_global_dimension,
                       mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      NETDATA_EBPF_MODULE_NAME_MOUNT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
                       "Errors to mount and umount syscalls.",
@@ -200,7 +202,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                       ebpf_create_global_dimension,
                       mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      NETDATA_EBPF_MODULE_NAME_MOUNT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     fflush(stdout);
 }
@@ -241,7 +243,7 @@ void *ebpf_mount_thread(void *ptr)
                        algorithms, NETDATA_EBPF_MOUNT_SYSCALL);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_mount_charts();
+    ebpf_create_mount_charts(em->update_time);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);

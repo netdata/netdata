@@ -617,11 +617,12 @@ static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w)
 /**
  * Create Hard Disk charts
  *
- * @param w the structure with necessary information to create the chart
- *
  * Make Hard disk charts and fill chart name
+ *
+ * @param w the structure with necessary information to create the chart
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
+static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 {
     int order = NETDATA_CHART_PRIO_DISK_LATENCY;
     char *family = w->family;
@@ -633,7 +634,7 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w)
     ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_DIMENSION_CALL,
                       family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
-                      NETDATA_EBPF_MODULE_NAME_DISK);
+                      update_every, NETDATA_EBPF_MODULE_NAME_DISK);
     order++;
 
     w->flags |= NETDATA_DISK_CHART_CREATED;
@@ -681,8 +682,10 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
  * Send Hard disk data
  *
  * Send hard disk information to Netdata.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_latency_send_hd_data()
+static void ebpf_latency_send_hd_data(int update_every)
 {
     pthread_mutex_lock(&plot_mutex);
     if (!plot_disks) {
@@ -695,7 +698,7 @@ static void ebpf_latency_send_hd_data()
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
         if (!(flags & NETDATA_DISK_CHART_CREATED)) {
-            ebpf_create_hd_charts(ned);
+            ebpf_create_hd_charts(ned, update_every);
         }
 
         if ((flags & NETDATA_DISK_CHART_CREATED)) {
@@ -722,7 +725,7 @@ static void disk_collector(ebpf_module_t *em)
     netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_disk_read_hash, em);
 
-
+    int update_time = em->update_time;
     read_thread_closed = 0;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
@@ -730,7 +733,7 @@ static void disk_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
-        ebpf_latency_send_hd_data();
+        ebpf_latency_send_hd_data(update_time);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);

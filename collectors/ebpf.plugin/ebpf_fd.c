@@ -417,7 +417,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5400,
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
-                      1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
@@ -426,7 +426,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5401,
                           ebpf_create_global_dimension,
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
-                          1,
+                          1, em->update_time,
                           NETDATA_EBPF_MODULE_NAME_SWAP);
     }
 
@@ -436,7 +436,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5402,
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
-                      1, NETDATA_EBPF_MODULE_NAME_SWAP);
+                      1, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
@@ -445,7 +445,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5403,
                           ebpf_create_global_dimension,
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
-                          1,
+                          1, em->update_time,
                           NETDATA_EBPF_MODULE_NAME_SWAP);
     }
 }
@@ -772,7 +772,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       fd_publish_aggregated,
                       NETDATA_FD_SYSCALL_END,
-                      NETDATA_EBPF_MODULE_NAME_FD);
+                      em->update_time, NETDATA_EBPF_MODULE_NAME_FD);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
@@ -786,7 +786,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
                           ebpf_create_global_dimension,
                           fd_publish_aggregated,
                           NETDATA_FD_SYSCALL_END,
-                          NETDATA_EBPF_MODULE_NAME_FD);
+                          em->update_time, NETDATA_EBPF_MODULE_NAME_FD);
     }
 }
 

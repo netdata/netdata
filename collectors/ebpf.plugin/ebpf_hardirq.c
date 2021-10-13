@@ -336,7 +336,7 @@ static void *hardirq_reader(void *ptr)
     return NULL;
 }
 
-static void hardirq_create_charts()
+static void hardirq_create_charts(int update_every)
 {
     ebpf_create_chart(
         NETDATA_EBPF_SYSTEM_GROUP,
@@ -347,7 +347,7 @@ static void hardirq_create_charts()
         NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
-        NULL, NULL, 0,
+        NULL, NULL, 0, update_every,
         NETDATA_EBPF_MODULE_NAME_HARDIRQ
     );
 
@@ -426,7 +426,7 @@ static void hardirq_collector(ebpf_module_t *em)
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    hardirq_create_charts();
+    hardirq_create_charts(em->update_time);
     hardirq_create_static_dims();
     pthread_mutex_unlock(&lock);
 

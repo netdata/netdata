@@ -246,7 +246,6 @@ extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
-extern int update_every;
 extern uint32_t finalized_threads;
 
 // Socket functions and variables
