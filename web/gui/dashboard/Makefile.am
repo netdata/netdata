@@ -26,7 +26,7 @@ dist_web_DATA = \
     index.html \
     infographic.html \
     manifest.json \
-    precache-manifest.cd1e55ed4532ec26d7326ca173a13c62.js \
+    precache-manifest.7e50f5968c47a090fb58f71f9b09f19e.js \
     refresh-badges.js \
     robots.txt \
     service-worker.js \
@@ -115,7 +115,7 @@ dist_weblib_DATA = \
     lib/dygraph-smooth-plotter-c91c859.js \
     lib/fontawesome-all-5.0.1.min.js \
     lib/gauge-1.3.2.min.js \
-    lib/jquery-2.2.4.min.js \
+    lib/jquery-3.6.0.min.js \
     lib/jquery.easypiechart-97b5824.min.js \
     lib/jquery.peity-3.2.0.min.js \
     lib/jquery.sparkline-2.1.2.min.js \
@@ -139,9 +139,9 @@ webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
     static/js/10.a23c74b9.chunk.js \
     static/js/10.a23c74b9.chunk.js.map \
-    static/js/2.52598c52.chunk.js \
-    static/js/2.52598c52.chunk.js.LICENSE \
-    static/js/2.52598c52.chunk.js.map \
+    static/js/2.25b01583.chunk.js \
+    static/js/2.25b01583.chunk.js.LICENSE \
+    static/js/2.25b01583.chunk.js.map \
     static/js/3.5ef4adcd.chunk.js \
     static/js/3.5ef4adcd.chunk.js.map \
     static/js/4.1621c1ad.chunk.js \
@@ -157,9 +157,9 @@ dist_webstaticjs_DATA = \
     static/js/8.fb328a3a.chunk.js.map \
     static/js/9.f8eb4edd.chunk.js \
     static/js/9.f8eb4edd.chunk.js.map \
-    static/js/main.5a90354d.chunk.js \
-    static/js/main.5a90354d.chunk.js.LICENSE \
-    static/js/main.5a90354d.chunk.js.map \
+    static/js/main.6777f475.chunk.js \
+    static/js/main.6777f475.chunk.js.LICENSE \
+    static/js/main.6777f475.chunk.js.map \
     static/js/runtime-main.ea592e2f.js \
     static/js/runtime-main.ea592e2f.js.map \
     $(NULL)
