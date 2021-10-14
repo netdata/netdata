@@ -419,7 +419,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
 
     if [ "${proc_count}" -lt 1 ]; then
       run_failed "Netdata needs at least ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
-      run_failed "Insufficient RAM available for an install. Possibly try building with the '--use-system-protobuf' flag."
+      run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag."
       exit 2
     fi
   else

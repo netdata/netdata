@@ -560,7 +560,7 @@ if [ -n "$ndpath" ] ; then
         fi
       else
         if [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] || [ "${ndstatic}" = "yes" ] ; then
-          fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue." F0101
+          fatal "Existing installation detected which cannot be safely updated by this script. Refusing to continue." F0101
           exit 1
         else
           progress "User explicitly requested duplicate install, proceeding."
@@ -570,7 +570,7 @@ if [ -n "$ndpath" ] ; then
       if [ "${ndstatic}" = "no" ] ; then
         progress "User requested reinstall instead of update, proceeding."
       else
-        fatal "Existing install is a static install, please use kickstart-static64.sh instead." F0102
+        fatal "Existing install is a static install. Please use kickstart-static64.sh instead." F0102
         exit 1
       fi
     fi
@@ -584,7 +584,7 @@ if [ -n "$ndpath" ] ; then
       claim
       exit $?
     elif [ -z "${NETDATA_ALLOW_DUPLICATE_INSTALL}" ] ; then
-      fatal "Existing installation detected which cannot be safely updated by this script, refusing to continue." F0103
+      fatal "Existing installation detected which cannot be safely updated by this script. Refusing to continue." F0103
       exit 1
     else
       progress "User explicitly requested duplicate install, proceeding."
