@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
 
-#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 #include "../../aclk/aclk_alarm_api.h"
 #include "../../aclk/aclk.h"
 #endif
@@ -15,12 +15,17 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     //check aclk architecture and handle old json alarm update to cloud
     //include also the valid statuses for this case
 #ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!aclk_use_new_cloud_arch) {
+#endif
+
         if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
             aclk_update_alarm(host, ae);
         }
         return;
+#endif
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     }
 
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
@@ -92,7 +97,7 @@ bind_fail:
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 {
-#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return ALARM_STATUS_REMOVED;
