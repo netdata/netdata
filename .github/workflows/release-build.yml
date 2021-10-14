@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Mark Stable
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
       - name: Build
@@ -90,7 +90,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Mark Stable
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Build
