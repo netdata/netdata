@@ -32,6 +32,7 @@
 - apps: disable reporting min/avg/max group uptime by default [\#11609](https://github.com/netdata/netdata/pull/11609) ([ilyam8](https://github.com/ilyam8))
 - fix https client  [\#11608](https://github.com/netdata/netdata/pull/11608) ([underhood](https://github.com/underhood))
 - add cgroups.plugin charts descriptions [\#11607](https://github.com/netdata/netdata/pull/11607) ([ilyam8](https://github.com/ilyam8))
+- Update optional parameters for upcoming installer. [\#11604](https://github.com/netdata/netdata/pull/11604) ([DShreve2](https://github.com/DShreve2))
 - add apps.plugin charts descriptions [\#11601](https://github.com/netdata/netdata/pull/11601) ([ilyam8](https://github.com/ilyam8))
 - add proc\_vmstat charts info [\#11597](https://github.com/netdata/netdata/pull/11597) ([ilyam8](https://github.com/ilyam8))
 - fix varnish VBE parsing [\#11596](https://github.com/netdata/netdata/pull/11596) ([ilyam8](https://github.com/ilyam8))
@@ -166,14 +167,11 @@
 - FIX index reference [\#11356](https://github.com/netdata/netdata/pull/11356) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix sending MS Teams notifications to multiple channels [\#11355](https://github.com/netdata/netdata/pull/11355) ([ilyam8](https://github.com/ilyam8))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
-- packaging: update go.d.plugin version to v0.30.0 [\#11349](https://github.com/netdata/netdata/pull/11349) ([ilyam8](https://github.com/ilyam8))
 - eBPF btrfs [\#11348](https://github.com/netdata/netdata/pull/11348) ([thiagoftsm](https://github.com/thiagoftsm))
-- Assorted kickstart install fixes. [\#11342](https://github.com/netdata/netdata/pull/11342) ([Ferroin](https://github.com/Ferroin))
 - add geth default config [\#11341](https://github.com/netdata/netdata/pull/11341) ([odyslam](https://github.com/odyslam))
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
-- Add ACLK-NG cloud request type charts [\#11326](https://github.com/netdata/netdata/pull/11326) ([UmanShahzad](https://github.com/UmanShahzad))
 - Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
 
@@ -218,8 +216,6 @@
 - Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add documentation for claiming during kickstart installation [\#11052](https://github.com/netdata/netdata/pull/11052) ([joelhans](https://github.com/joelhans))
 - Remove dots in cgroup ids [\#11050](https://github.com/netdata/netdata/pull/11050) ([vlvkobal](https://github.com/vlvkobal))
-- health/vernemq: use `average` instead of  `sum` [\#11037](https://github.com/netdata/netdata/pull/11037) ([ilyam8](https://github.com/ilyam8))
-- Fix storing an NULL claim id on a parent node [\#11036](https://github.com/netdata/netdata/pull/11036) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
