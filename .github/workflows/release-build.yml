@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        name: Build Type
+        description: Build Type
         default: nightly
         required: true
       version:
-        name: Version Tag
+        description: Version Tag
         default: nightly
         required: true
 concurrency:
@@ -46,8 +46,8 @@ jobs:
                       --with-math \
                       --with-user=netdata
           make dist
-          cp netdata-*.tar.gz artifacts/
-          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
+          echo "DISTFILE=$(find . -name 'netdata-*.tar.gz')"
+          cp "${DISTFILE}" artifacts/
       - name: Test
         run: |
           .github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
