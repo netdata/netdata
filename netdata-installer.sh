@@ -409,6 +409,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
 
   target_ram="$((1500 * mega + (250 * mega * proc_count)))"
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
+  total_ram="$((total_ram * 1024))"
 
   if [ -z "${MAKEOPTS}" ]; then
     while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 0 ]; do
