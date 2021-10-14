@@ -668,6 +668,7 @@ if test "${with_bundled_protobuf}" != "no"; then
         AC_MSG_ERROR([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found])
     fi
     if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
+        AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
         with_bundled_protobuf="yes"
     fi
 fi
@@ -704,10 +705,6 @@ AS_IF(
 
 if test "${have_libprotobuf}" == "yes" && test "${have_CXX_compiler}" == "yes"; then
     AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available])
-fi
-
-if test "${have_libprotobuf}" == "yes" && test "${with_bundled_protobuf}" == "yes"; then
-    AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
 fi
 
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
