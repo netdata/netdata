@@ -668,7 +668,6 @@ if test "${with_bundled_protobuf}" != "no"; then
         AC_MSG_ERROR([Bundled protobuf requested using --with-bundled-protobuf but it cannot be used/found])
     fi
     if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
-        AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
         with_bundled_protobuf="yes"
     fi
 fi
@@ -689,6 +688,7 @@ AS_IF(
 )
 else
     AC_MSG_NOTICE([using bundled protobuf])
+    AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
     PROTOC="\$(abs_top_srcdir)/externaldeps/protobuf/src/protoc"
     PROTOBUF_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/protobuf/src"
     PROTOBUF_LIBS="\$(abs_top_srcdir)/externaldeps/protobuf/src/.libs/libprotobuf.a"
