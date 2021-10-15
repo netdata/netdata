@@ -403,8 +403,8 @@ handle_existing_install() {
           binpkg-*) NETDATA_ONLY_NATIVE=1 ;;
           *-build) NETDATA_ONLY_BUILD=1 ;;
           *-static) NETDATA_ONLY_STATIC=1 ;;
-          unknown)
-            fatal "User requested reinstall, but we do not support reinstalling over an unknown install type, exiting."
+          *)
+            fatal "User requested reinstall, but we do not support reinstalling over top of a ${INSTALL_TYPE} installation, exiting."
             ;;
         esac
 
