@@ -19,6 +19,7 @@
 // Charts created on Apps submenu
 #define NETDATA_SYSCALL_APPS_TASK_PROCESS "process_create"
 #define NETDATA_SYSCALL_APPS_TASK_THREAD "thread_create"
+#define NETDATA_SYSCALL_APPS_TASK_EXIT "task_exit"
 #define NETDATA_SYSCALL_APPS_TASK_CLOSE "task_close"
 #define NETDATA_SYSCALL_APPS_TASK_ERROR "task_error"
 
@@ -29,10 +30,14 @@
 #define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup.process_create"
 #define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup.thread_create"
 #define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup.task_close"
+#define NETDATA_CGROUP_PROCESS_EXIT_CONTEXT "cgroup.task_exit"
+#define NETDATA_CGROUP_PROCESS_ERROR_CONTEXT "cgroup.task_error"
 
 #define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "services.process_create"
 #define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "services.thread_create"
 #define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "services.task_close"
+#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "services.task_exit"
+#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "services.task_error"
 
 // Index from kernel
 typedef enum ebpf_process_index {

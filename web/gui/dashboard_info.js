@@ -2570,8 +2570,12 @@ netdataDashboard.context = {
         info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads monitoring tracepoint <code>sched_process_fork</code>. This chart is provided by eBPF plugin.'
     },
 
+    'apps.task_exit': {
+        info: 'Calls to the function responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks. This chart is provided by eBPF plugin.'
+    },
+
     'apps.task_close': {
-        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
+        info: 'Calls to the function responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks. This chart is provided by eBPF plugin.'
     },
 
     'apps.task_error': {
@@ -3914,8 +3918,12 @@ netdataDashboard.context = {
         info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
     },
 
+    'cgroup.task_exit': {
+        info: 'Calls to the function responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks.'
+    },
+
     'cgroup.task_close': {
-        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+        info: 'Calls to the functions responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
     'cgroup.task_error': {
@@ -4180,8 +4188,12 @@ netdataDashboard.context = {
         info: 'Calls to either <a href="https://programming.vip/docs/the-execution-procedure-of-do_fork-function-in-linux.html" target="_blank">do_fork</a>, or <code>kernel_clone</code> if you are running kernel newer than 5.9.16, to create a new task, which is the common name used to define process and tasks inside the kernel. Netdata identifies the threads by counting the number of calls to <a  href="https://linux.die.net/man/2/clone" target="_blank">sys_clone</a> that have the flag <code>CLONE_THREAD</code> set.'
     },
 
+    'services.task_exit': {
+        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) tasks.'
+    },
+
     'services.task_close': {
-        info: 'Calls to the functions responsible for closing (<a href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">do_exit</a>) and releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
+        info: 'Calls to the functions responsible for releasing (<a  href="https://www.informit.com/articles/article.aspx?p=370047&seqNum=4" target="_blank">release_task</a>) tasks.'
     },
 
     'services.task_error': {
