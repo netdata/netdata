@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
 - Fix chart config overflow [\#11645](https://github.com/netdata/netdata/pull/11645) ([stelfrag](https://github.com/stelfrag))
@@ -168,7 +169,6 @@
 - fix sending MS Teams notifications to multiple channels [\#11355](https://github.com/netdata/netdata/pull/11355) ([ilyam8](https://github.com/ilyam8))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
 - eBPF btrfs [\#11348](https://github.com/netdata/netdata/pull/11348) ([thiagoftsm](https://github.com/thiagoftsm))
-- add geth default config [\#11341](https://github.com/netdata/netdata/pull/11341) ([odyslam](https://github.com/odyslam))
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
