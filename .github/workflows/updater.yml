@@ -58,7 +58,7 @@ jobs:
           - distro: 'ubuntu:21.04'
             pre: 'apt-get update'
           - distro: 'ubuntu:21.10'
-            pre: 'apt-get update'
+            pre: 'rm -f /etc/apt/apt.conf.d/docker* && apt-get update'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
