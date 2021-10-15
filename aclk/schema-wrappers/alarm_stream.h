@@ -99,9 +99,33 @@ struct alarm_log_entry {
     char *rendered_info;
 };
 
+struct send_alarm_snapshot {
+    char *node_id;
+    char *claim_id;
+    uint64_t snapshot_id;
+    uint64_t sequence_id;
+};
+
+struct alarm_snapshot {
+    char *node_id;
+    char *claim_id;
+    uint64_t snapshot_id;
+    uint32_t chunks;
+    uint32_t chunk;
+};
+
+typedef void* alarm_snapshot_proto_ptr_t;
+
 void destroy_alarm_log_entry(struct alarm_log_entry *entry);
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data);
+
+struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t len);
+void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr);
+
+alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);
+void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data);
+char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapshot);
 
 #ifdef __cplusplus
 }
