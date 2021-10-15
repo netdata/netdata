@@ -226,10 +226,20 @@ download() {
     run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
-  elif command -v fetch > /dev/null 2>&1; then # Native FreeBSD tool
-    run fetch -T 15 -a -o "${dest}" "${url}" || return 1
   else
-    fatal "I need curl, wget, or fetch to proceed, but none of them are available on this system."
+    fatal "I need curl or wget to proceed, but neither of them are available on this system."
+  fi
+}
+
+get_redirect() {
+  url="${1}"
+
+  if command -v curl > /dev/null 2>&1; then
+    run sh -c "curl https://github.com/netdata/netdata/releases/latest -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
+  elif command -v wget > /dev/null 2>&1; then
+    run sh -c "wget --max-redirect=0 https://github.com/netdata/netdata/releases/latest 2>&1 | grep Location | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
+  else
+    fatal "I need curl or wget to proceed, but neither of them are available on this system."
   fi
 }
 
@@ -737,7 +747,7 @@ try_package_install() {
 
 set_static_archive_urls() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
     export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-${latest}.gz.run"
     export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
   else
@@ -793,7 +803,7 @@ try_static_install() {
 
 set_source_archive_urls() {
   if [ "$1" = "stable" ]; then
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
     export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${latest}.tar.gz"
     export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
   else
