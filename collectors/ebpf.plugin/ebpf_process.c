@@ -909,10 +909,9 @@ void ebpf_process_update_cgroup_algorithm()
 /**
  * Main loop for this collector.
  *
- * @param step the number of microseconds used with heart beat
  * @param em   the structure with thread information
  */
-static void process_collector(usec_t step, ebpf_module_t *em)
+static void process_collector(ebpf_module_t *em)
 {
     cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
     cgroup_thread.start_routine = ebpf_cgroup_update_shm;
@@ -930,11 +929,10 @@ static void process_collector(usec_t step, ebpf_module_t *em)
 
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     int update_time = em->update_time;
+    int counter = update_time - 1;
     while (!close_ebpf_plugin) {
-        usec_t dt = heartbeat_next(&hb, step);
+        usec_t dt = heartbeat_next(&hb, USEC_PER_MS);
         (void)dt;
-
-        read_hash_global_tables();
 
         pthread_mutex_lock(&collect_data_mutex);
         cleanup_exited_pids();
@@ -945,29 +943,37 @@ static void process_collector(usec_t step, ebpf_module_t *em)
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
-        int publish_apps = 0;
-        if (all_pids_count > 0) {
-            if (apps_enabled) {
-                publish_apps = 1;
-                ebpf_process_update_apps_data();
+        read_hash_global_tables();
+
+        if (++counter == update_time) {
+            counter = 1;
+            int publish_apps = 0;
+            if (all_pids_count > 0) {
+                if (apps_enabled) {
+                    publish_apps = 1;
+                    ebpf_process_update_apps_data();
+                }
+
+                if (cgroups) {
+                    ebpf_update_process_cgroup();
+                }
             }
 
-            if (cgroups) {
-                ebpf_update_process_cgroup();
+            pthread_mutex_lock(&lock);
+            if (publish_global) {
+                ebpf_process_send_data(em);
             }
-        }
 
-        pthread_mutex_lock(&lock);
-        if (publish_global) {
-            ebpf_process_send_data(em);
-        }
+            if (publish_apps) {
+                ebpf_process_send_apps_data(apps_groups_root_target);
+            }
 
         if (publish_apps) {
             ebpf_process_send_apps_data(apps_groups_root_target, em);
         }
 
         if (cgroups) {
-            ebpf_process_send_cgroup_data(em);
+            ebpf_process_send_cgroup_data(update_time);
         }
         pthread_mutex_unlock(&lock);
 
@@ -1217,7 +1223,7 @@ void *ebpf_process_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    process_collector((usec_t)(em->update_time * USEC_PER_SEC), em);
+    process_collector(em);
 
 endprocess:
     wait_for_all_threads_die();
