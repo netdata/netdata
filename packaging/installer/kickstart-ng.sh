@@ -235,9 +235,9 @@ get_redirect() {
   url="${1}"
 
   if command -v curl > /dev/null 2>&1; then
-    run sh -c "curl https://github.com/netdata/netdata/releases/latest -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
+    run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget --max-redirect=0 https://github.com/netdata/netdata/releases/latest 2>&1 | grep Location | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
+    run sh -c "wget --max-redirect=0 ${url} 2>&1 | grep Location | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
   else
     fatal "I need curl or wget to proceed, but neither of them are available on this system."
   fi
