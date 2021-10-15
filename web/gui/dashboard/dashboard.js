@@ -549,7 +549,7 @@ if (typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null &
 // default URLs for all the external files we need
 // make them RELATIVE so that the whole thing can also be
 // installed under a web server
-NETDATA.jQuery = NETDATA.serverStatic + 'lib/jquery-2.2.4.min.js';
+NETDATA.jQuery = NETDATA.serverStatic + 'lib/jquery-3.6.0.min.js';
 NETDATA.peity_js = NETDATA.serverStatic + 'lib/jquery.peity-3.2.0.min.js';
 NETDATA.sparkline_js = NETDATA.serverStatic + 'lib/jquery.sparkline-2.1.2.min.js';
 NETDATA.easypiechart_js = NETDATA.serverStatic + 'lib/jquery.easypiechart-97b5824.min.js';
