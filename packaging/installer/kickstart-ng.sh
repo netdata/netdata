@@ -849,6 +849,8 @@ install_local_build_dependencies() {
 build_and_install() {
   progress "Building netdata"
 
+  echo "INSTALL_TYPE='kickstart-build'" > system/.install-type
+
   opts="${NETDATA_INSTALLER_OPTIONS}"
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
@@ -892,11 +894,10 @@ try_build_install() {
   cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot cd to netdata source tree"
 
   if [ -x netdata-installer.sh ]; then
-    echo "INSTALL_TYPE='kickstart-build'" > system/.install-type
     build_and_install || return 1
   else
     if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
-      cd "$(find . -mindepth 1 -maxdepth 1 -type d)" && build_and_install || return 1
+      cd "$(find . -mindepth 1 -maxdepth 1 -type d)" &&  build_and_install || return 1
     else
       fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}"
     fi
