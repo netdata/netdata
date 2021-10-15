@@ -317,12 +317,12 @@ static int ebpf_read_local_partitions()
  */
 static int ebpf_update_partitions(ebpf_module_t *em)
 {
-    static time_t update_time = 0;
+    static time_t update_every = 0;
     time_t curr = now_realtime_sec();
-    if (curr < update_time)
+    if (curr < update_every)
         return 0;
 
-    update_time = curr + 5 * em->update_time;
+    update_every = curr + 5 * em->update_every;
     if (!ebpf_read_local_partitions()) {
         em->optional = -1;
         return -1;
@@ -510,14 +510,14 @@ void *ebpf_filesystem_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_time;
-    int update_time = em->update_time;
+    usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
+    int update_every = em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
         (void) ebpf_update_partitions(em);
-        ebpf_obsolete_fs_charts(update_time);
+        ebpf_obsolete_fs_charts(update_every);
 
         // No more partitions, it is not necessary to read tables
         if (em->optional)
@@ -570,14 +570,14 @@ static void filesystem_collector(ebpf_module_t *em)
     netdata_thread_create(filesystem_threads.thread, filesystem_threads.name,
                           NETDATA_THREAD_OPTION_JOINABLE, ebpf_filesystem_read_hash, em);
 
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     while (!close_ebpf_plugin || em->optional) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
-        ebpf_create_fs_charts(update_time);
+        ebpf_create_fs_charts(update_every);
         ebpf_histogram_send_data();
 
         pthread_mutex_unlock(&collect_data_mutex);
@@ -645,7 +645,7 @@ void *ebpf_filesystem_thread(void *ptr)
                        algorithms, NETDATA_EBPF_HIST_MAX_BINS);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_fs_charts(em->update_time);
+    ebpf_create_fs_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     filesystem_collector(em);

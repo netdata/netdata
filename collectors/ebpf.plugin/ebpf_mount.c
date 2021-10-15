@@ -111,7 +111,7 @@ void *ebpf_mount_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -243,7 +243,7 @@ void *ebpf_mount_thread(void *ptr)
                        algorithms, NETDATA_EBPF_MOUNT_SYSCALL);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_mount_charts(em->update_time);
+    ebpf_create_mount_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);

@@ -153,7 +153,7 @@ typedef struct ebpf_module {
     const char *config_name;
     int enabled;
     void *(*start_routine)(void *);
-    int update_time;
+    int update_every;
     int global_charts;
     int apps_charts;
     int cgroup_charts;

@@ -258,7 +258,7 @@ void *ebpf_swap_read_hash(void *ptr)
     heartbeat_init(&hb);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -543,7 +543,7 @@ static void swap_collector(ebpf_module_t *em)
 
     int apps = em->apps_charts;
     int cgroup = em->cgroup_charts;
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -562,7 +562,7 @@ static void swap_collector(ebpf_module_t *em)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
         if (cgroup)
-            ebpf_swap_send_cgroup_data(update_time);
+            ebpf_swap_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -592,7 +592,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20191,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_WRITE_CHART,
                                "Calls to function <code>swap_writepage</code>.",
@@ -601,7 +601,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20192,
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_SWAP);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
 }
 
 /**
@@ -683,7 +683,7 @@ void *ebpf_swap_thread(void *ptr)
                        algorithms, NETDATA_SWAP_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_swap_charts(em->update_time);
+    ebpf_create_swap_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     swap_collector(em);

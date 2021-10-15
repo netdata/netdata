@@ -166,7 +166,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_LINE,
                                20100,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REFERENCE_CHART,
                                "Count file access.",
@@ -175,7 +175,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20101,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                                "Access to files that were not present inside directory cache.",
@@ -184,7 +184,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20102,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
     ebpf_create_charts_on_apps(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                                "Number of requests for files that were not found on filesystem.",
@@ -193,7 +193,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20103,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
 }
 
 /*****************************************************************
@@ -365,7 +365,7 @@ void *ebpf_dcstat_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_LATENCY_DCSTAT_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -843,7 +843,7 @@ static void dcstat_collector(ebpf_module_t *em)
     memset(&publish, 0, sizeof(publish));
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
@@ -862,7 +862,7 @@ static void dcstat_collector(ebpf_module_t *em)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
         if (cgroups)
-            ebpf_dc_send_cgroup_data(update_time);
+            ebpf_dc_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
@@ -974,7 +974,7 @@ void *ebpf_dcstat_thread(void *ptr)
                        dcstat_counter_dimension_name, dcstat_counter_dimension_name,
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
-    ebpf_create_filesystem_charts(em->update_time);
+    ebpf_create_filesystem_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     dcstat_collector(em);

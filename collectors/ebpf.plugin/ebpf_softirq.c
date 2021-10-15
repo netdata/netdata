@@ -138,7 +138,7 @@ static void *softirq_reader(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
@@ -207,7 +207,7 @@ static void softirq_collector(ebpf_module_t *em)
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    softirq_create_charts(em->update_time);
+    softirq_create_charts(em->update_every);
     softirq_create_dims();
     pthread_mutex_unlock(&lock);
 

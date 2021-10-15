@@ -358,12 +358,12 @@ static int read_local_disks()
  */
 void ebpf_update_disks(ebpf_module_t *em)
 {
-    static time_t update_time = 0;
+    static time_t update_every = 0;
     time_t curr = now_realtime_sec();
-    if (curr < update_time)
+    if (curr < update_every)
         return;
 
-    update_time = curr + 5 * em->update_time;
+    update_every = curr + 5 * em->update_every;
 
     (void)read_local_disks();
 }
@@ -587,7 +587,7 @@ void *ebpf_disk_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -649,16 +649,16 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 {
     time_t current_time = now_realtime_sec();
-    time_t limit = 10 * em->update_time;
+    time_t limit = 10 * em->update_every;
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     while (move) {
         netdata_ebpf_disks_t *ned = move->plot;
         uint32_t flags = ned->flags;
 
         if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
-            ebpf_obsolete_hd_charts(ned, update_time);
+            ebpf_obsolete_hd_charts(ned, update_every);
             avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)ned);
             UNUSED(ret);
             if (move == plot_disks) {
@@ -727,7 +727,7 @@ static void disk_collector(ebpf_module_t *em)
     netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_disk_read_hash, em);
 
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     read_thread_closed = 0;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
@@ -735,7 +735,7 @@ static void disk_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
-        ebpf_latency_send_hd_data(update_time);
+        ebpf_latency_send_hd_data(update_every);
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);

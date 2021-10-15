@@ -132,7 +132,7 @@ void *ebpf_sync_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_every;
 
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -394,7 +394,7 @@ void *ebpf_sync_thread(void *ptr)
                        algorithms, NETDATA_SYNC_IDX_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_sync_charts(em->update_time);
+    ebpf_create_sync_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     sync_collector(em);

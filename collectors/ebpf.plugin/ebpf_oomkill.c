@@ -311,7 +311,7 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 static void oomkill_collector(ebpf_module_t *em)
 {
     int cgroups = em->cgroup_charts;
-    int update_time = em->update_time;
+    int update_every = em->update_every;
     int32_t keys[NETDATA_OOMKILL_MAX_ENTRIES];
     memset(keys, 0, sizeof(keys));
 
@@ -327,7 +327,7 @@ static void oomkill_collector(ebpf_module_t *em)
 
         // write everything from the ebpf map.
         if (cgroups)
-            ebpf_oomkill_send_cgroup_data(update_time);
+            ebpf_oomkill_send_cgroup_data(update_every);
 
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
         oomkill_write_data(keys, count);
@@ -355,7 +355,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                                NETDATA_EBPF_CHART_TYPE_STACKED,
                                20020,
                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_time, NETDATA_EBPF_MODULE_NAME_OOMKILL);
+                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_OOMKILL);
 }
 
 /**

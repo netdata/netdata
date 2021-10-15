@@ -323,7 +323,7 @@ static void *hardirq_reader(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
@@ -426,7 +426,7 @@ static void hardirq_collector(ebpf_module_t *em)
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    hardirq_create_charts(em->update_time);
+    hardirq_create_charts(em->update_every);
     hardirq_create_static_dims();
     pthread_mutex_unlock(&lock);
 
