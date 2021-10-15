@@ -438,7 +438,7 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
       ;;
     *)
-      fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
+      fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed."
       ;;
   esac
 }
