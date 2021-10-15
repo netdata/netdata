@@ -25,6 +25,8 @@
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
+int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
+
 time_t aclk_block_until = 0;
 
 aclk_env_t *aclk_env = NULL;
