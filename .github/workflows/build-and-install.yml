@@ -33,6 +33,7 @@ jobs:
           - 'fedora:33'
           - 'opensuse/leap:15.2'
           - 'opensuse/leap:15.3'
+          - 'ubuntu:21.10'
           - 'ubuntu:21.04'
           - 'ubuntu:20.04'
           - 'ubuntu:18.04'
@@ -79,6 +80,9 @@ jobs:
           - distro: 'opensuse/leap:15.3'
             rmjsonc: 'zypper rm -y libjson-c-devel'
 
+          - distro: 'ubuntu:21.10'
+            pre: 'rm -f /etc/apt/apt.conf.d/docker* && apt-get update'
+            rmjsonc: 'apt-get remove -y libjson-c-dev'
           - distro: 'ubuntu:21.04'
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
@@ -104,18 +108,19 @@ jobs:
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
       - name: Regular build on ${{ matrix.distro }}
         run: |
-          docker run -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         run: |
-          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         run: |
-          docker run -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, require ACLK-NG
         run: |
-          docker run -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' test /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+          docker run --security-opt seccomp=unconfined -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' test \
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         if: matrix.rmjsonc != ''
         run: |
-          docker run -w /netdata test \
+          docker run --security-opt seccomp=unconfined -w /netdata test \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'

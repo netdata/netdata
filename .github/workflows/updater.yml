@@ -37,6 +37,7 @@ jobs:
           - 'ubuntu:18.04'
           - 'ubuntu:20.04'
           - 'ubuntu:21.04'
+          - 'ubuntu:21.10'
         include:
           - distro: 'alpine:3.14'
             pre: 'apk add -U bash'
@@ -56,6 +57,8 @@ jobs:
             pre: 'apt-get update'
           - distro: 'ubuntu:21.04'
             pre: 'apt-get update'
+          - distro: 'ubuntu:21.10'
+            pre: 'rm -f /etc/apt/apt.conf.d/docker* && apt-get update'
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
@@ -85,7 +88,7 @@ jobs:
         run: |
           echo $PRE > ./prep-cmd.sh
           docker build . -f .github/dockerfiles/Dockerfile.build_test -t test --build-arg BASE=${{ matrix.distro }}
-          docker run -e DO_NOT_TRACK=1 --network host -w /netdata test \
+          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata test \
               /bin/sh -c '/netdata/packaging/installer/kickstart.sh --dont-wait \
               && /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update \
               && bash /netdata/.github/scripts/check-updater.sh'

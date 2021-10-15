@@ -22,6 +22,7 @@ jobs:
           - {distro: ubuntu, version: "18.04", pkgclouddistro: ubuntu/bionic, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "20.04", pkgclouddistro: ubuntu/focal, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: ubuntu, version: "21.04", pkgclouddistro: ubuntu/hirsute, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
+          - {distro: ubuntu, version: "21.10", pkgclouddistro: ubuntu/impish, format: deb, base_image: ubuntu, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "7", pkgclouddistro: el/7, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "33", pkgclouddistro: fedora/33, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
@@ -40,7 +41,9 @@ jobs:
       - name: Build Packages
         shell: bash
         run: |
-          docker run -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
+          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --platform ${{ matrix.platform }} \
+              -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+              /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
         shell: bash
         env:
