@@ -133,7 +133,7 @@ static void updateEventsChart(RRDHOST *RH,
             NULL, // name
             "detector_events", // family
             NULL, // ctx
-            "Anomaly events triggerred", // title
+            "Anomaly events triggered", // title
             "boolean", // units
             "netdata", // plugin
             "ml", // module
