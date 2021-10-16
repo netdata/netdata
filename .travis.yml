@@ -107,7 +107,7 @@ jobs:
       name: Trigger release build and draft release creation
       script:
         - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
-        - .travis/trigger_release_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
+        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "release"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
 
     - name: Trigger Docker image build and publish
@@ -143,7 +143,7 @@ jobs:
       name: Trigger nightly artifact build and upload
       script:
         - git checkout "${TRAVIS_BRANCH}" && export BUILD_VERSION="$(cat packaging/version | sed 's/^v//')"
-        - .travis/trigger_release_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
+        - .travis/trigger_artifact_build.sh "${GITHUB_TOKEN}" "${BUILD_VERSION}" "nightly"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger release artifact build during nightly release" "${NOTIF_CHANNEL}"
 
     - name: Trigger Docker image build and publish
