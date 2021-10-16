@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
 - Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
@@ -29,6 +30,7 @@
 - Fix swap size calculation for cgroups [\#11617](https://github.com/netdata/netdata/pull/11617) ([vlvkobal](https://github.com/vlvkobal))
 - Fix RSS memory counter for systemd services [\#11616](https://github.com/netdata/netdata/pull/11616) ([vlvkobal](https://github.com/vlvkobal))
 - Add @iigorkarpov to CODEOWNERS. [\#11614](https://github.com/netdata/netdata/pull/11614) ([Ferroin](https://github.com/Ferroin))
+- Adds new alarm status protocol messages [\#11612](https://github.com/netdata/netdata/pull/11612) ([underhood](https://github.com/underhood))
 - eBPF and cgroup \(process, file descriptor, VFS, directory cache and OOMkill\) [\#11611](https://github.com/netdata/netdata/pull/11611) ([thiagoftsm](https://github.com/thiagoftsm))
 - apps: disable reporting min/avg/max group uptime by default [\#11609](https://github.com/netdata/netdata/pull/11609) ([ilyam8](https://github.com/ilyam8))
 - fix https client  [\#11608](https://github.com/netdata/netdata/pull/11608) ([underhood](https://github.com/underhood))
@@ -44,6 +46,7 @@
 - Adds local webserver API/v1 call "aclk" [\#11588](https://github.com/netdata/netdata/pull/11588) ([underhood](https://github.com/underhood))
 - Makes New Cloud architecture optional for ACLK-NG [\#11587](https://github.com/netdata/netdata/pull/11587) ([underhood](https://github.com/underhood))
 - add proc\_stat charts info [\#11586](https://github.com/netdata/netdata/pull/11586) ([ilyam8](https://github.com/ilyam8))
+- Add Ubuntu 21.10 to CI. [\#11585](https://github.com/netdata/netdata/pull/11585) ([Ferroin](https://github.com/Ferroin))
 - Remove unused synproxy chart [\#11582](https://github.com/netdata/netdata/pull/11582) ([vlvkobal](https://github.com/vlvkobal))
 - add proc\_net\_stat\_synproxy charts info [\#11581](https://github.com/netdata/netdata/pull/11581) ([ilyam8](https://github.com/ilyam8))
 - Sorting the Postgres cluster databases in the postgres collector [\#11580](https://github.com/netdata/netdata/pull/11580) ([unhandled-exception](https://github.com/unhandled-exception))
@@ -165,14 +168,9 @@
 - update cockroachdb replication alarms [\#11360](https://github.com/netdata/netdata/pull/11360) ([ilyam8](https://github.com/ilyam8))
 - disable oom\_kill alarm if the node is k8s node [\#11359](https://github.com/netdata/netdata/pull/11359) ([ilyam8](https://github.com/ilyam8))
 - eBPF mount [\#11358](https://github.com/netdata/netdata/pull/11358) ([thiagoftsm](https://github.com/thiagoftsm))
-- FIX index reference [\#11356](https://github.com/netdata/netdata/pull/11356) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix sending MS Teams notifications to multiple channels [\#11355](https://github.com/netdata/netdata/pull/11355) ([ilyam8](https://github.com/ilyam8))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
-- eBPF btrfs [\#11348](https://github.com/netdata/netdata/pull/11348) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
-- Allows bundled protobuf [\#11335](https://github.com/netdata/netdata/pull/11335) ([underhood](https://github.com/underhood))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
-- Check if sendmail supports -F parameter [\#11283](https://github.com/netdata/netdata/pull/11283) ([MrZammler](https://github.com/MrZammler))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
@@ -215,7 +213,6 @@
 - Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
 - Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add documentation for claiming during kickstart installation [\#11052](https://github.com/netdata/netdata/pull/11052) ([joelhans](https://github.com/joelhans))
-- Remove dots in cgroup ids [\#11050](https://github.com/netdata/netdata/pull/11050) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
