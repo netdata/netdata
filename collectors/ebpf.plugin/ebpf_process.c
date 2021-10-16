@@ -570,6 +570,9 @@ void *ebpf_cgroup_update_shm(void *ptr)
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
+        if (close_ebpf_plugin)
+            break;
+
         if (!shm_ebpf_cgroup.header)
             ebpf_map_cgroup_shared_memory();
 
@@ -931,7 +934,7 @@ static void process_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     while (!close_ebpf_plugin) {
-        usec_t dt = heartbeat_next(&hb, USEC_PER_MS);
+        usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
 
         pthread_mutex_lock(&collect_data_mutex);
@@ -943,10 +946,11 @@ static void process_collector(ebpf_module_t *em)
         pthread_cond_broadcast(&collect_data_cond_var);
         pthread_mutex_unlock(&collect_data_mutex);
 
-        read_hash_global_tables();
-
         if (++counter == update_every) {
-            counter = 1;
+            counter = 0;
+
+            read_hash_global_tables();
+
             int publish_apps = 0;
             if (all_pids_count > 0) {
                 if (apps_enabled) {
@@ -971,7 +975,7 @@ static void process_collector(ebpf_module_t *em)
             if (cgroups) {
                 ebpf_process_send_cgroup_data(update_every);
             }
-
+            pthread_mutex_unlock(&lock);
         }
 
         pthread_mutex_unlock(&lock);
@@ -1035,7 +1039,7 @@ static void ebpf_process_cleanup(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    uint32_t tick = 50*USEC_PER_MS;
+    uint32_t tick =  1 * USEC_PER_SEC;
     while (!finalized_threads) {
         usec_t dt = heartbeat_next(&hb, tick);
         UNUSED(dt);

@@ -544,27 +544,31 @@ static void swap_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroup = em->cgroup_charts;
     int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        if (apps)
-            read_apps_table();
+        if (++counter == update_every) {
+            counter = 0;
+            if (apps)
+                read_apps_table();
 
-        if (cgroup)
-            ebpf_update_swap_cgroup();
+            if (cgroup)
+                ebpf_update_swap_cgroup();
 
-        pthread_mutex_lock(&lock);
+            pthread_mutex_lock(&lock);
 
-        swap_send_global();
+            swap_send_global();
 
-        if (apps)
-            ebpf_swap_send_apps_data(apps_groups_root_target);
+            if (apps)
+                ebpf_swap_send_apps_data(apps_groups_root_target);
 
-        if (cgroup)
-            ebpf_swap_send_cgroup_data(update_every);
+            if (cgroup)
+                ebpf_swap_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }

@@ -846,27 +846,32 @@ static void cachestat_collector(ebpf_module_t *em)
     int apps = em->apps_charts;
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        if (apps)
-            read_apps_table();
+        if (++counter == update_every) {
+            counter = 0;
+            if (apps)
+                read_apps_table();
 
-        if (cgroups)
-            ebpf_update_cachestat_cgroup();
+            if (cgroups)
+                ebpf_update_cachestat_cgroup();
 
-        pthread_mutex_lock(&lock);
+            pthread_mutex_lock(&lock);
 
-        cachestat_send_global(&publish);
+            cachestat_send_global(&publish);
 
-        if (apps)
-            ebpf_cache_send_apps_data(apps_groups_root_target);
+            if (apps)
+                ebpf_cache_send_apps_data(apps_groups_root_target);
 
-        if (cgroups)
-            ebpf_cachestat_send_cgroup_data(update_every);
+            if (cgroups)
+                ebpf_cachestat_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
+
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }

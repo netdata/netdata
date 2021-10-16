@@ -728,16 +728,21 @@ static void disk_collector(ebpf_module_t *em)
                           ebpf_disk_read_hash, em);
 
     int update_every = em->update_every;
+    int counter = update_every - 1;
     read_thread_closed = 0;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        pthread_mutex_lock(&lock);
-        ebpf_remove_pointer_from_plot_disk(em);
-        ebpf_latency_send_hd_data(update_every);
+        if (++counter == update_every) {
+            counter = 0;
+            pthread_mutex_lock(&lock);
+            ebpf_remove_pointer_from_plot_disk(em);
+            ebpf_latency_send_hd_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
+
         pthread_mutex_unlock(&collect_data_mutex);
 
         ebpf_update_disks(em);

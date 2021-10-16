@@ -312,6 +312,7 @@ static void oomkill_collector(ebpf_module_t *em)
 {
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
+    int counter = update_every - 1;
     int32_t keys[NETDATA_OOMKILL_MAX_ENTRIES];
     memset(keys, 0, sizeof(keys));
 
@@ -319,21 +320,26 @@ static void oomkill_collector(ebpf_module_t *em)
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
-        pthread_mutex_lock(&lock);
 
-        uint32_t count = oomkill_read_data(keys);
-        if (cgroups && count)
-            ebpf_update_oomkill_cgroup(keys, count);
+        if (++counter == update_every) {
+            counter = 0;
+            pthread_mutex_lock(&lock);
 
-        // write everything from the ebpf map.
-        if (cgroups)
-            ebpf_oomkill_send_cgroup_data(update_every);
+            uint32_t count = oomkill_read_data(keys);
+            if (cgroups && count)
+                ebpf_update_oomkill_cgroup(keys, count);
 
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
-        oomkill_write_data(keys, count);
-        write_end_chart();
+            // write everything from the ebpf map.
+            if (cgroups)
+                ebpf_oomkill_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
+            write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_OOMKILL_CHART);
+            oomkill_write_data(keys, count);
+            write_end_chart();
+
+            pthread_mutex_unlock(&lock);
+        }
+
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
