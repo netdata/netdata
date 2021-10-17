@@ -1314,26 +1314,26 @@ static void parse_args(int argc, char **argv)
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
-        {"help",           no_argument,    0,  'h' },
-        {"version",        no_argument,    0,  'v' },
-        {"global",         no_argument,    0,  'g' },
-        {"all",            no_argument,    0,  'a' },
-        {"cachestat",      no_argument,    0,  'c' },
-        {"dcstat",         no_argument,    0,  'd' },
-        {"disk",           no_argument,    0,  'k' },
-        {"filesystem",     no_argument,    0,  'i' },
-        {"filedescriptor", no_argument,    0,  'e' },
-        {"hardirq",        no_argument,    0,  'q' },
-        {"mount",          no_argument,    0,  'm' },
-        {"net",            no_argument,    0,  'n' },
-        {"oomkill",        no_argument,    0,  'o' },
-        {"process",        no_argument,    0,  'p' },
-        {"return",         no_argument,    0,  'r' },
-        {"shm",            no_argument,    0,  'b' },
-        {"softirq",        no_argument,    0,  't' },
-        {"sync",           no_argument,    0,  's' },
-        {"swap",           no_argument,    0,  'w' },
-        {"vfs",            no_argument,    0,  'f' },
+        {"help",           no_argument,    0,  0 },
+        {"version",        no_argument,    0,  0 },
+        {"global",         no_argument,    0,  0 },
+        {"all",            no_argument,    0,  0 },
+        {"cachestat",      no_argument,    0,  0 },
+        {"dcstat",         no_argument,    0,  0 },
+        {"disk",           no_argument,    0,  0 },
+        {"filesystem",     no_argument,    0,  0 },
+        {"filedescriptor", no_argument,    0,  0 },
+        {"hardirq",        no_argument,    0,  0 },
+        {"mount",          no_argument,    0,  0 },
+        {"net",            no_argument,    0,  0 },
+        {"oomkill",        no_argument,    0,  0 },
+        {"process",        no_argument,    0,  0 },
+        {"return",         no_argument,    0,  0 },
+        {"shm",            no_argument,    0,  0 },
+        {"softirq",        no_argument,    0,  0 },
+        {"sync",           no_argument,    0,  0 },
+        {"swap",           no_argument,    0,  0 },
+        {"vfs",            no_argument,    0,  0 },
         {0, 0, 0, 0}
     };
 
@@ -1348,20 +1348,20 @@ static void parse_args(int argc, char **argv)
     }
 
     while (1) {
-        int c = getopt_long(argc, argv, "hvgacdkieqmnoprbtswf", long_options, &option_index);
+        int c = getopt_long_only(argc, argv, "", long_options, &option_index);
         if (c == -1)
             break;
 
-        switch (c) {
-            case 'h': {
+        switch (option_index) {
+            case 0: {
                 ebpf_print_help();
                 exit(0);
             }
-            case 'v': {
+            case 1: {
                 printf("ebpf.plugin %s\n", VERSION);
                 exit(0);
             }
-            case 'g': {
+            case 2: {
                 disable_apps = 1;
                 ebpf_disable_apps();
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1370,14 +1370,14 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'a': {
+            case 3: {
                 ebpf_enable_all_charts(disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with all chart groups, because it was started with the option \"--all\" or \"-a\".");
 #endif
                 break;
             }
-            case 'c': {
+            case 4: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1386,7 +1386,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'd': {
+            case 5: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1395,23 +1395,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'i': {
-                enabled = 1;
-                ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, disable_apps, disable_cgroups);
-#ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"filesystem\" chart, because it was started with the option \"--filesystem\" or \"-i\".");
-#endif
-                break;
-            }
-            case 'q': {
-                enabled = 1;
-                ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, disable_apps, disable_cgroups);
-#ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"hardirq\" chart, because it was started with the option \"--hardirq\" or \"-q\".");
-#endif
-                break;
-            }
-            case 'k': {
+            case 6: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_DISK_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1419,15 +1403,15 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'm': {
+            case 7: {
                 enabled = 1;
-                ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps, disable_cgroups);
+                ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"mount\" chart, because it was started with the option \"--mount\" or \"-m\".");
+                info("EBPF enabling \"filesystem\" chart, because it was started with the option \"--filesystem\" or \"-i\".");
 #endif
                 break;
             }
-            case 'e': {
+            case 8: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_FD_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1435,7 +1419,23 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'n': {
+            case 9: {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, disable_apps, disable_cgroups);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"hardirq\" chart, because it was started with the option \"--hardirq\" or \"-q\".");
+#endif
+                break;
+            }
+            case 10: {
+                enabled = 1;
+                ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps, disable_cgroups);
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"mount\" chart, because it was started with the option \"--mount\" or \"-m\".");
+#endif
+                break;
+            }
+            case 11: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1443,7 +1443,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'o': {
+            case 12: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1451,7 +1451,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'p': {
+            case 13: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1460,14 +1460,14 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'r': {
+            case 14: {
                 ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running in \"return\" mode, because it was started with the option \"--return\" or \"-r\".");
 #endif
                 break;
             }
-            case 'b': {
+            case 15: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SHM_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1475,7 +1475,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 't': {
+            case 16: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1483,7 +1483,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 's': {
+            case 17: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1491,7 +1491,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'w': {
+            case 18: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1499,7 +1499,7 @@ static void parse_args(int argc, char **argv)
 #endif
                 break;
             }
-            case 'f': {
+            case 19: {
                 enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_VFS_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1716,6 +1716,8 @@ int main(int argc, char **argv)
     parse_args(argc, argv);
     ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
+
+    return 0;
 
     if (!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
