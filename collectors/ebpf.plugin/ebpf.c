@@ -1301,6 +1301,19 @@ void set_global_variables()
 }
 
 /**
+ * Load collector config
+ *
+ * @param lmode  the mode that will be used for them.
+ */
+static inline void ebpf_load_thread_config()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_update_module(&ebpf_modules[i]);
+    }
+}
+
+/**
  * Parse arguments given from user.
  *
  * @param argc the number of arguments
@@ -1360,12 +1373,7 @@ static void ebpf_parse_args(int argc, char **argv)
         enabled = 1;
     }
 
-    if (!enabled) {
-        ebpf_enable_all_charts(disable_apps, disable_cgroups);
-#ifdef NETDATA_INTERNAL_CHECKS
-        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
-#endif
-    }
+    ebpf_load_thread_config();
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, &option_index);
@@ -1529,6 +1537,13 @@ static void ebpf_parse_args(int argc, char **argv)
         }
     }
 
+    if (!enabled) {
+        ebpf_enable_all_charts(disable_apps, disable_cgroups);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
+#endif
+    }
+
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
             &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
@@ -1682,19 +1697,6 @@ static void ebpf_manage_pid(pid_t pid)
 }
 
 /**
- * Load collector config
- *
- * @param lmode  the mode that will be used for them.
- */
-static inline void ebpf_load_thread_config()
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_update_module(&ebpf_modules[i]);
-    }
-}
-
-/**
  * Entry point
  *
  * @param argc the number of arguments
@@ -1706,7 +1708,6 @@ int main(int argc, char **argv)
 {
     set_global_variables();
     ebpf_parse_args(argc, argv);
-    ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
 
     if (!has_condition_to_run(running_on_kernel)) {
