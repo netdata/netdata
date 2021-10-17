@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix file name typos in Travis config from \#11055 [\#11667](https://github.com/netdata/netdata/pull/11667) ([Ferroin](https://github.com/Ferroin))
 - Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
 - Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
@@ -165,7 +166,6 @@
 - Ebpf latency description [\#11363](https://github.com/netdata/netdata/pull/11363) ([thiagoftsm](https://github.com/thiagoftsm))
 - Properly handle eBPF plugin in RPM packages. [\#11362](https://github.com/netdata/netdata/pull/11362) ([Ferroin](https://github.com/Ferroin))
 - fix `gearman\_workers\_queued` alarm [\#11361](https://github.com/netdata/netdata/pull/11361) ([ilyam8](https://github.com/ilyam8))
-- update cockroachdb replication alarms [\#11360](https://github.com/netdata/netdata/pull/11360) ([ilyam8](https://github.com/ilyam8))
 - disable oom\_kill alarm if the node is k8s node [\#11359](https://github.com/netdata/netdata/pull/11359) ([ilyam8](https://github.com/ilyam8))
 - eBPF mount [\#11358](https://github.com/netdata/netdata/pull/11358) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
@@ -212,7 +212,6 @@
 - Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
 - Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
 - Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add documentation for claiming during kickstart installation [\#11052](https://github.com/netdata/netdata/pull/11052) ([joelhans](https://github.com/joelhans))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
