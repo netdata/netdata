@@ -1321,7 +1321,6 @@ static inline void ebpf_load_thread_config()
  */
 static void ebpf_parse_args(int argc, char **argv)
 {
-    int enabled = 0;
     int disable_apps = 0;
     int disable_cgroups = 0;
     int freq = 0;
@@ -1366,11 +1365,7 @@ static void ebpf_parse_args(int argc, char **argv)
             ebpf_user_config_dir);
         if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups)) {
             info("Does not have a stock file. It is starting with default options.");
-        } else {
-            enabled = 1;
         }
-    } else {
-        enabled = 1;
     }
 
     ebpf_load_thread_config();
@@ -1405,7 +1400,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 4: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"[-]-cachestat\".");
@@ -1413,7 +1407,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 5: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"DCSTAT\" charts, because it was started with the option \"[-]-dcstat\".");
@@ -1421,7 +1414,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 6: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_DISK_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"DISK\" chart, because it was started with the option \"[-]-disk\".");
@@ -1429,7 +1421,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 7: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"FILESYSTEM\" chart, because it was started with the option \"[-]-filesystem\".");
@@ -1437,7 +1428,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 8: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_FD_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"FILEDESCRIPTOR\" chart, because it was started with the option \"[-]-filedescriptor\".");
@@ -1445,7 +1435,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 9: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"HARDIRQ\" chart, because it was started with the option \"[-]-hardirq\".");
@@ -1453,7 +1442,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 10: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"MOUNT\" chart, because it was started with the option \"[-]-mount\".");
@@ -1461,7 +1449,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 11: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
@@ -1469,7 +1456,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 12: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"OOMKILL\" chart, because it was started with the option \"[-]-oomkill\".");
@@ -1477,7 +1463,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 13: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"[-]-process\".");
@@ -1492,7 +1477,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 15: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SHM_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"SHM\" chart, because it was started with the option \"[-]-shm\".");
@@ -1500,7 +1484,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 16: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"SOFTIRQ\" chart, because it was started with the option \"[-]-softirq\".");
@@ -1508,7 +1491,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 17: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"SYNC\" chart, because it was started with the option \"[-]-sync\".");
@@ -1516,7 +1498,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 18: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"SWAP\" chart, because it was started with the option \"[-]-swap\".");
@@ -1524,7 +1505,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case 19: {
-                enabled = 1;
                 ebpf_enable_chart(EBPF_MODULE_VFS_IDX, disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"VFS\" chart, because it was started with the option \"[-]-vfs\".");
@@ -1535,13 +1515,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
         }
-    }
-
-    if (!enabled) {
-        ebpf_enable_all_charts(disable_apps, disable_cgroups);
-#ifdef NETDATA_INTERNAL_CHECKS
-        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
-#endif
     }
 
     // Load apps_groups.conf
