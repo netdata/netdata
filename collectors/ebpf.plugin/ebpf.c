@@ -731,6 +731,19 @@ static inline void ebpf_disable_apps()
 }
 
 /**
+ * Disable Cgroups
+ *
+ * Disable charts for apps loading only global charts.
+ */
+static inline void ebpf_disable_cgroups()
+{
+    int i;
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].cgroup_charts = 0;
+    }
+}
+
+/**
  * Print help on standard error for user knows how to use the collector.
  */
 void ebpf_print_help()
@@ -1322,7 +1335,7 @@ static inline void ebpf_load_thread_config()
 static void ebpf_parse_args(int argc, char **argv)
 {
     int disable_apps = 0;
-    int disable_cgroups = 0;
+    int disable_cgroups = 1;
     int freq = 0;
     int option_index = 0;
     static struct option long_options[] = {
@@ -1492,13 +1505,15 @@ static void ebpf_parse_args(int argc, char **argv)
             }
             case EBPF_OPTION_GLOBAL_CHART: {
                 disable_apps = 1;
-                ebpf_disable_apps();
+                disable_cgroups = 1;
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with global chart group, because it was started with the option  \"[-]-global\".");
 #endif
                 break;
             }
             case EBPF_OPTION_ALL_CHARTS: {
+                disable_apps = 0;
+                disable_cgroups = 0;
                 ebpf_enable_all_charts(disable_apps, disable_cgroups);
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF running with all chart groups, because it was started with the option \"[-]-all\".");
@@ -1517,6 +1532,12 @@ static void ebpf_parse_args(int argc, char **argv)
             }
         }
     }
+
+    if (disable_apps)
+        ebpf_disable_apps();
+
+    if (disable_cgroups)
+        ebpf_disable_cgroups();
 
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
