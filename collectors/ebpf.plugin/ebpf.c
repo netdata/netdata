@@ -1347,6 +1347,26 @@ static void parse_args(int argc, char **argv)
         }
     }
 
+    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups)) {
+        info(
+            "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
+            ebpf_user_config_dir);
+        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups)) {
+            info("Does not have a stock file. It is starting with default options.");
+        } else {
+            enabled = 1;
+        }
+    } else {
+        enabled = 1;
+    }
+
+    if (!enabled) {
+        ebpf_enable_all_charts(disable_apps, disable_cgroups);
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
+#endif
+    }
+
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, &option_index);
         if (c == -1)
@@ -1511,30 +1531,6 @@ static void parse_args(int argc, char **argv)
                 break;
             }
         }
-    }
-
-    if (freq <= 0) {
-        freq = EBPF_DEFAULT_UPDATE_EVERY;
-    }
-
-    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
-        info(
-            "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
-            ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
-            info("Does not have a stock file. It is starting with default options.");
-        } else {
-            enabled = 1;
-        }
-    } else {
-        enabled = 1;
-    }
-
-    if (!enabled) {
-        ebpf_enable_all_charts(disable_apps, disable_cgroups);
-#ifdef NETDATA_INTERNAL_CHECKS
-        info("EBPF running with all charts, because neither \"-n\" or \"-p\" was given.");
-#endif
     }
 
     // Load apps_groups.conf
@@ -1716,8 +1712,6 @@ int main(int argc, char **argv)
     parse_args(argc, argv);
     ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
-
-    return 0;
 
     if (!has_condition_to_run(running_on_kernel)) {
         error("The current collector cannot run on this kernel.");
