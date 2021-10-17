@@ -1306,7 +1306,7 @@ void set_global_variables()
  * @param argc the number of arguments
  * @param argv the pointer to the arguments
  */
-static void parse_args(int argc, char **argv)
+static void ebpf_parse_args(int argc, char **argv)
 {
     int enabled = 0;
     int disable_apps = 0;
@@ -1705,7 +1705,7 @@ static inline void ebpf_load_thread_config()
 int main(int argc, char **argv)
 {
     set_global_variables();
-    parse_args(argc, argv);
+    ebpf_parse_args(argc, argv);
     ebpf_load_thread_config();
     ebpf_manage_pid(getpid());
 
