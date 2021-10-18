@@ -705,7 +705,7 @@ static inline void ebpf_enable_all_charts(int apps, int cgroups)
  *
  * Disable charts
  */
-static inline void disable_enable_all_global_charts()
+static inline void disable_all_global_charts()
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
@@ -1558,7 +1558,7 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     if (select_threads) {
-        disable_enable_all_global_charts();
+        disable_all_global_charts();
         uint64_t idx;
         for (idx = 0; idx < EBPF_OPTION_ALL_CHARTS; idx++) {
             if (select_threads & 1<<idx)
