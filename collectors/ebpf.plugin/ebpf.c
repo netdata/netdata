@@ -780,7 +780,7 @@ void ebpf_print_help()
             "\n"
             " This eBPF.plugin is a data collector plugin for netdata.\n"
             "\n"
-            " This plugin only accepts long options with one or wo dashes. The available command line options are:\n"
+            " This plugin only accepts long options with one or two dashes. The available command line options are:\n"
             "\n"
             " SECONDS               Set the data collection frequency.\n"
             "\n"
