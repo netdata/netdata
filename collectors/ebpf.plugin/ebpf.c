@@ -1389,11 +1389,14 @@ static void ebpf_parse_args(int argc, char **argv)
         }
     }
 
-    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups)) {
+    if (!freq)
+        freq = EBPF_DEFAULT_UPDATE_EVERY;
+
+    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
         info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups)) {
+        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
             info("Does not have a stock file. It is starting with default options.");
         }
     }
