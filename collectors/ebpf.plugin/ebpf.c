@@ -55,7 +55,6 @@ char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = {"absolute", "incremental"};
-int update_every = 1;
 static int thread_finished = 0;
 int close_ebpf_plugin = 0;
 struct config collector_config = { .first_section = NULL,
@@ -76,81 +75,90 @@ pthread_cond_t collect_data_cond_var;
 
 ebpf_module_t ebpf_modules[] = {
     { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &process_config,
       .config_file = NETDATA_PROCESS_CONFIG_FILE},
     { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &socket_config,
       .config_file = NETDATA_NETWORK_CONFIG_FILE},
     { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_cachestat_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &cachestat_config,
       .config_file = NETDATA_CACHESTAT_CONFIG_FILE},
     { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &sync_config,
       .config_file = NETDATA_SYNC_CONFIG_FILE},
     { .thread_name = "dc", .config_name = "dc", .enabled = 0, .start_routine = ebpf_dcstat_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_dcstat_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_dcstat_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &dcstat_config,
       .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE},
     { .thread_name = "swap", .config_name = "swap", .enabled = 0, .start_routine = ebpf_swap_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &swap_config,
       .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE},
     { .thread_name = "vfs", .config_name = "vfs", .enabled = 0, .start_routine = ebpf_vfs_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &vfs_config,
       .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE },
     { .thread_name = "filesystem", .config_name = "filesystem", .enabled = 0, .start_routine = ebpf_filesystem_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
       .config_file = NETDATA_FILESYSTEM_CONFIG_FILE},
     { .thread_name = "disk", .config_name = "disk", .enabled = 0, .start_routine = ebpf_disk_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
       .config_file = NETDATA_DISK_CONFIG_FILE},
     { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
       .config_file = NETDATA_MOUNT_CONFIG_FILE},
     { .thread_name = "fd", .config_name = "fd", .enabled = 0, .start_routine = ebpf_fd_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fd_config,
       .config_file = NETDATA_FD_CONFIG_FILE},
     { .thread_name = "hardirq", .config_name = "hardirq", .enabled = 0, .start_routine = ebpf_hardirq_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
       .config_file = NETDATA_HARDIRQ_CONFIG_FILE},
     { .thread_name = "softirq", .config_name = "softirq", .enabled = 0, .start_routine = ebpf_softirq_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &softirq_config,
       .config_file = NETDATA_SOFTIRQ_CONFIG_FILE},
     { .thread_name = "oomkill", .config_name = "oomkill", .enabled = 0, .start_routine = ebpf_oomkill_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_oomkill_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_oomkill_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &oomkill_config,
       .config_file = NETDATA_OOMKILL_CONFIG_FILE},
     { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
-      .update_time = 1, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,  .cgroup_charts = CONFIG_BOOLEAN_NO,
-      .mode = MODE_ENTRY, .optional = 0, .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &shm_config,
       .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE},
-    { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_time = 1,
+      { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
       .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
       .cfg = NULL, .config_name = NULL},
@@ -426,18 +434,19 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
 /**
  * Write chart cmd on standard output
  *
- * @param type      chart type
- * @param id        chart id
- * @param title     chart title
- * @param units     units label
- * @param family    group name used to attach the chart on dashboard
- * @param charttype chart type
- * @param context   chart context
- * @param order     chart order
- * @param module    chart module name, this is the eBPF thread.
+ * @param type          chart type
+ * @param id            chart id
+ * @param title         chart title
+ * @param units         units label
+ * @param family        group name used to attach the chart on dashboard
+ * @param charttype     chart type
+ * @param context       chart context
+ * @param order         chart order
+ * @param update_every  update interval used by plugin
+ * @param module        chart module name, this is the eBPF thread.
  */
 void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
-                          char *charttype, char *context, int order, char *module)
+                          char *charttype, char *context, int order, int update_every, char *module)
 {
     printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
@@ -463,9 +472,10 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
  * @param charttype chart type
  * @param context   chart context
  * @param order     chart order
+ * @param update_every value to overwrite the update frequency set by the server.
  */
 void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
-                               char *charttype, char *context, int order)
+                               char *charttype, char *context, int order, int update_every)
 {
     printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
            type,
@@ -513,18 +523,19 @@ void ebpf_create_global_dimension(void *ptr, int end)
 /**
  *  Call write_chart_cmd to create the charts
  *
- * @param type      chart type
- * @param id        chart id
- * @param title     chart title
- * @param units     axis label
- * @param family    group name used to attach the chart on dashboard
- * @param context   chart context
- * @param charttype chart type
- * @param order     order number of the specified chart
- * @param ncd       a pointer to a function called to create dimensions
- * @param move      a pointer for a structure that has the dimensions
- * @param end       number of dimensions for the chart created
- * @param module    chart module name, this is the eBPF thread.
+ * @param type         chart type
+ * @param id           chart id
+ * @param title        chart title
+ * @param units        axis label
+ * @param family       group name used to attach the chart on dashboard
+ * @param context      chart context
+ * @param charttype    chart type
+ * @param order        order number of the specified chart
+ * @param ncd          a pointer to a function called to create dimensions
+ * @param move         a pointer for a structure that has the dimensions
+ * @param end          number of dimensions for the chart created
+ * @param update_every update interval used with chart.
+ * @param module       chart module name, this is the eBPF thread.
  */
 void ebpf_create_chart(char *type,
                        char *id,
@@ -537,9 +548,10 @@ void ebpf_create_chart(char *type,
                        void (*ncd)(void *, int),
                        void *move,
                        int end,
+                       int update_every,
                        char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, module);
+    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, update_every, module);
 
     if (ncd) {
         ncd(move, end);
@@ -557,13 +569,15 @@ void ebpf_create_chart(char *type,
  * @param order  the chart order
  * @param algorithm the algorithm used by dimension
  * @param root   structure used to create the dimensions.
+ * @param update_every  update interval used by plugin
  * @param module    chart module name, this is the eBPF thread.
  */
 void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct target *root, char *module)
+                                char *algorithm, struct target *root, int update_every, char *module)
 {
     struct target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order, module);
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order,
+                         update_every, module);
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed))
@@ -1021,13 +1035,16 @@ static inline void how_to_load(char *ptr)
  * Update interval
  *
  * Update default interval with value from user
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_update_interval()
+static void ebpf_update_interval(int update_every)
 {
     int i;
-    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY, 1);
+    int value = (int) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_UPDATE_EVERY,
+                                          update_every);
     for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_modules[i].update_time = value;
+        ebpf_modules[i].update_every = value;
     }
 }
 
@@ -1052,8 +1069,9 @@ static void ebpf_update_table_size()
  *
  * @param disable_apps    variable to store information related to apps.
  * @param disable_cgroups variable to store information related to cgroups.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void read_collector_values(int *disable_apps, int *disable_cgroups)
+static void read_collector_values(int *disable_apps, int *disable_cgroups, int update_every)
 {
     // Read global section
     char *value;
@@ -1066,7 +1084,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
 
     how_to_load(value);
 
-    ebpf_update_interval();
+    ebpf_update_interval(update_every);
 
     ebpf_update_table_size();
 
@@ -1228,10 +1246,11 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups)
  * @param path             the path where the file ebpf.conf is stored.
  * @param disable_apps     variable to store the information about apps plugin status.
  * @param disable_cgroups  variable to store the information about cgroups plugin status.
+ * @param update_every value to overwrite the update frequency set by the server.
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups)
+static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups, int update_every)
 {
     char lpath[4096];
 
@@ -1243,7 +1262,7 @@ static int load_collector_config(char *path, int *disable_apps, int *disable_cgr
         }
     }
 
-    read_collector_values(disable_apps, disable_cgroups);
+    read_collector_values(disable_apps, disable_cgroups, update_every);
 
     return 0;
 }
@@ -1494,15 +1513,15 @@ static void parse_args(int argc, char **argv)
         }
     }
 
-    if (freq > 0) {
-        update_every = freq;
+    if (freq <= 0) {
+        freq = EBPF_DEFAULT_UPDATE_EVERY;
     }
 
-    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups)) {
+    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
         info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups)) {
+        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
             info("Does not have a stock file. It is starting with default options.");
         } else {
             enabled = 1;
