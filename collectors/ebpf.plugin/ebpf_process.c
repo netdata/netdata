@@ -930,6 +930,7 @@ static void process_collector(ebpf_module_t *em)
     int publish_global = em->global_charts;
     int apps_enabled = em->apps_charts;
     int cgroups = em->cgroup_charts;
+    int thread_enabled = em->enabled;
     if (cgroups)
         ebpf_process_update_cgroup_algorithm();
 
@@ -966,19 +967,21 @@ static void process_collector(ebpf_module_t *em)
                 }
             }
 
-            pthread_mutex_lock(&lock);
-            if (publish_global) {
-                ebpf_process_send_data(em);
-            }
+            if (thread_enabled) {
+                pthread_mutex_lock(&lock);
+                if (publish_global) {
+                    ebpf_process_send_data(em);
+                }
 
-            if (publish_apps) {
-                ebpf_process_send_apps_data(apps_groups_root_target, em);
-            }
+                if (publish_apps) {
+                    ebpf_process_send_apps_data(apps_groups_root_target, em);
+                }
 
-            if (cgroups) {
-                ebpf_process_send_cgroup_data(em);
+                if (cgroups) {
+                    ebpf_process_send_cgroup_data(em);
+                }
+                pthread_mutex_unlock(&lock);
             }
-            pthread_mutex_unlock(&lock);
         }
 
         pthread_mutex_unlock(&lock);
