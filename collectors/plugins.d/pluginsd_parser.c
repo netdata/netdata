@@ -152,6 +152,22 @@ PARSER_RC pluginsd_label_action(void *user, char *key, char *value, LABEL_SOURCE
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURCE source)
+{
+    ((PARSER_USER_OBJECT *) user)->chart_labels = add_label_to_list(((PARSER_USER_OBJECT *) user)->chart_labels, key, value, source);
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct label *new_labels)
+{
+    RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
+    if (unlikely(!st))
+        return PARSER_RC_OK;
+
+    rrdset_update_labels(st, new_labels);
+    return PARSER_RC_OK;
+}
 
 PARSER_RC pluginsd_overwrite_action(void *user, RRDHOST *host, struct label *new_labels)
 {
@@ -557,6 +573,38 @@ PARSER_RC pluginsd_label(char **words, void *user, PLUGINSD_ACTION  *plugins_act
 
     if (store != words[3])
         freez(store);
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_clabel(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    if (!words[1] || !words[2] || !words[3]) {
+        error("Ignoring malformed or empty CHART LABEL command.");
+        return PARSER_RC_OK;
+    }
+
+    if (plugins_action->clabel_action) {
+        PARSER_RC rc = plugins_action->clabel_action(user, words[1], words[2], strtol(words[3], NULL, 10));
+        return rc;
+    }
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_clabel_commit(char **words, void *user, PLUGINSD_ACTION  *plugins_action)
+{
+    UNUSED(words);
+
+    RRDHOST *host = ((PARSER_USER_OBJECT *) user)->host;
+    debug(D_PLUGINSD, "requested to commit chart labels");
+
+    struct label *chart_labels = ((PARSER_USER_OBJECT *)user)->chart_labels;
+    ((PARSER_USER_OBJECT *)user)->chart_labels = NULL;
+
+    if (plugins_action->clabel_commit_action) {
+        return plugins_action->clabel_commit_action(user, host, chart_labels);
+    }
+
     return PARSER_RC_OK;
 }
 
