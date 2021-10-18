@@ -57,7 +57,7 @@ USAGE: kickstart.sh [options]
   --reinstall                Explicitly reinstall instead of updating any existing install.
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install                  Specify an installation prefix for local builds (default: autodetect based on system type).
+  --install <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
   --claim-only               If there is an existing install, only try to claim it, not update it.
@@ -390,11 +390,11 @@ handle_existing_install() {
   fi
 
   case "${INSTALL_TYPE}" in
-    kickstart-*|legacy-*|manual-static|unknown)
+    kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
         warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
       else
-        progress "Found an existing netdata install at ${ndprefix}, with type '${INSTALL_TYPE}'."
+        progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
 
       if [ -n "${NETDATA_REINSTALL}" ]; then
@@ -909,6 +909,106 @@ try_build_install() {
 }
 
 # ======================================================================
+# Per system-type install logic
+
+install_on_linux() {
+  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+    try_package_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        ;;
+      1)
+        fatal "Unable to install on this system."
+        ;;
+      2)
+        if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+          fatal "Could not install native binary packages."
+        else
+          warning "Could not install native binary packages, falling back to alternative installation method."
+        fi
+        ;;
+    esac
+  fi
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+    try_static_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
+        ;;
+      1)
+        fatal "Unable to install on this system."
+        ;;
+      2)
+        if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+          fatal "Could not install static build."
+        else
+          warning "Could not install static build, falling back to alternative installation method."
+        fi
+        ;;
+    esac
+  fi
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        NETDATA_USER_CONFIG_DIR="/etc/netdata"
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+install_on_macos() {
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option."
+  elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option."
+  else
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        NETDATA_USER_CONFIG_DIR="/usr/local/netdata/etc/netdata"
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+install_on_freebsd() {
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option."
+  elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option."
+  else
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        NETDATA_USER_CONFIG_DIR="/usr/local/etc/netdata"
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+# ======================================================================
 # Main program
 
 setup_terminal || echo > /dev/null
@@ -1001,100 +1101,9 @@ cd "${tmpdir}" || exit 1
 handle_existing_install
 
 case "${SYSTYPE}" in
-  Linux)
-    if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-      try_package_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          ;;
-        1)
-          fatal "Unable to install on this system."
-          ;;
-        2)
-          if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-            fatal "Could not install native binary packages."
-          else
-            warning "Could not install native binary packages, falling back to alternative installation method."
-          fi
-          ;;
-      esac
-    fi
-
-    if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
-      try_static_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
-          ;;
-        1)
-          fatal "Unable to install on this system."
-          ;;
-        2)
-          if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-            fatal "Could not install static build."
-          else
-            warning "Could not install static build, falling back to alternative installation method."
-          fi
-          ;;
-      esac
-    fi
-
-    if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
-      try_build_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          NETDATA_USER_CONFIG_DIR="/etc/netdata"
-          ;;
-        *)
-          fatal "Unable to install on this system."
-          ;;
-      esac
-    fi
-    ;;
-  Darwin)
-    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option."
-    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option."
-    else
-      try_build_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          NETDATA_USER_CONFIG_DIR="/usr/local/netdata/etc/netdata"
-          ;;
-        *)
-          fatal "Unable to install on this system."
-          ;;
-      esac
-    fi
-    ;;
-  FreeBSD)
-    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option."
-    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option."
-    else
-      try_build_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          NETDATA_USER_CONFIG_DIR="/usr/local/etc/netdata"
-          ;;
-        *)
-          fatal "Unable to install on this system."
-          ;;
-      esac
-    fi
-    ;;
+  Linux) install_on_linux ;;
+  Darwin) install_on_macos ;;
+  FreeBSD) install_on_freebsd ;;
 esac
 
 if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
