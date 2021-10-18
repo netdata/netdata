@@ -710,6 +710,7 @@ static inline void disable_all_global_charts()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].enabled = 0;
+        ebpf_modules[i].global_charts = 0;
     }
 }
 
