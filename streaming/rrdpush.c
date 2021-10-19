@@ -198,9 +198,6 @@ void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
         buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
         netdata_rwlock_unlock(&host->labels.labels_rwlock);
     }
-
-    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 }
 
 // Send the current chart definition.
@@ -245,7 +242,8 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     );
 
     // send the chart labels
-    rrdpush_send_clabels(host, st);
+    if (host->sender->version >= STREAM_VERSION_CLABELS)
+        rrdpush_send_clabels(host, st);
 
     // send the dimensions
     RRDDIM *rd;
