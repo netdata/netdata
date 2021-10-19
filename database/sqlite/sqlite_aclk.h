@@ -124,6 +124,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_NODE_INFO,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
+    ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_RESET_CHART,
@@ -170,6 +171,8 @@ struct aclk_database_worker_config {
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
     uint64_t alert_sequence_id; // last alert sequence_id
+    uint64_t alerts_snapshot_id; //will contain the snapshot_id value if snapshot was requested
+    uint64_t alerts_ack_sequence_id; //last sequence_id ack'ed from cloud via sendsnapshot message
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;
