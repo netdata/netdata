@@ -55,6 +55,7 @@ USAGE: kickstart.sh [options]
   --static-only              Only install if a static build is available.
   --build-only               Only install using a local build.
   --reinstall                Explicitly reinstall instead of updating any existing install.
+  --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud            Disable support for Netdata Cloud (default: detect)
   --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
@@ -337,6 +338,21 @@ confirm_root_support() {
   fi
 }
 
+confirm() {
+  prompt="${1} [y/n]"
+
+  while true; do
+    echo "${prompt}"
+    read -r yn
+
+    case "$yn" in
+      [Yy]*) return 0;;
+      [Nn]*) return 1;;
+      *) echo "Please answer yes or no.";;
+    esac
+  done
+}
+
 # ======================================================================
 # Existing install handling code
 
@@ -405,7 +421,17 @@ handle_existing_install() {
           *-build) NETDATA_ONLY_BUILD=1 ;;
           *-static) NETDATA_ONLY_STATIC=1 ;;
           *)
-            fatal "User requested reinstall, but we do not support reinstalling over top of a ${INSTALL_TYPE} installation, exiting."
+            if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+              warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
+            elif [ "${INTERACTIVE}" -eq 0 ]; then
+              fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting."
+            else
+              if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+                progress "OK, continuing."
+              else
+                fatal "Cancelling reinstallation at user request."
+              fi
+            fi
             ;;
         esac
 
@@ -439,7 +465,21 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
       ;;
     *)
-      fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed."
+      if [ -n "${REINSTALL}" ]; then
+        if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+          warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
+        elif [ "${INTERACTIVE}" -eq 0 ]; then
+          fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting."
+        else
+          if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+            progress "OK, continuing."
+          else
+            fatal "Cancelling reinstallation at user request."
+          fi
+        fi
+      else
+        fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed."
+      fi
       ;;
   esac
 }
@@ -1027,6 +1067,7 @@ while [ -n "${1}" ]; do
     "--no-updates") NETDATA_AUTO_UPDATES= ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
+    "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
     "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
     "--dont-start-it") NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it" ;;
     "--disable-cloud") NETDATA_DISABLE_CLOUD=1 ;;
