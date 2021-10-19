@@ -980,6 +980,7 @@ install_on_linux() {
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
         NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
+        INSTALL_PREFIX="/opt/netdata"
         ;;
       1)
         fatal "Unable to install on this system."
