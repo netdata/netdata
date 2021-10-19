@@ -15,6 +15,11 @@ AutoReqProv: yes
 # error.
 %global __os_install_post %{nil}
 
+# We don’t want LTO as it has a minimal performance impact at runtime
+# but a huge impact on build times (we want our CI to not take multiple
+# hours to finish).
+%global _lto_cflags %nil
+
 # Disable eBPF for architectures other than x86
 %ifarch x86_64 i386
 %global _have_ebpf 1
