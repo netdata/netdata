@@ -208,7 +208,19 @@ Then run the following command in the same directory as the `docker-compose.yml`
 ```bash
 docker-compose up -d
 ```
+#### Using docker exec
 
+Connect a _running Netdata Agent container_, where you don't want to recreate the existing container, append the script offered by Netdata Cloud to a `docker exec ...` command, replacing
+`netdata` with the name of your running container:
+
+```bash
+docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
+```
+The values for `ROOM1,ROOM2` can be found by by going to Netdata Cloud, clicking the **Nodes** tab, clicking **Connect Nodes**, selecting **Docker**, and following
+the copying the `rooms=` value in the command provided. 
+
+The script should return `Agent was successfully claimed.`. If the connection process returns errors, or if
+you don't see the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
 
 ### Connect an agent running in macOS
 
