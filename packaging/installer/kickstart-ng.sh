@@ -896,6 +896,7 @@ try_build_install() {
   if [ -x netdata-installer.sh ]; then
     build_and_install || return 1
   else
+    # This case is needed because some platforms produce an extra directory on the source tarball extraction.
     if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
       cd "$(find . -mindepth 1 -maxdepth 1 -type d)" &&  build_and_install || return 1
     else
