@@ -6,17 +6,20 @@
 
 **Merged pull requests:**
 
-- Fix file name typos in Travis config from \#11055 [\#11667](https://github.com/netdata/netdata/pull/11667) ([Ferroin](https://github.com/Ferroin))
+- fix swap\_used alarm calc [\#11672](https://github.com/netdata/netdata/pull/11672) ([ilyam8](https://github.com/ilyam8))
+- Fix interval usage and reduce I/O [\#11662](https://github.com/netdata/netdata/pull/11662) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
 - Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
 - Fix chart config overflow [\#11645](https://github.com/netdata/netdata/pull/11645) ([stelfrag](https://github.com/stelfrag))
+- eBPF process \(collector improvements\) [\#11643](https://github.com/netdata/netdata/pull/11643) ([thiagoftsm](https://github.com/thiagoftsm))
 - eBPF cgroup integration [\#11642](https://github.com/netdata/netdata/pull/11642) ([thiagoftsm](https://github.com/thiagoftsm))
 - various fixes and updates for dashboard info [\#11639](https://github.com/netdata/netdata/pull/11639) ([ilyam8](https://github.com/ilyam8))
 - Fix an overflow when unsigned integer subtracted [\#11638](https://github.com/netdata/netdata/pull/11638) ([vlvkobal](https://github.com/vlvkobal))
 - add note for the new release of charts on the cloud [\#11637](https://github.com/netdata/netdata/pull/11637) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - add timex.plugin charts info [\#11635](https://github.com/netdata/netdata/pull/11635) ([ilyam8](https://github.com/ilyam8))
+- Revert "Update alarms info" [\#11633](https://github.com/netdata/netdata/pull/11633) ([ilyam8](https://github.com/ilyam8))
 - Fix nfsd RPC metrics and remove unused nfsd charts and metrics [\#11632](https://github.com/netdata/netdata/pull/11632) ([vlvkobal](https://github.com/vlvkobal))
 - add proc zfs charts info [\#11630](https://github.com/netdata/netdata/pull/11630) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.7. [\#11629](https://github.com/netdata/netdata/pull/11629) ([netdatabot](https://github.com/netdatabot))
@@ -159,17 +162,12 @@
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
 - Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- CODEOWNERS: Remove knatsakis [\#11377](https://github.com/netdata/netdata/pull/11377) ([knatsakis](https://github.com/knatsakis))
 - Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
 - Update handling of builds of bundled dependencies. [\#11375](https://github.com/netdata/netdata/pull/11375) ([Ferroin](https://github.com/Ferroin))
 - Added support for bundling protobuf as part of the install. [\#11374](https://github.com/netdata/netdata/pull/11374) ([Ferroin](https://github.com/Ferroin))
 - Ebpf latency description [\#11363](https://github.com/netdata/netdata/pull/11363) ([thiagoftsm](https://github.com/thiagoftsm))
-- Properly handle eBPF plugin in RPM packages. [\#11362](https://github.com/netdata/netdata/pull/11362) ([Ferroin](https://github.com/Ferroin))
-- fix `gearman\_workers\_queued` alarm [\#11361](https://github.com/netdata/netdata/pull/11361) ([ilyam8](https://github.com/ilyam8))
-- disable oom\_kill alarm if the node is k8s node [\#11359](https://github.com/netdata/netdata/pull/11359) ([ilyam8](https://github.com/ilyam8))
 - eBPF mount [\#11358](https://github.com/netdata/netdata/pull/11358) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
-- Allows ACLK-NG to grow MQTT buffer [\#11340](https://github.com/netdata/netdata/pull/11340) ([underhood](https://github.com/underhood))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
 - Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
 
@@ -210,8 +208,6 @@
 - Add a module for ZFS pool state [\#11071](https://github.com/netdata/netdata/pull/11071) ([vlvkobal](https://github.com/vlvkobal))
 - Improve dashboard documentation \(part 2\) [\#11065](https://github.com/netdata/netdata/pull/11065) ([joelhans](https://github.com/joelhans))
 - Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
-- Add functionality to store node\_id for a host [\#11059](https://github.com/netdata/netdata/pull/11059) ([stelfrag](https://github.com/stelfrag))
-- Add `charts` to templates [\#11054](https://github.com/netdata/netdata/pull/11054) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
