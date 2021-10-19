@@ -413,7 +413,7 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
 
-      if [ -n "${NETDATA_REINSTALL}" ]; then
+      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
@@ -465,7 +465,7 @@ handle_existing_install() {
       fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
       ;;
     *)
-      if [ -n "${REINSTALL}" ]; then
+      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
         if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
           warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
         elif [ "${INTERACTIVE}" -eq 0 ]; then
