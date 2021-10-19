@@ -412,6 +412,10 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC, "Pushing alarm health log to the cloud for %s", wc->host_guid);
                     aclk_push_alarm_health_log(wc, cmd);
                     break;
+                case ACLK_DATABASE_PUSH_ALERT_SNAPSHOT:
+                    debug(D_ACLK_SYNC, "Pushing alert snapshot to the cloud for node %s", wc->host_guid);
+                    aclk_push_alert_snapshot_event(wc, cmd);
+                    break;
 
 // NODE OPERATIONS
                 case ACLK_DATABASE_NODE_INFO:

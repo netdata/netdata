@@ -18,6 +18,7 @@ extern int aclk_disable_runtime;
 extern int aclk_disable_single_updates;
 
 extern int aclk_stats_enabled;
+extern int aclk_alert_reloaded;
 
 extern int aclk_ng;
 

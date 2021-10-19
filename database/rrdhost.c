@@ -1640,6 +1640,8 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         return res;
     else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
         return res;
+    else if (!strcmp(name, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE"))
+        return res;
     else {
         res = 1;
     }

@@ -74,7 +74,7 @@ typedef struct netdata_error_report {
 } netdata_error_report_t;
 
 extern ebpf_module_t ebpf_modules[];
-enum ebpf_module_indexes {
+enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_CACHESTAT_IDX,
@@ -89,7 +89,13 @@ enum ebpf_module_indexes {
     EBPF_MODULE_HARDIRQ_IDX,
     EBPF_MODULE_SOFTIRQ_IDX,
     EBPF_MODULE_OOMKILL_IDX,
-    EBPF_MODULE_SHM_IDX
+    EBPF_MODULE_SHM_IDX,
+    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
+    EBPF_OPTION_ALL_CHARTS,
+    EBPF_OPTION_VERSION,
+    EBPF_OPTION_HELP,
+    EBPF_OPTION_GLOBAL_CHART,
+    EBPF_OPTION_RETURN_MODE
 };
 
 typedef struct ebpf_tracepoint {
@@ -134,6 +140,8 @@ typedef struct ebpf_tracepoint {
 #define EBPF_SYS_CLONE_IDX 11
 #define EBPF_MAX_MAPS 32
 
+#define EBPF_DEFAULT_UPDATE_EVERY 10
+
 enum ebpf_algorithms_list {
     NETDATA_EBPF_ABSOLUTE_IDX,
     NETDATA_EBPF_INCREMENTAL_IDX
@@ -171,6 +179,7 @@ extern void ebpf_write_chart_cmd(char *type,
                                  char *charttype,
                                  char *context,
                                  int order,
+                                 int update_every,
                                  char *module);
 
 extern void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
@@ -188,6 +197,7 @@ extern void ebpf_create_chart(char *type,
                               void (*ncd)(void *, int),
                               void *move,
                               int end,
+                              int update_every,
                               char *module);
 
 extern void write_begin_chart(char *family, char *name);
@@ -209,6 +219,7 @@ extern void ebpf_create_charts_on_apps(char *name,
                                        int order,
                                        char *algorithm,
                                        struct target *root,
+                                       int update_every,
                                        char *module);
 
 extern void write_end_chart();
@@ -243,7 +254,6 @@ extern int shm_fd_ebpf_cgroup;
 extern sem_t *shm_sem_ebpf_cgroup;
 extern pthread_mutex_t mutex_cgroup_shm;
 extern size_t all_pids_count;
-extern int update_every;
 extern uint32_t finalized_threads;
 
 // Socket functions and variables
@@ -255,7 +265,7 @@ extern void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim
 extern collected_number get_value_from_structure(char *basis, size_t offset);
 extern void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 extern void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
-                                      char *charttype, char *context, int order);
+                                      char *charttype, char *context, int order, int update_every);
 extern void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300

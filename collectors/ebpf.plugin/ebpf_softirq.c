@@ -138,7 +138,7 @@ static void *softirq_reader(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         UNUSED(dt);
@@ -150,7 +150,7 @@ static void *softirq_reader(void *ptr)
     return NULL;
 }
 
-static void softirq_create_charts()
+static void softirq_create_charts(int update_every)
 {
     ebpf_create_chart(
         NETDATA_EBPF_SYSTEM_GROUP,
@@ -161,7 +161,7 @@ static void softirq_create_charts()
         NULL,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
-        NULL, NULL, 0,
+        NULL, NULL, 0, update_every,
         NETDATA_EBPF_MODULE_NAME_SOFTIRQ
     );
 
@@ -207,22 +207,28 @@ static void softirq_collector(ebpf_module_t *em)
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    softirq_create_charts();
+    softirq_create_charts(em->update_every);
     softirq_create_dims();
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
-        pthread_mutex_lock(&lock);
 
-        // write dims now for all hitherto discovered IRQs.
-        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency");
-        softirq_write_dims();
-        write_end_chart();
+        if (++counter == update_every) {
+            counter = 0;
+            pthread_mutex_lock(&lock);
 
-        pthread_mutex_unlock(&lock);
+            // write dims now for all hitherto discovered IRQs.
+            write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency");
+            softirq_write_dims();
+            write_end_chart();
+
+            pthread_mutex_unlock(&lock);
+        }
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }

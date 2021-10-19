@@ -84,6 +84,9 @@ jobs:
         if: github.event.inputs.version == 'nightly'
         run: |
           echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> $GITHUB_ENV
+      - name: Mark image as official
+        if: github.repository == 'netdata/netdata'
+        run: echo "OFFICIAL_IMAGE=true" >> $GITHUB_ENV
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1
       - name: Setup Buildx
@@ -99,6 +102,7 @@ jobs:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: true
           tags: ${{ env.tags }}
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

@@ -132,7 +132,7 @@ void *ebpf_sync_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_every;
 
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
@@ -210,15 +210,20 @@ static void sync_collector(ebpf_module_t *em)
     netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_sync_read_hash, em);
 
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        pthread_mutex_lock(&lock);
+        if (++counter == update_every) {
+            counter = 0;
+            pthread_mutex_lock(&lock);
 
-        sync_send_data();
+            sync_send_data();
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
@@ -291,15 +296,18 @@ static void ebpf_sync_cleanup(void *ptr)
  * @param order     order number of the specified chart
  * @param idx       the first index with data.
  * @param end       the last index with data.
+ * @param update_every value to overwrite the update frequency set by the server.
  */
 static void ebpf_create_sync_chart(char *id,
                                    char *title,
                                    int order,
                                    int idx,
-                                   int end)
+                                   int end,
+                                   int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
                          NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
+                         update_every,
                          NETDATA_EBPF_MODULE_NAME_SYNC);
 
     netdata_publish_syscall_t *move = &sync_counter_publish_aggregated[idx];
@@ -317,28 +325,30 @@ static void ebpf_create_sync_chart(char *id,
  * Create global charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_sync_charts()
+static void ebpf_create_sync_charts(int update_every)
 {
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART,
                                "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.", 21300,
-                               NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX);
+                               NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_MSYNC_CHART,
                                "Monitor calls for <code>msync(2)</code>.", 21301,
-                               NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX);
+                               NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled || local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_SYNC_CHART,
                                "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.", 21302,
-                               NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX);
+                               NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
                                "Monitor calls for <code>sync_file_range(2)</code>.", 21303,
-                               NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX);
+                               NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every);
 }
 
 /**
@@ -389,7 +399,7 @@ void *ebpf_sync_thread(void *ptr)
                        algorithms, NETDATA_SYNC_IDX_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_sync_charts();
+    ebpf_create_sync_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     sync_collector(em);

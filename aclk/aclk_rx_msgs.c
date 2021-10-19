@@ -398,6 +398,17 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         freez(config_hash);
         return;
     }
+    if (!strcmp(message_type, "SendAlarmSnapshot")) {
+        struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
+        if (!sas->node_id || !sas->claim_id) {
+            error("Error parsing SendAlarmSnapshot");
+            destroy_send_alarm_snapshot(sas);
+            return;
+        }
+        aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_id, sas->sequence_id);
+        destroy_send_alarm_snapshot(sas);
+        return;
+    }
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
 #endif
