@@ -1109,6 +1109,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
 static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
+    UNUSED(host);
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     BUFFER *wb = w->response.data;
