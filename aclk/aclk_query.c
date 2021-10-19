@@ -353,7 +353,7 @@ void *aclk_query_main_thread(void *ptr)
     return NULL;
 }
 
-#define TASK_LEN_MAX 16
+#define TASK_LEN_MAX 22
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client)
 {
     info("Starting %d query threads.", query_threads->count);

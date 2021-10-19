@@ -244,7 +244,7 @@ static void aclk_stats_cloud_req_cmd(struct legacy_aclk_metrics_per_sample *per_
     rrdset_done(st);
 }
 
-#define MAX_DIM_NAME 16
+#define MAX_DIM_NAME 22
 static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 {
     static RRDSET *st = NULL;

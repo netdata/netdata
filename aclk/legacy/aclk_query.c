@@ -708,7 +708,7 @@ void legacy_aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
     } while (this_query);
 }
 
-#define TASK_LEN_MAX 16
+#define TASK_LEN_MAX 22
 void legacy_aclk_query_threads_start(struct aclk_query_threads *query_threads)
 {
     info("Starting %d query threads.", query_threads->count);
