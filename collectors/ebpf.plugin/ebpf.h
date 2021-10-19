@@ -74,7 +74,7 @@ typedef struct netdata_error_report {
 } netdata_error_report_t;
 
 extern ebpf_module_t ebpf_modules[];
-enum ebpf_module_indexes {
+enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
     EBPF_MODULE_CACHESTAT_IDX,
@@ -89,7 +89,13 @@ enum ebpf_module_indexes {
     EBPF_MODULE_HARDIRQ_IDX,
     EBPF_MODULE_SOFTIRQ_IDX,
     EBPF_MODULE_OOMKILL_IDX,
-    EBPF_MODULE_SHM_IDX
+    EBPF_MODULE_SHM_IDX,
+    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
+    EBPF_OPTION_ALL_CHARTS,
+    EBPF_OPTION_VERSION,
+    EBPF_OPTION_HELP,
+    EBPF_OPTION_GLOBAL_CHART,
+    EBPF_OPTION_RETURN_MODE
 };
 
 typedef struct ebpf_tracepoint {
