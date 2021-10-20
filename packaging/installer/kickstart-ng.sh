@@ -486,12 +486,30 @@ handle_existing_install() {
 soft_disable_cloud() {
   cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
 
-  mkdir -p "${cloud_prefix}"
+  run ${ROOTCMD} mkdir -p "${cloud_prefix}"
 
-  cat > "${cloud_prefix}/cloud.conf" << EOF
+  run ${ROOTCMD} cat > "${cloud_prefix}/cloud.conf" << EOF
 [global]
   enabled = no
 EOF
+
+  if [ -z "${NETDATA_NO_START}" ]; then
+    case "${SYSTYPE}" in
+      Darwin) run ${ROOTCMD} launchctl kickstart -k com.github.netdata ;;
+      FreeBSD) run ${ROOTCMD} service netdata restart ;;
+      Linux)
+        if command -v service > /dev/null 2>&1; then
+          run ${ROOTCMD} service netdata restart
+        elif command -v rc-service > /dev/null 2>&1; then
+          run ${ROOTCMD} rc-service netdata restart
+        elif [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ]; then
+          run ${ROOTCMD} systemctl restart netdata
+        elif [ -f /etc/init.d/netdata ]; then
+          run ${ROOTCMD} /etc/init.d/netdata restart
+        fi
+        ;;
+    esac
+  fi
 }
 
 confirm_install_prefix() {
@@ -1066,9 +1084,12 @@ while [ -n "${1}" ]; do
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
     "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
-    "--dont-start-it") NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it" ;;
     "--disable-cloud") NETDATA_DISABLE_CLOUD=1 ;;
     "--require-cloud") NETDATA_REQUIRE_CLOUD=1 ;;
+    "--dont-start-it")
+      NETDATA_NO_START=1
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+      ;;
     "--disable-telemetry")
       NETDATA_DISABLE_TELEMETRY="0"
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
