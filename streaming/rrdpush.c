@@ -195,7 +195,8 @@ void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
 
             lbl = lbl->next;
         }
-        buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
+        if (labels_c->head)
+            buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
         netdata_rwlock_unlock(&host->labels.labels_rwlock);
     }
 }
