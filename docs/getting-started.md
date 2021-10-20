@@ -54,7 +54,7 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
 -   Move Netdata's dashboard to a [different port](/web/server/) or enable TLS/HTTPS
     encryption.
 -   See all the `netdata.conf` options in our [daemon configuration documentation](/daemon/config/).
--   Run your own [registry](/registry/README.md#run-your-own-registry).
+-   Run your own [registry](/src/registry/README.md#run-your-own-registry).
 
 ## Change how long Netdata stores metrics
 

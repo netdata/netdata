@@ -82,8 +82,8 @@ area/packaging:
   - netdata.spec.in
 
 area/registry:
-  - registry/*
-  - registry/**/*
+  - src/registry/*
+  - src/registry/**/*
 
 area/streaming:
   - streaming/*
