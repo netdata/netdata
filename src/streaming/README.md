@@ -1,7 +1,7 @@
 <!--
 title: "Streaming and replication"
 description: "Replicate and mirror Netdata's metrics through real-time streaming from child to parent nodes. Then combine, correlate, and export."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/streaming/README.md
 -->
 
 # Streaming and replication

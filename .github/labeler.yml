@@ -86,8 +86,8 @@ area/registry:
   - registry/**/*
 
 area/streaming:
-  - streaming/*
-  - streaming/**/*
+  - src/streaming/*
+  - src/streaming/**/*
 
 area/tests:
   - tests/*

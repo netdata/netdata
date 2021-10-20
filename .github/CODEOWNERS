@@ -36,7 +36,7 @@ health/notifications/ @Ferroin @thiagoftsm
 libnetdata/ @thiagofsm
 packaging/ @Ferroin @iigorkarpov @vkalintiris
 registry/ @jacekkolasa
-streaming/ @thiagoftsm @vlvkobal
+src/streaming/ @thiagoftsm @vlvkobal
 system/ @Ferroin @iigorkarpov @vkalintiris
 tests/ @Ferroin @iigorkarpov @kaskavel @vkalintiris
 web/ @thiagoftsm @vlvkobal @vkalintiris

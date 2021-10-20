@@ -89,7 +89,7 @@ Agent.
 ##### Information
 
 For more information about setting `memory mode` on your nodes, in addition to other streaming configurations, see
-[streaming](/streaming/README.md).
+[streaming](/src/streaming/README.md).
 
 ### Memory requirements
 

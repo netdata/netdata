@@ -734,10 +734,10 @@ set(API_PLUGIN_FILES
         )
 
 set(STREAMING_PLUGIN_FILES
-        streaming/rrdpush.c
-        streaming/rrdpush.h
-        streaming/receiver.c
-        streaming/sender.c
+        src/streaming/rrdpush.c
+        src/streaming/rrdpush.h
+        src/streaming/receiver.c
+        src/streaming/sender.c
         )
 
 set(BACKENDS_PLUGIN_FILES
@@ -1153,6 +1153,8 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
 # -----------------------------------------------------------------------------
 # netdata
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/src)
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
