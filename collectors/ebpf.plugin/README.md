@@ -399,6 +399,8 @@ You can also enable the following eBPF programs:
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
+- `mdflush`: This eBPF program creates charts that show information about
+  multi-device software flushes.
 
 ## Thread configuration
 

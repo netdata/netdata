@@ -1606,6 +1606,9 @@ netdataDashboard.context = {
         'software issues should never cause such a mismatch. '+
         'For details, see <a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">md(4)</a>.'
     },
+    'md.flush': {
+        info: 'Number of flush counts per MD array.'
+    },
 
     // ------------------------------------------------------------------------
     // IP

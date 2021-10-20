@@ -29,6 +29,7 @@ dist_ebpfconfig_DATA = \
     ebpf.d/fd.conf \
     ebpf.d/filesystem.conf \
     ebpf.d/hardirq.conf \
+    ebpf.d/mdflush.conf \
     ebpf.d/mount.conf \
     ebpf.d/network.conf \
     ebpf.d/oomkill.conf \
