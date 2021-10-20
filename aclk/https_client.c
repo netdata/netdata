@@ -467,7 +467,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_req_ctx;
     }
 
-    snprintf(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
+    snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
