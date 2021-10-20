@@ -945,8 +945,8 @@ endif
 NETDATACLI_FILES = \
     daemon/commands.h \
     $(LIBNETDATA_FILES) \
-    cli/cli.c \
-    cli/cli.h \
+    src/cli/cli.c \
+    src/cli/cli.h \
     $(NULL)
 
 sbin_PROGRAMS += netdata

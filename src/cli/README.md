@@ -1,7 +1,7 @@
 <!--
 title: "Netdata CLI"
 description: "The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/cli/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/cli/README.md
 -->
 
 # Netdata CLI

@@ -193,7 +193,7 @@ The command line options of the Netdata 1.10.0 version are the following:
   - USR2                   Reload health configuration.
 ```
 
-You can send commands during runtime via [netdatacli](/cli/README.md).
+You can send commands during runtime via [netdatacli](/src/cli/README.md).
 
 ## Log files
 

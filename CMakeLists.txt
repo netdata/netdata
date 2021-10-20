@@ -987,8 +987,8 @@ set(NETDATA_FILES
 
 set(NETDATACLI_FILES
         daemon/commands.h
-        cli/cli.c
-        cli/cli.h
+        src/cli/cli.c
+        src/cli/cli.h
         )
 
 include_directories(AFTER .)
