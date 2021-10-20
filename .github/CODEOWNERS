@@ -27,7 +27,7 @@ collectors/node.d.plugin/stiebeleltron/ @ccremer
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
 exporting/  @vlvkobal @thiagoftsm
-daemon/ @thiagoftsm
+src/daemon/ @thiagoftsm
 database/ @thiagoftsm @vkalintiris
 docs/ @DShreve2
 health/ @thiagoftsm @vlvkobal @vkalintiris

@@ -132,7 +132,7 @@ killall -USR2 netdata
 ## What's next?
 
 To learn about all of Netdata's health configuration options, view the [reference guide](/health/REFERENCE.md) and
-[daemon configuration](/daemon/config/README.md#health-section-options) for additional options available in the
+[daemon configuration](/src/daemon/config/README.md#health-section-options) for additional options available in the
 `[health]` section of `netdata.conf`.
 
 Or, get guided insights into specific health configurations with our [health guides](/health/README.md#guides).

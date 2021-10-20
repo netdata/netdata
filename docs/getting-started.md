@@ -53,7 +53,7 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
     and `dbengine disk space` settings in `netdata.conf`.
 -   Move Netdata's dashboard to a [different port](/web/server/) or enable TLS/HTTPS
     encryption.
--   See all the `netdata.conf` options in our [daemon configuration documentation](/daemon/config/).
+-   See all the `netdata.conf` options in our [daemon configuration documentation](/src/daemon/config/).
 -   Run your own [registry](/registry/README.md#run-your-own-registry).
 
 ## Change how long Netdata stores metrics
@@ -158,7 +158,7 @@ changes based on your particular Nginx setup.
 -   Improve the [performance](/docs/guides/configure/performance.md) of Netdata on low-memory systems.
 -   Configure `systemd` to expose [systemd services
     utilization](/collectors/cgroups.plugin/README.md#monitoring-systemd-services) metrics automatically.
--   [Reconfigure individual charts](/daemon/config/README.md#per-chart-configuration) in `netdata.conf`.
+-   [Reconfigure individual charts](/src/daemon/config/README.md#per-chart-configuration) in `netdata.conf`.
 
 ## Health monitoring and alarms
 

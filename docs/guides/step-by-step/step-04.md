@@ -124,7 +124,7 @@ Once you're done, restart Netdata and refresh the dashboard. Say hello to your r
 netdata.conf](https://user-images.githubusercontent.com/1153921/80994808-1c065300-8df2-11ea-81af-d28dc3ba27c8.gif)
 
 Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon
-configuration](/daemon/config/README.md), or hop into our popular guide on [increasing long-term metrics
+configuration](/src/daemon/config/README.md), or hop into our popular guide on [increasing long-term metrics
 storage](/docs/guides/longer-metrics-storage.md).
 
 ## What's next?

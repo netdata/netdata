@@ -22,7 +22,7 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 ### Increase the long-term metrics retention period
 
 Increase the values for the `page cache size` and `dbengine multihost disk space` settings in the [`[global]`
-section](/daemon/config/README.md#global-section-options) of `netdata.conf`.
+section](/src/daemon/config/README.md#global-section-options) of `netdata.conf`.
 
 ```conf
 [global]
@@ -36,7 +36,7 @@ to help you determine the exact settings for your desired retention period.
 
 ### Reduce the data collection frequency
 
-Change `update every` in the [`[global]` section](/daemon/config/README.md#global-section-options) of `netdata.conf` so
+Change `update every` in the [`[global]` section](/src/daemon/config/README.md#global-section-options) of `netdata.conf` so
 that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
 of 5 seconds.
 
@@ -52,7 +52,7 @@ or configure a collector](/docs/collect/enable-configure.md) doc for details.
 
 ### Disable a collector or plugin
 
-Turn off entire plugins in the [`[plugins]` section](/daemon/config/README.md#plugins-section-options) of
+Turn off entire plugins in the [`[plugins]` section](/src/daemon/config/README.md#plugins-section-options) of
 `netdata.conf`.
 
 To disable specific collectors, open `go.d.conf`, `python.d.conf`, `node.d.conf`, or `charts.d.conf` and find the line
@@ -106,7 +106,7 @@ template: disk_fill_rate
 
 ### Turn of all alarms and notifications
 
-Set `enabled` to `no` in the [`[health]` section](/daemon/config/README.md#health-section-options) section of
+Set `enabled` to `no` in the [`[health]` section](/src/daemon/config/README.md#health-section-options) section of
 `netdata.conf`.
 
 ### Enable alarm notifications
@@ -204,7 +204,7 @@ You can also take what you've learned about node configuration to tweak the Agen
 ### Related reference documentation
 
 - [Netdata Agent · Daemon](/health/README.md)
-- [Netdata Agent · Daemon configuration](/daemon/config/README.md)
+- [Netdata Agent · Daemon configuration](/src/daemon/config/README.md)
 - [Netdata Agent · Web server](/web/server/README.md)
 - [Netdata Agent · Local Agent dashboard](/web/gui/README.md)
 - [Netdata Agent · Health monitoring](/health/REFERENCE.md)

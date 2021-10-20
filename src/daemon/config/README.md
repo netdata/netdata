@@ -1,7 +1,7 @@
 <!--
 title: "Daemon configuration"
 description: "The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/config/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md
 -->
 
 # Daemon configuration
@@ -13,7 +13,7 @@ This config file **is not needed by default**. Netdata works fine out of the box
 
 `netdata.conf` has sections stated with `[section]`. You will see the following sections:
 
-1.  `[global]` to [configure](#global-section-options) the [Netdata daemon](/daemon/README.md).
+1.  `[global]` to [configure](#global-section-options) the [Netdata daemon](/src/daemon/README.md).
 2.  `[web]` to [configure the web server](/web/server/README.md).
 3.  `[plugins]` to [configure](#plugins-section-options) which [collectors](/collectors/README.md) to use and PATH
     settings.
@@ -49,16 +49,16 @@ Please note that your data history will be lost if you have modified `history` p
 
 | setting|default|info|||
 |:-----:|:-----:|:---|---|---|
-| process scheduling policy|`keep`|See [Netdata process scheduling policy](/daemon/README.md#netdata-process-scheduling-policy)|||
-| OOM score|`1000`|See [OOM score](/daemon/README.md#oom-score)|||
-| glibc malloc arena max for plugins|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
-| glibc malloc arena max for Netdata|`1`|See [Virtual memory](/daemon/README.md#virtual-memory).|||
+| process scheduling policy|`keep`|See [Netdata process scheduling policy](/src/daemon/README.md#netdata-process-scheduling-policy)|||
+| OOM score|`1000`|See [OOM score](/src/daemon/README.md#oom-score)|||
+| glibc malloc arena max for plugins|`1`|See [Virtual memory](/src/daemon/README.md#virtual-memory).|||
+| glibc malloc arena max for Netdata|`1`|See [Virtual memory](/src/daemon/README.md#virtual-memory).|||
 | hostname|auto-detected|The hostname of the computer running Netdata.|||
 | history|`3996`| Used with `memory mode = save/map/ram/alloc`, not the default `memory mode = dbengine`. This number reflects the number of entries the `netdata` daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](/database/README.md) for more information. |||
 | update every|`1`|The frequency in seconds, for data collection. For more information see the [performance guide](/docs/guides/configure/performance.md).|||
 | config directory|`/etc/netdata`|The directory configuration files are kept.|||
 | stock config directory|`/usr/lib/netdata/conf.d`||||
-| log directory|`/var/log/netdata`|The directory in which the [log files](/daemon/README.md#log-files) are kept.|||
+| log directory|`/var/log/netdata`|The directory in which the [log files](/src/daemon/README.md#log-files) are kept.|||
 | web files directory|`/usr/share/netdata/web`|The directory the web static files are kept.|||
 | cache directory|`/var/cache/netdata`|The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.|||
 | lib directory|`/var/lib/netdata`|Contains the alarm log and the Netdata instance guid.|||
@@ -72,8 +72,8 @@ Please note that your data history will be lost if you have modified `history` p
 | memory deduplication (ksm)|`yes`|When set to `yes`, Netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](/database/README.md#ksm)|||
 | TZ environment variable|`:/etc/localtime`|Where to find the timezone|||
 | timezone|auto-detected|The timezone retrieved from the environment variable|||
-| debug flags|`0x0000000000000000`|Bitmap of debug options to enable. For more information check [Tracing Options](/daemon/README.md#debugging).|||
-| debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/daemon/README.md#debugging).|||
+| debug flags|`0x0000000000000000`|Bitmap of debug options to enable. For more information check [Tracing Options](/src/daemon/README.md#debugging).|||
+| debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](/src/daemon/README.md#debugging).|||
 | error log|`/var/log/netdata/error.log`|The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.|||
 | access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.|||
 | errors flood protection period|`1200`|Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.|||

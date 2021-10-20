@@ -71,7 +71,7 @@ Starting with v1.21, we additionally collect information about:
 -   Failures to connect to the Cloud in case the [connection process](/claim/README.md) has been completed. This includes error codes
     to inform the Netdata team about the reason why the connection failed.
 
-To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The
+To see exactly what and how is collected, you can review the script template `src/daemon/anonymous-statistics.sh.in`. The
 template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins
 directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
 

@@ -921,26 +921,26 @@ set(MONGODB_BACKEND_FILES
         )
 
 set(DAEMON_FILES
-        daemon/buildinfo.c
-        daemon/buildinfo.h
-        daemon/common.c
-        daemon/common.h
-        daemon/daemon.c
-        daemon/daemon.h
-        daemon/global_statistics.c
-        daemon/global_statistics.h
-        daemon/analytics.c
-        daemon/analytics.h
-        daemon/main.c
-        daemon/main.h
-        daemon/signals.c
-        daemon/signals.h
-        daemon/service.c
-        daemon/service.h
-        daemon/commands.c
-        daemon/commands.h
-        daemon/unit_test.c
-        daemon/unit_test.h
+        src/daemon/buildinfo.c
+        src/daemon/buildinfo.h
+        src/daemon/common.c
+        src/daemon/common.h
+        src/daemon/daemon.c
+        src/daemon/daemon.h
+        src/daemon/global_statistics.c
+        src/daemon/global_statistics.h
+        src/daemon/analytics.c
+        src/daemon/analytics.h
+        src/daemon/main.c
+        src/daemon/main.h
+        src/daemon/signals.c
+        src/daemon/signals.h
+        src/daemon/service.c
+        src/daemon/service.h
+        src/daemon/commands.c
+        src/daemon/commands.h
+        src/daemon/unit_test.c
+        src/daemon/unit_test.h
         )
 
 set(NETDATA_FILES
@@ -964,7 +964,7 @@ set(NETDATA_FILES
 )
 
 set(NETDATACLI_FILES
-        daemon/commands.h
+        src/daemon/commands.h
         cli/cli.c
         cli/cli.h
         )
@@ -1153,6 +1153,8 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
 # -----------------------------------------------------------------------------
 # netdata
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/src)
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}

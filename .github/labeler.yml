@@ -44,8 +44,8 @@ area/collectors:
   - collectors/**/*
 
 area/daemon:
-  - daemon/*
-  - daemon/**/*
+  - src/daemon/*
+  - src/daemon/**/*
 
 area/database:
   - database/*
@@ -92,7 +92,7 @@ area/streaming:
 area/tests:
   - tests/*
   - tests/**/*
-  - daemon/unit_test*
+  - src/daemon/unit_test*
   - coverity-scan.sh
   - cppcheck.sh
   - netdata.cppcheck

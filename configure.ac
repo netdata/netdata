@@ -25,7 +25,7 @@ AC_SUBST([PACKAGE_RPM_VERSION])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
-AC_CONFIG_SRCDIR([daemon/main.c])
+AC_CONFIG_SRCDIR([src/daemon/main.c])
 define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [
     define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
@@ -1585,7 +1585,7 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+CFLAGS="-I \$(abs_top_srcdir)/src/ ${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
@@ -1714,7 +1714,7 @@ AC_CONFIG_FILES([
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
-    daemon/Makefile
+    src/daemon/Makefile
     database/Makefile
     database/engine/Makefile
     database/engine/metadata_log/Makefile

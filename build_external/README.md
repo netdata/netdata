@@ -56,7 +56,7 @@ step only takes 15s. On a debian host with a fast network this reduces 1m30 -> 1
 ```bash
 build_external/bin/clean-install.sh arch current
 docker run -it --rm arch_current_dev
-echo >>daemon/main.c     # Simulate edit by touching file
+echo >>src/daemon/main.c     # Simulate edit by touching file
 build_external/bin/make-install.sh arch current
 docker run -it --rm arch_current_dev
 ```
@@ -70,10 +70,10 @@ it is up to you to know when you need to rerun the clean build step.
 build_external/bin/clean-install.sh arch current
 build_external/bin/clean-install.sh ubuntu 19.10
 docker run -it --rm arch_current_dev
-echo >>daemon/main.c     # Simulate edit by touching file
+echo >>src/daemon/main.c     # Simulate edit by touching file
 build_external/bin/make-install.sh arch current
 docker run -it --rm arch_current_dev
-echo >>daemon/daemon.c     # Simulate second edit step
+echo >>src/daemon/daemon.c     # Simulate second edit step
 build_external/bin/make-install.sh arch current   # Observe a single file is rebuilt
 build_external/bin/make-install.sh arch current   # Observe both files are rebuilt
 ```

@@ -41,7 +41,7 @@ infrastructure](/docs/visualize/overview-infrastructure.md) in real-time with Ne
 Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations).
 
 The Netdata Agent runs with the lowest possible [process scheduling
-policy](/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
+policy](/src/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
 Together, these settings ensure that the Agent only gets CPU resources when the node has CPU resources to space. If the
 node reaches 100% CPU utilization, the Agent is stopped first to ensure your applications get any available resources.
 In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.

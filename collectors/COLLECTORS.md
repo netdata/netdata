@@ -502,7 +502,7 @@ collectors are described only in code and associated charts in Netdata dashboard
 -   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
     metrics on CPU utilization for the [exporting engine](/exporting/README.md), and specific metrics for each enabled
     exporting connector.
--   [Global statistics (code only)](https://github.com/netdata/netdata/blob/master/daemon/global_statistics.c): See
+-   [Global statistics (code only)](https://github.com/netdata/netdata/blob/master/src/daemon/global_statistics.c): See
     metrics on the CPU utilization, network traffic, volume of web clients, API responses, database engine usage, and
     more.
 
