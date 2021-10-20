@@ -203,7 +203,7 @@ netnsid_find_all_interfaces_for_pid() {
     local pid="${1}"
     [ -z "${pid}" ] && return 1
 
-    local nsid=$(lsns -t net -p ${pid} -o NETNSID -nr)
+    local nsid=$(lsns -t net -p ${pid} -o NETNSID -nr 2>/dev/null)
     [ -z "${nsid}" -o "${nsid}" = "unassigned" ] && return 1
 
     set_source "netnsid"
