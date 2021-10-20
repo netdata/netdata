@@ -736,6 +736,7 @@ declare -A pkg_gxx=(
   ['gentoo']="NOTREQUIRED"
   ['macos']="NOTREQUIRED"
   ['ubuntu']="g++"
+  ['freebsd']="NOTREQUIRED"
   ['default']="gcc-c++"
 )
 
