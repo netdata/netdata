@@ -22,7 +22,6 @@ NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
 NETDATA_REQUIRE_CLOUD=1
-NETDATA_USER_CONFIG_DIR="/etc/netdata"
 RELEASE_CHANNEL="nightly"
 
 NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
@@ -770,6 +769,11 @@ try_package_install() {
     return 2
   fi
 
+  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
+    run ${ROOTCMD} mkdir -p "/etc/netdata"
+    run ${ROOTCMD} touch "/etc/netdata/.opt-out-from-anonymous-statistics"
+  fi
+
   progress "Installing Netdata package."
   # shellcheck disable=SC2086
   if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} netdata; then
@@ -943,10 +947,6 @@ try_build_install() {
       fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}"
     fi
   fi
-
-  if [ -n "${INSTALL_PREFIX}" ]; then
-    NETDATA_USER_CONFIG_DIR="${INSTALL_PREFIX}/etc/netdata"
-  fi
 }
 
 # ======================================================================
@@ -979,7 +979,6 @@ install_on_linux() {
     case "$?" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
-        NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
         INSTALL_PREFIX="/opt/netdata"
         ;;
       1)
@@ -1001,7 +1000,6 @@ install_on_linux() {
     case "$?" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
-        NETDATA_USER_CONFIG_DIR="/etc/netdata"
         ;;
       *)
         fatal "Unable to install on this system."
@@ -1021,7 +1019,6 @@ install_on_macos() {
     case "$?" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
-        NETDATA_USER_CONFIG_DIR="/usr/local/netdata/etc/netdata"
         ;;
       *)
         fatal "Unable to install on this system."
@@ -1041,7 +1038,6 @@ install_on_freebsd() {
     case "$?" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
-        NETDATA_USER_CONFIG_DIR="/usr/local/etc/netdata"
         ;;
       *)
         fatal "Unable to install on this system."
@@ -1148,10 +1144,6 @@ case "${SYSTYPE}" in
   Darwin) install_on_macos ;;
   FreeBSD) install_on_freebsd ;;
 esac
-
-if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
-  run ${ROOTCMD} touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-fi
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
