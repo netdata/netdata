@@ -1183,6 +1183,8 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 # -----------------------------------------------------------------------------
 # netdata
 
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/src)
+
 IF(LINUX)
     list(APPEND NETDATA_COMMON_LIBRARIES rt)
     add_executable(netdata config.h ${NETDATA_FILES}
