@@ -105,16 +105,17 @@ static int mdflush_val_cmp(void *a, void *b)
 static void mdflush_read_count_map()
 {
     int mapfd = mdflush_maps[MDFLUSH_MAP_COUNT].map_fd;
-    mdflush_ebpf_key_t key;
-    mdflush_ebpf_key_t next_key;
+    mdflush_ebpf_key_t curr_key = (uint32_t)-1;
+    mdflush_ebpf_key_t key = (uint32_t)-1;
     netdata_mdflush_t search_v;
     netdata_mdflush_t *v = NULL;
 
-    while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
+    while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
+        curr_key = key;
+
         // get val for this key.
         int test = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
         if (unlikely(test < 0)) {
-            key = next_key;
             continue;
         }
 
@@ -166,8 +167,6 @@ static void mdflush_read_count_map()
                 error("Internal error, cannot insert the AVL tree.");
             }
         }
-
-        key = next_key;
     }
 }
 
