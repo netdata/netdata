@@ -488,10 +488,12 @@ soft_disable_cloud() {
 
   run ${ROOTCMD} mkdir -p "${cloud_prefix}"
 
-  run ${ROOTCMD} cat > "${cloud_prefix}/cloud.conf" << EOF
+  run cat > "${tmpdir}/cloud.conf" << EOF
 [global]
   enabled = no
 EOF
+
+  run ${ROOTCMD} cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
 
   if [ -z "${NETDATA_NO_START}" ]; then
     case "${SYSTYPE}" in
