@@ -956,7 +956,7 @@ get_kernel_version() {
 }
 
 rename_libbpf_packaging() {
-  if [ "$(get_kernel_version)" -ge "005004014" ]; then
+  if [ "$(get_kernel_version)" -ge "004014000" ]; then
     cp packaging/current_libbpf.checksums packaging/libbpf.checksums
     cp packaging/current_libbpf.version packaging/libbpf.version
   else
