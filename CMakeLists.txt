@@ -602,8 +602,8 @@ set(PLUGINSD_PLUGIN_FILES
         )
 
 set(PARSER_PLUGIN_FILES
-        parser/parser.c
-        parser/parser.h
+        src/parser/parser.c
+        src/parser/parser.h
         )
 
 set(REGISTRY_PLUGIN_FILES
