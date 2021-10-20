@@ -846,10 +846,10 @@ set(ACLK_NG_FILES
         )
 
 set(SPAWN_PLUGIN_FILES
-        spawn/spawn.c
-        spawn/spawn_server.c
-        spawn/spawn_client.c
-        spawn/spawn.h
+        src/spawn/spawn.c
+        src/spawn/spawn_server.c
+        src/spawn/spawn_client.c
+        src/spawn/spawn.h
         )
 
 set(ACLK_LEGACY_STATIC_LIBS
@@ -1153,6 +1153,8 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
 # -----------------------------------------------------------------------------
 # netdata
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/src)
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}

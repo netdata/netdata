@@ -116,7 +116,7 @@ SUBDIRS += \
     web \
     claim \
     parser \
-    spawn \
+    src/spawn \
     $(NULL)
 
 if ENABLE_ACLK
@@ -759,10 +759,10 @@ ACLK_LEGACY_FILES = \
 endif #ACLK_LEGACY
 
 SPAWN_PLUGIN_FILES = \
-    spawn/spawn.c \
-    spawn/spawn_server.c \
-    spawn/spawn_client.c \
-    spawn/spawn.h \
+    src/spawn/spawn.c \
+    src/spawn/spawn_server.c \
+    src/spawn/spawn_client.c \
+    src/spawn/spawn.h \
     $(NULL)
 
 EXPORTING_ENGINE_FILES = \
