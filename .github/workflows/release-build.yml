@@ -138,7 +138,7 @@ jobs:
           cp ../packaging/version artifacts/latest-version.txt
           sha256sum -b ./* > "sha256sums.txt"
       - name: Store Artifacts
-        uses: action/upload-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
           name: final-artifacts
           path: artifacts/*
