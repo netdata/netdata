@@ -2,7 +2,7 @@
 #ifndef ACLK_CHARTS_H
 #define ACLK_CHARTS_H
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "schema-wrappers/schema_wrappers.h"
 
 void aclk_chart_inst_update(char **payloads, size_t *payload_sizes, struct aclk_message_position *new_positions);

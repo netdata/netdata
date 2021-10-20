@@ -2,7 +2,7 @@
 
 #ifndef NETDATA_SQLITE_HEALTH_H
 #define NETDATA_SQLITE_HEALTH_H
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 #include "sqlite3.h"
 
 extern sqlite3 *db_meta;
