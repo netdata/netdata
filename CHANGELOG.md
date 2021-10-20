@@ -7,12 +7,16 @@
 **Merged pull requests:**
 
 - fix swap\_used alarm calc [\#11672](https://github.com/netdata/netdata/pull/11672) ([ilyam8](https://github.com/ilyam8))
+- Fix line arguments \(eBPF\) [\#11670](https://github.com/netdata/netdata/pull/11670) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add snapshot message for cloud new architecture [\#11664](https://github.com/netdata/netdata/pull/11664) ([MrZammler](https://github.com/MrZammler))
 - Fix interval usage and reduce I/O [\#11662](https://github.com/netdata/netdata/pull/11662) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
+- Optimize static build and update various dependencies. [\#11660](https://github.com/netdata/netdata/pull/11660) ([Ferroin](https://github.com/Ferroin))
 - Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
 - Fix chart config overflow [\#11645](https://github.com/netdata/netdata/pull/11645) ([stelfrag](https://github.com/stelfrag))
+- Explicitly opt out of LTO in RPM builds. [\#11644](https://github.com/netdata/netdata/pull/11644) ([Ferroin](https://github.com/Ferroin))
 - eBPF process \(collector improvements\) [\#11643](https://github.com/netdata/netdata/pull/11643) ([thiagoftsm](https://github.com/thiagoftsm))
 - eBPF cgroup integration [\#11642](https://github.com/netdata/netdata/pull/11642) ([thiagoftsm](https://github.com/thiagoftsm))
 - various fixes and updates for dashboard info [\#11639](https://github.com/netdata/netdata/pull/11639) ([ilyam8](https://github.com/ilyam8))
@@ -39,6 +43,7 @@
 - apps: disable reporting min/avg/max group uptime by default [\#11609](https://github.com/netdata/netdata/pull/11609) ([ilyam8](https://github.com/ilyam8))
 - fix https client  [\#11608](https://github.com/netdata/netdata/pull/11608) ([underhood](https://github.com/underhood))
 - add cgroups.plugin charts descriptions [\#11607](https://github.com/netdata/netdata/pull/11607) ([ilyam8](https://github.com/ilyam8))
+- Add flag to mark containers as created from official images in analytics. [\#11606](https://github.com/netdata/netdata/pull/11606) ([Ferroin](https://github.com/Ferroin))
 - Update optional parameters for upcoming installer. [\#11604](https://github.com/netdata/netdata/pull/11604) ([DShreve2](https://github.com/DShreve2))
 - add apps.plugin charts descriptions [\#11601](https://github.com/netdata/netdata/pull/11601) ([ilyam8](https://github.com/ilyam8))
 - add proc\_vmstat charts info [\#11597](https://github.com/netdata/netdata/pull/11597) ([ilyam8](https://github.com/ilyam8))
@@ -158,18 +163,13 @@
 - Update perf.events and add new charts [\#11392](https://github.com/netdata/netdata/pull/11392) ([thiagoftsm](https://github.com/thiagoftsm))
 - charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
 - Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
-- Specify module for threads [\#11387](https://github.com/netdata/netdata/pull/11387) ([thiagoftsm](https://github.com/thiagoftsm))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
 - Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
-- Update handling of builds of bundled dependencies. [\#11375](https://github.com/netdata/netdata/pull/11375) ([Ferroin](https://github.com/Ferroin))
 - Added support for bundling protobuf as part of the install. [\#11374](https://github.com/netdata/netdata/pull/11374) ([Ferroin](https://github.com/Ferroin))
-- Ebpf latency description [\#11363](https://github.com/netdata/netdata/pull/11363) ([thiagoftsm](https://github.com/thiagoftsm))
-- eBPF mount [\#11358](https://github.com/netdata/netdata/pull/11358) ([thiagoftsm](https://github.com/thiagoftsm))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
-- Add code for repository configuration packages. [\#11273](https://github.com/netdata/netdata/pull/11273) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
@@ -206,8 +206,6 @@
 - Remove dash-example, place in community repo [\#11077](https://github.com/netdata/netdata/pull/11077) ([tnyeanderson](https://github.com/tnyeanderson))
 - Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add a module for ZFS pool state [\#11071](https://github.com/netdata/netdata/pull/11071) ([vlvkobal](https://github.com/vlvkobal))
-- Improve dashboard documentation \(part 2\) [\#11065](https://github.com/netdata/netdata/pull/11065) ([joelhans](https://github.com/joelhans))
-- Fix coverity issue \(CID 370510\) [\#11060](https://github.com/netdata/netdata/pull/11060) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
