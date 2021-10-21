@@ -134,7 +134,7 @@ jobs:
         working-directory: ./artifacts/
         run: |
           mv ../dist-tarball/* artifacts
-          mv ../static-archive/* artifcts
+          mv ../static-archive/* artifacts
           cp ../packaging/version artifacts/latest-version.txt
           sha256sum -b ./* > "sha256sums.txt"
       - name: Store Artifacts
