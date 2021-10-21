@@ -172,6 +172,26 @@ download() {
   fi
 }
 
+get_netdata_latest_stable_version() {
+  local dest="${1}"
+  local url="https://github.com/netdata/netdata/releases/latest"
+  local version
+
+  if command -v curl >/dev/null 2>&1; then
+    version=$(curl "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
+  elif command -v wget >/dev/null 2>&1; then
+    version=$(wget --max-redirect=0 "${url}" 2>&1 | grep Location | cut -d ' ' -f2 | grep -m 1 -o '[^/]*$')
+  else
+    fatal "I need curl or wget to proceed, but neither of them are available on this system."
+  fi
+
+  if [[ ! $version =~ ^v[0-9]+\..+ ]]; then
+    fatal "Cannot download latest stable version from ${url}"
+  fi
+
+  echo "${version}" >"${dest}"
+}
+
 newer_commit_date() {
   echo >&3 "Checking if a newer version of the updater script is available."
 
@@ -237,7 +257,7 @@ parse_version() {
 
 get_latest_version() {
   if [ "${RELEASE_CHANNEL}" == "stable" ]; then
-    download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4
+    get_netdata_latest_stable_version /dev/stdout
   else
     download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout
   fi
@@ -252,8 +272,7 @@ set_tarball_urls() {
 
   if [ "$1" = "stable" ]; then
     local latest
-    # Simple version
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    latest="$(get_netdata_latest_stable_version /dev/stdout)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.${extension}"
     export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
   else
