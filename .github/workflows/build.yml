@@ -151,8 +151,8 @@ jobs:
           PRE: ${{ matrix.pre }}
           RMJSONC: ${{ matrix.rmjsonc }}
         run: |
-          echo "$PRE" > ./prep-cmd.sh
-          echo "$RMJSONC" > ./rmjsonc.sh && chmod +x ./rmjsonc.sh
+          echo "$PRE" > ${{ github.workspace }}/prep-cmd.sh
+          echo "$RMJSONC" > ${{ github.workspace }}/rmjsonc.sh && chmod +x ${{ github.workspace }}/rmjsonc.sh
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
       - name: Build test environment
