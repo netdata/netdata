@@ -110,8 +110,15 @@ setup_terminal() {
   return 0
 }
 
+cleanup() {
+  if [ -z "${NO_CLEANUP}" ]; then
+    ${ROOTCMD} rm -rf "${tmpdir}"
+  fi
+}
+
 fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
+  cleanup
   exit 1
 }
 
@@ -488,7 +495,7 @@ soft_disable_cloud() {
 
   run ${ROOTCMD} mkdir -p "${cloud_prefix}"
 
-  run cat > "${tmpdir}/cloud.conf" << EOF
+  cat > "${tmpdir}/cloud.conf" << EOF
 [global]
   enabled = no
 EOF
@@ -500,11 +507,13 @@ EOF
       Darwin) run ${ROOTCMD} launchctl kickstart -k com.github.netdata ;;
       FreeBSD) run ${ROOTCMD} service netdata restart ;;
       Linux)
+        initpath="$(${ROOTCMD} readlink /proc/1/exe)"
+
         if command -v service > /dev/null 2>&1; then
           run ${ROOTCMD} service netdata restart
         elif command -v rc-service > /dev/null 2>&1; then
           run ${ROOTCMD} rc-service netdata restart
-        elif [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ]; then
+        elif [ "$(basename "${initpath}" 2> /dev/null)" = "systemd" ]; then
           run ${ROOTCMD} systemctl restart netdata
         elif [ -f /etc/init.d/netdata ]; then
           run ${ROOTCMD} /etc/init.d/netdata restart
@@ -538,7 +547,7 @@ check_claim_opts() {
     fatal "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
   elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
     fatal "Invalid claiming options, a claiming token must be specified."
-  elif [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
     fatal "Cloud explicitly disabled, but automatic claiming requested. Either enable Netdata Cloud, or remove the --claim-* options."
   fi
 }
@@ -1170,10 +1179,8 @@ esac
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
-elif [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
+elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
   soft_disable_cloud
 fi
 
-if [ -z "${NO_CLEANUP}" ]; then
-  ${ROOTCMD} rm -rf "${tmpdir}"
-fi
+cleanup
