@@ -116,7 +116,7 @@ jobs:
           }}
 
   matrix: # Generate the shared build matrix for our build tests.
-    name: Prepare Test Matrix
+    name: Prepare Build Matrix
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -129,6 +129,7 @@ jobs:
         id: set-matrix
         run: |
           TASKS=$(echo $(cat .github/data/build-matrix.json) | sed 's/ //g' )
+          echo "Generated Matrix: $TASKS"
           echo "::set-output name=matrix::$TASKS"
 
   prepare-test-images:
@@ -139,7 +140,7 @@ jobs:
     strategy:
       fail-fast: true
       max-parallel: 8
-      matrix: ${{ needs.matrix.outputs.matrix }}
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
@@ -195,7 +196,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix: ${{ needs.matrix.outputs.matrix }}
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
@@ -255,7 +256,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix: ${{ needs.matrix.outputs.matrix }}
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     services:
       apache:
         image: httpd:2.4
