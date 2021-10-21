@@ -128,7 +128,7 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         run: |
-          TASKS=$(echo $(cat .github/data/build-matrix.json) | sed 's/ //g' )
+          TASKS="$(sed 's/ //g' .github/data/build-matrix.json)"
           echo "Generated Matrix: $TASKS"
           echo "::set-output name=matrix::$TASKS"
 
@@ -151,8 +151,8 @@ jobs:
           PRE: ${{ matrix.pre }}
           RMJSONC: ${{ matrix.rmjsonc }}
         run: |
-          echo $PRE > ./prep-cmd.sh
-          echo $RMJSONC > ./rmjsonc.sh && chmod +x ./rmjsonc.sh
+          echo "$PRE" > ./prep-cmd.sh
+          echo "$RMJSONC" > ./rmjsonc.sh && chmod +x ./rmjsonc.sh
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
       - name: Build test environment
@@ -275,17 +275,14 @@ jobs:
           cd artifacts || exit 1
           sha256sum -b ./* > "sha256sums.txt"
       - name: Prepare local environment
-        env:
-          PRE: ${{ matrix.pre }}
         run: |
           ORIG_TARBALL="export NETDATA_TARBALL_URL=.*"
           ORIG_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=.*"
-          CURRENT_VERSION="current_version=.*"
           NEW_TARBALL="export NETDATA_TARBALL_URL=http://localhost:8080/artifacts/netdata-latest.tar.gz"
           NEW_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=http://localhost:8080/artifacts/sha256sums.txt"
           sed -i "s|${ORIG_TARBALL}|${NEW_TARBALL}|g" packaging/installer/netdata-updater.sh
           sed -i "s|${ORIG_CHECKSUM}|${NEW_CHECKSUM}|g" packaging/installer/netdata-updater.sh
-          sed -i "s|"current_version=.*"|"current_version=1"|g" packaging/installer/netdata-updater.sh
+          sed -i 's|"current_version=.*"|"current_version=1"|g' packaging/installer/netdata-updater.sh
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
@@ -296,9 +293,7 @@ jobs:
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         run: |
           docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata test \
-              /bin/sh -c '/netdata/packaging/installer/kickstart.sh --dont-wait \
-              && /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update \
-              && bash /netdata/.github/scripts/check-updater.sh'
+                /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
