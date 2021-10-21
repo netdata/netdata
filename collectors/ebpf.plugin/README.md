@@ -325,7 +325,7 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
 ['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
 
-#### `[ebpf programs]`
+### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
