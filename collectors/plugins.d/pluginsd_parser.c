@@ -161,11 +161,11 @@ PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURC
 
 PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct label *new_labels)
 {
-    UNUSED(host);
-
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
-    if (unlikely(!st))
+    if (unlikely(!st)) {
+        error("requested CLABEL_COMMIT on host '%s', without a BEGIN, ignoring it.", host->hostname);
         return PARSER_RC_OK;
+    }
 
     rrdset_update_labels(st, new_labels);
     return PARSER_RC_OK;
