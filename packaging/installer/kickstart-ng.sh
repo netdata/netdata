@@ -465,6 +465,7 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      cleanup
       exit $ret
       ;;
     oci)
@@ -572,6 +573,7 @@ claim() {
   else
     warning "Unable to claim node, you must do so manually."
     if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+      cleanup
       exit 1
     fi
   fi
@@ -1084,6 +1086,7 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--help")
       usage
+      cleanup
       exit 0
       ;;
     "--no-cleanup") NO_CLEANUP=1 ;;
