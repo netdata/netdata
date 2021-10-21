@@ -6,8 +6,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/i
 
 # Interact with dashboards and charts
 
+<<<<<<< HEAD
 > ⚠️ There is new version of charts that is currently **only** available on [Netdata Cloud](/docs/cloud/visualize/interact-new-charts). We didn't
 > want to keep this valuable feature from you, so after we get this into your hands on the cloud, we will collect and implement your feedback to make sure we are providing the best possible version of the feature on the Netdata Agent dashboard as quickly as possible.
+=======
+> ⚠️ There is a new version of charts that is currently **only** available on [Netdata Cloud](/docs/cloud/visualize/interact-with-new-charts). We didn't
+> want to keep this valuable feature from you, so after we get this into your hands on the Cloud, we will collect and implement your feedback to make sure we are providing the best possible version of the feature on the Netdata Agent dashboard as quickly as possible.
+>>>>>>> 8d7a7b3292d5f17e7cac25ba51e7737fa155984f
 
 You can find Netdata's dashboards in two places: locally served at `http://NODE:19999` by the Netdata Agent, and in
 Netdata Cloud. While you access these dashboards differently, they have similar interfaces, identical charts and
@@ -122,7 +127,11 @@ to get informed when something goes wrong in your infrastructure.
 ### Related reference documentation
 
 -   [Netdata Agent · Web dashboards overview](/web/README.md)
+<<<<<<< HEAD
 -   [Netdata Cloud · Interact with new charts](https://learn.netdata.cloud/docs/cloud/visualize/interact-new-charts)
+=======
+-   [Netdata Cloud · Interact with new charts](https://learn.netdata.cloud/docs/cloud/visualize/interact-with-new-charts)
+>>>>>>> 8d7a7b3292d5f17e7cac25ba51e7737fa155984f
 -   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
 -   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
 -   [Netdata Cloud · Nodes](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
