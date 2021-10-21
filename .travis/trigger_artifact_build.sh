@@ -7,7 +7,7 @@ type="${3}"
 resp="$(curl -X POST \
              -H 'Accept: application/vnd.github.v3+json' \
              -H "Authorization: Bearer ${token}" \
-             "https://api.github.com/repos/netdata/netdata/actions/workflows/release-build.yml/dispatches" \
+             "https://api.github.com/repos/netdata/netdata/actions/workflows/build.yml/dispatches" \
              -d "{\"ref\": \"master\", \"inputs\": {\"version\": \"${version}\", \"type\": \"${type}\"}}")"
 
 if [ -z "${resp}" ]; then
