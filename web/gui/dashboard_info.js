@@ -1607,7 +1607,7 @@ netdataDashboard.context = {
         'For details, see <a href="https://man7.org/linux/man-pages/man4/md.4.html" target="_blank">md(4)</a>.'
     },
     'md.flush': {
-        info: 'Number of flush counts per MD array.'
+        info: 'Number of flush counts per MD array. Based on the eBPF <a href="https://github.com/iovisor/bcc/blob/master/tools/mdflush_example.txt" target="_blank">mdflush</a> from BCC tools.'
     },
 
     // ------------------------------------------------------------------------
