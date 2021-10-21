@@ -306,7 +306,7 @@ When the integration is enabled, eBPF collector allocates memory for each proces
  it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
  for each processor it runs.
 
-### Integration with `cgroups.plugin`
+#### Integration with `cgroups.plugin`
 
 The eBPF collector also creates charts for each cgroup through an integration with the
 [`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
