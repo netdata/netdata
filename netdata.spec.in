@@ -235,7 +235,15 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-judy.sh ${RPM_BUILD_DIR}/%{name}-%{version}
 %endif
 %if 0%{?_have_ebpf}
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version}
+%if 0%{?centos_ver:1}
+%if %{centos_ver} < 8
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos7
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos8
+%endif
+%else
+export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} other
+%endif
 %endif
 
 %build
