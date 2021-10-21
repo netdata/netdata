@@ -20,8 +20,8 @@ area/backends:
   - backends/**/*
 
 area/exporting:
-  - exporting/*
-  - exporting/**/*
+  - src/exporting/*
+  - src/exporting/**/*
 
 area/build:
   - build/*

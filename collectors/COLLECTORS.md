@@ -499,8 +499,8 @@ collectors are described only in code and associated charts in Netdata dashboard
     **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
 -   [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the
     Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
--   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
-    metrics on CPU utilization for the [exporting engine](/exporting/README.md), and specific metrics for each enabled
+-   [Exporting (code only)](https://github.com/netdata/netdata/blob/master/src/exporting/send_internal_metrics.c): Gather
+    metrics on CPU utilization for the [exporting engine](/src/exporting/README.md), and specific metrics for each enabled
     exporting connector.
 -   [Global statistics (code only)](https://github.com/netdata/netdata/blob/master/daemon/global_statistics.c): See
     metrics on the CPU utilization, network traffic, volume of web clients, API responses, database engine usage, and

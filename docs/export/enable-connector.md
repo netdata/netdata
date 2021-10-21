@@ -53,8 +53,8 @@ Netdata Agent exports metrics _beginning from the time the process starts_, and 
 collected, you should start seeing data in your external database after only a few seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the
-[OpenTSDB connector doc](/exporting/opentsdb/README.md) and [exporting engine
-reference](/exporting/README.md#configuration) for details.
+[OpenTSDB connector doc](/src/exporting/opentsdb/README.md) and [exporting engine
+reference](/src/exporting/README.md#configuration) for details.
 
 ## Example: Enable the Graphite connector
 
@@ -75,12 +75,12 @@ Because the Agent exports metrics as they're collected, you should start seeing 
 only a few seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your Graphite-supported database.
-See [exporting engine reference](/exporting/README.md#configuration) for details.
+See [exporting engine reference](/src/exporting/README.md#configuration) for details.
 
 ## What's next?
 
 If you want to further configure your exporting connectors, see the [exporting engine
-reference](/exporting/README.md#configuration).
+reference](/src/exporting/README.md#configuration).
 
 For a comprehensive example of using the Graphite connector, read our guide: [_Export and visualize Netdata metrics in
 Graphite_](/docs/guides/export/export-netdata-metrics-graphite.md). Or, start [using host
@@ -88,8 +88,8 @@ labels](/docs/guides/using-host-labels.md) on exported metrics.
 
 ### Related reference documentation
 
--   [Exporting engine reference](/exporting/README.md)
--   [OpenTSDB connector](/exporting/opentsdb/README.md)
--   [Graphite connector](/exporting/graphite/README.md)
+-   [Exporting engine reference](/src/exporting/README.md)
+-   [OpenTSDB connector](/src/exporting/opentsdb/README.md)
+-   [Graphite connector](/src/exporting/graphite/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fexporting%2Fenable-connector&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

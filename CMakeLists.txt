@@ -858,49 +858,49 @@ set(ACLK_LEGACY_STATIC_LIBS
         )
 
 set(EXPORTING_ENGINE_FILES
-        exporting/exporting_engine.c
-        exporting/exporting_engine.h
-        exporting/graphite/graphite.c
-        exporting/graphite/graphite.h
-        exporting/json/json.c
-        exporting/json/json.h
-        exporting/opentsdb/opentsdb.c
-        exporting/opentsdb/opentsdb.h
-        exporting/prometheus/prometheus.c
-        exporting/prometheus/prometheus.h
-        exporting/read_config.c
-        exporting/clean_connectors.c
-        exporting/init_connectors.c
-        exporting/process_data.c
-        exporting/check_filters.c
-        exporting/send_data.c
-        exporting/send_internal_metrics.c
+        src/exporting/exporting_engine.c
+        src/exporting/exporting_engine.h
+        src/exporting/graphite/graphite.c
+        src/exporting/graphite/graphite.h
+        src/exporting/json/json.c
+        src/exporting/json/json.h
+        src/exporting/opentsdb/opentsdb.c
+        src/exporting/opentsdb/opentsdb.h
+        src/exporting/prometheus/prometheus.c
+        src/exporting/prometheus/prometheus.h
+        src/exporting/read_config.c
+        src/exporting/clean_connectors.c
+        src/exporting/init_connectors.c
+        src/exporting/process_data.c
+        src/exporting/check_filters.c
+        src/exporting/send_data.c
+        src/exporting/send_internal_metrics.c
         )
 
 set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
-        exporting/prometheus/remote_write/remote_write.c
-        exporting/prometheus/remote_write/remote_write.h
-        exporting/prometheus/remote_write/remote_write_request.cc
-        exporting/prometheus/remote_write/remote_write_request.h
+        src/exporting/prometheus/remote_write/remote_write.c
+        src/exporting/prometheus/remote_write/remote_write.h
+        src/exporting/prometheus/remote_write/remote_write_request.cc
+        src/exporting/prometheus/remote_write/remote_write_request.h
         )
 
 set(KINESIS_EXPORTING_FILES
-        exporting/aws_kinesis/aws_kinesis.c
-        exporting/aws_kinesis/aws_kinesis.h
-        exporting/aws_kinesis/aws_kinesis_put_record.cc
-        exporting/aws_kinesis/aws_kinesis_put_record.h
+        src/exporting/aws_kinesis/aws_kinesis.c
+        src/exporting/aws_kinesis/aws_kinesis.h
+        src/exporting/aws_kinesis/aws_kinesis_put_record.cc
+        src/exporting/aws_kinesis/aws_kinesis_put_record.h
         )
 
 set(PUBSUB_EXPORTING_FILES
-        exporting/pubsub/pubsub.c
-        exporting/pubsub/pubsub.h
-        exporting/pubsub/pubsub_publish.cc
-        exporting/pubsub/pubsub_publish.h
+        src/exporting/pubsub/pubsub.c
+        src/exporting/pubsub/pubsub.h
+        src/exporting/pubsub/pubsub_publish.cc
+        src/exporting/pubsub/pubsub_publish.h
         )
 
 set(MONGODB_EXPORTING_FILES
-        exporting/mongodb/mongodb.c
-        exporting/mongodb/mongodb.h
+        src/exporting/mongodb/mongodb.c
+        src/exporting/mongodb/mongodb.h
         )
 
 set(KINESIS_BACKEND_FILES
@@ -1037,7 +1037,7 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     message(STATUS "prometheus remote write backend: enabled")
 
     find_package(Protobuf REQUIRED)
-    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS exporting/prometheus/remote_write/remote_write.proto)
+    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/exporting/prometheus/remote_write/remote_write.proto)
 
     list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
     list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
@@ -1153,6 +1153,8 @@ include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
 # -----------------------------------------------------------------------------
 # netdata
+
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/src)
 
 IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
@@ -1358,12 +1360,12 @@ if(BUILD_TESTING)
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
     set(EXPORTING_ENGINE_TEST_FILES
-        exporting/tests/test_exporting_engine.c
-        exporting/tests/test_exporting_engine.h
-        exporting/tests/exporting_fixtures.c
-        exporting/tests/exporting_doubles.c
-        exporting/tests/netdata_doubles.c
-        exporting/tests/system_doubles.c
+        src/exporting/tests/test_exporting_engine.c
+        src/exporting/tests/test_exporting_engine.h
+        src/exporting/tests/exporting_fixtures.c
+        src/exporting/tests/exporting_doubles.c
+        src/exporting/tests/netdata_doubles.c
+        src/exporting/tests/system_doubles.c
         )
     set(TEST_NAME exporting_engine)
     set(PROMETHEUS_REMOTE_WRITE_LINK_OPTIONS)

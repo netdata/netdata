@@ -2,7 +2,7 @@
 title: "Exporting engine reference"
 description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
 sidebar_label: Reference guide
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/README.md
 -->
 
 # Exporting engine reference
@@ -38,24 +38,24 @@ X seconds (though, it can send them per second if you need it to).
     [list of supported databases](/docs/export/external-databases.md#supported-databases) for information on which
     connector to enable and configure for your database of choice.
 
-    -   [**AWS Kinesis Data Streams**](/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
+    -   [**AWS Kinesis Data Streams**](/src/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
         format.
-    -   [**Google Cloud Pub/Sub Service**](/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
+    -   [**Google Cloud Pub/Sub Service**](/src/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
         format.
-    -   [**Graphite**](/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
+    -   [**Graphite**](/src/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
         `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
         also be configured). Learn more in our guide to [export and visualize Netdata metrics in
         Graphite](/docs/guides/export/export-netdata-metrics-graphite.md).
-    -   [**JSON** document databases](/exporting/json/README.md)
-    -   [**OpenTSDB**](/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
+    -   [**JSON** document databases](/src/exporting/json/README.md)
+    -   [**OpenTSDB**](/src/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
         OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
-    -   [**MongoDB**](/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
-    -   [**Prometheus**](/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
+    -   [**MongoDB**](/src/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
+    -   [**Prometheus**](/src/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
         from node using the Netdata API.
-    -   [**Prometheus remote write**](/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
+    -   [**Prometheus remote write**](/src/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
         buffer encoding over HTTP. Supports many [storage
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
-    -   [**TimescaleDB**](/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
+    -   [**TimescaleDB**](/src/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
         Netdata client and writes them to a TimescaleDB table.
 
 2.  Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.

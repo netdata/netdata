@@ -184,7 +184,7 @@ location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames cont
 can safely delete some pairs of files when Netdata is stopped to manually free up some space.
 
 _Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._ You can also set up
-one or more [exporting connectors](/exporting/README.md) to send your Netdata metrics to other databases for long-term
+one or more [exporting connectors](/src/exporting/README.md) to send your Netdata metrics to other databases for long-term
 storage at lower granularity.
 
 ## Operation

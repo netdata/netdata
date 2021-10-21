@@ -1,7 +1,7 @@
 <!--
 title: "Export metrics to Prometheus"
 description: "Export Netdata metrics to Prometheus for archiving and further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.md
 sidebar_label: Using Netdata with Prometheus
 -->
 

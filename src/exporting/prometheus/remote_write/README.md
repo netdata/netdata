@@ -1,7 +1,7 @@
 <!--
 title: "Export metrics to Prometheus remote write providers"
 description: "Send Netdata metrics to your choice of more than 20 external storage providers for long-term archiving and further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/remote_write/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/remote_write/README.md
 sidebar_label: Prometheus remote write
 -->
 

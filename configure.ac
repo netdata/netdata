@@ -1469,7 +1469,7 @@ if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotob
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/exporting/prometheus/remote_write"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${SNAPPY_CFLAGS} -I \$(abs_top_srcdir)/src/exporting/prometheus/remote_write"
     CXX11FLAG="-std=c++11"
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${SNAPPY_LIBS}"
     OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
@@ -1585,7 +1585,7 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+CFLAGS="-I \$(abs_top_srcdir)/src/ ${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
@@ -1719,16 +1719,16 @@ AC_CONFIG_FILES([
     database/engine/Makefile
     database/engine/metadata_log/Makefile
     diagrams/Makefile
-    exporting/Makefile
-    exporting/graphite/Makefile
-    exporting/json/Makefile
-    exporting/opentsdb/Makefile
-    exporting/prometheus/Makefile
-    exporting/prometheus/remote_write/Makefile
-    exporting/aws_kinesis/Makefile
-    exporting/pubsub/Makefile
-    exporting/mongodb/Makefile
-    exporting/tests/Makefile
+    src/exporting/Makefile
+    src/exporting/graphite/Makefile
+    src/exporting/json/Makefile
+    src/exporting/opentsdb/Makefile
+    src/exporting/prometheus/Makefile
+    src/exporting/prometheus/remote_write/Makefile
+    src/exporting/aws_kinesis/Makefile
+    src/exporting/pubsub/Makefile
+    src/exporting/mongodb/Makefile
+    src/exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile

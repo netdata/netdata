@@ -152,7 +152,7 @@ Most importantly, you can always install additional services and instantly colle
 -   [Optimize performance](/docs/guides/configure/performance.md) using tweaks developed for IoT devices.
 -   [Stream Raspberry Pi metrics](/streaming/README.md) to a parent host for easy access or longer-term storage.
 -   [Tweak alarms](/health/QUICKSTART.md) for either Pi-hole or the health of your Raspberry Pi.
--   [Export metrics to external databases](/exporting/README.md) with the exporting engine.
+-   [Export metrics to external databases](/src/exporting/README.md) with the exporting engine.
 
 Or, head over to [our guides](https://learn.netdata.cloud/guides/) for even more experiments and insights into
 troubleshooting the health of your systems and services.

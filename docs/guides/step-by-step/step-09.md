@@ -151,7 +151,7 @@ charts fill up with data about the exporting process!
 ![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
 
 If you'd like to try connecting Netdata to another database, such as Prometheus or OpenTSDB, read our [exporting
-documentation](/exporting/README.md).
+documentation](/src/exporting/README.md).
 
 ## What's next?
 

@@ -158,7 +158,7 @@ documentation](/health/REFERENCE.md#alarm-line-host-labels) for more details, an
 
 ## Host labels in metrics exporting
 
-If you have enabled any metrics exporting via our experimental [exporters](/exporting/README.md), any new host
+If you have enabled any metrics exporting via our experimental [exporters](/src/exporting/README.md), any new host
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
@@ -183,7 +183,7 @@ send automatic labels = yes
 ```
 
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
-more about exporting, read the [documentation](/exporting/README.md).
+more about exporting, read the [documentation](/src/exporting/README.md).
 
 ## What's next?
 
