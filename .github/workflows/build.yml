@@ -161,7 +161,7 @@ jobs:
           push: false
           load: false
           file: .github/dockerfiles/Dockerfile.build_test
-          build-args: BASE=${ matrix.distro }}
+          build-args: BASE=${{ matrix.distro }}
           outputs: type=oci,dest=/tmp/image.tar
       - name: Upload image artifact
         uses: actions/upload-artifact@v2
@@ -188,7 +188,6 @@ jobs:
 
   source-build: # Test various source build arrangements.
     name: Test Source Build
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     needs:
       - matrix
