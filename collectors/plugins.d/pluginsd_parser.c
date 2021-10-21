@@ -161,6 +161,8 @@ PARSER_RC pluginsd_clabel_action(void *user, char *key, char *value, LABEL_SOURC
 
 PARSER_RC pluginsd_clabel_commit_action(void *user, RRDHOST *host, struct label *new_labels)
 {
+    UNUSED(host);
+
     RRDSET *st = ((PARSER_USER_OBJECT *)user)->st;
     if (unlikely(!st))
         return PARSER_RC_OK;
