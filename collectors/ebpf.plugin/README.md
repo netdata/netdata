@@ -270,29 +270,6 @@ The eBPF collector also creates charts for each running application through an i
 [`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
 interact with the Linux kernel.
 
-When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
-
--   eBPF file
-    -   Number of calls to open files. (`apps.file_open`)
-    -   Number of files closed. (`apps.file_closed`)
-    -   Number of calls to open files that returned errors.
-    -   Number of calls to close files that returned errors.
--   eBPF syscall
-    -   Number of calls to delete files. (`apps.file_deleted`)
-    -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
-    -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
-    -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
-    -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
-    -   Number of calls to write a file that returned errors.
-    -   Number of calls to read a file that returned errors.
--   eBPF process
-    -   Number of process created with `do_fork`. (`apps.process_create`)
-    -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
-    -   Number of times that a process called `do_exit`. (`apps.task_close`)
--   eBPF net
-    -   Number of bytes sent. (`apps.bandwidth_sent`)
-    -   Number of bytes received. (`apps.bandwidth_recv`)
-
 If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
 `no`.
 
@@ -325,6 +302,67 @@ If you do not need to monitor specific metrics for your `cgroups`, you can enabl
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
 ['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
 
+#### Integration Dashboard Elements
+
+When an integration is enabled, your dashboard will also show the following cgroups and apps charts using low-level
+Linux metrics:
+
+> Note: The parenthetical accompanying each bulleted item provides the chart name
+
+- mem
+    -   Number of process killed due out of memory. (`oomkills`)
+- process
+    -   Number of process created with `do_fork`. (`process_create`)
+    -   Number of threads created with `do_fork` or `clone (2)`, depending on your system's kernel version. (`thread_create`)
+    -   Number of times that a process called `do_exit`. (`task_exit`)
+    -   Number of times that a process called `release_task`. (`task_close`)
+    -   Number of times that an error happened to create thread or process. (`task_error`)
+- swap
+    -   Number of calls to `swap_readpage`. (`swap_read_call`)
+    -   Number of calls to `swap_writepage`. (`swap_write_call`)
+- network
+    -   Number of bytes sent. (`total_bandwidth_sent`)
+    -   Number of bytes received. (`total_bandwidth_recv`)
+    -   Number of calls to `tcp_sendmsg`. (`bandwidth_tcp_send`)
+    -   Number of calls to `tcp_cleanup_rbuf`. (`bandwidth_tcp_recv`)
+    -   Number of calls to `tcp_retransmit_skb`. (`bandwidth_tcp_retransmit`)
+    -   Number of calls to `udp_sendmsg`. (`bandwidth_udp_send`)
+    -   Number of calls to `udp_recvmsg`. (`bandwidth_udp_recv`)
+- file access
+    -   Number of calls to open files. (`file_open`)
+    -   Number of calls to open files that returned errors. (`open_error`)
+    -   Number of files closed. (`file_closed`)
+    -   Number of calls to close files that returned errors. (`file_error_closed`)
+- vfs
+    -   Number of calls to `vfs_unlink`. (`file_deleted`)
+    -   Number of calls to `vfs_write`. (`vfs_write_call`)
+    -   Number of calls to write a file that returned errors. (`vfs_write_error`)
+    -   Number of calls to `vfs_read`. (`vfs_read_call`)
+    -   Number of bytes written with `vfs_write`. (`vfs_write_bytes`)
+    -   Number of bytes read with `vfs_read`. (`vfs_read_bytes`)
+    -   Number of calls to read a file that returned errors. (`vfs_read_error`)
+    -   Number of calls to `vfs_fsync`. (`vfs_fsync`)
+    -   Number of calls to sync file that returned errors. (`vfs_fsync_error`)
+    -   Number of calls to `vfs_open`. (`vfs_open`)
+    -   Number of calls to open file that returned errors. (`vfs_open_error`)
+    -   Number of calls to `vfs_create`. (`vfs_create`)
+    -   Number of calls to open file that returned errors. (`vfs_create_error`)
+- page cache
+    -   Ratio of pages accessed. (`cachestat_ratio`)
+    -   Number of modified pages ("dirty"). (`cachestat_dirties`)
+    -   Number of accessed pages. (`cachestat_hits`)
+    -   Number of pages brought from disk. (`cachestat_misses`)
+- directory cache
+    -   Ratio of files available in directory cache. (`dc_hit_ratio`)
+    -   Number of files acessed. (`dc_reference`)
+    -   Number of files acessed that were not in cache. (`dc_not_cache`)
+    -   Number of files not found. (`dc_not_found`)
+- ipc shm
+    -   Number of calls to `shm_get`. (`shmget_call`)
+    -   Number of calls to `shm_at`. (`shmat_call`)
+    -   Number of calls to `shm_dt`. (`shmdt_call`)
+    -   Number of calls to `shm_ctl`. (`shmctl_call`)
+
 ### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
@@ -349,6 +387,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
     is turned on or off.
 
 You can also enable the following eBPF programs:
+
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
