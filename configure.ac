@@ -1585,7 +1585,7 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+CFLAGS="-I \$(abs_top_srcdir)/src/ ${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
@@ -1681,14 +1681,14 @@ AC_DEFINE_UNQUOTED(
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    backends/graphite/Makefile
-    backends/json/Makefile
-    backends/Makefile
-    backends/opentsdb/Makefile
-    backends/prometheus/Makefile
-    backends/prometheus/remote_write/Makefile
-    backends/aws_kinesis/Makefile
-    backends/mongodb/Makefile
+    src/backends/graphite/Makefile
+    src/backends/json/Makefile
+    src/backends/Makefile
+    src/backends/opentsdb/Makefile
+    src/backends/prometheus/Makefile
+    src/backends/prometheus/remote_write/Makefile
+    src/backends/aws_kinesis/Makefile
+    src/backends/mongodb/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile

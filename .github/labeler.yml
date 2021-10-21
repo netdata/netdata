@@ -16,8 +16,8 @@ ACLK:
   - mqtt_websockets
 
 area/backends:
-  - backends/*
-  - backends/**/*
+  - src/backends/*
+  - src/backends/**/*
 
 area/exporting:
   - exporting/*

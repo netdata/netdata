@@ -1,6 +1,6 @@
 <!--
 title: "Metrics long term archiving"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/backends/README.md
 -->
 
 # Metrics long term archiving
@@ -36,7 +36,7 @@ So, although Netdata collects metrics every second, it can send to the backend s
 
         metrics are sent to a document db, `JSON` formatted.
 
-    -   **prometheus** is described at [prometheus page](/backends/prometheus/README.md) since it pulls data from
+    -   **prometheus** is described at [prometheus page](/src/backends/prometheus/README.md) since it pulls data from
         Netdata.
 
     -   **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
@@ -45,9 +45,9 @@ So, although Netdata collects metrics every second, it can send to the backend s
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
 
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
-        protocol](/backends/prometheus/README.md). Notes on using the remote write backend are [here](/backends/prometheus/remote_write/README.md).
+        protocol](/src/backends/prometheus/README.md). Notes on using the remote write backend are [here](/src/backends/prometheus/remote_write/README.md).
 
-    -   **TimescaleDB** via [community-built connector](/backends/TIMESCALE.md) that takes JSON streams from a Netdata
+    -   **TimescaleDB** via [community-built connector](/src/backends/TIMESCALE.md) that takes JSON streams from a Netdata
         client and writes them to a TimescaleDB table.
 
     -   **AWS Kinesis Data Streams**
@@ -151,7 +151,7 @@ from your Netdata):
    For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
 
    The MongoDB backend doesn't use the `destination` option for its configuration. It uses the `mongodb.conf`
-   [configuration file](/backends/mongodb/README.md) instead.
+   [configuration file](/src/backends/mongodb/README.md) instead.
 
 -   `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of data that will
      be sent to the backend.

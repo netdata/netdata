@@ -43,7 +43,7 @@ guide](/collectors/QUICKSTART.md).
 **[Dashboards](/web/README.md)**: Visualize your newly-collect metrics in real-time using Netdata's [built-in
 dashboard](/web/gui/README.md). 
 
-**[Backends](/backends/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
+**[Backends](/src/backends/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
 long-term metrics storage, by archiving metrics to like Graphite, Prometheus, MongoDB, TimescaleDB, and more.
 
 **[Exporting](/exporting/README.md)**: An experimental refactoring of our backends system with a modular system and

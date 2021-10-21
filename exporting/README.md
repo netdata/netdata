@@ -21,7 +21,7 @@ When you enable the exporting engine and a connector, the Netdata Agent exports 
 restart its process_, not the entire [database of long-term metrics](/docs/store/change-metrics-storage.md).
 
 The exporting engine has its own configuration file `exporting.conf`. The configuration is almost similar to the
-deprecated [backends](/backends/README.md#configuration) system. The most important difference is that type of a
+deprecated [backends](/src/backends/README.md#configuration) system. The most important difference is that type of a
 connector should be specified in a section name before a colon and an instance name after the colon. Also, you can't use
 `host tags` anymore. Set your labels using the [`[host labels]`](/docs/guides/using-host-labels.md) section in
 `netdata.conf`.

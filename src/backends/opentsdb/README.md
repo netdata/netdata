@@ -1,6 +1,6 @@
 <!--
 title: "OpenTSDB with HTTP"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/backends/opentsdb/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/backends/opentsdb/README.md
 -->
 
 # OpenTSDB with HTTP
