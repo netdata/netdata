@@ -6,12 +6,15 @@
 
 **Merged pull requests:**
 
+- New eBPF and libbpf releases [\#11680](https://github.com/netdata/netdata/pull/11680) ([thiagoftsm](https://github.com/thiagoftsm))
+- Mark g++ for freebsd as NOTREQUIRED [\#11678](https://github.com/netdata/netdata/pull/11678) ([MrZammler](https://github.com/MrZammler))
 - fix swap\_used alarm calc [\#11672](https://github.com/netdata/netdata/pull/11672) ([ilyam8](https://github.com/ilyam8))
 - Fix line arguments \(eBPF\) [\#11670](https://github.com/netdata/netdata/pull/11670) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add snapshot message for cloud new architecture [\#11664](https://github.com/netdata/netdata/pull/11664) ([MrZammler](https://github.com/MrZammler))
 - Fix interval usage and reduce I/O [\#11662](https://github.com/netdata/netdata/pull/11662) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update dashboard to version v2.20.9. [\#11661](https://github.com/netdata/netdata/pull/11661) ([netdatabot](https://github.com/netdatabot))
 - Optimize static build and update various dependencies. [\#11660](https://github.com/netdata/netdata/pull/11660) ([Ferroin](https://github.com/Ferroin))
+- Mark unmaintained tests as expected failures. [\#11657](https://github.com/netdata/netdata/pull/11657) ([vkalintiris](https://github.com/vkalintiris))
 - Fix build issue related to legacy aclk and new arch code [\#11655](https://github.com/netdata/netdata/pull/11655) ([MrZammler](https://github.com/MrZammler))
 - minor - fixes typo in URL when calling env [\#11651](https://github.com/netdata/netdata/pull/11651) ([underhood](https://github.com/underhood))
 - Use submodules in Clang build checks. [\#11649](https://github.com/netdata/netdata/pull/11649) ([Ferroin](https://github.com/Ferroin))
@@ -158,11 +161,7 @@
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
 - Fix freebsd and macos plugin names [\#11398](https://github.com/netdata/netdata/pull/11398) ([vlvkobal](https://github.com/vlvkobal))
 - Add ACLK synchronization event loop [\#11396](https://github.com/netdata/netdata/pull/11396) ([stelfrag](https://github.com/stelfrag))
-- Add HTTP basic authentication to some exporting connectors [\#11394](https://github.com/netdata/netdata/pull/11394) ([vlvkobal](https://github.com/vlvkobal))
 - New Cloud chart related parsers and generators [\#11393](https://github.com/netdata/netdata/pull/11393) ([underhood](https://github.com/underhood))
-- Update perf.events and add new charts [\#11392](https://github.com/netdata/netdata/pull/11392) ([thiagoftsm](https://github.com/thiagoftsm))
-- charts.d.plugin: set "module" when sending CHART [\#11390](https://github.com/netdata/netdata/pull/11390) ([ilyam8](https://github.com/ilyam8))
-- Remove warning when GCC 8.x is used [\#11389](https://github.com/netdata/netdata/pull/11389) ([thiagoftsm](https://github.com/thiagoftsm))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
 - Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -205,7 +204,6 @@
 - Add an event when an incomplete agent shutdown is detected [\#11078](https://github.com/netdata/netdata/pull/11078) ([stelfrag](https://github.com/stelfrag))
 - Remove dash-example, place in community repo [\#11077](https://github.com/netdata/netdata/pull/11077) ([tnyeanderson](https://github.com/tnyeanderson))
 - Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add a module for ZFS pool state [\#11071](https://github.com/netdata/netdata/pull/11071) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
