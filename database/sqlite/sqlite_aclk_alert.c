@@ -670,9 +670,9 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->utc_offset = host->utc_offset;
     alarm_log->timezone = strdupz((char *)host->abbrev_timezone);
     alarm_log->exec_path = ae->exec ? strdupz((char *)ae->exec) : strdupz((char *)host->health_default_exec);
-    alarm_log->conf_source = strdupz(ae->source);
+    alarm_log->conf_source = ae->source ? strdupz((char *)ae->source) : "";
 
-    alarm_log->command = strdupz(edit_command);
+    alarm_log->command = strdupz((char *)edit_command);
 
     alarm_log->duration = (time_t)ae->duration;
     alarm_log->non_clear_duration = (time_t)ae->non_clear_duration;
