@@ -558,14 +558,12 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     return;
 }
 
-int sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
     UNUSED(cmd);
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
     UNUSED(wc);
 #else
-    CHECK_SQLITE_CONNECTION(db_meta);
-
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
