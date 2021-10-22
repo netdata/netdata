@@ -304,19 +304,19 @@ enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
-['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
+['Configuration`](#configuration) section.
 
 #### Integration Dashboard Elements
 
 When an integration is enabled, your dashboard will also show the following cgroups and apps charts using low-level
 Linux metrics:
 
-> Note: The parenthetical accompanying each bulleted item provides the chart name
+> Note: The parenthetical accompanying each bulleted item provides the chart name.
 
 - mem
-    - Number of process killed due out of memory. (`oomkills`)
+    - Number of processes killed due out of memory. (`oomkills`)
 - process
-    - Number of process created with `do_fork`. (`process_create`)
+    - Number of processes created with `do_fork`. (`process_create`)
     - Number of threads created with `do_fork` or `clone (2)`, depending on your system's kernel
       version. (`thread_create`)
     - Number of times that a process called `do_exit`. (`task_exit`)
