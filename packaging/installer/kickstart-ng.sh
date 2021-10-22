@@ -846,7 +846,7 @@ try_static_install() {
   fi
 
   if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping Netdata Agent installation and leaving binary in ${tmpdir}. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
+    fatal "Static binary checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
   fi
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
@@ -961,7 +961,7 @@ try_build_install() {
   download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"
 
   if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Tarball checksum validation failed. Stopping Netdata Agent installation and leaving tarball in ${tmpdir}. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
+    fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
   fi
 
   run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
