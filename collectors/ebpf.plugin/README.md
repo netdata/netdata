@@ -304,7 +304,7 @@ enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
-['Configuration`](#configuration) section.
+[Configuration](#configuration) section.
 
 #### Integration Dashboard Elements
 
