@@ -293,9 +293,8 @@ The eBPF collector also creates charts for each cgroup through an integration wi
 [`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
 interacts with the Linux kernel.
 
-The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to _
-enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
-`yes`.
+The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to
+_enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to `yes`.
 
 ```conf
 [global]
