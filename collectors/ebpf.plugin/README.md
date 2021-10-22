@@ -323,7 +323,7 @@ If you want to _enable_ the integration with `cgroups.plugin`, change the `cgrou
 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
 `ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
-['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
+[Configuration section](#configuration)
 
 #### `[ebpf programs]`
 
