@@ -156,7 +156,8 @@ docker run -d --name=netdata \
   -e NETDATA_CLAIM_PROXY=PROXY \
  netdata/netdata
 ```
->Note: This command only works for connecting a new container. If you are claiming an existing container that can not be recreated, 
+>Note: This command is suggested for connecting a new container. Using this command for an existing container recreates the container, though data 
+and configuration of the old container may be preserved.  If you are claiming an existing container that can not be recreated, 
 you can add the container by going to Netdata Cloud, clicking the **Nodes** tab, clicking **Connect Nodes**, selecting **Docker**, and following
 the instructions and commands provided or by following the instructions in an [empty War Room](#empty-war-room). 
 
