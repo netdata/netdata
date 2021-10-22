@@ -584,13 +584,16 @@ int sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (unlikely(!host->dbsync_worker))
+    if (unlikely(!host->dbsync_worker)) {
+        error("ACLK synchronization thread is not active for host %s", host->hostname);
         return;
+    }
 
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_QUEUE_REMOVED_ALERTS;
     cmd.data = NULL;
+    cmd.data_param = NULL;
     cmd.completion = NULL;
     aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
 #else
