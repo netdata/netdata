@@ -1,13 +1,21 @@
-#!/bin/sh
-
-LIBBPF_TARBALL="v$(cat "${1}/packaging/libbpf.version").tar.gz"
-LIBBPF_BUILD_PATH="${1}/externaldeps/libbpf/libbpf-$(cat "${1}/packaging/libbpf.version")"
+#!/bin/bash
 
 if [ "$(uname -m)" = x86_64 ]; then
     lib_subdir="lib64"
 else
     lib_subdir="lib"
 fi
+
+if [ "${2}" != "centos7" ]; then
+  cp "${1}/packaging/current_libbpf.checksums" "${1}/packaging/libbpf.checksums"
+  cp "${1}/packaging/current_libbpf.version" "${1}/packaging/libbpf.version"
+else
+  cp "${1}/packaging/libbpf_0_0_9.checksums" "${1}/packaging/libbpf.checksums"
+  cp "${1}/packaging/libbpf_0_0_9.version" "${1}/packaging/libbpf.version"
+fi
+
+LIBBPF_TARBALL="v$(cat "${1}/packaging/libbpf.version").tar.gz"
+LIBBPF_BUILD_PATH="${1}/externaldeps/libbpf/libbpf-$(cat "${1}/packaging/libbpf.version")"
 
 mkdir -p "${1}/externaldeps/libbpf" || exit 1
 curl -sSL --connect-timeout 10 --retry 3 "https://github.com/netdata/libbpf/archive/${LIBBPF_TARBALL}" > "${LIBBPF_TARBALL}" || exit 1
