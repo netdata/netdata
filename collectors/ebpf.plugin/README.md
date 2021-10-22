@@ -294,7 +294,7 @@ The eBPF collector also creates charts for each cgroup through an integration wi
 interacts with the Linux kernel.
 
 The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to
-_enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to `yes`.
+_enable_ the integration with `cgroups.plugin`, change the `cgroups` setting to `yes`.
 
 ```conf
 [global]
