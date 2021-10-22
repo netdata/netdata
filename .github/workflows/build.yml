@@ -149,13 +149,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Prepare image build environment
-        env:
-          PRE: ${{ matrix.pre }}
-          RMJSONC: ${{ matrix.rmjsonc }}
-        run: |
-          echo "$PRE" > ${{ github.workspace }}/prep-cmd.sh
-          echo "$RMJSONC" > ${{ github.workspace }}/rmjsonc.sh && chmod +x ${{ github.workspace }}/rmjsonc.sh
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
       - name: Build test environment
@@ -164,7 +157,10 @@ jobs:
           push: false
           load: false
           file: .github/dockerfiles/Dockerfile.build_test
-          build-args: BASE=${{ matrix.distro }}
+          build-args: |
+            BASE=${{ matrix.distro }}
+            PRE=${{ matrix.pre }}
+            RMJSONC=${{ matrix.rmjsonc }}
           outputs: type=oci,dest=/tmp/image.tar
       - name: Upload image artifact
         uses: actions/upload-artifact@v2

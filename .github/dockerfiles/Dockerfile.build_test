@@ -4,10 +4,14 @@ FROM ${BASE}
 
 ARG PRE
 ENV PRE=${PRE}
+ARG RMJSONC
+ENV RMJSONC=${RMJSONC}
 ENV DO_NOT_TRACK=1
 ENV GITHUB_ACTIONS=true
 
 COPY . /netdata
 
+RUN echo "${PRE}" > /netdata/prep-cmd.sh
+RUN echo "${RMJSONC}" > /netdata/rmjsonc.sh && chmod +x /netdata/rmjsonc.sh
 RUN /bin/sh /netdata/prep-cmd.sh
 RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
