@@ -419,7 +419,7 @@ sudo rm -rf cloud.d/
 This node no longer has access to the credentials it was used when connecting to Netdata Cloud via the ACLK.
 You will still be able to see this node in your War Rooms in an **unreachable** state.
 
-If you want to reconnect this node into a different Space, you need to create a new identity by adding `-id=$(uuidgen)` to
+If you want to reconnect this node, you need to create a new identity by adding `-id=$(uuidgen)` to
 the claiming script parameters (not yet supported on the kickstart script). Make sure that you have the `uuidgen-runtime` package installed, as it is used to run the command `uuidgen`. For example:
 
 **Claiming script**
