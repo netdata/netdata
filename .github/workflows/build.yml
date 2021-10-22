@@ -125,10 +125,13 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Prepare tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
       - name: Read build matrix
         id: set-matrix
         run: |
-          TASKS="$(sed 's/ //g' .github/data/build-matrix.json)"
+          TASKS="$(jq -c . .github/data/build-matrix.json)"
           echo "Generated Matrix: $TASKS"
           echo "::set-output name=matrix::$TASKS"
 
