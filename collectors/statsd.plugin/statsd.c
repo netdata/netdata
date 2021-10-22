@@ -2180,8 +2180,8 @@ void *statsd_main(void *ptr) {
         statsd.histogram_percentile = 95.0;
     }
     {
-        char buffer[100 + 1];
-        snprintf(buffer, 100, "%0.1f%%", statsd.histogram_percentile);
+        char buffer[314 + 1];
+        snprintfz(buffer, 314, "%0.1f%%", statsd.histogram_percentile);
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 

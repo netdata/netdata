@@ -353,7 +353,7 @@ void *aclk_query_main_thread(void *ptr)
     return NULL;
 }
 
-#define TASK_LEN_MAX 16
+#define TASK_LEN_MAX 22
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client)
 {
     info("Starting %d query threads.", query_threads->count);
@@ -363,7 +363,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
     for (int i = 0; i < query_threads->count; i++) {
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
 
-        if(unlikely(snprintf(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
+        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
             error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
