@@ -303,7 +303,8 @@ static int read_parse_response(https_req_ctx_t *ctx) {
                 error("Poll timed out");
                 return 2;
             }
-            continue;
+            if (!ctx->ssl_ctx)
+                continue;
         }
         ctx->poll_fd.events = 0;
 
