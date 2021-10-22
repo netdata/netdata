@@ -165,7 +165,7 @@ jobs:
       - name: Upload image artifact
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.distro }}-test-env
+          name: ${{ matrix.artifact_key }}-test-env
           path: /tmp/image.tar
           retention-days: 30
       - name: Failure Notification
@@ -203,10 +203,10 @@ jobs:
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
-          name: ${{ matrix.distro }}-text-env
+          name: ${{ matrix.artifact_key }}-text-env
       - name: Load test environment
         run: |
-          docker import ${{ matrix.distro }}-test-env/image.tar test:latest
+          docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
       - name: Regular build on ${{ matrix.distro }}
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
@@ -285,10 +285,10 @@ jobs:
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
-          name: ${{ matrix.distro }}-text-env
+          name: ${{ matrix.artifact_key }}-text-env
       - name: Load test environment
         run: |
-          docker import ${{ matrix.distro }}-test-env/image.tar test:latest
+          docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         run: |
           docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata test \
