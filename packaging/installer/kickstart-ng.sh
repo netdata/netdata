@@ -1093,13 +1093,19 @@ while [ -n "${1}" ]; do
     "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
-    "--no-updates") NETDATA_AUTO_UPDATES= ;;
+    "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
     "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
     "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
-    "--disable-cloud") NETDATA_DISABLE_CLOUD=1 ;;
-    "--require-cloud") NETDATA_REQUIRE_CLOUD=1 ;;
+  "--disable-cloud") 
+    NETDATA_DISABLE_CLOUD=1
+    NETDATA_REQUIRE_CLOUD=0 
+  ;;
+  "--require-cloud")
+    NETDATA_DISABLE_CLOUD=0
+    NETDATA_REQUIRE_CLOUD=1 
+  ;;
     "--dont-start-it")
       NETDATA_NO_START=1
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
