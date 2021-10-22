@@ -133,12 +133,12 @@ jobs:
       - name: Prepare Artifacts
         working-directory: ./artifacts/
         run: |
-          mv ../dist-tarball/* artifacts
-          mv ../static-archive/* artifcts
-          cp ../packaging/version artifacts/latest-version.txt
-          sha256sum -b ./* > "sha256sums.txt"
+          mv ../dist-tarball/* .
+          mv ../static-archive/* .
+          cp ../packaging/version latest-version.txt
+          sha256sum -b ./* > sha256sums.txt
       - name: Store Artifacts
-        uses: action/upload-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
           name: final-artifacts
           path: artifacts/*
@@ -182,7 +182,8 @@ jobs:
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
-          path: ./
+          path: ./final-artifacts
+          parent: false
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -218,7 +219,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'sha256sums.txt,netdata-*.tar.gz,netdata-*.gz.run'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
           draft: true
           tag: ${{ github.event.inputs.version }}
           token: ${{ secrets.NETDATABOT_TOKEN }}

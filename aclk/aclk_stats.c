@@ -190,7 +190,7 @@ static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_s
     rrdset_done(st);
 }
 
-#define MAX_DIM_NAME 16
+#define MAX_DIM_NAME 22
 static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 {
     static RRDSET *st = NULL;
@@ -203,7 +203,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
             "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < query_thread_count; i++) {
-            if (snprintf(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
+            if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }

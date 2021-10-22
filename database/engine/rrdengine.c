@@ -336,7 +336,7 @@ after_crc_check:
         /* care, we don't hold the descriptor mutex */
         if (have_read_error) {
             /* Applications should make sure NULL values match 0 as does SN_EMPTY_SLOT */
-            memset(page, 0, descr->page_length);
+            memset(page, SN_EMPTY_SLOT, descr->page_length);
         } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
             (void) memcpy(page, xt_io_descr->buf + payload_offset + page_offset, descr->page_length);
         } else {

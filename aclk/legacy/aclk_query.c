@@ -708,7 +708,7 @@ void legacy_aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
     } while (this_query);
 }
 
-#define TASK_LEN_MAX 16
+#define TASK_LEN_MAX 22
 void legacy_aclk_query_threads_start(struct aclk_query_threads *query_threads)
 {
     info("Starting %d query threads.", query_threads->count);
@@ -718,7 +718,7 @@ void legacy_aclk_query_threads_start(struct aclk_query_threads *query_threads)
     for (int i = 0; i < query_threads->count; i++) {
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
 
-        if(unlikely(snprintf(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
+        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
             error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, legacy_aclk_query_main_thread,

@@ -47,7 +47,7 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
 #define HTTP_HDR_BUFFER_SIZE 256
-#define PORT_STR_MAX_BYTES 7
+#define PORT_STR_MAX_BYTES 12
 
 static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
 {
@@ -303,7 +303,8 @@ static int read_parse_response(https_req_ctx_t *ctx) {
                 error("Poll timed out");
                 return 2;
             }
-            continue;
+            if (!ctx->ssl_ctx)
+                continue;
         }
         ctx->poll_fd.events = 0;
 
@@ -467,7 +468,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_req_ctx;
     }
 
-    snprintf(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
+    snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
