@@ -199,8 +199,8 @@ static void mdflush_create_charts(int update_every)
     ebpf_create_chart(
         "mdstat",
         "mdstat_flush",
-        "MD flush count",
-        "flush count",
+        "MD flushes",
+        "flushes",
         "flush (eBPF)",
         "md.flush",
         NETDATA_EBPF_CHART_TYPE_STACKED,
