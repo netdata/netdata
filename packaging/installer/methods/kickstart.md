@@ -26,8 +26,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
 
-> See our [installation guide](../README.md) for details about [automatic updates](../README.md#automatic-updates) or
-> [nightly vs. stable releases](../README.md#nightly-vs-stable-releases).
+> See our [installation guide](/packaging/installer/README.md) for details about [automatic updates](/packaging/installer/README.md#automatic-updates) or
+> [nightly vs. stable releases](/packaging/installer/README.md#nightly-vs-stable-releases).
 
 ## What does `kickstart.sh` do?
 
