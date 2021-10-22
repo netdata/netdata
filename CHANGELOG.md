@@ -6,8 +6,13 @@
 
 **Merged pull requests:**
 
+- Charts 2.0 - fix broken link [\#11701](https://github.com/netdata/netdata/pull/11701) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- postgres collector: Fix crash the wal query if wal-file was removed concurrently [\#11697](https://github.com/netdata/netdata/pull/11697) ([unhandled-exception](https://github.com/unhandled-exception))
+- Fix handling of disabling telemetry in static installs. [\#11689](https://github.com/netdata/netdata/pull/11689) ([Ferroin](https://github.com/Ferroin))
+- fix "lsns: unknown column" logging in cgroup-network-helper script [\#11687](https://github.com/netdata/netdata/pull/11687) ([ilyam8](https://github.com/ilyam8))
 - New eBPF and libbpf releases [\#11680](https://github.com/netdata/netdata/pull/11680) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mark g++ for freebsd as NOTREQUIRED [\#11678](https://github.com/netdata/netdata/pull/11678) ([MrZammler](https://github.com/MrZammler))
+- Update pfsense.md [\#11674](https://github.com/netdata/netdata/pull/11674) ([78Star](https://github.com/78Star))
 - fix swap\_used alarm calc [\#11672](https://github.com/netdata/netdata/pull/11672) ([ilyam8](https://github.com/ilyam8))
 - Fix line arguments \(eBPF\) [\#11670](https://github.com/netdata/netdata/pull/11670) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add snapshot message for cloud new architecture [\#11664](https://github.com/netdata/netdata/pull/11664) ([MrZammler](https://github.com/MrZammler))
@@ -154,18 +159,13 @@
 - eBPF Hard IRQ latency [\#11410](https://github.com/netdata/netdata/pull/11410) ([UmanShahzad](https://github.com/UmanShahzad))
 - minor - Remove autoreconf warning [\#11407](https://github.com/netdata/netdata/pull/11407) ([underhood](https://github.com/underhood))
 - Fix bundled protobuf linkage on systems needing -latomic [\#11406](https://github.com/netdata/netdata/pull/11406) ([underhood](https://github.com/underhood))
-- replaced reference to raw.githubuser to a relative path [\#11405](https://github.com/netdata/netdata/pull/11405) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - remove "vernemq.queue\_messages\_in\_queues" from dashboard\_info.js [\#11403](https://github.com/netdata/netdata/pull/11403) ([ilyam8](https://github.com/ilyam8))
 - Split eBPF programs [\#11401](https://github.com/netdata/netdata/pull/11401) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use only stock configuration filenames as module names [\#11400](https://github.com/netdata/netdata/pull/11400) ([vlvkobal](https://github.com/vlvkobal))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
-- Fix freebsd and macos plugin names [\#11398](https://github.com/netdata/netdata/pull/11398) ([vlvkobal](https://github.com/vlvkobal))
 - Add ACLK synchronization event loop [\#11396](https://github.com/netdata/netdata/pull/11396) ([stelfrag](https://github.com/stelfrag))
-- New Cloud chart related parsers and generators [\#11393](https://github.com/netdata/netdata/pull/11393) ([underhood](https://github.com/underhood))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
 - Claiming review to rename claiming action to connect [\#11378](https://github.com/netdata/netdata/pull/11378) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Docs: Remove extra 's' [\#11376](https://github.com/netdata/netdata/pull/11376) ([danmichaelo](https://github.com/danmichaelo))
 - Added support for bundling protobuf as part of the install. [\#11374](https://github.com/netdata/netdata/pull/11374) ([Ferroin](https://github.com/Ferroin))
 - Added support for claiming existing installs via kickstarter scripts. [\#11350](https://github.com/netdata/netdata/pull/11350) ([Ferroin](https://github.com/Ferroin))
 - Add Debian 11 \(Bullseye\) to CI. [\#11334](https://github.com/netdata/netdata/pull/11334) ([Ferroin](https://github.com/Ferroin))
@@ -200,10 +200,6 @@
 - health: clarify which health configuration entities are required / optional [\#11086](https://github.com/netdata/netdata/pull/11086) ([ilyam8](https://github.com/ilyam8))
 - build mqtt\_websockets with netdata autotools [\#11083](https://github.com/netdata/netdata/pull/11083) ([underhood](https://github.com/underhood))
 - Fixed a single typo in documentation [\#11082](https://github.com/netdata/netdata/pull/11082) ([yavin87](https://github.com/yavin87))
-- netdata-installer.sh: Enable IPv6 support in libwebsockets [\#11080](https://github.com/netdata/netdata/pull/11080) ([pjakuszew](https://github.com/pjakuszew))
-- Add an event when an incomplete agent shutdown is detected [\#11078](https://github.com/netdata/netdata/pull/11078) ([stelfrag](https://github.com/stelfrag))
-- Remove dash-example, place in community repo [\#11077](https://github.com/netdata/netdata/pull/11077) ([tnyeanderson](https://github.com/tnyeanderson))
-- Change eBPF chart type [\#11074](https://github.com/netdata/netdata/pull/11074) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
