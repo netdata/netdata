@@ -26,10 +26,15 @@ if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" ] && [ "${INSTALLER_DIR}" != 
 fi
 
 # -----------------------------------------------------------------------------
-# Pull in OpenSSL properly if on macOS
-if [ "$(uname -s)" = 'Darwin' ] && [ -d /usr/local/opt/openssl/include ]; then
-  export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
-  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
+# Pull in OpenSSL and other includes and libs properly if on macOS
+if [ "$(uname -s)" = 'Darwin' ]; then
+  if [ "$(uname -m)" = "x86_64" ] && [ -d /usr/local/opt/openssl/include ]; then
+    export C_INCLUDE_PATH="/usr/local/opt/openssl/include"
+    export LDFLAGS="-L/usr/local/opt/openssl/lib"
+  elif [ "$(uname -m)" = "arm64" ] && [ -d /opt/homebrew/opt/openssl/include ]; then
+    export CFLAGS="${CFLAGS} -I/opt/homebrew/include/ -I/opt/homebrew/opt/openssl/include/"
+    export LDFLAGS="${LDFLAGS} -L/opt/homebrew/lib/ -L/opt/homebrew/opt/openssl/lib/"
+  fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -621,12 +626,18 @@ build_libmosquitto() {
     run ${env_cmd} ${make} ${MAKEOPTS} -C "${1}/lib"
   else
     pushd ${1} > /dev/null || return 1
-    if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-      run ${env_cmd} cmake \
-        -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-        -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-        -D WITH_STATIC_LIBRARIES:boolean=YES \
-        .
+    if [ "$(uname)" = Darwin ]; then
+      if [ "$(uname -m)" = x86_64 ] && [ -d /usr/local/opt/openssl ]; then
+        run ${env_cmd} cmake \
+          -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+          -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
+          -D WITH_STATIC_LIBRARIES:boolean=YES
+      elif [ "$(uname -m)" = arm64 ] && [ -d /opt/homebrew/opt/openssl ]; then
+        run ${env_cmd} cmake \
+          -D OPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl \
+          -D OPENSSL_LIBRARIES=/opt/homebrew/opt/openssl/lib \
+          -D WITH_STATIC_LIBRARIES:boolean=YES
+      fi
     else
       run ${env_cmd} cmake -D WITH_STATIC_LIBRARIES:boolean=YES .
     fi
@@ -715,14 +726,22 @@ EOF
     fi
   fi
 
-  if [ "$(uname)" = "Darwin" ] && [ -d /usr/local/opt/openssl ]; then
-    run ${env_cmd} cmake \
-      -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
-      -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
-      -D LWS_WITH_SOCKS5:bool=ON \
-      -D LWS_IPV6:bool=ON \
-      $CMAKE_FLAGS \
-      .
+  if [ "$(uname)" = Darwin ]; then
+    if [ "$(uname -m)" = x86_64 ] && [ -d /usr/local/opt/openssl ]; then
+      run ${env_cmd} cmake \
+        -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+        -D OPENSSL_LIBRARIES=/usr/local/opt/openssl/lib \
+        -D LWS_WITH_SOCKS5:bool=ON \
+        -D LWS_IPV6:bool=ON \
+        $CMAKE_FLAGS
+    elif [ "$(uname -m)" = arm64 ] && [ -d /opt/homebrew/opt/openssl ]; then
+      run ${env_cmd} cmake \
+          -D OPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl \
+          -D OPENSSL_LIBRARIES=/opt/homebrew/opt/openssl/lib \
+          -D LWS_WITH_SOCKS5:bool=ON \
+          -D LWS_IPV6:bool=ON \
+          $CMAKE_FLAGS
+    fi
   else
     run ${env_cmd} cmake \
       -D LWS_WITH_SOCKS5:bool=ON \
