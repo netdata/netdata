@@ -201,7 +201,7 @@ static void mdflush_create_charts(int update_every)
         "mdstat_flush",
         "MD flush count",
         "flush count",
-        "flush",
+        "flush (eBPF)",
         "md.flush",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_MDSTAT_FLUSH,
