@@ -416,6 +416,10 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC, "Pushing alert snapshot to the cloud for node %s", wc->host_guid);
                     aclk_push_alert_snapshot_event(wc, cmd);
                     break;
+                case ACLK_DATABASE_QUEUE_REMOVED_ALERTS:
+                    debug(D_ACLK_SYNC, "Queueing removed alerts for node %s", wc->host_guid);
+                    sql_process_queue_removed_alerts_to_aclk(wc, cmd);
+                    break;
 
 // NODE OPERATIONS
                 case ACLK_DATABASE_NODE_INFO:

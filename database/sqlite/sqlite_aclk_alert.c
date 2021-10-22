@@ -558,19 +558,13 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     return;
 }
 
-int sql_queue_removed_alerts_to_aclk(RRDHOST *host)
+int sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
 {
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!aclk_use_new_cloud_arch) {
-        return 0;
-    }
-
+    UNUSED(cmd);
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+    UNUSED(wc);
+#else
     CHECK_SQLITE_CONNECTION(db_meta);
-
-    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
-    if (unlikely(!wc)) {
-        return 1;
-    }
 
     BUFFER *sql = buffer_create(1024);
 
@@ -583,10 +577,25 @@ int sql_queue_removed_alerts_to_aclk(RRDHOST *host)
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
+#endif
+    return 0;
+}
+
+void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
+{
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    if (unlikely(!host->dbsync_worker))
+        return;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_QUEUE_REMOVED_ALERTS;
+    cmd.data = NULL;
+    cmd.completion = NULL;
+    aclk_database_enq_cmd((struct aclk_database_worker_config *) host->dbsync_worker, &cmd);
 #else
     UNUSED(host);
 #endif
-    return 0;
 }
 
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t snapshot_id, uint64_t sequence_id)
