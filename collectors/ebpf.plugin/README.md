@@ -116,6 +116,20 @@ This chart monitors calls demonstrating commits from filesystem caches to disk.
 This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous
 syscall to synchronize data according to its manual.
 
+### MD flush
+
+The eBPF plugin shows multi-device flushes happening in real time. This can be
+used to explain some spikes happening in
+[disk latency](docs/agent/collectors/ebpf.plugin#disk) charts.
+
+By default, MD flush is disabled. To enable it, configure your
+`/etc/netdata/ebpf.d.conf` file as:
+
+```conf
+[global]
+    mdflush = yes
+```
+
 ### Disk
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
@@ -399,6 +413,8 @@ You can also enable the following eBPF programs:
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
+- `mdflush`: This eBPF program creates charts that show information about
+  multi-device software flushes.
 
 ## Thread configuration
 

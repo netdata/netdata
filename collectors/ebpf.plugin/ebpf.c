@@ -158,6 +158,11 @@ ebpf_module_t ebpf_modules[] = {
       .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &shm_config,
       .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE},
+    { .thread_name = "mdflush", .config_name = "mdflush", .enabled = 0, .start_routine = ebpf_mdflush_thread,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = CONFIG_BOOLEAN_NO,
+      .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
+      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
+      .config_file = NETDATA_DIRECTORY_MDFLUSH_CONFIG_FILE},
       { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = CONFIG_BOOLEAN_NO, .cgroup_charts = CONFIG_BOOLEAN_NO,
       .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL, .pid_map_size = 0, .names = NULL,
@@ -803,6 +808,8 @@ void ebpf_print_help()
             "\n"
             " [-]-hardirq           Enable chart related to hard IRQ latency.\n"
             "\n"
+            " [-]-mdflush           Enable charts related to multi-device flush.\n"
+            "\n"
             " [-]-mount             Enable charts related to mount monitoring.\n"
             "\n"
             " [-]-net               Enable network viewer charts.\n"
@@ -1259,6 +1266,13 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups, int u
         started++;
     }
 
+    enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush",
+                                    CONFIG_BOOLEAN_NO);
+    if (enabled) {
+        ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_apps, *disable_cgroups);
+        started++;
+    }
+
     if (!started){
         ebpf_enable_all_charts(*disable_apps, *disable_cgroups);
         // Read network viewer section
@@ -1370,6 +1384,7 @@ static void ebpf_parse_args(int argc, char **argv)
         {"softirq",        no_argument,    0,  0 },
         {"oomkill",        no_argument,    0,  0 },
         {"shm",            no_argument,    0,  0 },
+        {"mdflush",        no_argument,    0,  0 },
         /* INSERT NEW THREADS BEFORE THIS COMMENT TO KEEP COMPATIBILITY WITH enum ebpf_module_indexes */
         {"all",            no_argument,    0,  0 },
         {"version",        no_argument,    0,  0 },
@@ -1511,6 +1526,13 @@ static void ebpf_parse_args(int argc, char **argv)
                 select_threads |= 1<<EBPF_MODULE_SHM_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
                 info("EBPF enabling \"SHM\" chart, because it was started with the option \"[-]-shm\".");
+#endif
+                break;
+            }
+            case EBPF_MODULE_MDFLUSH_IDX: {
+                select_threads |= 1<<EBPF_MODULE_MDFLUSH_IDX;
+#ifdef NETDATA_INTERNAL_CHECKS
+                info("EBPF enabling \"MDFLUSH\" chart, because it was started with the option \"[-]-mdflush\".");
 #endif
                 break;
             }
@@ -1813,6 +1835,8 @@ int main(int argc, char **argv)
             NULL, NULL, ebpf_modules[EBPF_MODULE_OOMKILL_IDX].start_routine},
         {"EBPF SHM" , NULL, NULL, 1,
             NULL, NULL, ebpf_modules[EBPF_MODULE_SHM_IDX].start_routine},
+        {"EBPF MDFLUSH" , NULL, NULL, 1,
+            NULL, NULL, ebpf_modules[EBPF_MODULE_MDFLUSH_IDX].start_routine},
         {NULL          , NULL, NULL, 0,
           NULL, NULL, NULL}
     };

@@ -496,6 +496,8 @@ set(EBPF_PROCESS_PLUGIN_FILES
         collectors/ebpf.plugin/ebpf_fd.h
         collectors/ebpf.plugin/ebpf_hardirq.c
         collectors/ebpf.plugin/ebpf_hardirq.h
+        collectors/ebpf.plugin/ebpf_mdflush.c
+        collectors/ebpf.plugin/ebpf_mdflush.h
         collectors/ebpf.plugin/ebpf_mount.c
         collectors/ebpf.plugin/ebpf_mount.h
         collectors/ebpf.plugin/ebpf_filesystem.c
