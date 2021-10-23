@@ -57,22 +57,15 @@ SET(MACOS   False)
 
 # Detect the operating system
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    SET(TARGET_OS_NAME "macos")
-    SET(TARGET_OS 3)
     SET(MACOS True)
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    SET(TARGET_OS_NAME "freebsd")
-    SET(TARGET_OS 2)
     SET(FREEBSD True)
 ELSE()
-    SET(TARGET_OS_NAME "linux")
-    SET(TARGET_OS 1)
     SET(LINUX True)
 ENDIF()
 
 # show the operating system on the console
-message(STATUS "operating system: ${TARGET_OS_NAME} (TARGET_OS=${TARGET_OS})")
-
+message(STATUS "system name: ${CMAKE_SYSTEM_NAME}")
 
 # -----------------------------------------------------------------------------
 # Detect libuuid
@@ -990,7 +983,6 @@ include_directories(AFTER .)
 
 add_definitions(
         -DHAVE_CONFIG_H
-        -DTARGET_OS=${TARGET_OS}
         -DCACHE_DIR="/var/cache/netdata"
         -DCONFIG_DIR="/etc/netdata"
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-COMMON_CFLAGS = -I ../../ -DTARGET_OS=1  -Wall -Wextra
+COMMON_CFLAGS = -I ../../ -Wall -Wextra
 PROFILE_CFLAGS = -O1 -ggdb $(COMMON_CFLAGS)
 PERFORMANCE_CFLAGS = -O2 $(COMMON_CFLAGS)
 

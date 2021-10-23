@@ -274,7 +274,6 @@ extern int verify_netdata_host_prefix();
 extern int recursively_delete_dir(const char *path, const char *reason);
 
 extern volatile sig_atomic_t netdata_exit;
-extern const char *os_type;
 
 extern const char *program_version;
 

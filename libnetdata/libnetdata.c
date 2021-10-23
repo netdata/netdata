@@ -14,7 +14,6 @@ struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
-const char *os_type = NETDATA_OS_TYPE;
 const char *program_version = VERSION;
 
 // ----------------------------------------------------------------------------
