@@ -47,6 +47,7 @@ Netdata](https://user-images.githubusercontent.com/1153921/96495792-2e881380-11f
   - [Docker](#docker)
   - [Other operating systems](#other-operating-systems)
   - [Post-installation](#post-installation)
+  - [Netdata Cloud](#netdata-cloud)
 - [How it works](#how-it-works)
 - [Infographic](#infographic)
 - [Documentation](#documentation)
@@ -166,6 +167,14 @@ Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
+
+### Netdata Cloud
+
+Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
+layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
+can help you turn data into insights immediately.
+
+[Get Netdata Cloud now!](https://app.netdata.cloud/)
 
 ## How it works
 
