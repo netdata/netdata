@@ -576,7 +576,7 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 
     buffer_free(sql);
 #endif
-    return 0;
+    return;
 }
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
