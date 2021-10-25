@@ -162,6 +162,7 @@ jobs:
             PRE=${{ matrix.pre }}
             RMJSONC=${{ matrix.rmjsonc }}
           outputs: type=oci,dest=/tmp/image.tar
+          tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         uses: actions/upload-artifact@v2
         with:
@@ -205,27 +206,29 @@ jobs:
         with:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
+        id: load
         run: |
-          docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
+          docker load --input image.tar | tee image-info.txt
+          echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
       - name: Regular build on ${{ matrix.distro }}
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} /bin/sh -c 'autoreconf -ivf && ./configure && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test \
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test \
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, require ACLK-NG
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' test \
+          docker run --security-opt seccomp=unconfined -w /netdata -e NETDATA_CONFIGURE_OPTIONS='--with-aclk-ng' sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         if: matrix.rmjsonc != ''
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test \
+          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
               /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -287,11 +290,13 @@ jobs:
         with:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
+        id: load
         run: |
-          docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
+          docker load --input image.tar | tee image-info.txt
+          echo "::set-output name=image::$(cut -d ':' -f 3 image-info.txt)"
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         run: |
-          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata test \
+          docker run --security-opt seccomp=unconfined -e DO_NOT_TRACK=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
                 /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
