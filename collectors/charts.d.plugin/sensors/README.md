@@ -29,6 +29,24 @@ The plugin will create Netdata charts for:
 
 One chart for every sensor chip found and each of the above will be created.
 
+## Enable the collector
+
+The `sensors` collector is disabled by default. To enable it, use `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf`
+file.
+
+```bash
+cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+sudo ./edit-config charts.d.conf
+```
+
+Needs to be set to "force" to be enabled
+
+```shell
+# example=force
+sensors=force
+```
+
 ## Configuration
 
 Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the Netdata [config
