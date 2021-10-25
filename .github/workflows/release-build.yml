@@ -126,6 +126,8 @@ jobs:
       - build-dist
       - build-static
     steps:
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Prepare Environment
         run: mkdir -p artifacts
       - name: Retrieve Artifacts
@@ -135,7 +137,7 @@ jobs:
         run: |
           mv ../dist-tarball/* .
           mv ../static-archive/* .
-          cp ../packaging/version latest-version.txt
+          cp ../packaging/version ./latest-version.txt
           sha256sum -b ./* > sha256sums.txt
       - name: Store Artifacts
         uses: actions/upload-artifact@v2
