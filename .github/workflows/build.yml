@@ -266,6 +266,8 @@ jobs:
         volumes:
           - ${{ github.workspace }}:/usr/local/apache2/htdocs/
     steps:
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Fetch dist tarball artifacts
         uses: actions/download-artifact@v2
         with:
