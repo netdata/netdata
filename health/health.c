@@ -1038,6 +1038,14 @@ void *health_main(void *ptr) {
                 rrdhost_unlock(host);
             }
 
+#ifdef ENABLE_ACLK
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded)) {
+                sql_queue_removed_alerts_to_aclk(host);
+            }
+#endif
+#endif
+
             if (unlikely(netdata_exit))
                 break;
 
@@ -1061,6 +1069,11 @@ void *health_main(void *ptr) {
         while (NULL != (ae = alarm_notifications_in_progress.head)) {
             health_alarm_wait_for_execution(ae);
         }
+
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        if (netdata_cloud_setting && unlikely(aclk_alert_reloaded))
+            aclk_alert_reloaded = 0;
+#endif
 
         rrd_unlock();
 
