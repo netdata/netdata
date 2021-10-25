@@ -1,6 +1,7 @@
 <!--
 title: "eBPF monitoring with Netdata"
-description: "Use Netdata's extended Berkeley Packet Filter (eBPF) collector to monitor kernel-level metrics about your complex applications with per-second granularity."
+description: "Use Netdata's extended Berkeley Packet Filter (eBPF) collector to monitor kernel-level metrics about your 
+complex applications with per-second granularity."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md
 sidebar_label: "eBPF"
 -->
@@ -16,9 +17,9 @@ variety of kernel functions, such as `do_sys_open`, `__close_fd`, `vfs_read`, `v
 `return` program also monitors the return of each kernel functions to deliver more granular metrics about how your
 system and its applications interact with the Linux kernel.
 
-eBPF monitoring can help you troubleshoot and debug how applications interact with the Linux kernel. See our [guide on
-troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for configuration
-and troubleshooting tips.
+eBPF monitoring can help you troubleshoot and debug how applications interact with the Linux kernel. See
+our [guide on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for
+configuration and troubleshooting tips.
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
@@ -40,8 +41,8 @@ section for details.
 ## Charts
 
 The eBPF collector creates an **eBPF** menu in the Agent's dashboard along with two sub-menus: **Socket**, and
-**Process**. The plugin also creates charts on different menus, like System Overview, Memory, Disks, Filesystem,
-Mount Points and Applications. All the charts in this section update every second.
+**Process**. The plugin also creates charts on different menus, like System Overview, Memory, Disks, Filesystem, Mount
+Points and Applications. All the charts in this section update every second.
 
 The collector stores the actual value inside of its process, but charts only show the difference between the values
 collected in the previous and current seconds.
@@ -54,8 +55,8 @@ on host. See the [configuration](#configuration) section for details about how t
 
 #### Swap
 
-Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are calling
-functions `swap_readpage` and `swap_writepage`, which are functions responsible for doing IO in swap memory.
+Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are
+calling functions `swap_readpage` and `swap_writepage`, which are functions responsible for doing IO in swap memory.
 
 ### Memory
 
@@ -63,15 +64,15 @@ In the memory submenu the eBPF plugin creates two submenus **page cache** and **
 organization:
 
 * Page Cache
-  * Page cache ratio
-  * Dirty pages
-  * Page cache hits
-  * Page cache misses
+    * Page cache ratio
+    * Dirty pages
+    * Page cache hits
+    * Page cache misses
 * Synchronization
-  * File sync
-  * Memory map sync
-  * File system sync
-  * File range sync
+    * File sync
+    * Memory map sync
+    * File system sync
+    * File range sync
 
 #### Page cache ratio
 
@@ -92,8 +93,8 @@ added relatively recently.
 
 #### Page cache misses
 
-A page cache miss means that a page was not inside memory when the process tried to access it. This chart shows the result
-of the difference for calls between functions `add_to_page_cache_lru` and `account_page_dirtied`.
+A page cache miss means that a page was not inside memory when the process tried to access it. This chart shows the
+result of the difference for calls between functions `add_to_page_cache_lru` and `account_page_dirtied`.
 
 #### File sync
 
@@ -115,15 +116,31 @@ This chart monitors calls demonstrating commits from filesystem caches to disk.
 This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous
 syscall to synchronize data according to its manual.
 
+### MD flush
+
+The eBPF plugin shows multi-device flushes happening in real time. This can be
+used to explain some spikes happening in
+[disk latency](docs/agent/collectors/ebpf.plugin#disk) charts.
+
+By default, MD flush is disabled. To enable it, configure your
+`/etc/netdata/ebpf.d.conf` file as:
+
+```conf
+[global]
+    mdflush = yes
+```
+
 ### Disk
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
-chart `disk_latency_io` for each disk on the host. These charts use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
+chart `disk_latency_io` for each disk on the host. These charts
+use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
 `block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events.
 
 ### Filesystem
 
-This group has two charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
+This group has two charts demonstrating how applications interact with the Linux kernel to open and close file
+descriptors.
 
 #### File descriptor
 
@@ -137,9 +154,9 @@ This chart shows the number of times some software tried and failed to open or c
 
 ### VFS
 
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular filesystems.
-The functions presented inside this API are not used for filesystems, so it's possible that the charts in this section
-won't show _all_ the actions that occurred on your system.
+A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
+filesystems. The functions presented inside this API are not used for filesystems, so it's possible that the charts in
+this section won't show _all_ the actions that occurred on your system.
 
 #### Deleted objects
 
@@ -180,7 +197,8 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. In turn, each of these system calls uses either the function
 `_do_fork` (kernel older than `5.10.0`) or the function `do_fork` (latest kernels). To generate this chart, the eBPF
-collector monitors the cited functions to populate the `process` dimension, and monitors `sys_clone` to identify threads.
+collector monitors the cited functions to populate the `process` dimension, and monitors `sys_clone` to identify
+threads.
 
 #### Exit
 
@@ -196,13 +214,13 @@ process and thread creation only.
 
 #### TCP functions
 
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are
-used to send & receive data and to close connections when `TCP` protocol is used.
+This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are used
+to send & receive data and to close connections when `TCP` protocol is used.
 
 #### TCP bandwidth
 
-Like the previous chart, this one also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the
-number of calls, it demonstrates the number of bytes sent and received.
+Like the previous chart, this one also monitors `tcp_sendmsg` and `tcp_cleanup_rbuf`, but instead of showing the number
+of calls, it demonstrates the number of bytes sent and received.
 
 #### TCP retransmit
 
@@ -211,13 +229,13 @@ receiver did not return the packet during the expected time.
 
 #### UDP functions
 
-This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`,  which are responsible for sending &
+This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`, which are responsible for sending &
 receiving data for connections when the `UDP` protocol is used.
 
 #### UDP bandwidth
 
-Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the
-number of calls, it monitors the number of bytes sent and received.
+Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the number of
+calls, it monitors the number of bytes sent and received.
 
 ## Configuration
 
@@ -256,42 +274,19 @@ By default, this plugin uses the `entry` mode. Changing this mode can create sig
 system, but also offer valuable information if you are developing or debugging software. The `ebpf load mode` option
 accepts the following values: ​
 
--   `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described
-    in the sections above, and does not show charts related to errors.
--   `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates
-    new charts for the return of these functions, such as errors. Monitoring function returns can help in debugging
-    software, such as failing to close file descriptors or creating zombie processes.
--   `update every`:  Number of seconds used for eBPF to send data for Netdata.   
--   `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
-    
+- `entry`: This is the default mode. In this mode, the eBPF collector only monitors calls for the functions described in
+  the sections above, and does not show charts related to errors.
+- `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
+  charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
+  such as failing to close file descriptors or creating zombie processes.
+- `update every`:  Number of seconds used for eBPF to send data for Netdata.
+- `pid table size`: Defines the maximum number of PIDs stored inside the application hash table.
+
 #### Integration with `apps.plugin`
 
 The eBPF collector also creates charts for each running application through an integration with the
 [`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
 interact with the Linux kernel.
-
-When the integration is enabled, your dashboard will also show the following charts using low-level Linux metrics:
-
--   eBPF file
-    -   Number of calls to open files. (`apps.file_open`)
-    -   Number of files closed. (`apps.file_closed`)
-    -   Number of calls to open files that returned errors.
-    -   Number of calls to close files that returned errors.
--   eBPF syscall
-    -   Number of calls to delete files. (`apps.file_deleted`)
-    -   Number of calls to `vfs_write`. (`apps.vfs_write_call`)
-    -   Number of calls to `vfs_read`. (`apps.vfs_read_call`)
-    -   Number of bytes written with `vfs_write`. (`apps.vfs_write_bytes`)
-    -   Number of bytes read with `vfs_read`. (`apps.vfs_read_bytes`)
-    -   Number of calls to write a file that returned errors.
-    -   Number of calls to read a file that returned errors.
--   eBPF process
-    -   Number of process created with `do_fork`. (`apps.process_create`)
-    -   Number of threads created with `do_fork` or `__x86_64_sys_clone`, depending on your system's kernel version. (`apps.thread_create`)
-    -   Number of times that a process called `do_exit`. (`apps.task_close`)
--   eBPF net
-    -   Number of bytes sent. (`apps.bandwidth_sent`)
-    -   Number of bytes received. (`apps.bandwidth_recv`)
 
 If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
 `no`.
@@ -301,20 +296,19 @@ If you want to _disable_ the integration with `apps.plugin` along with the above
    apps = yes
 ```
 
-When the integration is enabled, eBPF collector allocates memory for each process running. The total 
- allocated memory has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, 
- it uses per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID 
- for each processor it runs.
+When the integration is enabled, eBPF collector allocates memory for each process running. The total allocated memory
+has direct relationship with the kernel version. When the eBPF plugin is running on kernels newer than `4.15`, it uses
+per-cpu maps to speed up the update of hash tables. This also implies storing data for the same PID for each processor
+it runs.
 
-### Integration with `cgroups.plugin`
+#### Integration with `cgroups.plugin`
 
 The eBPF collector also creates charts for each cgroup through an integration with the
 [`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
 interacts with the Linux kernel.
 
-The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system.
-If you want to _enable_ the integration with `cgroups.plugin`, change the `cgroups`setting to
-`yes`.
+The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to
+_enable_ the integration with `cgroups.plugin`, change the `cgroups` setting to `yes`.
 
 ```conf
 [global]
@@ -322,46 +316,109 @@ If you want to _enable_ the integration with `cgroups.plugin`, change the `cgrou
 ```
 
 If you do not need to monitor specific metrics for your `cgroups`, you can enable `cgroups` inside
-`ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the 
-['Configuration` section](docs/agent/collectors/ebpf.plugin#configuration)
+`ebpf.d.conf`, and then disable the plugin for a specific `thread` by following the steps in the
+[Configuration](#configuration) section.
 
-#### `[ebpf programs]`
+#### Integration Dashboard Elements
+
+When an integration is enabled, your dashboard will also show the following cgroups and apps charts using low-level
+Linux metrics:
+
+> Note: The parenthetical accompanying each bulleted item provides the chart name.
+
+- mem
+    - Number of processes killed due out of memory. (`oomkills`)
+- process
+    - Number of processes created with `do_fork`. (`process_create`)
+    - Number of threads created with `do_fork` or `clone (2)`, depending on your system's kernel
+      version. (`thread_create`)
+    - Number of times that a process called `do_exit`. (`task_exit`)
+    - Number of times that a process called `release_task`. (`task_close`)
+    - Number of times that an error happened to create thread or process. (`task_error`)
+- swap
+    - Number of calls to `swap_readpage`. (`swap_read_call`)
+    - Number of calls to `swap_writepage`. (`swap_write_call`)
+- network
+    - Number of bytes sent. (`total_bandwidth_sent`)
+    - Number of bytes received. (`total_bandwidth_recv`)
+    - Number of calls to `tcp_sendmsg`. (`bandwidth_tcp_send`)
+    - Number of calls to `tcp_cleanup_rbuf`. (`bandwidth_tcp_recv`)
+    - Number of calls to `tcp_retransmit_skb`. (`bandwidth_tcp_retransmit`)
+    - Number of calls to `udp_sendmsg`. (`bandwidth_udp_send`)
+    - Number of calls to `udp_recvmsg`. (`bandwidth_udp_recv`)
+- file access
+    - Number of calls to open files. (`file_open`)
+    - Number of calls to open files that returned errors. (`open_error`)
+    - Number of files closed. (`file_closed`)
+    - Number of calls to close files that returned errors. (`file_error_closed`)
+- vfs
+    - Number of calls to `vfs_unlink`. (`file_deleted`)
+    - Number of calls to `vfs_write`. (`vfs_write_call`)
+    - Number of calls to write a file that returned errors. (`vfs_write_error`)
+    - Number of calls to `vfs_read`. (`vfs_read_call`)
+    - Number of bytes written with `vfs_write`. (`vfs_write_bytes`)
+    - Number of bytes read with `vfs_read`. (`vfs_read_bytes`)
+    - Number of calls to read a file that returned errors. (`vfs_read_error`)
+    - Number of calls to `vfs_fsync`. (`vfs_fsync`)
+    - Number of calls to sync file that returned errors. (`vfs_fsync_error`)
+    - Number of calls to `vfs_open`. (`vfs_open`)
+    - Number of calls to open file that returned errors. (`vfs_open_error`)
+    - Number of calls to `vfs_create`. (`vfs_create`)
+    - Number of calls to open file that returned errors. (`vfs_create_error`)
+- page cache
+    - Ratio of pages accessed. (`cachestat_ratio`)
+    - Number of modified pages ("dirty"). (`cachestat_dirties`)
+    - Number of accessed pages. (`cachestat_hits`)
+    - Number of pages brought from disk. (`cachestat_misses`)
+- directory cache
+    - Ratio of files available in directory cache. (`dc_hit_ratio`)
+    - Number of files acessed. (`dc_reference`)
+    - Number of files acessed that were not in cache. (`dc_not_cache`)
+    - Number of files not found. (`dc_not_found`)
+- ipc shm
+    - Number of calls to `shm_get`. (`shmget_call`)
+    - Number of calls to `shm_at`. (`shmat_call`)
+    - Number of calls to `shm_dt`. (`shmdt_call`)
+    - Number of calls to `shm_ctl`. (`shmctl_call`)
+
+### `[ebpf programs]`
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
--   `fd` :  This eBPF program creates charts that show information about calls to open files.
--   `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
--   `shm`: This eBPF program creates charts that show calls to syscalls
-    shmget(2), shmat(2), shmdt(2) and shmctl(2).
--   `sync`: Montitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
--   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
--   `process`: This eBPF program creates charts that show information about process life.
-    When in `return` mode, it also creates charts showing errors when these operations are executed.
--   `hardirq`: This eBPF program creates charts that show information about
-    time spent servicing individual hardware interrupt requests (hard IRQs).
--   `softirq`: This eBPF program creates charts that show information about
-    time spent servicing individual software interrupt requests (soft IRQs).
--   `oomkill`: This eBPF program creates a chart that shows OOM kills for all
-    applications recognized via the `apps.plugin` integration. Note that this
-    program will show application charts regardless of whether apps integration
-    is turned on or off.
+- `fd` :  This eBPF program creates charts that show information about calls to open files.
+- `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
+- `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
+- `sync`: Montitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+- `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+  bandwidth consumed by each.
+- `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
+- `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
+  creates charts showing errors when these operations are executed.
+- `hardirq`: This eBPF program creates charts that show information about time spent servicing individual hardware
+  interrupt requests (hard IRQs).
+- `softirq`: This eBPF program creates charts that show information about time spent servicing individual software
+  interrupt requests (soft IRQs).
+- `oomkill`: This eBPF program creates a chart that shows OOM kills for all applications recognized via
+  the `apps.plugin` integration. Note that this program will show application charts regardless of whether apps
+  integration is turned on or off.
 
 You can also enable the following eBPF programs:
--   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
-    [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
-    for each application.
--   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
-    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and 
-    files are not found.
--   `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
--   `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
--   `swap` : This eBPF program creates charts that show information about swap access.
+
+- `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+  [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+  for each application.
+- `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
+  `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
+  not found.
+- `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
+- `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
+- `swap` : This eBPF program creates charts that show information about swap access.
+- `mdflush`: This eBPF program creates charts that show information about
+  multi-device software flushes.
 
 ## Thread configuration
 
-You can configure each thread of the eBPF data collector by editing either the `cachestat.conf`, `process.conf`, 
+You can configure each thread of the eBPF data collector by editing either the `cachestat.conf`, `process.conf`,
 or `network.conf` files. Use [`edit-config`](/docs/configure/nodes.md) from your Netdata config directory:
 
 ```bash
@@ -380,8 +437,8 @@ The following configuration files are available:
 - `filesystem.conf`: Configuration for the `filesystem` thread.
 - `hardirq.conf`: Configuration for the `hardirq` thread.
 - `process.conf`: Configuration for the `process` thread.
-- `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and
-  also lets you specify which network the eBPF collector monitors.
+- `network.conf`: Configuration for the `network viewer` thread. This config file overwrites the global options and also
+  lets you specify which network the eBPF collector monitors.
 - `softirq.conf`: Configuration for the `softirq` thread.
 - `sync.conf`: Configuration for the `sync` thread.
 - `vfs.conf`: Configuration for the `vfs` thread.
@@ -393,7 +450,7 @@ are divided in the following sections:
 
 #### `[network connections]`
 
-You can configure the information shown on `outbound` and `inbound` charts with the settings in this section. 
+You can configure the information shown on `outbound` and `inbound` charts with the settings in this section.
 
 ```conf
 [network connections]
@@ -406,23 +463,23 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 
 When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
 write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts  
-[simple patterns](/libnetdata/simple_pattern/README.md).  The `ports`, and `ips` settings accept negation (`!`) to
- deny specific values or asterisk alone to define all values.
+[simple patterns](/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
+specific values or asterisk alone to define all values.
 
 In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
 and 145.
 
 The following options are available:
 
--   `ports`: Define the destination ports for Netdata to monitor.
--   `hostnames`: The list of hostnames that can be resolved to an IP address. 
--   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this
-    can be changed with the `ips` setting.
-    
-By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions, 
-they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing the `maximum
-dimensions` setting.
+- `ports`: Define the destination ports for Netdata to monitor.
+- `hostnames`: The list of hostnames that can be resolved to an IP address.
+- `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
+  range of IPs, or use CIDR values. The default behavior is to only collect data for private IP addresses, but this can
+  be changed with the `ips` setting.
+
+By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions,
+they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing
+the `maximum dimensions` setting.
 
 The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
 changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
@@ -430,8 +487,9 @@ the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 #### `[service name]`
 
-Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain the
-name for a particular service you use in your infrastructure, you will need to add it to the `[service name]` section.
+Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain
+the name for a particular service you use in your infrastructure, you will need to add it to the `[service name]`
+section.
 
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
 service in network connection charts, and thus see the name of the service instead of its port, define it:
@@ -443,7 +501,7 @@ service in network connection charts, and thus see the name of the service inste
 
 ### Sync configuration
 
-The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are 
+The sync configuration has specific options to disable monitoring for syscalls, as default option all syscalls are
 monitored.
 
 ```conf
@@ -458,8 +516,8 @@ monitored.
 
 ### Filesystem configuration
 
-The filesystem configuration has specific options to disable monitoring for filesystems, by default all 
-filesystems are monitored.
+The filesystem configuration has specific options to disable monitoring for filesystems, by default all filesystems are
+monitored.
 
 ```conf
 [filesystem]
@@ -502,17 +560,18 @@ curl -sSL https://raw.githubusercontent.com/netdata/kernel-collector/master/tool
 
 If this script returns no output, your system is ready to compile and run the eBPF collector.
 
-If you see a warning about a missing kernel configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL
-BPF_JIT`), you will need to recompile your kernel to support this configuration. The process of recompiling Linux
-kernels varies based on your distribution and version. Read the documentation for your system's distribution to learn
-more about the specific workflow for recompiling the kernel, ensuring that you set all the necessary 
+If you see a warning about a missing kernel
+configuration (`KPROBES KPROBES_ON_FTRACE HAVE_KPROBES BPF BPF_SYSCALL BPF_JIT`), you will need to recompile your kernel
+to support this configuration. The process of recompiling Linux kernels varies based on your distribution and version.
+Read the documentation for your system's distribution to learn more about the specific workflow for recompiling the
+kernel, ensuring that you set all the necessary
 
--   [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
--   [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
--   [Fedora](https://fedoraproject.org/wiki/Building_a_custom_kernel)
--   [CentOS](https://wiki.centos.org/HowTos/Custom_Kernel)
--   [Arch Linux](https://wiki.archlinux.org/index.php/Kernel/Traditional_compilation)
--   [Slackware](https://docs.slackware.com/howtos:slackware_admin:kernelbuilding)
+- [Ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
+- [Debian](https://kernel-team.pages.debian.net/kernel-handbook/ch-common-tasks.html#s-common-official)
+- [Fedora](https://fedoraproject.org/wiki/Building_a_custom_kernel)
+- [CentOS](https://wiki.centos.org/HowTos/Custom_Kernel)
+- [Arch Linux](https://wiki.archlinux.org/index.php/Kernel/Traditional_compilation)
+- [Slackware](https://docs.slackware.com/howtos:slackware_admin:kernelbuilding)
 
 ### Mount `debugfs` and `tracefs`
 
@@ -525,19 +584,20 @@ sudo mount -t tracefs nodev /sys/kernel/tracing
 ```
 
 If they are already mounted, you will see an error. You can also configure your system's `/etc/fstab` configuration to
-mount these filesystems on startup. More information can be found in the [ftrace documentation](https://www.kernel.org/doc/Documentation/trace/ftrace.txt).
+mount these filesystems on startup. More information can be found in
+the [ftrace documentation](https://www.kernel.org/doc/Documentation/trace/ftrace.txt).
 
 ## Performance
 
-eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin 
+eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
 
-If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart, 
-consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next, 
-[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system 
-memory usage (see the `system.ram` chart) has dropped significantly.
+If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart,
+consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuration). Next,
+[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
+usage (see the `system.ram` chart) has dropped significantly.
 
-Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode) 
+Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode)
 in `ebpf.conf`.
 
 ## SELinux

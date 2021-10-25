@@ -24,6 +24,7 @@
 #include "ebpf_filesystem.h"
 #include "ebpf_hardirq.h"
 #include "ebpf_cachestat.h"
+#include "ebpf_mdflush.h"
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
 #include "ebpf_shm.h"
