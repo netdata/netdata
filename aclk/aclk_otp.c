@@ -9,17 +9,6 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
-static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char *decrypted)
-{
-    int  result = RSA_private_decrypt( data_len, enc_data, decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
-    if (result == -1) {
-        char err[512];
-        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
-        error("Decryption of the challenge failed: %s", err);
-    }
-    return result;
-}
-
 static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
     int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
@@ -279,91 +268,150 @@ exit:
 }
 #endif
 
-#define OTP_URL_PREFIX "/api/v1/auth/node/"
-int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target) {
-    // TODO this fnc will be rewritten and simplified in following PRs
-    // still carries lot of baggage from ACLK Legacy
-    int rc = 1;
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+#define CHALLENGE_LEN 256
+#define CHALLENGE_LEN_BASE64 344
+inline static int base64_decode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    unsigned char remaining_data[CHALLENGE_LEN];
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_DecodeInit(ctx);
+    EVP_DecodeUpdate(ctx, out, outl, in, in_len);
+    int remainder = 0;
+    EVP_DecodeFinal(ctx, remaining_data, &remainder);
+    EVP_ENCODE_CTX_free(ctx);
+    if (remainder) {
+        error("Unexpected data at EVP_DecodeFinal");
+        return 1;
+    }
+    return 0;
+}
 
+inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    int len;
+    unsigned char *str = out;
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_EncodeInit(ctx);
+    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
+    str += *outl;
+    EVP_EncodeFinal(ctx, str, &len);
+    *outl += len;
+    // if we ever expect longer output than what OpenSSL would pack into single line
+    // we would have to skip the endlines, until then we can just cut the string short
+    str = (unsigned char*)strchr((char*)out, '\n');
+    if (str)
+        *str = 0;
+    EVP_ENCODE_CTX_free(ctx);
+    return 0;
+}
+
+#define OTP_URL_PREFIX "/api/v1/auth/node/"
+int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes)
+{
+    int rc = 1;
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
-    char *agent_id = is_agent_claimed();
-    if (agent_id == NULL)
-    {
-        error("Agent was not claimed - cannot perform challenge/response");
-        goto cleanup;
-    }
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
 
-    // GET Challenge
     req.host = target->host;
     req.port = target->port;
     buffer_sprintf(url, "%s/node/%s/challenge", target->path, agent_id);
-    req.url = url->buffer;
+    req.url = (char *)buffer_tostring(url);
 
     if (aclk_https_request(&req, &resp)) {
         error ("ACLK_OTP Challenge failed");
-        goto cleanup;
+        buffer_free(url);
+        return 1;
     }
     if (resp.http_code != 200) {
         error ("ACLK_OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
+        buffer_free(url);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
         goto cleanup_resp;
     }
+    buffer_free(url);
+
     info ("ACLK_OTP Got Challenge from Cloud");
 
-    struct dictionary_singleton challenge = { .key = "challenge", .result = NULL };
-
-    if (json_parse(resp.payload, &challenge, json_extract_singleton) != JSON_OK)
-    {
-        freez(challenge.result);
-        error("Could not parse the the challenge");
+    json_object *json = json_tokener_parse(resp.payload);
+    if (!json) {
+        error ("Couldn't parse HTTP GET challenge payload");
         goto cleanup_resp;
     }
-    if (challenge.result == NULL) {
-        error("Could not retrieve challenge JSON key from challenge response");
-        goto cleanup_resp;
+    json_object *challenge_json;
+    //TODO does this increase ref count?
+    if (json_pointer_get(json, "/challenge", &challenge_json)) {
+        error ("No key named \"challenge\" in the returned JSON");
+        goto cleanup_json;
+    }
+    if (!json_object_is_type(challenge_json, json_type_string)) {
+        error ("\"challenge\" is not a string JSON type");
+        goto cleanup_json;
+    }
+    const char *challenge_base64;
+    if (!(challenge_base64 = json_object_get_string(challenge_json))) {
+        error("Failed to extract challenge from JSON object");
+        goto cleanup_json;
+    }
+    if (strlen(challenge_base64) != CHALLENGE_LEN_BASE64) {
+        error("Received Challenge has unexpected length of %zu (expected %d)", strlen(challenge_base64), CHALLENGE_LEN_BASE64);
+        goto cleanup_json;
     }
 
-    // Decrypt the Challenge and Calculate Response
-    size_t challenge_len = strlen(challenge.result);
-    unsigned char decoded[512];
-    size_t decoded_len = base64_decode((unsigned char*)challenge.result, challenge_len, decoded, sizeof(decoded));
-    freez(challenge.result);
+    *challenge = mallocz(CHALLENGE_LEN);
+    base64_decode_helper(*challenge, challenge_bytes, (const unsigned char*)challenge_base64, strlen(challenge_base64));
+    if (*challenge_bytes != CHALLENGE_LEN) {
+        error("Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
+        freez(challenge);
+        *challenge = NULL;
+        goto cleanup_json;
+    }
+    rc = 0;
 
-    unsigned char plaintext[4096]={};
-    int decrypted_length = private_decrypt(p_key, decoded, decoded_len, plaintext);
-    char encoded[512];
-    size_t encoded_len = base64_encode(plaintext, decrypted_length, encoded, sizeof(encoded));
-    encoded[encoded_len] = 0;
-    debug(D_ACLK, "Encoded len=%zu Decryption len=%d: '%s'", encoded_len, decrypted_length, encoded);
-
-    char response_json[4096]={};
-    sprintf(response_json, "{\"response\":\"%s\"}", encoded);
-    debug(D_ACLK, "Password phase: %s",response_json);
-
+cleanup_json:
+    json_object_put(json);
+cleanup_resp:
     https_req_response_free(&resp);
-    https_req_response_init(&resp);
+    return rc;
+}
 
-    // POST password
+int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, char **mqtt_id, char **mqtt_usr, char **mqtt_pass)
+{
+    int len;
+    int rc = 1;
+    https_req_t req = HTTPS_REQ_T_INITIALIZER;
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
+
+    req.host = target->host;
+    req.port = target->port;
     req.request_type = HTTP_REQ_POST;
-    buffer_flush(url);
+
+    unsigned char base64[CHALLENGE_LEN_BASE64 + 1];
+    memset(base64, 0, CHALLENGE_LEN_BASE64 + 1);
+
+    base64_encode_helper(base64, &len, response, response_bytes);
+
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
+    buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
+
     req.url = url->buffer;
-    req.payload = response_json;
-    req.payload_size = strlen(response_json);
+    req.payload = (char *)buffer_tostring(resp_json);
+    req.payload_size = strlen(req.payload);
 
     if (aclk_https_request(&req, &resp)) {
         error ("ACLK_OTP Password error trying to post result to password");
-        goto cleanup;
+        goto cleanup_buffers;
     }
     if (resp.http_code != 201) {
         error ("ACLK_OTP Password HTTP code not 201 Created (got %d)", resp.http_code);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
-        goto cleanup_resp;
+        goto cleanup_response;
     }
     info ("ACLK_OTP Got Password from Cloud");
 
@@ -371,7 +419,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     
     if (parse_passwd_response(resp.payload, &data)){
         error("Error parsing response of password endpoint");
-        goto cleanup_resp;
+        goto cleanup_response;
     }
 
     *mqtt_pass = data.passwd;
@@ -379,12 +427,68 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     *mqtt_id = data.client_id;
 
     rc = 0;
-cleanup_resp:
+
+cleanup_response:
     https_req_response_free(&resp);
-cleanup:
-    freez(agent_id);
+cleanup_buffers:
+    buffer_free(resp_json);
     buffer_free(url);
     return rc;
+}
+
+static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char **decrypted)
+{
+    *decrypted = mallocz(RSA_size(p_key));
+    int result = RSA_private_decrypt(data_len, enc_data, *decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
+    if (result == -1) {
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+        error("Decryption of the challenge failed: %s", err);
+        freez(*decrypted);
+    }
+    return result;
+}
+
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+{
+    unsigned char *challenge;
+    int challenge_bytes;
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL) {
+        error("Agent was not claimed - cannot perform challenge/response");
+        return 1;
+    }
+
+    // Get Challenge
+    if (aclk_get_otp_challenge(target, agent_id, &challenge, &challenge_bytes)) {
+        error("Error getting challenge");
+        freez(agent_id);
+        return 1;
+    }
+
+    // Decrypt Challenge / Get response
+    unsigned char *response_plaintext;
+    int response_plaintext_bytes = private_decrypt(p_key, challenge, challenge_bytes, &response_plaintext);
+    if (response_plaintext_bytes < 0) {
+        error ("Couldn't decrypt the challenge received");
+        freez(challenge);
+        freez(agent_id);
+        return 1;
+    }
+    freez(challenge);
+
+    // Encode and Send Challenge
+    if (aclk_send_otp_response(agent_id, response_plaintext, response_plaintext_bytes, target, mqtt_id, mqtt_usr, mqtt_pass)) {
+        error("Error getting response");
+        freez(response_plaintext);
+        freez(agent_id);
+        return 1;
+    }
+
+    freez(response_plaintext);
+    freez(agent_id);
+    return 0;
 }
 
 #define JSON_KEY_ENC "encoding"
