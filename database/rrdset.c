@@ -1247,8 +1247,10 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, new_value, true))
-                    dim_storage_flags |= SN_ANOMALOUS;
+                if (ml_is_anomalous(rd, new_value, true)) {
+                    // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
+                    dim_storage_flags &= ~ ((uint32_t) SN_ANOMALY_BIT);
+                }
 
                 rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, dim_storage_flags));
 //                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );

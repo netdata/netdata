@@ -30,7 +30,7 @@ static CalculatedNumber unpack_storage_number_dbl(storage_number value) {
         factor = 100;
 
     // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_EXISTS
+    // bit 25 SN_ANOMALY_BIT
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;

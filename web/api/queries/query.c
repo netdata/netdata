@@ -447,7 +447,7 @@ static inline void do_dimension_variablestep(
             if (likely(now >= db_now)) {
                 if (likely(does_storage_number_exist(n_curr))) {
                     if (options & RRDR_OPTION_ANOMALY_BIT)
-                        value = (n_curr & SN_ANOMALOUS) ? 100.0 : 0.0;
+                        value = (n_curr & SN_ANOMALY_BIT) ? 0.0 : 100.0;
                     else
                         value = unpack_storage_number(n_curr);
 
@@ -600,7 +600,7 @@ static inline void do_dimension_fixedstep(
                 }
 #endif
                 if (options & RRDR_OPTION_ANOMALY_BIT)
-                    value = (n & SN_ANOMALOUS) ? 100.0 : 0.0;
+                    value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
                 else
                     value = unpack_storage_number(n);
 
