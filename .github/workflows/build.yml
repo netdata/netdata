@@ -203,7 +203,7 @@ jobs:
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
-          name: ${{ matrix.artifact_key }}-text-env
+          name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
         run: |
           docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
@@ -285,7 +285,7 @@ jobs:
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
-          name: ${{ matrix.artifact_key }}-text-env
+          name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
         run: |
           docker import ${{ matrix.artifact_key }}-test-env/image.tar test:latest
