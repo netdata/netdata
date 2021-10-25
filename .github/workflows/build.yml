@@ -274,6 +274,7 @@ jobs:
           name: dist-tarball
       - name: Prepare artifact directory
         run: |
+          mkdir -p artifacts
           cp packaging/version artifacts/latest-version.txt
           cp dist-tarball/* artifacts
           cd artifacts || exit 1
