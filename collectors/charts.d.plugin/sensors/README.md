@@ -39,7 +39,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config charts.d.conf
 ```
 
-Needs to be set to "force" to be enabled
+It also needs to be set to "force" to be enabled:
 
 ```shell
 # example=force
