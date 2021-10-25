@@ -31,8 +31,7 @@
     },
     {
       "distro": "centos:7",
-      "artifact_key": "centos7",
-      "rmjsonc": "yum remove -y json-c-devel"
+      "artifact_key": "centos7"
     },
     {
       "distro": "centos:8",
