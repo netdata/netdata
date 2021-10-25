@@ -1244,6 +1244,10 @@ AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
 AC_LANG_POP([C++])
 
+if test "${host_cpu}" = "powerpc64le"; then
+    have_cxx11="no"
+fi
+
 if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
     AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
 else
