@@ -5,6 +5,7 @@
 # ======================================================================
 # Constants
 
+KICKSTART_OPTIONS="${*}"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
@@ -162,15 +163,14 @@ EOF
 )"
 
   if [ -n "$(command -v curl 2> /dev/null)" ]; then
-    curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}"
+    curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
   else
     wget -q -O - --no-check-certificate \
-    --server-response \
     --method POST \
     --timeout=1 \
     --header 'Content-Type: application/json' \
     --body-data "${REQ_BODY}" \
-     "${TELEMETRY_URL}" 2>&1 | awk '/^  HTTP/{print $2}'
+     "${TELEMETRY_URL}" > /dev/null
   fi
 }
 
