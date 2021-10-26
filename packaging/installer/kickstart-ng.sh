@@ -88,12 +88,12 @@ HEREDOC
 # Telemetry functions
 
 telemetry_event() {
-  now="$(date +%s)"
-  total_duration="$((now - START_TIME))"
-
-  if [ -n "${NETDATA_DISABLE_TELEMETRY}" ]; then
+  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
     return 0
   fi
+  
+  now="$(date +%s)"
+  total_duration="$((now - START_TIME))"
 
   if [ -e "/etc/os-release" ]; then
     eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" < /etc/os-release | sed 's/^/HOST_/')"
