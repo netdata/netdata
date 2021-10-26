@@ -1244,6 +1244,9 @@ AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
 AC_LANG_POP([C++])
 
+# PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
+# the agent's components use and have been tested only with -std=c++11.
+# Skip ML compilation on that CPU until we reorganize and test the C++ flags.
 if test "${host_cpu}" = "powerpc64le"; then
     have_cxx11="no"
 fi
