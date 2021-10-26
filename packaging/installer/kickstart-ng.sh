@@ -5,6 +5,7 @@
 # ======================================================================
 # Constants
 
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
 REPOCONFIG_VERSION="1-1"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
@@ -12,16 +13,20 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 # ======================================================================
 # Defaults for environment variables
 
-RELEASE_CHANNEL="nightly"
-NETDATA_CLAIM_URL="https://app.netdata.cloud"
-NETDATA_CLAIM_ONLY=0
-NETDATA_USER_CONFIG_DIR="/etc/netdata"
+INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
+NETDATA_CLAIM_ONLY=0
+NETDATA_CLAIM_URL="https://app.netdata.cloud"
+NETDATA_DISABLE_CLOUD=0
+NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
+NETDATA_REQUIRE_CLOUD=1
+RELEASE_CHANNEL="nightly"
 
 NETDATA_DISABLE_TELEMETRY="${DO_NOT_TRACK:-0}"
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
+NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:-""}"
 
 if [ ! -t 1 ]; then
   INTERACTIVE=0
@@ -47,7 +52,12 @@ USAGE: kickstart.sh [options]
   --disable-telemetry        Opt-out of anonymous statistics.
   --native-only              Only install if native binary packages are available.
   --static-only              Only install if a static build is available.
+  --build-only               Only install using a local build.
   --reinstall                Explicitly reinstall instead of updating any existing install.
+  --reinstall-even-if-unsafe Even try to reinstall if we don't think we can do so safely (implies --reinstall).
+  --disable-cloud            Disable support for Netdata Cloud (default: detect)
+  --require-cloud            Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
+  --install <path>           Specify an installation prefix for local builds (default: autodetect based on system type).
   --claim-token              Use a specified token for claiming to Netdata Cloud.
   --claim-rooms              When claiming, add the node to the specified rooms.
   --claim-only               If there is an existing install, only try to claim it, not update it.
@@ -64,6 +74,7 @@ Additionally, this script may use the following environment variables:
                              you need special options for one of those to work, or have a different tool to do
                              the same thing on your system, you can specify it here.
   DO_NOT_TRACK               If set to a value other than 0, behave as if \`--disable-telemetry\` was specified.
+  NETDATA_INSTALLER_OPTIONS: Specifies extra options to pass to the static installer or local build script.
 
 HEREDOC
 }
@@ -99,8 +110,15 @@ setup_terminal() {
   return 0
 }
 
+cleanup() {
+  if [ -z "${NO_CLEANUP}" ]; then
+    ${ROOTCMD} rm -rf "${tmpdir}"
+  fi
+}
+
 fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
+  cleanup
   exit 1
 }
 
@@ -216,10 +234,20 @@ download() {
     run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
-  elif command -v fetch > /dev/null 2>&1; then # Native FreeBSD tool
-    run fetch -T 15 -a -o "${dest}" "${url}" || return 1
   else
-    fatal "I need curl, wget, or fetch to proceed, but none of them are available on this system."
+    fatal "I need curl or wget to proceed, but neither of them are available on this system."
+  fi
+}
+
+get_redirect() {
+  url="${1}"
+
+  if command -v curl > /dev/null 2>&1; then
+    run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
+  elif command -v wget > /dev/null 2>&1; then
+    run sh -c "wget --max-redirect=0 ${url} 2>&1 | grep Location | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
+  else
+    fatal "I need curl or wget to proceed, but neither of them are available on this system."
   fi
 }
 
@@ -316,6 +344,21 @@ confirm_root_support() {
   fi
 }
 
+confirm() {
+  prompt="${1} [y/n]"
+
+  while true; do
+    echo "${prompt}"
+    read -r yn
+
+    case "$yn" in
+      [Yy]*) return 0;;
+      [Nn]*) return 1;;
+      *) echo "Please answer yes or no.";;
+    esac
+  done
+}
+
 # ======================================================================
 # Existing install handling code
 
@@ -369,74 +412,131 @@ handle_existing_install() {
   fi
 
   case "${INSTALL_TYPE}" in
-    kickstart-*|legacy-*|manual-static)
-      if [ -n "${NETDATA_REINSTALL}" ]; then
+    kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
+      if [ "${INSTALL_TYPE}" = "unknown" ]; then
+        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
+      else
+        progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
+      fi
+
+      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
+
+        case "${INSTALL_TYPE}" in
+          binpkg-*) NETDATA_ONLY_NATIVE=1 ;;
+          *-build) NETDATA_ONLY_BUILD=1 ;;
+          *-static) NETDATA_ONLY_STATIC=1 ;;
+          *)
+            if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+              warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
+            elif [ "${INTERACTIVE}" -eq 0 ]; then
+              fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting."
+            else
+              if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+                progress "OK, continuing."
+              else
+                fatal "Cancelling reinstallation at user request."
+              fi
+            fi
+            ;;
+        esac
+
         return 0
       fi
 
       ret=0
 
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
+      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ] && echo "${INSTALL_TYPE}" | grep -vq "binpkg-*"; then
         if ! update; then
           warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
         fi
+      else
+        warning "Not updating existing install at ${ndprefix}."
       fi
 
       if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
         progress "Attempting to claim existing install at ${ndprefix}."
+        INSTALL_PREFIX="${ndprefix}"
         claim
         ret=$?
       elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
         fatal "User asked to claim, but did not proide a claiming token."
+      else
+        progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
-      exit $ret
-      ;;
-    binpkg-*)
-      ret=0
-
-      if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-        progress "Attempting to claim existing install at ${ndprefix}."
-        claim
-        ret=$?
-      fi
-
+      cleanup
       exit $ret
       ;;
     oci)
       fatal "This is an OCI container, use the regular image lifecycle management commands in your container instead of this script for managing it."
       ;;
-    unknown)
-      warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type."
-
-      if [ -n "${NETDATA_REINSTALL}" ]; then
-        progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
-        return 0
-      fi
-
-      ret=0
-
-      if [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-        if ! update; then
-          warning "Unable to find usable updater script, not updating existing install at ${ndprefix}."
-        fi
-      fi
-
-      if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-        progress "Attempting to claim existing install at ${ndprefix}."
-        claim
-        ret=$?
-      elif [ "${NETDATA_CLAIM_ONLY}" -eq 1 ]; then
-        fatal "User asked to claim, but did not proide a claiming token."
-      fi
-
-      exit $ret
-      ;;
     *)
-      fatal "Found an existing netdata install at ${ndprefix}, but it is not a supported install type, refusing to proceed."
+      if [ -n "${NETDATA_REINSTALL}" ] || [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+        if [ -n "${NETDATA_UNSAFE_REINSTALL}" ]; then
+          warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
+        elif [ "${INTERACTIVE}" -eq 0 ]; then
+          fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting."
+        else
+          if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+            progress "OK, continuing."
+          else
+            fatal "Cancelling reinstallation at user request."
+          fi
+        fi
+      else
+        fatal "Found an existing netdata install at ${ndprefix}, but the install type is '${INSTALL_TYPE}', which is not supported, refusing to proceed."
+      fi
       ;;
   esac
+}
+
+soft_disable_cloud() {
+  cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
+
+  run ${ROOTCMD} mkdir -p "${cloud_prefix}"
+
+  cat > "${tmpdir}/cloud.conf" << EOF
+[global]
+  enabled = no
+EOF
+
+  run ${ROOTCMD} cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
+
+  if [ -z "${NETDATA_NO_START}" ]; then
+    case "${SYSTYPE}" in
+      Darwin) run ${ROOTCMD} launchctl kickstart -k com.github.netdata ;;
+      FreeBSD) run ${ROOTCMD} service netdata restart ;;
+      Linux)
+        initpath="$(${ROOTCMD} readlink /proc/1/exe)"
+
+        if command -v service > /dev/null 2>&1; then
+          run ${ROOTCMD} service netdata restart
+        elif command -v rc-service > /dev/null 2>&1; then
+          run ${ROOTCMD} rc-service netdata restart
+        elif [ "$(basename "${initpath}" 2> /dev/null)" = "systemd" ]; then
+          run ${ROOTCMD} systemctl restart netdata
+        elif [ -f /etc/init.d/netdata ]; then
+          run ${ROOTCMD} /etc/init.d/netdata restart
+        fi
+        ;;
+    esac
+  fi
+}
+
+confirm_install_prefix() {
+  if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+    fatal "The \`--install\` option is only supported together with the \`--only-build\` option."
+  fi
+
+  case "${SYSTYPE}" in
+    Darwin) INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local/netdata}" ;;
+    FreeBSD) INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}" ;;
+  esac
+
+  if [ -n "${INSTALL_PREFIX}" ]; then
+    NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install ${INSTALL_PREFIX}"
+  fi
 }
 
 # ======================================================================
@@ -448,17 +548,19 @@ check_claim_opts() {
     fatal "Invalid claiming options, claim rooms may only be specified when a token and URL are specified."
   elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
     fatal "Invalid claiming options, a claiming token must be specified."
+  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
+    fatal "Cloud explicitly disabled, but automatic claiming requested. Either enable Netdata Cloud, or remove the --claim-* options."
   fi
 }
 
 claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
-  if [ -z "${NETDATA_PREFIX}" ]; then
+  if [ -z "${INSTALL_PREFIX}" ]; then
     NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
-  elif [ "${NETDATA_PREFIX}" = "/opt/netdata" ]; then
+  elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
     NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
   else
-    NETDATA_CLAIM_PATH="${NETDATA_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
   if ! pgrep netdata > /dev/null; then
@@ -471,6 +573,7 @@ claim() {
   else
     warning "Unable to claim node, you must do so manually."
     if [ -z "${NETDATA_NEW_INSTALL}" ]; then
+      cleanup
       exit 1
     fi
   fi
@@ -697,6 +800,11 @@ try_package_install() {
     return 2
   fi
 
+  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
+    run ${ROOTCMD} mkdir -p "/etc/netdata"
+    run ${ROOTCMD} touch "/etc/netdata/.opt-out-from-anonymous-statistics"
+  fi
+
   progress "Installing Netdata package."
   # shellcheck disable=SC2086
   if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} netdata; then
@@ -715,7 +823,7 @@ try_package_install() {
 
 set_static_archive_urls() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+    latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
     export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${SYSARCH}-${latest}.gz.run"
     export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
   else
@@ -738,7 +846,7 @@ try_static_install() {
   fi
 
   if ! grep "netdata-${SYSARCH}-latest.gz.run" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-    fatal "Static binary checksum validation failed. Stopping Netdata Agent installation and leaving binary in ${tmpdir}. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
+    fatal "Static binary checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
   fi
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
@@ -767,6 +875,209 @@ try_static_install() {
 }
 
 # ======================================================================
+# Local build install code
+
+set_source_archive_urls() {
+  if [ "$1" = "stable" ]; then
+    latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+    export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${latest}.tar.gz"
+    export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
+  else
+    export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/netdata-latest.tar.gz"
+    export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/sha256sums.txt"
+  fi
+}
+
+install_local_build_dependencies() {
+  bash="$(command -v bash 2> /dev/null)"
+
+  if [ -z "${bash}" ] || [ ! -x "${bash}" ]; then
+    warning "Unable to find a usable version of \`bash\` (required for local build)."
+    return 1
+  fi
+
+  progress "Fetching script to detect required packages..."
+  download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"
+
+  if [ ! -s "${tmpdir}/install-required-packages.sh" ]; then
+    warning "Downloaded dependency installation script is empty."
+  else
+    progress "Running downloaded script to detect required packages..."
+
+    if [ "${INTERACTIVE}" -eq 0 ]; then
+      opts="--dont-wait --non-interactive"
+    fi
+
+    if [ "${SYSTYPE}" = "Darwin" ]; then
+      sudo=""
+    else
+      sudo="${ROOTCMD}"
+    fi
+
+    # shellcheck disable=SC2086
+    if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+      warning "It failed to install all the required packages, but installation might still be possible."
+    fi
+  fi
+}
+
+build_and_install() {
+  progress "Building netdata"
+
+  echo "INSTALL_TYPE='kickstart-build'" > system/.install-type
+
+  opts="${NETDATA_INSTALLER_OPTIONS}"
+
+  if [ "${INTERACTIVE}" -eq 0 ]; then
+    opts="${opts} --dont-wait"
+  fi
+
+  if [ "${NETDATA_AUTO_UPDATES}" -eq 1 ]; then
+    opts="${opts} --auto-update"
+  fi
+
+  if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+    opts="${opts} --stable-channel"
+  fi
+
+  if [ "${NETDATA_REQUIRE_CLOUD}" -eq 1 ]; then
+    opts="${opts} --require-cloud"
+  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
+    opts="${opts} --disable-cloud"
+  fi
+
+  # shellcheck disable=SC2086
+  run ${ROOTCMD} ./netdata-installer.sh ${opts} || fatal "netdata-installer.sh exited with error"
+}
+
+try_build_install() {
+  if ! install_local_build_dependencies; then
+    return 1
+  fi
+
+  set_source_archive_urls "${RELEASE_CHANNEL}"
+
+  download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"
+  download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"
+
+  if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+    fatal "Tarball checksum validation failed. Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour."
+  fi
+
+  run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
+  rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
+  cd "$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name netdata-)" || fatal "Cannot cd to netdata source tree"
+
+  if [ -x netdata-installer.sh ]; then
+    build_and_install || return 1
+  else
+    # This case is needed because some platforms produce an extra directory on the source tarball extraction.
+    if [ "$(find . -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ] && [ -x "$(find . -mindepth 1 -maxdepth 1 -type d)/netdata-installer.sh" ]; then
+      cd "$(find . -mindepth 1 -maxdepth 1 -type d)" &&  build_and_install || return 1
+    else
+      fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}"
+    fi
+  fi
+}
+
+# ======================================================================
+# Per system-type install logic
+
+install_on_linux() {
+  if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
+    try_package_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        ;;
+      1)
+        fatal "Unable to install on this system."
+        ;;
+      2)
+        if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+          fatal "Could not install native binary packages."
+        else
+          warning "Could not install native binary packages, falling back to alternative installation method."
+        fi
+        ;;
+    esac
+  fi
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+    try_static_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        INSTALL_PREFIX="/opt/netdata"
+        ;;
+      1)
+        fatal "Unable to install on this system."
+        ;;
+      2)
+        if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+          fatal "Could not install static build."
+        else
+          warning "Could not install static build, falling back to alternative installation method."
+        fi
+        ;;
+    esac
+  fi
+
+  if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+install_on_macos() {
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option."
+  elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option."
+  else
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+install_on_freebsd() {
+  if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
+    fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option."
+  elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
+    fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option."
+  else
+    try_build_install
+
+    case "$?" in
+      0)
+        NETDATA_INSTALL_SUCCESSFUL=1
+        ;;
+      *)
+        fatal "Unable to install on this system."
+        ;;
+    esac
+  fi
+}
+
+# ======================================================================
 # Main program
 
 setup_terminal || echo > /dev/null
@@ -775,28 +1086,54 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--help")
       usage
+      cleanup
       exit 0
       ;;
     "--no-cleanup") NO_CLEANUP=1 ;;
     "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
     "--interactive") INTERACTIVE=1 ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
-    "--no-updates") NETDATA_AUTO_UPDATES="" ;;
+    "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
     "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
-    "--disable-telemetry") NETDATA_DISABLE_TELEMETRY="1" ;;
     "--reinstall") NETDATA_REINSTALL=1 ;;
+    "--reinstall-even-if-unsafe") NETDATA_UNSAFE_REINSTALL=1 ;;
     "--claim-only") NETDATA_CLAIM_ONLY=1 ;;
+    "--disable-cloud")
+      NETDATA_DISABLE_CLOUD=1
+      NETDATA_REQUIRE_CLOUD=0
+      ;;
+    "--require-cloud")
+      NETDATA_DISABLE_CLOUD=0
+      NETDATA_REQUIRE_CLOUD=1
+      ;;
+    "--dont-start-it")
+      NETDATA_NO_START=1
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+      ;;
+    "--disable-telemetry")
+      NETDATA_DISABLE_TELEMETRY="0"
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
+      ;;
+    "--install")
+      INSTALL_PREFIX="${2}"
+      shift 1
+      ;;
     "--native-only")
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
+      NETDATA_ONLY_BUILD=0
       ;;
     "--static-only")
       NETDATA_ONLY_STATIC=1
       NETDATA_ONLY_NATIVE=0
+      NETDATA_ONLY_BUILD=0
       ;;
-    "--dont-start-it")
-      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
+    "--build-only")
+      NETDATA_ONLY_BUILD=1
+      NETDATA_ONLY_NATIVE=0
+      NETDATA_ONLY_STATIC=0
       ;;
+
     "--claim-token")
       NETDATA_CLAIM_TOKEN="${2}"
       shift 1
@@ -824,6 +1161,10 @@ while [ -n "${1}" ]; do
           ;;
       esac
       ;;
+    *)
+      warning "Passing unrecognized option '${1}' to installer script. If this is intended, please add it to \$NETDATA_INSTALLER_OPTIONS instead."
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+      ;;
   esac
   shift 1
 done
@@ -831,6 +1172,7 @@ done
 check_claim_opts
 confirm_root_support
 get_system_info
+confirm_install_prefix
 
 tmpdir="$(create_tmp_directory)"
 progress "Using ${tmpdir} as a temporary directory."
@@ -839,76 +1181,15 @@ cd "${tmpdir}" || exit 1
 handle_existing_install
 
 case "${SYSTYPE}" in
-  Linux)
-    if [ "${NETDATA_ONLY_STATIC}" -ne 1 ]; then
-      try_package_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          ;;
-        1)
-          fatal "Unable to install on this system."
-          ;;
-        2)
-          if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-            fatal "Could not install native binary packages."
-          else
-            warning "Could not install native binary packages, falling back to alternative installation method."
-          fi
-          ;;
-      esac
-    fi
-
-    if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
-      try_static_install
-
-      case "$?" in
-        0)
-          NETDATA_INSTALL_SUCCESSFUL=1
-          NETDATA_USER_CONFIG_DIR="/opt/netdata/etc/netdata"
-          ;;
-        1)
-          fatal "Unable to install on this system."
-          ;;
-        2)
-          if [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-            fatal "Could not install static build."
-          else
-            warning "Could not install static build, falling back to alternative installation method."
-          fi
-          ;;
-      esac
-    fi
-    ;;
-  Darwin)
-    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option."
-    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option."
-    else
-      fatal "This script currently does not support installation on macOS."
-    fi
-    ;;
-  FreeBSD)
-    if [ "${NETDATA_ONLY_NATIVE}" -eq 1 ]; then
-      fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option."
-    elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
-      fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option."
-    else
-      fatal "This script currently does not support installation on FreeBSD."
-    fi
-    ;;
+  Linux) install_on_linux ;;
+  Darwin) install_on_macos ;;
+  FreeBSD) install_on_freebsd ;;
 esac
-
-if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
-  run ${ROOTCMD} touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-fi
 
 if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
   claim
+elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
+  soft_disable_cloud
 fi
 
-if [ -z "${NO_CLEANUP}" ]; then
-  ${ROOTCMD} rm -rf "${tmpdir}"
-fi
+cleanup
