@@ -39,7 +39,7 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # inside the container and runs the script install-alpine-packages.sh
   # (also inside the container)
   #
-  if docker inspect alpine:3.14 > dev/null 2>&1; then
+  if docker inspect alpine:3.14 > /dev/null 2>&1; then
     run docker image remove alpine:3.14
     run docker pull --platform=${platform}  alpine:3.14
   fi
