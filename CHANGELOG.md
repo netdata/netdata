@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Fix kickstart.md Installation Guide Links [\#11708](https://github.com/netdata/netdata/pull/11708) ([DShreve2](https://github.com/DShreve2))
+- Queue removed alerts to cloud for new architecture [\#11704](https://github.com/netdata/netdata/pull/11704) ([MrZammler](https://github.com/MrZammler))
 - Ebpf doc [\#11703](https://github.com/netdata/netdata/pull/11703) ([thiagoftsm](https://github.com/thiagoftsm))
 - Charts 2.0 - fix broken link [\#11701](https://github.com/netdata/netdata/pull/11701) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - postgres collector: Fix crash the wal query if wal-file was removed concurrently [\#11697](https://github.com/netdata/netdata/pull/11697) ([unhandled-exception](https://github.com/unhandled-exception))
@@ -17,6 +18,7 @@
 - New eBPF and libbpf releases [\#11680](https://github.com/netdata/netdata/pull/11680) ([thiagoftsm](https://github.com/thiagoftsm))
 - Mark g++ for freebsd as NOTREQUIRED [\#11678](https://github.com/netdata/netdata/pull/11678) ([MrZammler](https://github.com/MrZammler))
 - Fix warnings from -Wformat-truncation=2 [\#11676](https://github.com/netdata/netdata/pull/11676) ([MrZammler](https://github.com/MrZammler))
+- Stream chart labels [\#11675](https://github.com/netdata/netdata/pull/11675) ([MrZammler](https://github.com/MrZammler))
 - Update pfsense.md [\#11674](https://github.com/netdata/netdata/pull/11674) ([78Star](https://github.com/78Star))
 - fix swap\_used alarm calc [\#11672](https://github.com/netdata/netdata/pull/11672) ([ilyam8](https://github.com/ilyam8))
 - Fix line arguments \(eBPF\) [\#11670](https://github.com/netdata/netdata/pull/11670) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -162,7 +164,6 @@
 - eBPF Hard IRQ latency [\#11410](https://github.com/netdata/netdata/pull/11410) ([UmanShahzad](https://github.com/UmanShahzad))
 - Split eBPF programs [\#11401](https://github.com/netdata/netdata/pull/11401) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
-- Add ACLK synchronization event loop [\#11396](https://github.com/netdata/netdata/pull/11396) ([stelfrag](https://github.com/stelfrag))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
 - Added support for bundling protobuf as part of the install. [\#11374](https://github.com/netdata/netdata/pull/11374) ([Ferroin](https://github.com/Ferroin))
@@ -193,7 +194,6 @@
 - Don't repeat the cgroup discovery cleanup info message [\#11101](https://github.com/netdata/netdata/pull/11101) ([vlvkobal](https://github.com/vlvkobal))
 - Add host\_cloud\_enabled attribute to analytics [\#11100](https://github.com/netdata/netdata/pull/11100) ([MrZammler](https://github.com/MrZammler))
 - Improve dashboard documentation \(part 3\) [\#11099](https://github.com/netdata/netdata/pull/11099) ([joelhans](https://github.com/joelhans))
-- cgroups: fix network interfaces detection when using `virsh` [\#11096](https://github.com/netdata/netdata/pull/11096) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
