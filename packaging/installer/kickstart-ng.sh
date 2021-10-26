@@ -1343,3 +1343,4 @@ fi
 
 telemetry_event INSTALL_SUCCESS "" ""
 cleanup
+trap - EXIT
