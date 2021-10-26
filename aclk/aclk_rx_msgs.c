@@ -417,7 +417,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             error ("Cloud Banned This Agent!");
             aclk_disable_runtime = 1;
         }
-        info ("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_desctiprion);
+        info ("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
         if (cmd->reconnect_after_s > 0) {
             aclk_block_until = now_monotonic_sec() + cmd->reconnect_after_s;
             info ("Cloud asks for parley for %u seconds. We shall honor that request", (unsigned int)cmd->reconnect_after_s);
