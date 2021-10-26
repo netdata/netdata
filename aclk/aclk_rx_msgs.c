@@ -413,9 +413,16 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         struct disconnect_cmd *cmd = parse_disconnect_cmd(msg, msg_len);
         if (!cmd)
             return;
-        info ("Cloud requested disconnect");
+        if (cmd->permaban) {
+            error ("Cloud Banned This Agent!");
+            aclk_disable_runtime = 1;
+        }
+        info ("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_desctiprion);
+        if (cmd->reconnect_after_s > 0) {
+            aclk_block_until = now_monotonic_sec() + cmd->reconnect_after_s;
+            info ("Cloud asks for parley for %u seconds. We shall honor that request", (unsigned int)cmd->reconnect_after_s);
+        }
         disconnect_req = 1;
-        
     }
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
