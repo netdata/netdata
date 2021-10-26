@@ -91,7 +91,7 @@ telemetry_event() {
   if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
     return 0
   fi
-  
+
   now="$(date +%s)"
   total_duration="$((now - START_TIME))"
 
@@ -140,8 +140,8 @@ telemetry_event() {
     "\$host": "installer.netdata.io",
     "\$ip": "127.0.0.1",
     "script_variant": "kickstart-ng",
-    "error_code": "${2}",
-    "error_message": "${3}",
+    "error_code": "${3}",
+    "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
     "total_runtime": "${total_duration}",
     "selected_install_method": "${ACTUAL_INSTALL_METHOD}",
@@ -1258,7 +1258,7 @@ while [ -n "${1}" ]; do
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
       ;;
     "--disable-telemetry")
-      NETDATA_DISABLE_TELEMETRY="0"
+      NETDATA_DISABLE_TELEMETRY="1"
       NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
       ;;
     "--install")
