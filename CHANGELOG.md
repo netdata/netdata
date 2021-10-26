@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Adding \(eBPF\) to submenu [\#11721](https://github.com/netdata/netdata/pull/11721) ([thiagoftsm](https://github.com/thiagoftsm))
+- add sensors to charts.d.conf and add a note how to enable it [\#11715](https://github.com/netdata/netdata/pull/11715) ([ilyam8](https://github.com/ilyam8))
+- Add Cloud sign-up link to README.md [\#11714](https://github.com/netdata/netdata/pull/11714) ([DShreve2](https://github.com/DShreve2))
 - Fix kickstart.md Installation Guide Links [\#11708](https://github.com/netdata/netdata/pull/11708) ([DShreve2](https://github.com/DShreve2))
 - Queue removed alerts to cloud for new architecture [\#11704](https://github.com/netdata/netdata/pull/11704) ([MrZammler](https://github.com/MrZammler))
 - Ebpf doc [\#11703](https://github.com/netdata/netdata/pull/11703) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -155,14 +158,11 @@
 - Fix issue \#11434 regarding inconsistent status check on  component. [\#11435](https://github.com/netdata/netdata/pull/11435) ([0x3333](https://github.com/0x3333))
 - Force play timezone [\#11433](https://github.com/netdata/netdata/pull/11433) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Default to not using LTO for builds. [\#11432](https://github.com/netdata/netdata/pull/11432) ([Ferroin](https://github.com/Ferroin))
-- Properly handle reuploads of packages to PackageCloud. [\#11427](https://github.com/netdata/netdata/pull/11427) ([Ferroin](https://github.com/Ferroin))
-- Use DebHelper compat level 9 in repoconfig packages to support Ubuntu 16.04 [\#11426](https://github.com/netdata/netdata/pull/11426) ([Ferroin](https://github.com/Ferroin))
 - Adds Alert Related API for new protocol [\#11424](https://github.com/netdata/netdata/pull/11424) ([underhood](https://github.com/underhood))
 - Update SQLite version from v3.33.0 to 3.36.0 [\#11423](https://github.com/netdata/netdata/pull/11423) ([stelfrag](https://github.com/stelfrag))
 - Add SQLite unit tests [\#11422](https://github.com/netdata/netdata/pull/11422) ([stelfrag](https://github.com/stelfrag))
 - Adds NodeInstanceInfo API [\#11419](https://github.com/netdata/netdata/pull/11419) ([underhood](https://github.com/underhood))
 - eBPF Hard IRQ latency [\#11410](https://github.com/netdata/netdata/pull/11410) ([UmanShahzad](https://github.com/UmanShahzad))
-- Split eBPF programs [\#11401](https://github.com/netdata/netdata/pull/11401) ([thiagoftsm](https://github.com/thiagoftsm))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
 - add Travis ctrl file for checking if changes happened [\#11383](https://github.com/netdata/netdata/pull/11383) ([oldgiova](https://github.com/oldgiova))
@@ -187,13 +187,6 @@
 - Check configuration for CUSTOM and MSTEAM [\#11113](https://github.com/netdata/netdata/pull/11113) ([MrZammler](https://github.com/MrZammler))
 - Fix broken links in various docs [\#11109](https://github.com/netdata/netdata/pull/11109) ([joelhans](https://github.com/joelhans))
 - minor - fixes typo in ACLK-NG log [\#11107](https://github.com/netdata/netdata/pull/11107) ([underhood](https://github.com/underhood))
-- Update mqtt\_websockets [\#11105](https://github.com/netdata/netdata/pull/11105) ([underhood](https://github.com/underhood))
-- packaging: update go.d.plugin version to v0.28.2 [\#11104](https://github.com/netdata/netdata/pull/11104) ([ilyam8](https://github.com/ilyam8))
-- aclk/legacy: change aclk statistics charts units from kB/s to KiB/s [\#11103](https://github.com/netdata/netdata/pull/11103) ([ilyam8](https://github.com/ilyam8))
-- Check the version of the default cgroup mountpoint [\#11102](https://github.com/netdata/netdata/pull/11102) ([vlvkobal](https://github.com/vlvkobal))
-- Don't repeat the cgroup discovery cleanup info message [\#11101](https://github.com/netdata/netdata/pull/11101) ([vlvkobal](https://github.com/vlvkobal))
-- Add host\_cloud\_enabled attribute to analytics [\#11100](https://github.com/netdata/netdata/pull/11100) ([MrZammler](https://github.com/MrZammler))
-- Improve dashboard documentation \(part 3\) [\#11099](https://github.com/netdata/netdata/pull/11099) ([joelhans](https://github.com/joelhans))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
