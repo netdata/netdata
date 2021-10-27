@@ -23,6 +23,8 @@ jobs:
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
+    outputs:
+      distfile: ${{ steps.build.outputs.distfile }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -34,6 +36,7 @@ jobs:
         run: |
           sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
       - name: Build
+        id: build
         run: |
           mkdir -p artifacts
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
@@ -46,11 +49,11 @@ jobs:
                       --with-math \
                       --with-user=netdata
           make dist
-          echo "DISTFILE=$(find . -name 'netdata-*.tar.gz')" >> "$GITHUB_ENV"
+          echo "::set-output name=distfile::$(find . -name 'netdata-*.tar.gz')"
           cp netdata-*.tar.gz artifacts/
       - name: Test
         run: |
-          .github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
+          .github/scripts/run_install_with_dist_file.sh ${{ steps.build.outputs.distfile }}
       - name: Store
         uses: actions/upload-artifact@v2
         with:
@@ -145,6 +148,7 @@ jobs:
         run: |
           mv ../dist-tarball/* .
           mv ../static-archive/* .
+          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz
           cp ../packaging/version ./latest-version.txt
           sha256sum -b ./* > sha256sums.txt
       - name: Store Artifacts
