@@ -840,6 +840,8 @@ set(ACLK_NG_FILES
         aclk/schema-wrappers/alarm_stream.h
         aclk/schema-wrappers/alarm_config.cc
         aclk/schema-wrappers/alarm_config.h
+        aclk/schema-wrappers/cloud_cmds.cc
+        aclk/schema-wrappers/cloud_cmds.h
         aclk/schema-wrappers/node_info.cc
         aclk/schema-wrappers/node_info.h
         aclk/schema-wrappers/schema_wrappers.h
@@ -1135,6 +1137,7 @@ endfunction()
 
 set(ACLK_NG_PROTO_DEFS
         aclk/aclk-schemas/proto/aclk/v1/lib.proto
+        aclk/aclk-schemas/proto/aclk/v1/cmd.proto
         aclk/aclk-schemas/proto/agent/v1/connection.proto
         aclk/aclk-schemas/proto/alarm/v1/config.proto
         aclk/aclk-schemas/proto/alarm/v1/stream.proto
