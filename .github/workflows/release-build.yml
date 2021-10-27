@@ -130,8 +130,16 @@ jobs:
         uses: actions/checkout@v2
       - name: Prepare Environment
         run: mkdir -p artifacts
-      - name: Retrieve Artifacts
+      - name: Retrieve Dist Tarball
         uses: actions/download-artifact@v2
+        with:
+          name: dist-tarball
+          path: dist-tarball
+      - name: Retrieve Static Build Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: static-archive
+          path: static-archive
       - name: Prepare Artifacts
         working-directory: ./artifacts/
         run: |
@@ -241,5 +249,5 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name == 'wworkflow_dispatch'
+            && github.event_name == 'workflow_dispatch'
           }}
