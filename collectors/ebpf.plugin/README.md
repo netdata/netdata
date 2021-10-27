@@ -120,7 +120,7 @@ syscall to synchronize data according to its manual.
 
 The eBPF plugin shows multi-device flushes happening in real time. This can be
 used to explain some spikes happening in
-[disk latency](docs/agent/collectors/ebpf.plugin#disk) charts.
+[disk latency](#disk) charts.
 
 By default, MD flush is disabled. To enable it, configure your
 `/etc/netdata/ebpf.d.conf` file as:
