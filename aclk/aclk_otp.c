@@ -9,33 +9,6 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
-struct dictionary_singleton {
-    char *key;
-    char *result;
-};
-
-static int json_extract_singleton(JSON_ENTRY *e)
-{
-    struct dictionary_singleton *data = e->callback_data;
-
-    switch (e->type) {
-        case JSON_OBJECT:
-        case JSON_ARRAY:
-            break;
-        case JSON_STRING:
-            if (!strcmp(e->name, data->key)) {
-                data->result = strdupz(e->data.string);
-                break;
-            }
-            break;
-        case JSON_NUMBER:
-        case JSON_BOOLEAN:
-        case JSON_NULL:
-            break;
-    }
-    return 0;
-}
-
 static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, unsigned char *decrypted)
 {
     int  result = RSA_private_decrypt( data_len, enc_data, decrypted, p_key, RSA_PKCS1_OAEP_PADDING);
