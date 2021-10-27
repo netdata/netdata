@@ -36,6 +36,7 @@ static struct {
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
+        , {"anomaly-bit"     , 0    , RRDR_OPTION_ANOMALY_BIT}
         , {                  NULL, 0, 0}
 };
 
@@ -1088,11 +1089,109 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"metrics-count\": ");
     analytics_get_data(analytics_data.netdata_metrics_count, wb);
+    buffer_strcat(wb, ",\n");
+
+#if defined(ENABLE_ML)
+    char *ml_info = ml_get_host_info(host);
+
+    buffer_strcat(wb, "\t\"ml-info\": ");
+    buffer_strcat(wb, ml_info);
     buffer_strcat(wb, "\n");
+
+    free(ml_info);
+#endif
 
     buffer_strcat(wb, "}");
     return 0;
 }
+
+#if defined(ENABLE_ML)
+int web_client_api_request_v1_anomaly_events(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    uint32_t after = 0, before = 0;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "after"))
+            after = (uint32_t) (strtoul(value, NULL, 0) / 1000);
+        else if (!strcmp(name, "before"))
+            before = (uint32_t) (strtoul(value, NULL, 0) / 1000);
+    }
+
+    char *s;
+    if (!before || !after)
+        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+    else {
+        s = ml_get_anomaly_events(host, "AD1", 1, after, before);
+        if (!s)
+            s = strdup("{\"error\": \"json string is empty\" }\n");
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+
+    return HTTP_RESP_OK;
+}
+
+int web_client_api_request_v1_anomaly_event_info(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    uint32_t after = 0, before = 0;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "after"))
+            after = (uint32_t) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "before"))
+            before = (uint32_t) strtoul(value, NULL, 0);
+    }
+
+    char *s;
+    if (!before || !after)
+        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+    else {
+        s = ml_get_anomaly_event_info(host, "AD1", 1, after, before);
+        if (!s)
+            s = strdup("{\"error\": \"json string is empty\" }\n");
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+    return HTTP_RESP_OK;
+}
+#endif // defined(ENABLE_ML)
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1148,6 +1247,12 @@ static struct api_command {
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
+
+#if defined(ENABLE_ML)
+        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
+        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
+#endif
+
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         { "aclk",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state      },
         // terminator

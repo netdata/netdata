@@ -39,6 +39,7 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
+    ml/kmeans/dlib \
     README.md \
     LICENSE \
     REDISTRIBUTED.md \
@@ -117,6 +118,7 @@ SUBDIRS += \
     claim \
     parser \
     spawn \
+    ml \
     $(NULL)
 
 if ENABLE_ACLK
@@ -232,6 +234,44 @@ HEALTH_PLUGIN_FILES = \
     health/health_json.c \
     health/health_log.c \
     $(NULL)
+
+ML_FILES = \
+    ml/ml.h \
+    ml/ml-dummy.c \
+    $(NULL)
+
+if ENABLE_ML
+ML_FILES += \
+    ml/BitBufferCounter.h \
+    ml/BitBufferCounter.cc \
+    ml/BitRateWindow.h \
+    ml/BitRateWindow.cc \
+    ml/Config.h \
+    ml/Config.cc \
+    ml/Database.h \
+    ml/Database.cc \
+    ml/Dimension.cc \
+    ml/Dimension.h \
+    ml/Host.h \
+    ml/Host.cc \
+    ml/Query.h \
+    ml/kmeans/KMeans.h \
+    ml/kmeans/KMeans.cc \
+    ml/kmeans/SamplesBuffer.h \
+    ml/kmeans/SamplesBuffer.cc \
+    ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/json/single_include/nlohmann/json.hpp \
+    ml/ml.cc \
+    ml/ml-private.h \
+    $(NULL)
+endif
+
+if ENABLE_ML_TESTS
+ML_TESTS_FILES = \
+    ml/kmeans/Tests.cc \
+    ml/Tests.cc \
+    $(NULL)
+endif
 
 IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
@@ -863,6 +903,8 @@ NETDATA_FILES = \
     $(EXPORTING_ENGINE_FILES) \
     $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
+    $(ML_FILES) \
+    $(ML_TESTS_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
@@ -941,6 +983,11 @@ netdata_LDADD = \
 if ACLK_NG
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
         $(OPTIONAL_ATOMIC_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_ML_TESTS
+    netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
         $(NULL)
 endif
 

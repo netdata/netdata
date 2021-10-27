@@ -796,6 +796,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                || !strcmp(co->name, CONFIG_SECTION_BACKEND)
                || !strcmp(co->name, CONFIG_SECTION_STREAM)
                || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
+               || !strcmp(co->name, CONFIG_SECTION_ML)
                     )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;

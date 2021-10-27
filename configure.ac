@@ -184,6 +184,18 @@ AC_ARG_WITH(
     [with_bundled_protobuf="$withval"],
     [with_bundled_protobuf="detect"]
 )
+AC_ARG_ENABLE(
+    [ml],
+    [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@default autodetect@:>@])],
+    ,
+    [enable_ml="detect"]
+)
+AC_ARG_ENABLE(
+    [ml_tests],
+    [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
+    [enable_ml_tests="yes"],
+    [enable_ml_tests="no"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -1190,6 +1202,90 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# gtest/gmock
+
+AC_MSG_CHECKING([if gtest and gmock can be found])
+
+PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
+PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+
+if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
+    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
+    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
+    have_gtest="yes"
+else
+    have_gtest="no"
+fi
+
+# -----------------------------------------------------------------------------
+# ml - anomaly detection
+
+# Check if uuid is availabe. Fail if ML was explicitly requested.
+if test "${enable_ml}" = "yes" -a "${have_uuid}" != "yes"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found."])
+fi
+
+# Check if submodules have not been fetched. Fail if ML was explicitly requested.
+AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
+if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+    AC_MSG_RESULT([yes])
+    have_ml_submodules="yes"
+else
+    AC_MSG_RESULT([no])
+    have_ml_submodules="no"
+fi
+
+if test "${enable_ml}" = "yes" -a "${have_ml_submodules}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built because the required git submodules are missing.])
+fi
+
+# Check if C++ toolchain does not support C++11. Fail if ML was explicitly requested.
+AC_LANG_PUSH([C++])
+AX_CHECK_COMPILE_FLAG([-std=c++11], [have_cxx11=yes], [have_cxx11=no])
+AC_LANG_POP([C++])
+
+# PPC64LE needs -std=gnu++11 in order to build dlib. However, the rest of
+# the agent's components use and have been tested only with -std=c++11.
+# Skip ML compilation on that CPU until we reorganize and test the C++ flags.
+if test "${host_cpu}" = "powerpc64le"; then
+    have_cxx11="no"
+fi
+
+if test "${enable_ml}" = "yes" -a "${have_cxx11}" = "no"; then
+    AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but it cannot be built without a C++11 toolchain.])
+else
+    CXX11FLAG="$CXX11FLAG -std=c++11"
+fi
+
+# Decide if we should build ML
+if test "${enable_ml}" != "no" -a "${have_ml_submodules}" = "yes" -a "${have_cxx11}" = "yes" -a "${have_uuid}" = "yes"; then
+    build_ml="yes"
+else
+    build_ml="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
+if test "${build_ml}" = "yes"; then
+    AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_LIBS=""
+fi
+
+# Decide if we should build ML tests.
+if test "${build_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
+    build_ml_tests="yes"
+else
+    build_ml_tests="no"
+fi
+
+AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${build_ml_tests}" = "yes"])
+if test "${build_ml_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
+    OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
+    OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
+fi
+
+# -----------------------------------------------------------------------------
 # ebpf.plugin
 
 if test "${build_target}" = "linux" -a "${enable_ebpf}" != "no"; then
@@ -1557,7 +1653,8 @@ AC_MSG_RESULT([${enable_lto}])
 AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" \
                                      -o "${enable_exporting_pubsub}" = "yes" \
                                      -o "${enable_backend_prometheus_remote_write}" = "yes" \
-                                     -o "${new_cloud_protocol}" = "yes"])
+                                     -o "${new_cloud_protocol}" = "yes" \
+                                     -o "${build_ml}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -1589,7 +1686,7 @@ CFLAGS="${CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_NG_CFLAGS}"
+    ${OPTIONAL_ACLK_NG_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1642,6 +1739,12 @@ AC_SUBST([OPTIONAL_LWS_LIBS])
 AC_SUBST([OPTIONAL_ACLK_NG_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_CFLAGS])
 AC_SUBST([OPTIONAL_PROTOBUF_LIBS])
+AC_SUBST([OPTIONAL_GTEST_CFLAGS])
+AC_SUBST([OPTIONAL_GTEST_LIBS])
+AC_SUBST([OPTIONAL_ML_CFLAGS])
+AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
+AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1731,6 +1834,8 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
+    ml/Makefile
+    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile

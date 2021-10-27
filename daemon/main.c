@@ -826,6 +826,11 @@ int main(int argc, char **argv) {
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
+#ifdef ENABLE_ML_TESTS
+                        else if(strcmp(optarg, "mltest") == 0) {
+                            return test_ml(argc, argv);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1143,6 +1148,10 @@ int main(int argc, char **argv) {
         // This is the safest place to start the SILENCERS structure
         set_silencers_filename();
         health_initialize_global_silencers();
+
+        // --------------------------------------------------------------------
+        // Initialize ML configuration
+        ml_init();
 
         // --------------------------------------------------------------------
         // setup process signals
