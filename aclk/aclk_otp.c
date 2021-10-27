@@ -377,7 +377,7 @@ cleanup_resp:
     return rc;
 }
 
-int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, char **mqtt_id, char **mqtt_usr, char **mqtt_pass)
+int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, struct auth_data *mqtt_auth)
 {
     int len;
     int rc = 1;
@@ -415,16 +415,10 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
     }
     info ("ACLK_OTP Got Password from Cloud");
 
-    struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
-    
-    if (parse_passwd_response(resp.payload, &data)){
+    if (parse_passwd_response(resp.payload, mqtt_auth)){
         error("Error parsing response of password endpoint");
         goto cleanup_response;
     }
-
-    *mqtt_pass = data.passwd;
-    *mqtt_usr = data.username;
-    *mqtt_id = data.client_id;
 
     rc = 0;
 
@@ -479,12 +473,17 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     freez(challenge);
 
     // Encode and Send Challenge
-    if (aclk_send_otp_response(agent_id, response_plaintext, response_plaintext_bytes, target, mqtt_id, mqtt_usr, mqtt_pass)) {
+    struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
+    if (aclk_send_otp_response(agent_id, response_plaintext, response_plaintext_bytes, target, &data)) {
         error("Error getting response");
         freez(response_plaintext);
         freez(agent_id);
         return 1;
     }
+
+    *mqtt_pass = data.passwd;
+    *mqtt_usr = data.username;
+    *mqtt_id = data.client_id;
 
     freez(response_plaintext);
     freez(agent_id);
