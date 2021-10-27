@@ -249,5 +249,5 @@ jobs:
           ${{
             failure()
             && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name == 'wworkflow_dispatch'
+            && github.event_name == 'workflow_dispatch'
           }}
