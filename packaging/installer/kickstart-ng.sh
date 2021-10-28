@@ -16,8 +16,8 @@ START_TIME="$(date +%s)"
 # ======================================================================
 # Defaults for environment variables
 
-ACTUAL_INSTALL_METHOD="none"
-INSTALL_METHOD_CODE="unknown"
+SELECTED_INSTALL_METHOD="none"
+INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="1"
 NETDATA_CLAIM_ONLY=0
@@ -145,9 +145,9 @@ telemetry_event() {
     "error_message": "${2}",
     "install_options": "${KICKSTART_OPTIONS}",
     "total_runtime": "${total_duration}",
-    "selected_install_method": "${ACTUAL_INSTALL_METHOD}",
+    "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
-    "netdata_install_type": "${INSTALL_METHOD_CODE}",
+    "netdata_install_type": "${INSTALL_TYPE}",
     "host_os_name": "${HOST_NAME:-unknown}",
     "host_os_id": "${HOST_ID:-unknown}",
     "host_os_id_like": "${HOST_ID_LIKE:-unknown}",
@@ -809,7 +809,7 @@ try_package_install() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       uninstall_subcmd="uninstall"
-      INSTALL_METHOD_CODE="binpkg-deb"
+      INSTALL_TYPE="binpkg-deb"
       ;;
     ubuntu)
       needs_early_refresh=1
@@ -822,7 +822,7 @@ try_package_install() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       uninstall_subcmd="uninstall"
-      INSTALL_METHOD_CODE="binpkg-deb"
+      INSTALL_TYPE="binpkg-deb"
       ;;
     centos)
       if command -v dnf > /dev/null; then
@@ -838,7 +838,7 @@ try_package_install() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       uninstall_subcmd="remove"
-      INSTALL_METHOD_CODE="binpkg-rpm"
+      INSTALL_TYPE="binpkg-rpm"
       ;;
     fedora)
       if command -v dnf > /dev/null; then
@@ -854,7 +854,7 @@ try_package_install() {
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       uninstall_subcmd="remove"
-      INSTALL_METHOD_CODE="binpkg-rpm"
+      INSTALL_TYPE="binpkg-rpm"
       ;;
     opensuse)
       pm_cmd="zypper"
@@ -866,7 +866,7 @@ try_package_install() {
       pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
       repo_update_opts=""
       uninstall_subcmd="remove"
-      INSTALL_METHOD_CODE="binpkg-rpm"
+      INSTALL_TYPE="binpkg-rpm"
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
@@ -1129,7 +1129,7 @@ try_build_install() {
 
 install_on_linux() {
   if [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    ACTUAL_INSTALL_METHOD="native"
+    SELECTED_INSTALL_METHOD="native"
     try_package_install
 
     case "$?" in
@@ -1150,8 +1150,8 @@ install_on_linux() {
   fi
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
-    ACTUAL_INSTALL_METHOD="static"
-    INSTALL_METHOD_CODE="kickstart-static"
+    SELECTED_INSTALL_METHOD="static"
+    INSTALL_TYPE="kickstart-static"
     try_static_install
 
     case "$?" in
@@ -1173,8 +1173,8 @@ install_on_linux() {
   fi
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_STATIC}" -ne 1 ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
-    ACTUAL_INSTALL_METHOD="build"
-    INSTALL_METHOD_CODE="kickstart-build"
+    SELECTED_INSTALL_METHOD="build"
+    INSTALL_TYPE="kickstart-build"
     try_build_install
 
     case "$?" in
@@ -1194,8 +1194,8 @@ install_on_macos() {
   elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
     fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option." F0306
   else
-    ACTUAL_INSTALL_METHOD="build"
-    INSTALL_METHOD_CODE="kickstart-build"
+    SELECTED_INSTALL_METHOD="build"
+    INSTALL_TYPE="kickstart-build"
     try_build_install
 
     case "$?" in
@@ -1215,8 +1215,8 @@ install_on_freebsd() {
   elif [ "${NETDATA_ONLY_STATIC}" -eq 1 ]; then
     fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option." F0309
   else
-    ACTUAL_INSTALL_METHOD="build"
-    INSTALL_METHOD_CODE="kickstart-build"
+    SELECTED_INSTALL_METHOD="build"
+    INSTALL_TYPE="kickstart-build"
     try_build_install
 
     case "$?" in
@@ -1276,19 +1276,19 @@ while [ -n "${1}" ]; do
       NETDATA_ONLY_NATIVE=1
       NETDATA_ONLY_STATIC=0
       NETDATA_ONLY_BUILD=0
-      ACTUAL_INSTALL_METHOD="native"
+      SELECTED_INSTALL_METHOD="native"
       ;;
     "--static-only")
       NETDATA_ONLY_STATIC=1
       NETDATA_ONLY_NATIVE=0
       NETDATA_ONLY_BUILD=0
-      ACTUAL_INSTALL_METHOD="static"
+      SELECTED_INSTALL_METHOD="static"
       ;;
     "--build-only")
       NETDATA_ONLY_BUILD=1
       NETDATA_ONLY_NATIVE=0
       NETDATA_ONLY_STATIC=0
-      ACTUAL_INSTALL_METHOD="build"
+      SELECTED_INSTALL_METHOD="build"
       ;;
     "--claim-token")
       NETDATA_CLAIM_TOKEN="${2}"
