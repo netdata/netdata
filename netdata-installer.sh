@@ -371,6 +371,10 @@ while [ -n "${1}" ]; do
       NETDATA_PREFIX="${2}/netdata"
       shift 1
       ;;
+    "--install-no-prefix")
+      NETDATA_PREFIX="${2}"
+      shift 1
+      ;;
     "--help" | "-h")
       usage
       exit 1

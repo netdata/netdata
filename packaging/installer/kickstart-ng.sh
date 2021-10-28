@@ -502,6 +502,7 @@ handle_existing_install() {
   else
     if [ -n "${INSTALL_PREFIX}" ]; then
       searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
     else
       searchpath="${PATH}"
     fi
@@ -656,13 +657,19 @@ confirm_install_prefix() {
     fatal "The \`--install\` option is only supported together with the \`--only-build\` option." F0204
   fi
 
-  case "${SYSTYPE}" in
-    Darwin) INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local/netdata}" ;;
-    FreeBSD) INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}" ;;
-  esac
-
   if [ -n "${INSTALL_PREFIX}" ]; then
     NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install ${INSTALL_PREFIX}"
+  else
+    case "${SYSTYPE}" in
+      Darwin)
+        INSTALL_PREFIX="/usr/local/netdata"
+        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install-no-prefix ${INSTALL_PREFIX}"
+        ;;
+      FreeBSD)
+        INSTALL_PREFIX="/usr/local"
+        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install-no-prefix ${INSTALL_PREFIX}"
+        ;;
+    esac
   fi
 }
 
