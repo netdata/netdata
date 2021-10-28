@@ -598,9 +598,7 @@ bundle_libmosquitto() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling libmosquitto."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libmosquitto."
 
   progress "Prepare custom libmosquitto version"
 
@@ -628,9 +626,7 @@ bundle_libmosquitto() {
     defer_error_highlighted "Unable to fetch sources for libmosquitto. You will not be able to connect this node to Netdata Cloud."
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_libmosquitto
@@ -706,9 +702,7 @@ bundle_libwebsockets() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling libwebsockets."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libwebsockets."
 
   progress "Prepare libwebsockets"
 
@@ -737,9 +731,7 @@ bundle_libwebsockets() {
     defer_error_highlighted "Unable to fetch sources for libwebsockets. You may not be able to connect this node to Netdata Cloud."
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_libwebsockets
@@ -786,9 +778,7 @@ bundle_protobuf() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling protobuf."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling protobuf."
 
   PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
 
@@ -815,9 +805,7 @@ bundle_protobuf() {
     defer_error_highlighted "Unable to fetch sources for protobuf. You may not be able to connect this node to Netdata Cloud."
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_protobuf
@@ -872,9 +860,7 @@ bundle_judy() {
     progress "/usr/include/Judy.h does not exist, but we need libJudy, building our own copy"
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling libJudy."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libJudy."
 
   progress "Prepare libJudy"
 
@@ -897,9 +883,7 @@ bundle_judy() {
     else
       run_failed "Failed to build libJudy."
       if [ -n "${NETDATA_BUILD_JUDY}" ]; then
-        if [ -n "${GITHUB_ACTIONS}" ]; then
-            echo "::endgroup::"
-        fi
+        [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
         exit 1
       else
@@ -909,9 +893,7 @@ bundle_judy() {
   else
     run_failed "Unable to fetch sources for libJudy."
     if [ -n "${NETDATA_BUILD_JUDY}" ]; then
-      if [ -n "${GITHUB_ACTIONS}" ]; then
-          echo "::endgroup::"
-      fi
+      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
       exit 1
     else
@@ -919,9 +901,7 @@ bundle_judy() {
     fi
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_judy
@@ -962,9 +942,7 @@ bundle_jsonc() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling JSON-C."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling JSON-C."
 
   progress "Prepare JSON-C"
 
@@ -992,9 +970,7 @@ bundle_jsonc() {
     defer_error_highlighted "Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled."
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_jsonc
@@ -1047,9 +1023,7 @@ bundle_libbpf() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Bundling libbpf."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
 
   rename_libbpf_packaging
 
@@ -1087,9 +1061,7 @@ bundle_libbpf() {
     fi
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 bundle_libbpf
@@ -1115,14 +1087,12 @@ fi
 
 # -----------------------------------------------------------------------------
 echo >&2
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Configuring Netdata."
 progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]; then
   run autoreconf -ivf || exit 1
-fi
-
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::group::Configuring Netdata."
 fi
 
 run ./configure \
@@ -1137,17 +1107,13 @@ run ./configure \
   ${NETDATA_CONFIGURE_OPTIONS} \
   CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" || exit 1
 
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::endgroup::"
-fi
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
 # remove the build_error hook
 trap - EXIT
 
 # -----------------------------------------------------------------------------
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::group::Building Netdata."
-fi
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building Netdata."
 
 progress "Cleanup compilation directory"
 
@@ -1158,14 +1124,10 @@ progress "Compile netdata"
 
 run $make ${MAKEOPTS} || exit 1
 
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::endgroup::"
-fi
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
 # -----------------------------------------------------------------------------
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::group::Installing Netdata."
-fi
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
 
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
 
@@ -1526,9 +1488,7 @@ else
   run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
 
-if [ -n "${GITHUB_ACTIONS}" ]; then
-  echo "::endgroup::"
-fi
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
 # -----------------------------------------------------------------------------
 
@@ -1597,9 +1557,7 @@ install_go() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Installing go.d.plugin."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing go.d.plugin."
 
   # When updating this value, ensure correct checksums in packaging/go.d.checksums
   GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
@@ -1648,9 +1606,7 @@ install_go() {
     defer_error "go.d plugin download failed, go.d plugin will not be available"
     echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
     echo >&2
-    if [ -n "${GITHUB_ACTIONS}" ]; then
-      echo "::endgroup::"
-    fi
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 0
   fi
 
@@ -1666,9 +1622,7 @@ install_go() {
 
     run_failed "go.d.plugin package files checksum validation failed."
     defer_error "go.d.plugin package files checksum validation failed, go.d.plugin will not be available"
-    if [ -n "${GITHUB_ACTIONS}" ]; then
-      echo "::endgroup::"
-    fi
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 0
   fi
 
@@ -1686,9 +1640,7 @@ install_go() {
   run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   rm -rf "${tmp}"
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 install_go
@@ -1781,9 +1733,7 @@ install_ebpf() {
     return 0
   fi
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::group::Installing eBPF code."
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing eBPF code."
 
   remove_old_ebpf
 
@@ -1806,9 +1756,7 @@ install_ebpf() {
     echo 2>&" Removing temporary directory ${tmp} ..."
     rm -rf "${tmp}"
 
-    if [ -n "${GITHUB_ACTIONS}" ]; then
-      echo "::endgroup::"
-    fi
+    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
     return 1
   fi
 
@@ -1824,9 +1772,7 @@ install_ebpf() {
     if [ "${RET}" != "0" ]; then
       rm -rf "${tmp}"
 
-      if [ -n "${GITHUB_ACTIONS}" ]; then
-        echo "::endgroup::"
-      fi
+      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
       return 1
     fi
   fi
@@ -1835,9 +1781,7 @@ install_ebpf() {
 
   rm -rf "${tmp}"
 
-  if [ -n "${GITHUB_ACTIONS}" ]; then
-    echo "::endgroup::"
-  fi
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
 progress "eBPF Kernel Collector"
