@@ -454,7 +454,6 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
         char err[512];
         ERR_error_string_n(ERR_get_error(), err, sizeof(err));
         error("Decryption of the challenge failed: %s", err);
-        freez(*decrypted);
     }
     return result;
 }
@@ -482,6 +481,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     int response_plaintext_bytes = private_decrypt(p_key, challenge, challenge_bytes, &response_plaintext);
     if (response_plaintext_bytes < 0) {
         error ("Couldn't decrypt the challenge received");
+        freez(response_plaintext);
         freez(challenge);
         freez(agent_id);
         return 1;
