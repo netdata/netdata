@@ -341,7 +341,6 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
         goto cleanup_resp;
     }
     json_object *challenge_json;
-    //TODO does this increase ref count?
     if (json_pointer_get(json, "/challenge", &challenge_json)) {
         error ("No key named \"challenge\" in the returned JSON");
         goto cleanup_json;
