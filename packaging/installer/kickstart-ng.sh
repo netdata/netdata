@@ -500,7 +500,14 @@ handle_existing_install() {
   if pkg_installed netdata; then
     ndprefix="/"
   else
-    ndpath="$(command -v netdata 2>/dev/null)"
+    if [ -n "${INSTALL_PREFIX}" ]; then
+      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    else
+      searchpath="${PATH}"
+    fi
+
+    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
     if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
       ndpath="/opt/netdata/bin/netdata"
     fi
