@@ -34,6 +34,8 @@ run ./netdata-installer.sh \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Finishing netdata install"
+
 # Properly mark the install type
 cat > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type" <<-EOF
 	INSTALL_TYPE='manual-static'
@@ -55,3 +57,5 @@ if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/apps.plugin
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/cgroup-network
 fi
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"

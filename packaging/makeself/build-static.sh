@@ -59,7 +59,7 @@ if [ -t 1 ]; then
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 else
   run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/usr/src/netdata.git:rw \
-    "${DOCKER_CONTAINER_NAME}" \
+    -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" "${DOCKER_CONTAINER_NAME}" \
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 fi
 
