@@ -4,6 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building OpenSSL"
+
 version="$(cat "$(dirname "${0}")/../openssl.version")"
 
 export CFLAGS='-fno-lto'
@@ -19,3 +21,5 @@ cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 run ./config -static no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
 run make -j "$(nproc)"
 run make -j "$(nproc)" install_sw
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"

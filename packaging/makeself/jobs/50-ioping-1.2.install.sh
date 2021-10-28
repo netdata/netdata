@@ -4,6 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building ioping"
+
 fetch "ioping-1.2" "https://github.com/koct9i/ioping/archive/v1.2.tar.gz"
 
 export CFLAGS="-static"
@@ -16,3 +18,5 @@ run install -o root -g root -m 4750 ioping "${NETDATA_INSTALL_PATH}"/usr/libexec
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/ioping
 fi
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
