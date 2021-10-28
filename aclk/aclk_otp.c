@@ -268,6 +268,23 @@ exit:
 }
 #endif
 
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+{
+	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+
+	if (ctx != NULL) {
+		memset(ctx, 0, sizeof(*ctx));
+	}
+	return ctx;
+}
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+	return;
+}
+#endif
+
 #define CHALLENGE_LEN 256
 #define CHALLENGE_LEN_BASE64 344
 inline static int base64_decode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
