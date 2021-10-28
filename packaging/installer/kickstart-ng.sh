@@ -112,6 +112,8 @@ telemetry_event() {
     fi
   fi
 
+  KERNEL_NAME="$(uname -s)"
+
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
     TOTAL_RAM="$(sysctl -n hw.physmem)"
   elif [ "${KERNEL_NAME}" = Darwin ]; then
@@ -153,7 +155,7 @@ telemetry_event() {
     "host_os_id_like": "${HOST_ID_LIKE:-unknown}",
     "host_os_version": "${HOST_VERSION:-unknown}",
     "host_os_version_id": "${HOST_VERSION_ID:-unknown}",
-    "system_kernel_name": "$(uname -s)",
+    "system_kernel_name": "${KERNEL_NAME}",
     "system_kernel_version": "$(uname -r)",
     "system_architecture": "$(uname -m)",
     "system_total_ram": "${TOTAL_RAM:-unknown}"
