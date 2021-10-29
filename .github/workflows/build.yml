@@ -142,7 +142,6 @@ jobs:
       - matrix
     strategy:
       fail-fast: true
-      max-parallel: 8
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - name: Git clone repository
