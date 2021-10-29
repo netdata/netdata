@@ -1362,6 +1362,7 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
         st->last_updated.tv_sec += c * st->update_every;
 
         st->current_entry += c;
+        st->counter += c;
         if(st->current_entry >= st->entries)
             st->current_entry -= st->entries;
     }
