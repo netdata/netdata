@@ -9,9 +9,10 @@ ENV RMJSONC=${RMJSONC}
 ENV DO_NOT_TRACK=1
 ENV GITHUB_ACTIONS=true
 
+RUN echo "${PRE}" > /prep-cmd.sh && \
+    echo "${RMJSONC}" > /rmjsonc.sh && chmod +x /rmjsonc.sh && \
+    /bin/sh /prep-cmd.sh
+
 COPY . /netdata
 
-RUN echo "${PRE}" > /netdata/prep-cmd.sh
-RUN echo "${RMJSONC}" > /netdata/rmjsonc.sh && chmod +x /netdata/rmjsonc.sh
-RUN /bin/sh /netdata/prep-cmd.sh
 RUN /netdata/packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all

@@ -230,7 +230,7 @@ jobs:
         if: matrix.rmjsonc != ''
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c '/netdata/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
+              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
