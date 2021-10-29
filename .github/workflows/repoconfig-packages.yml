@@ -38,6 +38,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         # Unlike normally, we do not need a deep clone or submodules for this.
+      - name: Fetch base image
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 900
+          command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
       - name: Build Packages
         shell: bash
         run: |

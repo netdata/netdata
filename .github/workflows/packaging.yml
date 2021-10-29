@@ -127,6 +127,15 @@ jobs:
           else
             echo "version=${{ matrix.alias }}" >> $GITHUB_ENV
           fi
+      - name: Fetch base image
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 900
+          command: |
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ env.version }}
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Build Packages
         shell: bash
         run: |
