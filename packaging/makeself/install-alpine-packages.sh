@@ -16,10 +16,12 @@ apk add --no-cache -U \
   binutils \
   cmake \
   curl \
+  elfutils-dev \
   gcc \
   git \
   gnutls-dev \
   gzip \
+  libelf-static \
   libmnl-dev \
   libnetfilter_acct-dev \
   libtool \
