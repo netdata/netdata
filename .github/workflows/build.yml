@@ -6,7 +6,7 @@ on:
     branches:
       - master
   pull_request: null # PR checks only validate the build and generate artifacts for testing.
-  workflow_dispatch:
+  workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
     inputs:
       type:
         description: Build Type
@@ -16,7 +16,7 @@ on:
         description: Version Tag
         default: nightly
         required: true
-concurrency:
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: release-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
@@ -37,7 +37,7 @@ jobs:
         id: build
         run: |
           mkdir -p artifacts
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
           autoreconf -ivf
           ./configure --prefix=/usr \
                       --sysconfdir=/etc \
@@ -123,8 +123,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Prepare tools
         run: |
           sudo apt-get update && sudo apt-get install -y jq
@@ -135,19 +133,19 @@ jobs:
           echo "Generated Matrix: $TASKS"
           echo "::set-output name=matrix::$TASKS"
 
-  prepare-test-images:
+  prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
     name: Prepare Test Environments
     runs-on: ubuntu-latest
     needs:
       - matrix
     strategy:
-      fail-fast: true
+      # Unlike the actal build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
+      # just run everything in parallel instead lof limiting job concurrency.
+      fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - name: Git clone repository
         uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
       - name: Build test environment
@@ -259,7 +257,7 @@ jobs:
       max-parallel: 8
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     services:
-      apache:
+      apache: # This gets used to serve the dist tarball for the updater script.
         image: httpd:2.4
         ports:
           - 8080:80
