@@ -519,8 +519,8 @@ handle_existing_install() {
       ndprefix="$(dirname "$(dirname "${ndpath}")")"
     fi
 
-    if (echo "${ndprefix}" | grep -Eq '/usr$'); then
-      ndprefix="$(dirname "${ndpath}")"
+    if echo "${ndprefix}" | grep -Eq '/usr$'; then
+      ndprefix="$(dirname "${ndprefix}")"
     fi
   fi
 
