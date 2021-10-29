@@ -768,7 +768,7 @@ void *aclk_main(void *ptr)
         if (!aclk_use_new_cloud_arch)
             queue_connect_payloads();
 
-        if (!handle_connection(mqttwss_client)) {
+        if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
             aclk_connected = 0;
         }
