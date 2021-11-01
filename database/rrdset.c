@@ -1819,6 +1819,7 @@ after_second_database_work:
             if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
                 if (likely(!sql_queue_dimension_to_aclk(rd))) {
                     rd->state->aclk_live_status = live;
+                    rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
                 }
             }
         }
