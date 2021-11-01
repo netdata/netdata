@@ -778,8 +778,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
         alarm_snap.chunks = chunks;
         alarm_snap.chunk = chunk;
 
-        alarm_snapshot_proto_ptr_t snapshot_proto;
-        snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
+        alarm_snapshot_proto_ptr_t snapshot_proto = NULL;
 
         for (; ae; ae = ae->next) {
             if (likely(ae->updated_by_id))
@@ -791,14 +790,17 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
             if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
                 continue;
 
+            cnt++;
+
             struct alarm_log_entry alarm_log;
             alarm_log.node_id = wc->node_id;
             alarm_log.claim_id = claim_id;
 
+            if (!snapshot_proto)
+                snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
+
             health_alarm_entry2proto_nolock(&alarm_log, ae, host);
             add_alarm_log_entry2snapshot(snapshot_proto, &alarm_log);
-
-            cnt++;
 
             if (cnt == ALARM_EVENTS_PER_CHUNK) {
                 aclk_send_alarm_snapshot(snapshot_proto);
