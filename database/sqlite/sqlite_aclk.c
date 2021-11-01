@@ -165,9 +165,9 @@ int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd)
             break;
         wc = wc->next;
     }
+    uv_mutex_unlock(&aclk_async_lock);
     if (wc)
         aclk_database_enq_cmd(wc, cmd);
-    uv_mutex_unlock(&aclk_async_lock);
     return (wc == NULL);
 }
 
