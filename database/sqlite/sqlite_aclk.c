@@ -332,7 +332,12 @@ void aclk_database_worker(void *arg)
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
     memset(&cmd, 0, sizeof(cmd));
-    sql_get_last_chart_sequence(wc, cmd);
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    sql_get_last_chart_sequence(wc);
+    wc->chart_payload_count = sql_get_pending_count(wc);
+    if (!wc->chart_payload_count)
+        info("%s: No pending charts and dimensions detected during startup", wc->host_guid);
+#endif
     wc->chart_updates = 0;
     wc->alert_updates = 0;
     wc->startup_time = now_realtime_sec();
@@ -370,6 +375,7 @@ void aclk_database_worker(void *arg)
                     break;
 
 // CHART / DIMENSION OPERATIONS
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
                 case ACLK_DATABASE_ADD_CHART:
                     debug(D_ACLK_SYNC, "Adding chart event for %s", wc->host_guid);
                     aclk_add_chart_event(wc, cmd);
@@ -394,7 +400,7 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC, "RESET chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
                     aclk_receive_chart_reset(wc, cmd);
                     break;
-
+#endif
 // ALERTS
                 case ACLK_DATABASE_ADD_ALERT:
                     debug(D_ACLK_SYNC,"Adding alert event for %s", wc->host_guid);
@@ -426,10 +432,15 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
                     break;
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+                case ACLK_DATABASE_DIM_DELETION:
+                    debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
+                    break;
                 case ACLK_DATABASE_UPD_RETENTION:
                     debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
                     aclk_update_retention(wc, cmd);
                     break;
+#endif
 
 // NODE_INSTANCE DETECTION
                 case ACLK_DATABASE_TIMER:
