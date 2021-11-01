@@ -8,14 +8,15 @@ sidebar_label: "eBPF"
 
 # eBPF monitoring with Netdata
 
-Netdata's extended Berkeley Packet Filter (eBPF) collector monitors kernel-level metrics for file descriptors, virtual
-filesystem IO, and process management on Linux systems. You can use our eBPF collector to analyze how and when a process
-accesses files, when it makes system calls, whether it leaks memory or creating zombie processes, and more.
+eBPF is a Linux kernel technology that allows us to run data collection programs within a kernel context.
 
-Netdata's eBPF monitoring toolkit uses two custom eBPF programs. The default, called `entry`, monitors calls to a
-variety of kernel functions, such as `do_sys_open`, `__close_fd`, `vfs_read`, `vfs_write`, `_do_fork`, and more. The
-`return` program also monitors the return of each kernel functions to deliver more granular metrics about how your
-system and its applications interact with the Linux kernel.
+eBPF consists of a wide toolchain that ultimately outputs a set of bytecode that will run inside of the eBPF virtual 
+machine (VM) which lives inside of the Linux kernel. The program in particular is executed in response to a [tracepoint 
+or kprobe](#probes-and-tracepoints) activation.
+
+Netdata has written many eBPF programs, which, when compiled and integrated into the Netdata Agent, are able to collect 
+a wide array of data about the host that would otherwise be impossible. The data eBPF programs can collect is truly unique, 
+which gives the Netdata Agent access to data that is high value but normally hard to capture.
 
 eBPF monitoring can help you troubleshoot and debug how applications interact with the Linux kernel. See
 our [guide on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for
@@ -25,6 +26,23 @@ configuration and troubleshooting tips.
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
   <figcaption>An example of VFS charts made possible by the eBPF collector plugin.</figcaption>
 </figure>
+
+## Probes and Tracepoints
+
+The following two features from the Linux kernel are used by Netdata to run eBPF programs:
+
+- Kprobes and return probes (kretprobe): Probes can insert virtually into any kernel instruction . When eBPF runs in 
+  `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a 
+  function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users 
+  to monitor return from these functions and detect possible failures.
+- Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when 
+  both options are available.
+
+In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is 
+run instead, performing various collection logic before letting the kernel continue its normal control flow.
+
+There are more methods by which eBPF programs can activate but which are not currently supported, such as via uprobes 
+which allow hooking into arbitrary user-space functions in a similar manner to kprobes.
 
 ## Enable the collector on Linux
 
