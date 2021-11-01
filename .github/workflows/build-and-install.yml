@@ -22,7 +22,6 @@ jobs:
           - 'alpine:3.14'
           - 'alpine:3.13'
           - 'alpine:3.12'
-          - 'alpine:3.11'
           - 'archlinux:latest'
           - 'centos:8'
           - 'centos:7'
@@ -48,9 +47,6 @@ jobs:
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
           - distro: 'alpine:3.12'
-            pre: 'apk add -U bash'
-            rmjsonc: 'apk del json-c-dev'
-          - distro: 'alpine:3.11'
             pre: 'apk add -U bash'
             rmjsonc: 'apk del json-c-dev'
 
