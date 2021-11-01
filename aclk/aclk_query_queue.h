@@ -25,7 +25,8 @@ typedef enum {
     RETENTION_UPDATED,
     UPDATE_NODE_INFO,
     ALARM_LOG_HEALTH,
-    ALARM_PROVIDE_CFG
+    ALARM_PROVIDE_CFG,
+    ALARM_SNAPSHOT
 } aclk_query_type_t;
 
 struct aclk_query_metadata {

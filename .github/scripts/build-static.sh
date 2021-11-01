@@ -10,7 +10,7 @@ set -e
 BUILDARCH="${1}"
 NAME="${NAME:-netdata}"
 VERSION="${VERSION:-"$(git describe)"}"
-BASENAME="$NAME-$VERSION"
+BASENAME="$NAME-$BUILDARCH-$VERSION"
 
 prepare_build() {
   progress "Preparing build"
@@ -32,8 +32,10 @@ prepare_assets() {
     cp packaging/version artifacts/latest-version.txt
 
     cd artifacts || exit 1
-    ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
-    sha256sum -b ./* > "sha256sums.txt"
+    ln -s "${BASENAME}.gz.run" "netdata-${BUILDARCH}-latest.gz.run"
+    if [ "${BUILDARCH}" = "x86_64" ]; then
+      ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+    fi
   ) >&2
 }
 

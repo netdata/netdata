@@ -52,7 +52,7 @@ make dist
 mv "${BASENAME}.tar.gz" artifacts/
 
 echo "--- Create self-extractor ---"
-sxarches="x86_64"
+sxarches="x86_64 armv7l aarch64"
 for arch in ${sxarches}; do
   git clean -d -f
   rm -rf packating/makeself/tmp

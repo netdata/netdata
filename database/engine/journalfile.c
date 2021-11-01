@@ -94,7 +94,7 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
 
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 

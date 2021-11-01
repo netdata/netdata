@@ -77,6 +77,9 @@ extern void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST 
 void legacy_aclk_host_state_update(RRDHOST *host, int connect);
 int aclk_send_info_child_connection(RRDHOST *host, ACLK_CMD cmd);
 void aclk_update_next_child_to_popcorn(void);
+
+char *legacy_aclk_state(void);
+char *legacy_aclk_state_json(void);
 #endif
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H

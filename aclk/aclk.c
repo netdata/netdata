@@ -25,6 +25,8 @@
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 
+int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
+
 time_t aclk_block_until = 0;
 
 aclk_env_t *aclk_env = NULL;
@@ -223,7 +225,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     aclk_handle_cloud_message(cmsg);
 }
 
-
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static void msg_callback_new(const char *topic, const void *msg, size_t msglen, int qos)
 {
     if (msglen > RX_MSGLEN_MAX)
@@ -261,6 +263,7 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
 
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
+#endif
 
 static void puback_callback(uint16_t packet_id)
 {
@@ -352,6 +355,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     else
         mqtt_wss_subscribe(client, topic, 1);
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (aclk_use_new_cloud_arch) {
         topic = aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
         if (!topic)
@@ -359,21 +363,26 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
         else
             mqtt_wss_subscribe(client, topic, 1);
     }
+#endif
 
     aclk_stats_upd_online(1);
     aclk_connected = 1;
     aclk_pubacks_per_conn = 0;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!aclk_use_new_cloud_arch) {
+#endif
         ACLK_SHARED_STATE_LOCK;
         if (aclk_shared_state.agent_state != ACLK_HOST_INITIALIZING) {
             error("Sending `connect` payload immediately as popcorning was finished already.");
             queue_connect_payloads();
         }
         ACLK_SHARED_STATE_UNLOCK;
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     } else {
         aclk_send_agent_connection_update(client, 1);
     }
+#endif
 }
 
 /* Waits until agent is ready or needs to exit
@@ -416,9 +425,11 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     error("Preparing to Gracefully Shutdown the ACLK");
     aclk_queue_lock();
     aclk_queue_flush();
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (aclk_use_new_cloud_arch)
         aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_agent_connection_update(client, 0);
     else
+#endif
         aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_app_layer_disconnect(client, "graceful");
 
     time_t t = now_monotonic_sec();
@@ -626,13 +637,17 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         aclk_session_sec = aclk_session_newarch / USEC_PER_SEC;
         aclk_session_us = aclk_session_newarch % USEC_PER_SEC;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         if (aclk_use_new_cloud_arch) {
             mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
         } else {
+#endif
             lwt = aclk_generate_disconnect(NULL);
             mqtt_conn_params.will_msg = json_object_to_json_string_ext(lwt, JSON_C_TO_STRING_PLAIN);
             mqtt_conn_params.will_msg_len = strlen(mqtt_conn_params.will_msg);
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
         }
+#endif
 
 #ifdef ACLK_DISABLE_CHALLENGE
         ret = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
@@ -675,7 +690,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
  */
 void *aclk_main(void *ptr)
 {
-#ifdef ACLK_NEWARCH_DEVMODE
+#if defined(ENABLE_NEW_CLOUD_PROTOCOL) && defined(ACLK_NEWARCH_DEVMODE)
     aclk_use_new_cloud_arch = 1;
 #endif
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -711,7 +726,11 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, (aclk_use_new_cloud_arch ? msg_callback_new : msg_callback), puback_callback))) {
+#else
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+#endif
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
@@ -749,7 +768,7 @@ void *aclk_main(void *ptr)
         if (!aclk_use_new_cloud_arch)
             queue_connect_payloads();
 
-        if (!handle_connection(mqttwss_client)) {
+        if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
             aclk_connected = 0;
         }
@@ -956,7 +975,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
         rrdhost_aclk_state_lock(localhost);
         create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
         rrdhost_aclk_state_unlock(localhost);
-        create_query->data.node_creation.hops = 1; //TODO - real hop count instead of hardcoded
+        create_query->data.node_creation.hops = (uint32_t) host->system_info->hops;
         create_query->data.node_creation.hostname = strdupz(host->hostname);
         create_query->data.node_creation.machine_guid = strdupz(host->machine_guid);
         aclk_queue_query(create_query);
@@ -964,7 +983,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
     }
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
-    query->data.node_update.hops = 1; //TODO - real hop count instead of hardcoded
+    query->data.node_update.hops = (uint32_t) host->system_info->hops;
     rrdhost_aclk_state_lock(localhost);
     query->data.node_update.claim_id = strdupz(localhost->aclk_state.claimed_id);
     rrdhost_aclk_state_unlock(localhost);
@@ -1003,7 +1022,7 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_lock(localhost);
             create_query->data.node_creation.claim_id = strdupz(localhost->aclk_state.claimed_id);
             rrdhost_aclk_state_unlock(localhost);
-            create_query->data.node_creation.hops = uuid_compare(list->host_id, localhost->host_uuid) ? 1 : 0; // TODO - when streaming supports hops
+            create_query->data.node_creation.hops = list->hops;
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
@@ -1018,4 +1037,74 @@ void aclk_send_node_instances()
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
     aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
+}
+
+char *ng_aclk_state(void)
+{
+    BUFFER *wb = buffer_create(1024);
+    char *ret;
+
+    buffer_strcat(wb,
+        "ACLK Available: Yes\n"
+        "ACLK Implementation: Next Generation\n"
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        "New Cloud Protocol Support: Yes\n"
+#else
+        "New Cloud Protocol Support: No\n"
+#endif
+        "Claimed: "
+    );
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+        buffer_strcat(wb, "No\n");
+    else {
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\n", agent_id);
+        freez(agent_id);
+    }
+
+    buffer_sprintf(wb, "Online: %s\nUsed Cloud Protocol: %s", aclk_connected ? "Yes" : "No", aclk_use_new_cloud_arch ? "New" : "Legacy");
+
+    ret = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+    return ret;
+}
+
+char *ng_aclk_state_json(void)
+{
+    json_object *tmp, *msg = json_object_new_object();
+
+    tmp = json_object_new_boolean(1);
+    json_object_object_add(msg, "aclk-available", tmp);
+
+    tmp = json_object_new_string("Next Generation");
+    json_object_object_add(msg, "aclk-implementation", tmp);
+
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    tmp = json_object_new_boolean(1);
+#else
+    tmp = json_object_new_boolean(0);
+#endif
+    json_object_object_add(msg, "new-cloud-protocol-supported", tmp);
+
+    char *agent_id = is_agent_claimed();
+    tmp = json_object_new_boolean(agent_id != NULL);
+    json_object_object_add(msg, "agent-claimed", tmp);
+
+    if (agent_id) {
+        tmp = json_object_new_string(agent_id);
+        freez(agent_id);
+    } else
+        tmp = NULL;
+    json_object_object_add(msg, "claimed-id", tmp);
+
+    tmp = json_object_new_boolean(aclk_connected);
+    json_object_object_add(msg, "online", tmp);
+
+    tmp = json_object_new_string(aclk_use_new_cloud_arch ? "New" : "Legacy");
+    json_object_object_add(msg, "used-cloud-protocol", tmp);
+
+    char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
+    json_object_put(msg);
+    return str;
 }

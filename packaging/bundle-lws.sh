@@ -10,7 +10,7 @@ curl -sSL --connect-timeout 10 --retry 3 "https://github.com/warmcat/libwebsocke
 sha256sum -c "${1}/packaging/libwebsockets.checksums" || exit 1
 tar -xzf "${LWS_TARBALL}" -C "${1}/externaldeps/libwebsockets" || exit 1
 cd "${LWS_BUILD_PATH}" || exit 1
-cmake -D LWS_WITH_SOCKS5:boolean=YES . || exit 1
+cmake -Wno-dev -Wno-deprecated -D LWS_WITH_SOCKS5:boolean=YES -D WITHOUT_LWS_TESTAPPS:boolean=YES . || exit 1
 make || exit 1
 cd "${startdir}" || exit 1
 cp -a "${LWS_BUILD_PATH}/lib/libwebsockets.a" "${1}/externaldeps/libwebsockets" || exit 1

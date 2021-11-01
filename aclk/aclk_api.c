@@ -194,3 +194,35 @@ struct label *add_aclk_host_labels(struct label *label) {
 #endif
     return label;
 }
+
+char *aclk_state(void) {
+#ifndef ENABLE_ACLK
+    return strdupz("ACLK Available: No");
+#else
+#ifdef ACLK_NG
+    if (aclk_ng)
+        return ng_aclk_state();
+#endif
+#ifdef ACLK_LEGACY
+    if (!aclk_ng)
+        return legacy_aclk_state();
+#endif
+#endif /* ENABLE_ACLK */
+    return NULL;
+}
+
+char *aclk_state_json(void) {
+#ifndef ENABLE_ACLK
+    return strdupz("{\"aclk-available\": false}");
+#else
+#ifdef ACLK_NG
+    if (aclk_ng)
+        return ng_aclk_state_json();
+#endif
+#ifdef ACLK_LEGACY
+    if (!aclk_ng)
+        return legacy_aclk_state_json();
+#endif
+#endif /* ENABLE_ACLK */
+    return NULL;
+}

@@ -4,6 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
+[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building fping"
+
 fetch "fping-5.0" "https://fping.org/dist/fping-5.0.tar.gz"
 
 export CFLAGS="-static -I/openssl-static/include"
@@ -28,3 +30,5 @@ run make install
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/fping
 fi
+
+[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"

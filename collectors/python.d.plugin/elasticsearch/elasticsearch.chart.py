@@ -506,7 +506,9 @@ CHARTS = {
 
 
 def convert_index_store_size_to_bytes(size):
-    # can be b, kb, mb, gb
+    # can be b, kb, mb, gb or None
+    if size is None:
+        return -1
     if size.endswith('kb'):
         return round(float(size[:-2]) * 1024)
     elif size.endswith('mb'):
@@ -518,6 +520,12 @@ def convert_index_store_size_to_bytes(size):
     elif size.endswith('b'):
         return round(float(size[:-1]))
     return -1
+
+
+def convert_index_null_value(value):
+    if value is None:
+        return -1
+    return value
 
 
 def convert_index_health(health):
@@ -634,6 +642,30 @@ class Service(UrlService):
         #         "docs.count": "10",
         #         "docs.deleted": "3",
         #         "store.size": "650b"
+        #     },
+        #     {
+        #         "status":"open",
+        #         "index":".kibana_3",
+        #         "health":"red",
+        #         "uuid":"umAdNrq6QaOXrmZjAowTNw",
+        #         "store.size":null,
+        #         "pri.store.size":null,
+        #         "docs.count":null,
+        #         "rep":"0",
+        #         "pri":"1",
+        #         "docs.deleted":null
+        #     },
+        #     {
+        #         "health" : "green",
+        #         "status" : "close",
+        #         "index" : "siem-events-2021.09.12",
+        #         "uuid" : "mTQ-Yl5TS7S3lGoRORE-Pg",
+        #         "pri" : "4",
+        #         "rep" : "0",
+        #         "docs.count" : null,
+        #         "docs.deleted" : null,
+        #         "store.size" : null,
+        #         "pri.store.size" : null
         #     }
         # ]
         raw_data = self._get_raw_data(url)
@@ -654,10 +686,12 @@ class Service(UrlService):
                     continue
 
                 v = {
-                    '{0}_index_docs_count'.format(name): idx['docs.count'],
                     '{0}_index_replica'.format(name): idx['rep'],
                     '{0}_index_health'.format(name): convert_index_health(idx['health']),
                 }
+                docs_count = convert_index_null_value(idx['docs.count'])
+                if docs_count != -1:
+                    v['{0}_index_docs_count'.format(name)] = idx['docs.count']
                 size = convert_index_store_size_to_bytes(idx['store.size'])
                 if size != -1:
                     v['{0}_index_store_size'.format(name)] = size

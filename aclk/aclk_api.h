@@ -18,6 +18,7 @@ extern int aclk_disable_runtime;
 extern int aclk_disable_single_updates;
 
 extern int aclk_stats_enabled;
+extern int aclk_alert_reloaded;
 
 extern int aclk_ng;
 
@@ -49,5 +50,7 @@ void aclk_host_state_update(RRDHOST *host, int connect);
 #endif
 
 struct label *add_aclk_host_labels(struct label *label);
+char *aclk_state(void);
+char *aclk_state_json(void);
 
 #endif /* ACLK_API_H */

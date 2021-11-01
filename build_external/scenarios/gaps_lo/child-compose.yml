@@ -12,4 +12,3 @@ services:
       - ./mostly_off.conf:/etc/netdata/netdata.conf:ro
     cap_add:
       - SYS_PTRACE
-

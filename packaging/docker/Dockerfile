@@ -57,6 +57,9 @@ RUN mkdir -p /app/usr/sbin/ \
 # hadolint ignore=DL3007
 FROM netdata/base:latest as base
 
+ARG OFFICIAL_IMAGE=false
+ENV NETDATA_OFFICIAL_IMAGE=$OFFICIAL_IMAGE
+
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
@@ -99,8 +102,10 @@ RUN chown -R root:root \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 \
         /usr/libexec/netdata/plugins.d/cgroup-network \
-        /usr/libexec/netdata/plugins.d/apps.plugin \
-        /usr/libexec/netdata/plugins.d/freeipmi.plugin && \
+        /usr/libexec/netdata/plugins.d/apps.plugin && \
+    if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
+        chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
+    fi && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
@@ -113,3 +118,5 @@ EXPOSE $NETDATA_LISTENER_PORT
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
+
+ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false

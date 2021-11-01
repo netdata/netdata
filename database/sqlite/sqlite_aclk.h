@@ -6,18 +6,19 @@
 #include "sqlite3.h"
 
 // TODO: To be added
-//#include "../../aclk/schema-wrappers/chart_stream.h"
+#include "../../aclk/schema-wrappers/chart_stream.h"
 
 #ifndef ACLK_MAX_CHART_BATCH
-#define ACLK_MAX_CHART_BATCH    (20)
+#define ACLK_MAX_CHART_BATCH    (200)
 #endif
 #ifndef ACLK_MAX_CHART_BATCH_COUNT
-#define ACLK_MAX_CHART_BATCH_COUNT (5)
+#define ACLK_MAX_CHART_BATCH_COUNT (10)
 #endif
 #define ACLK_MAX_ALERT_UPDATES  (5)
-#define ACLK_SYNC_RETRY_COUNT   "10"
 #define ACLK_DATABASE_CLEANUP_FIRST  (60)
+#define ACLK_DATABASE_ROTATION_DELAY  (60)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
+#define ACLK_DATABASE_ROTATION_INTERVAL (3600)
 #define ACLK_DELETE_ACK_INTERNAL (600)
 #define ACLK_SYNC_QUERY_SIZE 512
 
@@ -60,8 +61,6 @@ static inline void aclk_complete(struct aclk_completion *p)
 
 extern uv_mutex_t aclk_async_lock;
 
-extern int aclk_architecture;
-
 static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 {
     uuid_unparse_lower(*uuid, out);
@@ -84,7 +83,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
     return strdupz(uuid_str);
 }
 
-#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY AUTOINCREMENT, " \
+#define TABLE_ACLK_CHART "CREATE TABLE IF NOT EXISTS aclk_chart_%s (sequence_id INTEGER PRIMARY KEY, " \
         "date_created, date_updated, date_submitted, status, uuid, type, unique_id, " \
         "update_count default 1, unique(uuid, status));"
 
@@ -102,7 +101,7 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
         "end;"
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "alert_unique_id, date_created, date_submitted, " \
+        "alert_unique_id, date_created, date_submitted, date_cloud_ack, " \
         "unique(alert_unique_id)); " \
         "insert into aclk_alert_%s (alert_unique_id, date_created) " \
         "select unique_id alert_unique_id, strftime('%%s') date_created from health_log_%s where new_status <> 0 and new_status <> -2 order by unique_id asc on conflict (alert_unique_id) do nothing;"
@@ -120,24 +119,19 @@ enum aclk_database_opcode {
     ACLK_DATABASE_ADD_DIMENSION,
     ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CHART_ACK,
-    ACLK_DATABASE_CHECK,
-    ACLK_DATABASE_CHECK_ROTATION,
     ACLK_DATABASE_CLEANUP,
-    ACLK_DATABASE_DEDUP_CHART,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_INFO,
     ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
+    ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
+    ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
     ACLK_DATABASE_PUSH_CHART,
     ACLK_DATABASE_PUSH_CHART_CONFIG,
     ACLK_DATABASE_RESET_CHART,
-    ACLK_DATABASE_RESET_NODE,
     ACLK_DATABASE_SHUTDOWN,
-    ACLK_DATABASE_STATUS_CHART,
-    ACLK_DATABASE_SYNC_CHART_SEQ,
     ACLK_DATABASE_TIMER,
-    ACLK_DATABASE_UPD_STATS,
-    ACLK_DATABASE_MAX_OPCODE
+    ACLK_DATABASE_UPD_RETENTION
 };
 
 struct aclk_chart_payload_t {
@@ -157,7 +151,7 @@ struct aclk_database_cmd {
     struct aclk_completion *completion;
 };
 
-#define ACLK_DATABASE_CMD_Q_MAX_SIZE (2048)
+#define ACLK_DATABASE_CMD_Q_MAX_SIZE (16384)
 
 struct aclk_database_cmdqueue {
     unsigned head, tail;
@@ -173,10 +167,13 @@ struct aclk_database_worker_config {
     time_t chart_timestamp;         // last chart timestamp
     time_t cleanup_after;           // Start a cleanup after this timestamp
     time_t startup_time;           // When the sync thread started
+    time_t rotation_after;
     uint64_t batch_id;    // batch id to use
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
     uint64_t alert_sequence_id; // last alert sequence_id
+    uint64_t alerts_snapshot_id; //will contain the snapshot_id value if snapshot was requested
+    uint64_t alerts_ack_sequence_id; //last sequence_id ack'ed from cloud via sendsnapshot message
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;
@@ -189,6 +186,9 @@ struct aclk_database_worker_config {
     int chart_updates;
     int alert_updates;
     time_t batch_created;
+    int node_info_send;
+    int chart_pending;
+    int chart_reset_count;
     struct aclk_database_worker_config  *next;
 };
 
@@ -198,7 +198,8 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
     if (unlikely(!node_id))
         return NULL;
 
-    uuid_parse(node_id, node_uuid);
+    if (uuid_parse(node_id, node_uuid))
+        return NULL;
 
     RRDHOST *host = localhost;
     while(host) {
@@ -212,14 +213,13 @@ static inline RRDHOST *find_host_by_node_id(char *node_id)
 
 extern sqlite3 *db_meta;
 
-extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
+extern void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 extern void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
-extern void aclk_set_architecture(int mode);
+int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd);
+void aclk_data_rotated(void);
 void sql_aclk_sync_init(void);
-void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void sql_drop_host_aclk_table_list(uuid_t *host_uuid);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
-void aclk_data_rotated(RRDHOST *host);
+void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 #endif //NETDATA_SQLITE_ACLK_H

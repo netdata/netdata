@@ -11,7 +11,7 @@ set -e
 
 case ${BUILDARCH} in
   x86_64) platform=linux/amd64 ;;
-  arm7) platform=linux/arm/v7 ;;
+  armv7l) platform=linux/arm/v7 ;;
   aarch64) platform=linux/arm64/v8 ;;
   *)
     echo "Unknown target architecture '${BUILDARCH}'."
@@ -19,9 +19,9 @@ case ${BUILDARCH} in
     ;;
 esac
 
-DOCKER_CONTAINER_NAME="netdata-package-${BUILDARCH}-static-alpine312"
+DOCKER_CONTAINER_NAME="netdata-package-${BUILDARCH}-static-alpine314"
 
-if [ "${BUILDARCH}" != "x86_64" ]; then
+if [ "${BUILDARCH}" != "$(uname -m)" ]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
 fi
 
@@ -39,9 +39,12 @@ if ! docker inspect "${DOCKER_CONTAINER_NAME}" > /dev/null 2>&1; then
   # inside the container and runs the script install-alpine-packages.sh
   # (also inside the container)
   #
-  run docker pull alpine:3.12
+  if docker inspect alpine:3.14 > /dev/null 2>&1; then
+    run docker image remove alpine:3.14
+    run docker pull --platform=${platform}  alpine:3.14
+  fi
 
-  run docker run --platform=${platform} -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.12 \
+  run docker run --platform=${platform} -v "$(pwd)":/usr/src/netdata.git:rw alpine:3.14 \
     /bin/sh /usr/src/netdata.git/packaging/makeself/install-alpine-packages.sh
 
   # save the changes made permanently
@@ -56,7 +59,7 @@ if [ -t 1 ]; then
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 else
   run docker run -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/usr/src/netdata.git:rw \
-    "${DOCKER_CONTAINER_NAME}" \
+    -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" "${DOCKER_CONTAINER_NAME}" \
     /bin/sh /usr/src/netdata.git/packaging/makeself/build.sh "${@}"
 fi
 

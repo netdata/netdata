@@ -10,5 +10,4 @@ services:
       #- ./child_guid:/var/lib/netdata/registry/netdata.public.unique.id:ro
       - ./min.conf:/etc/netdata/netdata.conf:ro
     cap_add:
-    - SYS_PTRACE
-
+      - SYS_PTRACE

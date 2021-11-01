@@ -10,11 +10,10 @@
 int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     (void)dt;
 
-    static int do_entries = -1, do_cookies = -1, do_syns = -1, do_reopened = -1;
+    static int do_cookies = -1, do_syns = -1, do_reopened = -1;
     static procfile *ff = NULL;
 
-    if(unlikely(do_entries == -1)) {
-        do_entries  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY entries", CONFIG_BOOLEAN_AUTO);
+    if(unlikely(do_cookies == -1)) {
         do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_BOOLEAN_AUTO);
         do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_BOOLEAN_AUTO);
         do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_BOOLEAN_AUTO);
@@ -39,7 +38,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         return 1;
     }
 
-    unsigned long long entries = 0, syn_received = 0, cookie_invalid = 0, cookie_valid = 0, cookie_retrans = 0, conn_reopened = 0;
+    unsigned long long syn_received = 0, cookie_invalid = 0, cookie_valid = 0, cookie_retrans = 0, conn_reopened = 0;
 
     // synproxy gives its values per CPU
     for(l = 1; l < lines ;l++) {
@@ -47,7 +46,6 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         if(unlikely(words < 6))
             continue;
 
-        entries         += strtoull(procfile_lineword(ff, l, 0), NULL, 16);
         syn_received    += strtoull(procfile_lineword(ff, l, 1), NULL, 16);
         cookie_invalid  += strtoull(procfile_lineword(ff, l, 2), NULL, 16);
         cookie_valid    += strtoull(procfile_lineword(ff, l, 3), NULL, 16);
@@ -55,38 +53,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         conn_reopened   += strtoull(procfile_lineword(ff, l, 5), NULL, 16);
     }
 
-    unsigned long long events = entries + syn_received + cookie_invalid + cookie_valid + cookie_retrans + conn_reopened;
-
-    // --------------------------------------------------------------------
-
-    if(do_entries == CONFIG_BOOLEAN_YES || (do_entries == CONFIG_BOOLEAN_AUTO &&
-                                            (events || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        do_entries = CONFIG_BOOLEAN_YES;
-
-        static RRDSET *st = NULL;
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_STAT_NETFILTER
-                    , RRD_TYPE_NET_STAT_SYNPROXY "_entries"
-                    , NULL
-                    , RRD_TYPE_NET_STAT_SYNPROXY
-                    , NULL
-                    , "SYNPROXY Entries Used"
-                    , "entries"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_SYNPROXY_NAME
-                    , NETDATA_CHART_PRIO_SYNPROXY_ENTRIES
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rrddim_add(st, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-        else rrdset_next(st);
-
-        rrddim_set(st, "entries", entries);
-        rrdset_done(st);
-    }
+    unsigned long long events = syn_received + cookie_invalid + cookie_valid + cookie_retrans + conn_reopened;
 
     // --------------------------------------------------------------------
 

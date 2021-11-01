@@ -51,7 +51,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+    (void) snprintfz(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 

@@ -8,7 +8,7 @@
 
 #include "schema_wrapper_utils.h"
 
-using namespace alarmconfig::v1;
+using namespace alarms::v1;
 
 void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg)
 {

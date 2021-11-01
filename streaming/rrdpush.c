@@ -183,6 +183,24 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
+// chart labels
+void rrdpush_send_clabels(RRDHOST *host, RRDSET *st) {
+    struct label_index *labels_c = &st->state->labels;
+    if (labels_c) {
+        netdata_rwlock_rdlock(&host->labels.labels_rwlock);
+        struct label *lbl = labels_c->head;
+        while(lbl) {
+            buffer_sprintf(host->sender->build,
+                           "CLABEL \"%s\" \"%s\" %d\n", lbl->key, lbl->value, (int)lbl->label_source);
+
+            lbl = lbl->next;
+        }
+        if (labels_c->head)
+            buffer_sprintf(host->sender->build,"CLABEL_COMMIT\n");
+        netdata_rwlock_unlock(&host->labels.labels_rwlock);
+    }
+}
+
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
@@ -223,6 +241,10 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , (st->plugin_name)?st->plugin_name:""
             , (st->module_name)?st->module_name:""
     );
+
+    // send the chart labels
+    if (host->sender->version >= STREAM_VERSION_CLABELS)
+        rrdpush_send_clabels(host, st);
 
     // send the dimensions
     RRDDIM *rd;

@@ -4,12 +4,6 @@
 
 #include "daemon/common.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
 
@@ -128,6 +122,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_ALARM_LOG,             .name = "alarm-log"                },
     { .id = ACLK_TOPICID_ALARM_HEALTH,          .name = "alarm-health"             },
     { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
+    { .id = ACLK_TOPICID_ALARM_SNAPSHOT,        .name = "alarm-snapshot"           },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
@@ -157,6 +152,7 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_ALARM_LOG,
     ACLK_TOPICID_ALARM_HEALTH,
     ACLK_TOPICID_ALARM_CONFIG,
+    ACLK_TOPICID_ALARM_SNAPSHOT,
     ACLK_TOPICID_UNKNOWN
 };
 

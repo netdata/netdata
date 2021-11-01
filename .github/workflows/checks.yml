@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - master
-  pull_request:
+  pull_request: null
 env:
   DO_NOT_TRACK: 1
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   checksum-checks:
     name: Checksums
@@ -45,41 +48,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Build
         run: |
           docker build -f .github/dockerfiles/Dockerfile.clang .
-  dist-checks:
-    name: Dist
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Prepare environment
-        run: |
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-          sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
-                                  libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev
-      - name: Configure
-        run: |
-          autoreconf -ivf
-          ./configure \
-            --with-zlib \
-            --with-math \
-            --with-user=netdata \
-            CFLAGS=-O2
-      - name: Make dist
-        run: |
-          make dist
-      - name: Verify & Set distfile
-        run: |
-          ls -lah netdata-*.tar.gz
-          echo "DISTFILE=$(ls netdata-*.tar.gz)" >> $GITHUB_ENV
-      - name: Run run_install_with_dist_file.sh
-        run: |
-          ./.github/scripts/run_install_with_dist_file.sh "${DISTFILE}"
   gitignore-check:
     name: .gitignore
     runs-on: ubuntu-latest
