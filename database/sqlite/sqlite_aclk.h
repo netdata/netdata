@@ -175,6 +175,7 @@ struct aclk_database_worker_config {
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
     uint64_t alert_sequence_id; // last alert sequence_id
+    uint32_t chart_payload_count;
     uint64_t alerts_snapshot_id; //will contain the snapshot_id value if snapshot was requested
     uint64_t alerts_ack_sequence_id; //last sequence_id ack'ed from cloud via sendsnapshot message
     uv_loop_t *loop;
@@ -185,7 +186,7 @@ struct aclk_database_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
-    int error;
+    uint32_t retry_count;
     int chart_updates;
     int alert_updates;
     time_t batch_created;
