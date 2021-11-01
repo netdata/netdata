@@ -319,7 +319,6 @@ jobs:
 
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
     name: Prepare Artifacts
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     needs:
       - build-dist
@@ -370,14 +369,97 @@ jobs:
             && github.event_name != 'pull_request'
           }}
 
+  artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Source)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    services:
+      apache: # This gets used to serve the dist tarball for the updater script.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: artifacts
+      - name: Verify that artifacts work with installer
+        env:
+          NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
+        run: packaging/installer/kickstart.sh --dont-start-it --disable-telemetry
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Artifact verification for source tarball failed.'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Artifact verification for source tarball failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
+  artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Static)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    services:
+      apache: # This gets used to serve the static archives.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: final-artifacts
+          path: artifacts
+      - name: Verify that artifacts work with installer
+        env:
+          NETDATA_TARBALL_BASEURL: http://localhost:8080/artifacts
+        run: packaging/installer/kickstart-static64.sh --dont-start-it --disable-telemetry
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Artifact verification for static build failed.'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: "Artifact verification for static build failed."
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+          }}
+
   upload-nightly: # Upload the nightly build artifacts to GCS.
     name: Upload Nightly Artifacts
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly'
     needs:
-      - prepare-upload
       - updater-check
       - source-build
+      - artifact-verification-dist
+      - artifact-verification-static
     steps:
       - name: Retrieve Artifacts
         uses: actions/download-artifact@v2
@@ -419,9 +501,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release'
     needs:
-      - prepare-upload
       - updater-check
       - source-build
+      - artifact-verification-dist
+      - artifact-verification-static
     steps:
       - name: Checkout
         uses: actions/checkout@v2
