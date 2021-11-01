@@ -44,11 +44,11 @@ run instead, performing various collection logic before letting the kernel conti
 There are more methods by which eBPF programs can activate but which are not currently supported, such as via uprobes 
 which allow hooking into arbitrary user-space functions in a similar manner to kprobes.
 
-## Enable the collector on Linux
+## Manually enable the collector on Linux
 
 **The eBPF collector is installed and enabled by default on most new installations of the Agent**. The eBPF collector
-does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md), but improved
-support is in active development.
+does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md) for kernels older
+than `4.11`, but improved support is in active development.
 
 eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`,
 and all kernels on CentOS 7.6 or later.
