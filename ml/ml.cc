@@ -14,6 +14,7 @@ using namespace ml;
 
 void ml_init(void) {
     Cfg.readMLConfig();
+    ml_anomaly_bit_counter_window = Cfg.SaveAnomalyPercentageEvery;
 }
 
 void ml_new_host(RRDHOST *RH) {
@@ -136,6 +137,29 @@ char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
     }
 
     return strdup(Json.dump(4, '\t').c_str());
+}
+
+char *ml_get_anomaly_rate_info(RRDHOST *RH, const char *AnomalyDetectorName,
+                            int AnomalyDetectorVersion, time_t After, time_t Before) {
+    if (!RH || !RH->ml_host) {
+        error("No host");
+        return nullptr;
+    }
+
+    Host *H = static_cast<Host *>(RH->ml_host);
+    std::vector<std::pair<time_t, time_t>> TimeRanges;
+
+    bool Res = H->getAnomalyRateInfoInRange(TimeRanges, AnomalyDetectorName,
+                                                  AnomalyDetectorVersion,
+                                                  H->getUUID(),
+                                                  After, Before);
+    if (!Res) {
+        error("DB result is empty");
+        return nullptr;
+    }
+
+    nlohmann::json Json = TimeRanges;
+    return strdup(Json.dump(4).c_str());
 }
 
 #if defined(ENABLE_ML_TESTS)

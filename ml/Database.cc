@@ -16,11 +16,29 @@ const char *ml::Database::SQL_CREATE_ANOMALIES_TABLE =
     "     ) "
     ");";
 
+const char *ml::Database::SQL_CREATE_ANOMALY_RATE_INFO_TABLE =
+    "CREATE TABLE IF NOT EXISTS anomaly_rate_info( "
+    "     host_id text NOT NULL, "
+    "     dimension_id text NOT NULL, "
+    "     after int NOT NULL, "
+    "     before int NOT NULL, "
+    "     anomaly_rate text, "
+    "     PRIMARY KEY( "
+    "         host_id, dimension_id "
+    "     ) "
+    ");";
+
 const char *ml::Database::SQL_INSERT_ANOMALY =
     "INSERT INTO anomaly_events( "
     "     anomaly_detector_name, anomaly_detector_version, "
     "     host_id, after, before, anomaly_event_info) "
     "VALUES (?1, ?2, ?3, ?4, ?5, ?6);";
+
+const char *ml::Database::SQL_INSERT_ANOMALY_RATE_INFO =
+    "INSERT INTO anomaly_rate_info( "
+    "     host_id, dimension_id, after, before, anomaly_rate) "
+    "VALUES (?1, ?2, ?3, ?4, ?5);";
+
 
 const char *ml::Database::SQL_SELECT_ANOMALY =
     "SELECT anomaly_event_info FROM anomaly_events WHERE"
@@ -37,6 +55,11 @@ const char *ml::Database::SQL_SELECT_ANOMALY_EVENTS =
     "   host_id == ?3 AND"
     "   after >= ?4 AND"
     "   before <= ?5;";
+
+const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
+    "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info" 
+    "   GROUP BY host_id, dimension_id"
+    "   WHERE after >= ?1 AND before <= ?2;";
 
 using namespace ml;
 
@@ -109,8 +132,17 @@ Database::Database(const std::string &Path) {
     if (RC == SQLITE_OK)
         return;
 
-    error("SQLite error during database initialization, rc = %d (%s)", RC, ErrMsg);
+    error("SQLite error during database initialization; creating table anomaly_events, rc = %d (%s)", RC, ErrMsg);
     error("SQLite failed statement: %s", SQL_CREATE_ANOMALIES_TABLE);
+
+    sqlite3_free(ErrMsg);
+
+    RC = sqlite3_exec(Conn, SQL_CREATE_ANOMALY_RATE_TABLE, nullptr, nullptr, &ErrMsg);
+    if (RC == SQLITE_OK)
+        return;
+
+    error("SQLite error during database initialization; creating table anomaly_rate_info, rc = %d (%s)", RC, ErrMsg);
+    error("SQLite failed statement: %s", SQL_CREATE_ANOMALY_RATE_INFO_TABLE);
 
     sqlite3_free(ErrMsg);
     sqlite3_close(Conn);

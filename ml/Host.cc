@@ -282,6 +282,8 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["idle-window-size"] = Cfg.ADIdleWindowSize;
     Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
     Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
+
+    Json["save-anomaly-percentage-every"] = Cfg.SaveAnomalyPercentageEvery;
 }
 
 std::pair<Dimension *, Duration<double>>
@@ -350,6 +352,8 @@ void DetectableHost::detectOnce() {
                            (Edge.second == BitRateWindow::State::Idle);
 
     std::vector<std::pair<double, std::string>> DimsOverThreshold;
+    /*the following vector takes care of the count of the set anomaly bits per dimension*/
+    std::vector<std::pair<double, std::string>> DimsAnomalyRate;
 
     size_t NumAnomalousDimensions = 0;
     size_t NumNormalDimensions = 0;
@@ -358,10 +362,14 @@ void DetectableHost::detectOnce() {
     double TotalTrainingDuration = 0.0;
     double MaxTrainingDuration = 0.0;
 
+    /*variable used to work out the percentage of the set anomalies over AnomalyBitCounterWindow*/
+    double AnomalyPercentage = 0.0;
+    
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
         DimsOverThreshold.reserve(DimensionsMap.size());
+        DimsAnomalyRate.reserve(DimensionsMap.size());
 
         for (auto &DP : DimensionsMap) {
             Dimension *D = DP.second;
@@ -376,11 +384,23 @@ void DetectableHost::detectOnce() {
             MaxTrainingDuration = std::max(MaxTrainingDuration, DimTrainingDuration);
             TotalTrainingDuration += DimTrainingDuration;
 
-            if (IsAnomalous)
+            if (IsAnomalous) {
                 NumAnomalousDimensions += 1;
+                /*count up the number of anomalies for this dimension,
+                only if the counting window is not yet exhausted*/
+                if(AnomalyBitCounterWindow == 0) {
+                    AnomalyPercentage = D->anomalousBitCount / Cfg.SaveAnomalyPercentageEvery;
+                    DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
+                }
+                else {
+                    D->anomalousBitCount++;
+                }
+            }
 
             if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
                 DimsOverThreshold.push_back({ AnomalyRate, D->getID() });
+
+            
         }
 
         if (NumAnomalousDimensions)
@@ -389,6 +409,7 @@ void DetectableHost::detectOnce() {
             AnomalyRate = 0.0;
 
         NumNormalDimensions = DimensionsMap.size() - NumAnomalousDimensions;
+
     }
 
     this->NumAnomalousDimensions = NumAnomalousDimensions;
@@ -400,6 +421,24 @@ void DetectableHost::detectOnce() {
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
+
+    /*code snippet to keep account of the anomalous values per dimension per configurable window*/
+    /*keep count of the true Results in the anomaly-precentage period*/
+    if(AnomalyBitCounterWindow == 0) {
+        /*one window size is completed, save in the DB the vector that holds the values of the percentages 
+        (of the set anomaly bits) per dimension*/
+        nlohmann::json JsonResult = DimsAnomalyRate;
+
+        time_t Before = now_realtime_sec();
+        time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+        DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
+        /*and reset the window size to restart down-counting*/
+        AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
+    }
+    else {
+        AnomalyBitCounterWindow--;
+    }
+    
 
     if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
         return;
@@ -423,10 +462,12 @@ void DetectableHost::detectOnce() {
     time_t Before = now_realtime_sec();
     time_t After = Before - (WindowLength * updateEvery());
     DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
+
 }
 
 void DetectableHost::detect() {
     std::this_thread::sleep_for(Seconds{10});
+    AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
 
     while (!netdata_exit) {
         TimePoint StartTP = SteadyClock::now();

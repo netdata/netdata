@@ -83,9 +83,12 @@ private:
 class Database {
 private:
     static const char *SQL_CREATE_ANOMALIES_TABLE;
+    static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
     static const char *SQL_INSERT_ANOMALY;
+    static const char *SQL_INSERT_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY;
     static const char *SQL_SELECT_ANOMALY_EVENTS;
+    static const char *SQL_SELECT_ANOMALY_RATE_INFO;
 
 public:
     Database(const std::string &Path);
@@ -96,6 +99,12 @@ public:
     bool insertAnomaly(ArgTypes... Args) {
         Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
         return InsertAnomalyStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    bool insertAnomalyRateInfo(ArgTypes... Args) {
+        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
+        return InsertAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
     }
 
     template<typename ...ArgTypes>
@@ -118,12 +127,25 @@ public:
         return GetAnomaliesInRangeStmt.exec(Conn, RowCb, Args...);
     }
 
+    template<typename ...ArgTypes>
+    bool getAnomalyRateInfoInRange(std::vector<std::pair<time_t, time_t>> &V, ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
+            V.push_back({
+                sqlite3_column_int64(Stmt, 0),
+                sqlite3_column_int64(Stmt, 1)
+            });
+        };
+        return GetAnomalyRateInfoInRangeStmt.exec(Conn, RowCb, Args...);
+    }
+
 private:
     sqlite3 *Conn;
 
     Statement InsertAnomalyStmt{SQL_INSERT_ANOMALY};
+    Statement InsertAnomalyRateInfoStmt{SQL_INSERT_ANOMALY_RATE_INFO};
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
+    Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
 };
 
 }

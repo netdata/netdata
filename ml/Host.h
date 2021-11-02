@@ -71,6 +71,11 @@ public:
         return DB.getAnomaliesInRange(Args...);
     }
 
+    template<typename ...ArgTypes>
+    bool getAnomalyRateInfoInRange(ArgTypes&&... Args) {
+        return DB.getAnomalyRateInfoInRange(Args...);
+    }
+
     void getDetectionInfoAsJson(nlohmann::json &Json) const;
 
 private:
@@ -95,6 +100,11 @@ private:
     size_t NumTrainedDimensions{0};
 
     Database DB{Cfg.AnomalyDBPath};
+
+    /*the counter variable to downcount the time window for anomaly bit counting*/
+    unsigned int AnomalyBitCounterWindow;
+
+
 };
 
 using Host = DetectableHost;
