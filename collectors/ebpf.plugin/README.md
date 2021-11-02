@@ -336,7 +336,7 @@ calls, it monitors the number of bytes sent and received.
 
 ### Apps
 
-These are tracepoints related to OOM killing processes, netdata uses one of them to show when these events heppen:
+These are tracepoints related to OOM killing processes, netdata uses one of them to show when these events happen.
 
 -  `oom/mark_victm`: Monitors when an oomkill event happens.
 
