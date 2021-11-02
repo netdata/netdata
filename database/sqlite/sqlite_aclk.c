@@ -294,7 +294,7 @@ void aclk_database_worker(void *arg)
 {
     struct aclk_database_worker_config *wc = arg;
     uv_loop_t *loop;
-    int shutdown, ret;
+    int ret;
     enum aclk_database_opcode opcode;
     uv_timer_t timer_req;
     struct aclk_database_cmd cmd;
@@ -335,8 +335,6 @@ void aclk_database_worker(void *arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
     wc->retry_count = 0;
-    shutdown = 0;
-
     wc->node_info_send = (wc->host && !localhost);
     aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
@@ -355,11 +353,8 @@ void aclk_database_worker(void *arg)
     wc->alert_updates = 0;
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
-    while (likely(shutdown == 0)) {
+    while (likely(!netdata_exit)) {
         uv_run(loop, UV_RUN_DEFAULT);
-
-        if (netdata_exit)
-            shutdown = 1;
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -367,6 +362,10 @@ void aclk_database_worker(void *arg)
             if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
                 break;
             cmd = aclk_database_deq_cmd(wc);
+
+            if (netdata_exit)
+                break;
+
             opcode = cmd.opcode;
             ++cmd_batch_size;
             switch (opcode) {
@@ -481,7 +480,7 @@ void aclk_database_worker(void *arg)
             }
             if (cmd.completion)
                 aclk_complete(cmd.completion);
-        } while (opcode != ACLK_DATABASE_NOOP || !netdata_exit);
+        } while (opcode != ACLK_DATABASE_NOOP);
     }
 
     if (!uv_timer_stop(&timer_req))
