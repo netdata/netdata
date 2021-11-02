@@ -238,9 +238,8 @@ find_processors() {
   if [ -f "/proc/cpuinfo" ]; then
     # linux
     cpus=$(grep -c ^processor /proc/cpuinfo)
-  elif
   else
-    # freebsd
+  # freebsd
     cpus=$(sysctl hw.ncpu 2> /dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
   fi
   if [ -z "${cpus}" ] || [ $((cpus)) -lt 1 ]; then
