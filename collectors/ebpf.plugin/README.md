@@ -31,7 +31,7 @@ configuration and troubleshooting tips.
 
 The following two features from the Linux kernel are used by Netdata to run eBPF programs:
 
-- Kprobes and return probes (kretprobe): Probes can insert virtually into any kernel instruction . When eBPF runs in 
+- Kprobes and return probes (kretprobe): Probes can insert virtually into any kernel instruction. When eBPF runs in 
   `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a 
   function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users 
   to monitor return from these functions and detect possible failures.
@@ -80,7 +80,7 @@ collector uses the following `tracepoints` and `kprobe`:
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [fork](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415) 
    routine since kernel `5.10.0` was released.
-- `kprobe/_do_fork`: Like `kernel_clone`, but  this was the main function between kernels `4.2.0` and `5.9.16`
+- `kprobe/_do_fork`: Like `kernel_clone`, but this was the main function between kernels `4.2.0` and `5.9.16`
 - `kprobe/do_fork`: This was the main function before kernel `4.2.0`.
 
 #### Process Exit
@@ -88,11 +88,11 @@ collector uses the following `tracepoints` and `kprobe`:
 Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
 system that the task is finishing its work. The second step is to release the kernel information with the internal
 function `release_task`. The difference between the two dimensions can help you discover
-[zombie processes](https://en.wikipedia.org/wiki/Zombie_process). To get the metrics the collector uses:
+[zombie processes](https://en.wikipedia.org/wiki/Zombie_process). To get the metrics, the collector uses:
 
 - `sched/sched_process_exit`: Tracepoint called after a task exits.
-- `kprobe/release_task`: When a process exits, the kernel still needs to remove the process descriptor, so this function 
-   is called.
+- `kprobe/release_task`: This function is called when a process exits, as the kernel still needs to remove the process
+  descriptor, so this function is called.
 
 #### Task error
 
@@ -104,7 +104,7 @@ process and thread creation only.
 
 Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are
 calling functions [`swap_readpage` and `swap_writepage`](https://hzliu123.github.io/linux-kernel/Page%20Cache%20in%20Linux%202.6.pdf ), 
-which are functions responsible for doing IO in swap memory. To collect exact moment that an access to swap happens, 
+which are functions responsible for doing IO in swap memory. To collect the exact moment that an access to swap happens, 
 the collector attaches `kprobes` for cited functions.
 
 #### Soft IRQ
@@ -120,10 +120,10 @@ The following `tracepoints` are used to measure time usage for soft IRQs:
 
 To monitor shared memory system call counts, the following `kprobes` are used:
 
-- `shmget`: runs when [shmget](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
-- `shmat`: runs when [shmat](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmdt`: runs when [shmdt](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmctl`: runs when [shmctl](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
+- `shmget`: Runs when [shmget](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
+- `shmat`: Runs when [shmat](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmdt`: Runs when [shmdt](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmctl`: Runs when [shmctl](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
 
 ### Memory
 
@@ -144,7 +144,7 @@ organization:
 #### Page cache ratio
 
 The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around
-100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio Netdata
+100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio, Netdata
 attaches `kprobes` for kernel functions: 
 
 - `add_to_page_cache_lru`: Page addition.
@@ -187,7 +187,7 @@ This chart monitors calls demonstrating commits from filesystem caches to disk. 
 #### File range sync
 
 This chart shows calls to [sync_file_range (2)](https://man7.org/linux/man-pages/man2/sync_file_range.2.html) which 
-synchronizes file segments with disk. This is the most dangerous syscall to synchronize data according to its manual.
+synchronizes file segments with disk. This is the most dangerous syscall to synchronize data, according to its manual.
 
 ### MD arrays
 
@@ -221,7 +221,7 @@ chart `disk_latency_io` for each disk on the host. The following tracepoints are
 ### Filesystem
 
 This group has charts demonstrating how applications interact with the Linux kernel to open and close file
-descriptors. It also brings latency charts for five different filesystems and monitoring for Linux Virtual File System(VFS),
+descriptors. It also brings latency charts for five different filesystems and monitoring for Linux Virtual File System (VFS),
 that is a layer on top of regular filesystems. The functions presented inside this API are not used for filesystems, so 
 it's possible that the charts in this section won't show _all_ the actions that occurred on your system.
 
@@ -231,10 +231,10 @@ To measure the latency of executing some actions in a [btrfs](https://elixir.boo
 filesystem, the collector needs to attach `kprobes` and `kretprobes` for each one of the following functions:
 
 > Note: We are listing two functions used to measure `read` latency, but we use either `btrfs_file_read_iter` or
-`generic_file_read_iter` depending on kernel version.
+`generic_file_read_iter`, depending on kernel version.
 
 - `btrfs_file_read_iter`: Function used to measure read latency since kernel `5.10.0`.
-- `generic_file_read_iter`: Like the previous, but this function was used before kernel `5.10.0`.
+- `generic_file_read_iter`: Like `btrfs_file_read_iter`, but this function was used before kernel `5.10.0`.
 - `btrfs_file_write_iter`: Function used to write data.
 - `btrfs_file_open`: Function used to open files.
 - `btrfs_sync_file`: Function used to synchronize data to filesystem.
@@ -292,7 +292,7 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 
 Metrics for directory cache are collected using kprobe for `lookup_fast`, because we are interested in the number of 
 times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it 
-is accessed, but also in possible errors, so we need to attach a `kretprobe`. So, use the following:
+is accessed, but also in possible errors, so we need to attach a `kretprobe`. So, the following is used:
 
 - [lookup_fast](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
 - [d_lookup](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223): 
@@ -336,7 +336,7 @@ calls, it monitors the number of bytes sent and received.
 
 ### Apps
 
-These are tracepoints related to OOM killing processes, netdata uses one of them to show when these events happen.
+These are tracepoints related to OOM killing processes.
 
 -  `oom/mark_victm`: Monitors when an oomkill event happens.
 
