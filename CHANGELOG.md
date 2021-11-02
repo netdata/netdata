@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Change comma possition in v1/info if ml-info is missing [\#11739](https://github.com/netdata/netdata/pull/11739) ([MrZammler](https://github.com/MrZammler))
 - Fix typo in aclk\_query.c [\#11737](https://github.com/netdata/netdata/pull/11737) ([eltociear](https://github.com/eltociear))
 - Fix online chart in NG not updated properly [\#11734](https://github.com/netdata/netdata/pull/11734) ([underhood](https://github.com/underhood))
 - Fix Link to New Charts [\#11729](https://github.com/netdata/netdata/pull/11729) ([DShreve2](https://github.com/DShreve2))
@@ -15,6 +16,7 @@
 - add sensors to charts.d.conf and add a note how to enable it [\#11715](https://github.com/netdata/netdata/pull/11715) ([ilyam8](https://github.com/ilyam8))
 - Add Cloud sign-up link to README.md [\#11714](https://github.com/netdata/netdata/pull/11714) ([DShreve2](https://github.com/DShreve2))
 - Updating Docker Node Instructions for Clarity [\#11713](https://github.com/netdata/netdata/pull/11713) ([DShreve2](https://github.com/DShreve2))
+- Update jQuery Dependency [\#11710](https://github.com/netdata/netdata/pull/11710) ([rupokify](https://github.com/rupokify))
 - Bring eBPF to static binaries [\#11709](https://github.com/netdata/netdata/pull/11709) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix kickstart.md Installation Guide Links [\#11708](https://github.com/netdata/netdata/pull/11708) ([DShreve2](https://github.com/DShreve2))
 - Queue removed alerts to cloud for new architecture [\#11704](https://github.com/netdata/netdata/pull/11704) ([MrZammler](https://github.com/MrZammler))
@@ -154,12 +156,10 @@
 - Add custom e-mail headers [\#11454](https://github.com/netdata/netdata/pull/11454) ([MrZammler](https://github.com/MrZammler))
 - Fix ram level alarms [\#11452](https://github.com/netdata/netdata/pull/11452) ([ilyam8](https://github.com/ilyam8))
 - Check for failed protobuf configure or make [\#11450](https://github.com/netdata/netdata/pull/11450) ([MrZammler](https://github.com/MrZammler))
-- update "Install Netdata on Synology" guide [\#11449](https://github.com/netdata/netdata/pull/11449) ([ilyam8](https://github.com/ilyam8))
 - Add chart message support for ACLK new architecture [\#11447](https://github.com/netdata/netdata/pull/11447) ([stelfrag](https://github.com/stelfrag))
 - Don’t bail early if we fail to build cloud deps with required cloud. [\#11446](https://github.com/netdata/netdata/pull/11446) ([Ferroin](https://github.com/Ferroin))
 - eBPF Soft IRQ latency [\#11445](https://github.com/netdata/netdata/pull/11445) ([UmanShahzad](https://github.com/UmanShahzad))
 - Installation review [\#11442](https://github.com/netdata/netdata/pull/11442) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Update ebpf socket [\#11441](https://github.com/netdata/netdata/pull/11441) ([thiagoftsm](https://github.com/thiagoftsm))
 - Adds Alert Related API for new protocol [\#11424](https://github.com/netdata/netdata/pull/11424) ([underhood](https://github.com/underhood))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
 - add capsh check before issuing setcap cap\_perfmon [\#11386](https://github.com/netdata/netdata/pull/11386) ([oldgiova](https://github.com/oldgiova))
@@ -177,7 +177,6 @@
 - Use size\_t instead of int for vfs\_bufspace\_count in FreeBSD plugin [\#11142](https://github.com/netdata/netdata/pull/11142) ([diizzyy](https://github.com/diizzyy))
 - Bundle the react dashboard code into the agent repo directly. [\#11139](https://github.com/netdata/netdata/pull/11139) ([Ferroin](https://github.com/Ferroin))
 - Reduce the number of ACLK chart updates during chart obsoletion [\#11133](https://github.com/netdata/netdata/pull/11133) ([stelfrag](https://github.com/stelfrag))
-- Update k6.md [\#11127](https://github.com/netdata/netdata/pull/11127) ([odyslam](https://github.com/odyslam))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
