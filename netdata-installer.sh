@@ -244,6 +244,7 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry program. (DO_NOT_TRACK=1)
+  --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -335,6 +336,7 @@ while [ -n "${1}" ]; do
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
     "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ebpf/} --disable-ebpf" ;;
+    "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--aclk-ng") ;;
     "--aclk-legacy")
       NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--with-aclk-legacy/} --with-aclk-legacy"
@@ -421,12 +423,16 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
     done
 
     if [ "${proc_count}" -lt 1 ]; then
-      run_failed "Netdata needs at least ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
-      run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag."
-      exit 2
+      if [ -n "${SKIP_RAM_CHECK}" ]; then
+        MAKEOPTS=""
+      else
+        run_failed "Netdata needs at least ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
+        run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag."
+        exit 2
+      fi
     fi
   else
-    if [ "${target_ram}" -gt "${total_ram}" ]; then
+    if [ "${target_ram}" -gt "${total_ram}" ] && [ -z "${SKIP_RAM_CHECK}" ]; then
       run_failed "Netdata needs ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
       run_failed "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
       exit 2
