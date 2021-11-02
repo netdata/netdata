@@ -10,8 +10,8 @@ sidebar_label: "eBPF"
 
 eBPF is a Linux kernel technology that allows us to run data collection programs within a kernel context.
 
-eBPF consists of a wide toolchain that ultimately outputs a set of bytecode that will run inside of the eBPF virtual 
-machine (VM) which lives inside of the Linux kernel. The program in particular is executed in response to a [tracepoint 
+eBPF consists of a wide toolchain that ultimately outputs a set of bytecode that will run inside the eBPF virtual 
+machine (VM) which lives inside the Linux kernel. The program in particular is executed in response to a [tracepoint 
 or kprobe](#probes-and-tracepoints) activation.
 
 Netdata has written many eBPF programs, which, when compiled and integrated into the Netdata Agent, are able to collect 
@@ -91,8 +91,8 @@ function `release_task`. The difference between the two dimensions can help you 
 [zombie processes](https://en.wikipedia.org/wiki/Zombie_process). To get the metrics the collector uses:
 
 - `sched/sched_process_exit`: Tracepoint called after a task exits.
-- `kprobe/release_task`: When a process exits, the kernel still needs to remove the process descriptor, this function is 
-   called.
+- `kprobe/release_task`: When a process exits, the kernel still needs to remove the process descriptor, so this function 
+   is called.
 
 #### Task error
 
