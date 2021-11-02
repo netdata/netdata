@@ -13,6 +13,5 @@
 #include "alarm_config.h"
 #include "alarm_stream.h"
 #include "node_info.h"
-#include "cloud_cmds.h"
 
 #endif /* SCHEMA_WRAPPERS_H */
