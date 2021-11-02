@@ -877,6 +877,87 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/aclk_state"
+  /anomaly_events:
+    get:
+      summary: Retrieves the timestamps of anomaly events.
+      description: Returns the times ranges of anomaly events that occured in a specific time range.
+      parameters:
+        - name: after
+          in: query
+          description: Timestamp (in milliseconds) to use in order to retrieve anomaly events
+            with a greater or equal start time.
+          required: true
+          schema:
+            type: integer
+        - name: before
+          in: query
+          description: Timestamp (in milliseconds) to use in order to retrieve anomaly events
+            with an less or equal end time.
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: An array containing a time range for each anomaly event. Each time range is an array containing
+            two elements, ie. the start time and the end time of the anomaly event.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/anomaly_event_time_range"
+  /anomaly_event_info:
+    get:
+      summary: Retrieves information about a specific anomaly event.
+      description: Returns the anomaly rate of every anomalous dimension in the anomaly event.
+      parameters:
+        - name: after
+          in: query
+          description: The anomaly event's start timestamp in milliseconds.
+          required: true
+          schema:
+            type: integer
+        - name: before
+          in: query
+          description: The anomaly event's before timestamp in milliseconds.
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: An array containing arrays with the anomaly rate and the dimension id.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/anomaly_event_info"
+  /anomaly_rate_info:
+    get:
+      summary: Retrieves information about the anomaly rate of dimensions.
+      description: Returns the anomaly rate of every trained dimension in the host.
+      parameters:
+        - name: after
+          in: query
+          description: The start time of the duration for which the anomaly rate information will be computed.
+          required: true
+          schema:
+            type: integer
+        - name: before
+          in: query
+          description: The end time of the duration for which the anomaly rate information will be computed.
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: An array containing arrays with the anomaly rate and the dimension id for the specified time range.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/anomaly_rate_info"
 servers:
   - url: https://registry.my-netdata.io/api/v1
   - url: http://registry.my-netdata.io/api/v1
@@ -1655,3 +1736,25 @@ components:
           enum:
             - Old
             - New
+    anomaly_event_time_range:
+      type: array
+      items:
+        type: integer
+      minItems: 2
+      maxItems: 2
+    anomaly_event_info:
+      type: array
+      items:
+        oneOf:
+          - type: integer
+          - type: string
+      minItems: 2
+      maxItems: 2
+    anomaly_rate_info:
+      type: array
+      items:
+        oneOf:
+          - type: integer
+          - type: string
+      minItems: 2
+      maxItems: 2

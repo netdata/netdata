@@ -29,6 +29,8 @@ public:
     double ADIdleWindowSize;
     double ADWindowRateThreshold;
     double ADDimensionRateThreshold;
+    //The window size of anomaly bit counting for anomaly percentage
+    unsigned long SaveAnomalyPercentageEvery;
 
     std::string HostsToSkip;
     SIMPLE_PATTERN *SP_HostsToSkip;
@@ -37,7 +39,6 @@ public:
     SIMPLE_PATTERN *SP_ChartsToSkip;
 
     std::string AnomalyDBPath;
-
     void readMLConfig();
 };
 

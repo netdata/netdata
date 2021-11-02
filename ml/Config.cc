@@ -22,7 +22,9 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void Config::readMLConfig(void) {
     const char *ConfigSectionML = CONFIG_SECTION_ML;
 
-    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", false);
+    bool EnableAnomalyDetection = config_get_boolean(ConfigSectionML, "enabled", true);
+
+    unsigned long SaveAnomalyPercentageEvery = 15 * 60;
 
     /*
      * Read values
@@ -125,4 +127,6 @@ void Config::readMLConfig(void) {
             "!ip.* !ipv4.* !ipv6.* !net.* !net_* !netfilter.* "
             "!services.* !apps.* !groups.* !user.* !ebpf.* !netdata.* *");
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+ 
+    Cfg.SaveAnomalyPercentageEvery = SaveAnomalyPercentageEvery;
 }

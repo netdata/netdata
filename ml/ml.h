@@ -31,6 +31,8 @@ char *ml_get_anomaly_events(RRDHOST *RH, const char *AnomalyDetectorName,
 char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
                                 int AnomalyDetectorVersion, time_t After, time_t Before);
 
+char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before);
+
 #if defined(ENABLE_ML_TESTS)
 int test_ml(int argc, char *argv[]);
 #endif

@@ -86,6 +86,12 @@ private:
     static const char *SQL_INSERT_ANOMALY;
     static const char *SQL_SELECT_ANOMALY;
     static const char *SQL_SELECT_ANOMALY_EVENTS;
+    
+    static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
+    static const char *SQL_INSERT_BULK_ANOMALY_RATE_INFO;
+    static const char *SQL_SELECT_ANOMALY_RATE_INFO;
+    static const char *SQL_SELECT_ANOMALY_RATE_INFO_RANGE;
+    static const char *SQL_REMOVE_OLD_ANOMALY_RATE_INFO;
 
 public:
     Database(const std::string &Path);
@@ -118,12 +124,49 @@ public:
         return GetAnomaliesInRangeStmt.exec(Conn, RowCb, Args...);
     }
 
+    template<typename ...ArgTypes>
+    bool insertBulkAnomalyRateInfo(ArgTypes... Args) {
+        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
+        return InsertBulkAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    bool getAnomalyRateInfoInRange(std::vector<std::pair<std::string, double>> &V, ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
+            V.push_back({
+                reinterpret_cast<const char*>(sqlite3_column_text(Stmt, 0)),
+                sqlite3_column_double(Stmt, 1)
+            });
+        };
+        return GetAnomalyRateInfoInRangeStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    bool getTheLastSavedAnomalyInfoRange(std::pair<int, int> &P, ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
+            P.first = sqlite3_column_int64(Stmt, 0);
+            P.second = sqlite3_column_int64(Stmt, 1);
+        };
+        return GetTheLastSavedAnomalyInfoRangeStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    void removeOldAnomalyRateInfo(ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) { (void) Stmt; };
+        RemoveOldAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
+    }
+
 private:
     sqlite3 *Conn;
 
     Statement InsertAnomalyStmt{SQL_INSERT_ANOMALY};
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
+    
+    Statement InsertBulkAnomalyRateInfoStmt{SQL_INSERT_BULK_ANOMALY_RATE_INFO};
+    Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
+    Statement GetTheLastSavedAnomalyInfoRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO_RANGE};
+    Statement RemoveOldAnomalyRateInfoStmt{SQL_REMOVE_OLD_ANOMALY_RATE_INFO};
 };
 
 }

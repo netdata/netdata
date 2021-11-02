@@ -1615,6 +1615,11 @@ AC_SUBST([OPTIONAL_ML_LIBS])
 AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
 AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
+#------------------------------------------------------------------------------
+# sqlite configuration
+
+CFLAGS="${CFLAGS} -DSQLITE_ENABLE_JSON1"
+
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
 
