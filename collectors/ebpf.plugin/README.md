@@ -59,7 +59,7 @@ section for details.
 ## Charts
 
 The eBPF collector creates charts on different menus, like System Overview, Memory, MD arrays, Disks, Filesystem,
-Mount Points, Networking Stack, systemd Services, and Applications. All the charts in this section update every second.
+Mount Points, Networking Stack, systemd Services, and Applications.
 
 The collector stores the actual value inside of its process, but charts only show the difference between the values
 collected in the previous and current seconds.
