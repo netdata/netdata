@@ -187,7 +187,9 @@ This chart monitors calls demonstrating commits from filesystem caches to disk. 
 #### File range sync
 
 This chart shows calls to [sync_file_range (2)](https://man7.org/linux/man-pages/man2/sync_file_range.2.html) which 
-synchronizes file segments with disk. This is the most dangerous syscall to synchronize data, according to its manual.
+synchronizes file segments with disk.
+
+> Note: This is the most dangerous syscall to synchronize data, according to its manual.
 
 ### MD arrays
 
