@@ -32,5 +32,6 @@ void sql_check_rotation_state(struct aclk_database_worker_config *wc, struct acl
 void sql_get_last_chart_sequence(struct aclk_database_worker_config *wc);
 void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 uint32_t sql_get_pending_count(struct aclk_database_worker_config *wc);
 #endif //NETDATA_SQLITE_ACLK_CHART_H
