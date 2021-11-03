@@ -409,12 +409,12 @@ static int wait_popcorning_finishes()
         if (elapsed >= ACLK_STABLE_TIMEOUT) {
             aclk_shared_state.agent_state = ACLK_HOST_STABLE;
             ACLK_SHARED_STATE_UNLOCK;
-            error("ACLK localhost popocorn finished");
+            error("ACLK localhost popcorn timer finished");
             return 0;
         }
         ACLK_SHARED_STATE_UNLOCK;
         need_wait = ACLK_STABLE_TIMEOUT - elapsed;
-        error("ACLK localhost popocorn wait %d seconds longer", need_wait);
+        error("ACLK localhost popcorn timer - wait %d seconds longer", need_wait);
         sleep(need_wait);
     }
     return 1;
