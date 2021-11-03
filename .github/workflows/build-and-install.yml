@@ -28,6 +28,7 @@ jobs:
           - 'debian:bullseye' # 11
           - 'debian:10'
           - 'debian:9'
+          - 'fedora:35'
           - 'fedora:34'
           - 'fedora:33'
           - 'opensuse/leap:15.2'
@@ -66,6 +67,8 @@ jobs:
             pre: 'apt-get update'
             rmjsonc: 'apt-get remove -y libjson-c-dev'
 
+          - distro: 'fedora:35'
+            rmjsonc: 'dnf remove -y json-c-devel'
           - distro: 'fedora:34'
             rmjsonc: 'dnf remove -y json-c-devel'
           - distro: 'fedora:33'
