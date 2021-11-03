@@ -404,7 +404,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1000 * 1000))"
 
   if [ -n "${MAKEOPTS}" ]; then
-    proc_count="$(echo ${MAKEOPTS} | grep -oE '-j *[[:digit:]]+' | tr -d '\-j ')"
+    proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
   else
     proc_count="$(find_processors)"
   fi
