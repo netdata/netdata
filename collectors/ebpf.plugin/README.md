@@ -90,7 +90,7 @@ function `release_task`. The difference between the two dimensions can help you 
 
 - `sched/sched_process_exit`: Tracepoint called after a task exits.
 - `kprobe/release_task`: This function is called when a process exits, as the kernel still needs to remove the process
-  descriptor, so this function is called.
+  descriptor.
 
 #### Task error
 
