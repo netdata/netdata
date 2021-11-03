@@ -275,6 +275,7 @@ DONOTWAIT=0
 AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
+NETDATA_ENABLE_ML=1
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -326,8 +327,14 @@ while [ -n "${1}" ]; do
     "--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb" ;;
     "--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb" ;;
     "--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto" ;;
-    "--enable-ml") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-ml/} --enable-ml" ;;
-    "--disable-ml") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ml/} --disable-ml" ;;
+    "--enable-ml")
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-ml/} --enable-ml"
+      NETDATA_ENABLE_ML=1
+      ;;
+    "--disable-ml")
+      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ml/} --disable-ml"
+      NETDATA_ENABLE_ML=0
+      ;;
     "--enable-ml-tests") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-ml-tests/} --enable-ml-tests" ;;
     "--disable-ml-tests") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ml-tests/} --disable-ml-tests" ;;
     "--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto" ;;
@@ -400,8 +407,22 @@ if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; 
   NEED_PROTOBUF=false
 fi
 
-if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
+NEED_RAM_CHECK=false
+
+if ${NEED_PROTOBUF} || [ ${NETDATA_ENABLE_ML} -eq 1 ]; then
+    NEED_RAM_CHECK=true
+fi
+
+if ${NEED_RAM_CHECK} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1000 * 1000))"
+
+  if ${NEED_PROTOBUF}; then
+    base=1500
+    scale=250
+  else
+    base=1000
+    scale=100
+  fi
 
   if [ -n "${MAKEOPTS}" ]; then
     proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
@@ -409,7 +430,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
     proc_count="$(find_processors)"
   fi
 
-  target_ram="$((1500 * mega + (250 * mega * (proc_count - 1))))"
+  target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
   total_ram="$((total_ram * 1024))"
 
@@ -418,7 +439,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
 
     while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 0 ]; do
       proc_count="$((proc_count - 1))"
-      target_ram="$((1500 * mega + (250 * mega * (proc_count - 1))))"
+      target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
       MAKEOPTS="-j${proc_count}"
     done
 
@@ -429,7 +450,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
         target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
         total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
         run_failed "Netdata needs at least ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
-        run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag."
+        run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag or disabling ML support."
         exit 2
       fi
     fi
