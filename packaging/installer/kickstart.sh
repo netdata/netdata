@@ -102,7 +102,7 @@ telemetry_event() {
     fi
   fi
 
-  KERNEL_NAME="$(name -s)"
+  KERNEL_NAME="$(uname -s)"
 
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
     TOTAL_RAM="$(sysctl -n hw.physmem)"
