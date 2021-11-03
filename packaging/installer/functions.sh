@@ -88,8 +88,49 @@ setup_terminal() {
 }
 setup_terminal || echo > /dev/null
 
+logpath_suffix='var/log/netdata/installer.log'
+
+# shellcheck disable=SC2031
+state=$(set +o)
+set +u
+if [ -z "${NETDATA_PREFIX}" ] ; then
+  logpath="/${logpath_suffix}"
+else
+  logpath="${NETDATA_PREFIX}/${logpath_suffix}"
+fi
+eval "${state}"
+
+log_create() {
+  logdir="$(dirname "${logpath}")"
+  if [ ! -d "${logdir}" ] ; then
+    echo >&2 "Creating [${logdir}] for installer log file:"
+    mkdir -vp "$(dirname "${logpath}")" >&2
+  fi
+  if ! touch "${logpath}" ; then
+    echo >&2 "Unable to create [$logpath], falling back to current directory"
+    logpath="${PWD}/$(basename "${logpath}")"
+  fi
+  if [ -e "${logpath}" ] ; then
+    echo >&2 "Rotating [${logpath}] log file:"
+    i=4
+    while [ ${i} -gt 0 ] ; do
+      if [ -e "${logpath}.${i}" ] ; then
+        mv -vf "${logpath}.${i}" "${logpath}.$((i+1))"
+      fi
+      i=$((i-1))
+    done
+    mv -vf "${logpath}" "${logpath}.1"
+  fi
+}
+
+log_put() {
+  # shellcheck disable=SC2059
+  test -d "$(dirname "${logpath}")" && printf "$(date +%FT%T,%3N) ${*}\n" >>"${logpath}"
+}
+
 progress() {
   echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+  log_put "${*}"
 }
 
 get() {
@@ -247,15 +288,18 @@ find_processors() {
 # -----------------------------------------------------------------------------
 fatal() {
   printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  log_put "[ ABORTED ] ${*}\n\n"
   exit 1
 }
 
 run_ok() {
   printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  log_put "[ OK ]\n\n"
 }
 
 run_failed() {
   printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
+  log_put "[ FAILED ]\n\n"
 }
 
 ESCAPED_PRINT_METHOD=
@@ -265,8 +309,10 @@ fi
 escaped_print() {
   if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
     printf "%q " "${@}"
+    log_put "%q " "${@}"
   else
     printf "%s" "${*}"
+    log_put "%s" "${*}"
   fi
   return 0
 }
@@ -283,15 +329,11 @@ run() {
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
 
-  {
-    printf "%s" "${info}"
-    escaped_print "${@}"
-    printf "%s" " ... "
-  } >> "${run_logfile}"
-
+  log_put "${info}"
   printf >&2 "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
   printf >&2 "%s\n" "${TPUT_RESET}"
+  log_put " ... "
 
   "${@}"
 
