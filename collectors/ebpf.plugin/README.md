@@ -189,7 +189,7 @@ synchronizes file segments with disk.
 
 > Note: This is the most dangerous syscall to synchronize data, according to its manual.
 
-### MD arrays
+### Multiple Device (MD) arrays
 
 The eBPF plugin shows multi-device flushes happening in real time. This can be used to explain some spikes happening 
 in [disk latency](#disk) charts.
