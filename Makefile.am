@@ -241,6 +241,7 @@ ML_FILES = \
     $(NULL)
 
 if ENABLE_ML
+
 ML_FILES += \
     ml/BitBufferCounter.h \
     ml/BitBufferCounter.cc \
@@ -264,7 +265,12 @@ ML_FILES += \
     ml/ml.cc \
     ml/ml-private.h \
     $(NULL)
+
+# Disable warnings from dlib library
+ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits
+
 endif
+
 
 if ENABLE_ML_TESTS
 ML_TESTS_FILES = \
