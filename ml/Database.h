@@ -83,11 +83,12 @@ private:
 class Database {
 private:
     static const char *SQL_CREATE_ANOMALIES_TABLE;
-    static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
     static const char *SQL_INSERT_ANOMALY;
-    static const char *SQL_INSERT_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY;
     static const char *SQL_SELECT_ANOMALY_EVENTS;
+    
+    static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
+    static const char *SQL_INSERT_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
 
 public:

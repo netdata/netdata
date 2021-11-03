@@ -88,8 +88,8 @@ public:
 
     bool isAnomalous() { return AnomalyBit; }
 
-    double anomalousBitCount;
-    
+    double AnomalousBitCount;
+
 private:
     CalculatedNumber AnomalyScore{0.0};
     std::atomic<bool> AnomalyBit{false};

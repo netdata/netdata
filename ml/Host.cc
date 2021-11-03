@@ -386,15 +386,15 @@ void DetectableHost::detectOnce() {
 
             if (IsAnomalous) {
                 NumAnomalousDimensions += 1;
-                /*count up the number of anomalies for this dimension,
-                only if the counting window is not yet exhausted*/
-                if(AnomalyBitCounterWindow == 0) {
-                    AnomalyPercentage = D->anomalousBitCount / Cfg.SaveAnomalyPercentageEvery;
-                    DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
-                }
-                else {
-                    D->anomalousBitCount++;
-                }
+                /*count up the number of anomalies for this dimension*/
+                D->AnomalousBitCount++;
+            }
+
+            /*if the counting window is exhausted, push and then reset the counter*/
+            if(AnomalyBitCounterWindow == 0) {
+                AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+                DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
+                D->AnomalousBitCount = 0;
             }
 
             if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))

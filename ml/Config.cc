@@ -47,7 +47,7 @@ void Config::readMLConfig(void) {
     double ADWindowRateThreshold = config_get_float(ConfigSectionML, "window minimum anomaly rate", 0.25);
     double ADDimensionRateThreshold = config_get_float(ConfigSectionML, "anomaly event min dimension rate threshold", 0.05);
 
-    unsigned SaveAnomalyPercentageEvery = config_get_number(ConfigSectionML, "window size (in minutes) of anomaly bit counting for anomaly percentage", 15);
+    unsigned SaveAnomalyPercentageEvery = config_get_number(ConfigSectionML, "window size of anomaly bit counting for anomaly percentage", 15 * 60);
 
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
@@ -81,6 +81,8 @@ void Config::readMLConfig(void) {
     ADIdleWindowSize = clamp(ADIdleWindowSize, 30.0, 900.0);
     ADWindowRateThreshold = clamp(ADWindowRateThreshold, 0.01, 0.99);
     ADDimensionRateThreshold = clamp(ADDimensionRateThreshold, 0.01, 0.99);
+
+    SaveAnomalyPercentageEvery = clamp(SaveAnomalyPercentageEvery, 60.0, 900.0);
 
     /*
      * Validate

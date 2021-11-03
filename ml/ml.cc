@@ -148,9 +148,7 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, const char *AnomalyDetectorName,
     Host *H = static_cast<Host *>(RH->ml_host);
     std::vector<std::pair<time_t, time_t>> TimeRanges;
 
-    bool Res = H->getAnomalyRateInfoInRange(TimeRanges, AnomalyDetectorName,
-                                                  AnomalyDetectorVersion,
-                                                  H->getUUID(),
+    bool Res = H->getAnomalyRateInfoInRange(TimeRanges, H->getUUID(),
                                                   After, Before);
     if (!Res) {
         error("DB result is empty");
