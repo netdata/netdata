@@ -107,7 +107,7 @@ telemetry_event() {
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
     TOTAL_RAM="$(sysctl -n hw.physmem)"
   elif [ "${KERNEL_NAME}" = Darwin ]; then
-    TOTAL_RAM="$(sysctl -n hw.physmem)"
+    TOTAL_RAM="$(sysctl -n hw.memsize)"
   elif [ -r /proc/meminfo ]; then
     TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
     TOTAL_RAM="$((TOTAL_RAM * 1024))"
