@@ -8,8 +8,6 @@ sidebar_label: "eBPF"
 
 # eBPF monitoring with Netdata
 
-eBPF is a Linux kernel technology that allows us to run data collection programs within a kernel context.
-
 eBPF consists of a wide toolchain that ultimately outputs a set of bytecode that will run inside the eBPF virtual 
 machine (VM) which lives inside the Linux kernel. The program in particular is executed in response to a [tracepoint 
 or kprobe](#probes-and-tracepoints) activation.
