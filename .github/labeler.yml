@@ -53,6 +53,7 @@ area/database:
 
 area/docs:
   - "**/*.md"
+  - "**/*.mdx"
   - diagrams/*
   - diagrams/**/*
 
