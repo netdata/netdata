@@ -362,9 +362,6 @@ void DetectableHost::detectOnce() {
     double TotalTrainingDuration = 0.0;
     double MaxTrainingDuration = 0.0;
 
-    /*variable used to work out the percentage of the set anomalies over AnomalyBitCounterWindow*/
-    double AnomalyPercentage = 0.0;
-    
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
@@ -392,7 +389,7 @@ void DetectableHost::detectOnce() {
 
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+                double AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * updateEvery());
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
                 D->AnomalousBitCount = 0;
             }
