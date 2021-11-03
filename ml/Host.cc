@@ -431,7 +431,7 @@ void DetectableHost::detectOnce() {
 
         time_t Before = now_realtime_sec();
         time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
-        DB.insertAnomalyRateInfo("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
+        DB.insertAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
         AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
     }

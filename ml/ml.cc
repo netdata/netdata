@@ -14,7 +14,6 @@ using namespace ml;
 
 void ml_init(void) {
     Cfg.readMLConfig();
-    ml_anomaly_bit_counter_window = Cfg.SaveAnomalyPercentageEvery;
 }
 
 void ml_new_host(RRDHOST *RH) {
