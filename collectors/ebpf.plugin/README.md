@@ -41,7 +41,7 @@ The following two features from the Linux kernel are used by Netdata to run eBPF
 In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is 
 run instead, performing various collection logic before letting the kernel continue its normal control flow.
 
-There are more methods by which eBPF programs can activate but which are not currently supported, such as via uprobes 
+There are more methods by which eBPF programs can be triggered but which are not currently supported, such as via uprobes 
 which allow hooking into arbitrary user-space functions in a similar manner to kprobes.
 
 ## Manually enable the collector on Linux
@@ -294,7 +294,7 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 
 Metrics for directory cache are collected using kprobe for `lookup_fast`, because we are interested in the number of 
 times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it 
-is accessed, but also in possible errors, so we need to attach a `kretprobe`. So, the following is used:
+is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
 
 - [lookup_fast](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
 - [d_lookup](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223): 
@@ -338,7 +338,7 @@ calls, it monitors the number of bytes sent and received.
 
 ### Apps
 
-These are tracepoints related to OOM killing processes.
+These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memory) killing processes.
 
 -  `oom/mark_victm`: Monitors when an oomkill event happens.
 
