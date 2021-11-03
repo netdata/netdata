@@ -8,14 +8,13 @@ sidebar_label: "eBPF"
 
 # eBPF monitoring with Netdata
 
-Netdata's extended Berkeley Packet Filter (eBPF) collector monitors kernel-level metrics for file descriptors, virtual
-filesystem IO, and process management on Linux systems. You can use our eBPF collector to analyze how and when a process
-accesses files, when it makes system calls, whether it leaks memory or creating zombie processes, and more.
+eBPF consists of a wide toolchain that ultimately outputs a set of bytecode that will run inside the eBPF virtual 
+machine (VM) which lives inside the Linux kernel. The program in particular is executed in response to a [tracepoint 
+or kprobe](#probes-and-tracepoints) activation.
 
-Netdata's eBPF monitoring toolkit uses two custom eBPF programs. The default, called `entry`, monitors calls to a
-variety of kernel functions, such as `do_sys_open`, `__close_fd`, `vfs_read`, `vfs_write`, `_do_fork`, and more. The
-`return` program also monitors the return of each kernel functions to deliver more granular metrics about how your
-system and its applications interact with the Linux kernel.
+Netdata has written many eBPF programs, which, when compiled and integrated into the Netdata Agent, are able to collect 
+a wide array of data about the host that would otherwise be impossible. The data eBPF programs can collect is truly unique, 
+which gives the Netdata Agent access to data that is high value but normally hard to capture.
 
 eBPF monitoring can help you troubleshoot and debug how applications interact with the Linux kernel. See
 our [guide on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for
@@ -26,11 +25,28 @@ configuration and troubleshooting tips.
   <figcaption>An example of VFS charts made possible by the eBPF collector plugin.</figcaption>
 </figure>
 
-## Enable the collector on Linux
+## Probes and Tracepoints
+
+The following two features from the Linux kernel are used by Netdata to run eBPF programs:
+
+- Kprobes and return probes (kretprobe): Probes can insert virtually into any kernel instruction. When eBPF runs in 
+  `entry` mode, it attaches only `kprobes` for internal functions monitoring calls and some arguments every time a 
+  function is called. The user can also change configuration to use [`return`](#global) mode, and this will allow users 
+  to monitor return from these functions and detect possible failures.
+- Tracepoints are hooks to call specific functions. Tracepoints are more stable than `kprobes` and are preferred when 
+  both options are available.
+
+In each case, wherever a normal kprobe, kretprobe, or tracepoint would have run its hook function, an eBPF program is 
+run instead, performing various collection logic before letting the kernel continue its normal control flow.
+
+There are more methods by which eBPF programs can be triggered but which are not currently supported, such as via uprobes 
+which allow hooking into arbitrary user-space functions in a similar manner to kprobes.
+
+## Manually enable the collector on Linux
 
 **The eBPF collector is installed and enabled by default on most new installations of the Agent**. The eBPF collector
-does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md), but improved
-support is in active development.
+does not currently work with [static build installations](/packaging/installer/methods/kickstart-64.md) for kernels older
+than `4.11`, but improved support is in active development.
 
 eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`,
 and all kernels on CentOS 7.6 or later.
@@ -40,9 +56,8 @@ section for details.
 
 ## Charts
 
-The eBPF collector creates an **eBPF** menu in the Agent's dashboard along with two sub-menus: **Socket**, and
-**Process**. The plugin also creates charts on different menus, like System Overview, Memory, Disks, Filesystem, Mount
-Points and Applications. All the charts in this section update every second.
+The eBPF collector creates charts on different menus, like System Overview, Memory, MD arrays, Disks, Filesystem,
+Mount Points, Networking Stack, systemd Services, and Applications.
 
 The collector stores the actual value inside of its process, but charts only show the difference between the values
 collected in the previous and current seconds.
@@ -53,10 +68,60 @@ Not all charts within the System Overview menu are enabled by default, because t
 function call, this number is small for a human perspective, but the functions are called many times creating an impact
 on host. See the [configuration](#configuration) section for details about how to enable them.
 
+#### Processes
+
+Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
+system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
+collector uses the following `tracepoints` and `kprobe`:
+
+- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+- `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
+- `kprobe/kernel_clone`: This is the main [fork](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415) 
+   routine since kernel `5.10.0` was released.
+- `kprobe/_do_fork`: Like `kernel_clone`, but this was the main function between kernels `4.2.0` and `5.9.16`
+- `kprobe/do_fork`: This was the main function before kernel `4.2.0`.
+
+#### Process Exit
+
+Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
+system that the task is finishing its work. The second step is to release the kernel information with the internal
+function `release_task`. The difference between the two dimensions can help you discover
+[zombie processes](https://en.wikipedia.org/wiki/Zombie_process). To get the metrics, the collector uses:
+
+- `sched/sched_process_exit`: Tracepoint called after a task exits.
+- `kprobe/release_task`: This function is called when a process exits, as the kernel still needs to remove the process
+  descriptor.
+
+#### Task error
+
+The functions responsible for ending tasks do not return values, so this chart contains information about failures on
+process and thread creation only.
+
+
 #### Swap
 
 Inside the swap submenu the eBPF plugin creates the chart `swapcalls`; this chart is displaying when processes are
-calling functions `swap_readpage` and `swap_writepage`, which are functions responsible for doing IO in swap memory.
+calling functions [`swap_readpage` and `swap_writepage`](https://hzliu123.github.io/linux-kernel/Page%20Cache%20in%20Linux%202.6.pdf ), 
+which are functions responsible for doing IO in swap memory. To collect the exact moment that an access to swap happens, 
+the collector attaches `kprobes` for cited functions.
+
+#### Soft IRQ
+
+The following `tracepoints` are used to measure time usage for soft IRQs:
+
+- [irq/softirq_entry](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_entry): Called 
+   before softirq handler
+- [irq/softirq_exit](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when 
+   softirq handler returns.
+ 
+#### IPC shared memory
+
+To monitor shared memory system call counts, the following `kprobes` are used:
+
+- `shmget`: Runs when [shmget](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
+- `shmat`: Runs when [shmat](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmdt`: Runs when [shmdt](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmctl`: Runs when [shmctl](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
 
 ### Memory
 
@@ -77,9 +142,13 @@ organization:
 #### Page cache ratio
 
 The chart `cachestat_ratio` shows how processes are accessing page cache. In a normal scenario, we expect values around
-100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio Netdata
-monitors calls for kernel functions `add_to_page_cache_lru`, `mark_page_accessed`, `account_page_dirtied`, and
-`mark_buffer_dirty`.
+100%, which means that the majority of the work on the machine is processed in memory. To calculate the ratio, Netdata
+attaches `kprobes` for kernel functions: 
+
+- `add_to_page_cache_lru`: Page addition.
+- `mark_page_accessed`: Access to cache.
+- `account_page_dirtied`: Dirty (modified) pages.
+- `mark_buffer_dirty`: Writes to page cache.
 
 #### Dirty pages
 
@@ -98,29 +167,32 @@ result of the difference for calls between functions `add_to_page_cache_lru` and
 
 #### File sync
 
-This chart shows calls to synchronization methods, `fsync(2)` and `fdatasync(2)`, to transfer all modified page caches
+This chart shows calls to synchronization methods, [fsync (2)](https://man7.org/linux/man-pages/man2/fdatasync.2.html) 
+and [fdatasync (2)](https://man7.org/linux/man-pages/man2/fdatasync.2.html), to transfer all modified page caches
 for the files on disk devices. These calls block until the disk reports that the transfer has been completed. They flush
 data for specific file descriptors.
 
 #### Memory map sync
 
-The chart shows calls to `msync(2)` syscalls. This syscall flushes changes to a file that was mapped into memory using
-`mmap(2)`.
+The chart shows calls to [msync (2)](https://man7.org/linux/man-pages/man2/msync.2.html) syscalls. This syscall flushes 
+changes to a file that was mapped into memory using [mmap (2)](https://man7.org/linux/man-pages/man2/mmap.2.html).
 
 #### File system sync
 
-This chart monitors calls demonstrating commits from filesystem caches to disk.
+This chart monitors calls demonstrating commits from filesystem caches to disk. Netdata attaches `kprobes` for 
+[sync (2)](https://man7.org/linux/man-pages/man2/sync.2.html), and [syncfs (2)](https://man7.org/linux/man-pages/man2/sync.2.html).
 
 #### File range sync
 
-This chart shows calls to `sync_file_range(2)` which synchronizes file segments with disk. This is the most dangerous
-syscall to synchronize data according to its manual.
+This chart shows calls to [sync_file_range (2)](https://man7.org/linux/man-pages/man2/sync_file_range.2.html) which 
+synchronizes file segments with disk.
 
-### MD flush
+> Note: This is the most dangerous syscall to synchronize data, according to its manual.
 
-The eBPF plugin shows multi-device flushes happening in real time. This can be
-used to explain some spikes happening in
-[disk latency](#disk) charts.
+### Multiple Device (MD) arrays
+
+The eBPF plugin shows multi-device flushes happening in real time. This can be used to explain some spikes happening 
+in [disk latency](#disk) charts.
 
 By default, MD flush is disabled. To enable it, configure your
 `/etc/netdata/ebpf.d.conf` file as:
@@ -130,87 +202,112 @@ By default, MD flush is disabled. To enable it, configure your
     mdflush = yes
 ```
 
+#### MD flush
+
+To collect data related to Linux multi-device (MD) flushing, the following kprobe is used:
+
+-  `kprobe/md_flush_request`: called whenever a request for flushing multi-device data is made.
+
 ### Disk
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
-chart `disk_latency_io` for each disk on the host. These charts
-use [tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
-`block:block_rq_issue` and `block:block_rq_complete` to measure the latency of IO events.
+chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+
+- [block/block_rq_issue](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
+  IO request operation to a device drive.
+- [block:block_rq_complete](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
+  IO operation completed by device.
 
 ### Filesystem
 
-This group has two charts demonstrating how applications interact with the Linux kernel to open and close file
-descriptors.
+This group has charts demonstrating how applications interact with the Linux kernel to open and close file
+descriptors. It also brings latency charts for five different filesystems and monitoring for Linux Virtual File System (VFS),
+that is a layer on top of regular filesystems. The functions presented inside this API are not used for filesystems, so 
+it's possible that the charts in this section won't show _all_ the actions that occurred on your system.
+
+#### btrfs
+
+To measure the latency of executing some actions in a [btrfs](https://elixir.bootlin.com/linux/latest/source/fs/btrfs/file.c) 
+filesystem, the collector needs to attach `kprobes` and `kretprobes` for each one of the following functions:
+
+> Note: We are listing two functions used to measure `read` latency, but we use either `btrfs_file_read_iter` or
+`generic_file_read_iter`, depending on kernel version.
+
+- `btrfs_file_read_iter`: Function used to measure read latency since kernel `5.10.0`.
+- `generic_file_read_iter`: Like `btrfs_file_read_iter`, but this function was used before kernel `5.10.0`.
+- `btrfs_file_write_iter`: Function used to write data.
+- `btrfs_file_open`: Function used to open files.
+- `btrfs_sync_file`: Function used to synchronize data to filesystem.
 
 #### File descriptor
 
-This chart contains two dimensions that show the number of calls to the functions `do_sys_open` and `__close_fd`. Most
-software doesn't commonly call these functions directly, they are behind the system calls `open(2)`, `openat(2)`,
-and `close(2)`.
+To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these 
+events, the collector attaches `kprobes` for the common function used for syscalls:
+
+- [do_sys_open](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html ): Internal function used to 
+   open files.
+- [do_sys_openat2](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162): Function called from do_sys_open since 
+   version `5.6.0`.
+- [close_fd](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file 
+  descriptor since kernel `5.11.0`.
+- `__close_fd`: Function used to close files before version `5.11.0`.
 
 #### File error
 
 This chart shows the number of times some software tried and failed to open or close a file descriptor.
 
-### VFS
-
-A [virtual file system](https://en.wikipedia.org/wiki/Virtual_file_system) (VFS) is a layer on top of regular
-filesystems. The functions presented inside this API are not used for filesystems, so it's possible that the charts in
-this section won't show _all_ the actions that occurred on your system.
-
-#### Deleted objects
+#### VFS Deleted objects 
 
 This chart monitors calls to `vfs_unlink`. This function is responsible for removing objects from the file system.
 
-#### IO
+#### VFS IO
 
 This chart shows the number of calls to the functions `vfs_read` and `vfs_write`.
 
-#### IO bytes
+#### VFS IO bytes
 
 This chart also monitors `vfs_read` and `vfs_write` but, instead of the number of calls, it shows the total amount of
 bytes read and written with these functions.
 
 The Agent displays the number of bytes written as negative because they are moving down to disk.
 
-#### IO errors
+#### VFS IO errors
 
 The Agent counts and shows the number of instances where a running program experiences a read or write error.
 
-#### Create
+#### VFS Create
 
 This chart shows the number of calls to `vfs_create`. This function is responsible for creating files.
 
-#### Synchronization
+#### VFS Synchronization
 
 This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or
 `fdatasync(2)` on a file. You can see more details in the Synchronization section.
 
-#### Open
+#### VFS Open
 
 This chart shows the number of calls to `vfs_open`. This function is responsible for opening files.
 
-### eBPF
+#### Directory Cache
 
-#### Process thread
+Metrics for directory cache are collected using kprobe for `lookup_fast`, because we are interested in the number of 
+times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it 
+is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
 
-Internally, the Linux kernel treats both processes and threads as `tasks`. To create a thread, the kernel offers a few
-system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. In turn, each of these system calls uses either the function
-`_do_fork` (kernel older than `5.10.0`) or the function `do_fork` (latest kernels). To generate this chart, the eBPF
-collector monitors the cited functions to populate the `process` dimension, and monitors `sys_clone` to identify
-threads.
+- [lookup_fast](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
+- [d_lookup](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223): 
+  Called when the desired file is not inside the directory cache.
 
-#### Exit
+### Mount Points
 
-Ending a task requires two steps. The first is a call to the internal function `do_exit`, which notifies the operating
-system that the task is finishing its work. The second step is to release the kernel information with the internal
-function `release_task`. The difference between the two dimensions can help you discover
-[zombie processes](https://en.wikipedia.org/wiki/Zombie_process).
+The following `kprobes` are used to collect `mount` & `unmount` call counts:
 
-#### Task error
+- [mount](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
+- [umount](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
 
-The functions responsible for ending tasks do not return values, so this chart contains information about failures on
-process and thread creation only.
+### Networking Stack
+
+Netdata monitors socket bandwidth attaching `kprobes` for internal functions.
 
 #### TCP functions
 
@@ -236,6 +333,12 @@ receiving data for connections when the `UDP` protocol is used.
 
 Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the number of
 calls, it monitors the number of bytes sent and received.
+
+### Apps
+
+These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memory) killing processes.
+
+-  `oom/mark_victm`: Monitors when an oomkill event happens.
 
 ## Configuration
 
