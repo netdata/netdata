@@ -1391,19 +1391,12 @@ void rrdset_done(RRDSET *st) {
     rrdset_rdlock(st);
 
 #ifdef ENABLE_ACLK
-    #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
         if (st->counter_done >= RRDSET_MINIMUM_LIVE_COUNT) {
-            if (likely(!sql_queue_chart_to_aclk(st)))
+            if (likely(!queue_chart_to_aclk(st)))
                 rrdset_flag_set(st, RRDSET_FLAG_ACLK);
         }
     }
-    #else
-    if (unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-        rrdset_flag_set(st, RRDSET_FLAG_ACLK);
-        aclk_update_chart(st->rrdhost, st->id, 1);
-    }
-    #endif
 #endif
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
@@ -1813,12 +1806,13 @@ after_second_database_work:
         if (rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
             continue;
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+#if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
         int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
         if (unlikely(live != rd->state->aclk_live_status)) {
             if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-                if (likely(!sql_queue_dimension_to_aclk(rd))) {
+                if (likely(!queue_dimension_to_aclk(rd))) {
                     rd->state->aclk_live_status = live;
+                    rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
                 }
             }
         }

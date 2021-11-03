@@ -978,6 +978,7 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
         create_query->data.node_creation.hops = (uint32_t) host->system_info->hops;
         create_query->data.node_creation.hostname = strdupz(host->hostname);
         create_query->data.node_creation.machine_guid = strdupz(host->machine_guid);
+        info("Registering host=%s, hops=%u",host->machine_guid, host->system_info->hops);
         aclk_queue_query(create_query);
         return;
     }
@@ -992,6 +993,8 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd)
     uuid_unparse_lower(node_id, (char*)query->data.node_update.node_id);
     query->data.node_update.queryable = 1;
     query->data.node_update.session_id = aclk_session_newarch;
+    info("Queuing status update for node=%s, live=%d, hops=%u",(char*)query->data.node_update.node_id, cmd,
+         host->system_info->hops);
     aclk_queue_query(query);
 }
 
@@ -1015,6 +1018,9 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->node_id, (char*)query->data.node_update.node_id);
             query->data.node_update.queryable = 1;
             query->data.node_update.session_id = aclk_session_newarch;
+            info("Queuing status update for node=%s, live=%d, hops=%d",(char*)query->data.node_update.node_id,
+                 list->live,
+                 list->hops);
             aclk_queue_query(query);
         } else {
             aclk_query_t create_query;
@@ -1026,6 +1032,8 @@ void aclk_send_node_instances()
             create_query->data.node_creation.hostname = list->hostname;
             create_query->data.node_creation.machine_guid  = mallocz(UUID_STR_LEN);
             uuid_unparse_lower(list->host_id, (char*)create_query->data.node_creation.machine_guid);
+            info("Queuing registration for host=%s, hops=%d",(char*)create_query->data.node_creation.machine_guid,
+                 list->hops);
             aclk_queue_query(create_query);
         }
 

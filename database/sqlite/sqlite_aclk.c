@@ -165,9 +165,9 @@ int aclk_worker_enq_cmd(char *node_id, struct aclk_database_cmd *cmd)
             break;
         wc = wc->next;
     }
+    uv_mutex_unlock(&aclk_async_lock);
     if (wc)
         aclk_database_enq_cmd(wc, cmd);
-    uv_mutex_unlock(&aclk_async_lock);
     return (wc == NULL);
 }
 
@@ -261,12 +261,22 @@ static void timer_cb(uv_timer_t* handle)
                 wc->rotation_after += ACLK_DATABASE_ROTATION_INTERVAL;
         }
 
-        if (wc->chart_updates && !wc->chart_pending) {
+        if (wc->chart_updates && !wc->chart_pending && wc->chart_payload_count) {
             cmd.opcode = ACLK_DATABASE_PUSH_CHART;
             cmd.count = ACLK_MAX_CHART_BATCH;
             cmd.param1 = ACLK_MAX_CHART_BATCH_COUNT;
-            if (!aclk_database_enq_cmd_noblock(wc, &cmd))
+            if (!aclk_database_enq_cmd_noblock(wc, &cmd)) {
+                if (wc->retry_count)
+                    info("Queued chart/dimension payload command %s, retry count = %u", wc->host_guid, wc->retry_count);
                 wc->chart_pending = 1;
+                wc->retry_count = 0;
+            } else {
+                wc->retry_count++;
+                if (wc->retry_count % 100 == 0)
+                    error_report("Failed to queue chart/dimension payload command %s, retry count = %u",
+                        wc->host_guid,
+                        wc->retry_count);
+            }
         }
 
         if (wc->alert_updates) {
@@ -284,7 +294,7 @@ void aclk_database_worker(void *arg)
 {
     struct aclk_database_worker_config *wc = arg;
     uv_loop_t *loop;
-    int shutdown, ret;
+    int ret;
     enum aclk_database_opcode opcode;
     uv_timer_t timer_req;
     struct aclk_database_cmd cmd;
@@ -324,25 +334,27 @@ void aclk_database_worker(void *arg)
     timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
-    wc->error = 0;
-    shutdown = 0;
-
+    wc->retry_count = 0;
     wc->node_info_send = (wc->host && !localhost);
     aclk_add_worker_thread(wc);
     info("Starting ACLK sync thread for host %s -- scratch area %lu bytes", wc->host_guid, sizeof(*wc));
 
     memset(&cmd, 0, sizeof(cmd));
-    sql_get_last_chart_sequence(wc, cmd);
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    sql_get_last_chart_sequence(wc);
+    wc->chart_payload_count = sql_get_pending_count(wc);
+    if (!wc->chart_payload_count)
+        info("%s: No pending charts and dimensions detected during startup", wc->host_guid);
+#endif
     wc->chart_updates = 0;
-    wc->alert_updates = 0;
     wc->startup_time = now_realtime_sec();
     wc->cleanup_after = wc->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
     wc->rotation_after = wc->startup_time + ACLK_DATABASE_ROTATION_DELAY;
-    while (likely(shutdown == 0)) {
-        uv_run(loop, UV_RUN_DEFAULT);
+    wc->alert_updates = 0;
 
-        if (netdata_exit)
-            shutdown = 1;
+    debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
+    while (likely(!netdata_exit)) {
+        uv_run(loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -350,6 +362,10 @@ void aclk_database_worker(void *arg)
             if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
                 break;
             cmd = aclk_database_deq_cmd(wc);
+
+            if (netdata_exit)
+                break;
+
             opcode = cmd.opcode;
             ++cmd_batch_size;
             switch (opcode) {
@@ -370,6 +386,7 @@ void aclk_database_worker(void *arg)
                     break;
 
 // CHART / DIMENSION OPERATIONS
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
                 case ACLK_DATABASE_ADD_CHART:
                     debug(D_ACLK_SYNC, "Adding chart event for %s", wc->host_guid);
                     aclk_add_chart_event(wc, cmd);
@@ -394,7 +411,7 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC, "RESET chart SEQ for %s to %"PRIu64, wc->uuid_str, (uint64_t) cmd.param1);
                     aclk_receive_chart_reset(wc, cmd);
                     break;
-
+#endif
 // ALERTS
                 case ACLK_DATABASE_ADD_ALERT:
                     debug(D_ACLK_SYNC,"Adding alert event for %s", wc->host_guid);
@@ -426,10 +443,15 @@ void aclk_database_worker(void *arg)
                     debug(D_ACLK_SYNC,"Sending node info for %s", wc->uuid_str);
                     sql_build_node_info(wc, cmd);
                     break;
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+                case ACLK_DATABASE_DIM_DELETION:
+                    debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
+                    break;
                 case ACLK_DATABASE_UPD_RETENTION:
                     debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
                     aclk_update_retention(wc, cmd);
                     break;
+#endif
 
 // NODE_INSTANCE DETECTION
                 case ACLK_DATABASE_TIMER:
@@ -437,7 +459,7 @@ void aclk_database_worker(void *arg)
                         if (claimed()) {
                             wc->host = rrdhost_find_by_guid(wc->host_guid, 0);
                             if (wc->host) {
-                                info("HOST %s detected as active and claimed !!!", wc->host->hostname);
+                                info("HOST %s (%s) detected as active", wc->host->hostname, wc->host_guid);
                                 snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->host->hostname);
                                 uv_thread_set_name_np(wc->thread, threadname);
                                 wc->host->dbsync_worker = wc;
@@ -452,11 +474,6 @@ void aclk_database_worker(void *arg)
                         wc->node_info_send = aclk_database_enq_cmd_noblock(wc, &cmd);
                     }
                     break;
-                case ACLK_DATABASE_SHUTDOWN:
-                    shutdown = 1;
-                    fatal_assert(0 == uv_timer_stop(&timer_req));
-                    uv_close((uv_handle_t *)&timer_req, NULL);
-                    break;
                 default:
                     debug(D_ACLK_SYNC, "%s: default.", __func__);
                     break;
@@ -466,8 +483,11 @@ void aclk_database_worker(void *arg)
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 
+    if (!uv_timer_stop(&timer_req))
+        uv_close((uv_handle_t *)&timer_req, NULL);
+
     /* cleanup operations of the event loop */
-    info("Shutting down ACLK_DATABASE engine event loop.");
+    info("Shutting down ACLK sync event loop.");
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -477,7 +497,7 @@ void aclk_database_worker(void *arg)
     uv_close((uv_handle_t *)&wc->async, NULL);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    info("Shutting down ACLK_DATABASE engine event loop complete.");
+    info("Shutting down ACLK sync event loop complete.");
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
@@ -503,8 +523,6 @@ error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
-
-    wc->error = UV_EAGAIN;
 }
 
 // -------------------------------------------------------------

@@ -115,10 +115,18 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_ADD_ALERT,
+
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
     ACLK_DATABASE_ADD_CHART,
     ACLK_DATABASE_ADD_DIMENSION,
-    ACLK_DATABASE_ALARM_HEALTH_LOG,
+    ACLK_DATABASE_PUSH_CHART,
+    ACLK_DATABASE_PUSH_CHART_CONFIG,
+    ACLK_DATABASE_RESET_CHART,
     ACLK_DATABASE_CHART_ACK,
+    ACLK_DATABASE_UPD_RETENTION,
+    ACLK_DATABASE_DIM_DELETION,
+#endif
+    ACLK_DATABASE_ALARM_HEALTH_LOG,
     ACLK_DATABASE_CLEANUP,
     ACLK_DATABASE_DELETE_HOST,
     ACLK_DATABASE_NODE_INFO,
@@ -126,12 +134,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
-    ACLK_DATABASE_PUSH_CHART,
-    ACLK_DATABASE_PUSH_CHART_CONFIG,
-    ACLK_DATABASE_RESET_CHART,
-    ACLK_DATABASE_SHUTDOWN,
-    ACLK_DATABASE_TIMER,
-    ACLK_DATABASE_UPD_RETENTION
+    ACLK_DATABASE_TIMER
 };
 
 struct aclk_chart_payload_t {
@@ -172,6 +175,7 @@ struct aclk_database_worker_config {
     uint64_t alerts_batch_id; // batch id for alerts to use
     uint64_t alerts_start_seq_id; // cloud has asked to start streaming from
     uint64_t alert_sequence_id; // last alert sequence_id
+    uint32_t chart_payload_count;
     uint64_t alerts_snapshot_id; //will contain the snapshot_id value if snapshot was requested
     uint64_t alerts_ack_sequence_id; //last sequence_id ack'ed from cloud via sendsnapshot message
     uv_loop_t *loop;
@@ -182,7 +186,7 @@ struct aclk_database_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
-    int error;
+    uint32_t retry_count;
     int chart_updates;
     int alert_updates;
     time_t batch_created;

@@ -583,7 +583,7 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 {
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     if (unlikely(!host->dbsync_worker)) {
-        error("ACLK synchronization thread is not active for host %s", host->hostname);
+        error("ACLK synchronization thread is not active for host %s when trying to queue removed alerts", host->hostname);
         return;
     }
 
