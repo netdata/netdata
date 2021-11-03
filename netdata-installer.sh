@@ -275,7 +275,7 @@ DONOTWAIT=0
 AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
-NETDATA_ENABLE_ML=1
+NETDATA_ENABLE_ML=""
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -397,32 +397,10 @@ fi
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
-NEED_PROTOBUF=true
-
-if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
-  NEED_PROTOBUF=false
-fi
-
-if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
-  NEED_PROTOBUF=false
-fi
-
-NEED_RAM_CHECK=false
-
-if ${NEED_PROTOBUF} || [ ${NETDATA_ENABLE_ML} -eq 1 ]; then
-    NEED_RAM_CHECK=true
-fi
-
-if ${NEED_RAM_CHECK} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
+if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1000 * 1000))"
-
-  if ${NEED_PROTOBUF}; then
-    base=1500
-    scale=250
-  else
-    base=1000
-    scale=100
-  fi
+  base=1000
+  scale=250
 
   if [ -n "${MAKEOPTS}" ]; then
     proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
@@ -434,28 +412,21 @@ if ${NEED_RAM_CHECK} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; the
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
   total_ram="$((total_ram * 1024))"
 
+  if [ "${total_ram}" -le "$((base * mega))" ] && [ -z "${NETDATA_ENABLE_ML}" ]; then
+    NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-ml/} --disable-ml"
+    NETDATA_ENABLE_ML=0
+  fi
+
   if [ -z "${MAKEOPTS}" ]; then
     MAKEOPTS="-j${proc_count}"
 
-    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 0 ]; do
+    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ]; do
       proc_count="$((proc_count - 1))"
       target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
       MAKEOPTS="-j${proc_count}"
     done
-
-    if [ "${proc_count}" -lt 1 ]; then
-      if [ -n "${SKIP_RAM_CHECK}" ]; then
-        MAKEOPTS=""
-      else
-        target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
-        total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
-        run_failed "Netdata needs at least ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
-        run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag or disabling ML support."
-        exit 2
-      fi
-    fi
   else
-    if [ "${target_ram}" -gt "${total_ram}" ] && [ -z "${SKIP_RAM_CHECK}" ]; then
+    if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
       target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
       total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
       run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
@@ -929,7 +900,7 @@ copy_judy() {
 
 bundle_judy() {
   # If --build-judy flag or no Judy on the system and we're building the dbengine, bundle our own libJudy.
-  # shellcheck disable=SC2235
+  # shellcheck disable=SC2235,SC2030,SC2031
   if [ -n "${NETDATA_DISABLE_DBENGINE}" ] || ([ -z "${NETDATA_BUILD_JUDY}" ] && [ -e /usr/include/Judy.h ]); then
     return 0
   elif [ -n "${NETDATA_BUILD_JUDY}" ]; then
