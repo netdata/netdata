@@ -404,7 +404,7 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1000 * 1000))"
 
   if [ -n "${MAKEOPTS}" ]; then
-    proc_count="$(echo ${MAKEOPTS} | grep -oE '-j *[[:digit:]]+' | tr -d '-j ')"
+    proc_count="$(echo ${MAKEOPTS} | grep -oE '-j *[[:digit:]]+' | tr -d '\-j ')"
   else
     proc_count="$(find_processors)"
   fi
@@ -426,14 +426,18 @@ if ${NEED_PROTOBUF} && [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
       if [ -n "${SKIP_RAM_CHECK}" ]; then
         MAKEOPTS=""
       else
-        run_failed "Netdata needs at least ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
+        target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
+        total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
+        run_failed "Netdata needs at least ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
         run_failed "Insufficient RAM available for an install. Try building with the '--use-system-protobuf' flag."
         exit 2
       fi
     fi
   else
     if [ "${target_ram}" -gt "${total_ram}" ] && [ -z "${SKIP_RAM_CHECK}" ]; then
-      run_failed "Netdata needs ${target_ram} bytes of RAM to safely install, but this system only has ${total_ram} bytes."
+      target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
+      total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
+      run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
       run_failed "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
       exit 2
     fi
