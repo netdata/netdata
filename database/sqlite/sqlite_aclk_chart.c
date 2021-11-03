@@ -768,7 +768,11 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
         if (!update_every || update_every != (uint32_t) sqlite3_column_int(res, 1)) {
             if (update_every) {
                 debug(D_ACLK_SYNC,"Update %s for %u oldest time = %ld", wc->host_guid, update_every, start_time);
-                rotate_data.interval_durations[rotate_data.interval_duration_count].retention = rotate_data.rotation_timestamp.tv_sec - start_time;
+                if (start_time == LONG_MAX)
+                    rotate_data.interval_durations[rotate_data.interval_duration_count].retention = 0;
+                else
+                    rotate_data.interval_durations[rotate_data.interval_duration_count].retention =
+                        rotate_data.rotation_timestamp.tv_sec - start_time;
                 rotate_data.interval_duration_count++;
             }
             update_every = (uint32_t) sqlite3_column_int(res, 1);
@@ -813,16 +817,19 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
     }
     if (update_every) {
         debug(D_ACLK_SYNC, "Update %s for %u oldest time = %ld", wc->host_guid, update_every, start_time);
-        rotate_data.interval_durations[rotate_data.interval_duration_count].retention = rotate_data.rotation_timestamp.tv_sec - start_time;
+        if (start_time == LONG_MAX)
+            rotate_data.interval_durations[rotate_data.interval_duration_count].retention = 0;
+        else
+            rotate_data.interval_durations[rotate_data.interval_duration_count].retention =
+                rotate_data.rotation_timestamp.tv_sec - start_time;
         rotate_data.interval_duration_count++;
     }
 
-    for (int i = 0; i < rotate_data.interval_duration_count; ++i) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        info("%d --> Update %s for %u  Retention = %u", i, wc->host_guid,
+    for (int i = 0; i < rotate_data.interval_duration_count; ++i)
+        info("Update for host %s (node %s) for %u Retention = %u", wc->host_guid, wc->node_id,
              rotate_data.interval_durations[i].update_every, rotate_data.interval_durations[i].retention);
 #endif
-    };
     aclk_retention_updated(&rotate_data);
     freez(rotate_data.node_id);
     freez(rotate_data.interval_durations);
