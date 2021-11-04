@@ -424,7 +424,7 @@ void DetectableHost::detectOnce() {
     if(AnomalyBitCounterWindow == 0) {
         /*one window size is completed, save in the DB the vector that holds the values of the percentages 
         (of the set anomaly bits) per dimension*/
-        //nlohmann::json JsonResult = DimsAnomalyRate;
+        nlohmann::json JsonResult = DimsAnomalyRate;
 
         time_t Before = now_realtime_sec();
         time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
@@ -433,6 +433,7 @@ void DetectableHost::detectOnce() {
         for(std::vector<std::pair<double, std::string>>::iterator it = DimsAnomalyRate.begin(); it != DimsAnomalyRate.end(); ++it) {
             DB.insertAnomalyRateInfo(getUUID(), it->second, After, Before, it->first);
         }
+        //DB.insertAnomalyRatesInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
         AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
     }

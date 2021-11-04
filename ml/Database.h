@@ -89,6 +89,7 @@ private:
     
     static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
     static const char *SQL_INSERT_ANOMALY_RATE_INFO;
+    static const char *SQL_INSERT_ANOMALY_RATES_INFO;
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
 
 public:
@@ -129,6 +130,12 @@ public:
     }
 
     template<typename ...ArgTypes>
+    bool insertAnomalyRatesInfo(ArgTypes... Args) {
+        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
+        return InsertAnomalyRatesInfoStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
     bool getAnomalyRateInfoInRange(std::vector<std::pair<std::string, double>> &V, ArgTypes&&... Args) {
         Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
             V.push_back({
@@ -144,6 +151,7 @@ private:
 
     Statement InsertAnomalyStmt{SQL_INSERT_ANOMALY};
     Statement InsertAnomalyRateInfoStmt{SQL_INSERT_ANOMALY_RATE_INFO};
+    Statement InsertAnomalyRatesInfoStmt{SQL_INSERT_ANOMALY_RATES_INFO};
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
     Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
