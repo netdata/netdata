@@ -103,12 +103,6 @@ public:
     }
 
     template<typename ...ArgTypes>
-    bool insertAnomalyRateInfo(ArgTypes... Args) {
-        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
-        return InsertAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
-    }
-
-    template<typename ...ArgTypes>
     bool getAnomalyInfo(nlohmann::json &Json, ArgTypes&&... Args) {
         Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
             const char *Text = static_cast<const char *>(sqlite3_column_blob(Stmt, 0));
@@ -129,11 +123,17 @@ public:
     }
 
     template<typename ...ArgTypes>
-    bool getAnomalyRateInfoInRange(std::vector<std::pair<time_t, time_t>> &V, ArgTypes&&... Args) {
+    bool insertAnomalyRateInfo(ArgTypes... Args) {
+        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
+        return InsertAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    bool getAnomalyRateInfoInRange(std::vector<std::pair<std::string, double>> &V, ArgTypes&&... Args) {
         Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
             V.push_back({
-                sqlite3_column_int64(Stmt, 0),
-                sqlite3_column_int64(Stmt, 1)
+                sqlite3_column_text(Stmt, 0),
+                sqlite3_column_double(Stmt, 1)
             });
         };
         return GetAnomalyRateInfoInRangeStmt.exec(Conn, RowCb, Args...);

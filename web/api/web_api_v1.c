@@ -1295,7 +1295,7 @@ static struct api_command {
 #if defined(ENABLE_ML)
         { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
         { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
-        { "anomaly_rate",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_rate_info       },
+        { "anomaly_rate_info",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_rate_info       },
 #endif
 
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
