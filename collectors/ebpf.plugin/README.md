@@ -113,6 +113,41 @@ The following `tracepoints` are used to measure time usage for soft IRQs:
 - [`irq/softirq_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when
    softirq handler returns.
 
+#### Hard IRQ
+
+The following tracepoints are used to measure the latency of servicing a
+hardware interrupt request (hard IRQ).
+
+- [`irq/irq_handler_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_entry):
+  Called immediately before the IRQ action handler.
+- [`irq/irq_handler_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_irq_handler_exit):
+  Called immediately after the IRQ action handler returns.
+- `irq_vectors`: These are traces from `irq_handler_entry` and
+  `irq_handler_exit` when an IRQ is handled. The following elements from vector
+  are triggered:
+    - `irq_vectors/local_timer_entry`
+    - `irq_vectors/local_timer_exit`
+    - `irq_vectors/reschedule_entry`
+    - `irq_vectors/reschedule_exit`
+    - `irq_vectors/call_function_entry`
+    - `irq_vectors/call_function_exit`
+    - `irq_vectors/call_function_single_entry`
+    - `irq_vectors/call_function_single_xit`
+    - `irq_vectors/irq_work_entry`
+    - `irq_vectors/irq_work_exit`
+    - `irq_vectors/error_apic_entry`
+    - `irq_vectors/error_apic_exit`
+    - `irq_vectors/thermal_apic_entry`
+    - `irq_vectors/thermal_apic_exit`
+    - `irq_vectors/threshold_apic_entry`
+    - `irq_vectors/threshold_apic_exit`
+    - `irq_vectors/deferred_error_entry`
+    - `irq_vectors/deferred_error_exit`
+    - `irq_vectors/spurious_apic_entry`
+    - `irq_vectors/spurious_apic_exit`
+    - `irq_vectors/x86_platform_ipi_entry`
+    - `irq_vectors/x86_platform_ipi_exit`
+
 #### IPC shared memory
 
 To monitor shared memory system call counts, the following `kprobes` are used:
