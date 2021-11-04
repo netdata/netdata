@@ -23,6 +23,8 @@ jobs:
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
+    outputs:
+      distfile: ${{ steps.build.outputs.distfile }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -47,6 +49,7 @@ jobs:
                       --with-math \
                       --with-user=netdata
           make dist
+          echo "::set-output name=distfile::$(find . -name 'netdata-*.tar.gz')"
           cp netdata-*.tar.gz artifacts/
       - name: Store
         uses: actions/upload-artifact@v2
