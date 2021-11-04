@@ -267,7 +267,7 @@ function k8s_get_kubepod_name() {
   jq_filter+='container_name=\"\(.name)\",'
   jq_filter+='container_id=\"\(.containerID)\"'
   jq_filter+='") | '
-  jq_filter+='sub("docker://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
+  jq_filter+='sub("(docker|crio|cri-containerd)://";"")' # containerID: docker://a346da9bc0e3eaba6b295f64ac16e02f2190db2cef570835706a9e7a36e2c722
 
   local containers
   if ! containers=$(jq -r "${jq_filter}" <<< "$pods" 2>&1); then
