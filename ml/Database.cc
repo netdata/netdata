@@ -63,9 +63,9 @@ const char *ml::Database::SQL_INSERT_ANOMALY_RATES_INFO =
     " FROM json_each(?4) AS j";
     
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
-    "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info" 
-    "   GROUP BY host_id, dimension_id"
-    "   WHERE after >= ?1 AND before <= ?2;";
+    "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info " 
+    "  WHERE after >= ?2 AND before <= ?3 "
+    "  GROUP BY host_id, dimension_id;";
 
 using namespace ml;
 
