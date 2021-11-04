@@ -335,9 +335,11 @@ calls, it monitors the number of bytes sent and received.
 
 ### Apps
 
+#### OOM Killing
+
 These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memory) killing processes.
 
--  `oom/mark_victm`: Monitors when an oomkill event happens.
+-  `oom/mark_victim`: Monitors when an oomkill event happens.
 
 ## Configuration
 
