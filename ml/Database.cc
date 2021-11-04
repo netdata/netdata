@@ -55,6 +55,13 @@ const char *ml::Database::SQL_INSERT_ANOMALY_RATE_INFO =
     "     host_id, dimension_id, after, before, anomaly_rate) "
     "VALUES (?1, ?2, ?3, ?4, ?5);";
 
+const char *ml::Database::SQL_INSERT_ANOMALY_RATES_INFO =
+    "INSERT INTO anomaly_rate_info(host_id, after, before, anomaly_rate, dimension_id) "
+    " SELECT ?1, ?2, ?3 "
+    " , json_extract(j.value, '$.anomaly_rate') "
+    " , json_extract(j.value, '$.dimension_id') "
+    " FROM json_each(?4) AS j";
+    
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info" 
     "   GROUP BY host_id, dimension_id"
