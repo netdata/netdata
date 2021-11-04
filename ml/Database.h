@@ -132,7 +132,7 @@ public:
     bool getAnomalyRateInfoInRange(std::vector<std::pair<std::string, double>> &V, ArgTypes&&... Args) {
         Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
             V.push_back({
-                reinterpret_cast<const char*>sqlite3_column_text(Stmt, 0),
+                reinterpret_cast<const char*>(sqlite3_column_text(Stmt, 0)),
                 sqlite3_column_double(Stmt, 1)
             });
         };
