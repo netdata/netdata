@@ -424,7 +424,127 @@ update_static() {
 }
 
 update_binpkg() {
-  true
+  os_release_file=
+  if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
+    os_release_file="/etc/os-release"
+  elif [ -s "/usr/lib/os-release" ] && [ -r "/usr/lib/os-release" ]; then
+    os_release_file="/usr/lib/os-release"
+  else
+    fatal "Cannot find an os-release file ..." F0401
+  fi
+
+  # shellcheck disable=SC1090
+  . "${os_release_file}"
+
+  DISTRO="${ID}"
+
+  supported_compat_names="debian ubuntu centos fedora opensuse"
+
+  if str_in_list "${DISTRO}" "${supported_compat_names}"; then
+    DISTRO_COMPAT_NAME="${DISTRO}"
+  else
+    case "${DISTRO}" in
+      opensuse-leap)
+        DISTRO_COMPAT_NAME="opensuse"
+        ;;
+      rhel)
+        DISTRO_COMPAT_NAME="centos"
+        ;;
+      *)
+        DISTRO_COMPAT_NAME="unknown"
+        ;;
+    esac
+  fi
+
+  if [ "${INTERACTIVE}" = "0" ]; then
+    interactive_opts="-y"
+    env="DEBIAN_FRONTEND=noninteractive"
+  else
+    interactive_opts=""
+    env=""
+  fi
+
+  case "${DISTRO_COMPAT_NAME}" in
+    debian)
+      pm_cmd="apt-get"
+      repo_subcmd="update"
+      upgrade_cmd="upgrade"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      pkg_installed_check="dpkg -l"
+      INSTALL_TYPE="binpkg-deb"
+      ;;
+    ubuntu)
+      pm_cmd="apt-get"
+      repo_subcmd="update"
+      upgrade_cmd="upgrade"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      pkg_installed_check="dpkg -l"
+      INSTALL_TYPE="binpkg-deb"
+      ;;
+    centos)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      upgrade_cmd="upgrade"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      pkg_installed_check="rpm -q"
+      INSTALL_TYPE="binpkg-rpm"
+      ;;
+    fedora)
+      if command -v dnf > /dev/null; then
+        pm_cmd="dnf"
+        repo_subcmd="makecache"
+      else
+        pm_cmd="yum"
+      fi
+      upgrade_cmd="upgrade"
+      pkg_install_opts="${interactive_opts}"
+      repo_update_opts="${interactive_opts}"
+      pkg_installed_check="rpm -q"
+      INSTALL_TYPE="binpkg-rpm"
+      ;;
+    opensuse)
+      pm_cmd="zypper"
+      repo_subcmd="--gpg-auto-import-keys refresh"
+      upgrade_cmd="upgrade"
+      pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
+      repo_update_opts=""
+      pkg_installed_check="rpm -q"
+      INSTALL_TYPE="binpkg-rpm"
+      ;;
+    *)
+      warning "We do not provide native packages for ${DISTRO}."
+      return 2
+      ;;
+  esac
+
+  if [ -n "${repo_subcmd}" ]; then
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+  fi
+
+  if ${pkg_installed_check} netdata-repo > /dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata-repo || fatal "Failed to update Netdata repository config."
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+  fi
+
+  if ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata-repo-edge || fatal "Failed to update Netdata repository config."
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} || fatal "Failed to update repository metadata."
+  fi
+
+  # shellcheck disable=SC2086
+  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata || fatal "Failed to update Netdata package."
 }
 
 logfile=
