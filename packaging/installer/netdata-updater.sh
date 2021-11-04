@@ -310,7 +310,7 @@ set_tarball_urls() {
   fi
 }
 
-update() {
+update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
   RUN_INSTALLER=0
@@ -384,6 +384,49 @@ update() {
   return 0
 }
 
+update_static() {
+  ndtmpdir="$(create_tmp_directory)"
+  PREVDIR="$(pwd)"
+
+  echo >&2 "Entering ${ndtmpdir}"
+  cd "${ndtmpdir}" || exit 1
+
+  if update_available; then
+    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
+    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
+    if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
+    fi
+
+    if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
+      install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
+    else
+      install_type="INSTALL_TYPE='legacy-static'"
+    fi
+
+    # Do not pass any options other than the accept, for now
+    # shellcheck disable=SC2086
+    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+      rm -rf "${ndtmpdir}" >&3 2>&3
+    else
+      info "NOTE: did not remove: ${ndtmpdir}"
+    fi
+
+    echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
+  fi
+
+  if [ -e "${PREVDIR}" ]; then
+    info "Switching back to ${PREVDIR}"
+    cd "${PREVDIR}"
+  fi
+  [ -n "${logfile}" ] && rm "${logfile}" && logfile=
+  exit 0
+}
+
+update_binpkg() {
+  true
+}
+
 logfile=
 ndtmpdir=
 
@@ -419,6 +462,11 @@ fi
 # shellcheck source=/dev/null
 . "${ENVIRONMENT_FILE}" || exit 1
 
+if [ -f "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
+  # shellcheck source=/dev/null
+  . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || exit 1
+fi
+
 # We dont expect to find lib dir variable on older installations, so load this path if none found
 export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
@@ -446,46 +494,28 @@ fi
 
 self_update
 
-set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
-
-if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
-  ndtmpdir="$(create_tmp_directory)"
-  PREVDIR="$(pwd)"
-
-  info "Entering ${ndtmpdir}"
-  cd "${ndtmpdir}" || exit 1
-
-  if update_available; then
-    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
-    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
-    if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour."
-    fi
-
-    if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
-      install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
-    else
-      install_type="INSTALL_TYPE='legacy-static'"
-    fi
-
-    # Do not pass any options other than the accept, for now
-    # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
-      rm -rf "${ndtmpdir}" >&3 2>&3
-    else
-      info "NOTE: did not remove: ${ndtmpdir}"
-    fi
-
-    echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
-  fi
-
-  if [ -e "${PREVDIR}" ]; then
-    info "Switching back to ${PREVDIR}"
-    cd "${PREVDIR}"
-  fi
-  [ -n "${logfile}" ] && rm "${logfile}" && logfile=
-  exit 0
-else
-  # the installer updates this script - so we run and exit in a single line
-  update && exit 0
-fi
+# shellcheck disable=SC2153
+case "${INSTALL_TYPE}" in
+    *-build)
+      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      update_build && exit 0
+      ;;
+    *-static)
+      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      update_static && exit 0
+      ;;
+    *binpkg*)
+      update_binpkg && exit 0
+      ;;
+    "") # Fallback case for no `.isntall-type` file. This just works like the old install type detecton.
+      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
+        update_static && exit 0
+      else
+        update_build && exit 0
+      fi
+      ;;
+    *)
+      fatal "Unrecognized installation type, unable to update."
+      ;;
+esac
