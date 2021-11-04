@@ -130,7 +130,7 @@ Database::Database(const std::string &Path) {
     RC = sqlite3_exec(Conn, SQL_CREATE_ANOMALIES_TABLE, nullptr, nullptr, &ErrMsg);
     if (RC == SQLITE_OK) {
         
-        RC = sqlite3_exec(Conn, SQL_CREATE_ANOMALY_RATE_TABLE, nullptr, nullptr, &ErrMsg);
+        RC = sqlite3_exec(Conn, SQL_CREATE_ANOMALY_RATE_INFO_TABLE, nullptr, nullptr, &ErrMsg);
         if (RC == SQLITE_OK) {
             return;
         }

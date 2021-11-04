@@ -31,7 +31,7 @@ public:
     double ADDimensionRateThreshold;
 
     /*The time window size within which the set anomalous results per dimension are to be counted*/
-    unsigned SaveAnomalyPercentageEvery;
+    double SaveAnomalyPercentageEvery;
 
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
