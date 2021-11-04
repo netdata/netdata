@@ -398,9 +398,9 @@ fi
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
 if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
-  mega="$((1000 * 1000))"
-  base=1000
-  scale=250
+  mega="$((1024 * 1023))"
+  base=1024
+  scale=256
 
   if [ -n "${MAKEOPTS}" ]; then
     proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
@@ -427,8 +427,8 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
     done
   else
     if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
-      target_ram="$(echo "${target_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
-      total_ram="$(echo "${total_ram}" | awk '{$1/=1000*1000*1000;printf "%.2fGB\n",$1}')"
+      target_ram="$(echo "${target_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
+      total_ram="$(echo "${total_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}."
       run_failed "Insufficient RAM available for an install. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
       exit 2
