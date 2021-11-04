@@ -398,7 +398,7 @@ fi
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
 if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
-  mega="$((1024 * 1023))"
+  mega="$((1024 * 1024))"
   base=1024
   scale=256
 
