@@ -76,7 +76,7 @@ collector uses the following `tracepoints` and `kprobe`:
 
 - `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
-- `kprobe/kernel_clone`: This is the main [fork](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
+- `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
    routine since kernel `5.10.0` was released.
 - `kprobe/_do_fork`: Like `kernel_clone`, but this was the main function between kernels `4.2.0` and `5.9.16`
 - `kprobe/do_fork`: This was the main function before kernel `4.2.0`.
@@ -108,19 +108,19 @@ the collector attaches `kprobes` for cited functions.
 
 The following `tracepoints` are used to measure time usage for soft IRQs:
 
-- [irq/softirq_entry](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_entry): Called
+- [`irq/softirq_entry`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_entry): Called
    before softirq handler
-- [irq/softirq_exit](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when
+- [`irq/softirq_exit`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_softirq_exit): Called when
    softirq handler returns.
 
 #### IPC shared memory
 
 To monitor shared memory system call counts, the following `kprobes` are used:
 
-- `shmget`: Runs when [shmget](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
-- `shmat`: Runs when [shmat](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmdt`: Runs when [shmdt](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
-- `shmctl`: Runs when [shmctl](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
+- `shmget`: Runs when [`shmget`](https://man7.org/linux/man-pages/man2/shmget.2.html) is called.
+- `shmat`: Runs when [`shmat`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmdt`: Runs when [`shmdt`](https://man7.org/linux/man-pages/man2/shmat.2.html) is called.
+- `shmctl`: Runs when [`shmctl`](https://man7.org/linux/man-pages/man2/shmctl.2.html) is called.
 
 ### Memory
 
@@ -166,24 +166,24 @@ result of the difference for calls between functions `add_to_page_cache_lru` and
 
 #### File sync
 
-This chart shows calls to synchronization methods, [fsync (2)](https://man7.org/linux/man-pages/man2/fdatasync.2.html)
-and [fdatasync (2)](https://man7.org/linux/man-pages/man2/fdatasync.2.html), to transfer all modified page caches
+This chart shows calls to synchronization methods, [`fsync(2)`](https://man7.org/linux/man-pages/man2/fdatasync.2.html)
+and [`fdatasync(2)`](https://man7.org/linux/man-pages/man2/fdatasync.2.html), to transfer all modified page caches
 for the files on disk devices. These calls block until the disk reports that the transfer has been completed. They flush
 data for specific file descriptors.
 
 #### Memory map sync
 
-The chart shows calls to [msync (2)](https://man7.org/linux/man-pages/man2/msync.2.html) syscalls. This syscall flushes
-changes to a file that was mapped into memory using [mmap (2)](https://man7.org/linux/man-pages/man2/mmap.2.html).
+The chart shows calls to [`msync(2)`](https://man7.org/linux/man-pages/man2/msync.2.html) syscalls. This syscall flushes
+changes to a file that was mapped into memory using [`mmap(2)`](https://man7.org/linux/man-pages/man2/mmap.2.html).
 
 #### File system sync
 
 This chart monitors calls demonstrating commits from filesystem caches to disk. Netdata attaches `kprobes` for
-[sync (2)](https://man7.org/linux/man-pages/man2/sync.2.html), and [syncfs (2)](https://man7.org/linux/man-pages/man2/sync.2.html).
+[`sync(2)`](https://man7.org/linux/man-pages/man2/sync.2.html), and [`syncfs(2)`](https://man7.org/linux/man-pages/man2/sync.2.html).
 
 #### File range sync
 
-This chart shows calls to [sync_file_range (2)](https://man7.org/linux/man-pages/man2/sync_file_range.2.html) which
+This chart shows calls to [`sync_file_range(2)`](https://man7.org/linux/man-pages/man2/sync_file_range.2.html) which
 synchronizes file segments with disk.
 
 > Note: This is the most dangerous syscall to synchronize data, according to its manual.
@@ -212,9 +212,9 @@ To collect data related to Linux multi-device (MD) flushing, the following kprob
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled. This will create the
 chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
 
-- [block/block_rq_issue](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
+- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
   IO request operation to a device drive.
-- [block:block_rq_complete](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
+- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
   IO operation completed by device.
 
 ### Filesystem
@@ -243,11 +243,11 @@ filesystem, the collector needs to attach `kprobes` and `kretprobes` for each on
 To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these
 events, the collector attaches `kprobes` for the common function used for syscalls:
 
-- [do_sys_open](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html ): Internal function used to
+- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html ): Internal function used to
    open files.
-- [do_sys_openat2](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162): Function called from do_sys_open since
+- [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162): Function called from do_sys_open since
    version `5.6.0`.
-- [close_fd](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
+- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
   descriptor since kernel `5.11.0`.
 - `__close_fd`: Function used to close files before version `5.11.0`.
 
@@ -293,16 +293,16 @@ Metrics for directory cache are collected using kprobe for `lookup_fast`, becaus
 times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it
 is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
 
-- [lookup_fast](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
-- [d_lookup](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
+- [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
+- [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
   Called when the desired file is not inside the directory cache.
 
 ### Mount Points
 
 The following `kprobes` are used to collect `mount` & `unmount` call counts:
 
-- [mount](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
-- [umount](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
+- [`mount`](https://man7.org/linux/man-pages/man2/mount.2.html): mount filesystem on host.
+- [`umount`](https://man7.org/linux/man-pages/man2/umount.2.html): umount filesystem on host.
 
 ### Networking Stack
 
