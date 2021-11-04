@@ -44,10 +44,7 @@ const char *ml::Database::SQL_CREATE_ANOMALY_RATE_INFO_TABLE =
     "     dimension_id text NOT NULL, "
     "     after int NOT NULL, "
     "     before int NOT NULL, "
-    "     anomaly_rate real, "
-    "     PRIMARY KEY( "
-    "         host_id, dimension_id "
-    "     ) "
+    "     anomaly_rate real "
     ");";
 
 const char *ml::Database::SQL_INSERT_ANOMALY_RATE_INFO =
@@ -56,11 +53,12 @@ const char *ml::Database::SQL_INSERT_ANOMALY_RATE_INFO =
     "VALUES (?1, ?2, ?3, ?4, ?5);";
 
 const char *ml::Database::SQL_INSERT_ANOMALY_RATES_INFO =
-    "INSERT INTO anomaly_rate_info(host_id, after, before, anomaly_rate, dimension_id) "
-    " SELECT ?1, ?2, ?3 "
+    "INSERT INTO anomaly_rate_info( "
+    "     host_id, after, before, anomaly_rate, dimension_id) "
+    " VALUES (SELECT ?1, ?2, ?3 "
     " , json_extract(j.value, '$.anomaly_rate') "
     " , json_extract(j.value, '$.dimension_id') "
-    " FROM json_each(?4) AS j";
+    " FROM json_each(?4) AS j);";
     
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info " 
