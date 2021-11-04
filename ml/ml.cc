@@ -138,8 +138,7 @@ char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
     return strdup(Json.dump(4, '\t').c_str());
 }
 
-char *ml_get_anomaly_rate_info(RRDHOST *RH, const char *AnomalyDetectorName,
-                            int AnomalyDetectorVersion, time_t After, time_t Before) {
+char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
     if (!RH || !RH->ml_host) {
         error("No host");
         return nullptr;
@@ -154,7 +153,7 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, const char *AnomalyDetectorName,
         error("DB result is empty");
         return nullptr;
     }
-
+    debug(D_ML, "API response vector: %s, %s", DimAndAnomalyRate[0]->first, DimAndAnomalyRate[0]->second);
     nlohmann::json Json = DimAndAnomalyRate;
     return strdup(Json.dump(4).c_str());
 }

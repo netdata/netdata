@@ -1219,7 +1219,7 @@ int web_client_api_request_v1_anomaly_rate_info(RRDHOST *host, struct web_client
     if (!before || !after)
         s = strdup("{\"error\": \"missing after/before parameters\" }\n");
     else {
-        s = ml_get_anomaly_rate_info(host, "AD1", 1, after, before);
+        s = ml_get_anomaly_rate_info(host, after, before);
         if (!s)
             s = strdup("{\"error\": \"json string is empty\" }\n");
     }
@@ -1293,9 +1293,9 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
 
 #if defined(ENABLE_ML)
-        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
-        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
-        { "anomaly_rate_info",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_rate_info       },
+        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events           },
+        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info       },
+        { "anomaly_rate_info",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_rate_info   },
 #endif
 
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
