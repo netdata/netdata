@@ -93,14 +93,14 @@ bool Statement::bindValue(size_t Pos, const std::string &Value) {
     return false;
 }
 
-bool Statement::bindValue(size_t Pos, const int Value) {
+/*bool Statement::bindValue(size_t Pos, const int Value) {
     int RC = sqlite3_bind_int(ParsedStmt, Pos, Value);
     if (RC == SQLITE_OK)
         return true;
 
     error("Failed to bind integer %d (pos = %zu) in statement '%s'.", Value, Pos, RawStmt);
     return false;
-}
+}*/
 
 bool Statement::bindValue(size_t Pos, const double Value) {
     int RC = sqlite3_bind_double(ParsedStmt, Pos, Value);

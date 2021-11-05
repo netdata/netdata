@@ -391,7 +391,7 @@ void DetectableHost::detectOnce() {
 
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                double AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()));
+                double AnomalyPercentage = (D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;
                 //info("AnomalousBitCount= %f, SaveAnomalyPercentageEvery= %f, update_every=%f, AnomalyPercentage= %f", D->AnomalousBitCount, Cfg.SaveAnomalyPercentageEvery, static_cast<double>(updateEvery()), AnomalyPercentage);
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
                 D->AnomalousBitCount = 0.0;

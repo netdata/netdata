@@ -60,7 +60,7 @@ public:
 private:
     bool prepare(sqlite3 *Conn);
 
-    bool bindValue(size_t Pos, const int Value);
+    //bool bindValue(size_t Pos, const int Value);
     bool bindValue(size_t Pos, const double Value);
     bool bindValue(size_t Pos, const std::string &Value);
 
@@ -73,6 +73,16 @@ private:
     size_t bind(size_t Pos, ArgType T, ArgTypes ...Args) {
         return bindValue(Pos, T) + bind(Pos + 1, Args...);
     }
+
+    /*template<const int, typename ...ArgTypes>
+    size_t bind(size_t Pos, const int T, ArgTypes ...Args) {
+        return bindValue(Pos, T) + bind(Pos + 1, Args...);
+    }*/
+
+    /*template<float, typename ...ArgTypes>
+    size_t bind(size_t Pos, float T, ArgTypes ...Args) {
+        return bindValue(Pos, T) + bind(Pos + 1, Args...);
+    }*/
 
     bool resetAndClear(bool Ret);
 
