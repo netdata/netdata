@@ -277,19 +277,10 @@ jobs:
       - name: Prepare artifact directory
         run: |
           mkdir -p artifacts
-          cp packaging/version artifacts/latest-version.txt
+          echo "9999.0.0-0" > artifacts/latest-version.txt
           cp dist-tarball/* artifacts
           cd artifacts || exit 1
           sha256sum -b ./* > "sha256sums.txt"
-      - name: Prepare local environment
-        run: |
-          ORIG_TARBALL="export NETDATA_TARBALL_URL=.*"
-          ORIG_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=.*"
-          NEW_TARBALL="export NETDATA_TARBALL_URL=http://localhost:8080/artifacts/netdata-latest.tar.gz"
-          NEW_CHECKSUM="export NETDATA_TARBALL_CHECKSUM_URL=http://localhost:8080/artifacts/sha256sums.txt"
-          sed -i "s|${ORIG_TARBALL}|${NEW_TARBALL}|g" packaging/installer/netdata-updater.sh
-          sed -i "s|${ORIG_CHECKSUM}|${NEW_CHECKSUM}|g" packaging/installer/netdata-updater.sh
-          sed -i 's|"current_version=.*"|"current_version=1"|g' packaging/installer/netdata-updater.sh
       - name: Fetch test environment
         uses: actions/download-artifact@v2
         with:
