@@ -234,6 +234,8 @@ void RrdHost::addDimension(Dimension *D) {
     std::lock_guard<std::mutex> Lock(Mutex);
 
     DimensionsMap[D->getRD()] = D;
+    /*initialize the anomaly counter of the dimension*/
+    D->AnomalousBitCount = 0.0;
 
     // Default construct mutex for dimension
     LocksMap[D];
@@ -389,9 +391,10 @@ void DetectableHost::detectOnce() {
 
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                double AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+                double AnomalyPercentage = D->AnomalousBitCount / (static_cast<double>(Cfg.SaveAnomalyPercentageEvery) * static_cast<double>(updateEvery()));
+                info("AnomalousBitCount= %d, SaveAnomalyPercentageEvery= %d, update_every=%d, AnomalyPercentage= %d", D->AnomalousBitCount, static_cast<double>(Cfg.SaveAnomalyPercentageEvery), static_cast<double>(updateEvery()), AnomalyPercentage);
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
-                D->AnomalousBitCount = 0;
+                D->AnomalousBitCount = 0.0;
             }
 
             if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
@@ -424,15 +427,18 @@ void DetectableHost::detectOnce() {
     if(AnomalyBitCounterWindow == 0) {
         /*one window size is completed, save in the DB the vector that holds the values of the percentages 
         (of the set anomaly bits) per dimension*/
-        nlohmann::json JsonResult = DimsAnomalyRate;
+        //nlohmann::json JsonResult = DimsAnomalyRate;
 
         time_t Before = now_realtime_sec();
         time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
         
         //DB.insertAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
-        for(std::vector<std::pair<double, std::string>>::iterator it = DimsAnomalyRate.begin(); it != DimsAnomalyRate.end(); ++it) {
-            DB.insertAnomalyRateInfo(getUUID(), it->second, After, Before, it->first);
+        for(int i = 0; i < DimsAnomalyRate.size(); i++) {
+            DB.insertAnomalyRateInfo(getUUID(), DimsAnomalyRate[i].second, After, Before, DimsAnomalyRate[i].first);
         }
+        /*for(std::vector<std::pair<double, std::string>>::iterator it = DimsAnomalyRate.begin(); it != DimsAnomalyRate.end(); ++it) {
+            DB.insertAnomalyRateInfo(getUUID(), it->second, After, Before, it->first);
+        }*/
         //DB.insertAnomalyRatesInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
         AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
