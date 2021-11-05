@@ -510,7 +510,7 @@ static int aclk_block_till_recon_allowed() {
         sleep_usec(recon_delay * USEC_PER_MS);
         recon_delay = 0;
     }
-    return 0;
+    return netdata_exit;
 }
 
 #ifndef ACLK_DISABLE_CHALLENGE
@@ -602,6 +602,9 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             // delay handled by aclk_block_till_recon_allowed
             continue;
         }
+
+        if (netdata_exit)
+            return 1;
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
