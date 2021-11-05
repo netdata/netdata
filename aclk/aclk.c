@@ -323,6 +323,17 @@ static int handle_connection(mqtt_wss_client client)
     return 0;
 }
 
+inline static int aclk_popcorn_check()
+{
+    ACLK_SHARED_STATE_LOCK;
+    if (unlikely(aclk_shared_state.agent_state == ACLK_HOST_INITIALIZING)) {
+        ACLK_SHARED_STATE_UNLOCK;
+        return 1;
+    }
+    ACLK_SHARED_STATE_UNLOCK;
+    return 0;
+}
+
 inline static int aclk_popcorn_check_bump()
 {
     ACLK_SHARED_STATE_LOCK;
@@ -850,7 +861,7 @@ int ng_aclk_update_chart(RRDHOST *host, char *chart_name, int create)
 {
     struct aclk_query *query;
 
-    if (aclk_popcorn_check_bump())
+    if (host == localhost ? aclk_popcorn_check_bump() : aclk_popcorn_check())
         return 0;
 
     query = aclk_query_new(create ? CHART_NEW : CHART_DEL);
