@@ -61,6 +61,7 @@ private:
     bool prepare(sqlite3 *Conn);
 
     bool bindValue(size_t Pos, const int Value);
+    bool bindValue(size_t Pos, const double Value);
     bool bindValue(size_t Pos, const std::string &Value);
 
     template<typename ArgType, typename ...ArgTypes>

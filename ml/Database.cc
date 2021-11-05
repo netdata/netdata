@@ -102,6 +102,15 @@ bool Statement::bindValue(size_t Pos, const int Value) {
     return false;
 }
 
+bool Statement::bindValue(size_t Pos, const double Value) {
+    int RC = sqlite3_bind_double(ParsedStmt, Pos, Value);
+    if (RC == SQLITE_OK)
+        return true;
+
+    error("Failed to bind double %f (pos = %zu) in statement '%s'.", Value, Pos, RawStmt);
+    return false;
+}
+
 bool Statement::resetAndClear(bool Ret) {
     int RC = sqlite3_reset(ParsedStmt);
     if (RC != SQLITE_OK) {
