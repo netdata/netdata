@@ -254,15 +254,61 @@ chart `disk_latency_io` for each disk on the host. The following tracepoints are
 
 ### Filesystem
 
-This group has charts demonstrating how applications interact with the Linux kernel to open and close file
-descriptors. It also brings latency charts for five different filesystems and monitoring for Linux Virtual File System (VFS),
-that is a layer on top of regular filesystems. The functions presented inside this API are not used for filesystems, so
-it's possible that the charts in this section won't show _all_ the actions that occurred on your system.
+This group has charts demonstrating how applications interact with the Linux
+kernel to open and close file descriptors. It also brings latency charts for
+several different filesystems.
+
+#### ext4
+
+To measure the latency of executing some actions in an
+[ext4](https://elixir.bootlin.com/linux/latest/source/fs/ext4) filesystem, the
+collector needs to attach `kprobes` and `kretprobes` for each of the following
+functions:
+
+- `ext4_file_read_iter`: Function used to measure read latency.
+- `ext4_file_write_iter`: Function used to measure write latency.
+- `ext4_file_open`: Function used to measure open latency.
+- `ext4_sync_file`: Function used to measure sync latency.
+
+#### ZFS
+
+To measure the latency of executing some actions in a zfs filesystem, the
+collector needs to attach `kprobes` and `kretprobes` for each of the following
+functions:
+
+- `zpl_iter_read`: Function used to measure read latency.
+- `zpl_iter_write`: Function used to measure write latency.
+- `zpl_open`: Function used to measure open latency.
+- `zpl_fsync`: Function used to measure sync latency.
+
+#### XFS
+
+To measure the latency of executing some actions in an
+[xfs](https://elixir.bootlin.com/linux/latest/source/fs/xfs) filesystem, the
+collector needs to attach `kprobes` and `kretprobes` for each of the following
+functions:
+
+- `xfs_file_read_iter`: Function used to measure read latency.
+- `xfs_file_write_iter`: Function used to measure write latency.
+- `xfs_file_open`: Function used to measure open latency.
+- `xfs_file_fsync`: Function used to measure sync latency.
+
+#### NFS
+
+To measure the latency of executing some actions in an
+[nfs](https://elixir.bootlin.com/linux/latest/source/fs/nfs) filesystem, the
+collector needs to attach `kprobes` and `kretprobes` for each of the following
+functions:
+
+- `nfs_file_read`: Function used to measure read latency.
+- `nfs_file_write`: Function used to measure write latency.
+- `nfs_file_open`, `nfs4_file_open`: Functions used to measure open latency.
+- `nfs_getattr`: Function used to measure sync latency.
 
 #### btrfs
 
 To measure the latency of executing some actions in a [btrfs](https://elixir.bootlin.com/linux/latest/source/fs/btrfs/file.c)
-filesystem, the collector needs to attach `kprobes` and `kretprobes` for each one of the following functions:
+filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of the following functions:
 
 > Note: We are listing two functions used to measure `read` latency, but we use either `btrfs_file_read_iter` or
 `generic_file_read_iter`, depending on kernel version.
@@ -280,8 +326,8 @@ events, the collector attaches `kprobes` for the common function used for syscal
 
 - [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html ): Internal function used to
    open files.
-- [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162): Function called from do_sys_open since
-   version `5.6.0`.
+- [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
+  Function called from `do_sys_open` since version `5.6.0`.
 - [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
   descriptor since kernel `5.11.0`.
 - `__close_fd`: Function used to close files before version `5.11.0`.
@@ -290,35 +336,57 @@ events, the collector attaches `kprobes` for the common function used for syscal
 
 This chart shows the number of times some software tried and failed to open or close a file descriptor.
 
-#### VFS Deleted objects
+#### VFS
+
+The Linux Virtual File System (VFS) is an abstraction layer on top of a
+concrete filesystem like the ones listed in the parent section, e.g. `ext4`.
+
+In this section we list the mechanism by which we gather VFS data, and what
+charts are consequently created.
+
+##### VFS eBPF Hooks
+
+To measure the latency and total quantity of executing some VFS-level
+functions, ebpf.plugin needs to attach kprobes and kretprobes for each of the
+following functions:
+
+- `vfs_write`
+- `vfs_writev`
+- `vfs_read`
+- `vfs_readv`
+- `vfs_fsync`
+- `vfs_open`
+- `vfs_create`
+
+##### VFS Deleted objects
 
 This chart monitors calls to `vfs_unlink`. This function is responsible for removing objects from the file system.
 
-#### VFS IO
+##### VFS IO
 
 This chart shows the number of calls to the functions `vfs_read` and `vfs_write`.
 
-#### VFS IO bytes
+##### VFS IO bytes
 
 This chart also monitors `vfs_read` and `vfs_write` but, instead of the number of calls, it shows the total amount of
 bytes read and written with these functions.
 
 The Agent displays the number of bytes written as negative because they are moving down to disk.
 
-#### VFS IO errors
+##### VFS IO errors
 
 The Agent counts and shows the number of instances where a running program experiences a read or write error.
 
-#### VFS Create
+##### VFS Create
 
 This chart shows the number of calls to `vfs_create`. This function is responsible for creating files.
 
-#### VFS Synchronization
+##### VFS Synchronization
 
 This chart shows the number of calls to `vfs_fsync`. This function is responsible for calling `fsync(2)` or
 `fdatasync(2)` on a file. You can see more details in the Synchronization section.
 
-#### VFS Open
+##### VFS Open
 
 This chart shows the number of calls to `vfs_open`. This function is responsible for opening files.
 
