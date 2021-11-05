@@ -153,7 +153,6 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
         error("DB result is empty");
         return nullptr;
     }
-    info("The vector size = %d", DimAndAnomalyRate.size());
     nlohmann::json Json = DimAndAnomalyRate;
     return strdup(Json.dump(4).c_str());
 }
