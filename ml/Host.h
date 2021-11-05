@@ -102,7 +102,7 @@ private:
     Database DB{Cfg.AnomalyDBPath};
 
     /*the counter variable to downcount the time window for anomaly bit counting*/
-    unsigned int AnomalyBitCounterWindow;
+    size_t AnomalyBitCounterWindow;
 
 
 };

@@ -391,8 +391,8 @@ void DetectableHost::detectOnce() {
 
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                double AnomalyPercentage = D->AnomalousBitCount / (static_cast<double>(Cfg.SaveAnomalyPercentageEvery) * static_cast<double>(updateEvery()));
-                info("AnomalousBitCount= %d, SaveAnomalyPercentageEvery= %d, update_every=%d, AnomalyPercentage= %d", D->AnomalousBitCount, static_cast<double>(Cfg.SaveAnomalyPercentageEvery), static_cast<double>(updateEvery()), AnomalyPercentage);
+                double AnomalyPercentage = D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()));
+                info("AnomalousBitCount= %f, SaveAnomalyPercentageEvery= %f, update_every=%f, AnomalyPercentage= %f", D->AnomalousBitCount, Cfg.SaveAnomalyPercentageEvery, static_cast<double>(updateEvery()), AnomalyPercentage);
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
                 D->AnomalousBitCount = 0.0;
             }
@@ -422,18 +422,18 @@ void DetectableHost::detectOnce() {
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
 
-    /*code snippet to keep account of the anomalous values per dimension per configurable window*/
-    /*keep count of the true Results in the anomaly-precentage period*/
+    /*code snippet to keep account of the count of the anomalous values of each dimension*/
+    /*...in the anomaly-precentage period configured by (Cfg.SaveAnomalyPercentageEvery)*/
     if(AnomalyBitCounterWindow == 0) {
-        /*one window size is completed, save in the DB the vector that holds the values of the percentages 
-        (of the set anomaly bits) per dimension*/
+        /*one period is completed, save in the DB the vector that holds the values of the percentages 
+        (of the set anomaly bits) for each dimension*/
         //nlohmann::json JsonResult = DimsAnomalyRate;
 
         time_t Before = now_realtime_sec();
         time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
         
         //DB.insertAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
-        for(int i = 0; i < DimsAnomalyRate.size(); i++) {
+        for(size_t i = 0; i < DimsAnomalyRate.size(); i++) {
             DB.insertAnomalyRateInfo(getUUID(), DimsAnomalyRate[i].second, After, Before, DimsAnomalyRate[i].first);
         }
         /*for(std::vector<std::pair<double, std::string>>::iterator it = DimsAnomalyRate.begin(); it != DimsAnomalyRate.end(); ++it) {
