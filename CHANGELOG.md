@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Don't interrupt popcorn timer for children [\#11758](https://github.com/netdata/netdata/pull/11758) ([underhood](https://github.com/underhood))
+- fix \(cgroups.plugin\): containers name resolution for crio/containerd cri [\#11756](https://github.com/netdata/netdata/pull/11756) ([ilyam8](https://github.com/ilyam8))
 - Adds exit points between env and OTP [\#11751](https://github.com/netdata/netdata/pull/11751) ([underhood](https://github.com/underhood))
 - Teach GH about ML label and its code owners. [\#11750](https://github.com/netdata/netdata/pull/11750) ([vkalintiris](https://github.com/vkalintiris))
 - Update enable-streaming.mdx [\#11747](https://github.com/netdata/netdata/pull/11747) ([caleno](https://github.com/caleno))
@@ -159,7 +160,6 @@
 - eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Embed build architecture in static build archive names. [\#11463](https://github.com/netdata/netdata/pull/11463) ([Ferroin](https://github.com/Ferroin))
 - Adds aclk/cloud state command to netdatacli [\#11462](https://github.com/netdata/netdata/pull/11462) ([underhood](https://github.com/underhood))
-- add a note how to find web files directory for custom dashboards [\#11461](https://github.com/netdata/netdata/pull/11461) ([ilyam8](https://github.com/ilyam8))
 - Add custom e-mail headers [\#11454](https://github.com/netdata/netdata/pull/11454) ([MrZammler](https://github.com/MrZammler))
 - Add chart message support for ACLK new architecture [\#11447](https://github.com/netdata/netdata/pull/11447) ([stelfrag](https://github.com/stelfrag))
 - Installation review [\#11442](https://github.com/netdata/netdata/pull/11442) ([hugovalente-pm](https://github.com/hugovalente-pm))
