@@ -455,10 +455,12 @@ void aclk_database_worker(void *arg)
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
                 case ACLK_DATABASE_DIM_DELETION:
                     debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
+                    aclk_process_dimension_deletion(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_RETENTION:
                     debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
                     aclk_update_retention(wc, cmd);
+                    aclk_process_dimension_deletion(wc, cmd);
                     break;
 #endif
 
