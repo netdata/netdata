@@ -321,6 +321,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
                 netdata_mutex_lock(&host->receiver_lock);
                 query->data.node_update.live = (host->receiver != NULL);
                 netdata_mutex_unlock(&host->receiver_lock);
+                query->data.node_update.hops = host->system_info->hops;
             }
         }
 
