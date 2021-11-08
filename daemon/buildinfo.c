@@ -19,6 +19,24 @@
 #endif
 #endif
 
+#ifdef ACLK_NG
+#define FEAT_ACLK_NG 1
+#else
+#define FEAT_ACLK_NG 0
+#endif
+
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+#define NEW_CLOUD_PROTO 1
+#else
+#define NEW_CLOUD_PROTO 0
+#endif
+
+#ifdef ACLK_LEGACY
+#define FEAT_ACLK_LEGACY 1
+#else
+#define FEAT_ACLK_LEGACY 0
+#endif
+
 #ifdef ENABLE_DBENGINE
 #define FEAT_DBENGINE 1
 #else
@@ -44,6 +62,23 @@
 #endif
 
 // Optional libraries
+
+#ifdef HAVE_PROTOBUF
+#if defined(ACLK_NG) || defined(ENABLE_PROMETHEUS_REMOTE_WRITE)
+#define FEAT_PROTOBUF 1
+#ifdef BUNDLED_PROTOBUF
+#define FEAT_PROTOBUF_BUNDLED " (bundled)"
+#else
+#define FEAT_PROTOBUF_BUNDLED " (system)"
+#endif
+#else
+#define FEAT_PROTOBUF 0
+#define FEAT_PROTOBUF_BUNDLED ""
+#endif
+#else
+#define FEAT_PROTOBUF 0
+#define FEAT_PROTOBUF_BUNDLED ""
+#endif
 
 #ifdef ENABLE_JSONC
 #define FEAT_JSONC 1
@@ -199,24 +234,6 @@
 #define FEAT_REMOTE_WRITE 0
 #endif
 
-#ifdef ACLK_NG
-#define FEAT_ACLK_NG 1
-#else
-#define FEAT_ACLK_NG 0
-#endif
-
-#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-#define NEW_CLOUD_PROTO 1
-#else
-#define NEW_CLOUD_PROTO 0
-#endif
-
-#ifdef ACLK_LEGACY
-#define FEAT_ACLK_LEGACY 1
-#else
-#define FEAT_ACLK_LEGACY 0
-#endif
-
 #define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
 void print_build_info(void) {
@@ -233,6 +250,7 @@ void print_build_info(void) {
     printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
 
     printf("Libraries:\n");
+    printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
     printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
     printf("    JSON-C:                  %s\n", FEAT_YES_NO(FEAT_JSONC));
     printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
@@ -294,6 +312,8 @@ void print_build_info_json(void) {
     printf("  },\n");
 
     printf("  \"libs\": {\n");
+    printf("    \"protobuf\": %s,\n",         FEAT_JSON_BOOL(FEAT_PROTOBUF));
+    printf("    \"protobuf-source\": \"%s\",\n", FEAT_PROTOBUF_BUNDLED);
     printf("    \"jemalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_JEMALLOC));
     printf("    \"jsonc\": %s,\n",            FEAT_JSON_BOOL(FEAT_JSONC));
     printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));
@@ -347,6 +367,7 @@ void analytics_build_info(BUFFER *b) {
     if(FEAT_TLS_HOST_VERIFY) buffer_strcat (b, "|TLS Host Verification");
     if(FEAT_ML)              buffer_strcat (b, "|Machine Learning");
 
+    if(FEAT_PROTOBUF)        buffer_strcat (b, "|protobuf");
     if(FEAT_JEMALLOC)        buffer_strcat (b, "|jemalloc");
     if(FEAT_JSONC)           buffer_strcat (b, "|JSON-C");
     if(FEAT_LIBCAP)          buffer_strcat (b, "|libcap");

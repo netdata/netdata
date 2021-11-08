@@ -700,6 +700,7 @@ AS_IF(
 )
 else
     AC_MSG_NOTICE([using bundled protobuf])
+    AC_DEFINE([BUNDLED_PROTOBUF], [1], [Using a bundled copy of protobuf])
     PROTOC="\$(abs_top_srcdir)/externaldeps/protobuf/src/protoc"
     PROTOBUF_CFLAGS="-I \$(abs_top_srcdir)/externaldeps/protobuf/src"
     PROTOBUF_LIBS="\$(abs_top_srcdir)/externaldeps/protobuf/src/.libs/libprotobuf.a"
@@ -713,6 +714,10 @@ AS_IF(
     [have_CXX_compiler=no],
     [have_CXX_compiler=yes]
 )
+
+if test "${have_libprotobuf}" == "yes" && test "${have_CXX_compiler}" == "yes"; then
+    AC_DEFINE([HAVE_PROTOBUF], [1], [Protobuf is available])
+fi
 
 AC_MSG_CHECKING([if Cloud functionality should be enabled])
 AC_MSG_RESULT([${enable_cloud}])
