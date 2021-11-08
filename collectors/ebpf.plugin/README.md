@@ -302,7 +302,8 @@ functions:
 
 - `nfs_file_read`: Function used to measure read latency.
 - `nfs_file_write`: Function used to measure write latency.
-- `nfs_file_open`, `nfs4_file_open`: Functions used to measure open latency.
+- `nfs_file_open`: Functions used to measure open latency.
+- `nfs4_file_open`: Functions used to measure open latency for NFS v4.
 - `nfs_getattr`: Function used to measure sync latency.
 
 #### btrfs
@@ -350,13 +351,22 @@ To measure the latency and total quantity of executing some VFS-level
 functions, ebpf.plugin needs to attach kprobes and kretprobes for each of the
 following functions:
 
-- `vfs_write`
-- `vfs_writev`
-- `vfs_read`
-- `vfs_readv`
-- `vfs_fsync`
-- `vfs_open`
-- `vfs_create`
+- `vfs_write`: Used for monitoring the number of successful & failed filesystem
+  write calls, as well as the total number of written bytes.
+- `vfs_writev`: Same as `vfs_write` but for vector writes (i.e. a single write
+  operation using a group of buffers rather than 1).
+- `vfs_read`: Used for monitoring the number of successful & failed filesystem
+  read calls, as well as the total number of read bytes.
+- `vfs_readv` Same as `vfs_read` but for vector reads (i.e. a singe read
+  operation using a group of buffers rather than 1).
+- `vfs_unlink`: Used for monitoring the number of successful & failed
+  filesystem unlink calls.
+- `vfs_fsync`: Used for monitoring the number of successful & failed filesystem
+  fsync calls.
+- `vfs_open`: Used for monitoring the number of successful & failed filesystem
+  open calls.
+- `vfs_create`: Used for monitoring the number of successful & failed
+  filesystem create calls.
 
 ##### VFS Deleted objects
 
