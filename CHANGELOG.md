@@ -8,9 +8,11 @@
 
 - Don't interrupt popcorn timer for children [\#11758](https://github.com/netdata/netdata/pull/11758) ([underhood](https://github.com/underhood))
 - fix \(cgroups.plugin\): containers name resolution for crio/containerd cri [\#11756](https://github.com/netdata/netdata/pull/11756) ([ilyam8](https://github.com/ilyam8))
+- Add SSL\_MODE\_ENABLE\_PARTIAL\_WRITE to netdata\_srv\_ctx [\#11754](https://github.com/netdata/netdata/pull/11754) ([MrZammler](https://github.com/MrZammler))
 - Adds exit points between env and OTP [\#11751](https://github.com/netdata/netdata/pull/11751) ([underhood](https://github.com/underhood))
 - Teach GH about ML label and its code owners. [\#11750](https://github.com/netdata/netdata/pull/11750) ([vkalintiris](https://github.com/vkalintiris))
 - Update enable-streaming.mdx [\#11747](https://github.com/netdata/netdata/pull/11747) ([caleno](https://github.com/caleno))
+- Minor improvement to CPU number function regarding macOS. [\#11746](https://github.com/netdata/netdata/pull/11746) ([iigorkarpov](https://github.com/iigorkarpov))
 - minor - popocorn no more [\#11745](https://github.com/netdata/netdata/pull/11745) ([underhood](https://github.com/underhood))
 - Update dashboard to version v2.20.11. [\#11743](https://github.com/netdata/netdata/pull/11743) ([netdatabot](https://github.com/netdatabot))
 - Update eBPF documentation [\#11741](https://github.com/netdata/netdata/pull/11741) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -62,6 +64,7 @@
 - Fix an overflow when unsigned integer subtracted [\#11638](https://github.com/netdata/netdata/pull/11638) ([vlvkobal](https://github.com/vlvkobal))
 - add note for the new release of charts on the cloud [\#11637](https://github.com/netdata/netdata/pull/11637) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - add timex.plugin charts info [\#11635](https://github.com/netdata/netdata/pull/11635) ([ilyam8](https://github.com/ilyam8))
+- Add protobuf to `-W buildinfo` output. [\#11634](https://github.com/netdata/netdata/pull/11634) ([Ferroin](https://github.com/Ferroin))
 - Revert "Update alarms info" [\#11633](https://github.com/netdata/netdata/pull/11633) ([ilyam8](https://github.com/ilyam8))
 - Fix nfsd RPC metrics and remove unused nfsd charts and metrics [\#11632](https://github.com/netdata/netdata/pull/11632) ([vlvkobal](https://github.com/vlvkobal))
 - add proc zfs charts info [\#11630](https://github.com/netdata/netdata/pull/11630) ([ilyam8](https://github.com/ilyam8))
@@ -152,27 +155,20 @@
 - Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
 - Revert "add Travis ctrl file for checking if changes happened" [\#11486](https://github.com/netdata/netdata/pull/11486) ([Ferroin](https://github.com/Ferroin))
 - Clean netdata naming [\#11484](https://github.com/netdata/netdata/pull/11484) ([andrewm4894](https://github.com/andrewm4894))
-- remove broken link [\#11482](https://github.com/netdata/netdata/pull/11482) ([andrewm4894](https://github.com/andrewm4894))
 - Update alarms info [\#11481](https://github.com/netdata/netdata/pull/11481) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf [\#11480](https://github.com/netdata/netdata/pull/11480) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allow arbitrary options to be passed to make from netdata-installer.sh. [\#11479](https://github.com/netdata/netdata/pull/11479) ([Ferroin](https://github.com/Ferroin))
-- eBPF vsn bump to v0.7.9.1 [\#11471](https://github.com/netdata/netdata/pull/11471) ([UmanShahzad](https://github.com/UmanShahzad))
 - eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Embed build architecture in static build archive names. [\#11463](https://github.com/netdata/netdata/pull/11463) ([Ferroin](https://github.com/Ferroin))
 - Adds aclk/cloud state command to netdatacli [\#11462](https://github.com/netdata/netdata/pull/11462) ([underhood](https://github.com/underhood))
 - Add custom e-mail headers [\#11454](https://github.com/netdata/netdata/pull/11454) ([MrZammler](https://github.com/MrZammler))
 - Add chart message support for ACLK new architecture [\#11447](https://github.com/netdata/netdata/pull/11447) ([stelfrag](https://github.com/stelfrag))
-- Installation review [\#11442](https://github.com/netdata/netdata/pull/11442) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
 - Reuse the SN\_EXISTS bit to track anomaly status. [\#11154](https://github.com/netdata/netdata/pull/11154) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.31.0](https://github.com/netdata/netdata/tree/v1.31.0) (2021-05-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.30.1...v1.31.0)
-
-**Merged pull requests:**
-
-- Fix broken link in dimensions/contexts/families doc [\#11148](https://github.com/netdata/netdata/pull/11148) ([joelhans](https://github.com/joelhans))
 
 ## [v1.30.1](https://github.com/netdata/netdata/tree/v1.30.1) (2021-04-12)
 
