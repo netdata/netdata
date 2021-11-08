@@ -351,21 +351,21 @@ To measure the latency and total quantity of executing some VFS-level
 functions, ebpf.plugin needs to attach kprobes and kretprobes for each of the
 following functions:
 
-- `vfs_write`: Used for monitoring the number of successful & failed filesystem
-  write calls, as well as the total number of written bytes.
-- `vfs_writev`: Same as `vfs_write` but for vector writes (i.e. a single write
-  operation using a group of buffers rather than 1).
-- `vfs_read`: Used for monitoring the number of successful & failed filesystem
-  read calls, as well as the total number of read bytes.
-- `vfs_readv` Same as `vfs_read` but for vector reads (i.e. a singe read
-  operation using a group of buffers rather than 1).
-- `vfs_unlink`: Used for monitoring the number of successful & failed
+- `vfs_write`: Function used monitoring the number of successful & failed
+  filesystem write calls, as well as the total number of written bytes.
+- `vfs_writev`: Same function as `vfs_write` but for vector writes (i.e. a
+  single write operation using a group of buffers rather than 1).
+- `vfs_read`: Function used for monitoring the number of successful & failed
+  filesystem read calls, as well as the total number of read bytes.
+- `vfs_readv` Same function as `vfs_read` but for vector reads (i.e. a singe
+  read operation using a group of buffers rather than 1).
+- `vfs_unlink`: Function used for monitoring the number of successful & failed
   filesystem unlink calls.
-- `vfs_fsync`: Used for monitoring the number of successful & failed filesystem
-  fsync calls.
-- `vfs_open`: Used for monitoring the number of successful & failed filesystem
-  open calls.
-- `vfs_create`: Used for monitoring the number of successful & failed
+- `vfs_fsync`: Function used for monitoring the number of successful & failed
+  filesystem fsync calls.
+- `vfs_open`: Function used for monitoring the number of successful & failed
+  filesystem open calls.
+- `vfs_create`: Function used for monitoring the number of successful & failed
   filesystem create calls.
 
 ##### VFS Deleted objects
