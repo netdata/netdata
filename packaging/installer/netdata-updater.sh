@@ -388,10 +388,11 @@ update_static() {
   ndtmpdir="$(create_tmp_directory)"
   PREVDIR="$(pwd)"
 
-  echo >&2 "Entering ${ndtmpdir}"
+  info "Entering ${ndtmpdir}"
   cd "${ndtmpdir}" || exit 1
 
   if update_available; then
+    sysarch="$(uname -m)"
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.gz.run"
     if ! grep netdata-latest.gz.run "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
@@ -406,12 +407,11 @@ update_static() {
 
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
-      rm -rf "${ndtmpdir}" >&3 2>&3
+    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
+      rm -r "${ndtmpdir}"
     else
       info "NOTE: did not remove: ${ndtmpdir}"
     fi
-
     echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
   fi
 
