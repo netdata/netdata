@@ -3,7 +3,6 @@ title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
 -->
 
-import { Install, InstallBox } from '../../../src/components/Install/'
 
 # Installation guide
 
