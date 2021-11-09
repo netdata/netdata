@@ -11,6 +11,15 @@
 #endif
 
 const char *aclk_sync_config[] = {
+    "CREATE TABLE IF NOT EXISTS dimension_delete (dimension_id blob, dimension_name text, chart_type_id text, "
+    "dim_id blob, chart_id blob, host_id blob, date_created);",
+
+    "CREATE INDEX IF NOT EXISTS ind_h1 ON dimension_delete (host_id);",
+
+    "CREATE TRIGGER IF NOT EXISTS tr_dim_del AFTER DELETE ON dimension BEGIN INSERT INTO dimension_delete "
+    "(dimension_id, dimension_name, chart_type_id, dim_id, chart_id, host_id, date_created)"
+    " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, strftime('%s') FROM"
+    " chart c WHERE c.chart_id = old.chart_id; END;",
     NULL,
 };
 
@@ -446,10 +455,12 @@ void aclk_database_worker(void *arg)
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
                 case ACLK_DATABASE_DIM_DELETION:
                     debug(D_ACLK_SYNC,"Sending dimension deletion information %s", wc->uuid_str);
+                    aclk_process_dimension_deletion(wc, cmd);
                     break;
                 case ACLK_DATABASE_UPD_RETENTION:
                     debug(D_ACLK_SYNC,"Sending retention info for %s", wc->uuid_str);
                     aclk_update_retention(wc, cmd);
+                    aclk_process_dimension_deletion(wc, cmd);
                     break;
 #endif
 

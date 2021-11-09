@@ -170,24 +170,28 @@ int aclk_add_chart_event(struct aclk_database_worker_config *wc, struct aclk_dat
 }
 
 static inline int aclk_upd_dimension_event(struct aclk_database_worker_config *wc, char *claim_id, uuid_t *dim_uuid,
-        const char *dim_id, const char *dim_name, const char *chart_name, time_t first_time, time_t last_time)
+        const char *dim_id, const char *dim_name, const char *chart_type_id, time_t first_time, time_t last_time)
 {
     int rc = 0;
     size_t size;
 
-    if (unlikely(!dim_uuid || !dim_id || !dim_name || !chart_name))
+    if (unlikely(!dim_uuid || !dim_id || !dim_name || !chart_type_id))
         return 0;
 
     struct chart_dimension_updated dim_payload;
     memset(&dim_payload, 0, sizeof(dim_payload));
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if (!first_time)
-        info("DEBUG: Deleting dimension [%s] [%s] [%s] [%s] [%s]", wc->node_id, claim_id, dim_id, dim_name, chart_name);
+        info("Host %s (node %s) deleting dimension id=[%s] name=[%s] chart=[%s]",
+                wc->host_guid, wc->node_id, dim_id, dim_name, chart_type_id);
+#endif
+
     dim_payload.node_id = wc->node_id;
     dim_payload.claim_id = claim_id;
     dim_payload.name = dim_name;
     dim_payload.id = dim_id;
-    dim_payload.chart_id = chart_name;
+    dim_payload.chart_id = chart_type_id;
     dim_payload.created_at.tv_sec = first_time;
     dim_payload.last_timestamp.tv_sec = last_time;
     char *payload = generate_chart_dimension_updated(&size, &dim_payload);
@@ -195,6 +199,67 @@ static inline int aclk_upd_dimension_event(struct aclk_database_worker_config *w
         rc = aclk_add_chart_payload(wc, dim_uuid, claim_id, ACLK_PAYLOAD_DIMENSION, (void *)payload, size);
     freez(payload);
     return rc;
+}
+
+void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
+{
+    int rc = 0;
+    sqlite3_stmt *res = NULL;
+
+    if (!aclk_use_new_cloud_arch || !aclk_connected)
+        return;
+
+    if (unlikely(!db_meta))
+        return;
+
+    uuid_t host_id;
+    if (uuid_parse(wc->host_guid, host_id))
+        return;
+
+    char *claim_id = is_agent_claimed();
+    if (!claim_id)
+        return;
+
+    rc = sqlite3_prepare_v2(db_meta, "DELETE FROM dimension_delete where host_id = @host_id " \
+            "RETURNING dimension_id, dimension_name, chart_type_id, dim_id LIMIT 10;", -1, &res, 0);
+
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to delete dimension deletes");
+        freez(claim_id);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host_id , sizeof(host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    unsigned count = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        (void) aclk_upd_dimension_event(
+            wc,
+            claim_id,
+            (uuid_t *)sqlite3_column_text(res, 3),
+            (const char *)sqlite3_column_text(res, 0),
+            (const char *)sqlite3_column_text(res, 1),
+            (const char *)sqlite3_column_text(res, 2),
+            0,
+            0);
+        count++;
+    }
+
+    if (count) {
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.opcode = ACLK_DATABASE_DIM_DELETION;
+        if (aclk_database_enq_cmd_noblock(wc, &cmd))
+            info("Failed to queue a dimension deletion message");
+    }
+
+bind_fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when adding dimension deletion events, rc = %d", rc);
+    freez(claim_id);
+    return;
 }
 
 int aclk_add_dimension_event(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
