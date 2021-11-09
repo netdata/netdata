@@ -266,7 +266,14 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     // TODO do the look up table with hashes to optimize when there are more
     // than few
     if (!strcmp(message_type, "cmd")) {
-        aclk_handle_cloud_message((char *)msg);
+        // msg is binary payload in all other cases
+        // however in this message from old legacy cloud
+        // we have to convert it to C string
+        char *str = mallocz(msg_len+1);
+        memcpy(str, msg, msg_len);
+        str[msg_len] = 0;
+        aclk_handle_cloud_message(str);
+        freez(str);
         return;
     }
     if (!strcmp(message_type, "CreateNodeInstanceResult")) {
