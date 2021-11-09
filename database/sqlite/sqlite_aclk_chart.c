@@ -212,6 +212,10 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
     if (unlikely(!db_meta))
         return;
 
+    uuid_t host_id;
+    if (uuid_parse(wc->host_guid, host_id))
+        return;
+
     char *claim_id = is_agent_claimed();
     if (!claim_id)
         return;
@@ -224,9 +228,6 @@ void aclk_process_dimension_deletion(struct aclk_database_worker_config *wc, str
         freez(claim_id);
         return;
     }
-
-    uuid_t host_id;
-    uuid_parse(wc->host_guid, host_id);
 
     rc = sqlite3_bind_blob(res, 1, &host_id , sizeof(host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
