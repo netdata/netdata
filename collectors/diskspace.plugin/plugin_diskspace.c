@@ -389,6 +389,10 @@ void *diskspace_main(void *ptr) {
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
+            // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
+            if(mi->flags && MOUNTINFO_READONLY && !strcmp(mi->root, mi->mount_point))
+                continue;
+
             do_disk_space_stats(mi, update_every);
             if(unlikely(netdata_exit)) break;
         }
