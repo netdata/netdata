@@ -1135,6 +1135,7 @@ endfunction()
 
 set(ACLK_NG_PROTO_DEFS
         aclk/aclk-schemas/proto/aclk/v1/lib.proto
+        aclk/aclk-schemas/proto/agent/v1/disconnect.proto
         aclk/aclk-schemas/proto/agent/v1/connection.proto
         aclk/aclk-schemas/proto/alarm/v1/config.proto
         aclk/aclk-schemas/proto/alarm/v1/stream.proto

@@ -24,6 +24,7 @@
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
+int disconnect_req = 0;
 
 int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
@@ -218,7 +219,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
         error("Received message on unexpected topic %s", topic);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
-        error("Link is shutting down. Ignoring message.");
+        error("Link is shutting down. Ignoring incoming message.");
         return;
     }
 
@@ -234,7 +235,7 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
     debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
-        error("Link is shutting down. Ignoring message.");
+        error("Link is shutting down. Ignoring incoming message.");
         return;
     }
 
@@ -293,6 +294,8 @@ static int read_query_thread_count()
     return threads;
 }
 
+void aclk_graceful_disconnect(mqtt_wss_client client);
+
 /* Keeps connection alive and handles all network comms.
  * Returns on error or when netdata is shutting down.
  * @param client instance of mqtt_wss_client
@@ -307,6 +310,15 @@ static int handle_connection(mqtt_wss_client client)
         // for netdata_exit
         if (mqtt_wss_service(client, 1000) < 0){
             error("Connection Error or Dropped");
+            return 1;
+        }
+
+        if (disconnect_req) {
+            disconnect_req = 0;
+            aclk_graceful_disconnect(client);
+            aclk_queue_unlock();
+            aclk_shared_state.mqtt_shutdown_msg_id = -1;
+            aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
             return 1;
         }
 
