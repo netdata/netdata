@@ -417,7 +417,7 @@ void *diskspace_main(void *ptr) {
                 continue;
 
             // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
-            if(mi->flags && MOUNTINFO_READONLY && !strcmp(mi->root, mi->mount_point))
+            if(mi->flags & MOUNTINFO_READONLY && !strcmp(mi->root, mi->mount_point))
                 continue;
 
             do_disk_space_stats(mi, update_every);
