@@ -91,6 +91,7 @@ aclk_query_t aclk_queue_pop(void);
 void aclk_queue_flush(void);
 
 void aclk_queue_lock(void);
+void aclk_queue_unlock(void);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
     if (likely(query->data.bin_payload.payload)) {                                                                     \
