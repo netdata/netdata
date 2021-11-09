@@ -27,8 +27,7 @@ Use `cd` to navigate to the Netdata config directory, then use `ls -a` to look f
 
 -   If the `.environment` file _does not_ exist, reinstall with your [package manager](#deb-or-rpm-packages).
 -   If the `.environment` file _does_ exist, check its contents with `less .environment`.
-    -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static
-        binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
+    -   If `IS_NETDATA_STATIC_BINARY` is `"yes"`, update using the [pre-built static binary](#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh).
     -   In all other cases, update using the [one-line installer script](#one-line-installer-script-kickstartsh).
 
 Next, use the appropriate method to update the Netdata Agent:
@@ -68,30 +67,13 @@ distribution's package manager to update Netdata. Any custom settings present in
 Your package manager grabs a new package from our hosted repository, updates the Netdata Agent, and restarts it.
 
 ```bash
-apt-get install netdata     # Ubuntu/Debian
-dnf install netdata         # Fedora/RHEL
-yum install netdata         # CentOS
-zypper in netdata           # openSUSE
+apt-get update netdata     # Ubuntu/Debian
+dnf update netdata         # Fedora/RHEL
+yum update netdata         # CentOS
+zypper up netdata          # openSUSE
 ```
 
 > You may need to escalate privileges using `sudo`.
-
-## Pre-built static binary for 64-bit systems (`kickstart-static64.sh`)
-
-If you installed Netdata using the pre-built static binary, run the `kickstart-static64.sh` script again to update
-Netdata. Any custom settings present in your Netdata configuration directory (typically at `/etc/netdata`) persists
-during this process.
-
-This script will automatically run the update script that was installed as part of the initial install (even if
-you disabled automatic updates) and preserve the existing install options you specified.
-
-```bash
-bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
-```
-
-> ❗ If the above command fails, you can [reinstall
-> Netdata](/packaging/installer/REINSTALL.md#pre-built-static-binary-for-64-bit-systems-kickstart-static64sh) to get the
-> latest version. This also preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files.
 
 ## Docker
 

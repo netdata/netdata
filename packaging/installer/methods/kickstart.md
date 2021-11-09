@@ -22,17 +22,19 @@ sh <(curl -Ss https://my-netdata.io/kickstart.sh)
 > See our [installation guide](/packaging/installer/README.md) for details about [automatic updates](/packaging/installer/README.md#automatic-updates) or
 > [nightly vs. stable releases](/packaging/installer/README.md#nightly-vs-stable-releases).
 
+> If you are installing on macOS, make sure to check the [install documentation for macOS](packaging/installer/methods/macos) before continuing.
+
 ## What does `kickstart.sh` do?
 
 The `kickstart.sh` script does the following after being downloaded and run using `sh`:
 
 - Determines what platform you are running on.
 - Checks for an existing installation, and if found updates that instead of creating a new install.
-- Attempts to install Netdata using our official native binary packages.
+- Attempts to install Netdata using our [official native binary packages](#native-packages).
 - If there are no official native binary packages for your system (or installing that way failed), tries to install
-  using a static build of Netdata if one is available.
-- If no static build is available, installs required dependencies and then attempts to install by building Netdata
-  locally (by downloading the sources and building them directly).
+  using a [static build of Netdata](#static-builds) if one is available.
+- If no static build is available, installs required dependencies and then attempts to install by 
+  [building Netdata locally](#local-builds) (by downloading the sources and building them directly).
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly
   versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
 - Prints a message whether installation succeeded or failed for QA purposes.
@@ -94,6 +96,40 @@ sh <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token=TOKEN --claim-ro
 ```
 
 Please note that to run it you will either need to have root privileges or run it with the user that is running the agent, more details on the [Connect an agent without root privileges](/claim/README.md#connect-an-agent-without-root-privileges) section.
+
+### Native packages
+
+We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
+builds. These packages are available for 64-bit x86 systems, and depending on the distribution and release may
+also be available for 32-bit x86, ARMv7, and AArch64 systems.  These packages are the recommended installation
+method if available and will be used by default if possible for your system, allowing you to then handle updates
+of Netdata as part of your usual system update procedure.
+
+If you want to enforce the usage of native packages and have the installer return a failure if they are not available,
+you can do so by adding `--native-only` to the options you pass to the installer.
+
+### Static builds
+
+We publish pre-built static builds of Netdata for Linux systems. Currently, theseare published for 64-bit x86,
+ARMv7, and AArch64 hardware. These static builds are able to operate in a mostly self-contained manner, only
+requiring a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
+you are on a platform which we provide static builds for but do not provide native packages for, a static build
+will be used by default for installation.
+
+If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
+you can do so by adding `--static-only` to the options you pass to the installer.
+
+### Local builds
+
+For systems which do not have available native packages or static builds, we support building Netdata locally on
+the system it will be installed on. When using this approach, the installer will attempt to install any required
+dependencies for building Netdata, though this may not always work correctly.
+
+If you want to enforce the usage of a local build (perhaps because you require a custom installation prefix,
+which is not supported with native packages or static builds), you can do so by adding `--build-only` to the
+options you pass to the installer.
+
+## Considerations for macOS
 
 ## Verify script integrity
 
