@@ -423,6 +423,8 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
             info ("Cloud asks not to reconnect for %u seconds. We shall honor that request", (unsigned int)cmd->reconnect_after_s);
         }
         disconnect_req = 1;
+        freez(cmd->error_description);
+        freez(cmd);
         return;
     }
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
