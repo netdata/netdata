@@ -9,7 +9,7 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 
 **Table of Contents**
 
-1.  [Your data are safe with Netdata](#your-data-are-safe-with-netdata)
+1.  [Your data is safe with Netdata](#your-data-is-safe-with-netdata)
 2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
 3.  [Netdata is read-only](#netdata-is-read-only)
 4.  [Netdata viewers authentication](#netdata-viewers-authentication)
@@ -20,7 +20,7 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
         		\- [Other methods](#other-methods)
 5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
-## Your data are safe with Netdata
+## Your data is safe with Netdata
 
 Netdata collects raw data from many sources. For each source, Netdata uses a plugin that connects to the source (or reads the relative files produced by the source), receives raw data and processes them to calculate the metrics shown on Netdata dashboards.
 
