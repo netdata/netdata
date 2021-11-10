@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix host hop count reported to the cloud [\#11768](https://github.com/netdata/netdata/pull/11768) ([stelfrag](https://github.com/stelfrag))
 - Show stats for protected mount points in diskspace plugin [\#11767](https://github.com/netdata/netdata/pull/11767) ([vlvkobal](https://github.com/vlvkobal))
 - fix log if D\_ACLK is used [\#11763](https://github.com/netdata/netdata/pull/11763) ([underhood](https://github.com/underhood))
 - Don't interrupt popcorn timer for children [\#11758](https://github.com/netdata/netdata/pull/11758) ([underhood](https://github.com/underhood))
