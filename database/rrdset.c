@@ -1807,12 +1807,14 @@ after_second_database_work:
             continue;
 
 #if defined(ENABLE_ACLK) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
-        int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
-        if (unlikely(live != rd->state->aclk_live_status)) {
-            if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
-                if (likely(!queue_dimension_to_aclk(rd))) {
-                    rd->state->aclk_live_status = live;
-                    rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
+        if (!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) {
+            int live = ((mark - rd->last_collected_time.tv_sec) < (RRDSET_MINIMUM_LIVE_COUNT * rd->update_every));
+            if (unlikely(live != rd->state->aclk_live_status)) {
+                if (likely(rrdset_flag_check(st, RRDSET_FLAG_ACLK))) {
+                    if (likely(!queue_dimension_to_aclk(rd))) {
+                        rd->state->aclk_live_status = live;
+                        rrddim_flag_set(rd, RRDDIM_FLAG_ACLK);
+                    }
                 }
             }
         }
