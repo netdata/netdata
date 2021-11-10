@@ -9,7 +9,7 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 
 **Table of Contents**
 
-1.  [Your data are safe with Netdata](#your-data-are-safe-with-netdata)
+1.  [Your data is safe with Netdata](#your-data-are-safe-with-netdata)
 2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
 3.  [Netdata is read-only](#netdata-is-read-only)
 4.  [Netdata viewers authentication](#netdata-viewers-authentication)
