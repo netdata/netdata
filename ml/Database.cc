@@ -41,29 +41,24 @@ const char *ml::Database::SQL_SELECT_ANOMALY_EVENTS =
 const char *ml::Database::SQL_CREATE_ANOMALY_RATE_INFO_TABLE =
     "CREATE TABLE IF NOT EXISTS anomaly_rate_info( "
     "     host_id text NOT NULL, "
-    "     dimension_id text NOT NULL, "
     "     after int NOT NULL, "
     "     before int NOT NULL, "
-    "     anomaly_rate real "
+    "     anomaly_rates text "
     ");";
 
-const char *ml::Database::SQL_INSERT_ANOMALY_RATE_INFO =
+const char *ml::Database::SQL_INSERT_BULK_ANOMALY_RATE_INFO =
     "INSERT INTO anomaly_rate_info( "
-    "     host_id, dimension_id, after, before, anomaly_rate) "
-    "VALUES (?1, ?2, ?3, ?4, ?5);";
-
-const char *ml::Database::SQL_INSERT_ANOMALY_RATES_INFO =
-    "INSERT INTO anomaly_rate_info( "
-    "     host_id, after, before, anomaly_rate, dimension_id) "
-    " VALUES (SELECT ?1, ?2, ?3 "
-    " , json_extract(j.value, '$.anomaly_rate') "
-    " , json_extract(j.value, '$.dimension_id') "
-    " FROM json_each(?4) AS j);";
-    
+    "     host_id, after, before, anomaly_rates) "
+    " VALUES (?1, ?2, ?3, ?4);";
+   
 const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
-    "SELECT dimension_id, AVG(anomaly_rate) FROM anomaly_rate_info " 
-    "  WHERE host_id == ?1 AND after >= ?2 AND before <= ?3 "
-    "  GROUP BY host_id, dimension_id;";
+    "SELECT dimension_id, AVG(anomaly_percentage) "
+    "  FROM (SELECT json_extract(j.value, '$[1]') AS dimension_id, "
+    "  json_extract(j.value, '$[0]') AS anomaly_percentage "
+    "  FROM anomaly_rate_info AS ari, json_each(ari.anomaly_rates) AS j " 
+    "  WHERE ari.host_id == ?1 AND ari.after >= ?2 AND ari.before <= ?3 "
+    "  AND json_valid(ari.anomaly_rates)) "
+    "  GROUP BY dimension_id;";
 
 using namespace ml;
 
@@ -93,21 +88,12 @@ bool Statement::bindValue(size_t Pos, const std::string &Value) {
     return false;
 }
 
-/*bool Statement::bindValue(size_t Pos, const int Value) {
+bool Statement::bindValue(size_t Pos, const int Value) {
     int RC = sqlite3_bind_int(ParsedStmt, Pos, Value);
     if (RC == SQLITE_OK)
         return true;
 
     error("Failed to bind integer %d (pos = %zu) in statement '%s'.", Value, Pos, RawStmt);
-    return false;
-}*/
-
-bool Statement::bindValue(size_t Pos, const double Value) {
-    int RC = sqlite3_bind_double(ParsedStmt, Pos, Value);
-    if (RC == SQLITE_OK)
-        return true;
-
-    error("Failed to bind double %f (pos = %zu) in statement '%s'.", Value, Pos, RawStmt);
     return false;
 }
 

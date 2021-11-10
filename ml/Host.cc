@@ -356,7 +356,7 @@ void DetectableHost::detectOnce() {
     std::vector<std::pair<double, std::string>> DimsOverThreshold;
     /*the following vector takes care of the count of the set anomaly bits per dimension*/
     std::vector<std::pair<double, std::string>> DimsAnomalyRate;
-
+    
     size_t NumAnomalousDimensions = 0;
     size_t NumNormalDimensions = 0;
     size_t NumTrainedDimensions = 0;
@@ -421,8 +421,8 @@ void DetectableHost::detectOnce() {
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
 
-    /*code snippet to keep account of the count of the anomalous values of each dimension*/
-    /*...in the anomaly-precentage period configured by (Cfg.SaveAnomalyPercentageEvery)*/
+    /*code snippet to keep account of the count of the anomalous values of each dimension
+    ...in the anomaly-precentage period configured by (Cfg.SaveAnomalyPercentageEvery)*/
     if(AnomalyBitCounterWindow == 0) {
         /*one period is completed, save in the DB the vector that holds the values of the percentages 
         (of the set anomaly bits) for each dimension*/
@@ -431,14 +431,7 @@ void DetectableHost::detectOnce() {
         time_t Before = now_realtime_sec();
         time_t After = Before - (Cfg.SaveAnomalyPercentageEvery * updateEvery());
         
-        //DB.insertAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
-        /*for(size_t i = 0; i < DimsAnomalyRate.size(); i++) {
-            DB.insertAnomalyRateInfo(getUUID(), DimsAnomalyRate[i].second, After, Before, DimsAnomalyRate[i].first);
-        }*/
-        for(std::vector<std::pair<double, std::string>>::iterator it = DimsAnomalyRate.begin(); it != DimsAnomalyRate.end(); ++it) {
-            DB.insertAnomalyRateInfo(getUUID(), it->second, After, Before, it->first);
-        }
-        //DB.insertAnomalyRatesInfo(getUUID(), After, Before, JsonResult.dump(4));
+        DB.insertBulkAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
         AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
     }

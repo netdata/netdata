@@ -60,8 +60,7 @@ public:
 private:
     bool prepare(sqlite3 *Conn);
 
-    //bool bindValue(size_t Pos, const int Value);
-    bool bindValue(size_t Pos, const double Value);
+    bool bindValue(size_t Pos, const int Value);
     bool bindValue(size_t Pos, const std::string &Value);
 
     template<typename ArgType, typename ...ArgTypes>
@@ -73,16 +72,6 @@ private:
     size_t bind(size_t Pos, ArgType T, ArgTypes ...Args) {
         return bindValue(Pos, T) + bind(Pos + 1, Args...);
     }
-
-    /*template<const int, typename ...ArgTypes>
-    size_t bind(size_t Pos, const int T, ArgTypes ...Args) {
-        return bindValue(Pos, T) + bind(Pos + 1, Args...);
-    }*/
-
-    /*template<float, typename ...ArgTypes>
-    size_t bind(size_t Pos, float T, ArgTypes ...Args) {
-        return bindValue(Pos, T) + bind(Pos + 1, Args...);
-    }*/
 
     bool resetAndClear(bool Ret);
 
@@ -99,8 +88,7 @@ private:
     static const char *SQL_SELECT_ANOMALY_EVENTS;
     
     static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
-    static const char *SQL_INSERT_ANOMALY_RATE_INFO;
-    static const char *SQL_INSERT_ANOMALY_RATES_INFO;
+    static const char *SQL_INSERT_BULK_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
 
 public:
@@ -135,15 +123,9 @@ public:
     }
 
     template<typename ...ArgTypes>
-    bool insertAnomalyRateInfo(ArgTypes... Args) {
+    bool insertBulkAnomalyRateInfo(ArgTypes... Args) {
         Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
-        return InsertAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
-    }
-
-    template<typename ...ArgTypes>
-    bool insertAnomalyRatesInfo(ArgTypes... Args) {
-        Statement::RowCallback RowCb = [](sqlite3_stmt *Stmt) { (void) Stmt; };
-        return InsertAnomalyRatesInfoStmt.exec(Conn, RowCb, Args...);
+        return InsertBulkAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
     }
 
     template<typename ...ArgTypes>
@@ -161,8 +143,7 @@ private:
     sqlite3 *Conn;
 
     Statement InsertAnomalyStmt{SQL_INSERT_ANOMALY};
-    Statement InsertAnomalyRateInfoStmt{SQL_INSERT_ANOMALY_RATE_INFO};
-    Statement InsertAnomalyRatesInfoStmt{SQL_INSERT_ANOMALY_RATES_INFO};
+    Statement InsertBulkAnomalyRateInfoStmt{SQL_INSERT_BULK_ANOMALY_RATE_INFO};
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
     Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
