@@ -20,6 +20,10 @@ const char *aclk_sync_config[] = {
     "(dimension_id, dimension_name, chart_type_id, dim_id, chart_id, host_id, date_created)"
     " select old.id, old.name, c.type||\".\"||c.id, old.dim_id, old.chart_id, c.host_id, strftime('%s') FROM"
     " chart c WHERE c.chart_id = old.chart_id; END;",
+
+    "DELETE FROM dimension_delete WHERE host_id NOT IN"
+    " (SELECT host_id FROM host) OR strftime('%s') - date_created > 604800;",
+
     NULL,
 };
 
@@ -746,6 +750,8 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
         sqlite3_free(err_msg);
     }
+    db_execute("DELETE FROM dimension_delete WHERE host_id NOT IN (SELECT host_id FROM host) "
+               " OR strftime('%s') - date_created > 604800;");
     return;
 }
 
