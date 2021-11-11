@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
-              -v $PWD:/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+              -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
@@ -94,14 +94,17 @@ jobs:
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
+          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} ${pkgfile}
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} ${pkgfile}
-            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} ${pkgfile}
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-edge/${{ matrix.pkgclouddistro }} "${pkgfile}"
+            .github/scripts/package_cloud_wrapper.sh yank ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} \
+                "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ secrets.PACKAGE_CLOUD_REPO }}-repoconfig/${{ matrix.pkgclouddistro }} "${pkgfile}"
           done
       - name: Failure Notification
         if: ${{ failure() }}

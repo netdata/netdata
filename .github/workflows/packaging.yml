@@ -12,11 +12,11 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        name: Package build type
+        description: Package build type
         default: devel
         required: true
       version:
-        name: Package version
+        description: Package version
         required: false
 env:
   DISABLE_TELEMETRY: 1
@@ -107,27 +107,27 @@ jobs:
       - name: Check Base Branch
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "runtype=${{ github.event.inputs.type }}" >> $GITHUB_ENV
+            echo "runtype=${{ github.event.inputs.type }}" >> "${GITHUB_ENV}"
             case "${{ github.event.inputs.type }}" in
               "release")
-                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}" >> $GITHUB_ENV
-                echo "pkg_version=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-                echo "pkg_retention_days=365" >> $GITHUB_ENV
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}" >> "${GITHUB_ENV}"
+                echo "pkg_version=${{ github.event.inputs.version }}" >> "${GITHUB_ENV}"
+                echo "pkg_retention_days=365" >> "${GITHUB_ENV}"
                 ;;
               "nightly")
-                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-edge" >> $GITHUB_ENV
-                echo "pkg_version=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-                echo "pkg_retention_days=30" >> $GITHUB_ENV
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-edge" >> "${GITHUB_ENV}"
+                echo "pkg_version=${{ github.event.inputs.version }}" >> "${GITHUB_ENV}"
+                echo "pkg_retention_days=30" >> "${GITHUB_ENV}"
                 ;;
               *)
-                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-devel" >> $GITHUB_ENV
-                echo "pkg_version=0.${GITHUB_SHA}" >> $GITHUB_ENV
-                echo "pkg_retention_days=30" >> $GITHUB_ENV
+                echo "repo=${{ secrets.PACKAGE_CLOUD_REPO }}-devel" >> "${GITHUB_ENV}"
+                echo "pkg_version=0.${GITHUB_SHA}" >> "${GITHUB_ENV}"
+                echo "pkg_retention_days=30" >> "${GITHUB_ENV}"
                 ;;
             esac
           else
-            echo "runtype=test" >> $GITHUB_ENV
-            echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> $GITHUB_ENV
+            echo "runtype=test" >> "${GITHUB_ENV}"
+            echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> "${GITHUB_ENV}"
           fi
       - name: Setup QEMU
         if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
@@ -137,14 +137,6 @@ jobs:
         run: |
           echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
-      - name: Set Base Image Version
-        shell: bash
-        run: |
-          if [ -z "${{ matrix.alias }}" ] ; then
-            echo "version=${{ matrix.version }}" >> $GITHUB_ENV
-          else
-            echo "version=${{ matrix.alias }}" >> $GITHUB_ENV
-          fi
       - name: Fetch base image
         uses: nick-invision/retry@v2
         with:
@@ -152,16 +144,19 @@ jobs:
           retry_wait_seconds: 30
           timeout_seconds: 900
           command: |
-            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ env.version }}
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Build Packages
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} -v $PWD:/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} \
+                     -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Test Packages
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v $PWD:/netdata ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} \
+                     -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v "$PWD":/netdata \
+                     ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
       - name: Save Packages
         uses: actions/upload-artifact@v2
         with:
@@ -173,10 +168,10 @@ jobs:
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          echo "Packages to upload:\n$(ls artifacts/*.${{ matrix.format }})"
+          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} $(basename ${pkgfile}) || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} ${pkgfile}
+            .github/scripts/package_cloud_wrapper.sh yank ${{ env.repo }}/${{ matrix.pkgclouddistro }} "$(basename "${pkgfile}")" || true
+            .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
           done
       - name: Clean
         if: github.event_name == 'workflow_dispatch'

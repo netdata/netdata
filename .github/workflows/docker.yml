@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        name: Version Tag
+        description: Version Tag
         default: nightly
         required: true
 env:
@@ -79,14 +79,15 @@ jobs:
       - name: Determine which tags to use
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" \
+              >> "${GITHUB_ENV}"
       - name: Determine which tags to use
         if: github.event.inputs.version == 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> $GITHUB_ENV
+          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
         if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> $GITHUB_ENV
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1
       - name: Setup Buildx
