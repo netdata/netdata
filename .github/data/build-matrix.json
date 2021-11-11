@@ -82,6 +82,11 @@
       "rmjsonc": "zypper rm -y libjson-c-devel"
     },
     {
+      "distro": "oraclelinux:8",
+      "artifact_key": "oraclelinux8",
+      "rmjsonc": "dnf remove -y json-c-devel"
+    },
+    {
       "distro": "ubuntu:21.10",
       "artifact_key": "ubuntu21.10",
       "pre": "rm -f /etc/apt/apt.conf.d/docker && apt-get update",
