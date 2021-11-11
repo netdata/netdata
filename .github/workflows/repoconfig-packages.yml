@@ -73,9 +73,11 @@ jobs:
       max-parallel: 8
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
+        id: fetch-images
         uses: nick-invision/retry@v2
         with:
           max_attempts: 3
@@ -83,12 +85,14 @@ jobs:
           timeout_seconds: 900
           command: docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
       - name: Build Packages
+        id: build
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --platform ${{ matrix.platform }} \
               -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: Upload Packages
+        id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         shell: bash
         env:
@@ -115,5 +119,10 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Repository Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed."
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: ${{ matrix.pkgclouddistro }} ${{ matrix.version }} repository package build failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Fetch images: ${{ steps.fetch-images.outcome }}
+              Build: ${{ steps.build.outcome }}
+              Publish: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

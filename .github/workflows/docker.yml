@@ -22,19 +22,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
       - name: Setup Buildx
+        id: prepare
         uses: docker/setup-buildx-action@v1
       - name: Test Build
+        id: build
         uses: docker/build-push-action@v2
         with:
           load: true
           push: false
           tags: netdata/netdata:test
       - name: Test Image
+        id: test
         run: .github/scripts/docker-test.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker runtime testing failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: Building or testing Docker image for linux/amd64 failed.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Build image: ${{ steps.build.outcome }}
+              Test image: ${{ steps.test.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}
 
   docker-ci:
     if: github.event_name != 'workflow_dispatch'
@@ -50,21 +75,46 @@ jobs:
           - linux/ppc64le
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
       - name: Setup QEMU
+        id: qemu
         if: matrix.platforms != 'linux/i386'
         uses: docker/setup-qemu-action@v1
       - name: Setup Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v1
       - name: Build
+        id: build
         uses: docker/build-push-action@v2
         with:
           platforms: ${{ matrix.platforms }}
           load: false
           push: false
           tags: netdata/netdata:test
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker build testing failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: Building Docker image for ${{ matrix.platforms }} failed.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.buildx.outcome }}
+              Build image: ${{ steps.build.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+          }}
 
   docker-publish:
     if: github.event_name == 'workflow_dispatch'
@@ -73,31 +123,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
       - name: Determine which tags to use
+        id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
           echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ github.event.inputs.version }})" \
               >> "${GITHUB_ENV}"
       - name: Determine which tags to use
+        id: nightly-tags
         if: github.event.inputs.version == 'nightly'
         run: |
           echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
+        id: env
         if: github.repository == 'netdata/netdata'
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
+        id: qemu
         uses: docker/setup-qemu-action@v1
       - name: Setup Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v1
       - name: Docker Hub Login
+        id: login
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Docker Build
+        id: build
         uses: docker/build-push-action@v2
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
@@ -112,7 +170,16 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Docker Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "Docker image build failed."
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: Failed to build or publish Docker images.
+              CHeckout: ${{ steps.checkout.outcome }}
+              Generate release tags: ${{ steps.release-tags.outcome }}
+              Generate nightly tags: ${{ steps.nightly-tags.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.buildx.outcome }}
+              Authenticate against DockerHub: ${{ steps.login.outcome }}
+              Build and publish images: ${{ steps.build.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

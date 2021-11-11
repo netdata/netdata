@@ -91,20 +91,14 @@ jobs:
       fail-fast: false
       max-parallel: 8
     steps:
-      - name: Checkout # Checkout the repo if it’s not a tag.
-        if: github.event_name != 'workflow_dispatch'
+      - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0 # We need full history for versioning
-          submodules: recursive
-      - name: Checkout Tag # Otherwise check out the tag that triggered this.
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.ref }}
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
       - name: Check Base Branch
+        id: branch-check
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "runtype=${{ github.event.inputs.type }}" >> "${GITHUB_ENV}"
@@ -130,14 +124,17 @@ jobs:
             echo "pkg_version=$(cut -d'-' -f 1 packaging/version | sed -e 's/^v//')" >> "${GITHUB_ENV}"
           fi
       - name: Setup QEMU
+        id: qemu
         if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386'
         uses: docker/setup-qemu-action@v1
       - name: Prepare Docker Environment
+        id: docker-config
         shell: bash
         run: |
           echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
-      - name: Fetch base image
+      - name: Fetch images
+        id: fetch-images
         uses: nick-invision/retry@v2
         with:
           max_attempts: 3
@@ -147,22 +144,27 @@ jobs:
             docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Build Packages
+        id: build
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ env.pkg_version }} --platform=${{ matrix.platform }} \
                      -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Test Packages
+        id: test
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} -e VERSION=${{ env.pkg_version }} \
                      -e DISTRO_VERSION=${{ env.version }} --platform=${{ matrix.platform }} -v "$PWD":/netdata \
                      ${{ matrix.base_image }}:${{ env.version }} /netdata/.github/scripts/pkg-test.sh
       - name: Save Packages
+        id: artifacts
+        continue-on-error: true
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
       - name: Upload to PackageCloud
+        id: upload
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
@@ -174,6 +176,7 @@ jobs:
             .github/scripts/package_cloud_wrapper.sh push ${{ env.repo }}/${{ matrix.pkgclouddistro }} "${pkgfile}"
           done
       - name: Clean
+        id: cleanup
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
@@ -188,7 +191,16 @@ jobs:
           SLACK_ICON_EMOJI: ':github-actions:'
           SLACK_TITLE: 'Package Build failed:'
           SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: "${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed."
+          SLACK_MESSAGE: >-
+              ${{ github.repository }}: ${{ matrix.pkgclouddistro }} ${{ matrix.version }} package build for ${{ matrix.arch }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Version check: ${{ steps.branch-check.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup Docker: ${{ steps.docker-config.outcome }}
+              Fetch images: ${{ steps.fetch-images.outcome }}
+              Build: ${{ steps.build.outcome }}
+              Publish: ${{ steps.upload.outcome }}
+              Cleanup: ${{ steps.cleanup.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
