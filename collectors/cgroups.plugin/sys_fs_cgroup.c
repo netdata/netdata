@@ -663,6 +663,7 @@ struct cgroup {
     char enabled;        // enabled in the config
 
     char pending_renames;
+    char *intermediate_id; // TODO: remove it when the renaming script is fixed
 
     char *id;
     uint32_t hash;
@@ -1367,13 +1368,16 @@ static inline char *cgroup_chart_id_strdupz(const char *s) {
     char *r = strdupz(s);
     netdata_fix_chart_id(r);
 
+    return r;
+}
+
+// TODO: move the code to cgroup_chart_id_strdupz() when the renaming script is fixed
+static inline void substitute_dots_in_id(char *s) {
     // dots are used to distinguish chart type and id in streaming, so we should replace them
-    for (char *d = r; *d; d++) {
+    for (char *d = s; *d; d++) {
         if (*d == '.')
             *d = '-';
     }
-
-    return r;
 }
 
 char *parse_k8s_data(struct label **labels, char *data)
@@ -1411,7 +1415,8 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    // TODO: use cg->id when the renaming script is fixed
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->intermediate_id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->chart_id);
     FILE *fp = mypopen(command, &cgroup_pid);
@@ -1448,6 +1453,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
 
                     freez(cg->chart_id);
                     cg->chart_id = cgroup_chart_id_strdupz(name);
+                    substitute_dots_in_id(cg->chart_id);
                     cg->hash_chart = simple_hash(cg->chart_id);
                 }
             }
@@ -1474,7 +1480,10 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     cg->chart_title = cgroup_title_strdupz(id);
 
+    cg->intermediate_id = cgroup_chart_id_strdupz(id);
+
     cg->chart_id = cgroup_chart_id_strdupz(id);
+    substitute_dots_in_id(cg->chart_id);
     cg->hash_chart = simple_hash(cg->chart_id);
 
     if(cgroup_use_unified_cgroups) cg->options |= CGROUP_OPTIONS_IS_UNIFIED;
@@ -1514,10 +1523,6 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
             strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
             char *s = buffer;
-
-            //freez(cg->chart_id);
-            //cg->chart_id = cgroup_chart_id_strdupz(s);
-            //cg->hash_chart = simple_hash(cg->chart_id);
 
             // skip to the last slash
             size_t len = strlen(s);
@@ -1642,6 +1647,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     free_pressure(&cg->memory_pressure);
 
     freez(cg->id);
+    freez(cg->intermediate_id);
     freez(cg->chart_id);
     freez(cg->chart_title);
 
