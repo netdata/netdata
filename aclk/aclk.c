@@ -30,8 +30,6 @@ int aclk_alert_reloaded = 1; //1 on startup, and again on health_reload
 
 time_t aclk_block_until = 0;
 
-aclk_env_t *aclk_env = NULL;
-
 mqtt_wss_client mqttwss_client;
 
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -183,7 +181,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 
 //TODO prevent big buffer on stack
 #define RX_MSGLEN_MAX 4096
-static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
+static void msg_callback_old_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
     char cmsg[RX_MSGLEN_MAX];
     size_t len = (msglen < RX_MSGLEN_MAX - 1) ? msglen : (RX_MSGLEN_MAX - 1);
@@ -227,7 +225,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 }
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-static void msg_callback_new(const char *topic, const void *msg, size_t msglen, int qos)
+static void msg_callback_new_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
     if (msglen > RX_MSGLEN_MAX)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
@@ -264,7 +262,14 @@ static void msg_callback_new(const char *topic, const void *msg, size_t msglen, 
 
     aclk_handle_new_cloud_msg(msgtype, msg, msglen);
 }
-#endif
+
+static inline void msg_callback(const char *topic, const void *msg, size_t msglen, int qos) {
+    if (aclk_use_new_cloud_arch)
+        msg_callback_new_protocol(topic, msg, msglen, qos);
+    else
+        msg_callback_old_protocol(topic, msg, msglen, qos);
+}
+#endif /* ENABLE_NEW_CLOUD_PROTOCOL */
 
 static void puback_callback(uint16_t packet_id)
 {
@@ -600,6 +605,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             .drop_on_publish_fail = 1
         };
 
+#if defined(ENABLE_NEW_CLOUD_PROTOCOL) && defined(ACLK_NEWARCH_DEVMODE)
+        aclk_use_new_cloud_arch = 1;
+        info("Switching ACLK to new protobuf protocol. Due to #define ACLK_NEWARCH_DEVMODE.");
+#else
+        aclk_use_new_cloud_arch = 0;
+#endif
+
 #ifndef ACLK_DISABLE_CHALLENGE
         if (aclk_env) {
             aclk_env_t_destroy(aclk_env);
@@ -617,6 +629,21 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 
         if (netdata_exit)
             return 1;
+
+#ifndef ACLK_NEWARCH_DEVMODE
+        if (aclk_env->encoding == ACLK_ENC_PROTO) {
+#ifndef ENABLE_NEW_CLOUD_PROTOCOL
+            error("Cloud requested New Cloud Protocol to be used but this agent cannot support it!");
+            continue;
+#endif
+            if (!aclk_env_has_capa("proto")) {
+                error ("Can't encoding=proto without at least \"proto\" capability.");
+                continue;
+            }
+            info("Switching ACLK to new protobuf protocol. Due to /env response.");
+            aclk_use_new_cloud_arch = 1;
+        }
+#endif
 
         memset(&auth_url, 0, sizeof(url_t));
         if (url_parse(aclk_env->auth_endpoint, &auth_url)) {
@@ -716,9 +743,6 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
  */
 void *aclk_main(void *ptr)
 {
-#if defined(ENABLE_NEW_CLOUD_PROTOCOL) && defined(ACLK_NEWARCH_DEVMODE)
-    aclk_use_new_cloud_arch = 1;
-#endif
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     struct aclk_stats_thread *stats_thread = NULL;
@@ -753,9 +777,9 @@ void *aclk_main(void *ptr)
         goto exit;
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, (aclk_use_new_cloud_arch ? msg_callback_new : msg_callback), puback_callback))) {
-#else
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+#else
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback_old_protocol, puback_callback))) {
 #endif
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
