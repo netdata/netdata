@@ -284,6 +284,9 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
     Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
 
     Json["save-anomaly-percentage-every"] = Cfg.SaveAnomalyPercentageEvery;
+
+    Json["max_anomaly_rate_info_data_table_size"] = Cfg.MaxAnomalyRateInfoDataTableSize;
+    Json["max_anomaly_rate_info_data_age"] = Cfg.MaxAnomalyRateInfoDataAge;
 }
 
 std::pair<Dimension *, Duration<double>>
@@ -418,7 +421,7 @@ void DetectableHost::detectOnce() {
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
-
+    
     /*code snippet to keep account of the count of the anomalous values of each dimension
     ...in the anomaly-precentage period configured by (Cfg.SaveAnomalyPercentageEvery)*/
     if(AnomalyBitCounterWindow == 0) {
@@ -460,7 +463,6 @@ void DetectableHost::detectOnce() {
     time_t Before = now_realtime_sec();
     time_t After = Before - (WindowLength * updateEvery());
     DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
-
 }
 
 void DetectableHost::detect() {
@@ -475,6 +477,11 @@ void DetectableHost::detect() {
         updateDetectionChart(getRH(), Dur.count() * 1000);
 
         std::this_thread::sleep_for(Seconds{updateEvery()});
+
+        /*control the size of the database table and shrink them if required*/
+        DB.shrinkAnomalyRateInfoTable(static_cast<int>(Cfg.MaxAnomalyRateInfoDataTableSize));
+        time_t OldestTime = now_realtime_sec() - (Cfg.MaxAnomalyRateInfoDataAge * 3600);
+        DB.removeOldAnomalyRateInfo(OldestTime);
     }
 }
 

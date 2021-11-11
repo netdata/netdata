@@ -33,6 +33,10 @@ public:
     /*The time window size within which the set anomalous results per dimension are to be counted*/
     double SaveAnomalyPercentageEvery;
 
+    /*The maximum size, and the associated threshold, of the data table that holds anomaly rate information*/
+    double MaxAnomalyRateInfoDataTableSize;
+    double MaxAnomalyRateInfoDataAge;
+
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;
 

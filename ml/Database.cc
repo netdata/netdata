@@ -60,6 +60,17 @@ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "  AND json_valid(ari.anomaly_rates)) "
     "  GROUP BY dimension_id;";
 
+const char *ml::Database::SQL_SHRINK_ANOMALY_RATE_INFO =
+    "DELETE FROM anomaly_rate_info "
+    " WHERE after NOT IN ( "
+    " SELECT after FROM ( "
+    " SELECT after FROM anomaly_rate_info "
+    " ORDER BY after DESC LIMIT ?1 ) foo);";
+
+const char *ml::Database::SQL_REMOVE_OLD_ANOMALY_RATE_INFO =
+    "DELETE FROM anomaly_rate_info "
+    " WHERE before <= ?1;";
+
 using namespace ml;
 
 bool Statement::prepare(sqlite3 *Conn) {

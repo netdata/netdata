@@ -90,7 +90,9 @@ private:
     static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
     static const char *SQL_INSERT_BULK_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
-
+    static const char *SQL_SHRINK_ANOMALY_RATE_INFO;
+    static const char *SQL_REMOVE_OLD_ANOMALY_RATE_INFO;
+    
 public:
     Database(const std::string &Path);
 
@@ -139,6 +141,18 @@ public:
         return GetAnomalyRateInfoInRangeStmt.exec(Conn, RowCb, Args...);
     }
 
+    template<typename ...ArgTypes>
+    void shrinkAnomalyRateInfoTable(ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {};
+        ShrinkAnomalyRateInfoTableStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
+    void removeOldAnomalyRateInfo(ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {};
+        RemoveOldAnomalyRateInfoStmt.exec(Conn, RowCb, Args...);
+    }
+
 private:
     sqlite3 *Conn;
 
@@ -147,6 +161,8 @@ private:
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
     Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
+    Statement ShrinkAnomalyRateInfoTableStmt{SQL_SHRINK_ANOMALY_RATE_INFO};
+    Statement RemoveOldAnomalyRateInfoStmt{SQL_REMOVE_OLD_ANOMALY_RATE_INFO};
 };
 
 }
