@@ -1647,6 +1647,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     free_pressure(&cg->memory_pressure);
 
     freez(cg->id);
+    freez(cg->intermediate_id);
     freez(cg->chart_id);
     freez(cg->chart_title);
 
