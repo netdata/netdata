@@ -1524,10 +1524,6 @@ static inline struct cgroup *cgroup_add(const char *id) {
             strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
             char *s = buffer;
 
-            //freez(cg->chart_id);
-            //cg->chart_id = cgroup_chart_id_strdupz(s);
-            //cg->hash_chart = simple_hash(cg->chart_id);
-
             // skip to the last slash
             size_t len = strlen(s);
             while(len--) if(unlikely(s[len] == '/')) break;
