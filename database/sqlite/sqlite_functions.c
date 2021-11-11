@@ -1799,8 +1799,10 @@ struct  node_instance_list *get_node_list(void)
             uuid_copy(node_list[row].host_id, *host_id);
             node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
-            node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
-            node_list[row].hops = uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
+            RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
+            node_list[row].live = host ? 1 : 0;
+            node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
+                                  uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
