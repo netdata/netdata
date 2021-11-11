@@ -866,19 +866,6 @@ void aclk_update_retention(struct aclk_database_worker_config *wc, struct aclk_d
 
         if (likely(!rc && first_entry_t))
             start_time = MIN(start_time, first_entry_t);
-
-        //        if (memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        //            int live = ((now - last_entry_t) < (RRDSET_MINIMUM_LIVE_COUNT * update_every));
-        //            (void) aclk_upd_dimension_event(
-        //                wc->uuid_str,
-        //                claim_id,
-        //                (uuid_t *)sqlite3_column_blob(res, 0),
-        //                (const char *)(const char *)sqlite3_column_text(res, 3),
-        //                (const char *)(const char *)sqlite3_column_text(res, 4),
-        //                (const char *)(const char *)sqlite3_column_text(res, 2),
-        //                first_entry_t,
-        //                live ? 0 : last_entry_t);
-        //        }
     }
     if (update_every) {
         debug(D_ACLK_SYNC, "Update %s for %u oldest time = %ld", wc->host_guid, update_every, start_time);
