@@ -426,10 +426,6 @@ void aclk_database_worker(void *arg)
                     break;
 #endif
 // ALERTS
-                case ACLK_DATABASE_ADD_ALERT:
-                    debug(D_ACLK_SYNC,"Adding alert event for %s", wc->host_guid);
-                    aclk_add_alert_event(wc, cmd);
-                    break;
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
                     debug(D_ACLK_SYNC,"Pushing chart config info to the cloud for %s", wc->host_guid);
                     aclk_push_alert_config_event(wc, cmd);

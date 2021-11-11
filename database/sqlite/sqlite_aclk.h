@@ -114,7 +114,6 @@ static inline char *get_str_from_uuid(uuid_t *uuid)
 
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
-    ACLK_DATABASE_ADD_ALERT,
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     ACLK_DATABASE_ADD_CHART,
