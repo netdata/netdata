@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Temporary fix for cgroup renaming [\#11775](https://github.com/netdata/netdata/pull/11775) ([vlvkobal](https://github.com/vlvkobal))
+- Remove feature flag for ACLK new cloud architecture [\#11774](https://github.com/netdata/netdata/pull/11774) ([stelfrag](https://github.com/stelfrag))
+- Fix link to new charts. [\#11773](https://github.com/netdata/netdata/pull/11773) ([DShreve2](https://github.com/DShreve2))
+- Update netdata-security.md [\#11772](https://github.com/netdata/netdata/pull/11772) ([jlbriston](https://github.com/jlbriston))
+- Skip sending hidden dimensions via ACLK [\#11770](https://github.com/netdata/netdata/pull/11770) ([stelfrag](https://github.com/stelfrag))
+- Insert alert into aclk\_alert directly instead of queuing it [\#11769](https://github.com/netdata/netdata/pull/11769) ([MrZammler](https://github.com/MrZammler))
 - Fix host hop count reported to the cloud [\#11768](https://github.com/netdata/netdata/pull/11768) ([stelfrag](https://github.com/stelfrag))
 - Show stats for protected mount points in diskspace plugin [\#11767](https://github.com/netdata/netdata/pull/11767) ([vlvkobal](https://github.com/vlvkobal))
 - fix log if D\_ACLK is used [\#11763](https://github.com/netdata/netdata/pull/11763) ([underhood](https://github.com/underhood))
@@ -154,13 +160,11 @@
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 - Better check for supported -F parameter in sendmail [\#11506](https://github.com/netdata/netdata/pull/11506) ([MrZammler](https://github.com/MrZammler))
 - v2.19.9 [\#11505](https://github.com/netdata/netdata/pull/11505) ([allelos](https://github.com/allelos))
-- Fix elasticsearch null values returned by \_cat/indices API [\#11501](https://github.com/netdata/netdata/pull/11501) ([vpiserchia](https://github.com/vpiserchia))
-- Update claim README.md [\#11492](https://github.com/netdata/netdata/pull/11492) ([car12o](https://github.com/car12o))
-- Fix issues in Alarm API [\#11491](https://github.com/netdata/netdata/pull/11491) ([underhood](https://github.com/underhood))
 - Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
 - Update alarms info [\#11481](https://github.com/netdata/netdata/pull/11481) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf [\#11480](https://github.com/netdata/netdata/pull/11480) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allow arbitrary options to be passed to make from netdata-installer.sh. [\#11479](https://github.com/netdata/netdata/pull/11479) ([Ferroin](https://github.com/Ferroin))
+- Announce proto capability and enable if cloud supports [\#11476](https://github.com/netdata/netdata/pull/11476) ([underhood](https://github.com/underhood))
 - eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Adds aclk/cloud state command to netdatacli [\#11462](https://github.com/netdata/netdata/pull/11462) ([underhood](https://github.com/underhood))
 - Add custom e-mail headers [\#11454](https://github.com/netdata/netdata/pull/11454) ([MrZammler](https://github.com/MrZammler))
