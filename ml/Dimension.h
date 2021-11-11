@@ -88,13 +88,17 @@ public:
 
     bool isAnomalous() { return AnomalyBit; }
 
-    double AnomalousBitCount;
+    double getAnomalousBitCount() { return AnomalousBitCount; }
+
+    void setAnomalousBitCount(double dAnomalousBitCount) { AnomalousBitCount = dAnomalousBitCount; }
 
 private:
     CalculatedNumber AnomalyScore{0.0};
     std::atomic<bool> AnomalyBit{false};
 
     std::vector<CalculatedNumber> CNs;
+
+    double AnomalousBitCount{0.0};
 };
 
 class DetectableDimension : public PredictableDimension {

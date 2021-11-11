@@ -234,9 +234,7 @@ void RrdHost::addDimension(Dimension *D) {
     std::lock_guard<std::mutex> Lock(Mutex);
 
     DimensionsMap[D->getRD()] = D;
-    /*initialize the anomaly counter of the dimension*/
-    D->AnomalousBitCount = 0.0;
-
+    
     // Default construct mutex for dimension
     LocksMap[D];
 }
@@ -386,14 +384,14 @@ void DetectableHost::detectOnce() {
             if (IsAnomalous) {
                 NumAnomalousDimensions += 1;
                 /*count up the number of anomalies for this dimension*/
-                D->AnomalousBitCount++;
+                D->setAnomalousBitCount(D->getAnomalousBitCount() + 1);
             }
 
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
-                double AnomalyPercentage = (D->AnomalousBitCount / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;
+                double AnomalyPercentage = (D->getAnomalousBitCount() / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;
                 DimsAnomalyRate.push_back({AnomalyPercentage , D->getID() });
-                D->AnomalousBitCount = 0.0;
+                D->setAnomalousBitCount(0.0);
             }
 
             if (NewAnomalyEvent && (AnomalyRate >= Cfg.ADDimensionRateThreshold))
@@ -467,8 +465,7 @@ void DetectableHost::detectOnce() {
 
 void DetectableHost::detect() {
     std::this_thread::sleep_for(Seconds{10});
-    AnomalyBitCounterWindow = Cfg.SaveAnomalyPercentageEvery;
-
+    
     while (!netdata_exit) {
         TimePoint StartTP = SteadyClock::now();
         detectOnce();
