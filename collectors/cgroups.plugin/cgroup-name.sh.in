@@ -161,8 +161,6 @@ function k8s_get_kubepod_name() {
   local clean_id="$id"
   clean_id=${clean_id//.slice/}
   clean_id=${clean_id//.scope/}
-  clean_id=${clean_id//-slice/}
-  clean_id=${clean_id//-scope/}
 
   local name pod_uid cntr_id
   if [[ $clean_id == "kubepods" ]]; then
