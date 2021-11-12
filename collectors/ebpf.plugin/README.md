@@ -806,16 +806,16 @@ the [ftrace documentation](https://www.kernel.org/doc/Documentation/trace/ftrace
 
 ## Alerts
 
-Like other plugins, `eBPF.plugin` also have associated alerts for its charts. You can personalize them modifying
+Like other plugins, `eBPF.plugin` also has associated alerts for its charts. You can personalize the alerts by modifying
 the file `healt.d/ebpf.conf` using [`edit-config`](/docs/monitor/configure-alarms#edit-health-configuration-files).
 
 ### Default alerts
 
 The following alerts are enabled by default:
 
-- retransmit_tcp_error: When at least 2% of packages are retransmitted, `netdata` raises alerts to notify possible
+- retransmit_tcp_error: When at least 2% of packages are retransmitted, netdata raises alerts to notify possible
   network problems.
-- apps_oomkill: When some apps group has an event of [Out Of Memory](#OOM-Killing), `netdata` sends a notification for
+- apps_oomkill: When some apps group has an event of [Out Of Memory](#OOM-Killing), netdata sends a notification for
   our users.
 
 ### Silent alerts
@@ -824,8 +824,8 @@ Certain Alerts are of high interest for specific use cases due to a safety polic
 alert overload, 'netdata' set them [silent](/guides/monitor/stop-notifications-alarms).
 
 -   task_error: This alert is raised every time a process/thread cannot be created.
--   mount_call: For security reasons, some companies create policies that does not allow stick drivers to be used,
-    this alert sends notification every time a `mount (2)` or `umount (2)` `syscall` is called.
+-   mount_call: For security reasons, some companies create policies that does not allow stick drivers to be used. This
+    alert sends a notification every time a `mount (2)` or `umount (2)` `syscall` is called.
 
 ## Performance
 
