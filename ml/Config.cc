@@ -49,8 +49,8 @@ void Config::readMLConfig(void) {
 
     double SaveAnomalyPercentageEvery = config_get_number(ConfigSectionML, "window size of anomaly bit counting for anomaly percentage", 1 * 60);
 
-    double MaxAnomalyRateInfoDataTableSize = config_get_number(ConfigSectionML, "the maximum size, in rows, of the data table that holds anomaly rate information", 40.0);
-    double MaxAnomalyRateInfoDataAge = config_get_number(ConfigSectionML, "the oldest age, in hours, of the anomaly rate information allowed to stay in the table", 0.5);
+    double MaxAnomalyRateInfoTableSize = config_get_number(ConfigSectionML, "the maximum size, in rows, of the data table that holds anomaly rate information", 40.0);
+    double MaxAnomalyRateInfoAge = config_get_number(ConfigSectionML, "the oldest age, in hours, of the anomaly rate information allowed to stay in the table", 0.5);
 
     std::string HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");
     std::string ChartsToSkip = config_get(ConfigSectionML, "charts to skip from training",
@@ -87,8 +87,8 @@ void Config::readMLConfig(void) {
 
     SaveAnomalyPercentageEvery = clamp(SaveAnomalyPercentageEvery, 60.0, 240.0);
 
-    MaxAnomalyRateInfoDataTableSize = clamp(MaxAnomalyRateInfoDataTableSize, 10.0, 1000.0);
-    MaxAnomalyRateInfoDataAge = clamp(MaxAnomalyRateInfoDataAge, 0.1, 72.0);
+    MaxAnomalyRateInfoTableSize = clamp(MaxAnomalyRateInfoTableSize, 10.0, 1000.0);
+    MaxAnomalyRateInfoAge = clamp(MaxAnomalyRateInfoAge, 0.1, 72.0);
     /*
      * Validate
      */
@@ -134,8 +134,8 @@ void Config::readMLConfig(void) {
 
     Cfg.SaveAnomalyPercentageEvery = SaveAnomalyPercentageEvery;
 
-    Cfg.MaxAnomalyRateInfoDataTableSize = MaxAnomalyRateInfoDataTableSize;
-    Cfg.MaxAnomalyRateInfoDataAge = MaxAnomalyRateInfoDataAge;
+    Cfg.MaxAnomalyRateInfoTableSize = MaxAnomalyRateInfoTableSize;
+    Cfg.MaxAnomalyRateInfoAge = MaxAnomalyRateInfoAge;
 
     Cfg.SP_HostsToSkip = simple_pattern_create(HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);

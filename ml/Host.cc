@@ -285,8 +285,8 @@ void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
 
     Json["save-anomaly-percentage-every"] = Cfg.SaveAnomalyPercentageEvery;
 
-    Json["max_anomaly_rate_info_data_table_size"] = Cfg.MaxAnomalyRateInfoDataTableSize;
-    Json["max_anomaly_rate_info_data_age"] = Cfg.MaxAnomalyRateInfoDataAge;
+    Json["max_anomaly_rate_info_table_size"] = Cfg.MaxAnomalyRateInfoTableSize;
+    Json["max_anomaly_rate_info_age"] = Cfg.MaxAnomalyRateInfoAge;
 }
 
 std::pair<Dimension *, Duration<double>>
@@ -479,8 +479,9 @@ void DetectableHost::detect() {
         std::this_thread::sleep_for(Seconds{updateEvery()});
 
         /*control the size of the database table and shrink them if required*/
-        DB.shrinkAnomalyRateInfoTable(static_cast<int>(Cfg.MaxAnomalyRateInfoDataTableSize));
-        time_t OldestTime = now_realtime_sec() - (Cfg.MaxAnomalyRateInfoDataAge * 3600);
+        DB.shrinkAnomalyRateInfoTable(static_cast<int>(Cfg.MaxAnomalyRateInfoTableSize));
+        /*control the age of the data and remove them if required*/
+        time_t OldestTime = now_realtime_sec() - (Cfg.MaxAnomalyRateInfoAge * 3600);
         DB.removeOldAnomalyRateInfo(OldestTime);
     }
 }

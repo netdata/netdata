@@ -34,8 +34,8 @@ public:
     double SaveAnomalyPercentageEvery;
 
     /*The maximum size, and the associated threshold, of the data table that holds anomaly rate information*/
-    double MaxAnomalyRateInfoDataTableSize;
-    double MaxAnomalyRateInfoDataAge;
+    double MaxAnomalyRateInfoTableSize;
+    double MaxAnomalyRateInfoAge;
 
     SIMPLE_PATTERN *SP_HostsToSkip;
     SIMPLE_PATTERN *SP_ChartsToSkip;

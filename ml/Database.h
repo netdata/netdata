@@ -92,7 +92,7 @@ private:
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
     static const char *SQL_SHRINK_ANOMALY_RATE_INFO;
     static const char *SQL_REMOVE_OLD_ANOMALY_RATE_INFO;
-    
+
 public:
     Database(const std::string &Path);
 
@@ -157,9 +157,10 @@ private:
     sqlite3 *Conn;
 
     Statement InsertAnomalyStmt{SQL_INSERT_ANOMALY};
-    Statement InsertBulkAnomalyRateInfoStmt{SQL_INSERT_BULK_ANOMALY_RATE_INFO};
     Statement GetAnomalyInfoStmt{SQL_SELECT_ANOMALY};
     Statement GetAnomaliesInRangeStmt{SQL_SELECT_ANOMALY_EVENTS};
+    
+    Statement InsertBulkAnomalyRateInfoStmt{SQL_INSERT_BULK_ANOMALY_RATE_INFO};
     Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
     Statement ShrinkAnomalyRateInfoTableStmt{SQL_SHRINK_ANOMALY_RATE_INFO};
     Statement RemoveOldAnomalyRateInfoStmt{SQL_REMOVE_OLD_ANOMALY_RATE_INFO};
