@@ -34,7 +34,7 @@ extern netdata_mutex_t legacy_aclk_shared_state_mutex;
 #define ACLK_IS_HOST_POPCORNING(host) (ACLK_IS_HOST_INITIALIZING(host) && host->aclk_state.t_last_popcorn_update)
 
 extern struct legacy_aclk_shared_state {
-    // optimization to avoid looping trough hosts
+    // optimization to avoid looping through hosts
     // every time Query Thread wakes up
     RRDHOST *next_popcorn_host;
 

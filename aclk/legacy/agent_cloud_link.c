@@ -222,7 +222,7 @@ char *get_topic(char *sub_topic, char *final_topic, int max_size)
     return final_topic;
 }
 
-/* Avoids the need to scan trough all RRDHOSTS
+/* Avoids the need to scan through all RRDHOSTS
  * every time any Query Thread Wakes Up
  * (every time we need to check child popcorn expiry)
  * call with legacy_aclk_shared_state_LOCK held
