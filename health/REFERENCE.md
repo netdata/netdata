@@ -177,7 +177,7 @@ type: Database
 | Cgroups                  | Alerts for cpu and memory usage of control groups                                                |
 | Computing                | Alerts for shared computing applications (e.g. boinc)                                            |
 | Containers               | Container related alerts (e.g. docker instances)                                                 |
-| Database                 | Database systems (e.g. MySQL, Postgress, etc)                                                    |
+| Database                 | Database systems (e.g. MySQL, PostgreSQL, etc)                                                    |
 | Data Sharing             | Used to group together alerts for data sharing applications                                      |
 | DHCP                     | Alerts for dhcp related services                                                                 |
 | DNS                      | Alerts for dns related services                                                                  |

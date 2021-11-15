@@ -21,7 +21,7 @@ Netdata statsd is fast. It can collect more than **1.200.000 metrics per second*
 
 # Available StatsD collectors
 
-Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read bellow), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
+Netdata ships with collectors implemented using the StatsD collector. They are configuration files (as you will read below), but they function as a collector, in the sense that configuration file organize the metrics of a data source into pre-defined charts. 
 
 On these charts, we can have alarms as with any metric and chart.
 
@@ -64,7 +64,7 @@ Netdata fully supports the StatsD protocol. All StatsD client libraries can be u
      - Timers use `|ms`
      - Histograms use `|h`
   
-     The only difference between the two, is the `units` of the charts, as timers report *miliseconds*.
+     The only difference between the two, is the `units` of the charts, as timers report *milliseconds*.
 
      [Sampling rate](#sampling-rates) is supported.
 
@@ -102,7 +102,7 @@ When sending multiple packets over UDP, it is important not to exceed the networ
 
 Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
-> You can read more about the network maxium transmission unit(MTU) in this cloudflare [article](https://www.cloudflare.com/en-gb/learning/network-layer/what-is-mtu/).
+> You can read more about the network maximum transmission unit(MTU) in this cloudflare [article](https://www.cloudflare.com/en-gb/learning/network-layer/what-is-mtu/).
 
 ## Configuration
 

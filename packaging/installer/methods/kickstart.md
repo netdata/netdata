@@ -53,7 +53,7 @@ installation. Here are a few important parameters:
 - `--no-updates`: Disable automatic updates.
 - `--stable-channel`: Use a stable build instead of a nightly build.
 - `--reinstall`: If an existing install is found, reinstall instead of trying to update it in place.
-- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not gauranteed to work.
+- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
 - `--install`: Specify an alternative install prefix. 
 - `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds, 
     use runtime configuration to disable cloud support.

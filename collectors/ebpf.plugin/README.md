@@ -357,7 +357,7 @@ following functions:
   single write operation using a group of buffers rather than 1).
 - `vfs_read`: Function used for monitoring the number of successful & failed
   filesystem read calls, as well as the total number of read bytes.
-- `vfs_readv` Same function as `vfs_read` but for vector reads (i.e. a singe
+- `vfs_readv` Same function as `vfs_read` but for vector reads (i.e. a single
   read operation using a group of buffers rather than 1).
 - `vfs_unlink`: Function used for monitoring the number of successful & failed
   filesystem unlink calls.
@@ -589,8 +589,8 @@ Linux metrics:
     - Number of pages brought from disk. (`cachestat_misses`)
 - directory cache
     - Ratio of files available in directory cache. (`dc_hit_ratio`)
-    - Number of files acessed. (`dc_reference`)
-    - Number of files acessed that were not in cache. (`dc_not_cache`)
+    - Number of files accessed. (`dc_reference`)
+    - Number of files accessed that were not in cache. (`dc_not_cache`)
     - Number of files not found. (`dc_not_found`)
 - ipc shm
     - Number of calls to `shm_get`. (`shmget_call`)

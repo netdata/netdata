@@ -111,7 +111,7 @@ Find more details about family and context in our [documentation](/web/README.md
 Now, having decided on how we are going to group the charts, we need to define how we are going to group metrics into different charts. This is particularly important, since we decide:
 
 - What metrics **not** to show, since they are not useful for our use-case.
-- What metrics to consolidate into the same charts, so as to reduce noice and increase visual correlation.
+- What metrics to consolidate into the same charts, so as to reduce noise and increase visual correlation.
 
 The dimension option has this syntax: `dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS`
 
