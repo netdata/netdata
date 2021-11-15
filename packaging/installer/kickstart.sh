@@ -328,7 +328,7 @@ detect_bash4() {
     echo >&2 "No BASH is available on this system"
     return 1
   elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]; then
-    echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION}"
+    echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION})"
     return 1
   fi
   return 0
