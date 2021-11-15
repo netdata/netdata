@@ -226,7 +226,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         , dt_usec(&tv, &w->tv_ready) / 1000.0
         , dt_usec(&tv, &w->tv_in) / 1000.0
         , w->response.code
-        , strip_control_characters(query->data.http_api_v2.query)
+        , strip_control_characters(query->data.http_api_v2.query) // TODO: display only the params
     );
 
 cleanup:
