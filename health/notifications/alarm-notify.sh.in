@@ -319,7 +319,7 @@ SLACK_WEBHOOK_URL=
 # Microsoft Teams configs
 MSTEAMS_WEBHOOK_URL=
 
-# Legacy Microsoft Teams configs for backwards compatability:
+# Legacy Microsoft Teams configs for backwards compatibility:
 declare -A role_recipients_msteam
 
 # rocketchat configs
