@@ -92,7 +92,7 @@ int init_connectors(struct engine *engine)
         // dispatch the instance worker thread
         int error = uv_thread_create(&instance->thread, instance->worker, instance);
         if (error) {
-            error("EXPORTING: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
+            error("EXPORTING: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
             return 1;
         }
         char threadname[NETDATA_THREAD_NAME_MAX + 1];
