@@ -270,7 +270,7 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
 }
 
 /**
- * Send data to Netdata calling y functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
  * @param root the target list.
