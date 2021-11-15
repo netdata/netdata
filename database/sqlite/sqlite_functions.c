@@ -1801,7 +1801,7 @@ struct  node_instance_list *get_node_list(void)
             node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
-            node_list[row].live = host ? 1 : 0;
+            node_list[row].live = host && (host == localhost || host->receiver) ? 1 : 0;
             node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
                                   uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
