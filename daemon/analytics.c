@@ -239,7 +239,7 @@ void analytics_mirrored_hosts(void)
 void analytics_exporters(void)
 {
     //when no exporters are available, an empty string will be sent
-    //decide if something else is more suitable (but propably not null)
+    //decide if something else is more suitable (but probably not null)
     BUFFER *bi = buffer_create(1000);
     analytics_exporting_connectors(bi);
     analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
