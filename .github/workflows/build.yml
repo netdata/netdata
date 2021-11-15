@@ -391,7 +391,7 @@ jobs:
               Fetch dist tarball: ${{ steps.fetch-tarball.outcome }}
               Prepare artifact directory: ${{ steps.prepare.outcome }}
               Fetch test environment: ${{ steps.fetch-test-environment.outcome }}
-              Load test environment: ${{ steps.load-test-environment.outcome }}
+              Load test environment: ${{ steps.load.outcome }}
               Updater check: ${{ steps.updater-check.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
@@ -553,8 +553,8 @@ jobs:
           SLACK_MESSAGE: >-
               ${{ github.repository }}: Artifact verification for static build failed.
               Checkout:  ${{ steps.checkout.outcome }}
-              Fetch artifacts: ${{ steps.fetch-artifacts }}
-              Verify artifacts: ${{ steps.verify-artifacts }}
+              Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
+              Verify artifacts: ${{ steps.verify.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
