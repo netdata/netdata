@@ -654,7 +654,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
  *
  * @param algorithms the output vector
  * @param length     number of elements of algorithms vector
- * @param algortihm  algorithm used on charts.
+ * @param algorithm  algorithm used on charts.
 */
 void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
 {
