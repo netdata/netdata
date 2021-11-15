@@ -3355,7 +3355,7 @@ static void normalize_utilization(struct target *root) {
             cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
         }
         else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
-            // childrens resources are too high
+            // children resources are too high
             // lower only the children resources
             utime_fix_ratio  =
             stime_fix_ratio  =

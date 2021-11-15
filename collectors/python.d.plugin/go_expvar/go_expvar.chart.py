@@ -237,7 +237,7 @@ class Service(UrlService):
         gc_pauses = memstats['PauseNs']
         try:
             gc_pause_avg = sum(gc_pauses) / len([x for x in gc_pauses if x > 0])
-        # no GC cycles have occured yet
+        # no GC cycles have occurred yet
         except ZeroDivisionError:
             gc_pause_avg = 0
 

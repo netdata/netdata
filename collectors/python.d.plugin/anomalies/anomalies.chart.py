@@ -188,7 +188,7 @@ class Service(SimpleService):
         self.custom_model_scalers[model] = MinMaxScaler()
 
     def reinitialize(self):
-        """Reinitialize charts, models and data to a begining state.
+        """Reinitialize charts, models and data to a beginning state.
         """
         self.charts_init()
         self.custom_models_init()
@@ -385,7 +385,7 @@ class Service(SimpleService):
 
     def get_data(self):
 
-        # initialize to whats available right now
+        # initialize to what's available right now
         if self.reinitialize_at_every_step or len(self.host_charts_dict[self.host]) == 0:
             self.charts_init()
             self.custom_models_init()

@@ -103,7 +103,7 @@ static void ebpf_fd_cleanup(void *ptr)
  *****************************************************************/
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
  */
@@ -320,7 +320,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
  * @param root the target list.
@@ -609,7 +609,7 @@ static int ebpf_send_systemd_fd_charts(ebpf_module_t *em)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the main collector structure
 */

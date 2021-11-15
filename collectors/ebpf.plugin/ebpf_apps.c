@@ -116,9 +116,9 @@ int am_i_running_as_root()
 /**
  * Reset the target values
  *
- * @param root the pointer to the chain that will be reseted.
+ * @param root the pointer to the chain that will be reset.
  *
- * @return it returns the number of structures that was reseted.
+ * @return it returns the number of structures that was reset.
  */
 size_t zero_all_targets(struct target *root)
 {
@@ -949,7 +949,7 @@ void cleanup_variables_from_other_threads(uint32_t pid)
         socket_bandwidth_curr[pid] = NULL;
     }
 
-    // Clean cachestat strcture
+    // Clean cachestat structure
     if (cachestat_pid) {
         freez(cachestat_pid[pid]);
         cachestat_pid[pid] = NULL;

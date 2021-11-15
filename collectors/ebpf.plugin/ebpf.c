@@ -355,7 +355,7 @@ void write_chart_dimension(char *dim, long long value)
  * @param move    the pointer with the values that will be published
  * @param end     the number of values that will be written on standard output
  *
- * @return It returns a variable tha maps the charts that did not have zero values.
+ * @return It returns a variable that maps the charts that did not have zero values.
  */
 void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end)
 {
@@ -424,7 +424,7 @@ void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long 
  * @param dread the dimension name
  * @param vread the value for previous dimension
  *
- * @return It returns a variable tha maps the charts that did not have zero values.
+ * @return It returns a variable that maps the charts that did not have zero values.
  */
 void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread)
 {
@@ -599,7 +599,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  *  @param dimensions dimension values.
  *  @param end        number of bins that will be sent to Netdata.
  *
- * @return It returns a variable tha maps the charts that did not have zero values.
+ * @return It returns a variable that maps the charts that did not have zero values.
  */
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end)
 {
@@ -917,7 +917,7 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
 
 /*****************************************************************
  *
- *  AUXILIAR FUNCTIONS USED DURING INITIALIZATION
+ *  AUXILIARY FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
 

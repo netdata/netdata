@@ -124,7 +124,7 @@ void *ebpf_mount_read_hash(void *ptr)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
 */
 static void ebpf_mount_send_data()
 {

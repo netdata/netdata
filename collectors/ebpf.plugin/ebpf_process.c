@@ -114,7 +114,7 @@ static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
  */
@@ -185,7 +185,7 @@ void ebpf_process_remove_pids()
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
  */
@@ -848,7 +848,7 @@ static int ebpf_send_systemd_process_charts(ebpf_module_t *em)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
 */
