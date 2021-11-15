@@ -199,7 +199,7 @@ AC_ARG_ENABLE(
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
-test "${ac_cv_prog_cc_c99}" = "no" && AC_MSG_ERROR([Netdata rquires a compiler that supports C99 to build])
+test "${ac_cv_prog_cc_c99}" = "no" && AC_MSG_ERROR([Netdata requires a compiler that supports C99 to build])
 
 # -----------------------------------------------------------------------------
 # Check if cloud is enabled and if the functionality is available
@@ -823,7 +823,7 @@ if test "$enable_cloud" != "no" -a "$aclk_ng" != "no"; then
         AC_MSG_CHECKING([ACLK Next Generation can support New Cloud protocol])
         AC_MSG_RESULT([${can_build_new_cloud_protocol}])
         if test "$new_cloud_protocol" = "yes" -a "$can_build_new_cloud_protocol" != "yes"; then
-            AC_MSG_ERROR([Requested new cloud protocol support but it cant be build])
+            AC_MSG_ERROR([Requested new cloud protocol support but it can't be build])
         fi
         if test "$can_build_new_cloud_protocol" = "yes"; then
             new_cloud_protocol="yes"
@@ -1225,7 +1225,7 @@ fi
 # -----------------------------------------------------------------------------
 # ml - anomaly detection
 
-# Check if uuid is availabe. Fail if ML was explicitly requested.
+# Check if uuid is available. Fail if ML was explicitly requested.
 if test "${enable_ml}" = "yes" -a "${have_uuid}" != "yes"; then
     AC_MSG_ERROR([You have explicitly requested --enable-ml functionality but libuuid can not be found."])
 fi
