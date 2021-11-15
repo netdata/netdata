@@ -6,7 +6,8 @@
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building cURL"
 
-fetch "curl-7.78.0" "https://curl.haxx.se/download/curl-7.78.0.tar.gz"
+fetch "curl-7.78.0" "https://curl.haxx.se/download/curl-7.78.0.tar.gz" \
+    ed936c0b02c06d42cf84b39dd12bb14b62d77c7c4e875ade022280df5dcc81d7
 
 export CFLAGS="-I/openssl-static/include"
 export LDFLAGS="-static -L/openssl-static/lib"
