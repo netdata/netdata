@@ -183,7 +183,7 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
  *
  * Parse JSON string and fill tokens.
  *
- * @param parser the auxiliar vector used to parser
+ * @param parser the auxiliary vector used to parser
  * @param js the string to parse
  * @param len the string length
  * @param tokens the place to map the tokens

@@ -606,7 +606,7 @@ static int parse_host_port(url_t *url) {
             error(URL_PARSER_LOG_PREFIX ": specified but no port number");
             return 1;
         }
-        if (port_len > 5 /* MAX port lenght is 5digit long in decimal */) {
+        if (port_len > 5 /* MAX port length is 5digit long in decimal */) {
             error(URL_PARSER_LOG_PREFIX "port # is too long");
             return 1;
         }

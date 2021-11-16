@@ -12,8 +12,8 @@ on your Netdata charts and/or dimensions.
 
 Instead of this collector just _collecting_ data, it also does some computation on the data it collects to return a
 changepoint score for each chart or dimension you configure it to work on. This is
-an [online](https://en.wikipedia.org/wiki/Online_machine_learning) machine learning algorithim so there is no batch step
-to train the model, instead it evolves over time as more data arrives. That makes this particualr algorithim quite cheap
+an [online](https://en.wikipedia.org/wiki/Online_machine_learning) machine learning algorithm so there is no batch step
+to train the model, instead it evolves over time as more data arrives. That makes this particular algorithm quite cheap
 to compute at each step of data collection (see the notes section below for more details) and it should scale fairly
 well to work on lots of charts or hosts (if running on a parent node for example).
 
@@ -28,7 +28,7 @@ Two charts are available:
 This chart shows the percentile of the score that is output from the ChangeFinder library (it is turned off by default
 but available with `show_scores: true`).
 
-A high observed score is more likley to be a valid changepoint worth exploring, even more so when multiple charts or
+A high observed score is more likely to be a valid changepoint worth exploring, even more so when multiple charts or
 dimensions have high changepoint scores at the same time or very close together.
 
 ### ChangeFinder Flags (`changefinder.flags`)
@@ -36,11 +36,11 @@ dimensions have high changepoint scores at the same time or very close together.
 This chart shows `1` or `0` if the latest score has a percentile value that exceeds the `cf_threshold` threshold. By
 default, any scores that are in the 99th or above percentile will raise a flag on this chart.
 
-The raw changefinder score itself can be a little noisey and so limiting ourselves to just periods where it surpasses
+The raw changefinder score itself can be a little noisy and so limiting ourselves to just periods where it surpasses
 the 99th percentile can help manage the "[signal to noise ratio](https://en.wikipedia.org/wiki/Signal-to-noise_ratio)"
 better.
 
-The `cf_threshold` paramater might be one you want to play around with to tune things specifically for the workloads on
+The `cf_threshold` parameter might be one you want to play around with to tune things specifically for the workloads on
 your node and the specific charts you want to monitor. For example, maybe the 95th percentile might work better for you
 than the 99th percentile.
 
@@ -164,7 +164,7 @@ sudo su -s /bin/bash netdata
 - It may take an hour or two (depending on your choice of `n_score_samples`) for the collector to 'settle' into it's
   typical behaviour in terms of the trained models and scores you will see in the normal running of your node. Mainly
   this is because it can take a while to build up a proper distribution of previous scores in over to convert the raw
-  score returned by the ChangeFinder algorithim into a percentile based on the most recent `n_score_samples` that have
+  score returned by the ChangeFinder algorithm into a percentile based on the most recent `n_score_samples` that have
   already been produced. So when you first turn the collector on, it will have a lot of flags in the beginning and then
   should 'settle down' once it has built up enough history. This is a typical characteristic of online machine learning
   approaches which need some initial window of time before they can be useful.

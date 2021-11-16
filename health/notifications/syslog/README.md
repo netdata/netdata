@@ -17,7 +17,7 @@ netdata WARNING on hostname at Tue Apr 3 09:00:00 EDT 2018: disk_space._ out of 
 
 System log targets are configured as recipients in [`/etc/netdata/health_alarm_notify.conf`](https://github.com/netdata/netdata/blob/36bedc044584dea791fd29455bdcd287c3306cb2/conf.d/health_alarm_notify.conf#L534) (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`).
 
-You can als configure per-role targets in the same file a bit further down.
+You can also configure per-role targets in the same file a bit further down.
 
 Targets are defined as follows:
 

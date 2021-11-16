@@ -199,7 +199,7 @@ static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param update_every value to overwrite the update frequency set by the server.
 */

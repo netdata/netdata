@@ -294,7 +294,7 @@ static void ebpf_socket_send_nv_data(netdata_vector_plot_t *ptr)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
  */
@@ -304,7 +304,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
     netdata_publish_vfs_common_t common_udp;
     ebpf_update_global_publish(socket_publish_aggregated, &common_tcp, &common_udp, socket_aggregated_data);
 
-    // We read bytes from function arguments, but bandiwdth is given in bits,
+    // We read bytes from function arguments, but bandwidth is given in bits,
     // so we need to multiply by 8 to convert for the final value.
     write_count_chart(NETDATA_TCP_FUNCTION_COUNT, NETDATA_EBPF_IP_FAMILY, socket_publish_aggregated, 3);
     write_io_chart(NETDATA_TCP_FUNCTION_BITS, NETDATA_EBPF_IP_FAMILY, socket_id_names[0],
@@ -353,7 +353,7 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
  * @param root the target list.
@@ -2047,7 +2047,7 @@ void ebpf_socket_update_cgroup_algorithm()
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param update_every value to overwrite the update frequency set by the server.
 */

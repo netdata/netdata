@@ -299,7 +299,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_targe
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
 */
@@ -480,7 +480,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param update_every value to overwrite the update frequency set by the server.
 */

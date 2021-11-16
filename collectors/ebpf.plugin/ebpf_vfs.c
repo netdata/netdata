@@ -103,7 +103,7 @@ static void ebpf_vfs_cleanup(void *ptr)
  *****************************************************************/
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the structure with thread information
 */
@@ -270,7 +270,7 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
  * @param root the target list.
@@ -1122,7 +1122,7 @@ static int ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param em the main collector structure
 */

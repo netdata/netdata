@@ -4203,7 +4203,7 @@ void *cgroups_main(void *ptr) {
 
     int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
     if (error) {
-        error("CGROUP: cannot create tread worker. uv_thread_create(): %s", uv_strerror(error));
+        error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
     uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");

@@ -20,7 +20,7 @@ static void aclk_send_message_subtopic(mqtt_wss_client client, json_object *msg,
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting mesage send");
+        error("Couldn't get topic. Aborting message send");
         return;
     }
 
@@ -74,7 +74,7 @@ static uint16_t aclk_send_message_subtopic_pid(mqtt_wss_client client, json_obje
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting mesage send");
+        error("Couldn't get topic. Aborting message send");
         return 0;
     }
 

@@ -13,7 +13,7 @@ maximum granularity using Netdata. Collect more than 50 unique metrics and put t
 designed for better visual anomaly detection.
 
 Netdata itself uses CockroachDB as part of its Netdata Cloud infrastructure, so we're happy to introduce this new
-collector and help others get started with it straightaway.
+collector and help others get started with it straight away.
 
 Let's dive in and walk through the process of monitoring CockroachDB metrics with Netdata.
 

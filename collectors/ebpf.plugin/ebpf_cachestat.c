@@ -111,7 +111,7 @@ static void ebpf_cachestat_cleanup(void *ptr)
  *
  * Update publish values before to write dimension.
  *
- * @param out  strcuture that will receive data.
+ * @param out  structure that will receive data.
  * @param mpa  calls for mark_page_accessed during the last second.
  * @param mbd  calls for mark_buffer_dirty during the last second.
  * @param apcl calls for add_to_page_cache_lru during the last second.
@@ -481,7 +481,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
 */
@@ -784,7 +784,7 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param update_every value to overwrite the update frequency set by the server.
 */

@@ -309,7 +309,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
 */
@@ -599,7 +599,7 @@ static void ebpf_send_specific_shm_data(char *type, netdata_publish_shm_t *value
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
  *
  * @param update_every value to overwrite the update frequency set by the server.
 */
