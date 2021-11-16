@@ -485,10 +485,11 @@ char *health_edit_command_from_source(const char *source)
         snprintfz(
             buffer,
             FILENAME_MAX,
-            "sudo %s/edit-config health.d/%s=%s",
+            "sudo %s/edit-config health.d/%s=%s=%s",
             netdata_configured_user_config_dir,
             file_no_path + 1,
-            temp);
+            temp,
+            localhost->registry_hostname);
     } else
         buffer[0] = '\0';
 
