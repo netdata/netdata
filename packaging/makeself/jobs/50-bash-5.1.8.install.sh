@@ -6,7 +6,8 @@
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::building bash"
 
-fetch "bash-5.1.8" "http://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz"
+fetch "bash-5.1.8" "http://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz" \
+    0cfb5c9bb1a29f800a97bd242d19511c997a1013815b805e0fdd32214113d6be
 
 export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 

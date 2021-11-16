@@ -6,7 +6,8 @@
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building fping"
 
-fetch "fping-5.0" "https://fping.org/dist/fping-5.0.tar.gz"
+fetch "fping-5.0" "https://fping.org/dist/fping-5.0.tar.gz" \
+    ed38c0b9b64686a05d1b3bc1d66066114a492e04e44eef1821d43b1263cd57b8
 
 export CFLAGS="-static -I/openssl-static/include"
 export LDFLAGS="-static -L/openssl-static/lib"
