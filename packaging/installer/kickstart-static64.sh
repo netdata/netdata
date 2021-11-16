@@ -211,10 +211,12 @@ mark_install_type() {
   if [ -f "${install_type_file}" ]; then
     # shellcheck disable=SC1090
     . "${install_type_file}"
-    cat > "${install_type_file}" <<- EOF
+    cat > "${TMPDIR}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
+    ${sudo} chown netdata:netdata "${TMPDIR}/install-type"
+    ${sudo} cp "${TMPDIR}/install-type" "${install_type_file}"
   fi
 }
 
