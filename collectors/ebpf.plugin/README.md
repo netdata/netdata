@@ -824,8 +824,6 @@ Certain Alerts are of high interest for specific use cases due to a safety polic
 alert overload, 'netdata' set them [silent](/guides/monitor/stop-notifications-alarms).
 
 -   task_error: This alert is raised every time a process/thread cannot be created.
--   mount_call: For security reasons, some companies create policies that does not allow stick drivers to be used. This
-    alert sends a notification every time a `mount (2)` or `umount (2)` `syscall` is called.
 
 ## Performance
 
