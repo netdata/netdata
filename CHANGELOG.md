@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- Verify checksums of makeself deps. [\#11791](https://github.com/netdata/netdata/pull/11791) ([vkalintiris](https://github.com/vkalintiris))
 - packaging: update go.d.plugin version to v0.31.0 [\#11789](https://github.com/netdata/netdata/pull/11789) ([ilyam8](https://github.com/ilyam8))
 - Fix proc/interrupts parser [\#11783](https://github.com/netdata/netdata/pull/11783) ([maximethebault](https://github.com/maximethebault))
+- Fix typos [\#11782](https://github.com/netdata/netdata/pull/11782) ([rex4539](https://github.com/rex4539))
 - add nightly release version to readme [\#11780](https://github.com/netdata/netdata/pull/11780) ([andrewm4894](https://github.com/andrewm4894))
 - Temporary fix for cgroup renaming [\#11775](https://github.com/netdata/netdata/pull/11775) ([vlvkobal](https://github.com/vlvkobal))
 - Remove feature flag for ACLK new cloud architecture [\#11774](https://github.com/netdata/netdata/pull/11774) ([stelfrag](https://github.com/stelfrag))
@@ -156,17 +158,13 @@
 - add ipc semaphores charts info [\#11523](https://github.com/netdata/netdata/pull/11523) ([ilyam8](https://github.com/ilyam8))
 - Update dashboard to version v2.20.0. [\#11521](https://github.com/netdata/netdata/pull/11521) ([netdatabot](https://github.com/netdatabot))
 - Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
-- remove `reset\_netdata\_trace.sh` from netdata.service [\#11517](https://github.com/netdata/netdata/pull/11517) ([ilyam8](https://github.com/ilyam8))
-- Clean up dependency handling for CentOS/RHEL [\#11515](https://github.com/netdata/netdata/pull/11515) ([Ferroin](https://github.com/Ferroin))
 - Add node message support for ACLK new architecture [\#11514](https://github.com/netdata/netdata/pull/11514) ([stelfrag](https://github.com/stelfrag))
-- Improved some wordings of the file README.md, only a lifecycle test! [\#11510](https://github.com/netdata/netdata/pull/11510) ([siamaktavakoli](https://github.com/siamaktavakoli))
 - Install basic netdata deps by default. [\#11508](https://github.com/netdata/netdata/pull/11508) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 - Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
 - Update alarms info [\#11481](https://github.com/netdata/netdata/pull/11481) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf [\#11480](https://github.com/netdata/netdata/pull/11480) ([thiagoftsm](https://github.com/thiagoftsm))
 - Announce proto capability and enable if cloud supports [\#11476](https://github.com/netdata/netdata/pull/11476) ([underhood](https://github.com/underhood))
-- eBPF OOM kill tracking [\#11470](https://github.com/netdata/netdata/pull/11470) ([UmanShahzad](https://github.com/UmanShahzad))
 - Adds aclk/cloud state command to netdatacli [\#11462](https://github.com/netdata/netdata/pull/11462) ([underhood](https://github.com/underhood))
 - Add chart message support for ACLK new architecture [\#11447](https://github.com/netdata/netdata/pull/11447) ([stelfrag](https://github.com/stelfrag))
 - Use sqlite to store the health log and alert configurations. [\#11399](https://github.com/netdata/netdata/pull/11399) ([MrZammler](https://github.com/MrZammler))
