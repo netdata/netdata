@@ -125,7 +125,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     int rc;
 
     if (unlikely(!wc->alert_updates)) {
-        log_access("-- [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host->hostname);
+        log_access("AC [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host->hostname);
         return;
     }
 
@@ -257,7 +257,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                        wc->uuid_str, first_sequence_id, last_sequence_id);
         db_execute(buffer_tostring(sql));
 
-        log_access("<- [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host->hostname, first_sequence_id, last_sequence_id);
+        log_access("OG [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host->hostname, first_sequence_id, last_sequence_id);
     }
 
     rc = sqlite3_finalize(res);
@@ -276,7 +276,7 @@ void aclk_send_alarm_health_log(char *node_id)
     if (unlikely(!node_id))
         return;
 
-    log_access("-> [%s (N/A)]: Request to send alarm health log.", node_id);
+    log_access("IN [%s (N/A)]: Request to send alarm health log.", node_id);
 
     struct aclk_database_worker_config *wc  = NULL;
     struct aclk_database_cmd cmd;
@@ -362,7 +362,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     wc->alert_sequence_id = last_sequence;
 
     aclk_send_alarm_log_health(&alarm_log);
-    log_access("<- [%s (%s)]: Alarm health log sent, first sequence id %ld, last sequence id %ld.", wc->node_id, wc->host->hostname, first_sequence, last_sequence);
+    log_access("OG [%s (%s)]: Alarm health log sent, first sequence id %ld, last sequence id %ld.", wc->node_id, wc->host->hostname, first_sequence, last_sequence);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -386,7 +386,7 @@ void aclk_send_alarm_configuration(char *config_hash)
         return;
     }
 
-    log_access("-> [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host->hostname, config_hash);
+    log_access("IN [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host->hostname, config_hash);
 
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -496,7 +496,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
     }
 
     if (likely(p_alarm_config.cfg_hash)) {
-        log_access("<- [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host->hostname, config_hash);
+        log_access("OG [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host->hostname, config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         freez((char *) cmd.data_param);
         freez(p_alarm_config.cfg_hash);
@@ -523,7 +523,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     if (unlikely(!node_id))
         return;
 
-    log_access("-> [%s (N/A)]: Start streaming alerts with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, batch_id, start_seq_id);
+    log_access("IN [%s (N/A)]: Start streaming alerts with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, batch_id, start_seq_id);
 
     uuid_t node_uuid;
     if (uuid_parse(node_id, node_uuid))
@@ -537,12 +537,12 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     rrd_unlock();
 
     if (unlikely(!host->health_enabled)) {
-        log_access("-- [%s (%s)]: Ignoring request to stream alert state changes, health is disabled.", node_id, wc->host->hostname);
+        log_access("AC [%s (%s)]: Ignoring request to stream alert state changes, health is disabled.", node_id, wc->host->hostname);
         return;
     }
 
     if (likely(wc)) {
-        log_access("-- [%s (%s)]: Start streaming alerts enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, wc->host->hostname, batch_id, start_seq_id);
+        log_access("AC [%s (%s)]: Start streaming alerts enabled with batch_id %"PRIu64" and start_seq_id %"PRIu64".", node_id, wc->host->hostname, batch_id, start_seq_id);
         __sync_synchronize();
         wc->alerts_batch_id = batch_id;
         wc->alerts_start_seq_id = start_seq_id;
@@ -550,7 +550,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         __sync_synchronize();
     }
     else
-        log_access("-- [%s (%s)]: ACLK synchronization thread is not active.", node_id, wc->host->hostname);
+        log_access("AC [%s (%s)]: ACLK synchronization thread is not active.", node_id, wc->host->hostname);
 
 #else
     UNUSED(node_id);
@@ -619,7 +619,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
 
     if (likely(wc)) {
         log_access(
-            "-> [%s (%s)]: Request to send alerts snapshot, snapshot_id %" PRIu64 " and ack_sequence_id %" PRIu64,
+            "IN [%s (%s)]: Request to send alerts snapshot, snapshot_id %" PRIu64 " and ack_sequence_id %" PRIu64,
             wc->node_id,
             wc->host->hostname,
             snapshot_id,
@@ -735,7 +735,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     UNUSED(cmd);
     // we perhaps we don't need this for snapshots
     if (unlikely(!wc->alert_updates)) {
-        log_access("-- [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.", wc->node_id, wc->host->hostname);
+        log_access("AC [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.", wc->node_id, wc->host->hostname);
         return;
     }
 
@@ -743,7 +743,7 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     if (unlikely(!claim_id))
         return;
 
-    log_access("<- [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, wc->host->hostname, wc->alerts_snapshot_id);
+    log_access("OG [%s (%s)]: Sending alerts snapshot, snapshot_id %" PRIu64, wc->node_id, wc->host->hostname, wc->alerts_snapshot_id);
 
     aclk_mark_alert_cloud_ack(wc->uuid_str, wc->alerts_ack_sequence_id);
 
