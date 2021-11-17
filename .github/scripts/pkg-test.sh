@@ -98,7 +98,7 @@ case "${DISTRO}" in
   debian | ubuntu)
     install_debian_like
     ;;
-  fedora)
+  fedora | oraclelinux)
     install_fedora_like
     ;;
   centos)
