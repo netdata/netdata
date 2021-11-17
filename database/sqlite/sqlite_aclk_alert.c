@@ -177,8 +177,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     char uuid_str[GUID_LEN + 1];
     uint64_t  first_sequence_id = 0;
     uint64_t  last_sequence_id = 0;
-    static uint64_t log_first_sequence_id = 0;
-    static uint64_t log_last_sequence_id = 0;
+    static __thread uint64_t log_first_sequence_id = 0;
+    static __thread uint64_t log_last_sequence_id = 0;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
