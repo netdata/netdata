@@ -4,7 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building OpenSSL"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building OpenSSL" || true
 
 version="$(cat "$(dirname "${0}")/../openssl.version")"
 
@@ -22,4 +23,5 @@ run ./config -static no-tests --prefix=/openssl-static --openssldir=/opt/netdata
 run make -j "$(nproc)"
 run make -j "$(nproc)" install_sw
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

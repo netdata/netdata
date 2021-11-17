@@ -4,7 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::building bash"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
 fetch "bash-5.1.8" "http://ftp.gnu.org/gnu/bash/bash-5.1.8.tar.gz" \
     0cfb5c9bb1a29f800a97bd242d19511c997a1013815b805e0fdd32214113d6be
@@ -32,8 +33,9 @@ EOF
 
 run make install
 
-if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
+if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/bash
 fi
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

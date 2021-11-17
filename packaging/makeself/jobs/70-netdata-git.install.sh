@@ -6,7 +6,7 @@
 
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
-if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
+if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   export CFLAGS="-static -O3 -I/openssl-static/include"
 else
   export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include"
@@ -34,7 +34,8 @@ run ./netdata-installer.sh \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Finishing netdata install"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Finishing netdata install" || true
 
 # Properly mark the install type
 cat > "${NETDATA_INSTALL_PATH}/etc/netdata/.install-type" <<-EOF
@@ -52,10 +53,11 @@ if run readelf -l "${NETDATA_INSTALL_PATH}"/bin/netdata | grep 'INTERP'; then
   exit 1
 fi
 
-if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
+if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/netdata
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/apps.plugin
   run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/cgroup-network
 fi
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

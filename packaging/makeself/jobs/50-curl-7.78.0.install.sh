@@ -4,7 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building cURL"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
 fetch "curl-7.78.0" "https://curl.haxx.se/download/curl-7.78.0.tar.gz" \
     ed936c0b02c06d42cf84b39dd12bb14b62d77c7c4e875ade022280df5dcc81d7
@@ -45,8 +46,9 @@ run make clean
 run make -j "$(nproc)"
 run make install
 
-if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
+if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/curl
 fi
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Preparing build environment"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Preparing build environment" || true
