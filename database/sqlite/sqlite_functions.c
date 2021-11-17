@@ -1791,6 +1791,7 @@ struct  node_instance_list *get_node_list(void)
     node_list = callocz(row + 1, sizeof(*node_list));
     int max_rows = row;
     row = 0;
+    rrd_wrlock();
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (sqlite3_column_bytes(res, 0) == sizeof(uuid_t))
             uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
@@ -1799,8 +1800,10 @@ struct  node_instance_list *get_node_list(void)
             uuid_copy(node_list[row].host_id, *host_id);
             node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
-            node_list[row].live = rrdhost_find_by_guid(host_guid, 0) ? 1 : 0;
-            node_list[row].hops = uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
+            RRDHOST *host = rrdhost_find_by_guid(host_guid, 0);
+            node_list[row].live = host && (host == localhost || host->receiver) ? 1 : 0;
+            node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
+                                  uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
@@ -1808,6 +1811,7 @@ struct  node_instance_list *get_node_list(void)
         if (row == max_rows)
             break;
     }
+    rrd_unlock();
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
