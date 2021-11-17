@@ -177,6 +177,8 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
     char uuid_str[GUID_LEN + 1];
     uint64_t  first_sequence_id = 0;
     uint64_t  last_sequence_id = 0;
+    static uint64_t log_first_sequence_id = 0;
+    static uint64_t log_last_sequence_id = 0;
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
@@ -244,7 +246,12 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
         if (first_sequence_id == 0)
             first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
+
+        if (log_first_sequence_id == 0)
+            log_first_sequence_id  = (uint64_t) sqlite3_column_int64(res, 0);
+
         last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
+        log_last_sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
 
         destroy_alarm_log_entry(&alarm_log);
         freez(edit_command);
@@ -256,8 +263,11 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
                             "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
         db_execute(buffer_tostring(sql));
-
-        log_access("OG [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", first_sequence_id, last_sequence_id);
+    } else {
+        if (log_first_sequence_id)
+            log_access("OG [%s (%s)]: Sent alert events, first sequence_id %"PRIu64", last sequence_id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", log_first_sequence_id, log_last_sequence_id);
+        log_first_sequence_id = 0;
+        log_last_sequence_id = 0;
     }
 
     rc = sqlite3_finalize(res);
