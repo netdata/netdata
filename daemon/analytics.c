@@ -7,6 +7,8 @@ extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
 extern int aclk_connected, aclk_use_new_cloud_arch;
+void send_alert_statistics(const time_t start, const time_t end, BUFFER *stats);
+time_t analytics_startup_time;
 
 struct collector {
     char *plugin;
@@ -593,6 +595,28 @@ void analytics_gather_mutable_meta_data(void)
     }
 }
 
+void analytics_gather_alert_data() {
+    static time_t start, end;
+
+    if(unlikely(!localhost->health_enabled))
+        return;
+
+    BUFFER *b = buffer_create(32768);
+
+    if (unlikely(!start))
+        start = analytics_startup_time;
+    else
+        start = end;
+
+    end = now_realtime_sec();
+
+    if (sql_get_alert_analytics(localhost, start, end, b)) {
+        send_alert_statistics(start, end, b);
+    }
+
+    buffer_free(b);
+}
+
 void analytics_main_cleanup(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -631,7 +655,7 @@ void *analytics_main(void *ptr)
 
     analytics_gather_immutable_meta_data();
     analytics_gather_mutable_meta_data();
-    send_statistics("META_START", "-", "-");
+    /* send_statistics("META_START", "-", "-"); */
     analytics_log_data();
 
     sec = 0;
@@ -646,8 +670,9 @@ void *analytics_main(void *ptr)
             continue;
 
         analytics_gather_mutable_meta_data();
-        send_statistics("META", "-", "-");
+        /* send_statistics("META", "-", "-"); */
         analytics_log_data();
+        analytics_gather_alert_data();
         sec = 0;
     }
 
@@ -847,6 +872,8 @@ void get_system_timezone(void)
             netdata_configured_utc_offset = 0;
         }
     }
+
+    analytics_startup_time = now_realtime_sec();
 }
 
 void set_global_environment()
@@ -1048,6 +1075,69 @@ void send_statistics(const char *action, const char *action_result, const char *
             error("Execution of anonymous statistics script returned http code %s.", buffer);
     } else {
         error("Failed to run anonymous statistics script %s.", as_script);
+    }
+    freez(command_to_run);
+}
+
+void send_alert_statistics(const time_t start, const time_t end, BUFFER *stats)
+{
+    static char *as_script;
+
+    //just to be safe, statistics should have been set by a call to send_statistics
+    if (netdata_anonymous_statistics_enabled == -1 || !as_script) {
+        char *optout_file = mallocz(
+            sizeof(char) *
+            (strlen(netdata_configured_user_config_dir) + strlen(".opt-out-from-anonymous-statistics") + 2));
+        sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
+        if (likely(access(optout_file, R_OK) != 0)) {
+            as_script = mallocz(
+                sizeof(char) *
+                (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics-alerts.sh") + 2));
+            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics-alerts.sh");
+            if (unlikely(access(as_script, R_OK) != 0)) {
+                netdata_anonymous_statistics_enabled = 0;
+                info("Anonymous statistics script for alerts %s not found.", as_script);
+                freez(as_script);
+            } else {
+                netdata_anonymous_statistics_enabled = 1;
+            }
+        } else {
+            netdata_anonymous_statistics_enabled = 0;
+            as_script = NULL;
+        }
+        freez(optout_file);
+    }
+    if (!netdata_anonymous_statistics_enabled)
+        return;
+
+    //TODO check for max parameter size, do not run if it exceeds it
+    char *command_to_run = mallocz(sizeof(char) * (strlen(as_script) + buffer_strlen(stats) + 100)); //count correctly
+    pid_t command_pid;
+
+    sprintf(
+        command_to_run,
+        "%s '%s' '%s' '%s' '%ld' '%ld' '%s' ",
+        as_script,
+        "ALERT_STATS",
+        "",
+        "",
+        start,
+        end,
+        buffer_tostring(stats));
+
+    info("%s '%s' '%s' '%s'", as_script, "ALERT_STATS", "", "");
+
+    FILE *fp = mypopen(command_to_run, &command_pid);
+    if (fp) {
+        char buffer[4 + 1];
+        char *s = fgets(buffer, 4, fp);
+        int exit_code = mypclose(fp, command_pid);
+        if (exit_code)
+            error("Execution of anonymous statistics alerts script returned %d.", exit_code);
+        if (s && strncmp(buffer, "200", 3))
+            error("Execution of anonymous statistics alerts script returned http code %s.", buffer);
+    } else {
+        error("Failed to run anonymous statistics alerts script %s.", as_script);
     }
     freez(command_to_run);
 }

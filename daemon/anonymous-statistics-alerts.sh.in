@@ -1,0 +1,68 @@
+#!/usr/bin/env sh
+
+# Valid actions:
+
+# - STATISTICS_ALERTS
+#      ACTION_RESULT  -- NaN
+#      ACTION_DATA    -- NaN
+
+ACTION="${1}"
+ACTION_RESULT="${2}"
+ACTION_DATA="${3}"
+ACTION_DATA=$(echo "${ACTION_DATA}" | tr '"' "'")
+
+# -------------------------------------------------------------------------------------------------
+# check opt-out
+
+if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+  exit 0
+fi
+
+# -------------------------------------------------------------------------------------------------
+# Get the extra variables
+
+NETDATA_STATISTICS_ALERTS_START="${4}"
+NETDATA_STATISTICS_ALERTS_END="${5}"
+NETDATA_STATISTICS_ALERTS="${6}"
+
+# define body of request to be sent
+REQ_BODY="$(cat << EOF
+{
+    "api_key": "mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y",
+    "event": "${ACTION} ${ACTION_RESULT}",
+    "properties": {
+        "distinct_id": "${NETDATA_REGISTRY_UNIQUE_ID}",
+        "\$current_url": "agent backend",
+        "\$pathname": "netdata-backend",
+        "\$host": "backend.netdata.io",
+        "\$ip": "127.0.0.1",
+        "event_source": "agent backend",
+        "action": "${ACTION}",
+        "action_result": "${ACTION_RESULT}",
+        "action_data": "${ACTION_DATA}",
+        "netdata_machine_guid": "${NETDATA_REGISTRY_UNIQUE_ID}",
+        "netdata_version": "${NETDATA_VERSION}",
+        "start_time": "${NETDATA_STATISTICS_ALERTS_START}",
+        "end_time": "${NETDATA_STATISTICS_ALERTS_END}",
+        "alert_stats": {
+            ${NETDATA_STATISTICS_ALERTS}
+        }
+  }
+}
+EOF
+)"
+
+echo "${REQ_BODY}" > /tmp/alert_statistics.json
+
+# send the anonymous statistics to the Netdata PostHog
+# if [ -n "$(command -v curl 2> /dev/null)" ]; then
+#   curl --silent -o /dev/null --write-out '%{http_code}' -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" https://posthog.netdata.cloud/capture/
+# else
+#   wget -q -O - --no-check-certificate \
+#   --server-response \
+#   --method POST \
+#   --timeout=1 \
+#   --header 'Content-Type: application/json' \
+#   --body-data "${REQ_BODY}" \
+#    'https://posthog.netdata.cloud/capture/' 2>&1 | awk '/^  HTTP/{print $2}'
+# fi

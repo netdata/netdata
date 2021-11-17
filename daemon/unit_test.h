@@ -9,6 +9,7 @@ extern int run_all_mockup_tests(void);
 extern int unit_test_str2ld(void);
 extern int unit_test_buffer(void);
 extern int test_sqlite(void);
+extern int test_sql_alert_stats(void);
 #ifdef ENABLE_DBENGINE
 extern int test_dbengine(void);
 extern void generate_dbengine_dataset(unsigned history_seconds);

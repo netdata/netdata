@@ -942,3 +942,245 @@ int alert_hash_and_store_config(
 
     return 1;
 }
+
+void write_alert_analytics(BUFFER *b, char *name, time_t in_clear, uint8_t t_in_clear, uint8_t n_in_clear, time_t in_warn, uint8_t t_in_warn, uint8_t n_in_warn, time_t in_crit, uint8_t t_in_crit, uint8_t n_in_crit, uint8_t no_of_alerts, BUFFER *db_entries) {
+    buffer_sprintf(b, "\t\t\t\t\"%s\": {\n", name);
+    buffer_sprintf(b, "\t\t\t\t\"db_entries\": [ %s\n ],\n", buffer_tostring(db_entries));
+    buffer_sprintf(b, "\t\t\t\t\"num_of_alerts\": %d,\n", no_of_alerts);
+
+    buffer_strcat(b, "\t\t\t\t\t\"CLEAR\": {\n");
+    buffer_sprintf(b, "\t\t\t\t\t\t\"time_spent\": %ld,\n", in_clear);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"times_in_status\": %d,\n", t_in_clear);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"sent_notifications\": %d\n", n_in_clear);
+    buffer_strcat(b, "\t\t\t\t\t},\n");
+
+    buffer_strcat(b, "\t\t\t\t\t\"WARNING\": {\n");
+    buffer_sprintf(b, "\t\t\t\t\t\t\"time_spent\": %ld,\n", in_warn);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"times_in_status\": %d,\n", t_in_warn);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"sent_notifications\": %d\n", n_in_warn);
+    buffer_strcat(b, "\t\t\t\t\t},\n");
+
+    buffer_strcat(b, "\t\t\t\t\t\"CRITICAL\": {\n");
+    buffer_sprintf(b, "\t\t\t\t\t\t\"time_spent\": %ld,\n", in_crit);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"times_in_status\": %d,\n", t_in_crit);
+    buffer_sprintf(b, "\t\t\t\t\t\t\"sent_notifications\": %d\n", n_in_crit);
+    buffer_strcat(b, "\t\t\t\t\t}\n");
+
+    buffer_strcat(b, "\t\t\t\t}");
+}
+
+#define SQL_GET_ALERT_ANALYTICS(guid, start, guid2, start2, end) "SELECT name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id FROM health_log_%s \
+where source like '%%usr/lib/netdata/conf.d/health.d/%%' \
+and when_key < %ld \
+group by name, chart \
+having max(alarm_event_id) \
+UNION ALL \
+SELECT name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id FROM health_log_%s \
+where source like '%%usr/lib/netdata/conf.d/health.d/%%' \
+and (when_key >= %ld and when_key < %ld) \
+order by name, chart, when_key; ", guid, start, guid2, start2, end
+int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) {
+    sqlite3_stmt *res = NULL;
+    int rc, cnt = 0;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    BUFFER *db_entries = buffer_create(10000);
+
+    char *name, *chart, *curr_alert = NULL, *curr_chart = NULL;
+    time_t in_clear = 0, in_warn = 0, in_crit = 0, in_other = 0, total_range = 0, range = 0;
+    uint8_t t_in_clear = 0, t_in_warn = 0, t_in_crit = 0, t_in_other = 0;
+    uint8_t n_in_clear = 0, n_in_warn = 0, n_in_crit = 0;
+    uint8_t no_of_alerts = 1;
+    time_t when, exec_run_timestamp;
+    int db_entries_c=0;
+    RRDCALC_STATUS status, last_status = RRDCALC_STATUS_UNDEFINED;
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            error_report("HEALTH [%s]: Database has not been initialized", host->hostname);
+        return 0;
+    }
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_GET_ALERT_ANALYTICS(uuid_str, start, uuid_str, start, end));
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("HEALTH [%s]: Failed to prepare sql statement to load alert analytics data.", host->hostname);
+        return 0;
+    }
+
+    total_range = end - start;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        name = strdupz((char *) sqlite3_column_text(res, 0));
+        chart = strdupz((char *) sqlite3_column_text(res, 1));
+        status  = (RRDCALC_STATUS) sqlite3_column_int(res, 2);
+        when = (time_t) sqlite3_column_int64(res, 3);
+        exec_run_timestamp = (time_t) sqlite3_column_int64(res, 4);
+
+        if (!curr_alert) {
+            curr_alert = name;
+            curr_chart = chart;
+            in_other = total_range;
+        }
+
+        if (strcmp(name, curr_alert)){
+            write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts, db_entries);
+            buffer_strcat(b, ",\n");
+
+            in_other = total_range;
+            last_status = RRDCALC_STATUS_UNDEFINED;
+            in_clear = in_warn = in_crit = 0;
+            t_in_other = t_in_clear = t_in_warn = t_in_crit = 0;
+            n_in_clear = n_in_warn = n_in_crit = 0;
+            no_of_alerts = 1;
+            curr_alert = name;
+            curr_chart = chart;
+            buffer_reset(db_entries);
+            db_entries_c = 0;
+        }
+
+        if (db_entries_c)
+            buffer_sprintf(db_entries, ",\n");
+
+         if (strcmp(chart, curr_chart)) {
+            curr_chart = chart;
+            no_of_alerts++;
+            last_status = RRDCALC_STATUS_UNDEFINED;
+        }
+
+        if (when < start) {
+            switch (status)
+                {
+                case RRDCALC_STATUS_CLEAR:
+                    in_clear += total_range;
+                    t_in_clear++;
+                    if (exec_run_timestamp >= start) n_in_clear++;
+                    last_status = RRDCALC_STATUS_CLEAR;
+                    break;
+                case RRDCALC_STATUS_WARNING:
+                    in_warn += total_range;
+                    t_in_warn++;
+                    if (exec_run_timestamp >= start) n_in_warn++;
+                    last_status = RRDCALC_STATUS_WARNING;
+                    break;
+                case RRDCALC_STATUS_CRITICAL:
+                    in_crit += total_range;
+                    if (exec_run_timestamp >= start) n_in_crit++;
+                    t_in_crit++;
+                    last_status = RRDCALC_STATUS_CRITICAL;
+                    break;
+                default:
+                    in_other += total_range;
+                    t_in_other++;
+                    last_status = RRDCALC_STATUS_UNDEFINED;
+                }
+            buffer_sprintf(db_entries, "{ \"name\": \"%s\", \"chart\": \"%s\", \"status\": \"%s\", \"when\": %ld, \"notification\": %ld, \"after_start\": %s, \"in_other\": %ld, \"in_clear\": %ld, \"in_warn\": %ld, \"in_crit\": %ld }", curr_alert, curr_chart, rrdcalc_status2string(status), when, exec_run_timestamp, "false", in_other, in_clear, in_warn, in_crit);
+            db_entries_c++;
+            cnt = 1;
+            continue;
+        }
+
+        if (when <= end) {
+            range = end - when;
+            switch (status)
+                {
+                case RRDCALC_STATUS_CLEAR:
+                    if (last_status == RRDCALC_STATUS_WARNING) {
+                        in_warn -= range;
+                        in_clear += range;
+                        if (when == start) t_in_warn = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_CRITICAL) {
+                        in_crit -= range;
+                        in_clear += range;
+                        if (when == start) t_in_crit = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_UNDEFINED) {
+                        in_other -= range;
+                        in_clear += range;
+                        if (when == start) t_in_other = 0;
+                    }
+                    last_status = RRDCALC_STATUS_CLEAR;
+                    t_in_clear++;
+                    if (exec_run_timestamp && exec_run_timestamp < end) n_in_clear++;
+                    break;
+                case RRDCALC_STATUS_WARNING:
+                    if (last_status == RRDCALC_STATUS_CLEAR) {
+                        in_clear -= range;
+                        in_warn += range;
+                        if (when == start) t_in_clear = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_CRITICAL) {
+                        in_crit -= range;
+                        in_warn += range;
+                        if (when == start) t_in_crit = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_UNDEFINED) {
+                        in_other -= range;
+                        in_warn += range;
+                        if (when == start) t_in_other = 0;
+                    }
+                    last_status = RRDCALC_STATUS_WARNING;
+                    t_in_warn++;
+                    if (exec_run_timestamp && exec_run_timestamp < end) n_in_warn++;
+                    break;
+                case RRDCALC_STATUS_CRITICAL:
+                    if (last_status == RRDCALC_STATUS_CLEAR) {
+                        in_clear -= range;
+                        in_crit += range;
+                        if (when == start) t_in_clear = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_WARNING) {
+                        in_warn -= range;
+                        in_crit += range;
+                        if (when == start) t_in_warn = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_UNDEFINED) {
+                        in_other -= range;
+                        in_crit += range;
+                        if (when == start) t_in_other = 0;
+                    }
+                    last_status = RRDCALC_STATUS_CRITICAL;
+                    t_in_crit++;
+                    if (exec_run_timestamp && exec_run_timestamp < end) n_in_crit++;
+                    break;
+                default:
+                    //mark in other
+                    if (last_status == RRDCALC_STATUS_CLEAR) {
+                        in_clear -= range;
+                        in_other += range;
+                        if (when == start) t_in_clear = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_WARNING) {
+                        in_warn -= range;
+                        in_other += range;
+                        if (when == start) t_in_warn = 0;
+                    }
+                    else if (last_status == RRDCALC_STATUS_CRITICAL) {
+                        in_crit -= range;
+                        in_other += range;
+                        if (when == start) t_in_crit = 0;
+                    }
+                    last_status = RRDCALC_STATUS_UNDEFINED;
+                    t_in_other++;
+                }
+            buffer_sprintf(db_entries, "{ \"name\": \"%s\", \"chart\": \"%s\", \"status\": \"%s\", \"when\": %ld, \"notification\": %ld, \"after_start\": %s, \"in_other\": %ld, \"in_clear\": %ld, \"in_warn\": %ld, \"in_crit\": %ld }", curr_alert, curr_chart, rrdcalc_status2string(status), when, exec_run_timestamp, "true", in_other, in_clear, in_warn, in_crit);
+            db_entries_c++;
+            cnt = 1;
+            continue;
+        }
+   }
+
+    if (likely(cnt)) {
+        write_alert_analytics(b, curr_alert, in_clear, t_in_clear, n_in_clear, in_warn, t_in_warn, n_in_warn, in_crit, t_in_crit, n_in_crit, no_of_alerts, db_entries);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the alert analytics statement");
+
+    return cnt;
+}

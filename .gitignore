@@ -129,6 +129,7 @@ system/edit-config
 system/netdata.crontab
 
 daemon/anonymous-statistics.sh
+daemon/anonymous-statistics-alerts.sh
 daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh

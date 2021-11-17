@@ -4,6 +4,7 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
     anonymous-statistics.sh \
+    anonymous-statistics-alerts.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -13,11 +14,13 @@ dist_noinst_DATA = \
     README.md \
     config/README.md \
     anonymous-statistics.sh.in \
+    anonymous-statistics-alerts.sh.in \
     get-kubernetes-labels.sh.in \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
     anonymous-statistics.sh \
+    anonymous-statistics-alerts.sh \
     system-info.sh \
     get-kubernetes-labels.sh \
     $(NULL)

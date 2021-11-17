@@ -1493,6 +1493,356 @@ int test_sqlite(void) {
     return 0;
 }
 
+int test_sql_alert_stats_insert(const char *q) //make buffer
+{
+    sqlite3_stmt *res = NULL;
+    int rc = sqlite3_prepare_v2(db_meta, q, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        fprintf(stderr, "Failed to prepare statement to insert data.");
+        return 1;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        fprintf(stderr, "Failed to store data file, rc = %d", rc);
+        return 1;
+    }
+
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK)) {
+        fprintf(stderr, "Failed to finalize the prepared statement when inserting to health log");
+        return 1;
+    }
+
+    return 0;
+}
+
+int test_sql_alert_stats_check_json (BUFFER *b, char *name, uint8_t num_of_alerts, time_t in_clear, uint8_t t_in_clear, uint8_t n_in_clear, time_t in_warn, uint8_t t_in_warn, uint8_t n_in_warn, time_t in_crit, uint8_t t_in_crit, uint8_t n_in_crit) {
+    json_object *json;
+    json = json_tokener_parse((char *)buffer_tostring(b));
+    if (!json) {
+        fprintf(stderr, "JSON-C failed to parse buffer.");
+        return 1;
+    }
+
+    struct json_object *j_name, *j_num_of_alerts, *j_clear, *j_warn, *j_crit, *j_in_clear, *j_t_in_clear, *j_n_in_clear, *j_in_warn, *j_t_in_warn, *j_n_in_warn, *j_in_crit, *j_t_in_crit, *j_n_in_crit;
+    json_object_object_get_ex(json, name, &j_name);
+    json_object_object_get_ex(j_name, "num_of_alerts", &j_num_of_alerts);
+    if (json_object_get_int(j_num_of_alerts) != num_of_alerts) {
+        fprintf(stderr, "Diff in num of alerts, need [%d], got [%d]\n", num_of_alerts, json_object_get_int(j_num_of_alerts));
+        return 1;
+    }
+    json_object_object_get_ex(j_name, "CLEAR", &j_clear);
+    json_object_object_get_ex(j_clear, "time_spent", &j_in_clear);
+    if (json_object_get_int(j_in_clear) != in_clear) {
+        fprintf(stderr, "Diff in time spent in CLEAR, need [%ld], got [%ld]\n", in_clear, json_object_get_int64(j_in_clear));
+        return 1;
+    }
+    json_object_object_get_ex(j_clear, "times_in_status", &j_t_in_clear);
+    if (json_object_get_int(j_t_in_clear) != t_in_clear) {
+        fprintf(stderr, "Diff in times in status in CLEAR, need [%d], got [%d]\n", t_in_clear, json_object_get_int(j_t_in_clear));
+        return 1;
+    }
+    json_object_object_get_ex(j_clear, "sent_notifications", &j_n_in_clear);
+    if (json_object_get_int(j_n_in_clear) != n_in_clear) {
+        fprintf(stderr, "Diff in notifications in CLEAR, need [%d], got [%d]\n", n_in_clear, json_object_get_int(j_n_in_clear));
+        return 1;
+    }
+
+    json_object_object_get_ex(j_name, "WARNING", &j_warn);
+    json_object_object_get_ex(j_warn, "time_spent", &j_in_warn);
+    if (json_object_get_int(j_in_warn) != in_warn) {
+        fprintf(stderr, "Diff in time spent in WARNING, need [%ld], got [%ld]\n", in_warn, json_object_get_int64(j_in_warn));
+        return 1;
+    }
+    json_object_object_get_ex(j_warn, "times_in_status", &j_t_in_warn);
+    if (json_object_get_int(j_t_in_warn) != t_in_warn) {
+        fprintf(stderr, "Diff in times in status in WARNING, need [%d], got [%d]\n", t_in_warn, json_object_get_int(j_t_in_warn));
+        return 1;
+    }
+    json_object_object_get_ex(j_warn, "sent_notifications", &j_n_in_warn);
+    if (json_object_get_int(j_n_in_warn) != n_in_warn) {
+        fprintf(stderr, "Diff in notifications in WARNING, need [%d], got [%d]\n", n_in_warn, json_object_get_int(j_n_in_warn));
+        return 1;
+    }
+
+    json_object_object_get_ex(j_name, "CRIT", &j_crit);
+    json_object_object_get_ex(j_crit, "time_spent", &j_in_crit);
+    if (json_object_get_int(j_in_crit) != in_crit) {
+        fprintf(stderr, "Diff in time spent in CRITICAL, need [%ld], got [%ld]\n", in_crit, json_object_get_int64(j_in_crit));
+        return 1;
+    }
+    json_object_object_get_ex(j_crit, "times_in_status", &j_t_in_crit);
+    if (json_object_get_int(j_t_in_crit) != t_in_crit) {
+        fprintf(stderr, "Diff in times in status in CRITICAL, need [%d], got [%d]\n", t_in_crit, json_object_get_int(j_t_in_crit));
+        return 1;
+    }
+    json_object_object_get_ex(j_crit, "sent_notifications", &j_n_in_crit);
+    if (json_object_get_int(j_n_in_crit) != n_in_crit) {
+        fprintf(stderr, "Diff in notifications in CRITICAL, need [%d], got [%d]\n", n_in_crit, json_object_get_int(j_n_in_crit));
+        return 1;
+    }
+
+    return 0;
+}
+
+int test_sql_alert_stats(void) {
+    RRDHOST *host = NULL;
+    fprintf(stderr, "Opening DB in ram...\n");
+
+    int rc = sqlite3_open(":memory:", &db_meta);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: DB init failed\n");
+        return 1;
+    }
+
+    error_log_limit_unlimited();
+    default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+
+    fprintf(stderr, "Initializing localhost with hostname 'unittest-sql-alert-stats'");
+    host = rrdhost_find_or_create(
+            "unittest-sql-alert-stats"
+            , "unittest-sql-alert-stats"
+            , "00000000-0000-0000-0000-000000000000"
+            , os_type
+            , netdata_configured_timezone
+            , netdata_configured_abbrev_timezone
+            , netdata_configured_utc_offset
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , RRD_MEMORY_MODE_RAM
+            , 0
+            , 0
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
+            , NULL
+    );
+    if (NULL == host)
+        return 1;
+
+    fprintf(stderr, "Creating health log table...\n");
+    sql_create_health_log_table (host);
+
+    BUFFER *b = buffer_create(32768);
+
+    /*
+      Check for start being exactly as the first row start, with no prior event
+    */
+    fprintf(stderr, "Running scenario 1...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 1, 1636379565, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", -2, 1636379650, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 0, 1636379656, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 1, 1636379565, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", -2, 1636379650, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 0, 1636379656, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 1, 1636379565, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", -2, 1636379650, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 0, 1636379656, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 1, 1636379565, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", -2, 1636379650, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 0, 1636379656, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 1, 1636379565, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", -2, 1636379650, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 0, 1636379656, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 1636379565, 1636379665, b);
+    buffer_strcat(b, "}");
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 85, 1, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 1/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    if (test_sql_alert_stats_check_json(b, "b-name", 4, 340, 4, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 1/b failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    /*
+      Total range 150, a clear in 140 of them
+    */
+    test_sql_alert_stats_insert("delete from health_log_00000000_0000_0000_0000_000000000000");
+    buffer_reset(b);
+
+    fprintf(stderr, "Running scenario 2...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", -2, 1636538238, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 0, 1636538249, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 1, 1636538258, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", -2, 1636538238, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 0, 1636538249, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 1, 1636538258, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", -2, 1636538238, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 0, 1636538249, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 1, 1636538258, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", -2, 1636538238, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 0, 1636538249, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 1, 1636538258, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", -2, 1636538238, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 0, 1636538249, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 1, 1636538258, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 1636538248, 1636538398, b);
+    buffer_strcat(b, "}");
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 140, 1, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 2/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    if (test_sql_alert_stats_check_json(b, "b-name", 4, 560, 4, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 2/b failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    //////////////////////////////////////////
+    test_sql_alert_stats_insert("delete from health_log_00000000_0000_0000_0000_000000000000");
+    buffer_reset(b);
+
+    fprintf(stderr, "Running scenario 3...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 1, 1636541465, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 1, 1636541465, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 1, 1636541465, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 1, 1636541465, 0, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 1, 1636541465, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 1636541604, 1636541724, b);
+    buffer_strcat(b, "}");
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 120, 1, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 3/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    if (test_sql_alert_stats_check_json(b, "b-name", 4, 480, 4, 0, 0, 0, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 3/b failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    /*
+      Check for one event started before start time
+      and a notification sent before start
+    */
+    test_sql_alert_stats_insert("delete from health_log_00000000_0000_0000_0000_000000000000");
+    buffer_reset(b);
+
+    fprintf(stderr, "Running scenario 4...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 3, 1636541465, 1636541603, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 3, 1636541465, 1636541603, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 3, 1636541465, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 3, 1636541465, 1636541603, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 3, 1636541465, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 1636541604, 1636541724, b);
+    buffer_strcat(b, "}");
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 0, 0, 0, 120, 1, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 4/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    if (test_sql_alert_stats_check_json(b, "b-name", 4, 0, 0, 0, 480, 4, 0, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 4/b failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    /*
+      Same as 4, but notification sent just on start time and one right after start
+    */
+    test_sql_alert_stats_insert("delete from health_log_00000000_0000_0000_0000_000000000000");
+    buffer_reset(b);
+
+    fprintf(stderr, "Running scenario 5...\n");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"a-name\", \"a-chart\", 3, 1636541465, 1636541604, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"a-chart\", 3, 1636541465, 1636541604, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"b-chart\", 3, 1636541465, 0, 2, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"c-chart\", 3, 1636541465, 1636541605, 3, \"usr/lib/netdata/conf.d/health.d/\")");
+    test_sql_alert_stats_insert("insert into health_log_00000000_0000_0000_0000_000000000000 (name, chart, new_status, when_key, exec_run_timestamp, alarm_event_id, source) \
+                                 values (\"b-name\", \"d-chart\", 3, 1636541465, 0, 1, \"usr/lib/netdata/conf.d/health.d/\")");
+
+    buffer_strcat(b, "{\n");
+    sql_get_alert_analytics(host, 1636541604, 1636541724, b);
+    buffer_strcat(b, "}");
+
+    fprintf(stderr, "[%s]\n", buffer_tostring(b));
+
+    if (test_sql_alert_stats_check_json(b, "a-name", 1, 0, 0, 0, 120, 1, 1, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 5/a failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    if (test_sql_alert_stats_check_json(b, "b-name", 4, 0, 0, 0, 480, 4, 2, 0, 0, 0)) {
+        fprintf(stderr, "SQL alerts statistics scenario 5/b failed.\n");
+        buffer_free(b);
+        return 1;
+    }
+
+    return 0;
+}
 
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
