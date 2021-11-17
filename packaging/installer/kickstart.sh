@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Run me with:
@@ -198,8 +198,9 @@ progress() {
 
 run_logfile="/dev/null"
 run() {
-  local user="${USER--}" dir="${PWD}" info info_console
-
+  local user="${USER--}" dir="${PWD}"
+  local info
+  local info_console
   if [ "${UID}" = "0" ]; then
     info="[root ${dir}]# "
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
@@ -243,9 +244,9 @@ warning() {
 }
 
 _cannot_use_tmpdir() {
-  local testfile ret
+  local testfile
+  local ret=0
   testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
-  ret=0
 
   if [ -z "${testfile}" ] ; then
     return "${ret}"
@@ -311,28 +312,6 @@ set_tarball_urls() {
   fi
 }
 
-detect_bash4() {
-  bash="${1}"
-  if [ -z "${BASH_VERSION}" ]; then
-    # we don't run under bash
-    if [ -n "${bash}" ] && [ -x "${bash}" ]; then
-      # shellcheck disable=SC2016
-      BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
-    fi
-  else
-    # we run under bash
-    BASH_MAJOR_VERSION="${BASH_VERSINFO[0]}"
-  fi
-
-  if [ -z "${BASH_MAJOR_VERSION}" ]; then
-    echo >&2 "No BASH is available on this system"
-    return 1
-  elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]; then
-    echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION}"
-    return 1
-  fi
-  return 0
-}
 
 dependencies() {
   SYSTEM="$(uname -s 2> /dev/null || uname -v)"
@@ -342,34 +321,27 @@ dependencies() {
   echo "System            : ${SYSTEM}"
   echo "Operating System  : ${OS}"
   echo "Machine           : ${MACHINE}"
-  echo "BASH major version: ${BASH_MAJOR_VERSION}"
 
-  bash="$(command -v bash 2> /dev/null)"
-  if ! detect_bash4 "${bash}"; then
-    warning "Cannot detect packages to be installed in this system, without BASH v4+."
+  progress "Fetching script to detect required packages..."
+  if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+    if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+      run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+    else
+      fatal "Invalid given dependency file, please check your --local-files parameter options and try again" F1001
+    fi
   else
-    progress "Fetching script to detect required packages..."
-    if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-      if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-        run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
-      else
-        fatal "Invalid given dependency file, please check your --local-files parameter options and try again" F1001
-      fi
-    else
-      download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
-    fi
+    download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+  fi
 
-    if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
-      warning "Downloaded dependency installation script is empty."
-    else
-      progress "Running downloaded script to detect required packages..."
-      run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
-      # shellcheck disable=SC2181
-      if [ $? -ne 0 ]; then
-        warning "It failed to install all the required packages, but installation might still be possible."
-      fi
+  if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
+    warning "Downloaded dependency installation script is empty."
+  else
+    progress "Running downloaded script to detect required packages..."
+    run ${sudo}  "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+    # shellcheck disable=SC2181
+    if [ $? -ne 0 ]; then
+      warning "It failed to install all the required packages, but installation might still be possible."
     fi
-
   fi
 }
 
