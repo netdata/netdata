@@ -4,7 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building fping"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building fping" || true
 
 fetch "fping-5.0" "https://fping.org/dist/fping-5.0.tar.gz" \
     ed38c0b9b64686a05d1b3bc1d66066114a492e04e44eef1821d43b1263cd57b8
@@ -28,8 +29,9 @@ run make clean
 run make -j "$(nproc)"
 run make install
 
-if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]; then
+if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/fping
 fi
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

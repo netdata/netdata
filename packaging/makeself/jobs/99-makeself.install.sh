@@ -4,7 +4,8 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building self-extracting archive"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building self-extracting archive" || true
 
 run cd "${NETDATA_SOURCE_PATH}" || exit 1
 
@@ -107,6 +108,7 @@ if [ "${BUILDARCH}" = "x86_64" ]; then
   run ln -s "./${FILE}" "artifacts/netdata-${VERSION}.gz.run"
 fi
 
-[ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+# shellcheck disable=SC2015
+[ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true
 
 echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"

@@ -39,6 +39,7 @@ if [ ! -f ../../netdata-installer.sh ]; then
 fi
 
 git clean -dxf
+git submodule foreach --recursive git clean -dxf
 
 cat >&2 << EOF
 This program will create a self-extracting shell package containing
@@ -53,6 +54,10 @@ if [ ! -d tmp ]; then
   mkdir tmp || exit 1
 else
   rm -rf tmp/*
+fi
+
+if [ -z "${GITHUB_ACTIONS}" ]; then
+    export GITHUB_ACTIONS=false
 fi
 
 if ! ./run-all-jobs.sh "$@"; then
