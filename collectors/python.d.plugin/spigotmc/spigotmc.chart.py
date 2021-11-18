@@ -42,10 +42,10 @@ CHARTS = {
         ]
     },
     'mem': {
-        'options': [None, 'Minecraft Memory Usage', 'mb', 'spigotmc', 'spigotmc.mem', 'line'],
+        'options': [None, 'Minecraft Memory Usage', 'MiB', 'spigotmc', 'spigotmc.mem', 'line'],
         'lines': [
-            ['mem_cur', 'Current Memory Usage', 'absolute', 1, 1],
-            ['mem_max', 'Max Memory', 'absolute', 1, 1]
+            ['mem_cur', 'current', 'absolute', 1, 1],
+            ['mem_max', 'max', 'absolute', 1, 1]
         ]
     }
 }
