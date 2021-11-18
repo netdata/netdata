@@ -51,7 +51,7 @@ If you installed Netdata using an installation prefix, you will need to add an `
 that prefix to this command to make sure it finds Netdata.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
 ```
 
 > ❗ If the above command fails, you can [reinstall

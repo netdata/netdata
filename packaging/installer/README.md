@@ -34,16 +34,18 @@ _actively_ contributing to Netdata's future.
 
 This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others, as well as on mac OS environments.
 
-To install Netdata from source, including all dependencies required to connect to Netdata Cloud, and get _automatic
-nightly updates_, run the following as your normal user:
+To install Netdata, including all dependencies required to connect to Netdata Cloud, and get _automatic nightly
+updates_, run the following as your normal user:
 
 ```bash
-sh <(curl -Ss https://my-netdata.io/kickstart.sh)
+rm -f ./kickstart.sh ; wget https://my-netdata.io/kickstart.sh && sh ./kickstart.sh
 ```
+
+This script will preferentially use native DEB/RPM packages if we provide them for your platform.
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
 stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
-page](/packaging/installer/methods/kickstart.md). 
+page](/packaging/installer/methods/kickstart.md).
 
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
@@ -77,27 +79,19 @@ operating systems.
     svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/docker"
-    os="Run with Docker" 
+    os="Run with Docker"
     svg="docker" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/kubernetes"
-    os="Deploy on Kubernetes" 
+    os="Deploy on Kubernetes"
     svg="kubernetes" />
    <InstallBox
     to="/docs/agent/packaging/installer/methods/macos"
-    os="Install on macOS" 
+    os="Install on macOS"
     svg="macos" />
   <InstallBox
-    to="/docs/agent/packaging/installer/methods/packages"
-    os="Linux with .deb/.rpm packages" 
-    svg="linux" />
-  <InstallBox
-    to="/docs/agent/packaging/installer/methods/kickstart-64"
-    os="Linux with static 64-bit binary" 
-    svg="linux" />
-  <InstallBox
     to="/docs/agent/packaging/installer/methods/manual"
-    os="Linux from Git" 
+    os="Linux from Git"
     svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/installer/methods/source"
@@ -174,9 +168,6 @@ If you're running an older Linux distribution or one that has reached EOL, such 
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which
 helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart-64.md), which uses an
-up-to-date version of OpenSSL with hostname validation enabled.
-
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
 man-in-the-middle attacks.
@@ -219,9 +210,6 @@ method](/docs/configure/start-stop-restart.md) for your system, and try accessin
 We've received reports from the community about issues with running the `kickstart.sh` script on systems that have both
 a distribution-installed version of OpenSSL and a manually-installed local version. The Agent's installer cannot handle
 both.
-
-We recommend you install Netdata with the [static binary](/packaging/installer/methods/kickstart-64.md) to avoid the
-issue altogether. Or, you can manually remove one version of OpenSSL to remove the conflict.
 
 ### Clang compiler on Linux
 
