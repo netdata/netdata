@@ -221,5 +221,8 @@ externaldeps/
 Session.vim
 Session.*.vim
 
+# clangd cache
+.cache/
+
 # Special exceptions
 !packaging/repoconfig/Makefile
