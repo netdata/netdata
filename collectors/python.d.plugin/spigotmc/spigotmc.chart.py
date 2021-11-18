@@ -60,7 +60,7 @@ _TPS_REGEX = re.compile(
     r'(\d{1,2}.\d+), .*?'  # 5-minute TPS value
     r'(\d{1,2}\.\d+).*?'  # 15-minute TPS value
     r'(\s.*?(\d+)\/(\d+).*?: (\d+).*)?',  # Current Memory Usage / Total Memory (Max Memory)
-    re.X
+    re.MULTILINE
 )
 _LIST_REGEX = re.compile(
     # Examples:
