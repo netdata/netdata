@@ -351,19 +351,19 @@ dependencies() {
     progress "Fetching script to detect required packages..."
     if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
       if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-        run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+        echo run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
       else
         fatal "Invalid given dependency file, please check your --local-files parameter options and try again" F1001
       fi
     else
-      download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+      echo download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
     fi
 
     if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
       warning "Downloaded dependency installation script is empty."
     else
       progress "Running downloaded script to detect required packages..."
-      run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      echo run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
       # shellcheck disable=SC2181
       if [ $? -ne 0 ]; then
         warning "It failed to install all the required packages, but installation might still be possible."
