@@ -58,7 +58,7 @@ _TPS_REGEX = re.compile(
     r'(\d{1,2}.\d+), .*?'  # 1-minute TPS value
     r'(\d{1,2}.\d+), .*?'  # 5-minute TPS value
     r'(\d{1,2}\.\d+).*?'  # 15-minute TPS value
-    r'\s.*?(\d+)\/(\d+).*', # Current Memory Usage / Max Memory
+    r'(.*?(\d+)\/(\d+).*)?', # Current Memory Usage / Max Memory
     re.X
 )
 _LIST_REGEX = re.compile(
@@ -138,8 +138,9 @@ class Service(SimpleService):
                 data['tps1'] = int(float(match.group(1)) * PRECISION)
                 data['tps5'] = int(float(match.group(2)) * PRECISION)
                 data['tps15'] = int(float(match.group(3)) * PRECISION)
-                data['mem_cur'] = int(match.group(4))
-                data['mem_max'] = int(match.group(5))
+                if match.group(4):
+                    data['mem_cur'] = int(match.group(5))
+                    data['mem_max'] = int(match.group(6))
             else:
                 self.error('Unable to process TPS values.')
                 if not raw:
