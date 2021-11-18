@@ -44,8 +44,8 @@ CHARTS = {
     'mem': {
         'options': [None, 'Minecraft Memory Usage', 'MiB', 'spigotmc', 'spigotmc.mem', 'line'],
         'lines': [
-            ['mem_cur', 'current', 'absolute', 1, 1],
-            ['mem_total', 'total', 'absolute', 1, 1],
+            ['mem_used', 'used', 'absolute', 1, 1],
+            ['mem_alloc', 'allocated', 'absolute', 1, 1],
             ['mem_max', 'max', 'absolute', 1, 1]
         ]
     }
@@ -140,8 +140,8 @@ class Service(SimpleService):
                 data['tps5'] = int(float(match.group(2)) * PRECISION)
                 data['tps15'] = int(float(match.group(3)) * PRECISION)
                 if match.group(4):
-                    data['mem_cur'] = int(match.group(5))
-                    data['mem_total'] = int(match.group(6))
+                    data['mem_used'] = int(match.group(5))
+                    data['mem_alloc'] = int(match.group(6))
                     data['mem_max'] = int(match.group(7))
             else:
                 self.error('Unable to process TPS values.')
