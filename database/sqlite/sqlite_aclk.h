@@ -226,4 +226,5 @@ void sql_aclk_sync_init(void);
 void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
+int claimed();
 #endif //NETDATA_SQLITE_ACLK_H

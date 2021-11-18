@@ -16,17 +16,19 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae)
     //include also the valid statuses for this case
 #ifdef ENABLE_ACLK
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-    if (!aclk_use_new_cloud_arch) {
+    if (!aclk_use_new_cloud_arch && aclk_connected) {
 #endif
 
         if ((ae->new_status == RRDCALC_STATUS_WARNING || ae->new_status == RRDCALC_STATUS_CRITICAL) ||
             ((ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL))) {
             aclk_update_alarm(host, ae);
         }
-        return 0;
 #endif
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
     }
+
+    if (!claimed())
+        return 0;
 
     if (ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
         return 0;
@@ -845,4 +847,29 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
     freez(claim_id);
 #endif
     return;
+}
+
+void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
+{
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+    if (!claimed())
+        return;
+
+    if (unlikely(!host->dbsync_worker))
+        return;
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    BUFFER *sql = buffer_create(1024);
+
+    buffer_sprintf(sql,"delete from aclk_alert_%s where alert_unique_id not in "
+                   " (select unique_id from health_log_%s); ", uuid_str, uuid_str);
+
+    db_execute(buffer_tostring(sql));
+
+    buffer_free(sql);
+#else
+    UNUSED(host);
+#endif
 }
