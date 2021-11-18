@@ -13,6 +13,7 @@ case ${BUILDARCH} in
   x86_64) platform=linux/amd64 ;;
   armv7l) platform=linux/arm/v7 ;;
   aarch64) platform=linux/arm64/v8 ;;
+  ppc64le) platform=linux/ppc64le ;;
   *)
     echo "Unknown target architecture '${BUILDARCH}'."
     exit 1
@@ -21,7 +22,7 @@ esac
 
 DOCKER_CONTAINER_NAME="netdata-package-${BUILDARCH}-static-alpine314"
 
-if [ "${BUILDARCH}" != "$(uname -m)" ]; then
+if [ "${BUILDARCH}" != "$(uname -m)" ] && [ "$(uname -m)" = 'x86_64' ] && [ -z "${SKIP_EMULATION}" ]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
 fi
 

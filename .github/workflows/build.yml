@@ -83,6 +83,7 @@ jobs:
           - 'x86_64'
           - 'armv7l'
           - 'aarch64'
+          - 'ppc64le'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
