@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Always queue alerts to aclk\_alert [\#11806](https://github.com/netdata/netdata/pull/11806) ([MrZammler](https://github.com/MrZammler))
+- Add POWER8+ static builds. [\#11802](https://github.com/netdata/netdata/pull/11802) ([Ferroin](https://github.com/Ferroin))
 - Update libbpf [\#11800](https://github.com/netdata/netdata/pull/11800) ([thiagoftsm](https://github.com/thiagoftsm))
 - Assorted cleanups to static builds. [\#11798](https://github.com/netdata/netdata/pull/11798) ([Ferroin](https://github.com/Ferroin))
 - Use the proper format specifier when logging configuration options. [\#11795](https://github.com/netdata/netdata/pull/11795) ([vkalintiris](https://github.com/vkalintiris))
 - Verify checksums of makeself deps. [\#11791](https://github.com/netdata/netdata/pull/11791) ([vkalintiris](https://github.com/vkalintiris))
 - packaging: update go.d.plugin version to v0.31.0 [\#11789](https://github.com/netdata/netdata/pull/11789) ([ilyam8](https://github.com/ilyam8))
+- Add some logging for cloud new architecture to access.log [\#11788](https://github.com/netdata/netdata/pull/11788) ([MrZammler](https://github.com/MrZammler))
 - Use correct hop count if host is already in memory [\#11785](https://github.com/netdata/netdata/pull/11785) ([stelfrag](https://github.com/stelfrag))
 - Fix proc/interrupts parser [\#11783](https://github.com/netdata/netdata/pull/11783) ([maximethebault](https://github.com/maximethebault))
 - Fix typos [\#11782](https://github.com/netdata/netdata/pull/11782) ([rex4539](https://github.com/rex4539))
@@ -158,8 +161,6 @@
 - update london demo to point at london3 [\#11533](https://github.com/netdata/netdata/pull/11533) ([andrewm4894](https://github.com/andrewm4894))
 - add/update proc\_interrupts charts info [\#11532](https://github.com/netdata/netdata/pull/11532) ([ilyam8](https://github.com/ilyam8))
 - add diskstats charts info  [\#11528](https://github.com/netdata/netdata/pull/11528) ([ilyam8](https://github.com/ilyam8))
-- Re-added EPEL on CentOS 7. [\#11525](https://github.com/netdata/netdata/pull/11525) ([Ferroin](https://github.com/Ferroin))
-- Fix issue with log messages appearing in the terminal instead of the error.log on startup [\#11524](https://github.com/netdata/netdata/pull/11524) ([stelfrag](https://github.com/stelfrag))
 - Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
 - Add node message support for ACLK new architecture [\#11514](https://github.com/netdata/netdata/pull/11514) ([stelfrag](https://github.com/stelfrag))
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
