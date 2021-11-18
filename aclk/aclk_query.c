@@ -81,6 +81,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
+    BUFFER *log_buffer = buffer_create(NETDATA_WEB_REQUEST_URL_SIZE);
     RRDHOST *query_host = localhost;
 
 #ifdef NETDATA_WITH_ZLIB
@@ -115,6 +116,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
             goto cleanup;
         }
     }
+
+    buffer_strcat(log_buffer, query->data.http_api_v2.query);
 
     char *mysep = strchr(query->data.http_api_v2.query, '?');
     if (mysep) {
@@ -226,7 +229,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
         , dt_usec(&tv, &w->tv_ready) / 1000.0
         , dt_usec(&tv, &w->tv_in) / 1000.0
         , w->response.code
-        , strip_control_characters(query->data.http_api_v2.query)
+        , strip_control_characters((char *)buffer_tostring(log_buffer))
     );
 
 cleanup:
@@ -240,6 +243,7 @@ cleanup:
     buffer_free(w->response.header_output);
     freez(w);
     buffer_free(local_buffer);
+    buffer_free(log_buffer);
     return retval;
 }
 

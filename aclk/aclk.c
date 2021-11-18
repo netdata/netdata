@@ -183,6 +183,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
 #define RX_MSGLEN_MAX 4096
 static void msg_callback_old_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
+    UNUSED(qos);
     char cmsg[RX_MSGLEN_MAX];
     size_t len = (msglen < RX_MSGLEN_MAX - 1) ? msglen : (RX_MSGLEN_MAX - 1);
     const char *cmd_topic = aclk_get_topic(ACLK_TOPICID_COMMAND);
@@ -227,6 +228,7 @@ static void msg_callback_old_protocol(const char *topic, const void *msg, size_t
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
 static void msg_callback_new_protocol(const char *topic, const void *msg, size_t msglen, int qos)
 {
+    UNUSED(qos);
     if (msglen > RX_MSGLEN_MAX)
         error("Incoming ACLK message was bigger than MAX of %d and got truncated.", RX_MSGLEN_MAX);
 
@@ -281,7 +283,7 @@ static void puback_callback(uint16_t packet_id)
 #endif
 
     if (aclk_shared_state.mqtt_shutdown_msg_id == (int)packet_id) {
-        error("Got PUBACK for shutdown message. Can exit gracefully.");
+        info("Shutdown message has been acknowledged by the cloud. Exiting gracefully");
         aclk_shared_state.mqtt_shutdown_msg_rcvd = 1;
     }
 }
@@ -314,7 +316,7 @@ static int handle_connection(mqtt_wss_client client)
         // timeout 1000 to check at least once a second
         // for netdata_exit
         if (mqtt_wss_service(client, 1000) < 0){
-            error("Connection Error or Dropped");
+            error_report("Connection Error or Dropped");
             return 1;
         }
 
@@ -450,7 +452,7 @@ static int wait_popcorning_finishes()
 
 void aclk_graceful_disconnect(mqtt_wss_client client)
 {
-    error("Preparing to Gracefully Shutdown the ACLK");
+    info("Preparing to gracefully shutdown ACLK connection");
     aclk_queue_lock();
     aclk_queue_flush();
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
@@ -467,14 +469,16 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
             break;
         }
         if (aclk_shared_state.mqtt_shutdown_msg_rcvd) {
-            error("MQTT App Layer `disconnect` message sent successfully");
+            info("MQTT App Layer `disconnect` message sent successfully");
             break;
         }
     }
+    info("ACLK link is down");
+    log_access("ACLK DISCONNECTED");
     aclk_stats_upd_online(0);
     aclk_connected = 0;
 
-    error("Attempting to Gracefully Shutdown MQTT/WSS connection");
+    info("Attempting to gracefully shutdown the MQTT/WSS connection");
     mqtt_wss_disconnect(client, 1000);
 }
 
@@ -720,12 +724,13 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             json_object_put(lwt);
 
         if (!ret) {
-            info("MQTTWSS connection succeeded");
+            info("ACLK connection successfully established");
+            log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
             return 0;
         }
 
-        error("Connect failed\n");
+        error_report("Connect failed");
     }
 
     return 1;
@@ -821,6 +826,7 @@ void *aclk_main(void *ptr)
         if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
             aclk_connected = 0;
+            log_access("ACLK DISCONNECTED");
         }
     } while (!netdata_exit);
 
