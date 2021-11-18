@@ -30,7 +30,7 @@ const char *aclk_sync_config[] = {
 uv_mutex_t aclk_async_lock;
 struct aclk_database_worker_config  *aclk_thread_head = NULL;
 
-static inline int claimed()
+int claimed()
 {
     int rc;
     rrdhost_aclk_state_lock(localhost);

@@ -392,6 +392,8 @@ void sql_health_alarm_log_cleanup(RRDHOST *host) {
         error_report("Failed to finalize the prepared statement to cleanup health log table");
 
     host->health_log_entries_written = rotate_every;
+
+    sql_aclk_alert_clean_dead_entries(host);
 }
 
 /* Health related SQL queries

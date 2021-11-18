@@ -1040,7 +1040,7 @@ void *health_main(void *ptr) {
 
 #ifdef ENABLE_ACLK
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
-            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded)) {
+            if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > 2) {
                 sql_queue_removed_alerts_to_aclk(host);
             }
 #endif
