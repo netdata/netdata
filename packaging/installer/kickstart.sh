@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Run me with:
@@ -196,41 +196,41 @@ progress() {
   echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
-run_logfile="/dev/null"
 run() {
-  local user="${USER--}" dir="${PWD}"
-  local info
-  local info_console
+  run_logfile="/dev/null"
+  run_user="${USER--}"
+  run_dir="${PWD}"
+
   if [ "${UID}" = "0" ]; then
-    info="[root ${dir}]# "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
+    run_info="[root ${run_dir}]# "
+    run_info_console="[${TPUT_DIM}${run_dir}${TPUT_RESET}]# "
   else
-    info="[${user} ${dir}]$ "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
+    run_info="[${run_user} ${run_dir}]$ "
+    run_info_console="[${TPUT_DIM}${run_dir}${TPUT_RESET}]$ "
   fi
 
   {
-    printf "${info}"
+    printf "${run_info}"
     escaped_print "${@}"
     printf " ... "
   } >> "${run_logfile}"
 
-  printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+  printf >&2 "${run_info_console}${TPUT_BOLD}${TPUT_YELLOW}"
   escaped_print >&2 "${@}"
   printf >&2 "${TPUT_RESET}"
 
   "${@}"
 
-  local ret=$?
-  if [ ${ret} -ne 0 ]; then
+  run_ret=$?
+  if [ ${run_ret} -ne 0 ]; then
     run_failed
-    printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
+    printf >> "${run_logfile}" "FAILED with exit code ${run_ret}\n"
   else
     run_ok
     printf >> "${run_logfile}" "OK\n"
   fi
 
-  return ${ret}
+  return ${run_ret}
 }
 
 warning() {
@@ -244,24 +244,23 @@ warning() {
 }
 
 _cannot_use_tmpdir() {
-  local testfile
-  local ret=0
-  testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  _testfile="$(TMPDIR="${1}" mktemp -q -t netdata-test.XXXXXXXXXX)"
+  _ret=0
 
-  if [ -z "${testfile}" ] ; then
-    return "${ret}"
+  if [ -z "${_testfile}" ] ; then
+    return "${_ret}"
   fi
 
-  if printf '#!/bin/sh\necho SUCCESS\n' > "${testfile}" ; then
-    if chmod +x "${testfile}" ; then
-      if [ "$("${testfile}")" = "SUCCESS" ] ; then
-        ret=1
+  if printf '#!/bin/sh\necho SUCCESS\n' > "${_testfile}" ; then
+    if chmod +x "${_testfile}" ; then
+      if [ "$("${_testfile}")" = "SUCCESS" ] ; then
+        _ret=1
       fi
     fi
   fi
 
-  rm -f "${testfile}"
-  return "${ret}"
+  rm -f "${_testfile}"
+  return "${_ret}"
 }
 
 create_tmp_directory() {
@@ -283,12 +282,12 @@ create_tmp_directory() {
 }
 
 download() {
-  url="${1}"
-  dest="${2}"
+  download_url="${1}"
+  download_dest="${2}"
   if command -v curl > /dev/null 2>&1; then
-    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || fatal "Cannot download ${url}" F0002
+    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${download_dest}" "${download_url}" || fatal "Cannot download ${download_url}" F0002
   elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}" || fatal "Cannot download ${url}" F0002
+    run wget -T 15 -O "${download_dest}" "${download_url}" || fatal "Cannot download ${download_url}" F0002
   else
     fatal "I need curl or wget to proceed, but neither is available on this system." F0003
   fi
@@ -301,7 +300,6 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
-    local latest
     # Simple version
     latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
     export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
@@ -312,6 +310,28 @@ set_tarball_urls() {
   fi
 }
 
+detect_bash4() {
+  bash="${1}"
+  if [ -z "${BASH_VERSION}" ]; then
+    # we don't run under bash
+    if [ -n "${bash}" ] && [ -x "${bash}" ]; then
+      # shellcheck disable=SC2016
+      BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
+    fi
+  else
+    # we run under bash
+    BASH_MAJOR_VERSION="${BASH_VERSINFO[0]}"
+  fi
+
+  if [ -z "${BASH_MAJOR_VERSION}" ]; then
+    echo >&2 "No BASH is available on this system"
+    return 1
+  elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]; then
+    echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION})"
+    return 1
+  fi
+  return 0
+}
 
 dependencies() {
   SYSTEM="$(uname -s 2> /dev/null || uname -v)"
@@ -321,27 +341,34 @@ dependencies() {
   echo "System            : ${SYSTEM}"
   echo "Operating System  : ${OS}"
   echo "Machine           : ${MACHINE}"
+  echo "BASH major version: ${BASH_MAJOR_VERSION}"
 
-  progress "Fetching script to detect required packages..."
-  if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-    if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-      run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+  bash="$(command -v bash 2> /dev/null)"
+  if ! detect_bash4 "${bash}"; then
+    warning "Cannot detect packages to be installed in this system, without BASH v4+."
+  else
+    progress "Fetching script to detect required packages..."
+    if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+      if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+        run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
+      else
+        fatal "Invalid given dependency file, please check your --local-files parameter options and try again" F1001
+      fi
     else
-      fatal "Invalid given dependency file, please check your --local-files parameter options and try again" F1001
+      download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
     fi
-  else
-    download "${PACKAGES_SCRIPT}" "${ndtmpdir}/install-required-packages.sh"
-  fi
 
-  if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
-    warning "Downloaded dependency installation script is empty."
-  else
-    progress "Running downloaded script to detect required packages..."
-    run ${sudo}  "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-      warning "It failed to install all the required packages, but installation might still be possible."
+    if [ ! -s "${ndtmpdir}/install-required-packages.sh" ]; then
+      warning "Downloaded dependency installation script is empty."
+    else
+      progress "Running downloaded script to detect required packages..."
+      run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      # shellcheck disable=SC2181
+      if [ $? -ne 0 ]; then
+        warning "It failed to install all the required packages, but installation might still be possible."
+      fi
     fi
+
   fi
 }
 
@@ -596,7 +623,8 @@ cd netdata-* || fatal "Cannot cd to netdata source tree" F0006
 
 install() {
   progress "Installing netdata..."
-  run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
+  pwd
+  run ${sudo} /netdata/netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
   case $? in
     1)
       fatal "netdata-installer.sh exited with error" F0007
