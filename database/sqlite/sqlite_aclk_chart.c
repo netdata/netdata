@@ -406,7 +406,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
             db_unlock();
 
             aclk_chart_inst_and_dim_update(payload_list, payload_list_size, is_dim, position_list, wc->batch_id);
-            log_access("OG [%s (%s)]: Sending charts and dimensions update, batch_id %ld, first sequence %ld, last sequence %ld", wc->node_id, wc->host ? wc->host->hostname : "N/A", wc->batch_id, first_sequence, last_sequence);
+            log_access("OG [%s (%s)]: Sending charts and dimensions update, batch_id %"PRIu64", first sequence %"PRIu64", last sequence %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", wc->batch_id, first_sequence, last_sequence);
             wc->chart_sequence_id = last_sequence;
             wc->chart_timestamp = last_timestamp;
         }
@@ -519,7 +519,7 @@ void aclk_receive_chart_ack(struct aclk_database_worker_config *wc, struct aclk_
     int rc;
     sqlite3_stmt *res = NULL;
 
-    log_access("IN [%s (%s)]: Received ack chart sequence id %ld.", wc->node_id, wc->host ? wc->host->hostname : "N/A", cmd.param1);
+    log_access("IN [%s (%s)]: Received ack chart sequence id %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", cmd.param1);
 
     BUFFER *sql = buffer_create(1024);
 
