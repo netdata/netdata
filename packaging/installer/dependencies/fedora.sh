@@ -21,68 +21,32 @@ else
 fi
 
 declare -a package_tree=(
+  findutils
+  gcc
+  gcc-c++
+  make
   autoconf
   autoconf-archive
   autogen
   automake
   libtool
   cmake
-  json-c-devel
-  bridge-utils
-  chrony
-  curl
-  gzip
-  tar
-  git
-  gcc
-  gcc-c++
-  gdb
-  iotop
-  iproute
-  ipset
-  jq
-  iptables
-  lm_sensors
-  logwatch
-  lxc
-  make
-  nginx
-  nodejs
-  postfix
-  python
-  python-mysql
-  python-psycopg2
-  python-pip
-  python3-pip
-  python-pymongo
-  python3-pymongo
-  python-requests
-  lz4-devel
-  libuv-devel
-  openssl-devel
-  python3
-  screen
-  sudo
-  sysstat
-  tcpdump
-  traceroute
-  valgrind
-  unzip
-  zip
-  autoconf-archive
+  nmap-ncat
   zlib-devel
   libuuid-devel
   libmnl-devel
   json-c-devel
-  libuv
+  libuv-devel
   lz4-devel
   openssl-devel
   Judy-devel
   elfutils-libelf-devel
-  mailx
-  nmap-ncat
+  git
   pkgconfig
+  tar
+  curl
+  gzip
+  python3
   ${ulogd_pkg}
 )
-
 dnf -y install ${package_tree[@]}
