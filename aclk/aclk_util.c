@@ -55,7 +55,7 @@ void aclk_env_t_destroy(aclk_env_t *env) {
 
 int aclk_env_has_capa(const char *capa)
 {
-    for (int i = 0; i < aclk_env->capability_count; i++) {
+    for (int i = 0; i < (int) aclk_env->capability_count; i++) {
         if (!strcasecmp(capa, aclk_env->capabilities[i]))
             return 1;
     }
