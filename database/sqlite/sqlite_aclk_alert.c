@@ -751,6 +751,11 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
         return;
     }
 
+    if (unlikely(!wc->host)) {
+        error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
+        return;
+    }
+
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;

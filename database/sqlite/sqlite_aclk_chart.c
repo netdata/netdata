@@ -572,18 +572,24 @@ void aclk_receive_chart_reset(struct aclk_database_worker_config *wc, struct acl
         wc->chart_payload_count = 0;
 
         RRDHOST *host = wc->host;
-        rrdhost_rdlock(host);
-        RRDSET *st;
-        rrdset_foreach_read(st, host) {
-            rrdset_rdlock(st);
-            rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
-            RRDDIM *rd;
-            rrddim_foreach_read(rd, st) {
-                rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+        if (likely(host)) {
+            rrdhost_rdlock(host);
+            RRDSET *st;
+            rrdset_foreach_read(st, host)
+            {
+                rrdset_rdlock(st);
+                rrdset_flag_clear(st, RRDSET_FLAG_ACLK);
+                RRDDIM *rd;
+                rrddim_foreach_read(rd, st)
+                {
+                    rd->state->aclk_live_status = (rd->state->aclk_live_status == 0);
+                }
+                rrdset_unlock(st);
             }
-            rrdset_unlock(st);
+            rrdhost_unlock(host);
         }
-        rrdhost_unlock(host);
+        else
+            error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
     }
     else {
         log_access("AC [%s (%s)]: Restarting chart sync from sequence %"PRIu64, wc->node_id, wc->host ? wc->host->hostname : "N/A", cmd.param1);
