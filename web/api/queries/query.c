@@ -537,7 +537,9 @@ static inline void do_dimension_fixedstep(
         , time_t before_wanted
         , uint32_t options
 ){
+#ifdef NETDATA_INTERNAL_CHECKS
     RRDSET *st = r->st;
+#endif
 
     time_t
             now = after_wanted,

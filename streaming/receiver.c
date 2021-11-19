@@ -346,13 +346,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
         netdata_mutex_unlock(&rpt->host->receiver_lock);
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     int ssl = 0;
 #ifdef ENABLE_HTTPS
     if (rpt->ssl.conn != NULL)
         ssl = 1;
 #endif
-
-#ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip

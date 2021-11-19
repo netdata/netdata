@@ -16,7 +16,9 @@
  */
 inline int can_send_rrdset(struct instance *instance, RRDSET *st)
 {
+#ifdef NETDATA_INTERNAL_CHECKS
     RRDHOST *host = st->rrdhost;
+#endif
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_EXPORTING_IGNORE)))
         return 0;
