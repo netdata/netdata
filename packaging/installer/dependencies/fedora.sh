@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << CentOS >> versions: 6/7/8
+# << Fedora >>
+# supported versions: 22->35
 
 function os_version {
-  if [[ -f /etc/redhat-release ]]; then
-    cat /etc/redhat-release | grep VERSION_ID | cut -d'=' -f2
-  else
-    echo "Erorr: Cannot determine OS version!"
-    exit 1
+  if [[ -f /etc/os-release ]]; then
+    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
   fi
 }
 
-#if [[ $(os_version) -gt 24 ]]; then
-#  ulogd_pkg=
-#else
-#  ulogd_pkg=ulogd
-#fi
+if [[ $(os_version) -gt 24 ]]; then
+  ulogd_pkg=
+else
+  ulogd_pkg=ulogd
+fi
 
 declare -a package_tree=(
   autoconf
@@ -64,7 +62,7 @@ declare -a package_tree=(
   tcpdump
   traceroute
   valgrind
-  nzip
+  unzip
   zip
   autoconf-archive
   zlib-devel

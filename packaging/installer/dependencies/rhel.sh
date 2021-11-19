@@ -1,31 +1,72 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Fedora >> versions: 22->35
-# << CentOS >> versions: 6/7/8
-# << RHEL >>   versions: 6/7/8
-
-os_name=$1
-
-if [[ -z $os_name ]]; then
-  echo "ERROR: os name must be passed as parameter to $0!"
-  exit 1
-fi
+# << RHEL >>
+# supported versions: 6/7/8
 
 function os_version {
-  if [[ -f /etc/os-release ]]; then
-    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
+  if [[ -f /etc/redhat-release ]]; then
+    cat /etc/redhat-release | grep VERSION_ID | cut -d'=' -f2
+  else
+    echo "Erorr: Cannot determine OS version!"
+    exit 1
   fi
 }
 
-if [[ $os_name == "fedora" ]] && [[ $(os_version) -gt 24 ]]; then
-  ulogd_pkg=
-else
-  ulogd_pkg=ulogd
-fi
+#if [[ $os_name == "rhel" ]] && [[ $(os_version) -gt 24 ]]; then
+#  ulogd_pkg=
+#else
+#  ulogd_pkg=ulogd
+#fi
 
-source default.sh
-
-declare -a package_tree_rhel=(
+declare -a package_tree=(
+  autoconf
+  autoconf-archive
+  autogen
+  automake
+  libtool
+  cmake
+  json-c-devel
+  bridge-utils
+  chrony
+  curl
+  gzip
+  tar
+  git
+  gcc
+  gcc-c++
+  gdb
+  iotop
+  iproute
+  ipset
+  jq
+  iptables
+  lm_sensors
+  logwatch
+  lxc
+  make
+  nginx
+  nodejs
+  postfix
+  python
+  python-mysql
+  python-psycopg2
+  python-pip
+  python3-pip
+  python-pymongo
+  python3-pymongo
+  python-requests
+  lz4-devel
+  libuv-devel
+  openssl-devel
+  python3
+  screen
+  sudo
+  sysstat
+  tcpdump
+  traceroute
+  valgrind
+  nzip
+  zip
   autoconf-archive
   zlib-devel
   libuuid-devel
@@ -42,5 +83,4 @@ declare -a package_tree_rhel=(
   ${ulogd_pkg}
 )
 
-dnf -y install ${package_tree_default[@]}
-dnf -y install ${package_tree_rhel[@]}
+dnf -y install ${package_tree[@]}
