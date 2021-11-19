@@ -3,9 +3,14 @@
 # << Fedora >>
 # supported versions: 22->35
 
+set -e
+
 function os_version {
   if [[ -f /etc/os-release ]]; then
     cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
+  else
+    echo "Erorr: Cannot determine OS version!"
+    exit 1
   fi
 }
 

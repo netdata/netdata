@@ -2,6 +2,8 @@
 # Package tree used for installing netdata on distribution:
 # << CentOS >> versions: 6/7/8
 
+set -e
+
 function os_version {
   if [[ -f /etc/redhat-release ]]; then
     cat /etc/redhat-release | grep VERSION_ID | cut -d'=' -f2
