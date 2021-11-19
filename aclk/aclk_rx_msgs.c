@@ -260,6 +260,7 @@ err_cleanup_nojson:
     return 1;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 typedef uint32_t simple_hash_t;
 typedef int(*rx_msg_handler)(const char *msg, size_t msg_len);
 
@@ -504,7 +505,6 @@ void aclk_init_rx_msg_handlers(void)
     }
 }
 
-#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
 {
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));

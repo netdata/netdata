@@ -9,9 +9,9 @@
 #include "libnetdata/libnetdata.h"
 
 int aclk_handle_cloud_message(char *payload);
-void aclk_init_rx_msg_handlers(void);
 
 #ifdef ENABLE_NEW_CLOUD_PROTOCOL
+void aclk_init_rx_msg_handlers(void);
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len);
 #endif
 
