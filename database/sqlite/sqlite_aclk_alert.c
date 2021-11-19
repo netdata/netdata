@@ -751,6 +751,11 @@ void aclk_push_alert_snapshot_event(struct aclk_database_worker_config *wc, stru
         return;
     }
 
+    if (unlikely(!wc->host)) {
+        error_report("ACLK synchronization thread for %s is not linked to HOST", wc->host_guid);
+        return;
+    }
+
     char *claim_id = is_agent_claimed();
     if (unlikely(!claim_id))
         return;
@@ -865,9 +870,14 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 
     buffer_sprintf(sql,"delete from aclk_alert_%s where alert_unique_id not in "
                    " (select unique_id from health_log_%s); ", uuid_str, uuid_str);
-
-    db_execute(buffer_tostring(sql));
-
+    
+    char *err_msg = NULL;
+    int rc = sqlite3_exec(db_meta, buffer_tostring(sql), NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("Failed when trying to clean stale ACLK alert entries from aclk_alert_%s, error message \"%s""",
+                     uuid_str, err_msg);
+        sqlite3_free(err_msg);
+    }
     buffer_free(sql);
 #else
     UNUSED(host);
