@@ -49,4 +49,13 @@ declare -a package_tree=(
   python3
   ${ulogd_pkg}
 )
-dnf -y install ${package_tree[@]}
+
+
+for val in ${package_tree[@]}
+  if rmp -q ${val}; then
+    echo "Package ${val} is installed"
+  else
+    uninstalled_list+=${val}
+  fi
+
+dnf -y install ${uninstalled_list}
