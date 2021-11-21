@@ -51,11 +51,18 @@ declare -a package_tree=(
 )
 
 
-for val in ${package_tree[@]}
-  if rmp -q ${val}; then
+for val in ${package_tree[@]}; do
+  if rpm -q $val; then
     echo "Package ${val} is installed"
   else
     uninstalled_list+=${val}
+    uninstalled_list+=" " 
   fi
+done
+
+if [[ ${#uninstalled_list[@]} -eq 0 ]]; then
+  echo "Everything is up to date"
+  exit 2
+fi
 
 dnf -y install ${uninstalled_list}
