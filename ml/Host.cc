@@ -77,7 +77,7 @@ static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
         );
 
         AnomalyRateRD = rrddim_add(RS, "anomaly_rate", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
+                1, 100, RRD_ALGORITHM_ABSOLUTE);
     } else
         rrdset_next(RS);
 
@@ -396,7 +396,7 @@ void DetectableHost::detectOnce() {
     this->NumTrainedDimensions = NumTrainedDimensions;
 
     updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
-    updateRateChart(getRH(), AnomalyRate * 100.0);
+    updateRateChart(getRH(), AnomalyRate * 10000.0);
     updateWindowLengthChart(getRH(), WindowLength);
     updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
     updateTrainingChart(getRH(), TotalTrainingDuration * 1000.0, MaxTrainingDuration * 1000.0);
