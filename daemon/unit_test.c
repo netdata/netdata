@@ -1604,7 +1604,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     collected_number next;
 
     update_every = REGION_UPDATE_EVERY[current_region];
-    time_now = time_start + update_every;
+    time_now = time_start;
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
@@ -1615,7 +1615,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
         }
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
-        time_now += update_every; // time_now = start + (c + 2) * update_every
+        time_now += update_every; // time_now = start + (c + 1) * update_every
         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
@@ -1647,7 +1647,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 
     // check the result
     for (c = 0; c < REGION_POINTS[current_region] ; c += QUERY_BATCH) {
-        time_now = time_start + (c + 2) * update_every;
+        time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
                 rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
@@ -1692,7 +1692,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
     errors = 0;
     update_every = REGION_UPDATE_EVERY[current_region];
-    long points = (time_end - time_start) / update_every - 1;
+    long points = (time_end - time_start) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         RRDR *r = rrd2rrdr(st[i], points, time_start + update_every, time_end, RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
         if (!r) {
@@ -1711,7 +1711,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
                     value = cn[j];
                     assert(rd[i][j] == d);
 
-                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
+                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c + 1;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
@@ -1810,7 +1810,7 @@ int test_dbengine(void)
     current_region = 1;
     update_every = REGION_UPDATE_EVERY[current_region]; // use the maximum update_every = 3
     errors = 0;
-    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every - 1; // cover all time regions with RRDR
+    long points = (time_end[REGIONS - 1] - time_start[0]) / update_every; // cover all time regions with RRDR
     long point_offset = (time_start[current_region] - time_start[0]) / update_every;
     for (i = 0 ; i < CHARTS ; ++i) {
         RRDR *r = rrd2rrdr(st[i], points, time_start[0] + update_every, time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0, 0, NULL, NULL);
@@ -1833,7 +1833,7 @@ int test_dbengine(void)
                     calculated_number value = cn[j];
                     assert(rd[i][j] == d);
 
-                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset;
+                    collected_number last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c - point_offset + 1;
                     calculated_number expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_DEFAULT_FLAGS));
 
                     uint8_t same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;

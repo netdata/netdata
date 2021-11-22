@@ -1150,7 +1150,10 @@ static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
         time_t first_entry_t = LONG_MAX;
 
         rrddim_foreach_read(rd, st) {
-            first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
+            first_entry_t =
+                MIN(first_entry_t,
+                    rd->state->query_ops.oldest_time(rd) > st->update_every ?
+                        rd->state->query_ops.oldest_time(rd) - st->update_every : 0);
         }
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
