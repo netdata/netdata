@@ -1,18 +1,9 @@
 #!/usr/bin/env sh
 # Package tree used for installing netdata on distribution:
 # << Alpine >>
-# supported versions: 3.13, 3.14, 3.15
+# supported versions: 3.12, 3.13, 3.14, 3.15, edge
 
 set -e
-
-function os_version {
-  if [[ -f /etc/os-release ]]; then
-    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
-  else
-    echo "Erorr: Cannot determine OS version!"
-    exit 1
-  fi
-}
 
 package_tree="
   alpine-sdk
@@ -51,7 +42,7 @@ for package in $package_tree; do
   fi
 done
 
-if [[ -z $packages_to_install ]]; then
+if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
