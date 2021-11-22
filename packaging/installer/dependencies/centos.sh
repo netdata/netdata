@@ -25,7 +25,7 @@ declare -a package_tree=(
   gcc-c++
   make
   autoconf
-  autoconf_archive
+  autoconf-archive
   autogen
   automake
   libtool
