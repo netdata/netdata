@@ -339,7 +339,7 @@ SELECT
     ((sum(relpages) * 8) * 1024) AS table_size,
     count(1)                     AS table_count
 FROM pg_class
-WHERE relkind IN ('r', 't');
+WHERE relkind IN ('r', 't', 'm');
 """,
 }
 
