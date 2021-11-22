@@ -738,6 +738,7 @@ set(API_PLUGIN_FILES
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
+        streaming/compression.c
         streaming/receiver.c
         streaming/sender.c
         )

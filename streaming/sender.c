@@ -15,8 +15,16 @@ void sender_start(struct sender_state *s) {
 
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s) {
-    if(cbuffer_add_unsafe(s->host->sender->buffer, buffer_tostring(s->host->sender->build),
-       s->host->sender->build->len))
+    char *src = (char *)buffer_tostring(s->host->sender->build);
+    size_t src_len = s->host->sender->build->len;
+#ifdef ENABLE_COMPRESSION
+    if (!src || !src_len)
+        return;
+    if (s->compressor)
+        src_len = s->compressor->compress(s->compressor,
+            src, src_len, &src);
+#endif
+    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
     buffer_flush(s->build);
     netdata_mutex_unlock(&s->mutex);
@@ -371,6 +379,10 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         return 0;
     }
     s->version = version;
+#ifdef ENABLE_COMPRESSION
+    if (s->compressor)
+        s->compressor->reset(s->compressor);
+#endif
 
     info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
          , host->hostname
@@ -565,6 +577,10 @@ void sender_init(struct sender_state *s, RRDHOST *parent) {
     s->host = parent;
     s->buffer = cbuffer_new(1024, 1024*1024);
     s->build = buffer_create(1);
+#ifdef ENABLE_COMPRESSION
+    if (default_compression_enabled)
+        s->compressor = create_compressor();
+#endif
     netdata_mutex_init(&s->mutex);
 }
 

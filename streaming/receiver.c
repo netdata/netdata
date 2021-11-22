@@ -22,6 +22,10 @@ void destroy_receiver_state(struct receiver_state *rpt) {
         SSL_free(rpt->ssl.conn);
     }
 #endif
+#ifdef ENABLE_COMPRESSION
+    if (rpt->decompressor)
+        rpt->decompressor->destroy(&rpt->decompressor);
+#endif
     freez(rpt);
 }
 
@@ -141,6 +145,8 @@ PARSER_RC streaming_claimed_id(char **words, void *user, PLUGINSD_ACTION *plugin
     return PARSER_RC_OK;
 }
 
+
+#ifndef ENABLE_COMPRESSION
 /* The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
  */
 static int receiver_read(struct receiver_state *r, FILE *fp) {
@@ -168,6 +174,106 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     r->read_len = strlen(r->read_buffer);
     return 0;
 }
+#else
+
+/*
+ * The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
+ * if SSL encryption is on, then use SSL API for reading stream data.
+ * Use line oriented fgets() in buffer from receiver_state is provided.
+ * In other cases use fread to read binary data from socket.
+ * Return zero on success and the number of bytes were read using pointer in the last argument.
+ */
+static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t size, int* ret) {
+    if (!ret)
+        return 1;
+    *ret = 0;
+#ifdef ENABLE_HTTPS
+    if (r->ssl.conn && !r->ssl.flags) {
+        ERR_clear_error();
+        *ret = SSL_read(r->ssl.conn, buffer, size);
+        if (*ret > 0)
+            return 0;
+        // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
+        u_long err;
+        char buf[256];
+        while ((err = ERR_get_error()) != 0) {
+            ERR_error_string_n(err, buf, sizeof(buf));
+            error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
+        }
+        return 1;
+    }
+#endif
+    if (buffer != r->read_buffer + r->read_len) {
+        // read to external buffer
+        *ret = fread(buffer, 1, size, fp);
+        if (!*ret)
+            return 1;
+    } else {
+        if (!fgets(r->read_buffer, sizeof(r->read_buffer), fp))
+            return 1;
+        *ret = strlen(r->read_buffer);
+    }
+    return 0;
+}
+
+/*
+ * Get the next line of data for parsing.
+ * Return data from the decompressor buffer if available.
+ * Otherwise read next line from the socket and check for compression header.
+ * Return the line was read If no compression header was found.
+ * Otherwise read the entire block of compressed data, decompress it
+ * and return it in receiver_state buffer.
+ * Return zero on success.
+ */
+static int receiver_read(struct receiver_state *r, FILE *fp) {
+    // check any decompressed data  present
+    if (r->decompressor &&
+            r->decompressor->decompressed_bytes_in_buffer(r->decompressor)) {
+        size_t available = sizeof(r->read_buffer) - r->read_len;
+        if (available) {
+            size_t len = r->decompressor->get(r->decompressor,
+                    r->read_buffer + r->read_len, available);
+            if (!len)
+                return 1;
+            r->read_len += len;
+        }
+        return 0;
+    }
+    int ret = 0;
+    if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
+        return 1;
+
+    if (!is_compressed_data(r->read_buffer, ret)) {
+        r->read_len = ret;
+        return 0;
+    }
+
+    if (unlikely(!r->decompressor))
+        r->decompressor = create_decompressor();
+
+    size_t bytes_to_read = r->decompressor->start(r->decompressor,
+            r->read_buffer, ret);
+
+    // Read the entire block of compressed data because
+    // we're unable to decompress incomplete block
+    char compressed[bytes_to_read];
+    do {
+        if (read_stream(r, fp, compressed, bytes_to_read, &ret) || !ret)
+            return 1;
+        // Send input data to decompressor
+        r->decompressor->put(r->decompressor, compressed, ret);
+        bytes_to_read -= ret;
+    } while (bytes_to_read > 0);
+    // Decompress
+    size_t bytes_to_parse = r->decompressor->decompress(r->decompressor);
+    if (!bytes_to_parse)
+        return 1;
+    // Fill read buffer with decompressed data
+    r->read_len = r->decompressor->get(r->decompressor,
+                    r->read_buffer, sizeof(r->read_buffer));
+    return 0;
+}
+#endif
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -189,7 +295,6 @@ static char *receiver_next_line(struct receiver_state *r, int *pos) {
     r->read_len -= start;
     return NULL;
 }
-
 
 size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp) {
     size_t result;
@@ -221,12 +326,14 @@ size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp
     parser->plugins_action->overwrite_action = &pluginsd_overwrite_action;
     parser->plugins_action->chart_action     = &pluginsd_chart_action;
     parser->plugins_action->set_action       = &pluginsd_set_action;
-    parser->plugins_action->clabel_commit_action  = &pluginsd_clabel_commit_action;
-    parser->plugins_action->clabel_action    = &pluginsd_clabel_action;
 
     user->parser = parser;
 
-    do {
+#ifdef ENABLE_COMPRESSION
+    if (rpt->decompressor)
+        rpt->decompressor->reset(rpt->decompressor);
+#endif
+    do{
         if (receiver_read(rpt, fp))
             break;
         int pos = 0;
