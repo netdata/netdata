@@ -1,87 +1,66 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << CentOS >> versions: 6/7/8
+# << CentOS >>
+# supported versions: 6->8
 
 set -e
 
 function os_version {
-  if [[ -f /etc/redhat-release ]]; then
-    cat /etc/redhat-release | grep VERSION_ID | cut -d'=' -f2
+  if [[ -f /etc/os-release ]]; then
+    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2
   else
     echo "Erorr: Cannot determine OS version!"
     exit 1
   fi
 }
 
-#if [[ $(os_version) -gt 24 ]]; then
-#  ulogd_pkg=
-#else
-#  ulogd_pkg=ulogd
-#fi
+if [[ $(os_version) -gt 24 ]]; then
+  ulogd_pkg=
+else
+  ulogd_pkg=ulogd
+fi
 
 declare -a package_tree=(
+  gcc
+  gcc-c++
+  make
   autoconf
-  autoconf-archive
+  autoconf_archive
   autogen
   automake
   libtool
+  pkgconfig
   cmake
-  json-c-devel
-  bridge-utils
-  chrony
-  curl
-  gzip
-  tar
-  git
-  gcc
-  gcc-c++
-  gdb
-  iotop
-  iproute
-  ipset
-  jq
-  iptables
-  lm_sensors
-  logwatch
-  lxc
-  make
-  nginx
-  nodejs
-  postfix
-  python
-  python-mysql
-  python-psycopg2
-  python-pip
-  python3-pip
-  python-pymongo
-  python3-pymongo
-  python-requests
-  lz4-devel
-  libuv-devel
-  openssl-devel
-  python3
-  screen
-  sudo
-  sysstat
-  tcpdump
-  traceroute
-  valgrind
-  nzip
-  zip
-  autoconf-archive
+  nmap-ncat
   zlib-devel
   libuuid-devel
   libmnl-devel
   json-c-devel
-  libuv
+  libuv-devel
   lz4-devel
   openssl-devel
-  Judy-devel
   elfutils-libelf-devel
-  mailx
-  nmap-ncat
-  pkgconfig
-  ${ulogd_pkg}
+  python3
+  git
+  tar
+  curl
+  gzip
 )
 
-dnf -y install ${package_tree[@]}
+packages_to_install=
+
+for package in ${package_tree[@]}; do
+  if rpm -q $package &> /dev/null; then
+    echo "Package '${package}' is installed"
+  else
+    echo "Package '$package' is NOT installed"
+    packages_to_install="$packages_to_install $package"
+  fi
+done
+
+if [[ -z $packages_to_install ]]; then
+  echo "All required packages are already installed. Skipping .."
+else
+  echo "packages_to_install: ${packages_to_install[@]}"
+  dnf -y install ${packages_to_install[@]}
+fi
