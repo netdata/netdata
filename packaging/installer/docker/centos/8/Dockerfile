@@ -1,6 +1,8 @@
 FROM centos:8
 
-RUN cat /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+#RUN sed -i "s/enabled=.*/enabled=1/g" /etc/yum.repos.d/CentOS-Linux-Plus.repo
+
+RUN sed -i "s/enabled=.*/enabled=1/g" /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
 
 RUN dnf makecache --refresh
 

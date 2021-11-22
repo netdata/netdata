@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << CentOS >>
-# supported versions: 6->8
+# supported versions: 7,8
 
 set -e
 
@@ -14,10 +14,11 @@ function os_version {
   fi
 }
 
-if [[ $(os_version) -gt 24 ]]; then
-  ulogd_pkg=
+
+if [[ $(os_version) -eq 8 ]]; then
+  package_manager=dnf
 else
-  ulogd_pkg=ulogd
+  package_manager=yum
 fi
 
 declare -a package_tree=(
@@ -39,8 +40,8 @@ declare -a package_tree=(
   libuv-devel
   lz4-devel
   openssl-devel
-  elfutils-libelf-devel
   python3
+  elfutils-libelf-devel
   git
   tar
   curl
@@ -62,5 +63,6 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  dnf -y install ${packages_to_install[@]}
+  ${package_manager} install -y ${packages_to_install[@]}
 fi
+
