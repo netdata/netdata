@@ -337,7 +337,7 @@ QUERY_TABLE_STATS = {
     DEFAULT: """
 SELECT
     sum(relpages) * current_setting('block_size')::numeric AS table_size,
-    count(1)                     AS table_count
+    count(1) AS table_count
 FROM pg_class
 WHERE relkind IN ('r', 't');
 """,
@@ -347,7 +347,7 @@ QUERY_INDEX_STATS = {
     DEFAULT: """
 SELECT
     sum(relpages) * current_setting('block_size')::numeric AS index_size,
-    count(1)                     AS index_count
+    count(1) AS index_count
 FROM pg_class
 WHERE relkind = 'i';
 """,
