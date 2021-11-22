@@ -52,16 +52,16 @@ declare -a package_tree=(
 
 packages_to_install=
 
-for val in ${package_tree[@]}; do
-  if rpm -q $val &> /dev/null; then
-    echo "Package '${val}' is installed"
+for package in ${package_tree[@]}; do
+  if rpm -q $package &> /dev/null; then
+    echo "Package '${package}' is installed"
   else
-    echo "Package '${val}' is NOT installed"
-    packages_to_install+=" $val"
+    echo "Package '$package' is NOT installed"
+    packages_to_install="$packages_to_install $package"
   fi
 done
 
-if [[ -z ${packages_to_install} ]]; then
+if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
