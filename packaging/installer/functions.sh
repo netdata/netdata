@@ -1,9 +1,9 @@
 #!/bin/sh
+
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
-
 # -----------------------------------------------------------------------------
 
 setup_terminal() {
@@ -129,13 +129,13 @@ download_file() {
 
 fetch_and_verify() {
   component="${1}"
-  url_fav="${2}"
+  url="${2}"
   base_name="${3}"
   tmp="${4}"
   override="${5}"
 
   if [ -z "${override}" ]; then
-    download_file "${url_fav}" "${tmp}/${base_name}" "${component}"
+    download_file "${url}" "${tmp}/${base_name}" "${component}"
   else
     progress "Using provided ${component} archive ${override}"
     run cp "${override}" "${tmp}/${base_name}"
@@ -167,19 +167,17 @@ netdata_banner() {
     msg="${*}"
     chartcolor="${TPUT_DIM}"
 
-  [ ${#msg} -lt ${#netdata} ] && msg=$(printf "%s" "$sp" | cut -c $((${#netdata} - ${#msg})))
-  [ ${#msg} -gt $((${#l2} - 20)) ] && msg=$(printf "%s" "$msg" | cut -c $((${#l2} - 23)))
+  [ ${#msg} -lt ${#netdata} ] && msg="${msg}$(printf '%s' ${sp} | cut -c $((${#netdata} - ${#msg})))"
+  [ ${#msg} -gt $((${#l2} - 20)) ] && msg="$(printf '%s' ${msg} | cut -c $((${#l2} - 23)))..."
 
   start="$((${#l2} / 2 - 4))"
   [ $((start + ${#msg} + 4)) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
   end=$((start + ${#msg} + 4))
 
-# shellcheck disable=SC3057,SC2039
-
   echo >&2
   echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
- # echo >&2 "${chartcolor}${l2:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}${TPUT_RESET}"
- # echo >&2 "${chartcolor}${l3:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}${sp:0:2}${l3:end:$((${#l2} - end))}${TPUT_RESET}"
+#  echo >&2 "${chartcolor}$(printf '%s' "${l2}" | cut -c "$start")$(printf '%s' "${sp}" | cut -c 2)${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}$(printf '%s' "${sp}" | cut -c $((end - start - 2 - ${#netdata})))$(printf '%s' "${l2}" | cut ${end} $((${#l2} - end)))${TPUT_RESET}"
+#  echo >&2 "${chartcolor}$(printf '%s' "${l3}" | cut -c "$start")$(printf '%s' "${sp}" | cut -c 2)${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}$(printf '%s' "${sp}" | cut -c 2)$(printf '%s' "${l3}" | cut "$end" $((${#l2} - end)))${TPUT_RESET}"
   echo >&2 "${chartcolor}${l4}${TPUT_RESET}"
   echo >&2
 }
@@ -325,7 +323,6 @@ iscontainer() {
 
   # /proc/1/sched exposes the host's pid of our init !
   # http://stackoverflow.com/a/37016302
-  pid
   pid=$(head -n 1 /proc/1/sched 2> /dev/null | {
     # shellcheck disable=SC2034
     IFS='(),#:' read -r name pid th threads
@@ -360,18 +357,14 @@ get_os_key() {
     echo "${ID}-${VERSION_ID}"
 
   elif [ -f /etc/redhat-release ]; then
-    cat "/etc/redhat-release"
+    cat /etc/redhat-release
   else
     echo "unknown"
   fi
 }
 
 issystemd() {
-  pids
-  p
-  myns
-  ns
-  systemctl
+  local pids p myns ns systemctl
 
   # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
   if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
@@ -416,7 +409,7 @@ get_systemd_service_dir() {
     SYSTEMD_DIRECTORY="/etc/systemd/system"
   fi
 
-  if expr "${key}" : "^devuan*"  [ "${key}" = "debian-7" ]  [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+  if expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
     SYSTEMD_DIRECTORY="/etc/systemd/system"
   fi
 
@@ -425,7 +418,6 @@ get_systemd_service_dir() {
 
 install_non_systemd_init() {
   [ "${UID}" != 0 ] && return 1
-
   key="$(get_os_key)"
 
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
@@ -436,7 +428,7 @@ install_non_systemd_init() {
         run rc-update add netdata default &&
         return 0
 
-    elif expr "${key}" : "^devuan*"  [ "${key}" = "debian-7" ]  [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+    elif expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
       echo >&2 "Installing LSB init file..."
       run cp system/netdata-lsb /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
@@ -570,9 +562,9 @@ pidisnetdata() {
 }
 
 stop_netdata_on_pid() {
-  pid="${1}"
-  ret=0
-  count=0
+   pid="${1}"
+   ret=0
+   count=0
 
   pidisnetdata "${pid}" || return 0
 
@@ -598,7 +590,7 @@ stop_netdata_on_pid() {
       ret=$?
     fi
 
-    test ${ret} -eq 0 && printf >&2 "." && sleep 5
+    test {ret} -eq 0 && printf >&2 "." && sleep 5
 
   done
 
@@ -613,9 +605,7 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
-  p
-  ns
-
+  local p ns
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -631,8 +621,7 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-  p
-  uname
+  local p uname
 
   if [ "${UID}" -eq 0 ]; then
     uname="$(uname 2> /dev/null)"
@@ -746,13 +735,13 @@ install_netdata_logrotate() {
 
 create_netdata_conf() {
   path="${1}"
-  url_cnc="${2}"
+  url="${2}"
 
   if [ -s "${path}" ]; then
     return 0
   fi
 
-  if [ -n "$url_cnc" ]; then
+  if [ -n "$url" ]; then
     echo >&2 "Downloading default configuration from netdata..."
     sleep 5
 
@@ -764,9 +753,9 @@ create_netdata_conf() {
     export https_proxy=
 
     if command -v curl 1> /dev/null 2>&1; then
-      run curl -sSL --connect-timeout 10 --retry 3 "${url_cnc}" > "${path}.new"
+      run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${path}.new"
     elif command -v wget 1> /dev/null 2>&1; then
-      run wget -T 15 -O - "${url_cnc}" > "${path}.new"
+      run wget -T 15 -O - "${url}" > "${path}.new"
     fi
 
     if [ -s "${path}.new" ]; then
@@ -774,12 +763,12 @@ create_netdata_conf() {
       run_ok "New configuration saved for you to edit at ${path}"
     else
       [ -f "${path}.new" ] && rm "${path}.new"
-      run_failed "Cannot download configuration from netdata daemon using url '${url_cnc}'"
-      url_cnc=''
+      run_failed "Cannot download configuration from netdata daemon using url '${url}'"
+      url=''
     fi
   fi
 
-  if [ -z "$url_cnc" ]; then
+  if [ -z "$url" ]; then
     echo "# netdata can generate its own config which is available at 'http://<netdata_ip>/netdata.conf'" > "${path}"
     echo "# You can download it with command like: 'wget -O ${path} http://localhost:19999/netdata.conf'" >> "${path}"
   fi
@@ -1067,3 +1056,4 @@ disable_netdata_updater() {
 set_netdata_updater_channel() {
   sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
+
