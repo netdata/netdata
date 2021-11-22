@@ -50,19 +50,20 @@ declare -a package_tree=(
   ${ulogd_pkg}
 )
 
+packages_to_install=
 
 for val in ${package_tree[@]}; do
-  if rpm -q $val; then
-    echo "Package ${val} is installed"
+  if rpm -q $val &> /dev/null; then
+    echo "Package '${val}' is installed"
   else
-    uninstalled_list+=${val}
-    uninstalled_list+=" " 
+    echo "Package '${val}' is NOT installed"
+    packages_to_install+=" $val"
   fi
 done
 
-if [[ ${#uninstalled_list[@]} -eq 0 ]]; then
-  echo "Everything is up to date"
-  exit 2
+if [[ -z ${packages_to_install} ]]; then
+  echo "All required packages are already installed. Skipping .."
+else
+  echo "packages_to_install: ${packages_to_install[@]}"
+  dnf -y install ${packages_to_install[@]}
 fi
-
-dnf -y install ${uninstalled_list}
