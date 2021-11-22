@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << Fedora >>
-# supported versions: 22->35
+# supported versions: 24->35
 
 set -e
 
