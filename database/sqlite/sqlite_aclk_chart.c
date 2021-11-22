@@ -647,7 +647,7 @@ static void aclk_submit_param_command(char *node_id, enum aclk_database_opcode a
         aclk_database_enq_cmd(wc, &cmd);
     else {
         if (aclk_worker_enq_cmd(node_id, &cmd))
-            log_access("AC [%s (%s)]: ACLK synchronization thread is not active.", node_id, host ? host->hostname : "N/A");
+            log_access("AC [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
     }
     return;
 }
@@ -727,7 +727,7 @@ void aclk_start_streaming(char *node_id, uint64_t sequence_id, time_t created_at
                 }
             }
             else
-                log_access("AC [%s (%s)]: ACLK synchronization thread is not active.", wc->node_id, wc->host ? wc->host->hostname : "N/A");
+                log_access("AC [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
             return;
         }
         host = host->next;

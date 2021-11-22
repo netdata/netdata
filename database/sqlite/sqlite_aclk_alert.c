@@ -304,7 +304,7 @@ void aclk_send_alarm_health_log(char *node_id)
         aclk_database_enq_cmd(wc, &cmd);
     else {
         if (aclk_worker_enq_cmd(node_id, &cmd))
-            error_report("ACLK synchronization thread is not active for node id %s", node_id);
+            log_access("AC [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
     }
     return;
 }
@@ -515,7 +515,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
         destroy_aclk_alarm_configuration(&alarm_config);
     }
     else
-        info("Alert config for %s not found", config_hash);
+        log_access("AC [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? wc->host->hostname : "N/A", config_hash);
 
 bind_fail:
     rc = sqlite3_finalize(res);
@@ -549,7 +549,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
     rrd_unlock();
 
     if (unlikely(!host->health_enabled)) {
-        log_access("AC [%s (%s)]: Ignoring request to stream alert state changes, health is disabled.", node_id, wc->host ? wc->host->hostname : "N/A");
+        log_access("AC [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
         return;
     }
 
@@ -562,7 +562,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
         __sync_synchronize();
     }
     else
-        log_access("AC [%s (%s)]: ACLK synchronization thread is not active.", node_id, wc->host ? wc->host->hostname : "N/A");
+        log_access("AC [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
 
 #else
     UNUSED(node_id);
@@ -648,7 +648,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
         cmd.completion = NULL;
         aclk_database_enq_cmd(wc, &cmd);
     } else
-        error("ACLK synchronization thread is not active for host %s", host->hostname);
+        log_access("AC [%s (N/A)]: ACLK synchronization thread is not active.", node_id);
 #else
     UNUSED(node_id);
     UNUSED(snapshot_id);
