@@ -695,6 +695,7 @@ declare -A pkg_json_c_dev=(
   ['sabayon']="dev-libs/json-c"
   ['suse']="libjson-c-devel"
   ['freebsd']="json-c"
+  ['macos']="json-c"
   ['default']="json-c-devel"
 )
 
@@ -1171,7 +1172,7 @@ declare -A pkg_openssl=(
   ['gentoo']="dev-libs/openssl"
   ['arch']="openssl"
   ['freebsd']="openssl"
-  ['macos']="openssl@1.1"
+  ['macos']="openssl"
   ['default']="openssl-devel"
 )
 

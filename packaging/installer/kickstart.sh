@@ -363,7 +363,11 @@ dependencies() {
       warning "Downloaded dependency installation script is empty."
     else
       progress "Running downloaded script to detect required packages..."
-      run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      if [ "$(uname -s)" = Darwin ]; then
+          run "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      else
+          run ${sudo} "${bash}" "${ndtmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+      fi
       # shellcheck disable=SC2181
       if [ $? -ne 0 ]; then
         warning "It failed to install all the required packages, but installation might still be possible."
