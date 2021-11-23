@@ -39,14 +39,13 @@ declare -a package_tree=(
   tar
   curl
   gzip
-  file
 )
 
 if [[ $(os_version) -eq 8 ]]; then
   package_manager=dnf
 else
   package_manager=yum
-  package_tree+=('Judy-devel')
+  package_tree+=('Judy-devel' 'file')
 fi
 
 packages_to_install=
@@ -64,6 +63,6 @@ if [[ -z $packages_to_install ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: ${packages_to_install[@]}"
-  ${package_manager} install -y ${packages_to_install[@]}
+  ${package_manager} install -y ${packages_to_install[@]} || true
 fi
 
