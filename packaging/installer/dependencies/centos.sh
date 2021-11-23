@@ -14,13 +14,6 @@ function os_version {
   fi
 }
 
-
-if [[ $(os_version) -eq 8 ]]; then
-  package_manager=dnf
-else
-  package_manager=yum
-fi
-
 declare -a package_tree=(
   gcc
   gcc-c++
@@ -48,6 +41,13 @@ declare -a package_tree=(
   gzip
   file
 )
+
+if [[ $(os_version) -eq 8 ]]; then
+  package_manager=dnf
+else
+  package_manager=yum
+  package_tree+=('Judy-devel')
+fi
 
 packages_to_install=
 
