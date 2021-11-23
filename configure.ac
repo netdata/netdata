@@ -537,7 +537,7 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 AC_MSG_CHECKING([if netdata compression should be used])
-if test "${enable_compression}" != "no"; then
+if test "${enable_compression}" != "no" -a "${LZ4_LIBS}"; then
     enable_compression="yes"
     AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
 else
