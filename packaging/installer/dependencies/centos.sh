@@ -46,6 +46,7 @@ declare -a package_tree=(
   tar
   curl
   gzip
+  file
 )
 
 packages_to_install=
