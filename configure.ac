@@ -1641,10 +1641,17 @@ if test "${enable_backend_kinesis}" = "yes" -o \
         "${build_ml}" = "yes"; then
     enable_cxx_linker="yes"
 
-    # Link with libatomic when using toolchains that don't provide all the
-    # atomic ops as builtins.
+    # Try to unconditionally link with -latomic. If the compiler can satisfy
+    # all the atomic ops with builtins then, the library will be left unused.
+    # Otherwise, some ops will be covered by the compiler's intrinsics and some
+    # will be picked up by the linker from -latomic. In the later case, if
+    # -latomic is not available there will be a build failure, which would
+    # have happened either way before this change.
     AC_LANG_PUSH([C++])
-    AC_MSG_CHECKING(whether -latomic is needed)
+
+    AC_MSG_CHECKING(whether we can use -latomic)
+    OLD_LIBS="${LIBS}"
+    LIBS="-latomic"
     AC_LINK_IFELSE([AC_LANG_SOURCE([[
       #include <atomic>
       #include <cstdint>
@@ -1652,12 +1659,15 @@ if test "${enable_backend_kinesis}" = "yes" -o \
       int main() {
         return v;
       }
-    ]])], STD_ATOMIC_NEED_LIBATOMIC=no, STD_ATOMIC_NEED_LIBATOMIC=yes)
-    AC_MSG_RESULT($STD_ATOMIC_NEED_LIBATOMIC)
-    if test "x$STD_ATOMIC_NEED_LIBATOMIC" = xyes; then
+    ]])], CAN_USE_LIBATOMIC=yes, CAN_USE_LIBATOMIC=no)
+    LIBS="${OLD_LIBS}"
+    AC_MSG_RESULT($CAN_USE_LIBATOMIC)
+
+    if test "x$CAN_USE_LIBATOMIC" = xyes; then
         OPTIONAL_ATOMIC_LIBS="-latomic"
     fi
     AC_SUBST([OPTIONAL_ATOMIC_LIBS])
+
     AC_LANG_POP([C++])
 fi
 
