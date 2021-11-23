@@ -243,10 +243,10 @@ static size_t lz4_decompressor_decompress(struct decompressor_state *state)
     if (!state->buffer)
         fatal("STREAM: No decompressor buffer allocated");
 
-    size_t decompressed_size = LZ4_decompress_safe_continue(state->data->stream, state->buffer,
+    long int decompressed_size = LZ4_decompress_safe_continue(state->data->stream, state->buffer,
             state->data->stream_buffer + state->data->stream_buffer_pos,
             state->buffer_len, state->data->stream_buffer_size - state->data->stream_buffer_pos);
-    if (decompressed_size < 0) { //} || decompressed_size != state->src_len) {
+    if (decompressed_size < 0) {
         error("STREAM: Decompressor error %ld", decompressed_size);
         return 0;
     }
