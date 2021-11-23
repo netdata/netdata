@@ -1,0 +1,11 @@
+FROM debian:9
+
+RUN apt-get update
+
+RUN apt-get install git
+
+RUN git clone https://github.com/netdata/netdata.git -b packaging-split
+
+RUN ./netdata/packaging/installer/dependencies/debian.sh
+
+RUN ./netdata/packaging/installer/kickstart.sh
