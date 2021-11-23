@@ -10,14 +10,15 @@ Monitors the fail2ban log file to show all bans for all active jails.
 
 ## Requirements
 
--   fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
+- fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at
+  logrotate.d)
 
 It produces one chart with multiple lines (one line per jail)
 
 ## Configuration
 
-Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the
+Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -28,13 +29,13 @@ Sample:
 
 ```yaml
 local:
- log_path: '/var/log/fail2ban.log'
- conf_path: '/etc/fail2ban/jail.local'
- exclude: 'dropbear apache'
+  log_path: '/var/log/fail2ban.log'
+  conf_path: '/etc/fail2ban/jail.local'
+  exclude: 'dropbear apache'
 ```
 
-If no configuration is given, module will attempt to read log file at `/var/log/fail2ban.log` and conf file at `/etc/fail2ban/jail.local`.
-If conf file is not found default jail is `ssh`.
+If no configuration is given, module will attempt to read log file at `/var/log/fail2ban.log` and conf file
+at `/etc/fail2ban/jail.local`. If conf file is not found default jail is `ssh`.
 
 ---
 
