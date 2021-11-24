@@ -380,6 +380,11 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
+AC_CHECK_LIB(
+    [lz4],
+    [LZ4_resetStream_fast],
+    [LZ4_LIBS="-llz4"]
+)
 
 # -----------------------------------------------------------------------------
 # zlib
