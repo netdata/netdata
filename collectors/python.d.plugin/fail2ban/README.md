@@ -10,7 +10,7 @@ Monitors the fail2ban log file to show all bans for all active jails.
 
 ## Requirements
 
-- fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at
+- fail2ban.log file must be readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at
   logrotate.d)
 
 ## Charts
