@@ -703,6 +703,12 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-brain"></i>',
         info: 'Charts relating to anomaly detection, increased <code>anomalous</code> dimensions or a higher than usual <code>anomaly_rate</code> could be signs of some abnormal behaviour. Read our <a href="https://learn.netdata.cloud/guides/monitor/anomaly-detection" target="_blank">anomaly detection guide</a> for more details.'
     },
+
+    'fail2ban': {
+        title: 'Fail2ban',
+        icon: '<i class="fas fa-shield-alt"></i>',
+        info: 'Netdata keeps track of the current jail status by reading the Fail2ban log file.'
+    },
 };
 
 
@@ -6371,6 +6377,25 @@ netdataDashboard.context = {
 
     'anomaly_detection.training_stats': {
         info: 'Diagnostic metrics relating to training time of anomaly detection. '
+    },
+
+    // ------------------------------------------------------------------------
+    // Supervisor
+
+    'fail2ban.failed_attempts': {
+        info: '<p>The number of failed attempts.</p>'+
+        '<p>This chart reflects the number of \'Found\' lines. '+
+        'Found means a line in the service’s log file matches the failregex in its filter.</p>'
+    },
+
+    'fail2ban.bans': {
+        info: '<p>The number of bans.</p>'+
+        '<p>This chart reflects the number of \'Ban\' and \'Restore Ban\' lines. '+
+        'Ban action happens when the number of failed attempts (maxretry) occurred in the last configured interval (findtime).</p>'
+    },
+
+    'fail2ban.banned_ips': {
+        info: '<p>The number of banned IP addresses.</p>'
     },
 
 };
