@@ -363,6 +363,9 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W check-database        Check metadata database integrity and exit.\n\n"
+            "  -W fix-database          Check metadata database integrity, fix if needed and exit.\n\n"
+            "  -W compact-database      Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F\n"
@@ -804,6 +807,20 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
+                        if(strcmp(optarg, "check-database") == 0) {
+                            sql_init_database(DB_CHECK_INTEGRITY);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "fix-database") == 0) {
+                            sql_init_database(DB_CHECK_FIX_DB);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "compact-database") == 0) {
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE);
+                            return 0;
+                        }
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;

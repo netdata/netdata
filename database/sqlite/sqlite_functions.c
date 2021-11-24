@@ -186,7 +186,7 @@ void store_active_dimension(uuid_t *dimension_uuid)
  * Initialize the SQLite database
  * Return 0 on success
  */
-int sql_init_database(void)
+int sql_init_database(db_check_action_type_t rebuild)
 {
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
