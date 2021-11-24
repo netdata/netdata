@@ -155,6 +155,12 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
+    [compression],
+    [AS_HELP_STRING([--enable-compression], [Enable LZ4 compression support @<:@default autodetect@:>@])],
+    ,
+    [enable_compression="detect"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -376,13 +382,13 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_compress_default],
-    [LZ4_LIBS="-llz4"]
+    [LZ4_resetStream_fast],
+    [LZ4_LIBS_FAST="-llz4"]
 )
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_resetStream_fast],
+    [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
 
@@ -542,9 +548,14 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 AC_MSG_CHECKING([if netdata compression should be used])
-if test "${enable_compression}" != "no" -a "${LZ4_LIBS}"; then
-    enable_compression="yes"
-    AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+if test "${enable_compression}" != "no"; then
+    if test "${LZ4_LIBS_FAST}"; then
+        enable_compression="yes"
+        AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+    else
+        enable_compression="no"
+        AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+    fi
 else
     enable_compression="no"
 fi

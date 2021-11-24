@@ -61,7 +61,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
     if (!state || !size || !out)
         return 0;
     if (size > LZ4_MAX_MSG_SIZE) {
-        error("Message size above limit: %ld", size);
+        error("Message size above limit: %lu", size);
         return 0;
     }
     size_t max_dst_size = LZ4_COMPRESSBOUND(size);
@@ -89,7 +89,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
     uint32_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
     *(uint32_t *)state->buffer = len | SIGNATURE;
     *out = state->buffer;
-    debug(D_STREAM, "STREAM: Compressed data header: %lu", compressed_data_size);
+    debug(D_STREAM, "STREAM: Compressed data header: %ld", compressed_data_size);
     return compressed_data_size + SIGNATURE_SIZE;
 }
 
