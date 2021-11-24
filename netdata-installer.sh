@@ -5,19 +5,19 @@
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
-  path=""
+  local path=""
   tmp="$(mktemp)"
   (echo "${PATH}" | tr ":" "\n") > "$tmp"
-  while read -r REPLY
+  while read -r REPLY;
   do
-    if (! ${path} : "(^|:) ${REPLY} (:|$)"); then
+    if echo "${path}" | grep -v "(^|:)${REPLY}(:|$)"; then
       [ -n "${path}" ] && path="${path}:"
       path="${path}${REPLY}"
     fi
   done < "$tmp"
-  rm "$tmp"
-
-  [ -n "${path}" ] && expr "${PATH}" : "/bin" && expr "${PATH}" : "/sbin" && export PATH="${path}"
+rm "$tmp"
+  [ -n "${path}" ]
+export PATH="${path%:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin}"
 }
 uniquepath
 
@@ -550,7 +550,7 @@ if [ ${DONOTWAIT} -eq 0 ]; then
   else
     echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
   fi
-  read -ern1
+  read ern1
   if [ "$REPLY" != '' ]; then
     exit 1
   fi
@@ -1261,7 +1261,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r '' x; do
     if [ -f "${x}" ]; then
       # find it relative filename
-	  f=$("$x" | sed "${NETDATA_PREFIX}\/etc\/netdata\//")
+	  f=$("$x" | sed "${NETDATA_PREFIX}%etc/netdata/")
 
       # find the stock filename
 	  t=$("${f}" | sed ".conf.installer_backup.*/.conf")
@@ -1578,12 +1578,12 @@ govercomp() {
   read -r ver1
   read -r ver2
 
-  if [ ${#ver1[@]} -eq 0 ] || [ ${#ver2[@]} -eq 0 ]; then
+  if [ ${#ver1} -eq 0 ] || [ ${#ver2} -eq 0 ]; then
     return 3
   fi
 
   local i
-  for i in $(seq 0 ${#ver1[@]}); do
+  for i in $(seq 0 ${#ver1}); do
     if [ "${ver1[i]}" -gt "${ver2[i]}" ]; then
       return 1
     elif [ "${ver2[i]}" -gt "${ver1[i]}" ]; then
@@ -1694,7 +1694,7 @@ install_go() {
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
   run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-  run mv -f "$GO_PACKAGE_BASENAME" | sed ".tar.gz" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  run mv -f "{$GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   if [ "${UID}" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   fi
