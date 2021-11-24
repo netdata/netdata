@@ -13,7 +13,11 @@ Monitors the fail2ban log file to show all bans for all active jails.
 - fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at
   logrotate.d)
 
-It produces one chart with multiple lines (one line per jail)
+## Charts
+
+- Failed attempts in attempts/s
+- Bans in bans/s
+- Banned IP addresses (since the last restart of netdata) in ips
 
 ## Configuration
 
