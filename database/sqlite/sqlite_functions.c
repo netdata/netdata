@@ -203,9 +203,14 @@ static int check_table_integrity(char *table)
     char *err_msg = NULL;
     char wstr[255];
 
-    info("Checking table %s", table);
-
-    snprintf(wstr, 254, "PRAGMA integrity_check(%s);", table);
+    if (table) {
+        info("Checking table %s", table);
+        snprintfz(wstr, 254, "PRAGMA integrity_check(%s);", table);
+    }
+    else {
+        info("Checking entire database");
+        strcpy(wstr,"PRAGMA integrity_check;");
+    }
 
     int rc = sqlite3_exec(db_meta, wstr, check_table_integrity_cb, (void *) &status, &err_msg);
     if (rc != SQLITE_OK) {
@@ -282,6 +287,41 @@ void rebuild_dimension()
     return;
 }
 
+static int attempt_database_fix()
+{
+    info("Closing database and attempting to fix it");
+    int rc = sqlite3_close(db_meta);
+    if (rc != SQLITE_OK)
+        error_report("Failed to close database, rc = %d", rc);
+    info("Attempting to fix database");
+    db_meta = NULL;
+    return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT);
+}
+
+static int init_database_batch(int rebuild, int init_type, const char *batch[])
+{
+    int rc;
+    char *err_msg = NULL;
+    for (int i = 0; batch[i]; i++) {
+        debug(D_METADATALOG, "Executing %s", batch[i]);
+        rc = sqlite3_exec(db_meta, batch[i], 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
+            error_report("SQLite failed statement %s", batch[i]);
+            sqlite3_free(err_msg);
+            if (SQLITE_CORRUPT == rc) {
+                if (!rebuild)
+                    return attempt_database_fix();
+                rc = check_table_integrity(NULL);
+                if (rc)
+                    error_report("Databse integrity errors reported");
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -302,10 +342,12 @@ int sql_init_database(db_check_action_type_t rebuild)
     }
 
     if (rebuild & (DB_CHECK_INTEGRITY | DB_CHECK_FIX_DB)) {
+        int errors_detected = 0;
         if (!(rebuild & DB_CHECK_CONT))
             info("Running database check on %s", sqlite_database);
 
         if (check_table_integrity("chart")) {
+            errors_detected++;
             if (rebuild & DB_CHECK_FIX_DB)
                 rebuild_chart();
             else
@@ -313,10 +355,16 @@ int sql_init_database(db_check_action_type_t rebuild)
         }
 
         if (check_table_integrity("dimension")) {
+            errors_detected++;
             if (rebuild & DB_CHECK_FIX_DB)
                 rebuild_dimension();
             else
                 error_report("Errors reported -- run with -W fix-database");
+        }
+
+        if (!errors_detected) {
+            if (check_table_integrity(NULL))
+                error_report("Errors reported");
         }
     }
 
@@ -335,45 +383,12 @@ int sql_init_database(db_check_action_type_t rebuild)
 
     info("SQLite database %s initialization", sqlite_database);
 
-    for (int i = 0; database_config[i]; i++) {
-        debug(D_METADATALOG, "Executing %s", database_config[i]);
-        rc = sqlite3_exec(db_meta, database_config[i], 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
-            error_report("SQLite failed statement %s", database_config[i]);
-            sqlite3_free(err_msg);
-            if (SQLITE_CORRUPT == rc && !rebuild) {
-                info("Closing database and attempting to fix it");
-                rc =  sqlite3_close(db_meta);
-                if (rc != SQLITE_OK)
-                    error_report("Failed to close database, rc = %d", rc);
-                info("Attempting to fix database");
-                db_meta = NULL;
-                return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT);
-            }
-            return 1;
-        }
-    }
+    if (init_database_batch(rebuild, 0, &database_config[0]))
+        return 1;
 
-    for (int i = 0; database_cleanup[i]; i++) {
-        debug(D_METADATALOG, "Executing %s", database_cleanup[i]);
-        rc = sqlite3_exec(db_meta, database_cleanup[i], 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("SQLite error during database cleanup, rc = %d (%s)", rc, err_msg);
-            error_report("SQLite failed statement %s", database_cleanup[i]);
-            sqlite3_free(err_msg);
-            if (SQLITE_CORRUPT == rc && !rebuild) {
-                info("Closing database and attempting to fix it");
-                rc =  sqlite3_close(db_meta);
-                if (rc != SQLITE_OK)
-                    error_report("Failed to close database, rc = %d", rc);
-                info("Attempting to fix database");
-                db_meta = NULL;
-                return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT);
-            }
-            return 1;
-        }
-    }
+    if (init_database_batch(rebuild, 0, &database_cleanup[0]))
+        return 1;
+
     fatal_assert(0 == uv_mutex_init(&sqlite_transaction_lock));
     info("SQLite database initialization completed");
     return 0;
