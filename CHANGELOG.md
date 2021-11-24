@@ -161,8 +161,6 @@
 - add proc\_net\_dev charts info [\#11543](https://github.com/netdata/netdata/pull/11543) ([ilyam8](https://github.com/ilyam8))
 - add proc\_meminfo charts info [\#11541](https://github.com/netdata/netdata/pull/11541) ([ilyam8](https://github.com/ilyam8))
 - Fix installer flag --use-system-protobuf [\#11539](https://github.com/netdata/netdata/pull/11539) ([underhood](https://github.com/underhood))
-- add proc\_mdstat charts info [\#11537](https://github.com/netdata/netdata/pull/11537) ([ilyam8](https://github.com/ilyam8))
-- Add New Cloud Protocol files to CMake [\#11536](https://github.com/netdata/netdata/pull/11536) ([underhood](https://github.com/underhood))
 - Fix coverity issues for health config [\#11535](https://github.com/netdata/netdata/pull/11535) ([MrZammler](https://github.com/MrZammler))
 - Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
