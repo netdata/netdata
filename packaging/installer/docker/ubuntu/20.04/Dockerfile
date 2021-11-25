@@ -1,8 +1,10 @@
-FROM ubuntu:20.10
+FROM ubuntu:20.04
 
 RUN apt-get update
 
-RUN apt-get install -y git
+RUN apt-get install -y tzdata
+
+RUN apt-get install -y git 
 
 RUN git clone https://github.com/netdata/netdata.git -b packaging-split
 

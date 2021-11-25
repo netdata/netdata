@@ -1,6 +1,8 @@
-FROM ubuntu:20.10
+FROM ubuntu:21.04
 
 RUN apt-get update
+
+RUN apt-get install -y tzdata
 
 RUN apt-get install -y git
 

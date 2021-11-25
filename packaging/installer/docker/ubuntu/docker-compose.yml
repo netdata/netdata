@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  ubuntu-1804:
+    build: ./18.04
+  ubuntu-2004:
+    build: ./20.04
+  ubuntu-2010:
+    build: ./20.10
+  ubuntu-2104:
+    build: ./21.04
+  ubuntu-2110:
+    build: ./21.10
