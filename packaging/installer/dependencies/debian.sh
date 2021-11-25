@@ -1,24 +1,9 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
 # << Debian >>
-# supported versions: 8, 9, 10, 11
+# supported versions: 9, 10, 11
 
 set -e
-
-function os_version {
-  if [[ -f /etc/os-release ]]; then
-    cat /etc/os-release | grep VERSION_ID | cut -d'=' -f2 | cut -d'"' -f2
-  else
-    echo "Erorr: Cannot determine OS version!"
-    exit 1
-  fi
-}
-
-if [[ $(os_version) -gt 8 ]]; then
-  libuv=libuv1-dev
-else
-  libuv=libuv-dev
-fi
 
 package_tree="
   git
@@ -40,7 +25,7 @@ package_tree="
   uuid-dev
   libmnl-dev
   libjson-c-dev
-  ${libuv}
+  libuv1-dev
   liblz4-dev
   libssl-dev
   libjudy-dev
