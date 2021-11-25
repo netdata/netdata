@@ -206,6 +206,7 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
     if (buffer != r->read_buffer + r->read_len) {
         // read to external buffer
         *ret = fread(buffer, 1, size, fp);
+        info("STREAM: Decompressor is active in receiver side.");
         if (!*ret)
             return 1;
     } else {
