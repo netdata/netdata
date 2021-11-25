@@ -1557,8 +1557,8 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         system_info->container_os_version_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
-        freez(system_info->host_os_detection);
-        system_info->host_os_detection = strdupz(value);
+        freez(system_info->container_os_detection);
+        system_info->container_os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
         freez(system_info->host_os_name);
