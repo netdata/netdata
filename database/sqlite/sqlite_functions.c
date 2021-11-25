@@ -214,7 +214,8 @@ static int check_table_integrity(char *table)
 
     int rc = sqlite3_exec(db_meta, wstr, check_table_integrity_cb, (void *) &status, &err_msg);
     if (rc != SQLITE_OK) {
-        error_report("SQLite error during database integrity check for table %s, rc = %d (%s)", table, rc, err_msg);
+        error_report("SQLite error during database integrity check for %s, rc = %d (%s)",
+                     table ? table : "the entire database", rc, err_msg);
         sqlite3_free(err_msg);
     }
 
