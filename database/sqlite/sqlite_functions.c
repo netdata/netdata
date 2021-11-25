@@ -351,7 +351,7 @@ int sql_init_database(db_check_action_type_t rebuild)
             if (rebuild & DB_CHECK_FIX_DB)
                 rebuild_chart();
             else
-                error_report("Errors reported -- run with -W fix-database");
+                error_report("Errors reported -- run with -W fix-sqlite-database");
         }
 
         if (check_table_integrity("dimension")) {
@@ -359,7 +359,7 @@ int sql_init_database(db_check_action_type_t rebuild)
             if (rebuild & DB_CHECK_FIX_DB)
                 rebuild_dimension();
             else
-                error_report("Errors reported -- run with -W fix-database");
+                error_report("Errors reported -- run with -W fix-sqlite-database");
         }
 
         if (!errors_detected) {
