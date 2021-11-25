@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Set NETDATA\_CONTAINER\_OS\_DETECTION properly [\#11827](https://github.com/netdata/netdata/pull/11827) ([MrZammler](https://github.com/MrZammler))
+- feat\(apps.plugin\): add aws to apps\_groups.conf [\#11826](https://github.com/netdata/netdata/pull/11826) ([ilyam8](https://github.com/ilyam8))
 - Don't use wc struct if it might not exist [\#11820](https://github.com/netdata/netdata/pull/11820) ([MrZammler](https://github.com/MrZammler))
 - specify pip3 when installing git-semver package [\#11817](https://github.com/netdata/netdata/pull/11817) ([maneamarius](https://github.com/maneamarius))
 - Cleanup compilation warnings [\#11810](https://github.com/netdata/netdata/pull/11810) ([stelfrag](https://github.com/stelfrag))
@@ -159,9 +161,6 @@
 - add proc\_net\_ip\_vs\_stats charts info [\#11546](https://github.com/netdata/netdata/pull/11546) ([ilyam8](https://github.com/ilyam8))
 - fix proc collector: Undefined state DEGRADED for zpool [\#11545](https://github.com/netdata/netdata/pull/11545) ([elelayan](https://github.com/elelayan))
 - add proc\_net\_dev charts info [\#11543](https://github.com/netdata/netdata/pull/11543) ([ilyam8](https://github.com/ilyam8))
-- add proc\_meminfo charts info [\#11541](https://github.com/netdata/netdata/pull/11541) ([ilyam8](https://github.com/ilyam8))
-- Fix installer flag --use-system-protobuf [\#11539](https://github.com/netdata/netdata/pull/11539) ([underhood](https://github.com/underhood))
-- Fix coverity issues for health config [\#11535](https://github.com/netdata/netdata/pull/11535) ([MrZammler](https://github.com/MrZammler))
 - Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 - Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
