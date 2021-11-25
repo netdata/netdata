@@ -553,8 +553,11 @@ if test "${enable_compression}" != "no"; then
         enable_compression="yes"
         AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
     else
+        if test "${enable_compression}" == "yes"; then
+            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+            enable_compression="no"
+        fi
         enable_compression="no"
-        AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
     fi
 else
     enable_compression="no"
