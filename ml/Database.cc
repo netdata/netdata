@@ -60,7 +60,7 @@ const char *ml::Database::SQL_INSERT_BULK_ANOMALY_RATE_INFO =
     "  AND json_valid(ari.anomaly_rates)) "
     "  GROUP BY dimension_id;";*/
 
-const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
+ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "SELECT  main.dimension_id, "
     " ((pre.avg * (SELECT before-after FROM anomaly_rate_info WHERE after <= ?2 ORDER BY after DESC LIMIT 1)) + "
     " (main.avg * ((SELECT before FROM anomaly_rate_info WHERE before <= ?3 ORDER BY before DESC LIMIT 1) - "
@@ -98,7 +98,7 @@ const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "  GROUP BY dimension_id) AS post "
     " ON main.dimension_id = post.dimension_id "
     "GROUP BY main.dimension_id;";
-
+ 
 const char *ml::Database::SQL_SHRINK_ANOMALY_RATE_INFO =
     "DELETE FROM anomaly_rate_info "
     " WHERE after NOT IN ( "
