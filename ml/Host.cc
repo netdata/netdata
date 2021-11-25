@@ -390,6 +390,9 @@ void DetectableHost::detectOnce() {
                 D->setAnomalousBitCount(D->getAnomalousBitCount() + 1);
             }
 
+            /*regardless the dimension value was anomalous or not, update the value of the percentage of anomalous dimension*/            
+            D->setAnomalyPercentage((D->getAnomalousBitCount() / ((Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * static_cast<double>(updateEvery()))) * 100.0);
+            
             /*if the counting window is exhausted, push and then reset the counter*/
             if(AnomalyBitCounterWindow == 0) {
                 double AnomalyPercentage = (D->getAnomalousBitCount() / (Cfg.SaveAnomalyPercentageEvery * static_cast<double>(updateEvery()))) * 100.0;

@@ -89,8 +89,10 @@ public:
     bool isAnomalous() { return AnomalyBit; }
 
     double getAnomalousBitCount() { return AnomalousBitCount; }
-
     void setAnomalousBitCount(double dAnomalousBitCount) { AnomalousBitCount = dAnomalousBitCount; }
+
+    double getAnomalyPercentage() { return AnomalyPercentage; }
+    void setAnomalyPercentage(double dAnomalyPercentage) { AnomalyPercentage = dAnomalyPercentage; }
 
 private:
     CalculatedNumber AnomalyScore{0.0};
@@ -98,7 +100,10 @@ private:
 
     std::vector<CalculatedNumber> CNs;
 
+    /*The bit count used to work out the percentage of anomalous dimension within given period*/
     double AnomalousBitCount{0.0};
+    /*The live value of the percentage of anomalous dimension used before a full period is met*/
+    double AnomalyPercentage{0.0};
 };
 
 class DetectableDimension : public PredictableDimension {

@@ -71,9 +71,47 @@ public:
         return DB.getAnomaliesInRange(Args...);
     }
 
-    template<typename ...ArgTypes>
-    bool getAnomalyRateInfoInRange(ArgTypes&&... Args) {
-        return DB.getAnomalyRateInfoInRange(Args...);
+    //template<typename ...ArgTypes>
+    //bool getAnomalyRateInfoInRange(ArgTypes&&... Args) {
+    bool getAnomalyRateInfoInRange(std::vector<std::pair<std::string, double>> V, std::string HostUUID, time_t After, time_t Before) { 
+        /*time_t CompletePeriod = static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery * updateEvery());
+        time_t CompleteAfter = 0;
+        time_t CompleteBefore = 0;
+        time_t PreCompleteAfter = 0;
+        time_t PostCompleteBefore = 0;
+        time_t FromNowToAfter = 0;
+        time_t FromNowToBefore = 0;
+        size_t NumOfCompletePeriods = 0;
+        size_t BeforePortionCoeff = 1;
+        size_t AfterPortionCoeff = 1;
+        //Work out CompleteBefore and the remaining after it
+        info("Now = %ld, After = %ld, Before = %ld", now_realtime_sec(), After, Before);
+        FromNowToBefore = now_realtime_sec() - Before;
+        //info("FromNowToBefore = %ld", FromNowToBefore);
+        NumOfCompletePeriods = static_cast<size_t>(FromNowToBefore / CompletePeriod);
+        //info("NumOfCompletePeriods = %ld", NumOfCompletePeriods);
+        CompleteBefore = now_realtime_sec() - ((NumOfCompletePeriods + 1) * CompletePeriod) - ((Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * updateEvery());
+        info("CompleteBefore = %ld", CompleteBefore);
+        BeforePortionCoeff = static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery / (Before - CompleteBefore));
+        //info("BeforePortionCoeff = %ld", BeforePortionCoeff);
+        //Work out CompleteAfter and the remaining before it
+        FromNowToAfter = now_realtime_sec() - After;
+        //info("FromNowToAfter = %ld", FromNowToAfter);
+        NumOfCompletePeriods = static_cast<size_t>(FromNowToAfter / CompletePeriod);
+        //info("NumOfCompletePeriods = %ld", NumOfCompletePeriods);
+        CompleteAfter = now_realtime_sec() - ((NumOfCompletePeriods) * CompletePeriod) - ((Cfg.SaveAnomalyPercentageEvery - AnomalyBitCounterWindow) * updateEvery());
+        info("CompleteAfter = %ld", CompleteAfter);
+        AfterPortionCoeff = static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery / (CompleteAfter - After));
+        //info("AfterPortionCoeff = %ld", AfterPortionCoeff);
+        //Now, work out how many complete period exists between the two complete pointers, i.e. CompleteAfter and CompleteBefore
+        NumOfCompletePeriods = static_cast<size_t>((CompleteBefore - CompleteAfter) / CompletePeriod);
+        //info("NumOfCompletePeriods = %ld", NumOfCompletePeriods);
+        PreCompleteAfter = After - CompletePeriod; // using After instead of CompleteAfter is a bit safer as if CompleteAfter is not sharp on a saved timestamp
+        info("PreCompleteAfter = %ld", PreCompleteAfter);
+        PostCompleteBefore = Before + CompletePeriod;  // using Before instead of CompleteBefore is a bit safer as if CompleteBefore is not sharp on a saved timestamp
+        info("PostCompleteBefore = %ld", PostCompleteBefore);
+        //return DB.getAnomalyRateInfoInRange(V, HostUUID, CompleteAfter, CompleteBefore, PreCompleteAfter, PostCompleteBefore, NumOfCompletePeriods, AfterPortionCoeff, BeforePortionCoeff);*/
+        return DB.getAnomalyRateInfoInRange(V, HostUUID, After, Before);
     }
 
     void getDetectionInfoAsJson(nlohmann::json &Json) const;

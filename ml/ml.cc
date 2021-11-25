@@ -127,9 +127,9 @@ char *ml_get_anomaly_event_info(RRDHOST *RH, const char *AnomalyDetectorName,
 
     nlohmann::json Json;
     bool Res = H->getAnomalyInfo(Json, AnomalyDetectorName,
-                                       AnomalyDetectorVersion,
-                                       H->getUUID(),
-                                       After, Before);
+                                    AnomalyDetectorVersion,
+                                    H->getUUID(),
+                                    After, Before);
     if (!Res) {
         error("DB result is empty");
         return nullptr;
@@ -146,13 +146,39 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
 
     Host *H = static_cast<Host *>(RH->ml_host);
     std::vector<std::pair<std::string, double>> DimAndAnomalyRate;
+    
+    /*before calling the function to get the anomaly percentages, check if the before time
+    ... exists or the given time range is current*/
+    /*if((Before == 9999999999) || (Before >= now_realtime_sec())) {
+        //This is the case of "from After up to the current time"
+        time_t FullPeriod = now_realtime_sec() - After;
+        time_t LastPortion = FullPeriod % (Cfg.SaveAnomalyPercentageEvery * updateEvery());
+        if(FullPeriod > LastPortion) {
+            //There are some complete periods though, for which we read the saved values in the database
+            time_t CompletePeriodBefore = FullPeriod - LastPortion;
+            bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),
+                                                    After, CompletePeriodBefore);
+            if (!Res) {
+                error("DB result is empty");
+                return nullptr;
+            }
 
-    bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),
-                                                  After, Before);
-    if (!Res) {
-        error("DB result is empty");
-        return nullptr;
+        }
+        if(LastPortion > 0) {
+            //There is one last period shorter than a complete period, get the live value...
+
+        }
+
     }
+    else {*/
+        bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),
+                                                    After, Before);
+        if (!Res) {
+            error("DB result is empty");
+            return nullptr;
+        }
+    //}
+
     nlohmann::json Json = DimAndAnomalyRate;
     return strdup(Json.dump(4).c_str());
 }
