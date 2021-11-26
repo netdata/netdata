@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add a note about pkg-config file location for freeipmi [\#11831](https://github.com/netdata/netdata/pull/11831) ([vlvkobal](https://github.com/vlvkobal))
+- Add commands to check and fix database corruption [\#11828](https://github.com/netdata/netdata/pull/11828) ([stelfrag](https://github.com/stelfrag))
 - Set NETDATA\_CONTAINER\_OS\_DETECTION properly [\#11827](https://github.com/netdata/netdata/pull/11827) ([MrZammler](https://github.com/MrZammler))
 - feat\(apps.plugin\): add aws to apps\_groups.conf [\#11826](https://github.com/netdata/netdata/pull/11826) ([ilyam8](https://github.com/ilyam8))
 - Don't use wc struct if it might not exist [\#11820](https://github.com/netdata/netdata/pull/11820) ([MrZammler](https://github.com/MrZammler))
@@ -159,9 +161,6 @@
 - Anomaly Detection MVP [\#11548](https://github.com/netdata/netdata/pull/11548) ([vkalintiris](https://github.com/vkalintiris))
 - Update ebpf dashboard [\#11547](https://github.com/netdata/netdata/pull/11547) ([thiagoftsm](https://github.com/thiagoftsm))
 - add proc\_net\_ip\_vs\_stats charts info [\#11546](https://github.com/netdata/netdata/pull/11546) ([ilyam8](https://github.com/ilyam8))
-- fix proc collector: Undefined state DEGRADED for zpool [\#11545](https://github.com/netdata/netdata/pull/11545) ([elelayan](https://github.com/elelayan))
-- add proc\_net\_dev charts info [\#11543](https://github.com/netdata/netdata/pull/11543) ([ilyam8](https://github.com/ilyam8))
-- Use the correct exit status for the updater with static updates. [\#11520](https://github.com/netdata/netdata/pull/11520) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of claiming in kickstart script when running as non-root. [\#11507](https://github.com/netdata/netdata/pull/11507) ([Ferroin](https://github.com/Ferroin))
 - Added static builds for ARMv7l and ARMv8a [\#11490](https://github.com/netdata/netdata/pull/11490) ([Ferroin](https://github.com/Ferroin))
 - Update alarms info [\#11481](https://github.com/netdata/netdata/pull/11481) ([ilyam8](https://github.com/ilyam8))
