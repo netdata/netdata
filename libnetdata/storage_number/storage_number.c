@@ -2,17 +2,23 @@
 
 #include "../libnetdata.h"
 
+#define get_storage_number_flags(value) \
+    ((((storage_number)(value)) & (1 << 24)) | \
+     (((storage_number)(value)) & (1 << 25)) | \
+     (((storage_number)(value)) & (1 << 26)))
+
 storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     // bit 27 SN_EXISTS_100
     // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_EXISTS
+    // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
     storage_number r = get_storage_number_flags(flags);
-    if(!value) return r;
+    if(!value)
+        goto RET_SN;
 
     int m = 0;
     calculated_number n = value, factor = 10;
@@ -47,7 +53,7 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
             error("Number " CALCULATED_NUMBER_FORMAT " is too big.", value);
             #endif
             r += 0x00ffffff;
-            return r;
+            goto RET_SN;
         }
     }
     else {
@@ -78,6 +84,10 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     r += (storage_number)n;
 #endif
 
+RET_SN:
+    if (r == SN_EMPTY_SLOT)
+        r = SN_ANOMALOUS_ZERO;
+
     return r;
 }
 
@@ -100,7 +110,7 @@ calculated_number unpack_storage_number(storage_number value) {
         factor = 100;
 
     // bit 26 SN_EXISTS_RESET
-    // bit 25 SN_EXISTS
+    // bit 25 SN_ANOMALY_BIT
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;

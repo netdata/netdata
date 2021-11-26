@@ -26,8 +26,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --install /usr/local/
 ```
 
-> See our [installation guide](../README.md) for details about [automatic updates](../README.md#automatic-updates) or
-> [nightly vs. stable releases](../README.md#nightly-vs-stable-releases).
+> See our [installation guide](/packaging/installer/README.md) for details about [automatic updates](/packaging/installer/README.md#automatic-updates) or
+> [nightly vs. stable releases](/packaging/installer/README.md#nightly-vs-stable-releases).
 
 ## What does `kickstart.sh` do?
 
@@ -48,20 +48,25 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, which you can use to customize your
 installation. Here are a few important parameters:
 
--   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
--   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
--   `--stable-channel`: Automatically update only on the release of new major versions.
--   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
-    Netdata better.
--   `--no-updates`: Prevent automatic updates of any kind.
--   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
-    cannot be used to change installation types.
--   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
+- `--dont-wait`: Synonym for `--non-interactive`
+- `--non-interactive`: Don’t prompt for anything and assume yes whenever possible.
+- `--no-updates`: Disable automatic updates.
+- `--stable-channel`: Use a stable build instead of a nightly build.
+- `--reinstall`: If an existing install is found, reinstall instead of trying to update it in place.
+- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
+- `--install`: Specify an alternative install prefix. 
+- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds, 
+    use runtime configuration to disable cloud support.
+- `--auto-update-type`: Specify how auto-updates are to be scheduled, overriding auto-detection. 
+- `--disable-telemetry`: Disable anonymous statistics. 
+- `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
-
+-    `all`: Ask for all dependencies in the dependency handling script. 
+     
+ > Note: The `all` and `--local-files` parameters are scheduled to be removed in a forthcoming update. 
+ 
 ### Connect node to Netdata Cloud during installation
 
 The `kickstart.sh` script accepts additional parameters to automatically [connect](/claim/README.md) your node to Netdata
@@ -69,12 +74,13 @@ Cloud immediately after installation. Find the `token` and `rooms` strings by [s
 Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** in the [Spaces management
 area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 
-- `--claim-token`: The unique token associated with your Space in Netdata Cloud.
-- `--claim-rooms`: A comma-separated list of tokens for each War Room this node should appear in.
-- `--claim-proxy`: Should take the form of `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or
-  `http://[user:pass@]host:ip` for an HTTP(S) proxy.See [connecting through a
-  proxy](/claim/README.md#connect-through-a-proxy) for details.
-- `--claim-url`: Defaults to `https://app.netdata.cloud`.
+- `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node 
+  after the install.
+- `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
+- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of 
+  `socks5[h]://[user:pass@]host:ip` for a SOCKS5 proxy, or `http://[user:pass@]host:ip` for an HTTP(S) proxy.
+  See [connecting through a proxy](/claim/README.md#connect-through-a-proxy) for details.
+- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
 
 For example:
 
@@ -90,7 +96,7 @@ To use `md5sum` to verify the integrity of the `kickstart.sh` script you will do
 run the following:
 
 ```bash
-[ "755019025d721fc199d52f7fb62d3420" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "7e8b449ca44e49b7074b5b9d6022cbcc" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 If the script is valid, this command will return `OK, VALID`.

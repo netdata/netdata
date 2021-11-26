@@ -15,6 +15,9 @@ typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 typedef struct context_param CONTEXT_PARAM;
 
+typedef void *ml_host_t;
+typedef void *ml_dimension_t;
+
 // forward declarations
 struct rrddim_volatile;
 struct rrdset_volatile;
@@ -35,6 +38,7 @@ struct pg_cache_page_index;
 #include "rrdcalctemplate.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
+#include "sqlite/sqlite_health.h"
 
 enum {
     CONTEXT_FLAGS_ARCHIVE = 0x01,
@@ -49,6 +53,7 @@ struct context_param {
     uint8_t flags;
 };
 
+#define RRDSET_MINIMUM_LIVE_COUNT 3
 #define META_CHART_UPDATED 1
 #define META_PLUGIN_UPDATED 2
 #define META_MODULE_UPDATED 4
@@ -162,7 +167,8 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 3)
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
+    RRDDIM_FLAG_ACLK                            = (1 << 4)
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -379,6 +385,9 @@ struct rrddim_volatile {
     uuid_t *rrdeng_uuid;                 // database engine metric UUID
     struct pg_cache_page_index *page_index;
 #endif
+#ifdef ENABLE_ACLK
+    int aclk_live_status;
+#endif
     uuid_t metric_uuid;                 // global UUID for this metric (unique_across hosts)
     union rrddim_collect_handle handle;
     // ------------------------------------------------------------------------
@@ -415,6 +424,8 @@ struct rrddim_volatile {
         // get the timestamp of the first entry of this metric
         time_t (*oldest_time)(RRDDIM *rd);
     } query_ops;
+
+    ml_dimension_t ml_dimension;
 };
 
 // ----------------------------------------------------------------------------
@@ -422,6 +433,7 @@ struct rrddim_volatile {
 struct rrdset_volatile {
     char *old_title;
     char *old_context;
+    uuid_t hash_id;
     struct label *new_labels;
     struct label_index labels;
 };
@@ -650,6 +662,7 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    uuid_t config_hash_id;
 
     time_t when;
     time_t duration;
@@ -867,6 +880,10 @@ struct rrdhost {
     // locks
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
+
+    // ------------------------------------------------------------------------
+    // ML handle
+    ml_host_t ml_host;
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
@@ -1133,7 +1150,10 @@ static inline time_t rrdset_first_entry_t_nolock(RRDSET *st)
         time_t first_entry_t = LONG_MAX;
 
         rrddim_foreach_read(rd, st) {
-            first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
+            first_entry_t =
+                MIN(first_entry_t,
+                    rd->state->query_ops.oldest_time(rd) > st->update_every ?
+                        rd->state->query_ops.oldest_time(rd) - st->update_every : 0);
         }
 
         if (unlikely(LONG_MAX == first_entry_t)) return 0;
@@ -1352,4 +1372,8 @@ extern void set_host_properties(
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_aclk.h"
+#include "sqlite/sqlite_aclk_chart.h"
+#include "sqlite/sqlite_aclk_alert.h"
+#include "sqlite/sqlite_aclk_node.h"
+#include "sqlite/sqlite_health.h"
 #endif /* NETDATA_RRD_H */

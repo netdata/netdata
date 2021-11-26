@@ -58,7 +58,7 @@ struct aclk_lws_wss_engine_instance {
     struct lws_wss_packet_buffer *write_buffer_head;
     struct lws_ring *read_ringbuffer;
 
-    //flags to be readed by engine user
+    //flags to be read by engine user
     int websocket_connection_up;
 
     // currently this is by default disabled

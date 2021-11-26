@@ -389,6 +389,7 @@ static inline void do_dimension_variablestep(
         , long dim_id_in_rrdr
         , time_t after_wanted
         , time_t before_wanted
+        , uint32_t options
 ){
 //  RRDSET *st = r->st;
 
@@ -445,7 +446,11 @@ static inline void do_dimension_variablestep(
             // db_now has a different value than above
             if (likely(now >= db_now)) {
                 if (likely(does_storage_number_exist(n_curr))) {
-                    value = unpack_storage_number(n_curr);
+                    if (options & RRDR_OPTION_ANOMALY_BIT)
+                        value = (n_curr & SN_ANOMALY_BIT) ? 0.0 : 100.0;
+                    else
+                        value = unpack_storage_number(n_curr);
+
                     if (likely(value != 0.0))
                         values_in_group_non_zero++;
 
@@ -530,8 +535,11 @@ static inline void do_dimension_fixedstep(
         , long dim_id_in_rrdr
         , time_t after_wanted
         , time_t before_wanted
+        , uint32_t options
 ){
+#ifdef NETDATA_INTERNAL_CHECKS
     RRDSET *st = r->st;
+#endif
 
     time_t
             now = after_wanted,
@@ -593,7 +601,11 @@ static inline void do_dimension_fixedstep(
                     error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)handle.rrdeng.now, (long)now);
                 }
 #endif
-                value = unpack_storage_number(n);
+                if (options & RRDR_OPTION_ANOMALY_BIT)
+                    value = (n & SN_ANOMALY_BIT) ? 0.0 : 100.0;
+                else
+                    value = unpack_storage_number(n);
+
                 if(likely(value != 0.0))
                     values_in_group_non_zero++;
 
@@ -1100,6 +1112,7 @@ static RRDR *rrd2rrdr_fixedstep(
                 , c
                 , after_wanted
                 , before_wanted
+                , options
                 );
 
         if(r->od[c] & RRDR_DIMENSION_NONZERO)
@@ -1476,6 +1489,7 @@ static RRDR *rrd2rrdr_variablestep(
                 , c
                 , after_wanted
                 , before_wanted
+                , options
         );
 
         if(r->od[c] & RRDR_DIMENSION_NONZERO)

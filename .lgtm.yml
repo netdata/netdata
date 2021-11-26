@@ -17,6 +17,8 @@ path_classifiers:
     - collectors/node.d.plugin/node_modules/extend.js
     - collectors/node.d.plugin/node_modules/net-snmp.js
     - collectors/node.d.plugin/node_modules/pixl-xml.js
+    - ml/kmeans/dlib/
+    - ml/json/
     - web/gui/lib/
     - web/gui/src/
     - web/gui/css/

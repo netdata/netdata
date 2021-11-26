@@ -427,7 +427,9 @@ void attempt_to_send(struct sender_state *s) {
 
     rrdpush_send_labels(s->host);
 
+#ifdef NETDATA_INTERNAL_CHECKS
     struct circular_buffer *cb = s->buffer;
+#endif
 
     netdata_thread_disable_cancelability();
     netdata_mutex_lock(&s->mutex);

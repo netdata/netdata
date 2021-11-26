@@ -3,7 +3,7 @@
 name: Pull Request Labeler
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
 env:
   DO_NOT_TRACK: 1
 jobs:

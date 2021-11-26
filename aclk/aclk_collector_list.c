@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// This is copied from Legacy ACLK, Original Autor: amoss
+// This is copied from Legacy ACLK, Original Author: amoss
 
 // TODO unmess this
 

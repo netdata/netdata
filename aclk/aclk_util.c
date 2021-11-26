@@ -4,14 +4,10 @@
 
 #include "daemon/common.h"
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN 37
-#endif
-
 int aclk_use_new_cloud_arch = 0;
 usec_t aclk_session_newarch = 0;
+
+aclk_env_t *aclk_env = NULL;
 
 int chart_batch_id;
 
@@ -55,6 +51,15 @@ void aclk_env_t_destroy(aclk_env_t *env) {
             freez(env->capabilities[i]);
         freez(env->capabilities);
     }
+}
+
+int aclk_env_has_capa(const char *capa)
+{
+    for (int i = 0; i < (int) aclk_env->capability_count; i++) {
+        if (!strcasecmp(capa, aclk_env->capabilities[i]))
+            return 1;
+    }
+    return 0;
 }
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
@@ -128,6 +133,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_ALARM_LOG,             .name = "alarm-log"                },
     { .id = ACLK_TOPICID_ALARM_HEALTH,          .name = "alarm-health"             },
     { .id = ACLK_TOPICID_ALARM_CONFIG,          .name = "alarm-config"             },
+    { .id = ACLK_TOPICID_ALARM_SNAPSHOT,        .name = "alarm-snapshot"           },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
@@ -157,6 +163,7 @@ enum aclk_topics compulsory_topics_new_cloud_arch[] = {
     ACLK_TOPICID_ALARM_LOG,
     ACLK_TOPICID_ALARM_HEALTH,
     ACLK_TOPICID_ALARM_CONFIG,
+    ACLK_TOPICID_ALARM_SNAPSHOT,
     ACLK_TOPICID_UNKNOWN
 };
 

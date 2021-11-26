@@ -110,6 +110,13 @@ bother you with notifications.
 The best way to understand how health entities work is building your own and experimenting with the options. To start,
 let's build a health entity that triggers an alarm when system RAM usage goes above 80%.
 
+We will first create a new file inside of the `health.d/` directory. We'll name our file
+`example.conf` for now.
+
+```bash
+./edit-config health.d/example.conf
+```
+
 The first line in a health entity will be `alarm:`. This is how you name your entity. You can give it any name you
 choose, but the only symbols allowed are `.` and `_`. Let's call the alarm `ram_usage`.
 

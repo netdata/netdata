@@ -85,7 +85,7 @@ by the `netdata` user.
 
 ```bash
 sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
-sudo chown netdata:netdata /etc/netdata/ssl/cert.pem k/etc/netdata/ssl/ey.pem
+sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
 ```
 
 Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind

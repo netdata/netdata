@@ -106,6 +106,7 @@ REQ_BODY="$(cat << EOF
         "container_os_version": "${NETDATA_CONTAINER_OS_VERSION}",
         "container_os_version_id": "${NETDATA_CONTAINER_OS_VERSION_ID}",
         "container_os_detection": "${NETDATA_CONTAINER_OS_DETECTION}",
+        "container_is_official_image": ${NETDATA_CONTAINER_IS_OFFICIAL_IMAGE},
         "system_cpu_detection": "${NETDATA_SYSTEM_CPU_DETECTION}",
         "system_cpu_freq": "${NETDATA_SYSTEM_CPU_FREQ}",
         "system_cpu_logical_cpu_count": "${NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT}",

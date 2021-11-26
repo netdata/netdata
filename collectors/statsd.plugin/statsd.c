@@ -2180,8 +2180,8 @@ void *statsd_main(void *ptr) {
         statsd.histogram_percentile = 95.0;
     }
     {
-        char buffer[100 + 1];
-        snprintf(buffer, 100, "%0.1f%%", statsd.histogram_percentile);
+        char buffer[314 + 1];
+        snprintfz(buffer, 314, "%0.1f%%", statsd.histogram_percentile);
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 
@@ -2441,7 +2441,7 @@ void *statsd_main(void *ptr) {
         char title[100 + 1];
 
         snprintfz(id, 100, "plugin_statsd_collector%d_cpu", i + 1);
-        snprintfz(title, 100, "NetData statsd collector thread No %d CPU usage", i + 1);
+        snprintfz(title, 100, "Netdata statsd collector thread No %d CPU usage", i + 1);
 
         statsd.collection_threads_status[i].st_cpu = rrdset_create_localhost(
                 "netdata"

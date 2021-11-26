@@ -37,8 +37,6 @@ typedef struct ebpf_sync_syscalls {
 
     struct bpf_object *objects;
     struct bpf_link **probe_links;
-
-    ebpf_data_t kernel_info;
 } ebpf_sync_syscalls_t;
 
 enum netdata_sync_charts {

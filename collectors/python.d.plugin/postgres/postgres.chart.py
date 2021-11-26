@@ -196,7 +196,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_wal') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_wal/'||name)).modification,
+        (pg_stat_file('pg_wal/'||name, true)).modification,
         wal.name DESC) sub;
 """,
     V96: """
@@ -223,7 +223,7 @@ FROM
     FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
     WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
-        (pg_stat_file('pg_xlog/'||name)).modification,
+        (pg_stat_file('pg_xlog/'||name, true)).modification,
         wal.name DESC) sub;
 """,
 }
@@ -455,7 +455,8 @@ FROM pg_stat_database
 WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
-    AND NOT datname ~* '^template\d';
+    AND NOT datname ~* '^template\d'
+ORDER BY datname;
 """,
 }
 

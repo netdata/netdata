@@ -10,7 +10,6 @@ static ebpf_local_maps_t mount_maps[] = {{.name = "tbl_mount", .internal_input =
                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-static ebpf_data_t mount_data;
 static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = { "mount", "umount" };
 static netdata_syscall_stat_t mount_aggregated_data[NETDATA_EBPF_MOUNT_SYSCALL];
 static netdata_publish_syscall_t mount_publish_aggregated[NETDATA_EBPF_MOUNT_SYSCALL];
@@ -112,7 +111,7 @@ void *ebpf_mount_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_time;
+    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
     while (!close_ebpf_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
@@ -125,7 +124,7 @@ void *ebpf_mount_read_hash(void *ptr)
 }
 
 /**
- * Send data to Netdata calling auxiliar functions.
+ * Send data to Netdata calling auxiliary functions.
 */
 static void ebpf_mount_send_data()
 {
@@ -157,15 +156,21 @@ static void mount_collector(ebpf_module_t *em)
     netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_JOINABLE,
                           ebpf_mount_read_hash, em);
 
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!close_ebpf_plugin) {
         pthread_mutex_lock(&collect_data_mutex);
         pthread_cond_wait(&collect_data_cond_var, &collect_data_mutex);
 
-        pthread_mutex_lock(&lock);
+        if (++counter == update_every) {
+            counter = 0;
+            pthread_mutex_lock(&lock);
 
-        ebpf_mount_send_data();
+            ebpf_mount_send_data();
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
+
         pthread_mutex_unlock(&collect_data_mutex);
     }
 }
@@ -180,8 +185,10 @@ static void mount_collector(ebpf_module_t *em)
  * Create mount charts
  *
  * Call ebpf_create_chart to create the charts for the collector.
+ *
+ * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_mount_charts()
+static void ebpf_create_mount_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
                       "Calls to mount and umount syscalls.",
@@ -191,7 +198,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                       ebpf_create_global_dimension,
                       mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      NETDATA_EBPF_MODULE_NAME_MOUNT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
                       "Errors to mount and umount syscalls.",
@@ -201,7 +208,7 @@ static void ebpf_create_mount_charts()
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                       ebpf_create_global_dimension,
                       mount_publish_aggregated, NETDATA_EBPF_MOUNT_SYSCALL,
-                      NETDATA_EBPF_MODULE_NAME_MOUNT);
+                      update_every, NETDATA_EBPF_MODULE_NAME_MOUNT);
 
     fflush(stdout);
 }
@@ -227,15 +234,11 @@ void *ebpf_mount_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mount_maps;
-    fill_ebpf_data(&mount_data);
 
     if (!em->enabled)
         goto endmount;
 
-    if (ebpf_update_kernel(&mount_data))
-        goto endmount;
-
-    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects, mount_data.map_fd);
+    probe_links = ebpf_load_program(ebpf_plugin_dir, em, kernel_string, &objects);
     if (!probe_links) {
         goto endmount;
     }
@@ -246,7 +249,7 @@ void *ebpf_mount_thread(void *ptr)
                        algorithms, NETDATA_EBPF_MOUNT_SYSCALL);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_mount_charts();
+    ebpf_create_mount_charts(em->update_every);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);

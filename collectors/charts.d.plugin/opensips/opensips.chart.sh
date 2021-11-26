@@ -147,7 +147,7 @@ EOF
 
 opensips_update() {
   # the first argument to this function is the microseconds since last update
-  # pass this parameter to the BEGIN statement (see bellow).
+  # pass this parameter to the BEGIN statement (see below).
 
   # do all the work to collect / calculate the values
   # for each dimension
@@ -158,7 +158,7 @@ opensips_update() {
   #    local opensips_client_http_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
   #    local opensips_server_all_ then one or more of these a-z 0-9 _ then = and one of more of 0-9
   # 4. then execute this as a script with the eval
-  #    be very carefull with eval:
+  #    be very careful with eval:
   #    prepare the script and always grep at the end the lines that are useful, so that
   #    even if something goes wrong, no other code can be executed
 

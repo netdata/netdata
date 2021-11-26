@@ -26,7 +26,7 @@ dist_web_DATA = \
     $(srcdir)/index.html \
     $(srcdir)/infographic.html \
     $(srcdir)/manifest.json \
-    $(srcdir)/precache-manifest.1718fe47e07e741ebd03d583c26fed7c.js \
+    $(srcdir)/precache-manifest.14a1e41ead8f8b6e26e356372042ef5a.js \
     $(srcdir)/refresh-badges.js \
     $(srcdir)/robots.txt \
     $(srcdir)/service-worker.js \
@@ -115,7 +115,7 @@ dist_weblib_DATA = \
     $(srcdir)/lib/dygraph-smooth-plotter-c91c859.js \
     $(srcdir)/lib/fontawesome-all-5.0.1.min.js \
     $(srcdir)/lib/gauge-1.3.2.min.js \
-    $(srcdir)/lib/jquery-2.2.4.min.js \
+    $(srcdir)/lib/jquery-3.6.0.min.js \
     $(srcdir)/lib/jquery.easypiechart-97b5824.min.js \
     $(srcdir)/lib/jquery.peity-3.2.0.min.js \
     $(srcdir)/lib/jquery.sparkline-2.1.2.min.js \
@@ -127,41 +127,41 @@ dist_weblib_DATA = \
 
 webstaticcssdir=$(webdir)/static/css
 dist_webstaticcss_DATA = \
-    $(srcdir)/static/css/2.6b842ba1.chunk.css \
-    $(srcdir)/static/css/2.6b842ba1.chunk.css.map \
+    $(srcdir)/static/css/2.20fd0a40.chunk.css \
+    $(srcdir)/static/css/2.20fd0a40.chunk.css.map \
     $(srcdir)/static/css/4.a36e3b73.chunk.css \
     $(srcdir)/static/css/4.a36e3b73.chunk.css.map \
-    $(srcdir)/static/css/main.d931154a.chunk.css \
-    $(srcdir)/static/css/main.d931154a.chunk.css.map \
+    $(srcdir)/static/css/main.a46a34fa.chunk.css \
+    $(srcdir)/static/css/main.a46a34fa.chunk.css.map \
     $(NULL)
 
 webstaticjsdir=$(webdir)/static/js
 dist_webstaticjs_DATA = \
-    $(srcdir)/static/js/10.db7e8e19.chunk.js \
-    $(srcdir)/static/js/10.db7e8e19.chunk.js.map \
-    $(srcdir)/static/js/2.e58473c4.chunk.js \
-    $(srcdir)/static/js/2.e58473c4.chunk.js.LICENSE \
-    $(srcdir)/static/js/2.e58473c4.chunk.js.map \
-    $(srcdir)/static/js/3.99238dcb.chunk.js \
-    $(srcdir)/static/js/3.99238dcb.chunk.js.map \
-    $(srcdir)/static/js/4.6ef9bdcb.chunk.js \
-    $(srcdir)/static/js/4.6ef9bdcb.chunk.js.map \
-    $(srcdir)/static/js/5.96a698ab.chunk.js \
-    $(srcdir)/static/js/5.96a698ab.chunk.js.LICENSE \
-    $(srcdir)/static/js/5.96a698ab.chunk.js.map \
-    $(srcdir)/static/js/6.d9713eb9.chunk.js \
-    $(srcdir)/static/js/6.d9713eb9.chunk.js.map \
-    $(srcdir)/static/js/7.12e939e5.chunk.js \
-    $(srcdir)/static/js/7.12e939e5.chunk.js.map \
-    $(srcdir)/static/js/8.91852cf4.chunk.js \
-    $(srcdir)/static/js/8.91852cf4.chunk.js.map \
-    $(srcdir)/static/js/9.e3a9ce26.chunk.js \
-    $(srcdir)/static/js/9.e3a9ce26.chunk.js.map \
-    $(srcdir)/static/js/main.0023ba53.chunk.js \
-    $(srcdir)/static/js/main.0023ba53.chunk.js.LICENSE \
-    $(srcdir)/static/js/main.0023ba53.chunk.js.map \
-    $(srcdir)/static/js/runtime-main.6c7b39cd.js \
-    $(srcdir)/static/js/runtime-main.6c7b39cd.js.map \
+    $(srcdir)/static/js/10.a23c74b9.chunk.js \
+    $(srcdir)/static/js/10.a23c74b9.chunk.js.map \
+    $(srcdir)/static/js/2.3456bb26.chunk.js \
+    $(srcdir)/static/js/2.3456bb26.chunk.js.LICENSE \
+    $(srcdir)/static/js/2.3456bb26.chunk.js.map \
+    $(srcdir)/static/js/3.5ef4adcd.chunk.js \
+    $(srcdir)/static/js/3.5ef4adcd.chunk.js.map \
+    $(srcdir)/static/js/4.1621c1ad.chunk.js \
+    $(srcdir)/static/js/4.1621c1ad.chunk.js.map \
+    $(srcdir)/static/js/5.05b274a5.chunk.js \
+    $(srcdir)/static/js/5.05b274a5.chunk.js.LICENSE \
+    $(srcdir)/static/js/5.05b274a5.chunk.js.map \
+    $(srcdir)/static/js/6.299c0acd.chunk.js \
+    $(srcdir)/static/js/6.299c0acd.chunk.js.map \
+    $(srcdir)/static/js/7.850d6c32.chunk.js \
+    $(srcdir)/static/js/7.850d6c32.chunk.js.map \
+    $(srcdir)/static/js/8.fb328a3a.chunk.js \
+    $(srcdir)/static/js/8.fb328a3a.chunk.js.map \
+    $(srcdir)/static/js/9.f8eb4edd.chunk.js \
+    $(srcdir)/static/js/9.f8eb4edd.chunk.js.map \
+    $(srcdir)/static/js/main.fa83a16e.chunk.js \
+    $(srcdir)/static/js/main.fa83a16e.chunk.js.LICENSE \
+    $(srcdir)/static/js/main.fa83a16e.chunk.js.map \
+    $(srcdir)/static/js/runtime-main.ea592e2f.js \
+    $(srcdir)/static/js/runtime-main.ea592e2f.js.map \
     $(NULL)
 
 webstaticmediadir=$(webdir)/static/media

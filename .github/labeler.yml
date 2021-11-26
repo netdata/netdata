@@ -53,6 +53,7 @@ area/database:
 
 area/docs:
   - "**/*.md"
+  - "**/*.mdx"
   - diagrams/*
   - diagrams/**/*
 
@@ -69,6 +70,10 @@ area/external:
 area/health:
   - health/*
   - health/**/*
+
+area/ml:
+  - ml/*
+  - ml/**/*
 
 area/packaging:
   - contrib/*

@@ -7,7 +7,8 @@
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
 
 // Groups used on Dashboard
-#define NETDATA_PROCESS_GROUP "Process"
+#define NETDATA_PROCESS_GROUP "processes"
+#define NETDATA_PROCESS_CGROUP_GROUP "processes (eBPF)"
 
 // Global chart name
 #define NETDATA_EXIT_SYSCALL "exit"
@@ -18,10 +19,25 @@
 // Charts created on Apps submenu
 #define NETDATA_SYSCALL_APPS_TASK_PROCESS "process_create"
 #define NETDATA_SYSCALL_APPS_TASK_THREAD "thread_create"
+#define NETDATA_SYSCALL_APPS_TASK_EXIT "task_exit"
 #define NETDATA_SYSCALL_APPS_TASK_CLOSE "task_close"
+#define NETDATA_SYSCALL_APPS_TASK_ERROR "task_error"
 
 // Process configuration name
 #define NETDATA_PROCESS_CONFIG_FILE "process.conf"
+
+// Contexts
+#define NETDATA_CGROUP_PROCESS_CREATE_CONTEXT "cgroup.process_create"
+#define NETDATA_CGROUP_THREAD_CREATE_CONTEXT "cgroup.thread_create"
+#define NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT "cgroup.task_close"
+#define NETDATA_CGROUP_PROCESS_EXIT_CONTEXT "cgroup.task_exit"
+#define NETDATA_CGROUP_PROCESS_ERROR_CONTEXT "cgroup.task_error"
+
+#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "services.process_create"
+#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "services.thread_create"
+#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "services.task_close"
+#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "services.task_exit"
+#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "services.task_error"
 
 // Index from kernel
 typedef enum ebpf_process_index {
@@ -56,12 +72,11 @@ typedef struct ebpf_process_publish_apps {
     // Number of calls during the last read
     uint64_t call_do_exit;
     uint64_t call_release_task;
-    uint64_t call_do_fork;
-    uint64_t call_sys_clone;
+    uint64_t create_process;
+    uint64_t create_thread;
 
     // Number of errors during the last read
-    uint64_t ecall_do_fork;
-    uint64_t ecall_sys_clone;
+    uint64_t task_err;
 } ebpf_process_publish_apps_t;
 
 enum ebpf_process_tables {

@@ -12,7 +12,7 @@
 
 extern time_t aclk_block_until;
 
-extern aclk_env_t *aclk_env;
+extern int disconnect_req;
 
 void *aclk_main(void *ptr);
 
@@ -25,7 +25,7 @@ extern struct aclk_shared_state {
     time_t last_popcorn_interrupt;
 
     // To wait for `disconnect` message PUBACK
-    // when shuting down
+    // when shutting down
     // at the same time if > 0 we know link is
     // shutting down
     int mqtt_shutdown_msg_id;
@@ -48,5 +48,8 @@ void ng_aclk_host_state_update(RRDHOST *host, int cmd);
 void aclk_send_node_instances(void);
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
+
+char *ng_aclk_state(void);
+char *ng_aclk_state_json(void);
 
 #endif /* ACLK_H */

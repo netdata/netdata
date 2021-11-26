@@ -64,13 +64,19 @@ int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int get_kernel_version(char *out, int size)
+/**
+ * Get Kernel version
+ *
+ * Get the current kernel from /proc and returns an integer value representing it
+ *
+ * @return it returns a value representing the kernel version.
+ */
+int ebpf_get_kernel_version()
 {
     char major[16], minor[16], patch[16];
     char ver[VERSION_STRING_LEN];
     char *version = ver;
 
-    out[0] = '\0';
     int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
     if (fd < 0)
         return -1;
@@ -103,10 +109,6 @@ int get_kernel_version(char *out, int size)
     while (*version && *version != '\n' && *version != '-')
         *move++ = *version++;
     *move = '\0';
-
-    fd = snprintf(out, (size_t)size, "%s.%s.%s", major, minor, patch);
-    if (fd > size)
-        error("The buffer to store kernel version is not smaller than necessary.");
 
     return ((int)(str2l(major) * 65536) + (int)(str2l(minor) * 256) + (int)str2l(patch));
 }
@@ -272,14 +274,24 @@ char *ebpf_kernel_suffix(int version, int isrh)
 
 //----------------------------------------------------------------------------------------------------------------------
 
-int ebpf_update_kernel(ebpf_data_t *ed)
+/**
+ *  Update Kernel
+ *
+ *  Update string used to load eBPF programs
+ *
+ * @param ks      vector to store the value
+ * @param length  available length to store kernel
+ * @param isrh    Is a Red Hat distribution?
+ * @param version the kernel version
+ */
+void ebpf_update_kernel(char *ks, size_t length, int isrh, int version)
 {
-    char *kernel = ebpf_kernel_suffix(ed->running_on_kernel, (ed->isrh < 0) ? 0 : 1);
-    size_t length = strlen(kernel);
-    strncpyz(ed->kernel_string, kernel, length);
-    ed->kernel_string[length] = '\0';
-
-    return 0;
+    char *kernel = ebpf_kernel_suffix(version, (isrh < 0) ? 0 : 1);
+    size_t len = strlen(kernel);
+    if (len > length)
+        len = length - 1;
+    strncpyz(ks, kernel, len);
+    ks[len] = '\0';
 }
 
 static int select_file(char *name, const char *program, size_t length, int mode, char *kernel_string)
@@ -321,7 +333,7 @@ void ebpf_update_map_sizes(struct bpf_object *program, ebpf_module_t *em)
                         info("Changing map %s from size %u to %u ", map_name, w->internal_input, w->user_input);
 #endif
                         bpf_map__resize(map, w->user_input);
-                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts)) {
+                    } else if (((w->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
                         w->user_input = ND_EBPF_DEFAULT_MIN_PID;
                         bpf_map__resize(map, w->user_input);
                     }
@@ -386,15 +398,14 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     return links;
 }
 
-static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *obj)
+static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
 {
-    if (!map_fd)
+    if (!em->maps)
         return;
 
     ebpf_local_maps_t *maps = em->maps;
     struct bpf_map *map;
-    size_t i = 0;
-        bpf_map__for_each(map, obj)
+    bpf_map__for_each(map, obj)
     {
         int fd = bpf_map__fd(map);
         if (maps) {
@@ -408,8 +419,6 @@ static void ebpf_update_maps(ebpf_module_t *em, int *map_fd, struct bpf_object *
                 j++;
             }
         }
-        map_fd[i] = fd;
-        i++;
     }
 }
 
@@ -420,7 +429,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
         return;
 
     struct bpf_map *map;
-        bpf_map__for_each(map, obj)
+    bpf_map__for_each(map, obj)
     {
         size_t i = 0;
         while (maps[i].name) {
@@ -430,7 +439,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
                 w->type |= NETDATA_EBPF_MAP_CONTROLLER_UPDATED;
 
                 uint32_t key = NETDATA_CONTROLLER_APPS_ENABLED;
-                int value = em->apps_charts;
+                int value = em->apps_charts | em->cgroup_charts;
                 int ret = bpf_map_update_elem(w->map_fd, &key, &value, 0);
                 if (ret)
                     error("Add key(%u) for controller table failed.", key);
@@ -441,7 +450,7 @@ static void ebpf_update_controller(ebpf_module_t *em, struct bpf_object *obj)
 }
 
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *kernel_string,
-                                    struct bpf_object **obj, int *map_fd)
+                                    struct bpf_object **obj)
 {
     char lpath[4096];
     char lname[128];
@@ -466,7 +475,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, char *
         return NULL;
     }
 
-    ebpf_update_maps(em, map_fd, *obj);
+    ebpf_update_maps(em, *obj);
     ebpf_update_controller(em, *obj);
 
     size_t count_programs =  ebpf_count_programs(*obj);
@@ -559,8 +568,8 @@ void ebpf_update_module_using_config(ebpf_module_t *modules)
     char *mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
     modules->mode = ebpf_select_mode(mode);
 
-    modules->update_time = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
-                                                     EBPF_CFG_UPDATE_EVERY, modules->update_time);
+    modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+                                                     EBPF_CFG_UPDATE_EVERY, modules->update_every);
 
     modules->apps_charts = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION,
                                                  modules->apps_charts);
@@ -645,7 +654,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
  *
  * @param algorithms the output vector
  * @param length     number of elements of algorithms vector
- * @param algortihm  algorithm used on charts.
+ * @param algorithm  algorithm used on charts.
 */
 void ebpf_fill_algorithms(int *algorithms, size_t length, int algorithm)
 {

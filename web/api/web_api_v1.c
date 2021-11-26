@@ -36,6 +36,7 @@ static struct {
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {"allow_past"      , 0    , RRDR_OPTION_ALLOW_PAST}
+        , {"anomaly-bit"     , 0    , RRDR_OPTION_ANOMALY_BIT}
         , {                  NULL, 0, 0}
 };
 
@@ -984,6 +985,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #else
     buffer_strcat(wb, "\t\"aclk-ng-available\": false,\n");
 #endif
+#if defined(ACLK_NG) && defined(ENABLE_NEW_CLOUD_PROTOCOL)
+    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": true,\n");
+#else
+    buffer_strcat(wb, "\t\"aclk-ng-new-cloud-protocol\": false,\n");
+#endif
 #ifdef ACLK_LEGACY
     buffer_strcat(wb, "\t\"aclk-legacy-available\": true,\n");
 #else
@@ -1083,11 +1089,108 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, "\t\"metrics-count\": ");
     analytics_get_data(analytics_data.netdata_metrics_count, wb);
-    buffer_strcat(wb, "\n");
 
-    buffer_strcat(wb, "}");
+#if defined(ENABLE_ML)
+    buffer_strcat(wb, ",\n");
+    char *ml_info = ml_get_host_info(host);
+
+    buffer_strcat(wb, "\t\"ml-info\": ");
+    buffer_strcat(wb, ml_info);
+
+    free(ml_info);
+#endif
+
+    buffer_strcat(wb, "\n}");
     return 0;
 }
+
+#if defined(ENABLE_ML)
+int web_client_api_request_v1_anomaly_events(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    uint32_t after = 0, before = 0;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "after"))
+            after = (uint32_t) (strtoul(value, NULL, 0) / 1000);
+        else if (!strcmp(name, "before"))
+            before = (uint32_t) (strtoul(value, NULL, 0) / 1000);
+    }
+
+    char *s;
+    if (!before || !after)
+        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+    else {
+        s = ml_get_anomaly_events(host, "AD1", 1, after, before);
+        if (!s)
+            s = strdup("{\"error\": \"json string is empty\" }\n");
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+
+    return HTTP_RESP_OK;
+}
+
+int web_client_api_request_v1_anomaly_event_info(RRDHOST *host, struct web_client *w, char *url) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    uint32_t after = 0, before = 0;
+
+    while (url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name)
+            continue;
+        if (!value || !*value)
+            continue;
+
+        if (!strcmp(name, "after"))
+            after = (uint32_t) strtoul(value, NULL, 0);
+        else if (!strcmp(name, "before"))
+            before = (uint32_t) strtoul(value, NULL, 0);
+    }
+
+    char *s;
+    if (!before || !after)
+        s = strdup("{\"error\": \"missing after/before parameters\" }\n");
+    else {
+        s = ml_get_anomaly_event_info(host, "AD1", 1, after, before);
+        if (!s)
+            s = strdup("{\"error\": \"json string is empty\" }\n");
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_strcat(wb, s);
+    buffer_no_cacheable(wb);
+
+    freez(s);
+    return HTTP_RESP_OK;
+}
+#endif // defined(ENABLE_ML)
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -1098,6 +1201,23 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
     web_client_api_request_v1_info_fill_buffer(host, wb);
 
+    buffer_no_cacheable(wb);
+    return HTTP_RESP_OK;
+}
+
+static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
+    UNUSED(url);
+    UNUSED(host);
+    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+
+    char *str = aclk_state_json();
+    buffer_strcat(wb, str);
+    freez(str);
+
+    wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
@@ -1126,7 +1246,14 @@ static struct api_command {
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
+
+#if defined(ENABLE_ML)
+        { "anomaly_events",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_events     },
+        { "anomaly_event_info", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_anomaly_event_info },
+#endif
+
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
+        { "aclk",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_aclk_state      },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };

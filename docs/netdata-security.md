@@ -9,7 +9,7 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 
 **Table of Contents**
 
-1.  [Your data are safe with Netdata](#your-data-are-safe-with-netdata)
+1.  [Your data is safe with Netdata](#your-data-is-safe-with-netdata)
 2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
 3.  [Netdata is read-only](#netdata-is-read-only)
 4.  [Netdata viewers authentication](#netdata-viewers-authentication)
@@ -20,13 +20,13 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
         		\- [Other methods](#other-methods)
 5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
-## Your data are safe with Netdata
+## Your data is safe with Netdata
 
 Netdata collects raw data from many sources. For each source, Netdata uses a plugin that connects to the source (or reads the relative files produced by the source), receives raw data and processes them to calculate the metrics shown on Netdata dashboards.
 
 Even if Netdata plugins connect to your database server, or read your application log file to collect raw data, the product of this data collection process is always a number of **chart metadata and metric values** (summarized data for dashboard visualization). All Netdata plugins (internal to the Netdata daemon, and external ones written in any computer language), convert raw data collected into metrics, and only these metrics are stored in Netdata databases, sent to upstream Netdata servers, or archived to external time-series databases.
 
-> The **raw data** collected by Netdata, do not leave the host they are collected. **The only data Netdata exposes are chart metadata and metric values.**
+> The **raw data** collected by Netdata, does not leave the host when collected. **The only data Netdata exposes are chart metadata and metric values.**
 
 This means that Netdata can safely be used in environments that require the highest level of data isolation (like PCI Level 1).
 

@@ -12,7 +12,7 @@ struct node_instance_list {
     uuid_t  host_id;
     char *hostname;
     int live;
-    int querable;
+    int queryable;
     int hops;
 };
 
@@ -39,6 +39,16 @@ struct node_instance_list {
 
 #define SQL_STORE_ACTIVE_DIMENSION \
     "insert or replace into dimension_active (dim_id, date_created) values (@id, strftime('%s'));"
+
+#define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
+    if (unlikely(!db_meta)) {                                                                                          \
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
+            return 1;                                                                                                  \
+        }                                                                                                              \
+        error_report("Database has not been initialized");                                                             \
+        return 1;                                                                                                      \
+    }
+
 extern int sql_init_database(void);
 extern void sql_close_database(void);
 
@@ -63,6 +73,8 @@ extern int find_uuid_type(uuid_t *uuid);
 extern void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
 
 extern RRDHOST *sql_create_host_by_uuid(char *guid);
+extern int prepare_statement(sqlite3 *database, char *query, sqlite3_stmt **statement);
+extern int execute_insert(sqlite3_stmt *res);
 extern void db_execute(const char *cmd);
 extern int file_is_migrated(char *path);
 extern void add_migrated_file(char *path, uint64_t file_size);
@@ -78,4 +90,5 @@ extern int get_host_id(uuid_t *node_id, uuid_t *host_id);
 extern void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 extern struct node_instance_list *get_node_list(void);
 extern void sql_load_node_id(RRDHOST *host);
+extern void compute_chart_hash(RRDSET *st);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

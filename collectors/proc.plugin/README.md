@@ -553,7 +553,7 @@ Each port will have its counters metrics monitored, grouped in the following cha
 
 -  **Errors Statistics**
     Many errors counters are provided, presenting statistics for:
-    - Packets: malformated, sent/received discarded by card/switch, missing ressource
+    - Packets: malformed, sent/received discarded by card/switch, missing resource
     - Link: downed, recovered, integrity error, minor error
     - Other events: Tick Wait to send, buffer overrun
 

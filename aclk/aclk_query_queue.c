@@ -173,6 +173,7 @@ void aclk_query_free(aclk_query_t query)
     case UPDATE_NODE_INFO:
     case ALARM_LOG_HEALTH:
     case ALARM_PROVIDE_CFG:
+    case ALARM_SNAPSHOT:
         freez(query->data.bin_payload.payload);
         break;
 
@@ -190,5 +191,12 @@ void aclk_queue_lock(void)
 {
     ACLK_QUEUE_LOCK;
     aclk_query_queue.block_push = 1;
+    ACLK_QUEUE_UNLOCK;
+}
+
+void aclk_queue_unlock(void)
+{
+    ACLK_QUEUE_LOCK;
+    aclk_query_queue.block_push = 0;
     ACLK_QUEUE_UNLOCK;
 }

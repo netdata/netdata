@@ -87,6 +87,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 host,
                 rc->id,
                 rc->next_event_id++,
+                rc->config_hash_id,
                 now,
                 rc->name,
                 rc->rrdset->id,
@@ -164,6 +165,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 host,
                 rc->id,
                 rc->next_event_id++,
+                rc->config_hash_id,
                 now,
                 rc->name,
                 rc->rrdset->id,
@@ -398,6 +400,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->hash = simple_hash(rc->name);
     rc->chart = strdupz(chart);
     rc->hash_chart = simple_hash(rc->chart);
+    uuid_copy(rc->config_hash_id, rt->config_hash_id);
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
@@ -513,6 +516,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     newrc->hash = simple_hash(newrc->name);
     newrc->chart = strdupz(rc->chart);
     newrc->hash_chart = simple_hash(rc->chart);
+    uuid_copy(newrc->config_hash_id, *((uuid_t *) &rc->config_hash_id));
 
     newrc->dimensions = strdupz(dimension);
     newrc->foreachdim = NULL;

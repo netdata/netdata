@@ -17,7 +17,7 @@ To create the `netdata` user, execute the following in the MySQL shell:
 
 ```sh
 create user 'netdata'@'localhost';
-grant usage on *.* to 'netdata'@'localhost';
+grant usage, replication client on *.* to 'netdata'@'localhost';
 flush privileges;
 ```
 The `netdata` user will have the ability to connect to the MySQL server on `localhost` without a password. 

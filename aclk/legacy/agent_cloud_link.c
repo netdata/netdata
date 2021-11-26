@@ -222,7 +222,7 @@ char *get_topic(char *sub_topic, char *final_topic, int max_size)
     return final_topic;
 }
 
-/* Avoids the need to scan trough all RRDHOSTS
+/* Avoids the need to scan through all RRDHOSTS
  * every time any Query Thread Wakes Up
  * (every time we need to check child popcorn expiry)
  * call with legacy_aclk_shared_state_LOCK held
@@ -1449,4 +1449,54 @@ int legacy_aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
     buffer_free(local_buffer);
 
     return 0;
+}
+
+char *legacy_aclk_state(void)
+{
+    BUFFER *wb = buffer_create(1024);
+    char *ret;
+
+    buffer_strcat(wb,
+        "ACLK Available: Yes\n"
+        "ACLK Implementation: Legacy\n"
+        "Claimed: "
+    );
+
+    char *agent_id = is_agent_claimed();
+    if (agent_id == NULL)
+        buffer_strcat(wb, "No\n");
+    else {
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\n", agent_id);
+        freez(agent_id);
+    }
+
+    buffer_sprintf(wb, "Online: %s", aclk_connected ? "Yes" : "No");
+
+    ret = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+    return ret;
+}
+
+char *legacy_aclk_state_json(void)
+{
+    BUFFER *wb = buffer_create(1024);
+    char *agent_id = is_agent_claimed();
+
+    buffer_sprintf(wb,
+        "{\"aclk-available\":true,"
+        "\"aclk-implementation\":\"Legacy\","
+        "\"agent-claimed\":%s,"
+        "\"claimed-id\":",
+        agent_id ? "true" : "false"
+    );
+
+    if (agent_id) {
+        buffer_sprintf(wb, "\"%s\"", agent_id);
+        freez(agent_id);
+    } else
+        buffer_strcat(wb, "null");
+
+    buffer_sprintf(wb, ",\"online\":%s}", aclk_connected ? "true" : "false");
+
+    return strdupz(buffer_tostring(wb));
 }

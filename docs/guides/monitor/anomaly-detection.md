@@ -123,7 +123,7 @@ configure the collector to monitor charts from the
 log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) collectors.
 
 `charts_regex` allows for some basic regex, such as wildcards (`*`) to match all contexts with a certain pattern. For
-example, `system\..*` matches with any chart wit ha context that begins with `system.`, and ends in any number of other
+example, `system\..*` matches with any chart with a context that begins with `system.`, and ends in any number of other
 characters (`.*`). Note the escape character (`\`) around the first period to capture a period character exactly, and
 not any character.
 

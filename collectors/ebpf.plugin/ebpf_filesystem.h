@@ -59,7 +59,6 @@ typedef struct ebpf_filesystem_partitions {
     uint32_t flags;
     uint32_t enabled;
 
-    ebpf_data_t kernel_info;
     ebpf_addresses_t addresses;
 } ebpf_filesystem_partitions_t;
 

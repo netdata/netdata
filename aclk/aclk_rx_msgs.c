@@ -260,12 +260,20 @@ err_cleanup_nojson:
     return 1;
 }
 
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len)
 {
     // TODO do the look up table with hashes to optimize when there are more
     // than few
     if (!strcmp(message_type, "cmd")) {
-        aclk_handle_cloud_message((char *)msg);
+        // msg is binary payload in all other cases
+        // however in this message from old legacy cloud
+        // we have to convert it to C string
+        char *str = mallocz(msg_len+1);
+        memcpy(str, msg, msg_len);
+        str[msg_len] = 0;
+        aclk_handle_cloud_message(str);
+        freez(str);
         return;
     }
     if (!strcmp(message_type, "CreateNodeInstanceResult")) {
@@ -313,6 +321,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
                 netdata_mutex_lock(&host->receiver_lock);
                 query->data.node_update.live = (host->receiver != NULL);
                 netdata_mutex_unlock(&host->receiver_lock);
+                query->data.node_update.hops = host->system_info->hops;
             }
         }
 
@@ -329,5 +338,103 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         return;
     }
 
+    if (!strcmp(message_type, "StreamChartsAndDimensions")) {
+        stream_charts_and_dims_t res = parse_stream_charts_and_dims(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        chart_batch_id = res.batch_id;
+        aclk_start_streaming(res.node_id, res.seq_id, res.seq_id_created_at.tv_sec, res.batch_id);
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "ChartsAndDimensionsAck")) {
+        chart_and_dim_ack_t res = parse_chart_and_dimensions_ack(msg, msg_len);
+        if (!res.claim_id || !res.node_id) {
+            error("Error parsing StreamChartsAndDimensions msg");
+            freez(res.claim_id);
+            freez(res.node_id);
+            return;
+        }
+        aclk_ack_chart_sequence_id(res.node_id, res.last_seq_id);
+        freez(res.claim_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "UpdateChartConfigs")) {
+        struct update_chart_config res = parse_update_chart_config(msg, msg_len);
+        if (!res.claim_id || !res.node_id || !res.hashes)
+            error("Error parsing UpdateChartConfigs msg");
+        else
+            aclk_get_chart_config(res.hashes);
+        destroy_update_chart_config(&res);
+        return;
+    }
+    if (!strcmp(message_type, "StartAlarmStreaming")) {
+        struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
+        if (!res.node_id || !res.batch_id) {
+            error("Error parsing StartAlarmStreaming");
+            freez(res.node_id);
+            return;
+        }
+        aclk_start_alert_streaming(res.node_id, res.batch_id, res.start_seq_id);
+        freez(res.node_id);
+        return;
+    }
+    if (!strcmp(message_type, "SendAlarmLogHealth")) {
+        char *node_id = parse_send_alarm_log_health(msg, msg_len);
+        if (!node_id) {
+            error("Error parsing SendAlarmLogHealth");
+            return;
+        }
+        aclk_send_alarm_health_log(node_id);
+        freez(node_id);
+        return;
+    }
+    if (!strcmp(message_type, "SendAlarmConfiguration")) {
+        char *config_hash = parse_send_alarm_configuration(msg, msg_len);
+        if (!config_hash || !*config_hash) {
+            error("Error parsing SendAlarmConfiguration");
+            freez(config_hash);
+            return;
+        }
+        aclk_send_alarm_configuration(config_hash);
+        freez(config_hash);
+        return;
+    }
+    if (!strcmp(message_type, "SendAlarmSnapshot")) {
+        struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
+        if (!sas->node_id || !sas->claim_id) {
+            error("Error parsing SendAlarmSnapshot");
+            destroy_send_alarm_snapshot(sas);
+            return;
+        }
+        aclk_process_send_alarm_snapshot(sas->node_id, sas->claim_id, sas->snapshot_id, sas->sequence_id);
+        destroy_send_alarm_snapshot(sas);
+        return;
+    }
+    if (!strcmp(message_type, "DisconnectReq")) {
+        struct disconnect_cmd *cmd = parse_disconnect_cmd(msg, msg_len);
+        if (!cmd)
+            return;
+        if (cmd->permaban) {
+            error ("Cloud Banned This Agent!");
+            aclk_disable_runtime = 1;
+        }
+        info ("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
+        if (cmd->reconnect_after_s > 0) {
+            aclk_block_until = now_monotonic_sec() + cmd->reconnect_after_s;
+            info ("Cloud asks not to reconnect for %u seconds. We shall honor that request", (unsigned int)cmd->reconnect_after_s);
+        }
+        disconnect_req = 1;
+        freez(cmd->error_description);
+        freez(cmd);
+        return;
+    }
     error ("Unknown new cloud arch message type received \"%s\"", message_type);
 }
+#endif
