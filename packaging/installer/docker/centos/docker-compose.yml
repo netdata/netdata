@@ -1,0 +1,7 @@
+version: "3.9"
+services:
+  centos-7:
+    build: ./7
+  centos-8:
+    build: ./8
+
