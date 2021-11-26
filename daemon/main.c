@@ -44,6 +44,9 @@ void netdata_cleanup_and_exit(int ret) {
 
         // stop everything
         info("EXIT: stopping static threads...");
+#ifdef ENABLE_NEW_CLOUD_PROTOCOL
+        aclk_sync_exit_all();
+#endif
         cancel_main_threads();
 
         // free the database
@@ -360,13 +363,16 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W sqlite-check          Check metadata database integrity and exit.\n\n"
+            "  -W sqlite-fix            Check metadata database integrity, fix if needed and exit.\n\n"
+            "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F\n"
             "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, an optional disk space limit"
+            "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB and exit.\n\n"
 #endif
             "  -W set section option value\n"
@@ -801,6 +807,20 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
+                        if(strcmp(optarg, "sqlite-check") == 0) {
+                            sql_init_database(DB_CHECK_INTEGRITY);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-fix") == 0) {
+                            sql_init_database(DB_CHECK_FIX_DB);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-compact") == 0) {
+                            sql_init_database(DB_CHECK_RECLAIM_SPACE);
+                            return 0;
+                        }
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;

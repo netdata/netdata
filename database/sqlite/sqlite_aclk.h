@@ -193,6 +193,7 @@ struct aclk_database_worker_config {
     int node_info_send;
     int chart_pending;
     int chart_reset_count;
+    volatile unsigned is_shutting_down;
     struct aclk_database_worker_config  *next;
 };
 
@@ -227,4 +228,5 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
 void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int claimed();
+void aclk_sync_exit_all();
 #endif //NETDATA_SQLITE_ACLK_H
