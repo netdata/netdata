@@ -1,7 +1,5 @@
 FROM oraclelinux:8
 
-#RUN sed -i "s/enabled=.*/enabled=1/g" /etc/yum.repos.d/oracle-linux-ol8.repo
-
 RUN dnf config-manager --set-enabled ol8_codeready_builder 
 
 RUN dnf makecache --refresh
