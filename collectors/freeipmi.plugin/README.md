@@ -15,7 +15,7 @@ Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 2.  re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
 
-> In some distributions `libipmimonitoring.pc` is located in an unregistered directory.
+> ❗ In some distributions `libipmimonitoring.pc` is located in an unregistered directory.
 > In that case you should find the file and link it to the standard pkg-config directory. Usually, running
 > `sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc`
 > resolves the issue.
