@@ -18,11 +18,11 @@ void sender_commit(struct sender_state *s) {
     char *src = (char *)buffer_tostring(s->host->sender->build);
     size_t src_len = s->host->sender->build->len;
 #ifdef ENABLE_COMPRESSION
-    if (!src || !src_len)
-        return;
-    if (s->compressor)
-        src_len = s->compressor->compress(s->compressor,
-            src, src_len, &src);
+    if (src && src_len) {
+        if (s->compressor)
+            src_len = s->compressor->compress(s->compressor,
+                src, src_len, &src);
+    }
 #endif
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
