@@ -1,0 +1,5 @@
+version: "3.9"
+services:
+  ol-8:
+    build: ./8
+
