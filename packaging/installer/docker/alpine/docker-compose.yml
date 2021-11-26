@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  alpine-312:
+    build: ./3.12
+  alpine-313:
+    build: ./3.13
+  alpine-314:
+    build: ./3.14
+  alpine-edge:
+    build: ./edge
