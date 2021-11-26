@@ -7,7 +7,7 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
   local path=""
   tmp="$(mktemp)"
-  (echo "${PATH}" | tr ":" "\n") > "$tmp"
+  (echo  "${PATH}" | tr ":" "\n") > "$tmp"
   while read -r REPLY;
   do
     if echo "${path}" | grep -v "(^|:)${REPLY}(:|$)"; then
@@ -18,7 +18,7 @@ uniquepath() {
 rm "$tmp"
   [ -n "${path}" ]
 export PATH="${path%:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin}"
-}
+} > /dev/null
 uniquepath
 
 PROGRAM="$0"
@@ -1694,7 +1694,7 @@ install_go() {
   run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
   run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-  run mv -f "{$GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+  run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   if [ "${UID}" -eq 0 ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
   fi
@@ -2086,9 +2086,11 @@ echo >&2
 progress "We are done!"
 
 if [ ${started} -eq 1 ]; then
-  netdata_banner "is installed and running now!"
+  netdata_banner
+  progress "is installed and running now!"
 else
-  netdata_banner "is installed now!"
+  netdata_banner
+  progress "is installed now!"
 fi
 
 echo >&2 "  enjoy real-time performance and health monitoring..."

@@ -158,11 +158,15 @@ fetch_and_verify() {
 # -----------------------------------------------------------------------------
 
 netdata_banner() {
-    l1="  ^" \
+    local l1="  ^" \
     l2="  |.-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-.   .-" \
     l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  " \
     l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
     sp="                                                                              " \
+    space="  "
+    l3f="  |   '-'   '-'   '-'   '-'   '-'"
+    l3e="               '-'   '-'   '-'   '-'   '-'   "
+
     netdata="netdata"
     msg="${*}"
     chartcolor="${TPUT_DIM}"
@@ -176,8 +180,8 @@ netdata_banner() {
 
   echo >&2
   echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
-#  echo >&2 "${chartcolor}$(printf '%s' "${l2}" | cut -c "$start")$(printf '%s' "${sp}" | cut -c 2)${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}$(printf '%s' "${sp}" | cut -c $((end - start - 2 - ${#netdata})))$(printf '%s' "${l2}" | cut ${end} $((${#l2} - end)))${TPUT_RESET}"
-#  echo >&2 "${chartcolor}$(printf '%s' "${l3}" | cut -c "$start")$(printf '%s' "${sp}" | cut -c 2)${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}$(printf '%s' "${sp}" | cut -c 2)$(printf '%s' "${l3}" | cut "$end" $((${#l2} - end)))${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l2%-.   .-.   .-.   .-.   .-.   .-.   .-.   .-}${space}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${l2#  |.-.   .-.   .-.   .-.   .-.   .-.   .-. }${TPUT_RESET}"
+  echo >&2 "${chartcolor}${l3f}${l3e}${TPUT_RESET}"
   echo >&2 "${chartcolor}${l4}${TPUT_RESET}"
   echo >&2
 }
@@ -562,14 +566,12 @@ pidisnetdata() {
 }
 
 stop_netdata_on_pid() {
-   pid="${1}"
-   ret=0
-   count=0
+  local pid="${1}" ret=0 count=0
 
   pidisnetdata "${pid}" || return 0
 
   printf >&2 "Stopping netdata on pid %s ..." "${pid}"
-  while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
+  while [ -n "${pid}" ] && [ ${ret} -eq 0 ]; do
     if [ ${count} -gt 24 ]; then
       echo >&2 "Cannot stop the running netdata on pid ${pid}."
       return 1
@@ -590,7 +592,7 @@ stop_netdata_on_pid() {
       ret=$?
     fi
 
-    test {ret} -eq 0 && printf >&2 "." && sleep 5
+    test ${ret} -eq 0 && printf >&2 "." && sleep 5
 
   done
 
@@ -605,7 +607,7 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
-  local p ns
+  local p myns ns
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -646,7 +648,7 @@ stop_all_netdata() {
     fi
   fi
 
-  if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ]; then
+  if [ -n "$(netdata_pids)" ] && [ -n "$(type -P netdatacli)" ]; then
     netdatacli shutdown-agent
     sleep 20
   fi
@@ -661,10 +663,10 @@ stop_all_netdata() {
 # restart netdata
 
 restart_netdata() {
-  netdata="${1}"
+  local netdata="${1}"
   shift
 
-  started=0
+  local started=0
 
   progress "Restarting netdata instance"
 
