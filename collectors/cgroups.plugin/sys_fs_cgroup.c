@@ -1411,7 +1411,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->chart_id);
     FILE *fp = mypopen(command, &cgroup_pid);
