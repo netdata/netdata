@@ -693,6 +693,30 @@ check_claim_opts() {
   fi
 }
 
+is_netdata_running() {
+  if command -v pgrep > /dev/null 2>&1; then
+    if pgrep netdata; then
+      return 0
+    else
+      return 1
+    fi
+  else
+    if [ -z "${INSTALL_PREFIX}" ]; then
+      NETDATACLI_PATH=/usr/sbin/netdatacli
+    elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
+      NETDATACLI_PATH="/opt/netdata/bin/netdatacli"
+    else
+      NETDATACLI_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdatacli"
+    fi
+
+    if "${NETDATACLI_PATH}" ping > /dev/null 2>&1; then
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
 claim() {
   progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   if [ -z "${INSTALL_PREFIX}" ]; then
@@ -703,7 +727,7 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
-  if ! pgrep netdata > /dev/null; then
+  if ! is_netdata_running; then
     NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
   fi
 
