@@ -55,6 +55,7 @@ static void lz4_compressor_destroy(struct compressor_state **state)
  * Compress the given block of data
  * Comprecced data will remain in the internal buffer until the next invokation
  * Return the size of compressed data block as result and the pointer to internal buffer  using the last argument
+ * or 0 in case of error
  */
 static size_t lz4_compressor_compress(struct compressor_state *state, const char *data, size_t size, char **out)
 {

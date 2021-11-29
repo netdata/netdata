@@ -139,9 +139,13 @@ a proxy).
 ```
 [stream]
     enabled = yes | no
+    compresion_enabled = yes | no
     destination = IP:PORT[:SSL] ...
     api key = XXXXXXXXXXX
 ```
+Stream data compression is enabled by default on systems where the appropriate versions (1.9.0 and later) of LZ4 library are installed.
+The current implementation of streaming data compression has the limitation: the size of single data block transmitted
+must not exceed 16384 bytes. If single data block size exceeds this limit, stream data compression should be disabled.
 
 This is an overview of how these options can be combined:
 
@@ -153,6 +157,7 @@ This is an overview of how these options can be combined:
 | central netdata|not `none`|not `none`|`no`|possible|possible|yes|
 
 For the options to encrypt the data stream between the child and the parent, refer to [securing the communication](#securing-streaming-communications)
+
 
 ##### options for the receiving node
 
@@ -226,6 +231,9 @@ The receiving end (proxy or parent) logs entries like these:
 ```
 
 For Netdata v1.9+, streaming can also be monitored via `access.log`.
+
+There is no any configuaration options for enabling or disabling stream data compression.
+A compressed data packet is determined and decompressed on the fly.
 
 ### Securing streaming communications
 
