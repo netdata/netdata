@@ -27,8 +27,10 @@ struct compressor_data {
 static void lz4_compressor_reset(struct compressor_state *state)
 {
     if (state->data) {
-        if (state->data->stream)
-            LZ4_resetStream_fast(state->data->stream);
+        if (state->data->stream) {
+            LZ4_resetStream_fast(state->data->stream);            
+            info("STREAM_COMPRESSION: Compressor resets stream fast!");
+        }
         state->data->stream_buffer_pos = 0;
     }
 }
@@ -48,6 +50,7 @@ static void lz4_compressor_destroy(struct compressor_state **state)
         freez(s->buffer);
         freez(s);
         *state = NULL;
+        info("STREAM_COMPRESSION: Compressor destroyed!");    
     }
 }
 
@@ -75,6 +78,7 @@ static size_t lz4_compressor_compress(struct compressor_state *state, const char
         state->buffer_size = data_size;
     }
 
+    info("STREAM_COMPRESSION: Compressing...");
     memcpy(state->data->stream_buffer + state->data->stream_buffer_pos, data, size);
     long int compressed_data_size = LZ4_compress_fast_continue(state->data->stream,
             state->data->stream_buffer + state->data->stream_buffer_pos,
