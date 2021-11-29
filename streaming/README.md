@@ -232,7 +232,7 @@ The receiving end (proxy or parent) logs entries like these:
 
 For Netdata v1.9+, streaming can also be monitored via `access.log`.
 
-There is no any configuaration options for enabling or disabling stream data compression.
+There are no any configuration options for enabling or disabling stream data compression.
 A compressed data packet is determined and decompressed on the fly.
 
 ### Securing streaming communications
