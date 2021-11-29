@@ -990,7 +990,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
     time_t in_clear = 0, in_warn = 0, in_crit = 0, in_other = 0, total_range = 0, range = 0;
     uint8_t t_in_clear = 0, t_in_warn = 0, t_in_crit = 0, t_in_other = 0;
     uint8_t n_in_clear = 0, n_in_warn = 0, n_in_crit = 0;
-    uint8_t no_of_alerts = 1;
+    uint8_t no_of_alerts = 0, chart_change = 0;
     time_t when, exec_run_timestamp;
     int db_entries_c=0;
     RRDCALC_STATUS status, last_status = RRDCALC_STATUS_UNDEFINED;
@@ -1024,6 +1024,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
             curr_alert = name;
             curr_chart = chart;
             in_other = total_range;
+            chart_change = 1;
         }
 
         if (strcmp(name, curr_alert)){
@@ -1035,7 +1036,8 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
             in_clear = in_warn = in_crit = 0;
             t_in_other = t_in_clear = t_in_warn = t_in_crit = 0;
             n_in_clear = n_in_warn = n_in_crit = 0;
-            no_of_alerts = 1;
+            no_of_alerts = 0;
+            chart_change = 1;
             curr_alert = name;
             curr_chart = chart;
             buffer_reset(db_entries);
@@ -1047,7 +1049,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
 
          if (strcmp(chart, curr_chart)) {
             curr_chart = chart;
-            no_of_alerts++;
+            chart_change = 1;
             last_status = RRDCALC_STATUS_UNDEFINED;
         }
 
@@ -1058,18 +1060,21 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     in_clear += total_range;
                     t_in_clear++;
                     if (exec_run_timestamp >= start) n_in_clear++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     last_status = RRDCALC_STATUS_CLEAR;
                     break;
                 case RRDCALC_STATUS_WARNING:
                     in_warn += total_range;
                     t_in_warn++;
                     if (exec_run_timestamp >= start) n_in_warn++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     last_status = RRDCALC_STATUS_WARNING;
                     break;
                 case RRDCALC_STATUS_CRITICAL:
                     in_crit += total_range;
-                    if (exec_run_timestamp >= start) n_in_crit++;
                     t_in_crit++;
+                    if (exec_run_timestamp >= start) n_in_crit++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     last_status = RRDCALC_STATUS_CRITICAL;
                     break;
                 default:
@@ -1106,6 +1111,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     last_status = RRDCALC_STATUS_CLEAR;
                     t_in_clear++;
                     if (exec_run_timestamp && exec_run_timestamp < end) n_in_clear++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     break;
                 case RRDCALC_STATUS_WARNING:
                     if (last_status == RRDCALC_STATUS_CLEAR) {
@@ -1126,6 +1132,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     last_status = RRDCALC_STATUS_WARNING;
                     t_in_warn++;
                     if (exec_run_timestamp && exec_run_timestamp < end) n_in_warn++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     break;
                 case RRDCALC_STATUS_CRITICAL:
                     if (last_status == RRDCALC_STATUS_CLEAR) {
@@ -1146,6 +1153,7 @@ int sql_get_alert_analytics(RRDHOST *host, time_t start, time_t end, BUFFER *b) 
                     last_status = RRDCALC_STATUS_CRITICAL;
                     t_in_crit++;
                     if (exec_run_timestamp && exec_run_timestamp < end) n_in_crit++;
+                    if (chart_change) { no_of_alerts++; chart_change = 0; }
                     break;
                 default:
                     //mark in other
