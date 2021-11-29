@@ -175,7 +175,6 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     return 0;
 }
 #else
-
 /*
  * The receiver socket is blocking, perform a single read into a buffer so that we can reassemble lines for parsing.
  * if SSL encryption is on, then use SSL API for reading stream data.
@@ -190,9 +189,32 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
 #ifdef ENABLE_HTTPS
     if (r->ssl.conn && !r->ssl.flags) {
         ERR_clear_error();
-        *ret = SSL_read(r->ssl.conn, buffer, size);
-        if (*ret > 0)
-            return 0;
+        if (buffer != r->read_buffer + r->read_len) {
+            *ret = SSL_read(r->ssl.conn, buffer, size);
+            if (*ret > 0 ) 
+                return 0;
+        } else {
+            // we need to receive data with LF to parse compression header
+            size_t ofs = 0;
+            int res = 0;
+            while (ofs < size) {
+                do {
+                    res = SSL_read(r->ssl.conn, buffer + ofs, 1);
+                } while (res == 0);
+
+                if (res < 0)
+                    break;
+                if (buffer[ofs] == '\n')
+                    break;
+                ofs += res;
+            }
+            if (res > 0) {
+                ofs += res;
+                *ret = ofs;
+                buffer[ofs] = 0;
+                return 0;
+            }
+        }
         // Don't treat SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE differently on blocking socket
         u_long err;
         char buf[256];
@@ -243,15 +265,15 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     int ret = 0;
     if (read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1, &ret))
         return 1;
-
+    
     if (!is_compressed_data(r->read_buffer, ret)) {
-        r->read_len = ret;
+        r->read_len += ret;
         return 0;
     }
 
-    if (unlikely(!r->decompressor))
+    if (unlikely(!r->decompressor)) 
         r->decompressor = create_decompressor();
-
+    
     size_t bytes_to_read = r->decompressor->start(r->decompressor,
             r->read_buffer, ret);
 
@@ -259,10 +281,11 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
     // we're unable to decompress incomplete block
     char compressed[bytes_to_read];
     do {
-        if (read_stream(r, fp, compressed, bytes_to_read, &ret) || !ret)
+        if (read_stream(r, fp, compressed, bytes_to_read, &ret))
             return 1;
         // Send input data to decompressor
-        r->decompressor->put(r->decompressor, compressed, ret);
+        if (ret)
+            r->decompressor->put(r->decompressor, compressed, ret);
         bytes_to_read -= ret;
     } while (bytes_to_read > 0);
     // Decompress
@@ -274,6 +297,7 @@ static int receiver_read(struct receiver_state *r, FILE *fp) {
                     r->read_buffer, sizeof(r->read_buffer));
     return 0;
 }
+
 #endif
 
 /* Produce a full line if one exists, statefully return where we start next time.
