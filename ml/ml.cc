@@ -146,11 +146,35 @@ char *ml_get_anomaly_rate_info(RRDHOST *RH, time_t After, time_t Before) {
 
     Host *H = static_cast<Host *>(RH->ml_host);
     std::vector<std::pair<std::string, double>> DimAndAnomalyRate;
-    
-    bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),
-                                                    After, Before);
-    if (!Res) {
-        error("DB result is empty");
+    if(Before > After) {
+        if(Before <= H->getLastSavedBefore()) {
+            //Only information from saved data is inquired
+            bool Res = H->getAnomalyRateInfoInRange(DimAndAnomalyRate, H->getUUID(),
+                                                        After, Before);
+            if (!Res) {
+                error("DB result is empty");
+                return nullptr;
+            }
+        }
+        else {
+            //Information from unsaved data is also inquired
+            if(Before > now_realtime_sec()) { 
+                Before = now_realtime_sec();
+            }
+            if(After >= H->getLastSavedBefore()) {
+                //Only the information from unsaved data is inquired
+                H->getAnomalyRateInfoCurrentRange(DimAndAnomalyRate, After, Before);
+            }
+            else {
+                //Mix information from saved and unsaved data is inquired
+                H->getAnomalyRateInfoMixedRange(DimAndAnomalyRate, H->getUUID(),
+                                                        After, Before);
+            }
+        }
+    }
+    else
+    {
+        error("Incorrect time range; Before time tag is not larger than After time tag!");
         return nullptr;
     }
 

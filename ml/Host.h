@@ -56,7 +56,12 @@ private:
 
 class DetectableHost : public TrainableHost {
 public:
-    DetectableHost(RRDHOST *RH) : TrainableHost(RH) {}
+    DetectableHost(RRDHOST *RH) : TrainableHost(RH) {
+        std::pair<int, int> TheLastSavedRange;
+        if(DB.getTheLastSavedAnomalyInfoRange(TheLastSavedRange, getUUID())) {
+            LastSavedBefore = TheLastSavedRange.second;
+        }
+    }
 
     void startAnomalyDetectionThreads();
     void stopAnomalyDetectionThreads();
@@ -78,6 +83,11 @@ public:
 
     void getDetectionInfoAsJson(nlohmann::json &Json) const;
 
+    time_t getLastSavedBefore() { return LastSavedBefore; }
+    void setLastSavedBefore(time_t lastSavedBefore) { LastSavedBefore = lastSavedBefore; }
+    void getAnomalyRateInfoCurrentRange(std::vector<std::pair<std::string, double>> &V, time_t After, time_t Before);
+    void getAnomalyRateInfoMixedRange(std::vector<std::pair<std::string, double>> &V, std::string HostUUID, time_t After, time_t Before);
+    
 private:
     void detect();
     void detectOnce();
@@ -103,7 +113,7 @@ private:
 
     /*the counter variable to downcount the time window for anomaly bit counting*/
     size_t AnomalyBitCounterWindow{static_cast<size_t>(Cfg.SaveAnomalyPercentageEvery)};
-
+    time_t LastSavedBefore{0};
 
 };
 

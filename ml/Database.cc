@@ -62,12 +62,14 @@ const char *ml::Database::SQL_INSERT_BULK_ANOMALY_RATE_INFO =
 
  const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO =
     "SELECT  main.dimension_id, "
-    " ((pre.avg * (SELECT before-after FROM anomaly_rate_info WHERE after <= ?2 ORDER BY after DESC LIMIT 1)) + "
+    " ((pre.avg * (SELECT before-?2 FROM anomaly_rate_info WHERE after <= ?2 ORDER BY after DESC LIMIT 1)) + "
     " (main.avg * ((SELECT before FROM anomaly_rate_info WHERE before <= ?3 ORDER BY before DESC LIMIT 1) - "
     "              (SELECT after FROM anomaly_rate_info WHERE after >= ?2 ORDER BY after ASC LIMIT 1))) + "
-    " (post.avg * (SELECT before-after FROM anomaly_rate_info WHERE before >= ?3 ORDER BY before ASC LIMIT 1))) / "
-    " ((SELECT before FROM anomaly_rate_info WHERE before >= ?3 ORDER BY before ASC LIMIT 1) - "
-    "  (SELECT after FROM anomaly_rate_info WHERE after <= ?2 ORDER BY after DESC LIMIT 1)) percentage FROM "
+    " (post.avg * (SELECT ?3-after FROM anomaly_rate_info WHERE before >= ?3 OR "
+    "                ((SELECT before FROM anomaly_rate_info WHERE before <= ?3 ORDER BY before DESC LIMIT 1) "
+    "                 AND NOT EXISTS (SELECT before FROM anomaly_rate_info WHERE before >= ?3 ORDER BY before ASC LIMIT 1)) "
+    "              ORDER BY before DESC LIMIT 1))) / "
+    " (?3 - ?2) percentage FROM "
     "(SELECT dimension_id, AVG(anomaly_percentage) avg FROM "
     "  (SELECT json_extract(j.value, '$[1]') AS dimension_id, "
     "  json_extract(j.value, '$[0]') AS anomaly_percentage "
@@ -93,12 +95,18 @@ const char *ml::Database::SQL_INSERT_BULK_ANOMALY_RATE_INFO =
     "  FROM anomaly_rate_info AS ari, json_each(ari.anomaly_rates) AS j " 
     "  WHERE ari.host_id == ?1 "
     "  AND ari.after >= (SELECT after FROM anomaly_rate_info WHERE after <= ?3 ORDER BY after DESC LIMIT 1) "
-    "  AND ari.before <= (SELECT before FROM anomaly_rate_info WHERE before >= ?3 ORDER BY before ASC LIMIT 1) "
+    "  AND ari.before <= (SELECT before FROM anomaly_rate_info WHERE before >= ?3 OR "
+    "                ((SELECT before FROM anomaly_rate_info WHERE before <= ?3 ORDER BY before DESC LIMIT 1) "
+    "                 AND NOT EXISTS (SELECT before FROM anomaly_rate_info WHERE before >= ?3 ORDER BY before ASC LIMIT 1)) "
+    "              ORDER BY before DESC LIMIT 1) "
     "  AND json_valid(ari.anomaly_rates)) "
     "  GROUP BY dimension_id) AS post "
     " ON main.dimension_id = post.dimension_id "
     "GROUP BY main.dimension_id;";
  
+const char *ml::Database::SQL_SELECT_ANOMALY_RATE_INFO_RANGE =
+    "SELECT after, before FROM anomaly_rate_info WHERE host_id == ?1 ORDER BY before DESC LIMIT 1;";
+
 const char *ml::Database::SQL_SHRINK_ANOMALY_RATE_INFO =
     "DELETE FROM anomaly_rate_info "
     " WHERE after NOT IN ( "

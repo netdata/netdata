@@ -90,6 +90,7 @@ private:
     static const char *SQL_CREATE_ANOMALY_RATE_INFO_TABLE;
     static const char *SQL_INSERT_BULK_ANOMALY_RATE_INFO;
     static const char *SQL_SELECT_ANOMALY_RATE_INFO;
+    static const char *SQL_SELECT_ANOMALY_RATE_INFO_RANGE;
     static const char *SQL_SHRINK_ANOMALY_RATE_INFO;
     static const char *SQL_REMOVE_OLD_ANOMALY_RATE_INFO;
 
@@ -142,6 +143,15 @@ public:
     }
 
     template<typename ...ArgTypes>
+    bool getTheLastSavedAnomalyInfoRange(std::pair<int, int> &P, ArgTypes&&... Args) {
+        Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {
+            P.first = sqlite3_column_int64(Stmt, 0);
+            P.second = sqlite3_column_int64(Stmt, 1);
+        };
+        return GetTheLastSavedAnomalyInfoRangeStmt.exec(Conn, RowCb, Args...);
+    }
+
+    template<typename ...ArgTypes>
     void shrinkAnomalyRateInfoTable(ArgTypes&&... Args) {
         Statement::RowCallback RowCb = [&](sqlite3_stmt *Stmt) {};
         ShrinkAnomalyRateInfoTableStmt.exec(Conn, RowCb, Args...);
@@ -162,6 +172,7 @@ private:
     
     Statement InsertBulkAnomalyRateInfoStmt{SQL_INSERT_BULK_ANOMALY_RATE_INFO};
     Statement GetAnomalyRateInfoInRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO};
+    Statement GetTheLastSavedAnomalyInfoRangeStmt{SQL_SELECT_ANOMALY_RATE_INFO_RANGE};
     Statement ShrinkAnomalyRateInfoTableStmt{SQL_SHRINK_ANOMALY_RATE_INFO};
     Statement RemoveOldAnomalyRateInfoStmt{SQL_REMOVE_OLD_ANOMALY_RATE_INFO};
 };
