@@ -11,7 +11,7 @@ Netdata's [one-line kickstart](/docs/get-started.mdx) is zero-configuration, hig
 of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
 in-between.
 
-But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible. What if you need to
+But what if you're trying to bootstrap an infrastructure monitoring solution as quickly as possible? What if you need to
 deploy Netdata across an entire infrastructure with many nodes? What if you want to make this deployment reliable,
 repeatable, and idempotent? What if you want to write and deploy your infrastructure or cloud monitoring system like
 code?
@@ -22,7 +22,7 @@ those operations over standard and secure SSH connections. There's no agent to i
 have to worry about is your application and your monitoring software. 
 
 Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the
-most valuable feature about Ansible is that every is **idempotent**. From the [Ansible
+most valuable feature about Ansible is **idempotent**. From the [Ansible
 glossary](https://docs.ansible.com/ansible/latest/reference_appendices/glossary.html)
 
 > An operation is idempotent if the result of performing it once is exactly the same as the result of performing it
