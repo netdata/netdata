@@ -257,7 +257,9 @@ char *ebpf_kernel_suffix(int version, int isrh)
         else
             return "3.10";
     } else {
-        if (version >= NETDATA_EBPF_KERNEL_5_11)
+        if (version >= NETDATA_EBPF_KERNEL_5_15)
+            return "5.15";
+        else if (version >= NETDATA_EBPF_KERNEL_5_11)
             return "5.11";
         else if (version >= NETDATA_EBPF_KERNEL_5_10)
             return "5.10";
