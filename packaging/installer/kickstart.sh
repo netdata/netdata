@@ -240,7 +240,7 @@ cleanup() {
 }
 
 fatal() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*}"
+  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
   cleanup
   trap - EXIT
