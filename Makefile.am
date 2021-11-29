@@ -612,8 +612,8 @@ PARSER_FILES = \
     parser/parser.h \
     $(NULL)
 
-if ACLK_NG
-ACLK_NG_FILES = \
+if ENABLE_ACLK
+ACLK_FILES = \
     aclk/aclk.c \
     aclk/aclk.h \
     aclk/aclk_util.c \
@@ -646,7 +646,7 @@ ACLK_NG_FILES = \
     $(NULL)
 
 if ENABLE_NEW_CLOUD_PROTOCOL
-ACLK_NG_FILES += \
+ACLK_FILES += \
     aclk/aclk_charts_api.c \
     aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
@@ -672,7 +672,7 @@ ACLK_NG_FILES += \
     aclk/schema-wrappers/schema_wrapper_utils.h \
     $(NULL)
 
-ACLK_NG_PROTO_DEFINITIONS = \
+ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/aclk/v1/lib.proto \
     aclk/aclk-schemas/proto/agent/v1/disconnect.proto \
     aclk/aclk-schemas/proto/agent/v1/connection.proto \
@@ -687,9 +687,9 @@ ACLK_NG_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
     $(NULL)
 
-dist_noinst_DATA += $(ACLK_NG_PROTO_DEFINITIONS)
+dist_noinst_DATA += $(ACLK_PROTO_DEFINITIONS)
 
-ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
+ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/agent/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
@@ -715,9 +715,9 @@ ACLK_NG_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h \
     $(NULL)
 
-BUILT_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
-nodist_netdata_SOURCES += $(ACLK_NG_PROTO_BUILT_FILES)
-CLEANFILES += $(ACLK_NG_PROTO_BUILT_FILES)
+BUILT_SOURCES += $(ACLK_PROTO_BUILT_FILES)
+nodist_netdata_SOURCES += $(ACLK_PROTO_BUILT_FILES)
+CLEANFILES += $(ACLK_PROTO_BUILT_FILES)
 
 aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
 aclk/aclk-schemas/proto/agent/v1/connection.pb.h: aclk/aclk-schemas/proto/agent/v1/connection.proto
@@ -769,7 +769,7 @@ aclk/aclk-schemas/proto/nodeinstance/info/v1/info.pb.h: aclk/aclk-schemas/proto/
 
 endif #ENABLE_NEW_CLOUD_PROTOCOL
 
-endif #ACLK_NG
+endif #ENABLE_ACLK
 
 if ENABLE_ACLK
 ACLK_COMMON_FILES = \
@@ -902,7 +902,7 @@ NETDATA_FILES = \
     $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_COMMON_FILES) \
-    $(ACLK_NG_FILES) \
+    $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(NULL)
 
@@ -965,7 +965,7 @@ netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 
-if ACLK_NG
+if ENABLE_ACLK
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
         $(OPTIONAL_ATOMIC_LIBS) \
         $(NULL)
