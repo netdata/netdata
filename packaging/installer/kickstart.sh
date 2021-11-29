@@ -168,9 +168,9 @@ telemetry_event() {
 EOF
 )"
 
-  if [ -n "$(command -v curl 2> /dev/null)" ]; then
+  if command -v curl > /dev/null 2>&1; then
     curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
-  else
+  elif command -v wget > /dev/null 2>&1; then
     wget -q -O - --no-check-certificate \
     --method POST \
     --timeout=1 \
