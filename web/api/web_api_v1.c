@@ -995,13 +995,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #else
     buffer_strcat(wb, "\t\"aclk-legacy-available\": false,\n");
 #endif
-    buffer_strcat(wb, "\t\"aclk-implementation\": \"");
-    if (aclk_ng) {
-        buffer_strcat(wb, "Next Generation");
-    } else {
-        buffer_strcat(wb, "legacy");
-    }
-    buffer_strcat(wb, "\",\n");
+    buffer_strcat(wb, "\t\"aclk-implementation\": \"Next Generation\",\n");
 #else
     buffer_strcat(wb, "\t\"cloud-available\": false,\n");
 #endif
