@@ -135,9 +135,13 @@ struct receiver_state {
 
 
 extern unsigned int default_rrdpush_enabled;
-#ifdef ENABLE_COMPRESSION
+// #ifdef ENABLE_COMPRESSION
+// extern unsigned int default_compression_enabled;
+// #endif
+// Need to create a different streaming version in order to support and select compression.
+// Then is compression is supported the agents can negotiate the compression.
 extern unsigned int default_compression_enabled;
-#endif
+
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
@@ -160,8 +164,8 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
-extern unsigned int parse_stream_compression(RRDHOST *host, char *http);
 extern long int parse_stream_version(RRDHOST *host, char *http);
+extern unsigned int parse_stream_compression(RRDHOST *host, char *http);
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();

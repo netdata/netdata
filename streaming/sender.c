@@ -123,11 +123,6 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_send_custom_host_variables(host);
 }
 
-static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
-}
-
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
@@ -351,8 +346,6 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     info("Response to sender from far end: %s", http);
     // negotiations
     int32_t version = (int32_t)parse_stream_version(host, http);
-    unsigned int rrdpush_compression = parse_stream_compression(host, http);
- 
     // if(version_start) {
     //     version_start++;
     //     version = (int32_t)strtol(version_start, NULL, 10);
@@ -382,7 +375,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
         return 0;
     }
     s->version = version;
-    s->rrdpush_compression = rrdpush_compression;
+    unsigned int rrdpush_compression = parse_stream_compression(host, http);
+    s->rrdpush_compression = rrdpush_compression;    
 #ifdef ENABLE_COMPRESSION
     if (s->compressor && s->rrdpush_compression)
         s->compressor->reset(s->compressor);

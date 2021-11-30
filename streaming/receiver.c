@@ -544,7 +544,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     {
         info("STREAM %s [receive from [%s]:%s]: Compression disabled over stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
     }
-    sprintf(initial_response, " %s%u", START_COMPRESSION, rpt->rrdpush_compression);        
+    sprintf((initial_response + strlen(initial_response)), " %s%u", START_COMPRESSION, rpt->rrdpush_compression);        
     info("Initial response to %s: %s", rpt->client_ip, initial_response);
 
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
