@@ -156,7 +156,6 @@
 - add proc\_net\_sockstat and sockstat6 charts info [\#11567](https://github.com/netdata/netdata/pull/11567) ([ilyam8](https://github.com/ilyam8))
 - Disable eBPF compilation in different platforms [\#11566](https://github.com/netdata/netdata/pull/11566) ([thiagoftsm](https://github.com/thiagoftsm))
 - add proc\_net\_snmp6 charts info [\#11565](https://github.com/netdata/netdata/pull/11565) ([ilyam8](https://github.com/ilyam8))
-- add proc\_net\_sctp\_snmp charts info [\#11564](https://github.com/netdata/netdata/pull/11564) ([ilyam8](https://github.com/ilyam8))
 - eBPF Shared Memory system call tracking [\#11560](https://github.com/netdata/netdata/pull/11560) ([UmanShahzad](https://github.com/UmanShahzad))
 - Add shared memory to cgroup [\#11559](https://github.com/netdata/netdata/pull/11559) ([thiagoftsm](https://github.com/thiagoftsm))
 - End of support for Ubuntu 16.04 [\#11556](https://github.com/netdata/netdata/pull/11556) ([Ferroin](https://github.com/Ferroin))
