@@ -979,6 +979,8 @@ int queue_chart_to_aclk(RRDSET *st)
 #ifndef ENABLE_NEW_CLOUD_PROTOCOL
 #ifdef ENABLE_ACLK
     aclk_update_chart(st->rrdhost, st->id, 1);
+#else
+    UNUSED(st);
 #endif
     return 0;
 #else
