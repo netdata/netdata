@@ -42,37 +42,6 @@ void aclk_single_update_enable()
 {
     aclk_disable_single_updates = 0;
 }
-
-void aclk_alarm_reload(void)
-{
-    ng_aclk_alarm_reload();
-}
-
-int aclk_update_chart(RRDHOST *host, char *chart_name, int create)
-{
-    return ng_aclk_update_chart(host, chart_name, create);
-}
-
-int aclk_update_alarm(RRDHOST *host, ALARM_ENTRY *ae)
-{
-    return ng_aclk_update_alarm(host, ae);
-}
-
-void aclk_add_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
-{
-    return ng_aclk_add_collector(host, plugin_name, module_name);
-}
-
-void aclk_del_collector(RRDHOST *host, const char *plugin_name, const char *module_name)
-{
-    return ng_aclk_del_collector(host, plugin_name, module_name);
-}
-
-void aclk_host_state_update(RRDHOST *host, int connect)
-{
-    return ng_aclk_host_state_update(host, connect);
-}
-
 #endif /* ENABLE_ACLK */
 
 struct label *add_aclk_host_labels(struct label *label) {
