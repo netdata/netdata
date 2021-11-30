@@ -521,7 +521,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
     char initial_response[HTTP_HEADER_SIZE];
     if (rpt->stream_version > 1) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, rpt->stream_version);
+        uint32_t capabilities = 0;
+#ifdef ENABLE_COMPRESSION
+        capabilities |= default_compression_enabled ? STREAM_CAPABILITY_COMPRESSION : 0;
+#endif
+        sprintf(initial_response, "%s%u.%x", START_STREAMING_PROMPT_VN, rpt->stream_version, capabilities);
     } else if (rpt->stream_version == 1) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", rpt->host->hostname, rpt->client_ip, rpt->client_port, rpt->stream_version);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);

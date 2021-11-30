@@ -18,14 +18,23 @@ void sender_commit(struct sender_state *s) {
     char *src = (char *)buffer_tostring(s->host->sender->build);
     size_t src_len = s->host->sender->build->len;
 #ifdef ENABLE_COMPRESSION
-    if (src && src_len) {
-        if (s->compressor)
-            src_len = s->compressor->compress(s->compressor,
-                src, src_len, &src);
-    }
-#endif
+    do {
+        if (src && src_len) {
+            if (s->compressor) {
+                src_len = s->compressor->compress(s->compressor, src, src_len, &src);
+                if (!src_len) {
+                    error("Compression error - data discarded");
+                    break;
+                }
+            }
+            if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+                s->overflow = 1;
+        }
+    } while (0);
+#else
     if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
         s->overflow = 1;
+#endif
     buffer_flush(s->build);
     netdata_mutex_unlock(&s->mutex);
 }
@@ -351,12 +360,26 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     char *version_start = strchr(http, '=');
     int32_t version = -1;
     if(version_start) {
+        uint32_t capabilities = 0;
+        char *caps_start = NULL;
         version_start++;
-        version = (int32_t)strtol(version_start, NULL, 10);
+        version = (int32_t)strtol(version_start, &caps_start, 10);
         answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
         }
+        if (caps_start && *caps_start == '.') {
+            capabilities = (uint32_t)strtol(caps_start + 1, NULL, 10);
+        }
+#ifdef ENABLE_COMPRESSION
+        if (!(capabilities & STREAM_CAPABILITY_COMPRESSION)) {
+            // if parent doesn't support compression and this child does
+            // then disable compression for this child
+            default_compression_enabled = 0;
+            if (s->compressor) 
+                s->compressor->destroy(&s->compressor);
+        }
+#endif
     } else {
         answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
         if(!answer) {
