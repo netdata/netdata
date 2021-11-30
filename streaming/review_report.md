@@ -72,3 +72,30 @@ liblz4-1:
 
 /usr/lib/x86_64-linux-gnu/liblz4.so.1.7.1
 ```
+
+
+### Compression negotiation in streaming
+If hop2 (grandparent) doesn't support compression but hop1 has compression enbaled then hop1 sends compressed data to hop2 which cannot decompress them. So the solution is to negotiate compression between agents during streaming.
+
+```
+hop2 (compression enabled but does not support the lz4 v1.9.0+ requirements) <- hop1 (supports compression and has it enbaled) <- hop0_compression, hop0_no_compression
+
+2021-11-29 13:00:56: netdata INFO  : WEB_SERVER[static3] : clients wants to STREAM metrics.
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : thread created with task id 10411
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : set name of thread 10411 to STREAM_RECEIVER
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [0.0.0.0]:53854: receive thread created (task id 10411)
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: client willing to stream metrics for host 'child02_nocompression' with machine_guid 'd12df8f0-2a7c-11ec-9e79-fa163ec93321': update every = 1, history = 3996, memory mode = ram, health auto, tags ''
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: initializing communication...
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: Netdata is using the stream version 4.
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : Postponing health checks for 60 seconds, on host 'child02_nocompression', because it was just connected.
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: receiving metrics...
+2021-11-29 13:00:56: netdata ERROR : STREAM_RECEIVER[child01,[0.0.0.0]:53852] : Unknown keyword [�ہ]
+2021-11-29 13:00:56: netdata ERROR : STREAM_RECEIVER[child01,[0.0.0.0]:53852] : STREAM child01 [receive from [0.0.0.0]:53852]: disconnected (completed 0 updates).
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child01,[0.0.0.0]:53852] : STREAM child01 [receive from [0.0.0.0]:53852]: receive thread ended (task id 10410)
+2021-11-29 13:00:56: netdata INFO  : STREAM_RECEIVER[child01,[0.0.0.0]:53852] : thread with task id 10410 finished
+2021-11-29 13:00:57: netdata ERROR : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : Unknown keyword [���]
+2021-11-29 13:00:57: netdata ERROR : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: disconnected (completed 0 updates).
+2021-11-29 13:00:57: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : STREAM child02_nocompression [receive from [0.0.0.0]:53854]: receive thread ended (task id 10411)
+2021-11-29 13:00:57: netdata INFO  : STREAM_RECEIVER[child02_nocompression,[0.0.0.0]:53854] : thread with task id 10411 finished
+2021-11-29 13:00:57: netdata INFO  : WEB_SERVER[static2] : clients wants to STREAM metrics.
+```

@@ -19,6 +19,7 @@
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
+#define START_COMPRESSION "stream_compression="
 
 #define HTTP_HEADER_SIZE 8192
 
@@ -92,6 +93,7 @@ struct sender_state {
     char read_buffer[512];
     int read_len;
     int32_t version;
+    unsigned int rrdpush_compression;
 #ifdef ENABLE_COMPRESSION
     struct compressor_state *compressor;
 #endif
@@ -120,11 +122,12 @@ struct receiver_state {
     time_t last_msg_t;
     char read_buffer[1024];     // Need to allow RRD_ID_LENGTH_MAX * 4 + the other fields
     int read_len;
+    unsigned int shutdown:1;    // Tell the thread to exit
+    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+    unsigned int rrdpush_compression;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
-    unsigned int shutdown:1;    // Tell the thread to exit
-    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
 #ifdef ENABLE_COMPRESSION
     struct decompressor_state *decompressor;
 #endif
@@ -157,6 +160,8 @@ extern void rrdpush_sender_thread_stop(RRDHOST *host);
 extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 extern void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 
+extern unsigned int parse_stream_compression(RRDHOST *host, char *http);
+extern long int parse_stream_version(RRDHOST *host, char *http);
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
