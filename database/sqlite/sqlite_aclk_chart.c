@@ -318,7 +318,7 @@ void aclk_send_chart_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     uint64_t first_sequence;
     uint64_t last_sequence;
-    time_t last_timestamp;
+    time_t last_timestamp = 0;
 
     BUFFER *sql = buffer_create(1024);
 
