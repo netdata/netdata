@@ -519,7 +519,7 @@ jobs:
           artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
           draft: true
           tag: ${{ github.event.inputs.version }}
-          token: ${{ secrets.NETDATABOT_TOKEN }}
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
