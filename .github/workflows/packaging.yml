@@ -63,8 +63,6 @@ jobs:
           - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/arm/v7, arch: armhf}
           - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/arm64/v8, arch: arm64}
-          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/arm64/v8, arch: arm64}
           - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
           - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/arm64/v8, arch: arm64}
           - {distro: oraclelinux, version: "8", pkgclouddistro: ol/8, format: rpm, base_image: oraclelinux, platform: linux/amd64, arch: amd64}

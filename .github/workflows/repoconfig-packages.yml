@@ -27,7 +27,6 @@ jobs:
           - {distro: centos, version: "8", pkgclouddistro: el/8, format: rpm, base_image: centos, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "34", pkgclouddistro: fedora/34, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
           - {distro: fedora, version: "35", pkgclouddistro: fedora/35, format: rpm, base_image: fedora, platform: linux/amd64, arch: amd64}
-          - {distro: opensuse, version: "15.2", pkgclouddistro: opensuse/15.2, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
           - {distro: opensuse, version: "15.3", pkgclouddistro: opensuse/15.3, format: rpm, base_image: opensuse/leap, platform: linux/amd64, arch: amd64}
           - {distro: oraclelinux, version: "8", pkgclouddistro: ol/8, format: rpm, base_image: oraclelinux, platform: linux/amd64, arch: amd64}
       # We intentiaonally disable the fail-fast behavior so that a

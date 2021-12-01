@@ -72,11 +72,6 @@
       "rmjsonc": "zypper rm -y libjson-c-devel"
     },
     {
-      "distro": "opensuse/leap:15.2",
-      "artifact_key": "opensuse15.2",
-      "rmjsonc": "zypper rm -y libjson-c-devel"
-    },
-    {
       "distro": "oraclelinux:8",
       "artifact_key": "oraclelinux8",
       "rmjsonc": "dnf remove -y json-c-devel"
