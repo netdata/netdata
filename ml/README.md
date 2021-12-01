@@ -234,6 +234,7 @@ The anomaly rate across all dimensions of a node.
 ### Notes
 
 - We would love to hear any feedback relating to this functionality, please email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
+- [This presentation](https://docs.google.com/presentation/d/18zkCvU3nKP-Bw_nQZuXTEa4PIVM6wppH3VUnAauq-RU/edit?usp=sharing) walks through some of the main concepts covered above in a more informal way.
 - After restart Netdata will wait until `minimum num samples to train` observations of data are available before starting training and prediction.
 - Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alarms based on ML driven anomaly detection models.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.
