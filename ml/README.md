@@ -2,21 +2,21 @@
 
 ## Overview
 
-As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML capabilites built into it and available to use out of the box with minimal configuration required.
+As of [`v1.32.0`](https://github.com/netdata/netdata/releases/tag/v1.32.0) Netdata comes with some ML powered anomaly detection capabilites built into it and available to use out of the box with minimal configuration required.
 
 **Note**: This functionality is still under active development and may face breaking changes. It is considered experimental while we dogfood it internally and among early adopters within the Netdata community. We would like to develop and build on these foundational ml capabilities in the open and with the community so if you would like to get involved and help us with some feedback please feel free to email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 
-Once ml is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed "feature vector" of recent smoothed and differenced values. This should enable the model to detect a wider range of "strange patterns" in recent observations for each metric as opposed to just point anomalies like big spikes or drops. 
+Once ML is enabled, Netdata will begin training a model for each dimension. By default this model is a [k-means clustering](https://en.wikipedia.org/wiki/K-means_clustering) model trained on the most recent 4 hours of data. Rather than just using the most recent value of each raw metric, the model works on a preprocessed ["feature vector"](#feature-vector) of recent smoothed and differenced values. This should enable the model to detect a wider range of "strange patterns" in recent observations for each metric as opposed to just point anomalies like big spikes or drops. 
 
 The below sections will introduce some of the main concepts. Additional explainations and details can be found in the Glossary and Notes sections below.
 
-### Anomaly Bit
+### Anomaly Bit - (100 = Anomalous, 0 = Normal)
 
-Once each model is trained, Netdata will begin producing an "anomaly score" at each timestep for each dimension. This "anomaly score" is essentially a distance measure to the trained cluster centers of the model, so more anomlous looking data should be more distant to those cluster centers. If this "anomaly score" is sufficiently large this is a sign that the recent raw values of the dimension could potentialy be anomalous. Once this threshold is passed the "anomaly bit" corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
+Once each model is trained, Netdata will begin producing an ["anomaly score"](#anomaly-score) at each timestep for each dimension. This ["anomaly score"](#anomaly-score) is essentially a distance measure to the trained cluster centers of the model, so more anomlous looking data should be more distant to those cluster centers. If this ["anomaly score"](#anomaly-score) is sufficiently large this is a sign that the recent raw values of the dimension could potentialy be anomalous. Once this threshold is passed the ["anomaly bit"](#anomaly-bit) corresponding to that dimension is set to 100 to flag it as anomalous, otherwise it would be left at 0 to signal normal data.
 
-What this means is that in addition to the raw value of each metric, Netdata now also would have available an "anomaly bit" that is either 100 for anomalous or 0 for normal. Importanlty, this is achieved without additional storage overhead due to how the anomaly bit has been implemented within the internal Netdata storage representation.
+What this means is that in addition to the raw value of each metric, Netdata now also would have available an ["anomaly bit"](#anomaly-bit) that is either 100 for anomalous or 0 for normal. Importanlty, this is achieved without additional storage overhead due to how the anomaly bit has been implemented within the internal Netdata storage representation.
 
-This "anomaly bit" is exposed via the `anomaly-bit` key that can be passed to the `options` param of the `/api/v1/data` REST API. 
+This ["anomaly bit"](#anomaly-bit) is exposed via the `anomaly-bit` key that can be passed to the `options` param of the `/api/v1/data` REST API. 
 
 For example, here are some recent raw dimension values for `system.ip` on our [london](http://london.my-netdata.io/) demo server:
 
@@ -54,7 +54,7 @@ And if we add the `&options=anomaly-bit` params, we can see the "anomaly bit" va
 
 Typically, the anomaly bit will mostly be 0 under normal circumstances with some random fluctuations every now and then to 100. Although this very much depends on the nature of the dimension in question.
 
-### Anomaly Rate
+### Anomaly Rate - avg(anomaly bit)
 
 Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here. 
 
@@ -78,13 +78,13 @@ NAR        = Node Anomaly Rate
 NAR_t1-t10 = Node Anomaly Rate over t1 to t10
 ```
 
-Here we can just average a row or a column and work out an "anomaly rate". For example, if we were to just average along a row then this would be the "anomaly rate" across all dimensions at time t. Likewise if we averaged a column then we would have the "anomaly rate" for dimension d over the time window t=1-10. Extending this idea we can work out an "anomaly rate" for the whole matrix or any subset of it we might be interested in. 
+Here we can just average a row or a column and work out an ["anomaly rate"](#anomaly-rate). For example, if we were to just average along a row then this would be the ["anomaly rate"](#anomaly-rate) across all dimensions at time t. Likewise if we averaged a column then we would have the ["anomaly rate"](#anomaly-rate) for dimension d over the time window t=1-10. Extending this idea we can work out an ["anomaly rate"](#anomaly-rate) for the whole matrix or any subset of it we might be interested in. 
 
-### Anomaly Detector
+### Anomaly Detector - Node level anomaly events
 
-Netdata uses the concept of an "anomaly detector" that looks at all the anomaly bits of the node and if a sufficient percentage of them are high enough for a persistant amount of time then an "anomaly event" will be produced. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behaviour might have been detected. 
+Netdata uses the concept of an ["anomaly detector"](#anomaly-detector) that looks at all the anomaly bits of the node and if a sufficient percentage of them are high enough for a persistant amount of time then an ["anomaly event"](#anomaly-event) will be produced. This anomaly event signals that there was sufficient evidence among all the anomaly bits that some strange behaviour might have been detected. 
 
-Essentially if the "Node Anomaly Rate" (NAR) passes a defined threshold and stays above that threshold for a persistant amout of time a "Node Anomaly Event" will be triggered.
+Essentially if the ["Node Anomaly Rate"](#node-anomaly-rate) (NAR) passes a defined threshold and stays above that threshold for a persistant amout of time a "Node Anomaly Event" will be triggered.
 
 These anomaly events are currently exposed via `/api/v1/anomaly_events`
 
@@ -203,11 +203,33 @@ After a short while the rolling node anomaly rate goes `above_threshold`, and on
 
 ## Glossary
 
-- "**feature vector**": A [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)) is what the ML model is trained on and uses for prediction. The most simple feature vector would be just the latest raw dimension value itself [x]. By default Netdata will use a feature vector consisting of the 6 latest differences and smoothed values of the dimension so conceptually something like `[avg3(diff1(x-5)), avg3(diff1(x-4)), avg3(diff1(x-3)), avg3(diff1(x-2)), avg3(diff1(x-1)), avg3(diff1(x))]` which ends up being 6 floating point numbers that try and represent the "shape" of recent data.
-- "**anomaly score**": At prediction time the anomaly score is just the distance of the most recent feature vector to the trained cluster centers of the model, which are themselves just feature vectors, albeit supposeldy the best most representitive feature vectors that could be "learned" from the training data. So if the most recent feature vector is very far away in terms of [eucliedian distance](https://en.wikipedia.org/wiki/Euclidean_distance#:~:text=In%20mathematics%2C%20the%20Euclidean%20distance,being%20called%20the%20Pythagorean%20distance.) it's more likley that the recent data it represents consists of some strange pattern not commonly found in the training data.
-- "**anomaly bit**": If the anomaly score is greater than a specified threshold then the most recent feature vector, and hence most recent raw data, is considered anomalous. Since storing the raw anomaly score would essentially double amout of storage space Netdata would need, we instead efficiently store just the anomaly bit in the existing internal Netdata data representation without any additional storage overhead.
-- "**anomaly rate**": An anomaly rate is really just an average over one or more anomaly bits. An anomaly rate can be calculated over time for one or more dimensions or at a point in time across multiple dimensions, or some combination of the two. Its just an average of some collection of anomaly bits.
-- "**anomaly detector**": The is essentially business logic that just tries to process a collection of anomaly bits to determine if there is enough active anomaly bits to merit investigation or declaration of a node level anomaly event. 
+#### _feature vector_
+
+A [feature vector](https://en.wikipedia.org/wiki/Feature_(machine_learning)) is what the ML model is trained on and uses for prediction. The most simple feature vector would be just the latest raw dimension value itself [x]. By default Netdata will use a feature vector consisting of the 6 latest differences and smoothed values of the dimension so conceptually something like `[avg3(diff1(x-5)), avg3(diff1(x-4)), avg3(diff1(x-3)), avg3(diff1(x-2)), avg3(diff1(x-1)), avg3(diff1(x))]` which ends up being 6 floating point numbers that try and represent the "shape" of recent data.
+
+#### _anomaly score_
+
+At prediction time the anomaly score is just the distance of the most recent feature vector to the trained cluster centers of the model, which are themselves just feature vectors, albeit supposeldy the best most representitive feature vectors that could be "learned" from the training data. So if the most recent feature vector is very far away in terms of [eucliedian distance](https://en.wikipedia.org/wiki/Euclidean_distance#:~:text=In%20mathematics%2C%20the%20Euclidean%20distance,being%20called%20the%20Pythagorean%20distance.) it's more likley that the recent data it represents consists of some strange pattern not commonly found in the training data.
+
+#### _anomaly bit_
+
+If the anomaly score is greater than a specified threshold then the most recent feature vector, and hence most recent raw data, is considered anomalous. Since storing the raw anomaly score would essentially double amout of storage space Netdata would need, we instead efficiently store just the anomaly bit in the existing internal Netdata data representation without any additional storage overhead.
+
+#### _anomaly rate_
+
+An anomaly rate is really just an average over one or more anomaly bits. An anomaly rate can be calculated over time for one or more dimensions or at a point in time across multiple dimensions, or some combination of the two. Its just an average of some collection of anomaly bits.
+
+#### _anomaly detector_
+
+The is essentially business logic that just tries to process a collection of anomaly bits to determine if there is enough active anomaly bits to merit investigation or declaration of a node level anomaly event. 
+
+#### _anomaly event_
+
+Anomaly events are triggered by the anomaly detector as represent a window of time on the node with sufficiently elevated anomaly rates across all dimensions.
+
+#### _node anomaly rate_
+
+The anomaly rate across all dimensions of a node.
 
 ### Notes
 
