@@ -377,18 +377,21 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     struct bpf_link **links = callocz(length , sizeof(struct bpf_link *));
     size_t i = 0;
     struct bpf_program *prog;
+    ebpf_specify_name_t *w;
     bpf_object__for_each_program(prog, obj)
     {
-        links[i] = bpf_program__attach(prog);
-        if (libbpf_get_error(links[i]) && names) {
+        if (names) {
             const char *name = bpf_program__name(prog);
-            ebpf_specify_name_t *w = ebpf_find_names(names, name);
-            if (w) {
-                enum bpf_prog_type type = bpf_program__get_type(prog);
-                if (type == BPF_PROG_TYPE_KPROBE)
-                    links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
-            }
-        }
+            w = ebpf_find_names(names, name);
+        } else
+            w = NULL;
+
+        if (w) {
+            enum bpf_prog_type type = bpf_program__get_type(prog);
+            if (type == BPF_PROG_TYPE_KPROBE)
+                links[i] = bpf_program__attach_kprobe(prog, w->retprobe, w->optional);
+        } else
+            links[i] = bpf_program__attach(prog);
 
         if (libbpf_get_error(links[i])) {
             links[i] = NULL;
