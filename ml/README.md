@@ -211,7 +211,9 @@ After a short while the rolling node anomaly rate goes `above_threshold`, and on
 
 ### Notes
 
+- We would love to hear any feedback relating to this functionality, please email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 - After restart Netdata will wait until `minimum num samples to train` observations of data are available before starting training and prediction.
+- Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alarms based on ML driven anomaly detection models.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.
 - You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU.
 - The "anomaly bit" has been implemented to be a building block to underpin many more ML based use cases that we plan to deliver soon.
