@@ -67,11 +67,6 @@
       "rmjsonc": "dnf remove -y json-c-devel"
     },
     {
-      "distro": "fedora:33",
-      "artifact_key": "fedora33",
-      "rmjsonc": "dnf remove -y json-c-devel"
-    },
-    {
       "distro": "opensuse/leap:15.3",
       "artifact_key": "opensuse15.3",
       "rmjsonc": "zypper rm -y libjson-c-devel"
