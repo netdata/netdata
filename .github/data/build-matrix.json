@@ -83,12 +83,6 @@
       "rmjsonc": "apt-get remove -y libjson-c-dev"
     },
     {
-      "distro": "ubuntu:21.04",
-      "artifact_key": "ubuntu21.04",
-      "pre": "apt-get update",
-      "rmjsonc": "apt-get remove -y libjson-c-dev"
-    },
-    {
       "distro": "ubuntu:20.04",
       "artifact_key": "ubuntu20.04",
       "pre": "apt-get update",
