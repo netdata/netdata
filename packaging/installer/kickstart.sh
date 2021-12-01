@@ -39,7 +39,7 @@
 # shellcheck disable=SC2039,SC2059,SC2086
 
 # External files
-PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/packaging-split/packaging/installer/install-required-packages.sh"
 
 # Netdata Tarball Base URL (defaults to our Google Storage Bucket)
 [ -z "$NETDATA_TARBALL_BASEURL" ] && NETDATA_TARBALL_BASEURL=https://storage.googleapis.com/netdata-nightlies
