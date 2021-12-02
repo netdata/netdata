@@ -403,10 +403,11 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     else {
         //parent does not support compression or has compression disabled
-        if (default_compression_enabled)
-            default_compression_enabled = 0;
-        if (s->compressor)
-            s->compressor->destroy(&s->compressor);
+        if (default_compression_enabled) {
+            info("Parent %s does not support compression.", s->connected_to);
+            if (s->compressor)
+                s->compressor->destroy(&s->compressor);
+        }
     }        
 #endif  //ENABLE_COMPRESSION
 
