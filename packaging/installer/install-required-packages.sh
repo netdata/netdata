@@ -1221,13 +1221,16 @@ Detection Method: ${detection}
 Default Python v: ${pv} $([ ${pv} -eq 2 ] && [ "${PACKAGES_NETDATA_PYTHON3}" -eq 1 ] && echo "(will install python3 too)")
 EOF
 
-mapfile -t PACKAGES_TO_INSTALL < <(packages | sort -u)
+#mapfile -t PACKAGES_TO_INSTALL < <(packages | sort -u)
 
 
   if [ "${DONT_WAIT}" -eq 0 ] && [ "${NON_INTERACTIVE}" -eq 0 ]; then
     read -r -p "Press ENTER to run it > " || exit 1
   fi
 
+
+pwd
+ls -la
 dependencies/${distribution}.sh
 
 remote_log "OK"
