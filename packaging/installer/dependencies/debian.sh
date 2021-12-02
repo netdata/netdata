@@ -49,5 +49,5 @@ if [[ -z "$packages_to_install" ]]; then
   echo "All required packages are already installed. Skipping .."
 else
   echo "packages_to_install: $packages_to_install"
-  apt-get install -y $packages_to_install
+  DEBIAN_FRONTEND=noninteractive apt-get install -y $packages_to_install
 fi
