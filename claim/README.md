@@ -239,7 +239,7 @@ for details on connecting a parent Netdata pod.
 
 ### Connect through a proxy
 
-A Space's administrator can connect a node through a SOCKS5 or HTTP(S) proxy.
+A Space's administrator can connect a node through HTTP(S) proxy.
 
 You should first configure the proxy in the `[cloud]` section of `netdata.conf`. The proxy settings you specify here
 will also be used to tunnel the ACLK. The default `proxy` setting is `none`.
@@ -252,16 +252,15 @@ will also be used to tunnel the ACLK. The default `proxy` setting is `none`.
 The `proxy` setting can take one of the following values:
 
 -   `none`: Do not use a proxy, even if the system configured otherwise.
--   `env`: Try to read proxy settings from set environment variables `http_proxy`/`socks_proxy`.
--   `socks5[h]://[user:pass@]host:ip`: The ACLK and connection process will use the specified SOCKS5 proxy.
+-   `env`: Try to read proxy settings from set environment variables `http_proxy`.
 -   `http://[user:pass@]host:ip`: The ACLK and connection process will use the specified HTTP(S) proxy.
 
-For example, a SOCKS5 proxy setting may look like the following:
+For example, a HTTP proxy setting may look like the following:
 
 ```conf
 [cloud]
-    proxy = socks5h://203.0.113.0:1080       # With an IP address
-    proxy = socks5h://proxy.example.com:1080 # With a URL
+    proxy = http://203.0.113.0:1080       # With an IP address
+    proxy = http://proxy.example.com:1080 # With a URL
 ```
 
 You can now move on to connecting. When you connect with the [kickstart](/packaging/installer/#automatic-one-line-installation-script) script, add the `--claim-proxy=` parameter and
@@ -287,6 +286,18 @@ might be having with the ACLK or connection process.
 	"cloud-available"
 	"agent-claimed"
 	"aclk-available"
+```
+
+On Netdata agent version `1.32` (`netdata -v` to find your version) and newer, the `netdata -W aclk-state` command can be used to get some diagnostic information about ACLK. Sample output:
+
+```
+ACLK Available: Yes
+ACLK Implementation: Next Generation
+New Cloud Protocol Support: Yes
+Claimed: Yes
+Claimed Id: 53aa76c2-8af5-448f-849a-b16872cc4ba1
+Online: Yes
+Used Cloud Protocol: New
 ```
 
 Use these keys and the information below to troubleshoot the ACLK.
@@ -347,7 +358,7 @@ Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud
 To fix this issue, reinstall Netdata using your [preferred method](/packaging/installer/README.md) and do not add the
 `--disable-cloud` option.
 
-#### cloud-available is false
+#### cloud-available is false / ACLK Available: No
 
 If `cloud-available` is `false` after you verified Cloud is enabled in the previous step, the most likely issue is that
 Cloud features failed to build during installation.
@@ -377,7 +388,7 @@ You may see one of the following error messages during installation:
 -   Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled.
 
 One common cause of the installer failing to build Cloud features is not having one of the following dependencies on
-your system: `cmake` and OpenSSL, including the `devel` package.
+your system: `cmake`, `json-c` and `OpenSSL`, including corresponding `devel` packages.
 
 You can also look for error messages in `/var/log/netdata/error.log`. Try one of the following two commands to search
 for ACLK-related errors.
@@ -391,11 +402,11 @@ If the installer's output does not help you enable Cloud features, contact us by
 GitHub](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage%2C+ACLK&template=bug_report.md&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
 with details about your system and relevant output from `error.log`.
 
-#### agent-claimed is false
+#### agent-claimed is false / Claimed: No
 
 You must [connect your node](#how-to-connect-a-node).
 
-#### aclk-available is false
+#### aclk-available is false / Online: No
 
 If `aclk-available` is `false` and all other keys are `true`, your Agent is having trouble connecting to the Cloud
 through the ACLK. Please check your system's firewall.
