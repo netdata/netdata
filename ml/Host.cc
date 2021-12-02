@@ -433,7 +433,7 @@ void DetectableHost::detectOnce() {
         nlohmann::json JsonResult = DimsAnomalyRate;
 
         time_t Before = now_realtime_sec();
-        time_t After = Before - ((Cfg.SaveAnomalyPercentageEvery-1) * updateEvery());
+        time_t After = Before - ((Cfg.SaveAnomalyPercentageEvery+1) * updateEvery());
         
         DB.insertBulkAnomalyRateInfo(getUUID(), After, Before, JsonResult.dump(4));
         /*and reset the window size to restart down-counting*/
