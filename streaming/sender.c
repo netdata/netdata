@@ -132,11 +132,6 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_sender_thread_send_custom_host_variables(host);
 }
 
-static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
-    host->labels.labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-    host->labels.labels_flag &= ~LABEL_FLAG_STOP_STREAM;
-}
-
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
 {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):"";
@@ -162,6 +157,35 @@ void rrdpush_clean_encoded(stream_encoded_t *se)
 
     if (se->kernel_version)
         freez(se->kernel_version);
+}
+
+static inline long int parse_stream_version(RRDHOST *host, char *http)
+{
+    long int stream_version = -1;
+    int answer = -1;
+    char *stream_version_start = strchr(http, '=');
+    if (stream_version_start) {
+        stream_version_start++;
+        stream_version = strtol(stream_version_start, NULL, 10);
+        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(stream_version_start - http));
+        if (!answer) {
+            rrdpush_set_flags_to_newest_stream(host);
+        }
+    } else {
+        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        if (!answer) {
+            stream_version = 1;
+            rrdpush_set_flags_to_newest_stream(host);
+        } else {
+            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            if (!answer) {
+                stream_version = 0;
+                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+            }
+        }
+    }
+    return stream_version;
 }
 
 static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout,
@@ -231,7 +255,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&abbrev_timezone=%s&utc_offset=%d&hops=%d&tags=%s&ver=%u&compression=%u"
                  "&NETDATA_SYSTEM_OS_NAME=%s"
                  "&NETDATA_SYSTEM_OS_ID=%s"
                  "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -272,6 +296,7 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
                  , host->system_info->hops + 1
                  , (host->tags) ? host->tags : ""
                  , STREAMING_PROTOCOL_CURRENT_VERSION
+                 , default_compression_enabled
                  , se.os_name
                  , se.os_id
                  , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
@@ -356,45 +381,31 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
 
     http[received] = '\0';
     debug(D_STREAM, "Response to sender from far end: %s", http);
-    int answer = -1;
-    char *version_start = strchr(http, '=');
-    int32_t version = -1;
-    if(version_start) {
-        uint32_t capabilities = 0;
-        char *caps_start = NULL;
-        version_start++;
-        version = (int32_t)strtol(version_start, &caps_start, 10);
-        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
-        if(!answer) {
-            rrdpush_set_flags_to_newest_stream(host);
-        }
-        if (caps_start && *caps_start == '.') {
-            capabilities = (uint32_t)strtol(caps_start + 1, NULL, 10);
-        }
-#ifdef ENABLE_COMPRESSION
-        if (!(capabilities & STREAM_CAPABILITY_COMPRESSION)) {
-            // if parent doesn't support compression and this child does
-            // then disable compression for this child
-            default_compression_enabled = 0;
-            if (s->compressor) 
-                s->compressor->destroy(&s->compressor);
-        }
-#endif
-    } else {
-        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-        if(!answer) {
-            version = 1;
-            rrdpush_set_flags_to_newest_stream(host);
-        }
-        else {
-            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
-            if(!answer) {
-                version = 0;
-                host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
-                host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-            }
-        }
-    }
+    info("Response to sender from far end: %s", http);
+    // negotiations
+    int32_t version = (int32_t)parse_stream_version(host, http);
+    // if(version_start) {
+    //     version_start++;
+    //     version = (int32_t)strtol(version_start, NULL, 10);
+    //     answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
+    //     if(!answer) {
+    //         rrdpush_set_flags_to_newest_stream(host);
+    //     }
+    // } else {
+    //     answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+    //     if(!answer) {
+    //         version = 1;
+    //         rrdpush_set_flags_to_newest_stream(host);
+    //     }
+    //     else {
+    //         answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+    //         if(!answer) {
+    //             version = 0;
+    //             host->labels.labels_flag |= LABEL_FLAG_STOP_STREAM;
+    //             host->labels.labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+    //         }
+    //     }
+    // }
 
     if(version == -1) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, s->connected_to);
@@ -403,14 +414,27 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     s->version = version;
 #ifdef ENABLE_COMPRESSION
-    if (s->compressor)
-        s->compressor->reset(s->compressor);
-#endif
+    if(s->version >= STREAM_VERSION_COMPRESSION)
+    {
+        // parent supports compression
+        if(s->compressor)
+            s->compressor->reset(s->compressor);
+    }
+    else {
+        //parent does not support compression or has compression disabled
+        if (default_compression_enabled) {
+            info("Parent %s does not support compression.", s->connected_to);
+            if (s->compressor)
+                s->compressor->destroy(&s->compressor);
+        }
+    }        
+#endif  //ENABLE_COMPRESSION
 
-    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d - ready to send metrics..."
+
+    info("STREAM %s [send to %s]: established communication with a parent using protocol version %d. Negotiated compression is %s - ready to send metrics..."
          , host->hostname
          , s->connected_to
-         , version);
+         , s->version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, s->connected_to);
