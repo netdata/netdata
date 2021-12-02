@@ -395,7 +395,8 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     s->version = version;
 
 #ifdef ENABLE_COMPRESSION
-    if(s->version >= STREAM_VERSION_COMPRESSION)
+    s->rrdpush_compression = (default_compression_enabled && (s->version >= STREAM_VERSION_COMPRESSION));
+    if(s->rrdpush_compression)
     {
         // parent supports compression
         if(s->compressor)
@@ -403,11 +404,9 @@ static int rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_po
     }
     else {
         //parent does not support compression or has compression disabled
-        if (default_compression_enabled) {
-            info("Parent %s does not support compression.", s->connected_to);
-            if (s->compressor)
-                s->compressor->destroy(&s->compressor);
-        }
+        info("Parent %s does not support compression.", s->connected_to);
+        if (s->compressor)
+            s->compressor->destroy(&s->compressor);
     }        
 #endif  //ENABLE_COMPRESSION
 
