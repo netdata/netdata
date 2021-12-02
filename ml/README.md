@@ -54,7 +54,7 @@ And if we add the `&options=anomaly-bit` params, we can see the "anomaly bit" va
 
 Typically, the anomaly bit will mostly be 0 under normal circumstances with some random fluctuations every now and then to 100. Although this very much depends on the nature of the dimension in question.
 
-### Anomaly Rate - avg(anomaly bit)
+### Anomaly Rate - average(anomaly bit)
 
 Once all models have been trained, we can think of the Netdata dashboard as essentially a big matrix or table of 0's and 100's. If we consider this "anomaly bit" based representation of the state of the node we can now think about how we might detect overall node level anomalies. Below is a picture to help illustrate the main ideas here.
 
@@ -102,6 +102,8 @@ If an event exists within the window the result would be a list of start and end
 ]
 ```
 
+**Note**: Clicking the link above will likely return an empty list of `[]`. This is the response when no anomaly events exist in the specified range. The example response above is illustrative of what the response would be when one or more anomaly events exist within the range of `after` to `before`.
+
 Where information about each anomaly event can then be found at the `/api/v1/anomaly_event_info` endpoint (making sure to pass the `after` and `before` params): 
 
 https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1638367851
@@ -123,13 +125,17 @@ https://london.my-netdata.io/api/v1/anomaly_event_info?after=1638367788&before=1
     ...
 ```
 
+**Note**: If you click the above url you will get a `null` since no such anomaly event exists as the response is just an illustrative example taken from a node that did have such an anomaly event.
+
 This returns a list of dimension anomaly rates for all dimensions that were considered part of the detected anomaly event.
 
 **Note**: We plan to build additional anomaly detection and exploration features into both Netdata Agent and Netdata Cloud and so these endpoints are primarily to power these features and so still under active development.
 
 ## Configuration
 
-To enable anomaly detection all you need to do is set `enabled = yes` in the `[ml]` section of `netdata.conf` and restart netdata (typically `sudo systemctl restart netdata`).
+To enable anomaly detection all you need to do is set `enabled = yes` in the `[ml]` section of `netdata.conf` and restart netdata (typically `sudo systemctl restart netdata`). 
+
+**Note**: If you would like to learn more about configuring Netdata please see [this guide](https://learn.netdata.cloud/guides/step-by-step/step-04).
 
 Below is a list of all the available configuration params and their default values.
 
